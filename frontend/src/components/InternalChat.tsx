@@ -1,0 +1,384 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Send, Loader2, MessageCircle, LogIn, ImageIcon, FileText, X, Paperclip } from "lucide-react";
+import { Link } from "react-router-dom";
+import { toast } from "sonner";
+
+interface ChatMessage {
+  id: string;
+  sender_id: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+interface InternalChatProps {
+  storeId: string;
+  storeName: string;
+  productId?: string;
+  productName?: string;
+}
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
+
+export function InternalChat({ storeId, storeName, productId, productName }: InternalChatProps) {
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [mediaEnabled, setMediaEnabled] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const scrollToBottom = useCallback(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, []);
+
+  // Check if store has media enabled
+  useEffect(() => {
+    async function checkMedia() {
+      const { data } = await supabase
+        .from("stores")
+        .select("chat_media_enabled")
+        .eq("id", storeId)
+        .maybeSingle();
+      if (data) setMediaEnabled(data.chat_media_enabled ?? false);
+    }
+    checkMedia();
+  }, [storeId]);
+
+  // Load or create conversation
+  useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    async function initConversation() {
+      setLoading(true);
+      let query = supabase
+        .from("conversations")
+        .select("id")
+        .eq("user_id", user!.id)
+        .eq("store_id", storeId);
+
+      if (productId) {
+        query = query.eq("product_id", productId);
+      } else {
+        query = query.is("product_id", null);
+      }
+
+      const { data: existing } = await query.maybeSingle();
+      if (existing) {
+        setConversationId(existing.id);
+      }
+      setLoading(false);
+    }
+
+    initConversation();
+  }, [user, storeId, productId]);
+
+  // Load messages when conversation exists
+  useEffect(() => {
+    if (!conversationId) return;
+
+    async function loadMessages() {
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", conversationId!)
+        .order("created_at", { ascending: true });
+
+      if (data) {
+        setMessages(data as ChatMessage[]);
+        setTimeout(scrollToBottom, 100);
+      }
+    }
+
+    loadMessages();
+
+    const channel = supabase
+      .channel(`messages-${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const msg = payload.new as ChatMessage;
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === msg.id)) return prev;
+            return [...prev, msg];
+          });
+          setTimeout(scrollToBottom, 100);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, scrollToBottom]);
+
+  const ensureConversation = async (): Promise<string | null> => {
+    if (conversationId) return conversationId;
+    if (!user) return null;
+
+    const insertData: any = { user_id: user.id, store_id: storeId };
+    if (productId) insertData.product_id = productId;
+
+    const { data: conv, error } = await supabase
+      .from("conversations")
+      .insert(insertData)
+      .select("id")
+      .single();
+
+    if (error || !conv) {
+      console.error("Error creating conversation:", error);
+      return null;
+    }
+    setConversationId(conv.id);
+    return conv.id;
+  };
+
+  const handleSend = async () => {
+    if (!newMessage.trim() || !user || sending) return;
+    setSending(true);
+
+    try {
+      const convId = await ensureConversation();
+      if (!convId) { setSending(false); return; }
+
+      const { error } = await supabase.from("messages").insert({
+        conversation_id: convId,
+        sender_id: user.id,
+        content: newMessage.trim(),
+      });
+
+      if (error) {
+        console.error("Error sending message:", error);
+      } else {
+        setNewMessage("");
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    // Validate type
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast.error("Format non autorisé. Seuls les images (JPG, PNG, WebP, GIF) et les PDF sont acceptés.");
+      return;
+    }
+
+    // Validate size
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("Le fichier ne doit pas dépasser 5 Mo.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const convId = await ensureConversation();
+      if (!convId) { setUploading(false); return; }
+
+      const ext = file.name.split(".").pop();
+      const filePath = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("chat-media")
+        .upload(filePath, file);
+
+      if (uploadError) {
+        toast.error("Erreur lors de l'upload");
+        console.error(uploadError);
+        setUploading(false);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(filePath);
+
+      // Send as message with special format
+      const isPdf = file.type === "application/pdf";
+      const content = isPdf
+        ? `[📄 PDF] ${file.name}\n${urlData.publicUrl}`
+        : `[📷 Image]\n${urlData.publicUrl}`;
+
+      await supabase.from("messages").insert({
+        conversation_id: convId,
+        sender_id: user.id,
+        content,
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  // Render message content (detect images and PDFs)
+  const renderContent = (content: string) => {
+    // Image message
+    if (content.startsWith("[📷 Image]")) {
+      const url = content.split("\n")[1]?.trim();
+      if (url) {
+        return (
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            <img src={url} alt="Image partagée" className="max-w-[200px] max-h-[200px] rounded-md object-cover" />
+          </a>
+        );
+      }
+    }
+    // PDF message
+    if (content.startsWith("[📄 PDF]")) {
+      const lines = content.split("\n");
+      const fileName = lines[0]?.replace("[📄 PDF] ", "").trim();
+      const url = lines[1]?.trim();
+      if (url) {
+        return (
+          <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm underline">
+            <FileText size={16} className="shrink-0" />
+            <span className="truncate">{fileName || "Document PDF"}</span>
+          </a>
+        );
+      }
+    }
+    // Regular text
+    return <p className="whitespace-pre-wrap break-words">{content}</p>;
+  };
+
+  // Not logged in state
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center px-4 py-8 space-y-4">
+        <LogIn size={40} className="text-muted-foreground/30" />
+        <p className="text-sm text-muted-foreground">
+          Connectez-vous pour envoyer un message à <strong>{storeName}</strong>.
+        </p>
+        <Link to="/auth">
+          <Button size="sm" className="gap-1.5">
+            <LogIn size={14} /> Se connecter
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="animate-spin text-primary" size={24} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Product context banner */}
+      {productName && (
+        <div className="px-3 py-2 bg-muted/50 border-b border-border text-xs text-muted-foreground">
+          À propos de : <span className="font-medium text-foreground">{productName}</span>
+        </div>
+      )}
+
+      {/* Messages area */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 space-y-3 min-h-[300px] max-h-[60vh]">
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground py-8">
+            <MessageCircle size={40} className="mb-3 opacity-20" />
+            <p className="text-sm">Démarrez la conversation avec <strong>{storeName}</strong>.</p>
+            <p className="text-xs mt-1">Votre message sera envoyé directement au fournisseur.</p>
+          </div>
+        ) : (
+          messages.map((msg) => {
+            const isOwn = msg.sender_id === user.id;
+            return (
+              <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[80%] px-3 py-2 rounded-lg text-sm ${
+                    isOwn
+                      ? "bg-primary text-primary-foreground rounded-br-none"
+                      : "bg-[hsl(var(--chat-received))] text-[hsl(var(--chat-received-foreground))] rounded-bl-none"
+                  }`}
+                >
+                  {renderContent(msg.content)}
+                  <span
+                    className={`block text-[10px] mt-1 ${
+                      isOwn ? "text-primary-foreground/60" : "text-muted-foreground"
+                    }`}
+                  >
+                    {new Date(msg.created_at).toLocaleTimeString("fr-FR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Input area */}
+      <div className="border-t border-border px-3 py-2 flex items-center gap-2">
+        {/* File upload button (only if media enabled) */}
+        {mediaEnabled && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="shrink-0 w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              title="Envoyer une image ou un PDF (max 5 Mo)"
+            >
+              {uploading ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
+            </button>
+          </>
+        )}
+        <textarea
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Écrivez votre message..."
+          rows={1}
+          className="flex-1 resize-none bg-muted/50 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground"
+        />
+        <Button
+          size="icon"
+          onClick={handleSend}
+          disabled={!newMessage.trim() || sending}
+          className="shrink-0 h-9 w-9"
+        >
+          {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+        </Button>
+      </div>
+    </div>
+  );
+}

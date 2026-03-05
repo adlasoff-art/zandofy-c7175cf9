@@ -1,0 +1,25 @@
+project_id = "uogkklwfvwoxkifpkzpu"
+
+[functions.send-email]
+verify_jwt = false
+
+[functions.notify-order-status]
+verify_jwt = false
+
+[functions.admin-users]
+verify_jwt = false
+
+[functions.notify-expiring-points]
+verify_jwt = false
+
+[functions.generate-invoice]
+verify_jwt = false
+
+[functions.kelpay-payment]
+verify_jwt = false
+
+[functions.kelpay-callback]
+verify_jwt = false
+
+[functions.kelpay-check]
+verify_jwt = false

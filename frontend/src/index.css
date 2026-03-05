@@ -1,0 +1,267 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 120 15% 96%;
+    --foreground: 120 55% 18%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 120 55% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 120 55% 18%;
+
+    --primary: 120 100% 25%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 120 100% 93%;
+    --secondary-foreground: 120 55% 18%;
+
+    --muted: 120 20% 95%;
+    --muted-foreground: 120 10% 45%;
+
+    --accent: 120 76% 55%;
+    --accent-foreground: 120 55% 10%;
+    --chat-received: 120 20% 92%;
+    --chat-received-foreground: 120 55% 18%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 120 20% 88%;
+    --input: 120 20% 88%;
+    --ring: 120 100% 25%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 120 100% 97%;
+    --sidebar-foreground: 120 55% 18%;
+    --sidebar-primary: 120 100% 25%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 120 40% 92%;
+    --sidebar-accent-foreground: 120 55% 18%;
+    --sidebar-border: 120 20% 88%;
+    --sidebar-ring: 120 100% 25%;
+
+    /* Custom tokens */
+    --brand-gradient: linear-gradient(135deg, hsl(120 100% 25%), hsl(120 76% 55%));
+    --brand-gradient-soft: linear-gradient(135deg, hsl(120 100% 93%), hsl(120 60% 96%));
+    --shadow-brand: 0 4px 20px -4px hsl(120 100% 25% / 0.15);
+    --shadow-card: 0 1px 4px 0 hsl(120 20% 20% / 0.08), 0 1px 3px -1px hsl(120 20% 20% / 0.06);
+    --shadow-card-hover: 0 8px 24px -4px hsl(120 20% 20% / 0.14), 0 6px 10px -4px hsl(120 20% 20% / 0.08);
+
+    --sale: 0 84% 55%;
+    --sale-foreground: 0 0% 100%;
+    --badge-new: 45 100% 50%;
+    --badge-new-foreground: 45 80% 15%;
+    --badge-bestseller: 40 90% 92%;
+    --badge-bestseller-border: 40 80% 78%;
+    --badge-bestseller-foreground: 30 70% 30%;
+    --badge-bestseller-icon: 30 80% 45%;
+
+    --zandofy-certified: 217 91% 60%;
+    --zandofy-certified-foreground: 0 0% 100%;
+  }
+
+  .dark {
+    --background: 120 20% 6%;
+    --foreground: 120 10% 90%;
+    --card: 120 20% 9%;
+    --card-foreground: 120 10% 90%;
+    --popover: 120 20% 9%;
+    --popover-foreground: 120 10% 90%;
+    --primary: 120 76% 55%;
+    --primary-foreground: 120 55% 10%;
+    --secondary: 120 20% 15%;
+    --secondary-foreground: 120 10% 90%;
+    --muted: 120 15% 15%;
+    --muted-foreground: 120 10% 60%;
+    --accent: 120 76% 55%;
+    --accent-foreground: 120 55% 10%;
+    --chat-received: 120 15% 22%;
+    --chat-received-foreground: 120 10% 90%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 120 15% 18%;
+    --input: 120 15% 18%;
+    --ring: 120 76% 55%;
+
+    --sidebar-background: 120 20% 8%;
+    --sidebar-foreground: 120 10% 90%;
+    --sidebar-primary: 120 76% 55%;
+    --sidebar-primary-foreground: 120 55% 10%;
+    --sidebar-accent: 120 15% 15%;
+    --sidebar-accent-foreground: 120 10% 90%;
+    --sidebar-border: 120 15% 18%;
+    --sidebar-ring: 120 76% 55%;
+
+    --brand-gradient: linear-gradient(135deg, hsl(120 76% 55%), hsl(120 100% 25%));
+    --brand-gradient-soft: linear-gradient(135deg, hsl(120 20% 12%), hsl(120 15% 15%));
+    --shadow-brand: 0 4px 20px -4px hsl(120 76% 55% / 0.2);
+    --shadow-card: 0 1px 4px 0 hsl(0 0% 0% / 0.3), 0 1px 3px -1px hsl(0 0% 0% / 0.2);
+    --shadow-card-hover: 0 8px 24px -4px hsl(0 0% 0% / 0.4), 0 6px 10px -4px hsl(0 0% 0% / 0.25);
+
+    --sale: 0 84% 55%;
+    --sale-foreground: 0 0% 100%;
+    --badge-new: 45 100% 50%;
+    --badge-new-foreground: 45 80% 15%;
+    --badge-bestseller: 40 30% 18%;
+    --badge-bestseller-border: 40 40% 30%;
+    --badge-bestseller-foreground: 40 60% 70%;
+    --badge-bestseller-icon: 30 60% 55%;
+
+    --zandofy-certified: 217 91% 60%;
+    --zandofy-certified-foreground: 0 0% 100%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  h1, h2, h3, h4 {
+    @apply font-sans;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--brand-gradient);
+  }
+  .bg-brand-gradient {
+    background-image: var(--brand-gradient);
+  }
+  .bg-brand-soft {
+    background-image: var(--brand-gradient-soft);
+  }
+  .shadow-brand {
+    box-shadow: var(--shadow-brand);
+  }
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  .shadow-card-hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+}
+
+/* Skeleton animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, hsl(120 20% 92%) 25%, hsl(120 20% 96%) 50%, hsl(120 20% 92%) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(120 20% 95%);
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(120 20% 75%);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(120 100% 25%);
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Thin scrollbar for horizontal scroll areas — desktop only, hidden on mobile */
+.scrollbar-thin::-webkit-scrollbar { display: none; }
+.scrollbar-thin { -ms-overflow-style: none; scrollbar-width: none; }
+
+@media (min-width: 1024px) {
+  .scrollbar-thin::-webkit-scrollbar { display: block; height: 30px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(120 100% 20%);
+    border-radius: 9999px;
+    border: 10px solid transparent;
+    background-clip: padding-box;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: hsl(120 100% 15%); background-clip: padding-box; }
+  .scrollbar-thin::-webkit-scrollbar-button:start { display: none; width: 0; height: 0; }
+  .scrollbar-thin::-webkit-scrollbar-button:end { display: none; width: 0; height: 0; }
+  .scrollbar-thin::-webkit-scrollbar-button { display: none !important; width: 0 !important; height: 0 !important; }
+  .scrollbar-thin { scrollbar-width: auto; scrollbar-color: hsl(120 100% 20%) transparent; -ms-overflow-style: auto; }
+}
+
+/* Touch-optimized active states */
+@layer utilities {
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+  .active-press {
+    @apply transition-transform duration-100 active:scale-[0.97] active:opacity-80;
+  }
+}
+
+/* Kill ghost-hover on touch devices */
+@media (hover: none) {
+  .action-button,
+  .action-button:hover {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    background-color: inherit !important;
+    color: inherit !important;
+    border-color: inherit !important;
+  }
+}
+
+/* Global image error fallback */
+img[data-fallback]::after {
+  content: '';
+  display: block;
+  position: absolute;
+  inset: 0;
+  background: hsl(120 20% 95%);
+}
+
+/* Safe area for bottom nav on mobile */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Add bottom padding to main content on mobile to avoid bottom nav overlap */
+@media (max-width: 1023px) {
+  body {
+    padding-bottom: 3.5rem;
+  }
+}
+
+/* Touch scrolling */
+html {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent horizontal overflow — clip instead of hidden to preserve sticky */
+body {
+  overflow-x: clip;
+}
+
+@media (max-width: 1023px) {
+  body {
+    max-width: 100vw;
+    overflow-x: clip;
+  }
+}
+
+/* Container overflow guard — inside base layer so utilities like max-w-2xl can override */

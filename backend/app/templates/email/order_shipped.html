@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Expédition</title></head>
+<body style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+  <h2>Votre commande a été expédiée</h2>
+  <p>La commande <strong>#{{ order_number }}</strong> est en route.</p>
+  {% if tracking_url %}
+  <p><a href="{{ tracking_url }}">Suivre le colis</a></p>
+  {% endif %}
+  <p>— Zandofy</p>
+</body>
+</html>

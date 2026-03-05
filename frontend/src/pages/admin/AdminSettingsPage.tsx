@@ -1,0 +1,376 @@
+import { AdminLayout } from "@/components/admin/AdminLayout";
+import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Switch } from "@/components/ui/switch";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
+interface FreeShippingConfig {
+  enabled: boolean;
+  amount: number;
+  currency: string;
+}
+
+interface ReferralConfig {
+  enabled: boolean;
+  commission_pct: number;
+  max_rewarded_orders: number;
+  welcome_discount_pct: number;
+  gift_card_enabled: boolean;
+  points_expiry_months: number;
+}
+
+interface MaintenanceConfig {
+  enabled: boolean;
+  title: string;
+  message: string;
+  end_time: string;
+  duration_minutes: number;
+}
+
+export default function AdminSettingsPage() {
+  const [trackingProvider, setTrackingProvider] = useState("17track");
+  const [freeShipping, setFreeShipping] = useState<FreeShippingConfig>({ enabled: true, amount: 49, currency: "USD" });
+  const [referral, setReferral] = useState<ReferralConfig>({ enabled: true, commission_pct: 5, max_rewarded_orders: 5, welcome_discount_pct: 10, gift_card_enabled: false, points_expiry_months: 12 });
+  const [maintenance, setMaintenance] = useState<MaintenanceConfig>({
+    enabled: false,
+    title: "Maintenance en cours",
+    message: "Nous effectuons une mise à jour planifiée. La plateforme sera de retour très bientôt.",
+    end_time: "",
+    duration_minutes: 60,
+  });
+  const [newnessDays, setNewnessDays] = useState(14);
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    supabase
+      .from("platform_settings")
+      .select("key, value")
+      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days"])
+      .then(({ data }) => {
+        data?.forEach((row) => {
+          const v = row.value as any;
+          if (row.key === "free_shipping_threshold") {
+            setFreeShipping({ enabled: !!v.enabled, amount: Number(v.amount) || 49, currency: v.currency || "USD" });
+          } else if (row.key === "referral_settings") {
+            setReferral({
+              enabled: v.enabled !== false,
+              commission_pct: Number(v.commission_pct) || 5,
+              max_rewarded_orders: Number(v.max_rewarded_orders) || 5,
+              welcome_discount_pct: Number(v.welcome_discount_pct) || 10,
+              gift_card_enabled: !!v.gift_card_enabled,
+              points_expiry_months: Number(v.points_expiry_months) || 12,
+            });
+          } else if (row.key === "maintenance_mode") {
+            setMaintenance({
+              enabled: !!v.enabled,
+              title: v.title || "Maintenance en cours",
+              message: v.message || "",
+              end_time: v.end_time || "",
+              duration_minutes: Number(v.duration_minutes) || 60,
+            });
+          } else if (row.key === "newness_duration_days") {
+            setNewnessDays(Number(v) || 14);
+          }
+        });
+      });
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const now = new Date().toISOString();
+
+    const { error: e1 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "free_shipping_threshold", value: freeShipping as any, updated_at: now }, { onConflict: "key" });
+
+    const { error: e2 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "referral_settings", value: referral as any, updated_at: now }, { onConflict: "key" });
+
+    // Compute end_time from duration if enabling
+    const maintenanceToSave = { ...maintenance };
+    if (maintenance.enabled && !maintenance.end_time) {
+      maintenanceToSave.end_time = new Date(Date.now() + maintenance.duration_minutes * 60 * 1000).toISOString();
+    }
+
+    const { error: e3 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "maintenance_mode", value: maintenanceToSave as any, updated_at: now }, { onConflict: "key" });
+
+    const { error: e4 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "newness_duration_days", value: newnessDays as any, updated_at: now }, { onConflict: "key" });
+
+    const error = e1 || e2 || e3 || e4;
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Paramètres enregistrés", description: "Les paramètres ont été mis à jour avec succès." });
+    }
+    setSaving(false);
+  };
+
+  const inputClass = "w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20";
+
+  return (
+    <AdminLayout title="Paramètres">
+      <div className="space-y-6 max-w-2xl">
+        {/* Newness Duration */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Bell size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Durée "Nouveautés"</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Nombre de jours pendant lesquels un produit nouvellement ajouté apparaît dans la section "Nouveautés".
+          </p>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min={1}
+              max={90}
+              value={newnessDays}
+              onChange={(e) => setNewnessDays(Number(e.target.value) || 14)}
+              className={inputClass + " max-w-[100px]"}
+            />
+            <span className="text-sm text-muted-foreground">jours</span>
+          </div>
+        </section>
+
+        {/* Maintenance Mode */}
+        <section className="bg-card border-2 border-destructive/30 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle size={18} className="text-destructive" />
+            <h2 className="text-sm font-semibold text-foreground">Mode maintenance</h2>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-destructive/5 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-foreground">Activer la maintenance</p>
+                <p className="text-xs text-muted-foreground">Bloque l'accès à la plateforme pour tous sauf les administrateurs</p>
+              </div>
+              <Switch
+                checked={maintenance.enabled}
+                onCheckedChange={(checked) => setMaintenance(prev => ({
+                  ...prev,
+                  enabled: checked,
+                  end_time: checked ? new Date(Date.now() + prev.duration_minutes * 60 * 1000).toISOString() : prev.end_time,
+                }))}
+              />
+            </div>
+            {maintenance.enabled && (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Titre affiché</label>
+                  <input
+                    type="text"
+                    value={maintenance.title}
+                    onChange={(e) => setMaintenance(prev => ({ ...prev, title: e.target.value }))}
+                    className={inputClass}
+                    placeholder="Maintenance en cours"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Message affiché</label>
+                  <textarea
+                    value={maintenance.message}
+                    onChange={(e) => setMaintenance(prev => ({ ...prev, message: e.target.value }))}
+                    className={inputClass + " min-h-[80px] resize-y"}
+                    placeholder="Nous effectuons une mise à jour planifiée..."
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Durée (minutes)</label>
+                    <input
+                      type="number"
+                      min={5}
+                      max={1440}
+                      step={5}
+                      value={maintenance.duration_minutes}
+                      onChange={(e) => {
+                        const mins = Number(e.target.value);
+                        setMaintenance(prev => ({
+                          ...prev,
+                          duration_minutes: mins,
+                          end_time: new Date(Date.now() + mins * 60 * 1000).toISOString(),
+                        }));
+                      }}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Fin estimée</label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={maintenance.end_time ? new Date(maintenance.end_time).toLocaleString("fr-FR") : "—"}
+                      className={inputClass + " bg-muted/50 cursor-not-allowed"}
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  💡 Astuce admin : Double-cliquez en bas à droite de la page de maintenance et entrez <code className="bg-muted px-1 rounded">zandofy-admin-bypass</code> pour accéder au site.
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Free Shipping Threshold */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Truck size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Seuil de livraison gratuite</h2>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-foreground">Activer la livraison gratuite</p>
+                <p className="text-xs text-muted-foreground">Les commandes au-dessus du seuil bénéficient de la livraison gratuite</p>
+              </div>
+              <Switch checked={freeShipping.enabled} onCheckedChange={(checked) => setFreeShipping(prev => ({ ...prev, enabled: checked }))} />
+            </div>
+            {freeShipping.enabled && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Montant minimum ($)</label>
+                  <input type="number" min={0} step={1} value={freeShipping.amount} onChange={(e) => setFreeShipping(prev => ({ ...prev, amount: Number(e.target.value) }))} className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Devise</label>
+                  <select value={freeShipping.currency} onChange={(e) => setFreeShipping(prev => ({ ...prev, currency: e.target.value }))} className={inputClass}>
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="XAF">XAF (FCFA)</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Referral Settings */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Users size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Programme de parrainage</h2>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-foreground">Activer le parrainage</p>
+                <p className="text-xs text-muted-foreground">Les utilisateurs peuvent parrainer et gagner des ZandoPoints</p>
+              </div>
+              <Switch checked={referral.enabled} onCheckedChange={(checked) => setReferral(prev => ({ ...prev, enabled: checked }))} />
+            </div>
+            {referral.enabled && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Commission (%)</label>
+                    <input type="number" min={0} max={50} step={1} value={referral.commission_pct} onChange={(e) => setReferral(prev => ({ ...prev, commission_pct: Number(e.target.value) }))} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Commandes max récompensées</label>
+                    <input type="number" min={1} max={100} step={1} value={referral.max_rewarded_orders} onChange={(e) => setReferral(prev => ({ ...prev, max_rewarded_orders: Number(e.target.value) }))} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Remise bienvenue filleul (%)</label>
+                    <input type="number" min={0} max={50} step={1} value={referral.welcome_discount_pct} onChange={(e) => setReferral(prev => ({ ...prev, welcome_discount_pct: Number(e.target.value) }))} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Expiration des points (mois)</label>
+                    <input type="number" min={1} max={60} step={1} value={referral.points_expiry_months} onChange={(e) => setReferral(prev => ({ ...prev, points_expiry_months: Number(e.target.value) }))} className={inputClass} />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg mt-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Conversion en carte cadeau</p>
+                    <p className="text-xs text-muted-foreground">Permettre aux clients de convertir leurs points en carte cadeau</p>
+                  </div>
+                  <Switch checked={referral.gift_card_enabled} onCheckedChange={(checked) => setReferral(prev => ({ ...prev, gift_card_enabled: checked }))} />
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* API Keys */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Key size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Clés API</h2>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Fournisseur de tracking</label>
+              <div className="flex gap-2">
+                {["17track", "AfterShip"].map((p) => (
+                  <button key={p} onClick={() => setTrackingProvider(p)} className={`px-4 py-2 text-sm rounded-lg border transition-colors ${trackingProvider === p ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:border-primary/50"}`}>{p}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Clé API {trackingProvider}</label>
+              <input type="password" placeholder="••••••••••••••••" className={inputClass} />
+            </div>
+          </div>
+        </section>
+
+        {/* Shipping rates */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Tarifs d'expédition</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              { label: "Livraison locale (Kinshasa)", value: "$3.00" },
+              { label: "Livraison nationale (RDC)", value: "$8.00" },
+              { label: "Livraison Afrique de l'Ouest", value: "$15.00" },
+              { label: "Livraison internationale", value: "$25.00" },
+            ].map((r) => (
+              <div key={r.label}>
+                <label className="text-xs text-muted-foreground block mb-1">{r.label}</label>
+                <input defaultValue={r.value} className={inputClass} />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Notifications */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Bell size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Notifications globales</h2>
+          </div>
+          <div className="space-y-3">
+            {[
+              { label: "Notifications Push", desc: "Envoyer des notifications push aux utilisateurs", enabled: true },
+              { label: "Alertes Email", desc: "Emails de confirmation et suivi de commande", enabled: true },
+              { label: "Alertes SMS", desc: "SMS pour les livreurs et transporteurs", enabled: false },
+            ].map((n) => (
+              <div key={n.label} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{n.label}</p>
+                  <p className="text-xs text-muted-foreground">{n.desc}</p>
+                </div>
+                <button className={`w-10 h-6 rounded-full transition-colors ${n.enabled ? "bg-primary" : "bg-border"}`}>
+                  <span className={`block w-4 h-4 rounded-full bg-white shadow transition-transform ${n.enabled ? "translate-x-5" : "translate-x-1"}`} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50">
+          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          Enregistrer les paramètres
+        </button>
+      </div>
+    </AdminLayout>
+  );
+}

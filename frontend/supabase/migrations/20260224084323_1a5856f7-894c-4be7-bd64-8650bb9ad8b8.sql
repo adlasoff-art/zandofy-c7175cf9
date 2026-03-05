@@ -1,0 +1,1 @@
+ALTER TABLE public.stores ADD COLUMN whatsapp_number text;

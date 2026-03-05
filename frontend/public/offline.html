@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hors ligne — Zandofy</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0f1a12 0%, #1a3a22 50%, #0f1a12 100%);
+      color: #e8f0eb;
+      padding: 1.5rem;
+    }
+    .card {
+      text-align: center;
+      max-width: 420px;
+      width: 100%;
+    }
+    .icon {
+      width: 80px; height: 80px; margin: 0 auto 1.5rem;
+      background: rgba(255,255,255,0.08);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .icon svg { width: 40px; height: 40px; stroke: #6ee7a0; fill: none; stroke-width: 1.5; }
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.75rem; }
+    p { color: #a3c4ae; line-height: 1.6; margin-bottom: 2rem; font-size: 0.95rem; }
+    .btn {
+      display: inline-block;
+      padding: 0.75rem 2rem;
+      background: #22c55e;
+      color: #0a1a0e;
+      font-weight: 600;
+      border: none;
+      border-radius: 9999px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn:hover { box-shadow: 0 4px 20px rgba(34,197,94,0.35); }
+    .logo { font-weight: 800; font-size: 1.1rem; letter-spacing: 0.5px; color: #6ee7a0; margin-bottom: 2rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">ZANDOFY</div>
+    <div class="icon">
+      <svg viewBox="0 0 24 24"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.56 9M1.42 9a16 16 0 014.38-2.6M8.53 16.11a6 6 0 016.95 0M12 20h.01"/></svg>
+    </div>
+    <h1>Pas de connexion internet</h1>
+    <p>Vérifiez votre connexion Wi-Fi ou données mobiles, puis réessayez. Vos données sont en sécurité.</p>
+    <button class="btn" onclick="location.reload()">Réessayer</button>
+  </div>
+</body>
+</html>

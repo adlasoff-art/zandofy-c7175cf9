@@ -1,0 +1,50 @@
+# Zandofy Backend — FastAPI
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+
+# Database
+sqlalchemy[asyncio]>=2.0.25
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.9
+alembic>=1.13.0
+
+# Auth & validation
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+pydantic-settings>=2.1.0
+email-validator>=2.1.0
+
+# HTTP & external APIs
+httpx>=0.26.0
+
+# Email
+aiosmtplib>=3.0.0
+jinja2>=3.1.0
+
+# PDF
+weasyprint>=60.0
+reportlab>=4.0.0
+
+# Scheduler (CRON)
+apscheduler>=3.10.0
+
+# Celery (tâches async)
+celery[redis]>=5.3.0
+
+# Search (full-text)
+# PostgreSQL ts_vector via raw SQL / SQLAlchemy
+
+# Push (Web Push)
+pywebpush>=1.14.0
+
+# Storage (Supabase Storage compatible)
+httpx>=0.26.0
+
+# Security & utils
+python-multipart>=0.0.6
+
+# Tests
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+httpx>=0.26.0

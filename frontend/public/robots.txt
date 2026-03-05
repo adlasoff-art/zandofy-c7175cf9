@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /
+
+# Block all search engine indexing until launch
+# Remove these rules and restore sitemap when ready to go live
+# Sitemap: https://zandofy.lovable.app/sitemap.xml
