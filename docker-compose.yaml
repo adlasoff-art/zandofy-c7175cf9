@@ -1,0 +1,85 @@
+# =============================================================================
+# Zandofy — Production (Coolify attend ce nom: docker-compose.yaml)
+# Contenu identique à docker-compose.prod.yml.
+# Variables d'environnement : définir dans l'UI Coolify.
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-zandofy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis en prod}
+      POSTGRES_DB: ${POSTGRES_DB:-zandofy}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zandofy} -d ${POSTGRES_DB:-zandofy}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-zandofy}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-zandofy}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY requis en prod}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS requis en prod}
+      API_PREFIX: ${API_PREFIX:-/api}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@zandofy.com}
+      KELPAY_MERCHANT_CODE: ${KELPAY_MERCHANT_CODE:-}
+      KELPAY_TOKEN: ${KELPAY_TOKEN:-}
+      KELPAY_WEBHOOK_SECRET: ${KELPAY_WEBHOOK_SECRET:-}
+      SITE_BASE_URL: ${SITE_BASE_URL:-https://zandofy.com}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+    volumes:
+      - backend_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:-}
+        VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID:-}
+        VITE_API_URL: ${VITE_API_URL:?VITE_API_URL requis en prod (ex. https://api.zandofy.com)}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  postgres_data:
+  backend_uploads:
