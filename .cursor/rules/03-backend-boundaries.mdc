@@ -1,0 +1,13 @@
+---
+description: Backend boundaries and API integration expectations
+globs: backend/**/*
+alwaysApply: false
+---
+
+# Backend Boundaries
+
+- Keep backend secrets out of frontend files.
+- Preserve API contracts unless a change is explicit and coordinated.
+- If backend changes require env updates, document them.
+- If backend changes require schema changes, add or reference migrations.
+- Prefer clear service boundaries and production-safe defaults.

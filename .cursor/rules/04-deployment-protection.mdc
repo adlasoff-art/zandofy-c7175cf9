@@ -1,0 +1,13 @@
+---
+description: Protect deployment and infrastructure files
+globs: "{docker-compose.yaml,docker-compose.prod.yml,backend/Dockerfile,frontend/Dockerfile}"
+alwaysApply: false
+---
+
+# Deployment Protection
+
+- These files are sensitive and affect Coolify deployment.
+- Do not change ports, domains, base images, or build logic casually.
+- Any edit here must consider staging, production, and environment variables.
+- Prefer minimal, explicit, justified changes.
+- Flag rollout risk before changing deployment-sensitive behavior.

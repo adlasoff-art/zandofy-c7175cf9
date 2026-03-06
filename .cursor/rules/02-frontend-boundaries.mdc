@@ -1,0 +1,13 @@
+---
+description: Frontend boundaries and integration expectations
+globs: frontend/**/*
+alwaysApply: false
+---
+
+# Frontend Boundaries
+
+- Frontend work may include React, TypeScript, hooks, pages, components, and client services.
+- Keep `VITE_*` variables stable unless explicitly asked to change them.
+- Do not invent deployment or infrastructure edits from frontend work alone.
+- If frontend work needs backend, DB, or env changes, state that clearly.
+- Prefer maintainable structure over one-off generated code.

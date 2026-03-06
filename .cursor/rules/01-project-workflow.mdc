@@ -1,0 +1,13 @@
+---
+description: Global workflow and safety rules for Zandofy
+alwaysApply: true
+---
+
+# Zandofy Workflow
+
+- Treat GitHub as the source of truth.
+- Use `develop` for staging and `main` for production.
+- Treat Lovable-generated code as draft code until reviewed.
+- Call out backend, DB, env, Docker, and deployment impacts explicitly.
+- Do not silently change domains, ports, or variable names.
+- Keep staging and production clearly separated.

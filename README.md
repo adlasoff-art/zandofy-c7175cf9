@@ -32,6 +32,15 @@ npm run dev
 
 ## Documentation
 
+### Governance and Workflow
+
+| File | Description |
+|--------|-------------|
+| **AGENTS.md** | Working agreement for humans, Lovable, and Cursor AI. Defines branch strategy, boundaries, and safety rules. |
+| **docs/AI-WORKFLOW.md** | End-to-end feature workflow from request to staging to production. |
+| **docs/ENVIRONMENTS.md** | Staging and production URLs, variable ownership, and environment rules. |
+| **docs/ARCHITECTURE.md** | High-level architecture of frontend, backend, Supabase, GitHub, and Coolify. |
+
 | Fichier | Description |
 |--------|-------------|
 | **PRODUCTION-READINESS.md** | Checklist production, **tout ce que vous devez fournir** (clés, variables), étapes déploiement Coolify. |
@@ -48,3 +57,10 @@ npm run dev
 - API versionnée sous `/api/v1`. Breaking changes possibles sous `/api/v2` plus tard.
 - Modifications documentées dans `backend/CHANGELOG.md`.
 - Déploiement et maintenance : **backend/DEPLOYMENT.md** et **backend/SECURITY.md**.
+
+## Recommended Delivery Model
+
+- `feature/*` -> scoped implementation work
+- `develop` -> staging branch
+- `main` -> production branch
+- Lovable generates scoped code, Cursor AI integrates and stabilizes it, GitHub remains the source of truth, and Coolify deploys from branches
