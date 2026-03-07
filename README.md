@@ -40,6 +40,8 @@ npm run dev
 | **docs/AI-WORKFLOW.md** | End-to-end feature workflow from request to staging to production. |
 | **docs/ENVIRONMENTS.md** | Staging and production URLs, variable ownership, and environment rules. |
 | **docs/ARCHITECTURE.md** | High-level architecture of frontend, backend, Supabase, GitHub, and Coolify. |
+| **docs/LOVABLE_INSTRUCTIONS.md** | Instructions et prompt à communiquer à Lovable pour cadrer son travail. |
+| **docs/LOVABLE_PHASE1_ALIGNMENT.md** | Phase 1 : prompt « première définition » pour aligner Lovable sur le monorepo actuel avant GitHub/staging/production. |
 
 | Fichier | Description |
 |--------|-------------|

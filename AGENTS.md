@@ -71,19 +71,23 @@ Zandofy is developed through a controlled workflow:
 - Any new environment variable must be documented in `.env.example` and project docs.
 - Renaming existing environment variables requires explicit approval.
 
-## Current Environment Model
+## Environment Model
 
-### Staging
+### Staging (suffix `-staging`)
 
-- frontend: `https://studio.zandofy.com`
-- backend: `https://api.zandofy.com`
-- supabase: `https://supabasa.zandofy.com`
+- frontend: `https://studio-staging.zandofy.com`
+- backend: `https://api-staging.zandofy.com`
+- supabase: `https://supabasa-staging.zandofy.com`
+- database: instance Supabase derrière `supabasa-staging.zandofy.com` (base dédiée staging)
 
-### Production target
+### Production
 
 - frontend: `https://zandofy.com`
-- backend: production API domain
-- production services should remain isolated from staging where possible
+- backend: `https://api.zandofy.com`
+- supabase: `https://supabasa.zandofy.com`
+- database: instance Supabase derrière `supabasa.zandofy.com` (base dédiée production)
+
+Staging et production sont entièrement séparés (domaines, bases, variables).
 
 ## Safety Rules
 

@@ -2,7 +2,18 @@
 
 ## Goal
 
-This document defines how work moves safely from idea to staging to production in Zandofy.
+This document defines how work moves safely from idea to staging to production in Zandofy. Lovable and Cursor AI work in the **same GitHub repository**. Everything is centralized.
+
+## Single Repository
+
+- **One repo** : adlasoff-art/Zandofy-project (or equivalent)
+- **Lovable** : generates frontend code, pushes to GitHub
+- **Cursor AI** : reviews, integrates, adds backend/DB/env, pushes to GitHub
+- **Coolify** : two resources, same repo, different branches
+  - Staging → `develop` → studio-staging, api-staging, supabasa-staging
+  - Production → `main` → zandofy.com, api.zandofy.com, supabasa.zandofy.com
+
+No separate "Lovable repo" vs "Cursor repo". One truth.
 
 ## Standard Delivery Flow
 

@@ -2,40 +2,46 @@
 
 ## Purpose
 
-This document defines the current and target environment model for Zandofy.
+This document defines the staging and production environment model for Zandofy. Staging uses the `-staging` suffix on subdomains. Production uses the main subdomains.
 
-## Staging
+## Staging (suffix `-staging`)
 
 Purpose:
 - integration testing
 - feature validation
 - deployment rehearsal
+- base de données dédiée (données de test, pas de mélange avec prod)
 
-Current public endpoints:
-- frontend: `https://studio.zandofy.com`
-- backend: `https://api.zandofy.com`
-- supabase: `https://supabasa.zandofy.com`
+Public endpoints:
+- frontend: `https://studio-staging.zandofy.com`
+- backend: `https://api-staging.zandofy.com`
+- supabase: `https://supabasa-staging.zandofy.com`
 
-Expected core values:
-- `SITE_BASE_URL=https://studio.zandofy.com`
-- `VITE_API_URL=https://api.zandofy.com`
-- `VITE_SUPABASE_URL=https://supabasa.zandofy.com`
+Expected core values (Coolify staging):
+- `SITE_BASE_URL=https://studio-staging.zandofy.com`
+- `VITE_API_URL=https://api-staging.zandofy.com`
+- `VITE_SUPABASE_URL=https://supabasa-staging.zandofy.com`
+- `VITE_SUPABASE_PUBLISHABLE_KEY` = clé anon du projet Supabase staging
+- `DATABASE_URL` = connexion vers la base Supabase staging
 
 ## Production
 
 Purpose:
 - stable public release
 - validated customer traffic
+- base de données dédiée (données réelles)
 
-Target public endpoints:
+Public endpoints:
 - frontend: `https://zandofy.com`
-- backend: production API domain
-- supabase: production Supabase endpoint
+- backend: `https://api.zandofy.com`
+- supabase: `https://supabasa.zandofy.com`
 
-Expected core values:
+Expected core values (Coolify production):
 - `SITE_BASE_URL=https://zandofy.com`
-- `VITE_API_URL=<production-api-url>`
-- `VITE_SUPABASE_URL=<production-supabase-url>`
+- `VITE_API_URL=https://api.zandofy.com`
+- `VITE_SUPABASE_URL=https://supabasa.zandofy.com`
+- `VITE_SUPABASE_PUBLISHABLE_KEY` = clé anon du projet Supabase production
+- `DATABASE_URL` = connexion vers la base Supabase production
 
 ## Variable Ownership
 
