@@ -16,6 +16,9 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 5173,
   },
+  build: {
+    outDir: "../dist",
+  },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   optimizeDeps: {
     include: [
