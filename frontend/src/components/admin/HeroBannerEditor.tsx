@@ -50,6 +50,8 @@ export function HeroBannerEditor() {
     title: "", subtitle: "", cta: "", link: "/", is_active: true,
     bg_color: "", text_color: "",
   });
+  const [formImageFile, setFormImageFile] = useState<File | null>(null);
+  const [formImagePreview, setFormImagePreview] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
