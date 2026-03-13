@@ -150,6 +150,8 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     setForm(EMPTY_FORM);
     setMainImage([]);
     setVariationMedia([]);
+    setSizes([]);
+    setColors([]);
     setCreating(true);
   };
 
