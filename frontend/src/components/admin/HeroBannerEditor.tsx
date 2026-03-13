@@ -169,6 +169,8 @@ export function HeroBannerEditor() {
     setShowForm(false);
     setEditingBanner(null);
     setForm({ title: "", subtitle: "", cta: "", link: "/", is_active: true, bg_color: "", text_color: "" });
+    setFormImageFile(null);
+    setFormImagePreview(null);
   };
 
   if (loading) {
