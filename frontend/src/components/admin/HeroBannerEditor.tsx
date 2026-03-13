@@ -91,6 +91,22 @@ export function HeroBannerEditor() {
 
   const handleSave = async () => {
     if (!form.title.trim() || !selectedZone) return;
+
+    let imageUrl: string | null = null;
+    if (formImageFile) {
+      setUploading(true);
+      const path = `banners/${Date.now()}_${formImageFile.name}`;
+      const { error } = await supabase.storage.from("cms-assets").upload(path, formImageFile);
+      if (error) {
+        toast({ title: "Erreur upload", description: error.message, variant: "destructive" });
+        setUploading(false);
+        return;
+      }
+      const { data: urlData } = supabase.storage.from("cms-assets").getPublicUrl(path);
+      imageUrl = urlData.publicUrl;
+      setUploading(false);
+    }
+
     const payload: any = {
       title: form.title,
       subtitle: form.subtitle || null,
@@ -101,6 +117,7 @@ export function HeroBannerEditor() {
       bg_color: form.bg_color || null,
       text_color: form.text_color || null,
     };
+    if (imageUrl) payload.image_url = imageUrl;
     if (editingBanner) {
       await supabase.from("cms_banners").update(payload).eq("id", editingBanner.id);
       toast({ title: "Bannière mise à jour" });
