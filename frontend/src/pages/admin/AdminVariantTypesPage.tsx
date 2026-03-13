@@ -41,7 +41,7 @@ export default function AdminVariantTypesPage() {
 
       if (!types) return [];
 
-      const { data: options } = await supabase
+      const { data: options } = await (supabase as any)
         .from("variant_type_options")
         .select("*")
         .order("sort_order");
