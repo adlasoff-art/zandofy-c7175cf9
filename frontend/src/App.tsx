@@ -88,6 +88,8 @@ function SupportDrawerWrapper() {
   return <SupportDrawer open={open} onOpenChange={setOpen} />;
 }
 
+function CmsThemeInjector() { useCmsTheme(); return null; }
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
