@@ -270,7 +270,35 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
         }));
         await supabase.from("product_images").insert(imgRows);
       }
-    }
+      }
+
+      // Sync sizes
+      await supabase.from("product_sizes").delete().eq("product_id", productId);
+      if (sizes.length > 0) {
+        await supabase.from("product_sizes").insert(
+          sizes.map((s) => ({
+            product_id: productId!,
+            size_label: s.size_label,
+            region: s.region || null,
+            bust_cm: s.bust_cm || null,
+            waist_cm: s.waist_cm || null,
+            hips_cm: s.hips_cm || null,
+          }))
+        );
+      }
+
+      // Sync colors
+      await supabase.from("product_colors").delete().eq("product_id", productId);
+      if (colors.length > 0) {
+        await supabase.from("product_colors").insert(
+          colors.map((c) => ({
+            product_id: productId!,
+            color_name: c.color_name,
+            color_hex: c.color_hex,
+            image_url: c.image_url || null,
+          }))
+        );
+      }
 
     toast.success(editing ? "Produit mis à jour" : "Produit sauvegardé en brouillon");
     cancelForm();
