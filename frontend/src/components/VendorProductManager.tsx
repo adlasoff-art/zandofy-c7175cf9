@@ -274,7 +274,6 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
         }));
         await supabase.from("product_images").insert(imgRows);
       }
-      }
 
       // Sync sizes
       await supabase.from("product_sizes").delete().eq("product_id", productId);
