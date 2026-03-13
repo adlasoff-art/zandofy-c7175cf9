@@ -109,7 +109,7 @@ export default function AdminVariantTypesPage() {
     mutationFn: async ({ typeId, label }: { typeId: string; label: string }) => {
       const type = variantTypes.find(t => t.id === typeId);
       const maxOrder = type && type.options.length > 0 ? Math.max(...type.options.map(o => o.sort_order)) + 1 : 0;
-      const { error } = await supabase.from("variant_type_options").insert({
+      const { error } = await (supabase as any).from("variant_type_options").insert({
         variant_type_id: typeId,
         label,
         sort_order: maxOrder,
