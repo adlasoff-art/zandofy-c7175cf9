@@ -304,6 +304,19 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
         );
       }
 
+      // Sync dynamic variant selections
+      await (supabase as any).from("product_variant_selections").delete().eq("product_id", productId);
+      if (dynamicSelections.length > 0) {
+        await (supabase as any).from("product_variant_selections").insert(
+          dynamicSelections.map((s) => ({
+            product_id: productId!,
+            variant_type_id: s.variant_type_id,
+            variant_option_id: s.variant_option_id,
+          }))
+        );
+      }
+    }
+
     toast.success(editing ? "Produit mis à jour" : "Produit sauvegardé en brouillon");
     cancelForm();
     loadProducts();
