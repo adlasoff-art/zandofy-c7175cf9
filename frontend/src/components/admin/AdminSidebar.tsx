@@ -14,6 +14,7 @@ const adminItems = [
   { title: "Utilisateurs", url: "/admin/users", icon: Users },
   { title: "Bannières & CMS", url: "/admin/cms", icon: Image },
   { title: "Catégories", url: "/admin/categories", icon: FolderTree },
+  { title: "Modération produits", url: "/admin/product-moderation", icon: ShieldCheck },
   { title: "Commandes", url: "/admin/orders", icon: Package },
   { title: "Support client", url: "/admin/support", icon: Headphones },
   { title: "Logistique", url: "/admin/logistics", icon: Truck },
