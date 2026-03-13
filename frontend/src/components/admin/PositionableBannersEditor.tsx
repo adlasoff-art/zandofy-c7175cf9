@@ -62,7 +62,7 @@ export function PositionableBannersEditor() {
       .select("*")
       .not("position", "in", '("hero_left","hero_slide","hero_right")')
       .order("sort_order");
-    setBanners((data || []) as Banner[]);
+    setBanners((data || []) as unknown as Banner[]);
     setLoading(false);
   }, []);
 
