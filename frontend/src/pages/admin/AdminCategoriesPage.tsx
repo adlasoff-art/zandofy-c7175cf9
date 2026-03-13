@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Plus, Edit2, Trash2, ChevronRight, Loader2, X, Save } from "lucide-react";
+import { Plus, Edit2, Trash2, ChevronRight, Loader2, X, Save, Upload, Image } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
