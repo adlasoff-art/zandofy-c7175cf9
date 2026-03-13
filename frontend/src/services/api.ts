@@ -154,6 +154,7 @@ export async function fetchFlashSaleProducts(): Promise<Product[]> {
   const { data, error } = await supabase
     .from("products")
     .select(PRODUCT_SELECT)
+    .eq("publish_status", "published")
     .eq("is_sale", true)
     .order("discount", { ascending: false });
 
