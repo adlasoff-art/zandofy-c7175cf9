@@ -98,6 +98,7 @@ const App = () => (
           <I18nProvider>
           <ThemeProvider>
           <UIConfigProvider>
+            <CmsThemeInjector />
             <Toaster />
             <Sonner />
             <NotificationListener />
