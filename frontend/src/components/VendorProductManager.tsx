@@ -153,6 +153,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     setVariationMedia([]);
     setSizes([]);
     setColors([]);
+    setDynamicSelections([]);
     setCreating(true);
   };
 
