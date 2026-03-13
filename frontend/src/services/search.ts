@@ -51,7 +51,8 @@ export interface SearchFilters {
 export async function searchProducts(filters: SearchFilters): Promise<Product[]> {
   let query = supabase
     .from("products")
-    .select(SEARCH_SELECT);
+    .select(SEARCH_SELECT)
+    .eq("publish_status", "published");
 
   // Text search on name / name_fr
   if (filters.query) {

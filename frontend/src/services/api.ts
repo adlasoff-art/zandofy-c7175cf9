@@ -120,6 +120,7 @@ export async function fetchProducts(params?: {
   let query = supabase
     .from("products")
     .select(PRODUCT_SELECT)
+    .eq("publish_status", "published")
     .order("created_at", { ascending: false });
 
   if (params?.category) {
@@ -153,6 +154,7 @@ export async function fetchFlashSaleProducts(): Promise<Product[]> {
   const { data, error } = await supabase
     .from("products")
     .select(PRODUCT_SELECT)
+    .eq("publish_status", "published")
     .eq("is_sale", true)
     .order("discount", { ascending: false });
 
@@ -212,6 +214,7 @@ export async function fetchProductById(
       stores!products_store_id_fkey(id, name, logo_url, is_verified, verified_years, verified_years_override, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, whatsapp_number, rating, response_rate, response_time)
     `)
     .eq("id", id)
+    .eq("publish_status", "published")
     .maybeSingle();
 
   if (error || !data) {
