@@ -1412,6 +1412,52 @@ export type Database = {
           },
         ]
       }
+      product_variant_selections: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          variant_option_id: string
+          variant_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          variant_option_id: string
+          variant_type_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          variant_option_id?: string
+          variant_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_variant_selections_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_variant_selections_variant_option_id_fkey"
+            columns: ["variant_option_id"]
+            isOneToOne: false
+            referencedRelation: "variant_type_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_variant_selections_variant_type_id_fkey"
+            columns: ["variant_type_id"]
+            isOneToOne: false
+            referencedRelation: "variant_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category_id: string | null
@@ -2421,6 +2467,68 @@ export type Database = {
           severity?: string
           user_id?: string
           warned_by?: string
+        }
+        Relationships: []
+      }
+      variant_type_options: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          sort_order: number
+          variant_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          sort_order?: number
+          variant_type_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          sort_order?: number
+          variant_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "variant_type_options_variant_type_id_fkey"
+            columns: ["variant_type_id"]
+            isOneToOne: false
+            referencedRelation: "variant_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      variant_types: {
+        Row: {
+          created_at: string
+          icon: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          unit: string | null
+        }
+        Insert: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          unit?: string | null
+        }
+        Update: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          unit?: string | null
         }
         Relationships: []
       }
