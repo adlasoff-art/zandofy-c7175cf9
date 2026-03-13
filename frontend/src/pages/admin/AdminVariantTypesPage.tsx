@@ -34,7 +34,7 @@ export default function AdminVariantTypesPage() {
   const { data: variantTypes = [], isLoading } = useQuery({
     queryKey: ["admin-variant-types"],
     queryFn: async () => {
-      const { data: types } = await supabase
+      const { data: types } = await (supabase as any)
         .from("variant_types")
         .select("*")
         .order("sort_order");
