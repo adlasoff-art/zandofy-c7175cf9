@@ -50,6 +50,8 @@ export function HeroBannerEditor() {
     title: "", subtitle: "", cta: "", link: "/", is_active: true,
     bg_color: "", text_color: "",
   });
+  const [formImageFile, setFormImageFile] = useState<File | null>(null);
+  const [formImagePreview, setFormImagePreview] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,6 +91,22 @@ export function HeroBannerEditor() {
 
   const handleSave = async () => {
     if (!form.title.trim() || !selectedZone) return;
+
+    let imageUrl: string | null = null;
+    if (formImageFile) {
+      setUploading(true);
+      const path = `banners/${Date.now()}_${formImageFile.name}`;
+      const { error } = await supabase.storage.from("cms-assets").upload(path, formImageFile);
+      if (error) {
+        toast({ title: "Erreur upload", description: error.message, variant: "destructive" });
+        setUploading(false);
+        return;
+      }
+      const { data: urlData } = supabase.storage.from("cms-assets").getPublicUrl(path);
+      imageUrl = urlData.publicUrl;
+      setUploading(false);
+    }
+
     const payload: any = {
       title: form.title,
       subtitle: form.subtitle || null,
@@ -99,6 +117,7 @@ export function HeroBannerEditor() {
       bg_color: form.bg_color || null,
       text_color: form.text_color || null,
     };
+    if (imageUrl) payload.image_url = imageUrl;
     if (editingBanner) {
       await supabase.from("cms_banners").update(payload).eq("id", editingBanner.id);
       toast({ title: "Bannière mise à jour" });
@@ -134,6 +153,8 @@ export function HeroBannerEditor() {
       bg_color: (b as any).bg_color || "",
       text_color: (b as any).text_color || "",
     });
+    setFormImageFile(null);
+    setFormImagePreview(b.image_url || null);
     setShowForm(true);
   };
 
@@ -148,6 +169,8 @@ export function HeroBannerEditor() {
     setShowForm(false);
     setEditingBanner(null);
     setForm({ title: "", subtitle: "", cta: "", link: "/", is_active: true, bg_color: "", text_color: "" });
+    setFormImageFile(null);
+    setFormImagePreview(null);
   };
 
   if (loading) {
@@ -264,7 +287,34 @@ export function HeroBannerEditor() {
                 <div className="space-y-1">
                   <Label className="text-xs">Lien (URL)</Label>
                   <Input value={form.link} onChange={(e) => setForm(f => ({ ...f, link: e.target.value }))} placeholder="/category/soldes" className="h-9 text-sm" />
+              </div>
+              {/* Image Upload */}
+              <div className="space-y-1">
+                <Label className="text-xs">Image</Label>
+                <div className="flex items-center gap-3">
+                  {(formImagePreview || (editingBanner?.image_url && !formImageFile)) && (
+                    <div className="w-20 h-12 rounded border border-border overflow-hidden shrink-0">
+                      <img src={formImagePreview || editingBanner?.image_url || ""} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <label className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-input bg-background text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors">
+                    <Upload size={14} />
+                    {formImageFile ? formImageFile.name : "Choisir une image"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setFormImageFile(file);
+                          setFormImagePreview(URL.createObjectURL(file));
+                        }
+                      }}
+                    />
+                  </label>
                 </div>
+              </div>
               </div>
               {selectedZone === "hero_slide" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
