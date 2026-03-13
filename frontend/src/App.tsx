@@ -78,6 +78,7 @@ const AdminSEOPage = lazy(() => import("./pages/admin/AdminSEOPage"));
 const AdminCountriesPage = lazy(() => import("./pages/admin/AdminCountriesPage"));
 const AdminPopupsPage = lazy(() => import("./pages/admin/AdminPopupsPage"));
 const AdminSupportPage = lazy(() => import("./pages/admin/AdminSupportPage"));
+const AdminProductModerationPage = lazy(() => import("./pages/admin/AdminProductModerationPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1 } },
