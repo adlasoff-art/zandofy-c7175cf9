@@ -38,10 +38,12 @@ interface FormState {
   name: string;
   name_fr: string;
   icon: string;
+  image_url: string;
+  display_mode: string;
   parent_id: string;
 }
 
-const emptyForm: FormState = { mode: "add", name: "", name_fr: "", icon: "", parent_id: "" };
+const emptyForm: FormState = { mode: "add", name: "", name_fr: "", icon: "", image_url: "", display_mode: "icon", parent_id: "" };
 
 export default function AdminCategoriesPage() {
   const queryClient = useQueryClient();
