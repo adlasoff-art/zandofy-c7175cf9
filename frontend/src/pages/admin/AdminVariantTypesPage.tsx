@@ -63,7 +63,7 @@ export default function AdminVariantTypesPage() {
   const createType = useMutation({
     mutationFn: async (form: { name: string; unit: string; icon: string }) => {
       const maxOrder = variantTypes.length > 0 ? Math.max(...variantTypes.map(t => t.sort_order)) + 1 : 0;
-      const { error } = await supabase.from("variant_types").insert({
+      const { error } = await (supabase as any).from("variant_types").insert({
         name: form.name,
         unit: form.unit,
         icon: form.icon,
