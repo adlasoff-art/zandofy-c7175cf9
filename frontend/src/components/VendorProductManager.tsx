@@ -197,12 +197,14 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     setVariationMedia(variations);
 
     // Load existing sizes & colors
-    const [sizesRes, colorsRes] = await Promise.all([
+    const [sizesRes, colorsRes, dynRes] = await Promise.all([
       supabase.from("product_sizes").select("id, size_label, region, bust_cm, waist_cm, hips_cm").eq("product_id", product.id),
       supabase.from("product_colors").select("id, color_name, color_hex, image_url").eq("product_id", product.id),
+      (supabase as any).from("product_variant_selections").select("variant_type_id, variant_option_id").eq("product_id", product.id),
     ]);
     setSizes(sizesRes.data || []);
     setColors(colorsRes.data || []);
+    setDynamicSelections((dynRes.data || []) as DynamicVariantSelection[]);
   };
 
   const cancelForm = () => {
