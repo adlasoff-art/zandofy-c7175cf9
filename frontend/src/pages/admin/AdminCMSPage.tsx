@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
-  Image, Menu, FileText, LayoutDashboard, Palette, MapPin, FootprintsIcon,
+  Image, Menu, FileText, LayoutDashboard, Palette, MapPin, FootprintsIcon, Languages,
 } from "lucide-react";
 import { HeroBannerEditor } from "@/components/admin/HeroBannerEditor";
 import { ColorPaletteEditor } from "@/components/admin/ColorPaletteEditor";
@@ -14,8 +14,9 @@ const MenusTab = lazy(() => import("@/components/admin/cms/MenusTab"));
 const PagesTab = lazy(() => import("@/components/admin/cms/PagesTab"));
 const SectionsTab = lazy(() => import("@/components/admin/cms/SectionsTab"));
 const FooterTab = lazy(() => import("@/components/admin/cms/FooterTab"));
+const TextsTab = lazy(() => import("@/components/admin/cms/TextsTab"));
 
-type Tab = "hero" | "banners" | "menus" | "pages" | "sections" | "colors" | "footer";
+type Tab = "hero" | "banners" | "menus" | "pages" | "sections" | "colors" | "footer" | "texts";
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "hero", label: "Hero Banner", icon: Image },
@@ -23,7 +24,8 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "menus", label: "Menus", icon: Menu },
   { key: "pages", label: "Pages", icon: FileText },
   { key: "sections", label: "Sections", icon: LayoutDashboard },
-  { key: "colors", label: "Couleurs", icon: Palette },
+  { key: "colors", label: "Thème & Couleurs", icon: Palette },
+  { key: "texts", label: "Textes i18n", icon: Languages },
   { key: "footer", label: "Footer", icon: FootprintsIcon },
 ];
 
@@ -63,6 +65,7 @@ const AdminCMSPage: React.FC = () => {
         {tab === "pages" && <PagesTab />}
         {tab === "sections" && <SectionsTab />}
         {tab === "footer" && <FooterTab />}
+        {tab === "texts" && <TextsTab />}
       </Suspense>
     </AdminLayout>
   );
