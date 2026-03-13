@@ -153,6 +153,8 @@ export function HeroBannerEditor() {
       bg_color: (b as any).bg_color || "",
       text_color: (b as any).text_color || "",
     });
+    setFormImageFile(null);
+    setFormImagePreview(b.image_url || null);
     setShowForm(true);
   };
 
