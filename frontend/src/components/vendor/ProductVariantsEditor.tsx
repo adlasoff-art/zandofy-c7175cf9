@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Plus, X, Palette, Ruler } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, X, Palette, Ruler, Layers } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 /* ── Size variant ── */
 export interface SizeVariant {
@@ -17,6 +18,20 @@ export interface ColorVariant {
   color_name: string;
   color_hex: string;
   image_url?: string | null;
+}
+
+/* ── Dynamic variant selection ── */
+export interface DynamicVariantSelection {
+  variant_type_id: string;
+  variant_option_id: string;
+}
+
+interface VariantType {
+  id: string;
+  name: string;
+  unit: string;
+  is_active: boolean;
+  options: { id: string; label: string; sort_order: number }[];
 }
 
 const PRESET_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL"];
@@ -39,14 +54,49 @@ const PRESET_COLORS: { name: string; hex: string }[] = [
 interface Props {
   sizes: SizeVariant[];
   colors: ColorVariant[];
+  dynamicSelections: DynamicVariantSelection[];
   onSizesChange: (sizes: SizeVariant[]) => void;
   onColorsChange: (colors: ColorVariant[]) => void;
+  onDynamicSelectionsChange: (selections: DynamicVariantSelection[]) => void;
 }
 
-export function ProductVariantsEditor({ sizes, colors, onSizesChange, onColorsChange }: Props) {
+export function ProductVariantsEditor({ sizes, colors, dynamicSelections, onSizesChange, onColorsChange, onDynamicSelectionsChange }: Props) {
   const [customSize, setCustomSize] = useState("");
   const [customColorName, setCustomColorName] = useState("");
   const [customColorHex, setCustomColorHex] = useState("#000000");
+  const [variantTypes, setVariantTypes] = useState<VariantType[]>([]);
+
+  // Load dynamic variant types
+  useEffect(() => {
+    async function load() {
+      const { data: types } = await (supabase as any)
+        .from("variant_types")
+        .select("id, name, unit, is_active")
+        .eq("is_active", true)
+        .order("sort_order");
+
+      if (!types || types.length === 0) { setVariantTypes([]); return; }
+
+      const typeIds = types.map((t: any) => t.id);
+      const { data: options } = await (supabase as any)
+        .from("variant_type_options")
+        .select("id, variant_type_id, label, sort_order")
+        .in("variant_type_id", typeIds)
+        .order("sort_order");
+
+      const optMap = new Map<string, any[]>();
+      (options || []).forEach((o: any) => {
+        const arr = optMap.get(o.variant_type_id) || [];
+        arr.push(o);
+        optMap.set(o.variant_type_id, arr);
+      });
+
+      setVariantTypes(
+        types.map((t: any) => ({ ...t, options: optMap.get(t.id) || [] }))
+      );
+    }
+    load();
+  }, []);
 
   /* ── Sizes ── */
   const toggleSize = (label: string) => {
@@ -92,6 +142,25 @@ export function ProductVariantsEditor({ sizes, colors, onSizesChange, onColorsCh
     onColorsChange(colors.filter((c) => c.color_hex.toLowerCase() !== hex.toLowerCase()));
   };
 
+  /* ── Dynamic variants ── */
+  const toggleDynamicOption = (typeId: string, optionId: string) => {
+    const exists = dynamicSelections.find(
+      (s) => s.variant_type_id === typeId && s.variant_option_id === optionId
+    );
+    if (exists) {
+      onDynamicSelectionsChange(
+        dynamicSelections.filter(
+          (s) => !(s.variant_type_id === typeId && s.variant_option_id === optionId)
+        )
+      );
+    } else {
+      onDynamicSelectionsChange([
+        ...dynamicSelections,
+        { variant_type_id: typeId, variant_option_id: optionId },
+      ]);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* ── Tailles ── */}
@@ -119,7 +188,6 @@ export function ProductVariantsEditor({ sizes, colors, onSizesChange, onColorsCh
           })}
         </div>
 
-        {/* Custom sizes added */}
         {sizes.filter((s) => !PRESET_SIZES.includes(s.size_label)).length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-2">
             {sizes
@@ -138,7 +206,6 @@ export function ProductVariantsEditor({ sizes, colors, onSizesChange, onColorsCh
           </div>
         )}
 
-        {/* Add custom size */}
         <div className="flex gap-2">
           <input
             type="text"
@@ -187,7 +254,6 @@ export function ProductVariantsEditor({ sizes, colors, onSizesChange, onColorsCh
           })}
         </div>
 
-        {/* Selected colors labels */}
         {colors.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-2">
             {colors.map((c) => (
@@ -205,7 +271,6 @@ export function ProductVariantsEditor({ sizes, colors, onSizesChange, onColorsCh
           </div>
         )}
 
-        {/* Add custom color */}
         <div className="flex gap-2 items-center">
           <input
             type="color"
@@ -230,6 +295,41 @@ export function ProductVariantsEditor({ sizes, colors, onSizesChange, onColorsCh
           </button>
         </div>
       </div>
+
+      {/* ── Dynamic variant types ── */}
+      {variantTypes.map((vt) => {
+        const selectedForType = dynamicSelections.filter((s) => s.variant_type_id === vt.id);
+        return (
+          <div key={vt.id} className="border-t border-border pt-3">
+            <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-2">
+              <Layers size={14} /> {vt.name} {vt.unit && <span className="text-muted-foreground font-normal">({vt.unit})</span>}
+            </label>
+            {vt.options.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">Aucune option disponible pour ce type.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {vt.options.map((opt) => {
+                  const active = selectedForType.some((s) => s.variant_option_id === opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => toggleDynamicOption(vt.id, opt.id)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-card text-muted-foreground border-border hover:border-foreground/30"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

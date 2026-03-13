@@ -10,7 +10,7 @@ import { CountryCombobox } from "@/components/vendor/CountryCombobox";
 import { MediaUploader } from "@/components/vendor/MediaUploader";
 import { ShippingEstimator } from "@/components/vendor/ShippingEstimator";
 import { PromotionTimer } from "@/components/vendor/PromotionTimer";
-import { ProductVariantsEditor, type SizeVariant, type ColorVariant } from "@/components/vendor/ProductVariantsEditor";
+import { ProductVariantsEditor, type SizeVariant, type ColorVariant, type DynamicVariantSelection } from "@/components/vendor/ProductVariantsEditor";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 
@@ -91,6 +91,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
   const [variationMedia, setVariationMedia] = useState<MediaItem[]>([]);
   const [sizes, setSizes] = useState<SizeVariant[]>([]);
   const [colors, setColors] = useState<ColorVariant[]>([]);
+  const [dynamicSelections, setDynamicSelections] = useState<DynamicVariantSelection[]>([]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -152,6 +153,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     setVariationMedia([]);
     setSizes([]);
     setColors([]);
+    setDynamicSelections([]);
     setCreating(true);
   };
 
@@ -195,12 +197,14 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     setVariationMedia(variations);
 
     // Load existing sizes & colors
-    const [sizesRes, colorsRes] = await Promise.all([
+    const [sizesRes, colorsRes, dynRes] = await Promise.all([
       supabase.from("product_sizes").select("id, size_label, region, bust_cm, waist_cm, hips_cm").eq("product_id", product.id),
       supabase.from("product_colors").select("id, color_name, color_hex, image_url").eq("product_id", product.id),
+      (supabase as any).from("product_variant_selections").select("variant_type_id, variant_option_id").eq("product_id", product.id),
     ]);
     setSizes(sizesRes.data || []);
     setColors(colorsRes.data || []);
+    setDynamicSelections((dynRes.data || []) as DynamicVariantSelection[]);
   };
 
   const cancelForm = () => {
@@ -299,6 +303,19 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
           }))
         );
       }
+
+      // Sync dynamic variant selections
+      await (supabase as any).from("product_variant_selections").delete().eq("product_id", productId);
+      if (dynamicSelections.length > 0) {
+        await (supabase as any).from("product_variant_selections").insert(
+          dynamicSelections.map((s) => ({
+            product_id: productId!,
+            variant_type_id: s.variant_type_id,
+            variant_option_id: s.variant_option_id,
+          }))
+        );
+      }
+    }
 
     toast.success(editing ? "Produit mis à jour" : "Produit sauvegardé en brouillon");
     cancelForm();
@@ -442,12 +459,14 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
             onEndChange={(v) => setForm({ ...form, promo_end_date: v })}
           />
 
-          {/* Tailles & Couleurs */}
+          {/* Tailles, Couleurs & Variations dynamiques */}
           <ProductVariantsEditor
             sizes={sizes}
             colors={colors}
+            dynamicSelections={dynamicSelections}
             onSizesChange={setSizes}
             onColorsChange={setColors}
+            onDynamicSelectionsChange={setDynamicSelections}
           />
 
           <button
