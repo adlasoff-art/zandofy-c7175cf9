@@ -120,6 +120,7 @@ export async function fetchProducts(params?: {
   let query = supabase
     .from("products")
     .select(PRODUCT_SELECT)
+    .eq("publish_status", "published")
     .order("created_at", { ascending: false });
 
   if (params?.category) {
