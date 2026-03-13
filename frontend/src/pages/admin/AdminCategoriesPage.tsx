@@ -106,8 +106,20 @@ export default function AdminCategoriesPage() {
   });
 
   const openEdit = (cat: Category) => {
-    setForm({ mode: "edit", id: cat.id, name: cat.name, name_fr: cat.name_fr, icon: cat.icon || "", parent_id: cat.parent_id || "" });
+    setForm({ mode: "edit", id: cat.id, name: cat.name, name_fr: cat.name_fr, icon: cat.icon || "", image_url: cat.image_url || "", display_mode: (cat as any).display_mode || "icon", parent_id: cat.parent_id || "" });
     setShowForm(true);
+  };
+
+  const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const path = `categories/${Date.now()}_${file.name}`;
+    const { error } = await supabase.storage.from("cms-assets").upload(path, file);
+    if (error) { toast.error(error.message); setUploading(false); return; }
+    const { data: urlData } = supabase.storage.from("cms-assets").getPublicUrl(path);
+    setForm(f => ({ ...f, image_url: urlData.publicUrl }));
+    setUploading(false);
   };
 
   const openAdd = (parentId?: string) => {
