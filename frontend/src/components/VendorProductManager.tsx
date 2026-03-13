@@ -155,7 +155,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     setCreating(true);
   };
 
-  const startEdit = (product: Product) => {
+  const startEdit = async (product: Product) => {
     setCreating(false);
     setEditing(product);
     setForm({
@@ -193,6 +193,14 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     }));
     setMainImage(main);
     setVariationMedia(variations);
+
+    // Load existing sizes & colors
+    const [sizesRes, colorsRes] = await Promise.all([
+      supabase.from("product_sizes").select("id, size_label, region, bust_cm, waist_cm, hips_cm").eq("product_id", product.id),
+      supabase.from("product_colors").select("id, color_name, color_hex, image_url").eq("product_id", product.id),
+    ]);
+    setSizes(sizesRes.data || []);
+    setColors(colorsRes.data || []);
   };
 
   const cancelForm = () => {
