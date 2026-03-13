@@ -17,6 +17,7 @@ import { OrderAlertListener } from "@/components/OrderAlertListener";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { ScrollRestoration } from "@/components/ScrollRestoration";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
+import { useCmsTheme } from "@/hooks/use-cms-theme";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { MaintenanceGuard } from "@/components/MaintenanceGuard";
 import { CookieConsent } from "@/components/CookieConsent";
@@ -87,6 +88,8 @@ function SupportDrawerWrapper() {
   return <SupportDrawer open={open} onOpenChange={setOpen} />;
 }
 
+function CmsThemeInjector() { useCmsTheme(); return null; }
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
@@ -97,6 +100,7 @@ const App = () => (
           <I18nProvider>
           <ThemeProvider>
           <UIConfigProvider>
+            <CmsThemeInjector />
             <Toaster />
             <Sonner />
             <NotificationListener />
