@@ -82,7 +82,7 @@ export default function AdminVariantTypesPage() {
 
   const updateType = useMutation({
     mutationFn: async ({ id, ...data }: { id: string; name?: string; unit?: string; icon?: string; is_active?: boolean }) => {
-      const { error } = await supabase.from("variant_types").update(data as any).eq("id", id);
+      const { error } = await (supabase as any).from("variant_types").update(data as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
