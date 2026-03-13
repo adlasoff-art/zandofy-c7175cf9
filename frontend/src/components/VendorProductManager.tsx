@@ -446,12 +446,14 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
             onEndChange={(v) => setForm({ ...form, promo_end_date: v })}
           />
 
-          {/* Tailles & Couleurs */}
+          {/* Tailles, Couleurs & Variations dynamiques */}
           <ProductVariantsEditor
             sizes={sizes}
             colors={colors}
+            dynamicSelections={dynamicSelections}
             onSizesChange={setSizes}
             onColorsChange={setColors}
+            onDynamicSelectionsChange={setDynamicSelections}
           />
 
           <button
