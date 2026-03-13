@@ -25,6 +25,8 @@ export default defineConfig(({ mode }) => ({
       "react/jsx-dev-runtime",
       "react-router-dom",
       "@tanstack/react-query",
+      "@supabase/supabase-js",
+      "framer-motion",
       "recharts",
     ],
     exclude: [],
@@ -33,8 +35,12 @@ export default defineConfig(({ mode }) => ({
     dedupe: [
       "react",
       "react-dom",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
       "react-router-dom",
       "@tanstack/react-query",
+      "@supabase/supabase-js",
+      "framer-motion",
     ],
     alias: {
       "@": path.resolve(__dirname, "./src"),
