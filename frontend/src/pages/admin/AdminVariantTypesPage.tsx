@@ -126,7 +126,7 @@ export default function AdminVariantTypesPage() {
 
   const deleteOption = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("variant_type_options").delete().eq("id", id);
+      const { error } = await (supabase as any).from("variant_type_options").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
