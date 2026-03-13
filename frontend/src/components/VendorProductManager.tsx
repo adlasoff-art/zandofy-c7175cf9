@@ -442,6 +442,14 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
             onEndChange={(v) => setForm({ ...form, promo_end_date: v })}
           />
 
+          {/* Tailles & Couleurs */}
+          <ProductVariantsEditor
+            sizes={sizes}
+            colors={colors}
+            onSizesChange={setSizes}
+            onColorsChange={setColors}
+          />
+
           <button
             onClick={handleSave}
             disabled={saving}
