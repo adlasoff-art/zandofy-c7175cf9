@@ -50,6 +50,7 @@ export default function AdminCategoriesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { data: categories = [], isLoading } = useQuery({
     queryKey: ["admin-categories"],
