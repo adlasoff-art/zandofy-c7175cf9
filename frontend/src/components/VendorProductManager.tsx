@@ -10,6 +10,7 @@ import { CountryCombobox } from "@/components/vendor/CountryCombobox";
 import { MediaUploader } from "@/components/vendor/MediaUploader";
 import { ShippingEstimator } from "@/components/vendor/ShippingEstimator";
 import { PromotionTimer } from "@/components/vendor/PromotionTimer";
+import { ProductVariantsEditor, type SizeVariant, type ColorVariant } from "@/components/vendor/ProductVariantsEditor";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 
@@ -88,6 +89,8 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [mainImage, setMainImage] = useState<MediaItem[]>([]);
   const [variationMedia, setVariationMedia] = useState<MediaItem[]>([]);
+  const [sizes, setSizes] = useState<SizeVariant[]>([]);
+  const [colors, setColors] = useState<ColorVariant[]>([]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -147,10 +150,12 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     setForm(EMPTY_FORM);
     setMainImage([]);
     setVariationMedia([]);
+    setSizes([]);
+    setColors([]);
     setCreating(true);
   };
 
-  const startEdit = (product: Product) => {
+  const startEdit = async (product: Product) => {
     setCreating(false);
     setEditing(product);
     setForm({
@@ -188,6 +193,14 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     }));
     setMainImage(main);
     setVariationMedia(variations);
+
+    // Load existing sizes & colors
+    const [sizesRes, colorsRes] = await Promise.all([
+      supabase.from("product_sizes").select("id, size_label, region, bust_cm, waist_cm, hips_cm").eq("product_id", product.id),
+      supabase.from("product_colors").select("id, color_name, color_hex, image_url").eq("product_id", product.id),
+    ]);
+    setSizes(sizesRes.data || []);
+    setColors(colorsRes.data || []);
   };
 
   const cancelForm = () => {
@@ -257,7 +270,35 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
         }));
         await supabase.from("product_images").insert(imgRows);
       }
-    }
+      }
+
+      // Sync sizes
+      await supabase.from("product_sizes").delete().eq("product_id", productId);
+      if (sizes.length > 0) {
+        await supabase.from("product_sizes").insert(
+          sizes.map((s) => ({
+            product_id: productId!,
+            size_label: s.size_label,
+            region: s.region || null,
+            bust_cm: s.bust_cm || null,
+            waist_cm: s.waist_cm || null,
+            hips_cm: s.hips_cm || null,
+          }))
+        );
+      }
+
+      // Sync colors
+      await supabase.from("product_colors").delete().eq("product_id", productId);
+      if (colors.length > 0) {
+        await supabase.from("product_colors").insert(
+          colors.map((c) => ({
+            product_id: productId!,
+            color_name: c.color_name,
+            color_hex: c.color_hex,
+            image_url: c.image_url || null,
+          }))
+        );
+      }
 
     toast.success(editing ? "Produit mis à jour" : "Produit sauvegardé en brouillon");
     cancelForm();
@@ -399,6 +440,14 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
             onEnabledChange={(v) => setForm({ ...form, flash_timer_enabled: v })}
             onStartChange={(v) => setForm({ ...form, promo_start_date: v })}
             onEndChange={(v) => setForm({ ...form, promo_end_date: v })}
+          />
+
+          {/* Tailles & Couleurs */}
+          <ProductVariantsEditor
+            sizes={sizes}
+            colors={colors}
+            onSizesChange={setSizes}
+            onColorsChange={setColors}
           />
 
           <button
