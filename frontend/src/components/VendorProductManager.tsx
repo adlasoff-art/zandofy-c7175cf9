@@ -91,6 +91,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
   const [variationMedia, setVariationMedia] = useState<MediaItem[]>([]);
   const [sizes, setSizes] = useState<SizeVariant[]>([]);
   const [colors, setColors] = useState<ColorVariant[]>([]);
+  const [dynamicSelections, setDynamicSelections] = useState<DynamicVariantSelection[]>([]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
