@@ -110,13 +110,31 @@ export default function AuthPage() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (error) {
-      toast({ title: t("auth.error"), description: String(error), variant: "destructive" });
+    try {
+      const isLovableEnv = window.location.hostname.endsWith(".lovable.app");
+      if (isLovableEnv) {
+        const { error } = await lovable.auth.signInWithOAuth("google", {
+          redirect_uri: window.location.origin,
+        });
+        if (error) {
+          toast({ title: t("auth.error"), description: String(error), variant: "destructive" });
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: window.location.origin,
+          },
+        });
+        if (error) {
+          toast({ title: t("auth.error"), description: String(error), variant: "destructive" });
+        }
+      }
+    } catch (err: any) {
+      toast({ title: t("auth.error"), description: err.message || t("auth.genericError"), variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
