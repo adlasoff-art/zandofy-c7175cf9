@@ -287,7 +287,34 @@ export function HeroBannerEditor() {
                 <div className="space-y-1">
                   <Label className="text-xs">Lien (URL)</Label>
                   <Input value={form.link} onChange={(e) => setForm(f => ({ ...f, link: e.target.value }))} placeholder="/category/soldes" className="h-9 text-sm" />
+              </div>
+              {/* Image Upload */}
+              <div className="space-y-1">
+                <Label className="text-xs">Image</Label>
+                <div className="flex items-center gap-3">
+                  {(formImagePreview || (editingBanner?.image_url && !formImageFile)) && (
+                    <div className="w-20 h-12 rounded border border-border overflow-hidden shrink-0">
+                      <img src={formImagePreview || editingBanner?.image_url || ""} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <label className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-input bg-background text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors">
+                    <Upload size={14} />
+                    {formImageFile ? formImageFile.name : "Choisir une image"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setFormImageFile(file);
+                          setFormImagePreview(URL.createObjectURL(file));
+                        }
+                      }}
+                    />
+                  </label>
                 </div>
+              </div>
               </div>
               {selectedZone === "hero_slide" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
