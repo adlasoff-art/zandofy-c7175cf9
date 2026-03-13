@@ -157,10 +157,37 @@ export default function AdminCategoriesPage() {
                 className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Icône (emoji)</label>
-              <input value={form.icon} onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))} placeholder="📱"
-                className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              <label className="text-xs text-muted-foreground block mb-1">Mode d'affichage</label>
+              <div className="flex gap-2">
+                <button onClick={() => setForm(f => ({ ...f, display_mode: "icon" }))} className={`flex-1 px-3 py-2 text-sm rounded-lg border transition-colors ${form.display_mode === "icon" ? "bg-primary text-primary-foreground border-primary" : "bg-muted border-border text-foreground hover:border-primary/50"}`}>
+                  Icône
+                </button>
+                <button onClick={() => setForm(f => ({ ...f, display_mode: "image" }))} className={`flex-1 px-3 py-2 text-sm rounded-lg border transition-colors ${form.display_mode === "image" ? "bg-primary text-primary-foreground border-primary" : "bg-muted border-border text-foreground hover:border-primary/50"}`}>
+                  Image
+                </button>
+              </div>
             </div>
+            {form.display_mode === "icon" ? (
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Icône (emoji)</label>
+                <input value={form.icon} onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))} placeholder="📱"
+                  className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Image de catégorie</label>
+                {form.image_url && (
+                  <div className="w-full h-20 rounded-lg overflow-hidden mb-2 bg-muted">
+                    <img src={form.image_url} alt="" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <label className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg cursor-pointer text-sm text-muted-foreground hover:bg-muted/80 w-fit">
+                  <Upload size={14} />
+                  {uploading ? "Upload..." : "Choisir une image"}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleUploadImage} disabled={uploading} />
+                </label>
+              </div>
+            )}
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Catégorie parente</label>
               <select value={form.parent_id} onChange={(e) => setForm((f) => ({ ...f, parent_id: e.target.value }))}
