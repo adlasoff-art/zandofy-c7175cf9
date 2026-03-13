@@ -202,6 +202,7 @@ export type Database = {
       categories: {
         Row: {
           created_at: string
+          display_mode: string
           icon: string | null
           id: string
           image_url: string | null
@@ -211,6 +212,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          display_mode?: string
           icon?: string | null
           id?: string
           image_url?: string | null
@@ -220,6 +222,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          display_mode?: string
           icon?: string | null
           id?: string
           image_url?: string | null
@@ -328,6 +331,7 @@ export type Database = {
       }
       cms_banners: {
         Row: {
+          bg_color: string | null
           created_at: string
           cta: string | null
           id: string
@@ -337,10 +341,13 @@ export type Database = {
           position: string
           sort_order: number
           subtitle: string | null
+          target_page: string
+          text_color: string | null
           title: string
           updated_at: string
         }
         Insert: {
+          bg_color?: string | null
           created_at?: string
           cta?: string | null
           id?: string
@@ -350,10 +357,13 @@ export type Database = {
           position?: string
           sort_order?: number
           subtitle?: string | null
+          target_page?: string
+          text_color?: string | null
           title: string
           updated_at?: string
         }
         Update: {
+          bg_color?: string | null
           created_at?: string
           cta?: string | null
           id?: string
@@ -363,6 +373,8 @@ export type Database = {
           position?: string
           sort_order?: number
           subtitle?: string | null
+          target_page?: string
+          text_color?: string | null
           title?: string
           updated_at?: string
         }

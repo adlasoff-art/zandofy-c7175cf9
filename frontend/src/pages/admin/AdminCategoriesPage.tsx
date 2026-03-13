@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Plus, Edit2, Trash2, ChevronRight, Loader2, X, Save } from "lucide-react";
+import { Plus, Edit2, Trash2, ChevronRight, Loader2, X, Save, Upload, Image } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -38,16 +38,19 @@ interface FormState {
   name: string;
   name_fr: string;
   icon: string;
+  image_url: string;
+  display_mode: string;
   parent_id: string;
 }
 
-const emptyForm: FormState = { mode: "add", name: "", name_fr: "", icon: "", parent_id: "" };
+const emptyForm: FormState = { mode: "add", name: "", name_fr: "", icon: "", image_url: "", display_mode: "icon", parent_id: "" };
 
 export default function AdminCategoriesPage() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { data: categories = [], isLoading } = useQuery({
     queryKey: ["admin-categories"],
@@ -64,10 +67,12 @@ export default function AdminCategoriesPage() {
 
   const saveMutation = useMutation({
     mutationFn: async (f: FormState) => {
-      const payload = {
+      const payload: any = {
         name: f.name,
         name_fr: f.name_fr,
         icon: f.icon || null,
+        image_url: f.image_url || null,
+        display_mode: f.display_mode || "icon",
         parent_id: f.parent_id || null,
       };
       if (f.mode === "edit" && f.id) {
@@ -101,8 +106,20 @@ export default function AdminCategoriesPage() {
   });
 
   const openEdit = (cat: Category) => {
-    setForm({ mode: "edit", id: cat.id, name: cat.name, name_fr: cat.name_fr, icon: cat.icon || "", parent_id: cat.parent_id || "" });
+    setForm({ mode: "edit", id: cat.id, name: cat.name, name_fr: cat.name_fr, icon: cat.icon || "", image_url: cat.image_url || "", display_mode: (cat as any).display_mode || "icon", parent_id: cat.parent_id || "" });
     setShowForm(true);
+  };
+
+  const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const path = `categories/${Date.now()}_${file.name}`;
+    const { error } = await supabase.storage.from("cms-assets").upload(path, file);
+    if (error) { toast.error(error.message); setUploading(false); return; }
+    const { data: urlData } = supabase.storage.from("cms-assets").getPublicUrl(path);
+    setForm(f => ({ ...f, image_url: urlData.publicUrl }));
+    setUploading(false);
   };
 
   const openAdd = (parentId?: string) => {
@@ -140,10 +157,37 @@ export default function AdminCategoriesPage() {
                 className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Icône (emoji)</label>
-              <input value={form.icon} onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))} placeholder="📱"
-                className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              <label className="text-xs text-muted-foreground block mb-1">Mode d'affichage</label>
+              <div className="flex gap-2">
+                <button onClick={() => setForm(f => ({ ...f, display_mode: "icon" }))} className={`flex-1 px-3 py-2 text-sm rounded-lg border transition-colors ${form.display_mode === "icon" ? "bg-primary text-primary-foreground border-primary" : "bg-muted border-border text-foreground hover:border-primary/50"}`}>
+                  Icône
+                </button>
+                <button onClick={() => setForm(f => ({ ...f, display_mode: "image" }))} className={`flex-1 px-3 py-2 text-sm rounded-lg border transition-colors ${form.display_mode === "image" ? "bg-primary text-primary-foreground border-primary" : "bg-muted border-border text-foreground hover:border-primary/50"}`}>
+                  Image
+                </button>
+              </div>
             </div>
+            {form.display_mode === "icon" ? (
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Icône (emoji)</label>
+                <input value={form.icon} onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))} placeholder="📱"
+                  className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Image de catégorie</label>
+                {form.image_url && (
+                  <div className="w-full h-20 rounded-lg overflow-hidden mb-2 bg-muted">
+                    <img src={form.image_url} alt="" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <label className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg cursor-pointer text-sm text-muted-foreground hover:bg-muted/80 w-fit">
+                  <Upload size={14} />
+                  {uploading ? "Upload..." : "Choisir une image"}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleUploadImage} disabled={uploading} />
+                </label>
+              </div>
+            )}
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Catégorie parente</label>
               <select value={form.parent_id} onChange={(e) => setForm((f) => ({ ...f, parent_id: e.target.value }))}
