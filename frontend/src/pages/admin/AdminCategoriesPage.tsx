@@ -67,10 +67,12 @@ export default function AdminCategoriesPage() {
 
   const saveMutation = useMutation({
     mutationFn: async (f: FormState) => {
-      const payload = {
+      const payload: any = {
         name: f.name,
         name_fr: f.name_fr,
         icon: f.icon || null,
+        image_url: f.image_url || null,
+        display_mode: f.display_mode || "icon",
         parent_id: f.parent_id || null,
       };
       if (f.mode === "edit" && f.id) {
