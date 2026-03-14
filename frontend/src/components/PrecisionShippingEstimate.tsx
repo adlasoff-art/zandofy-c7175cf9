@@ -107,21 +107,30 @@ export function PrecisionShippingEstimate({
   const height = productHeightCm || 0;
   const hasDimensions = length > 0 && width > 0 && height > 0;
 
-  // Resolve origin city
+  // Resolve origin city — fallback to CD (Congo) if product has no origin_country
+  const effectiveOriginCountry = originCountry || "CD";
+
   useEffect(() => {
-    if (!originCountry) return;
     const resolve = async () => {
       const { supabase } = await import("@/integrations/supabase/client");
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("cities")
         .select("*, zone:shipping_zones(id, name), logistic_zone:logistic_zones(id, name, continent)")
-        .eq("country_code", originCountry.toUpperCase())
+        .eq("country_code", effectiveOriginCountry.toUpperCase())
         .order("population", { ascending: false })
         .limit(1);
-      if (data && data.length > 0) setOriginCity(data[0] as unknown as City);
+      if (error) {
+        console.error("[ShippingEstimate] Origin city lookup error:", error);
+        return;
+      }
+      if (data && data.length > 0) {
+        setOriginCity(data[0] as unknown as City);
+      } else {
+        console.warn("[ShippingEstimate] No origin city found for", effectiveOriginCountry);
+      }
     };
     resolve();
-  }, [originCountry]);
+  }, [effectiveOriginCountry]);
 
   // City search
   const doSearch = useCallback(async (q: string) => {
