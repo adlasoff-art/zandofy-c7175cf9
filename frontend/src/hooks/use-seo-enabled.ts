@@ -7,20 +7,22 @@ export function useSeoEnabled() {
 
   useEffect(() => {
     let cancelled = false;
-    supabase
-      .from("platform_settings")
-      .select("value")
-      .eq("key", "seo_enabled")
-      .maybeSingle()
-      .then(({ data }) => {
+    const load = async () => {
+      try {
+        const { data } = await supabase
+          .from("platform_settings")
+          .select("value")
+          .eq("key", "seo_enabled")
+          .maybeSingle();
         if (!cancelled) {
           setSeoEnabled(data?.value === true);
           setIsLoading(false);
         }
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setIsLoading(false);
-      });
+      }
+    };
+    load();
     return () => { cancelled = true; };
   }, []);
 
