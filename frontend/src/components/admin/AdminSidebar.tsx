@@ -38,6 +38,7 @@ const adminItems = [
   { title: "Notifications", url: "/admin/notifications", icon: Bell },
   { title: "Paramètres", url: "/admin/settings", icon: Settings },
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
+  { title: "Templates Email", url: "/admin/email-templates", icon: Mail },
 ];
 
 export function AdminSidebar() {
