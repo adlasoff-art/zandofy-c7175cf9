@@ -37,6 +37,7 @@ const adminItems = [
   { title: "Journal d'audit", url: "/admin/audit", icon: ScrollText },
   { title: "Notifications", url: "/admin/notifications", icon: Bell },
   { title: "Paramètres", url: "/admin/settings", icon: Settings },
+  { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
 ];
 
 export function AdminSidebar() {
