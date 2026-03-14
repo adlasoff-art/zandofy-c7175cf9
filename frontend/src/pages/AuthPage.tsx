@@ -1,15 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ShieldCheck } from "lucide-react";
 import { useEffect } from "react";
 import { useI18n } from "@/contexts/I18nContext";
+import {
+  signInWithGoogle,
+  checkRateLimit,
+  recordFailedLogin,
+  resetLoginAttempts,
+  getPasswordStrength,
+} from "@/lib/auth-helpers";
 
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
@@ -19,12 +25,12 @@ export default function AuthPage() {
   const [lastName, setLastName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [lockoutMsg, setLockoutMsg] = useState<string | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useI18n();
 
-  // Extract referral code from URL
   const searchParams = new URLSearchParams(window.location.search);
   const refCode = searchParams.get("ref") || "";
 
@@ -32,11 +38,34 @@ export default function AuthPage() {
     if (user) navigate("/", { replace: true });
   }, [user, navigate]);
 
+  const pwStrength = mode === "signup" ? getPasswordStrength(password) : null;
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Rate-limit check
+    const rl = checkRateLimit();
+    if (!rl.allowed) {
+      const mins = Math.ceil(rl.remainingSeconds / 60);
+      setLockoutMsg(`Trop de tentatives. Réessayez dans ${mins} minute(s).`);
+      return;
+    }
+    setLockoutMsg(null);
     setLoading(true);
+
     try {
       if (mode === "signup") {
+        // Enforce password strength
+        if (getPasswordStrength(password).score < 3) {
+          toast({
+            title: "Mot de passe trop faible",
+            description: "Utilisez au moins 8 caractères avec majuscules, chiffres et symboles.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
         const { data: signUpData, error } = await supabase.auth.signUp({
           email,
           password,
@@ -47,9 +76,7 @@ export default function AuthPage() {
         });
         if (error) throw error;
 
-        // If referral code provided, create referral link after signup
         if (refCode && signUpData.user) {
-          // Find the referrer by code
           const { data: referrer } = await supabase
             .from("profiles")
             .select("id")
@@ -57,7 +84,6 @@ export default function AuthPage() {
             .maybeSingle();
 
           if (referrer) {
-            // Fetch referral settings
             const { data: settings } = await supabase
               .from("platform_settings")
               .select("value")
@@ -74,28 +100,28 @@ export default function AuthPage() {
               commission_pct: commissionPct,
               max_rewarded_orders: maxOrders,
             });
-
-            // Initialize wallet for new user
             await supabase.from("zando_points").insert({ user_id: signUpData.user.id });
           }
         }
-        toast({
-          title: t("auth.signupSuccess"),
-          description: t("auth.signupSuccessDesc"),
-        });
+        resetLoginAttempts();
+        toast({ title: t("auth.signupSuccess"), description: t("auth.signupSuccessDesc") });
       } else if (mode === "forgot") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/reset-password`,
         });
         if (error) throw error;
-        toast({
-          title: t("auth.emailSent"),
-          description: t("auth.emailSentDesc"),
-        });
+        toast({ title: t("auth.emailSent"), description: t("auth.emailSentDesc") });
         setMode("login");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          const result = recordFailedLogin();
+          if (result.locked) {
+            setLockoutMsg(`Compte temporairement verrouillé. Réessayez dans ${Math.ceil(result.remainingSeconds / 60)} minutes.`);
+          }
+          throw error;
+        }
+        resetLoginAttempts();
       }
     } catch (err: any) {
       toast({
@@ -109,13 +135,17 @@ export default function AuthPage() {
   };
 
   const handleGoogleLogin = async () => {
+    const rl = checkRateLimit();
+    if (!rl.allowed) {
+      const mins = Math.ceil(rl.remainingSeconds / 60);
+      setLockoutMsg(`Trop de tentatives. Réessayez dans ${mins} minute(s).`);
+      return;
+    }
     setLoading(true);
     try {
-      const { error } = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-      });
+      const { error } = await signInWithGoogle();
       if (error) {
-        toast({ title: t("auth.error"), description: String(error), variant: "destructive" });
+        toast({ title: t("auth.error"), description: error, variant: "destructive" });
       }
     } catch (err: any) {
       toast({ title: t("auth.error"), description: err.message || t("auth.genericError"), variant: "destructive" });
@@ -148,6 +178,13 @@ export default function AuthPage() {
               {mode === "forgot" && t("auth.forgotDesc")}
             </p>
           </div>
+
+          {lockoutMsg && (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+              <ShieldCheck size={16} />
+              {lockoutMsg}
+            </div>
+          )}
 
           {mode !== "forgot" && (
             <>
@@ -203,11 +240,22 @@ export default function AuthPage() {
                 <Label htmlFor="password" className="text-xs">{t("auth.password")}</Label>
                 <div className="relative">
                   <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="pl-9 pr-10 h-11" required minLength={6} />
+                  <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="pl-9 pr-10 h-11" required minLength={8} />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                {/* Password strength indicator for signup */}
+                {mode === "signup" && password.length > 0 && pwStrength && (
+                  <div className="space-y-1">
+                    <div className="flex gap-1 h-1.5">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className={`flex-1 rounded-full transition-colors ${i <= pwStrength.score ? pwStrength.color : "bg-muted"}`} />
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Force : {pwStrength.label}</p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -217,7 +265,7 @@ export default function AuthPage() {
               </button>
             )}
 
-            <Button type="submit" className="w-full h-12 font-bold" disabled={loading}>
+            <Button type="submit" className="w-full h-12 font-bold" disabled={loading || !!lockoutMsg}>
               {loading ? t("auth.loading") : mode === "login" ? t("auth.loginButton") : mode === "signup" ? t("auth.signupButton") : t("auth.sendLink")}
             </Button>
           </form>
@@ -230,6 +278,12 @@ export default function AuthPage() {
             ) : (
               <button onClick={() => setMode("login")} className="text-primary font-medium hover:underline inline-flex items-center gap-1"><ArrowLeft size={14} /> {t("auth.backToLogin")}</button>
             )}
+          </p>
+
+          {/* Security notice */}
+          <p className="text-center text-[11px] text-muted-foreground/60 flex items-center justify-center gap-1">
+            <ShieldCheck size={12} />
+            Connexion sécurisée · Données chiffrées
           </p>
         </div>
       </main>
