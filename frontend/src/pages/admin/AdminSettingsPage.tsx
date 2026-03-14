@@ -106,7 +106,11 @@ export default function AdminSettingsPage() {
       .from("platform_settings")
       .upsert({ key: "newness_duration_days", value: newnessDays as any, updated_at: now }, { onConflict: "key" });
 
-    const error = e1 || e2 || e3 || e4;
+    const { error: e5 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "payment_methods", value: paymentMethods as any, updated_at: now }, { onConflict: "key" });
+
+    const error = e1 || e2 || e3 || e4 || e5;
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
