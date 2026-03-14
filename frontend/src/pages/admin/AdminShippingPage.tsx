@@ -447,9 +447,11 @@ const AdminShippingPage: React.FC = () => {
   const [cityImporting, setCityImporting] = useState(false);
   const [cityImportResult, setCityImportResult] = useState<string | null>(null);
 
-  // Default rates inline editing
+  // Default rates editing
   const [editingDefaults, setEditingDefaults] = useState(false);
-  const [defaultForms, setDefaultForms] = useState<Record<string, { rate: number; unit: string }>>({});
+  const [defaultForms, setDefaultForms] = useState<Record<string, { rate: number; unit: string; origin_country: string; label: string }>>({});
+  const [showAddDefault, setShowAddDefault] = useState(false);
+  const [newDefault, setNewDefault] = useState({ mode: "air", rate: 0, unit: "kg", origin_country: "", label: "" });
 
   const load = async () => {
     setLoading(true);
