@@ -65,8 +65,7 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
     if (!user) return;
     setLoading(true);
     try {
-      const { data, error } = await (supabase.from("support_tickets") as any)
-        .select("*")
+      const { data, error } = await fromTable("support_tickets")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false });
       if (error) throw error;
