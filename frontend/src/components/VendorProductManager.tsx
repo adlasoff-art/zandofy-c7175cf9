@@ -448,7 +448,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     setDeleting(null);
   };
 
-  const showForm = creating || editing;
+  
 
   if (showForm) {
     return (
