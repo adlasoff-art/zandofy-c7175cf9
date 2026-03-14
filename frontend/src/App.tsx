@@ -93,8 +93,9 @@ function SupportDrawerWrapper() {
 
 function CmsThemeInjector() { useCmsTheme(); return null; }
 
+// Analytics is injected inside Router via a lazy component
+import { useAnalyticsTracker } from "@/hooks/use-analytics";
 function AnalyticsTrackerInjector() {
-  const { useAnalyticsTracker } = require("@/hooks/use-analytics");
   useAnalyticsTracker();
   return null;
 }
