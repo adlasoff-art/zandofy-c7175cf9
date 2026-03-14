@@ -737,10 +737,10 @@ export default function CheckoutPage() {
 
                 <div className="space-y-3">
                   {([
-                    { id: "stripe" as const, label: t("checkout.creditCard"), sub: "Visa, Mastercard, AMEX", icon: <CreditCard size={20} /> },
-                    { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, Wave, MTN", icon: <Smartphone size={20} /> },
-                    { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: "Cash on Delivery", icon: <Banknote size={20} /> },
-                  ]).map(method => (
+                    { id: "stripe" as const, label: t("checkout.creditCard"), sub: "Visa, Mastercard, AMEX", icon: <CreditCard size={20} />, configKey: "stripe" as const },
+                    { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, Wave, MTN", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
+                    { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: "Cash on Delivery", icon: <Banknote size={20} />, configKey: "cod" as const },
+                  ]).filter(m => paymentConfig?.[m.configKey] !== false).map(method => (
                     <button
                       key={method.id}
                       onClick={() => setPaymentMethod(method.id)}
