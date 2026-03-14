@@ -71,6 +71,72 @@ export type Database = {
         }
         Relationships: []
       }
+      analytics_events: {
+        Row: {
+          browser: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          device_type: string | null
+          duration_seconds: number | null
+          event_type: string
+          id: string
+          is_pwa: boolean | null
+          metadata: Json | null
+          os: string | null
+          page_path: string | null
+          product_id: string | null
+          referrer: string | null
+          screen_height: number | null
+          screen_width: number | null
+          session_id: string
+          store_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          browser?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          device_type?: string | null
+          duration_seconds?: number | null
+          event_type: string
+          id?: string
+          is_pwa?: boolean | null
+          metadata?: Json | null
+          os?: string | null
+          page_path?: string | null
+          product_id?: string | null
+          referrer?: string | null
+          screen_height?: number | null
+          screen_width?: number | null
+          session_id: string
+          store_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          browser?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          device_type?: string | null
+          duration_seconds?: number | null
+          event_type?: string
+          id?: string
+          is_pwa?: boolean | null
+          metadata?: Json | null
+          os?: string | null
+          page_path?: string | null
+          product_id?: string | null
+          referrer?: string | null
+          screen_height?: number | null
+          screen_width?: number | null
+          session_id?: string
+          store_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       badge_requests: {
         Row: {
           created_at: string
