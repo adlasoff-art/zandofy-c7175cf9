@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [ensureProfile]);
 
   // Check ban status when user changes
   useEffect(() => {
