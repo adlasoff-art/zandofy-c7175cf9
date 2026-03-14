@@ -233,25 +233,37 @@ export default function DashboardPage() {
 
 function OverviewTab({ orders, user }: { orders: OrderRow[]; user: any }) {
   const activeOrders = orders.filter(o => !["delivered", "cancelled", "returned"].includes(o.status)).length;
-  const totalSpent = orders.reduce((s, o) => s + Number(o.total), 0);
+  const completedStatuses = ["confirmed", "processing", "shipped", "delivered"];
+  const completedOrders = orders.filter(o => completedStatuses.includes(o.status));
+  const totalSpent = completedOrders.reduce((s, o) => s + Number(o.total), 0);
+  const cancelledCount = orders.filter(o => o.status === "cancelled").length;
+  const returnedCount = orders.filter(o => o.status === "returned").length;
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-card border border-border rounded-lg p-5">
-          <p className="text-sm text-muted-foreground">Bienvenue</p>
-          <p className="text-lg font-bold text-foreground mt-1 truncate">{user.email}</p>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-xs text-muted-foreground">Bienvenue</p>
+          <p className="text-sm font-bold text-foreground mt-1 truncate">{user.email}</p>
         </div>
-        <div className="bg-card border border-border rounded-lg p-5">
-          <p className="text-sm text-muted-foreground">Commandes en cours</p>
-          <p className="text-3xl font-bold text-primary mt-1">{activeOrders}</p>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-xs text-muted-foreground">En cours</p>
+          <p className="text-2xl font-bold text-primary mt-1">{activeOrders}</p>
         </div>
-        <div className="bg-card border border-border rounded-lg p-5">
-          <p className="text-sm text-muted-foreground">Total commandes</p>
-          <p className="text-3xl font-bold text-foreground mt-1">{orders.length}</p>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-xs text-muted-foreground">Total commandes</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{orders.length}</p>
         </div>
-        <div className="bg-card border border-border rounded-lg p-5">
-          <p className="text-sm text-muted-foreground">Total dépensé</p>
-          <p className="text-3xl font-bold text-foreground mt-1">${totalSpent.toFixed(2)}</p>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-xs text-muted-foreground">Total dépensé</p>
+          <p className="text-2xl font-bold text-foreground mt-1">${totalSpent.toFixed(2)}</p>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-xs text-muted-foreground">Annulées</p>
+          <p className="text-2xl font-bold text-destructive mt-1">{cancelledCount}</p>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-xs text-muted-foreground">Retournées</p>
+          <p className="text-2xl font-bold text-orange-500 mt-1">{returnedCount}</p>
         </div>
       </div>
       <LoyaltyProgress />

@@ -40,6 +40,7 @@ export default function AdminSettingsPage() {
     duration_minutes: 60,
   });
   const [newnessDays, setNewnessDays] = useState(14);
+  const [paymentMethods, setPaymentMethods] = useState({ mobile_money: true, stripe: true, cod: true });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
@@ -47,7 +48,7 @@ export default function AdminSettingsPage() {
     supabase
       .from("platform_settings")
       .select("key, value")
-      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days"])
+      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods"])
       .then(({ data }) => {
         data?.forEach((row) => {
           const v = row.value as any;
@@ -72,6 +73,8 @@ export default function AdminSettingsPage() {
             });
           } else if (row.key === "newness_duration_days") {
             setNewnessDays(Number(v) || 14);
+          } else if (row.key === "payment_methods") {
+            setPaymentMethods({ mobile_money: v.mobile_money !== false, stripe: v.stripe !== false, cod: v.cod !== false });
           }
         });
       });
@@ -103,7 +106,11 @@ export default function AdminSettingsPage() {
       .from("platform_settings")
       .upsert({ key: "newness_duration_days", value: newnessDays as any, updated_at: now }, { onConflict: "key" });
 
-    const error = e1 || e2 || e3 || e4;
+    const { error: e5 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "payment_methods", value: paymentMethods as any, updated_at: now }, { onConflict: "key" });
+
+    const error = e1 || e2 || e3 || e4 || e5;
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
@@ -139,7 +146,27 @@ export default function AdminSettingsPage() {
           </div>
         </section>
 
-        {/* Maintenance Mode */}
+        {/* Payment Methods Toggle */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Moyens de paiement</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">Activez ou désactivez les moyens de paiement disponibles pour les clients.</p>
+          <div className="space-y-3">
+            {([
+              { key: "stripe" as const, label: "Carte bancaire (Visa, Mastercard)" },
+              { key: "mobile_money" as const, label: "Mobile Money (Orange, M-Pesa, Airtel)" },
+              { key: "cod" as const, label: "Paiement à la livraison (COD)" },
+            ]).map((pm) => (
+              <div key={pm.key} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <span className="text-sm text-foreground">{pm.label}</span>
+                <Switch checked={paymentMethods[pm.key]} onCheckedChange={(v) => setPaymentMethods((prev) => ({ ...prev, [pm.key]: v }))} />
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="bg-card border-2 border-destructive/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle size={18} className="text-destructive" />

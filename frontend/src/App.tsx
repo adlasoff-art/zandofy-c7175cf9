@@ -80,6 +80,7 @@ const AdminPopupsPage = lazy(() => import("./pages/admin/AdminPopupsPage"));
 const AdminSupportPage = lazy(() => import("./pages/admin/AdminSupportPage"));
 const AdminProductModerationPage = lazy(() => import("./pages/admin/AdminProductModerationPage"));
 const AdminVariantTypesPage = lazy(() => import("./pages/admin/AdminVariantTypesPage"));
+const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1 } },
@@ -92,6 +93,13 @@ function SupportDrawerWrapper() {
 
 function CmsThemeInjector() { useCmsTheme(); return null; }
 
+// Analytics is injected inside Router via a lazy component
+import { useAnalyticsTracker } from "@/hooks/use-analytics";
+function AnalyticsTrackerInjector() {
+  useAnalyticsTracker();
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
@@ -103,6 +111,7 @@ const App = () => (
           <ThemeProvider>
           <UIConfigProvider>
             <CmsThemeInjector />
+            <AnalyticsTrackerInjector />
             <Toaster />
             <Sonner />
             <NotificationListener />
@@ -171,6 +180,7 @@ const App = () => (
                 <Route path="/admin/seo" element={<RoleGuard allowedRoles={["admin"]}><AdminSEOPage /></RoleGuard>} />
                 <Route path="/admin/countries" element={<RoleGuard allowedRoles={["admin"]}><AdminCountriesPage /></RoleGuard>} />
                 <Route path="/admin/popups" element={<RoleGuard allowedRoles={["admin"]}><AdminPopupsPage /></RoleGuard>} />
+                <Route path="/admin/analytics" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminAnalyticsPage /></RoleGuard>} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
