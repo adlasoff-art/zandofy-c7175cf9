@@ -82,7 +82,9 @@ export default function BecomeVendorPage() {
 
   // Load existing application
   useEffect(() => {
+    hasRestoredLocalDraftRef.current = false;
     if (!user) { setAppLoading(false); return; }
+
     (async () => {
       const { data } = await supabase
         .from("vendor_applications")
@@ -112,6 +114,10 @@ export default function BecomeVendorPage() {
         setStep(data.current_step || 1);
         setExistingApp(true);
 
+        if (localDraftKey && typeof localStorage !== "undefined") {
+          localStorage.removeItem(localDraftKey);
+        }
+
         // Load docs
         const { data: docData } = await supabase
           .from("vendor_documents")
@@ -121,9 +127,10 @@ export default function BecomeVendorPage() {
           setDocs(docData.map((d: any) => ({ type: d.document_type, url: d.document_url, file_name: d.file_name, id: d.id })));
         }
       }
+
       setAppLoading(false);
     })();
-  }, [user]);
+  }, [localDraftKey, user]);
 
   if (authLoading || appLoading) {
     return (
