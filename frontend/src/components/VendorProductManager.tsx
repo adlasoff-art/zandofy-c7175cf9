@@ -312,6 +312,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
   };
 
   const cancelForm = () => {
+    clearDraft();
     setEditing(null);
     setCreating(false);
   };
