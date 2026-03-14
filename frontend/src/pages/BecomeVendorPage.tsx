@@ -222,10 +222,16 @@ export default function BecomeVendorPage() {
   const handleSubmit = async () => {
     setSaving(true);
     if (form.id) {
-      await supabase
+      const { error } = await supabase
         .from("vendor_applications")
         .update({ status: "submitted", submitted_at: new Date().toISOString(), current_step: 4 })
         .eq("id", form.id);
+      if (error) {
+        console.error("Submit error:", error);
+        setSaving(false);
+        toast({ title: "Erreur", description: "Impossible de soumettre la demande. Veuillez réessayer.", variant: "destructive" });
+        return;
+      }
     }
     setForm((prev) => ({ ...prev, status: "submitted" }));
     setSaving(false);
