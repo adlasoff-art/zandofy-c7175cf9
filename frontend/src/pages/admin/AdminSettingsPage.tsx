@@ -40,6 +40,7 @@ export default function AdminSettingsPage() {
     duration_minutes: 60,
   });
   const [newnessDays, setNewnessDays] = useState(14);
+  const [paymentMethods, setPaymentMethods] = useState({ mobile_money: true, stripe: true, cod: true });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
