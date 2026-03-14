@@ -85,7 +85,7 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
     if (!user || !subject.trim() || !message.trim()) return;
     setLoading(true);
     try {
-      const { data: ticket, error: ticketErr } = await (supabase.from("support_tickets") as any)
+      const { data: ticket, error: ticketErr } = await fromTable("support_tickets")
         .insert({
           user_id: user.id,
           subject: subject.trim(),
