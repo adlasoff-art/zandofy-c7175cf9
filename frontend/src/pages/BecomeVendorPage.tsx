@@ -316,6 +316,9 @@ export default function BecomeVendorPage() {
         return;
       }
     }
+    if (localDraftKey && typeof localStorage !== "undefined") {
+      localStorage.removeItem(localDraftKey);
+    }
     setForm((prev) => ({ ...prev, status: "submitted" }));
     setSaving(false);
     toast({ title: t("vendor.submitted"), description: t("vendor.submittedDesc") });
