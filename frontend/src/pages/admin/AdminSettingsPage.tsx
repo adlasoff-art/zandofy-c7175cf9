@@ -146,7 +146,27 @@ export default function AdminSettingsPage() {
           </div>
         </section>
 
-        {/* Maintenance Mode */}
+        {/* Payment Methods Toggle */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Moyens de paiement</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">Activez ou désactivez les moyens de paiement disponibles pour les clients.</p>
+          <div className="space-y-3">
+            {([
+              { key: "stripe" as const, label: "Carte bancaire (Visa, Mastercard)" },
+              { key: "mobile_money" as const, label: "Mobile Money (Orange, M-Pesa, Airtel)" },
+              { key: "cod" as const, label: "Paiement à la livraison (COD)" },
+            ]).map((pm) => (
+              <div key={pm.key} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <span className="text-sm text-foreground">{pm.label}</span>
+                <Switch checked={paymentMethods[pm.key]} onCheckedChange={(v) => setPaymentMethods((prev) => ({ ...prev, [pm.key]: v }))} />
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="bg-card border-2 border-destructive/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle size={18} className="text-destructive" />
