@@ -1,7 +1,3 @@
-/**
- * Analytics tracking hook — tracks page views, product clicks, store views,
- * session duration, device info, PWA installs, etc.
- */
 import { useEffect, useRef, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,7 +50,7 @@ async function trackEvent(
   userId?: string
 ) {
   const sessionId = getSessionId();
-  const payload: Record<string, any> = {
+  const row: any = {
     session_id: sessionId,
     event_type: eventType,
     page_path: window.location.pathname,
@@ -67,16 +63,15 @@ async function trackEvent(
     screen_height: window.screen.height,
     ...extra,
   };
-  if (userId) payload.user_id = userId;
+  if (userId) row.user_id = userId;
 
   try {
-    await supabase.from("analytics_events").insert(payload);
+    await (supabase.from("analytics_events") as any).insert(row);
   } catch {
-    // Silent fail — analytics should never break the app
+    // Silent fail
   }
 }
 
-/** Global analytics tracker — place once in App */
 export function useAnalyticsTracker() {
   const location = useLocation();
   const { user } = useAuth();
@@ -84,15 +79,13 @@ export function useAnalyticsTracker() {
   const lastPathRef = useRef<string>("");
   const pageStartRef = useRef<number>(Date.now());
 
-  // Track session start
   useEffect(() => {
     sessionStartRef.current = Date.now();
     trackEvent("session_start", {}, user?.id);
 
     const handleBeforeUnload = () => {
       const duration = Math.round((Date.now() - sessionStartRef.current) / 1000);
-      // Use sendBeacon for reliability
-      const payload = {
+      const row: any = {
         session_id: getSessionId(),
         event_type: "session_end",
         page_path: window.location.pathname,
@@ -103,12 +96,17 @@ export function useAnalyticsTracker() {
         screen_width: window.screen.width,
         screen_height: window.screen.height,
         duration_seconds: duration,
-        ...(user?.id ? { user_id: user.id } : {}),
       };
+      if (user?.id) row.user_id = user.id;
       const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/analytics_events`;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      };
       navigator.sendBeacon(
-        url,
-        new Blob([JSON.stringify(payload)], { type: "application/json" })
+        url + "?" + new URLSearchParams({ apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY }).toString(),
+        new Blob([JSON.stringify(row)], { type: "application/json" })
       );
     };
 
@@ -116,12 +114,10 @@ export function useAnalyticsTracker() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [user?.id]);
 
-  // Track page views
   useEffect(() => {
     const path = location.pathname;
     if (path === lastPathRef.current) return;
 
-    // Track duration on previous page
     if (lastPathRef.current) {
       const duration = Math.round((Date.now() - pageStartRef.current) / 1000);
       if (duration > 0) {
@@ -135,7 +131,6 @@ export function useAnalyticsTracker() {
     lastPathRef.current = path;
     pageStartRef.current = Date.now();
 
-    // Determine if it's a product or store page
     const extra: Record<string, any> = {};
     const productMatch = path.match(/^\/product\/(.+)$/);
     const storeMatch = path.match(/^\/store\/(.+)$/);
@@ -146,7 +141,6 @@ export function useAnalyticsTracker() {
   }, [location.pathname, user?.id]);
 }
 
-/** Track a product click from any list/grid */
 export function useTrackProductClick() {
   const { user } = useAuth();
   return useCallback(
@@ -160,7 +154,6 @@ export function useTrackProductClick() {
   );
 }
 
-/** Track a store view */
 export function useTrackStoreView() {
   const { user } = useAuth();
   return useCallback(
@@ -171,7 +164,6 @@ export function useTrackStoreView() {
   );
 }
 
-/** Track PWA install */
 export function trackPWAInstall(userId?: string) {
   trackEvent("pwa_install", {
     metadata: { standalone: isPWA(), os: getOS(), device: getDeviceType() },

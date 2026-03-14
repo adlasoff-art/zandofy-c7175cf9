@@ -64,13 +64,12 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
     if (!user) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("support_tickets")
+      const { data, error } = await (supabase.from("support_tickets") as any)
         .select("*")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false });
       if (error) throw error;
-      setTickets(data || []);
+      setTickets((data || []) as SupportTicket[]);
     } catch (err: any) {
       console.error("Fetch tickets error:", err);
       toast({ title: "Erreur", description: "Impossible de charger les tickets", variant: "destructive" });
@@ -86,9 +85,7 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
     if (!user || !subject.trim() || !message.trim()) return;
     setLoading(true);
     try {
-      // Create ticket
-      const { data: ticket, error: ticketErr } = await supabase
-        .from("support_tickets")
+      const { data: ticket, error: ticketErr } = await (supabase.from("support_tickets") as any)
         .insert({
           user_id: user.id,
           subject: subject.trim(),
@@ -100,9 +97,7 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
         .single();
       if (ticketErr || !ticket) throw ticketErr;
 
-      // Create initial message
-      const { error: msgErr } = await supabase
-        .from("support_messages")
+      const { error: msgErr } = await (supabase.from("support_messages") as any)
         .insert({
           ticket_id: ticket.id,
           sender_id: user.id,
@@ -114,8 +109,9 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
       setSubject("");
       setCategory("other");
       setMessage("");
-      setTickets((prev) => [ticket, ...prev]);
-      setSelectedTicket(ticket);
+      const tkCast = ticket as SupportTicket;
+      setTickets((prev) => [tkCast, ...prev]);
+      setSelectedTicket(tkCast);
       setView("chat");
       setMessages([]);
       toast({ title: "Ticket créé", description: "Notre équipe vous répondra bientôt." });
@@ -212,7 +208,7 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
                   >
                     <div className="flex items-center justify-between">
                       <p className="font-medium text-sm text-foreground truncate flex-1">{tk.subject}</p>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ml-2 ${
                         tk.status === "open" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                         : tk.status === "in_progress" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
                         : tk.status === "resolved" || tk.status === "closed" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
@@ -261,17 +257,14 @@ function SupportChatInner({
   useEffect(() => {
     if (!ticketId) return;
 
-    // Fetch messages
     (async () => {
-      const { data } = await supabase
-        .from("support_messages")
+      const { data } = await (supabase.from("support_messages") as any)
         .select("*")
         .eq("ticket_id", ticketId)
         .order("created_at", { ascending: true });
-      setMessages(data || []);
+      setMessages((data || []) as SupportMessage[]);
     })();
 
-    // Realtime subscription
     const channel = supabase
       .channel(`support-messages-${ticketId}`)
       .on(
@@ -295,7 +288,6 @@ function SupportChatInner({
     return () => { supabase.removeChannel(channel); };
   }, [ticketId, setMessages]);
 
-  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -304,8 +296,7 @@ function SupportChatInner({
     if (!messageInput.trim() || sending) return;
     setSending(true);
     try {
-      const { error } = await supabase
-        .from("support_messages")
+      const { error } = await (supabase.from("support_messages") as any)
         .insert({
           ticket_id: ticketId,
           sender_id: userId,
@@ -314,8 +305,7 @@ function SupportChatInner({
         });
       if (error) throw error;
       setMessageInput("");
-      // Update ticket updated_at
-      await supabase.from("support_tickets").update({ updated_at: new Date().toISOString() }).eq("id", ticketId);
+      await (supabase.from("support_tickets") as any).update({ updated_at: new Date().toISOString() }).eq("id", ticketId);
     } catch (err) {
       console.error("Send message error:", err);
     }

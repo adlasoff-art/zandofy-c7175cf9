@@ -6,7 +6,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { Header } from "@/components/Header";
 import {
   BarChart3, Users, Eye, MousePointer, Smartphone, Monitor, Tablet,
-  Globe, TrendingUp, Clock, Download, Store, Package,
+  Globe, TrendingUp, Clock, Download, Store,
 } from "lucide-react";
 
 const PERIODS = [
@@ -16,6 +16,22 @@ const PERIODS = [
   { key: "365d", label: "1 an", days: 365 },
 ];
 
+interface AnalyticsEvent {
+  event_type: string;
+  page_path: string | null;
+  product_id: string | null;
+  store_id: string | null;
+  device_type: string | null;
+  os: string | null;
+  browser: string | null;
+  is_pwa: boolean | null;
+  session_id: string;
+  user_id: string | null;
+  duration_seconds: number | null;
+  created_at: string;
+  metadata: any;
+}
+
 export default function AdminAnalyticsPage() {
   const [period, setPeriod] = useState("30d");
   const days = PERIODS.find((p) => p.key === period)?.days || 30;
@@ -24,23 +40,20 @@ export default function AdminAnalyticsPage() {
   const { data: events, isLoading } = useQuery({
     queryKey: ["admin-analytics", period],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("analytics_events")
+      const { data } = await (supabase.from("analytics_events") as any)
         .select("event_type, page_path, product_id, store_id, device_type, os, browser, is_pwa, session_id, user_id, duration_seconds, created_at, metadata")
         .gte("created_at", since)
         .order("created_at", { ascending: false })
         .limit(50000);
-      return data || [];
+      return (data || []) as AnalyticsEvent[];
     },
   });
 
-  // Compute metrics
   const allEvents = events || [];
   const pageViews = allEvents.filter((e) => e.event_type === "page_view");
   const productClicks = allEvents.filter((e) => e.event_type === "product_click");
   const storeViews = allEvents.filter((e) => e.event_type === "store_view");
   const pwaInstalls = allEvents.filter((e) => e.event_type === "pwa_install");
-  const sessionStarts = allEvents.filter((e) => e.event_type === "session_start");
   const sessionEnds = allEvents.filter((e) => e.event_type === "session_end");
 
   const uniqueSessions = new Set(allEvents.map((e) => e.session_id)).size;
@@ -66,12 +79,6 @@ export default function AdminAnalyticsPage() {
   });
 
   // OS breakdown
-  const osCounts: Record<string, number> = {};
-  uniqueDeviceSessions.forEach(() => {}); // already mapped
-  allEvents.forEach((e) => {
-    if (e.os) osCounts[e.os] = (osCounts[e.os] || 0) + 1;
-  });
-  // Deduplicate by session
   const osSessionMap = new Map<string, string>();
   allEvents.forEach((e) => {
     if (!osSessionMap.has(e.session_id) && e.os) osSessionMap.set(e.session_id, e.os);
@@ -85,37 +92,23 @@ export default function AdminAnalyticsPage() {
 
   // Top pages
   const pageCounts: Record<string, number> = {};
-  pageViews.forEach((e) => {
-    const p = e.page_path || "/";
-    pageCounts[p] = (pageCounts[p] || 0) + 1;
-  });
-  const topPages = Object.entries(pageCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
+  pageViews.forEach((e) => { const p = e.page_path || "/"; pageCounts[p] = (pageCounts[p] || 0) + 1; });
+  const topPages = Object.entries(pageCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
-  // Top products clicked
+  // Top products
   const productClickCounts: Record<string, number> = {};
-  productClicks.forEach((e) => {
-    if (e.product_id) productClickCounts[e.product_id] = (productClickCounts[e.product_id] || 0) + 1;
-  });
-  const topProducts = Object.entries(productClickCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
+  productClicks.forEach((e) => { if (e.product_id) productClickCounts[e.product_id] = (productClickCounts[e.product_id] || 0) + 1; });
+  const topProducts = Object.entries(productClickCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
-  // Top stores viewed
+  // Top stores
   const storeViewCounts: Record<string, number> = {};
-  storeViews.forEach((e) => {
-    if (e.store_id) storeViewCounts[e.store_id] = (storeViewCounts[e.store_id] || 0) + 1;
-  });
-  const topStores = Object.entries(storeViewCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
+  storeViews.forEach((e) => { if (e.store_id) storeViewCounts[e.store_id] = (storeViewCounts[e.store_id] || 0) + 1; });
+  const topStores = Object.entries(storeViewCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
   // PWA installs by OS
   const pwaByOS: Record<string, number> = {};
   pwaInstalls.forEach((e) => {
-    const meta = e.metadata as Record<string, any> | null;
-    const os = meta?.os || e.os || "unknown";
+    const os = (e.metadata as any)?.os || e.os || "unknown";
     pwaByOS[os] = (pwaByOS[os] || 0) + 1;
   });
 
@@ -144,7 +137,7 @@ export default function AdminAnalyticsPage() {
         <div className="flex-1 flex flex-col">
           <Header />
           <main className="flex-1 p-4 md:p-6 space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
                 <BarChart3 size={22} /> Analytics & Tracking
               </h1>
@@ -154,9 +147,7 @@ export default function AdminAnalyticsPage() {
                     key={p.key}
                     onClick={() => setPeriod(p.key)}
                     className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
-                      period === p.key
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      period === p.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
                     }`}
                   >
                     {p.label}
@@ -169,29 +160,26 @@ export default function AdminAnalyticsPage() {
               <div className="flex items-center justify-center py-12 text-muted-foreground">Chargement...</div>
             ) : (
               <>
-                {/* KPI Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                   <StatCard icon={Eye} label="Pages vues" value={pageViews.length} />
                   <StatCard icon={Users} label="Sessions" value={uniqueSessions} />
-                  <StatCard icon={Users} label="Utilisateurs connectés" value={uniqueUsers} />
-                  <StatCard icon={Globe} label="Visiteurs anonymes" value={anonymousVisitors} />
-                  <StatCard icon={Clock} label="Durée moy. session" value={formatDuration(avgSessionDuration)} />
-                  <StatCard icon={Download} label="Installations PWA" value={pwaInstalls.length} />
+                  <StatCard icon={Users} label="Connectés" value={uniqueUsers} />
+                  <StatCard icon={Globe} label="Anonymes" value={anonymousVisitors} />
+                  <StatCard icon={Clock} label="Durée moy." value={formatDuration(avgSessionDuration)} />
+                  <StatCard icon={Download} label="PWA installées" value={pwaInstalls.length} />
                 </div>
 
-                {/* Device + OS + PWA */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Device Type */}
                   <div className="bg-card border border-border rounded-lg p-4">
                     <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                       <Monitor size={16} /> Appareils
                     </h3>
                     <div className="space-y-2">
-                      {[
+                      {([
                         { label: "Mobile", icon: Smartphone, count: deviceCounts.mobile },
                         { label: "Tablette", icon: Tablet, count: deviceCounts.tablet },
                         { label: "Ordinateur", icon: Monitor, count: deviceCounts.desktop },
-                      ].map((d) => {
+                      ] as const).map((d) => {
                         const pct = uniqueSessions > 0 ? Math.round((d.count / uniqueSessions) * 100) : 0;
                         return (
                           <div key={d.label} className="flex items-center gap-2">
@@ -205,28 +193,24 @@ export default function AdminAnalyticsPage() {
                     </div>
                   </div>
 
-                  {/* OS */}
                   <div className="bg-card border border-border rounded-lg p-4">
                     <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                       <Globe size={16} /> Systèmes d'exploitation
                     </h3>
                     <div className="space-y-2">
-                      {Object.entries(osBreakdown)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([os, count]) => {
-                          const pct = uniqueSessions > 0 ? Math.round((count / uniqueSessions) * 100) : 0;
-                          return (
-                            <div key={os} className="flex items-center gap-2">
-                              <span className="text-sm text-foreground flex-1 capitalize">{os}</span>
-                              <span className="text-sm font-medium text-foreground">{count}</span>
-                              <span className="text-xs text-muted-foreground w-10 text-right">{pct}%</span>
-                            </div>
-                          );
-                        })}
+                      {Object.entries(osBreakdown).sort((a, b) => b[1] - a[1]).map(([os, count]) => {
+                        const pct = uniqueSessions > 0 ? Math.round((count / uniqueSessions) * 100) : 0;
+                        return (
+                          <div key={os} className="flex items-center gap-2">
+                            <span className="text-sm text-foreground flex-1 capitalize">{os}</span>
+                            <span className="text-sm font-medium text-foreground">{count}</span>
+                            <span className="text-xs text-muted-foreground w-10 text-right">{pct}%</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* PWA vs Web */}
                   <div className="bg-card border border-border rounded-lg p-4">
                     <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                       <Smartphone size={16} /> PWA vs Navigateur
@@ -243,7 +227,7 @@ export default function AdminAnalyticsPage() {
                       {Object.entries(pwaByOS).length > 0 && (
                         <>
                           <hr className="border-border" />
-                          <p className="text-xs text-muted-foreground font-medium">Installations PWA par OS</p>
+                          <p className="text-xs text-muted-foreground font-medium">Installations par OS</p>
                           {Object.entries(pwaByOS).sort((a, b) => b[1] - a[1]).map(([os, count]) => (
                             <div key={os} className="flex items-center gap-2">
                               <span className="text-xs text-foreground flex-1 capitalize">{os}</span>
@@ -256,7 +240,6 @@ export default function AdminAnalyticsPage() {
                   </div>
                 </div>
 
-                {/* Top Pages, Products, Stores */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-card border border-border rounded-lg p-4">
                     <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
