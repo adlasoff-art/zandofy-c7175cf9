@@ -107,21 +107,30 @@ export function PrecisionShippingEstimate({
   const height = productHeightCm || 0;
   const hasDimensions = length > 0 && width > 0 && height > 0;
 
-  // Resolve origin city
+  // Resolve origin city — fallback to CD (Congo) if product has no origin_country
+  const effectiveOriginCountry = originCountry || "CD";
+
   useEffect(() => {
-    if (!originCountry) return;
     const resolve = async () => {
       const { supabase } = await import("@/integrations/supabase/client");
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("cities")
         .select("*, zone:shipping_zones(id, name), logistic_zone:logistic_zones(id, name, continent)")
-        .eq("country_code", originCountry.toUpperCase())
+        .eq("country_code", effectiveOriginCountry.toUpperCase())
         .order("population", { ascending: false })
         .limit(1);
-      if (data && data.length > 0) setOriginCity(data[0] as unknown as City);
+      if (error) {
+        console.error("[ShippingEstimate] Origin city lookup error:", error);
+        return;
+      }
+      if (data && data.length > 0) {
+        setOriginCity(data[0] as unknown as City);
+      } else {
+        console.warn("[ShippingEstimate] No origin city found for", effectiveOriginCountry);
+      }
     };
     resolve();
-  }, [originCountry]);
+  }, [effectiveOriginCountry]);
 
   // City search
   const doSearch = useCallback(async (q: string) => {
@@ -136,31 +145,57 @@ export function PrecisionShippingEstimate({
     return () => clearTimeout(timer);
   }, [query, open, doSearch]);
 
+  // Queue: if user selects a city before originCity resolves, retry once ready
+  const [pendingCity, setPendingCity] = useState<City | null>(null);
+
+  const runEstimate = useCallback(async (origin: City, dest: City) => {
+    setCalculating(true);
+    const landOk = isLandTransportFeasible(origin.country_code, dest.country_code);
+    const modes = landOk ? ["air", "sea", "road", "rail"] : ["air", "sea"];
+    try {
+      const quoteResults = await Promise.all(
+        modes.map(mode =>
+          calculateDynamicQuote({
+            origin_city_id: origin.id,
+            destination_city_id: dest.id,
+            mode,
+            weight_grams: 1000,
+            volume_cbm: 1,
+            quantity: 1,
+          })
+        )
+      );
+      const valid = quoteResults.filter(Boolean) as DynamicQuoteResult[];
+      console.log("[ShippingEstimate] Quotes:", valid.length, "for", origin.name, "→", dest.name);
+      setRawQuotes(valid);
+    } catch (err) {
+      console.error("[ShippingEstimate] Quote calculation error:", err);
+    }
+    setCalculating(false);
+  }, []);
+
+  // Retry pending selection when originCity resolves
+  useEffect(() => {
+    if (originCity && pendingCity) {
+      runEstimate(originCity, pendingCity);
+      setPendingCity(null);
+    }
+  }, [originCity, pendingCity, runEstimate]);
+
   // Fetch base rates when city selected
   const handleSelect = async (city: City) => {
     setSelectedCity(city);
     setQuery(`${city.name} (${city.country_code})`);
     setOpen(false);
-    if (!originCity) return;
 
-    setCalculating(true);
-    // Only show road/rail for same country or neighboring countries
-    const landOk = originCity && isLandTransportFeasible(originCity.country_code, city.country_code);
-    const modes = landOk ? ["air", "sea", "road", "rail"] : ["air", "sea"];
-    const results = await Promise.all(
-      modes.map(mode =>
-        calculateDynamicQuote({
-          origin_city_id: originCity.id,
-          destination_city_id: city.id,
-          mode,
-          weight_grams: 1000, // 1kg base for rate extraction
-          volume_cbm: 1,      // 1 CBM base for rate extraction
-          quantity: 1,
-        })
-      )
-    );
-    setRawQuotes(results.filter(Boolean) as DynamicQuoteResult[]);
-    setCalculating(false);
+    if (!originCity) {
+      console.warn("[ShippingEstimate] originCity not yet resolved, queuing...");
+      setPendingCity(city);
+      setCalculating(true);
+      return;
+    }
+
+    await runEstimate(originCity, city);
   };
 
   // ── Precision quotes recalculated on every quantity/weight change ──
