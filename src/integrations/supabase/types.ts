@@ -2038,7 +2038,9 @@ export type Database = {
           currency: string
           default_rate: number
           id: string
+          label: string | null
           mode: string
+          origin_country: string | null
           rate_unit: string
           updated_at: string
         }
@@ -2046,7 +2048,9 @@ export type Database = {
           currency?: string
           default_rate?: number
           id?: string
+          label?: string | null
           mode: string
+          origin_country?: string | null
           rate_unit?: string
           updated_at?: string
         }
@@ -2054,7 +2058,9 @@ export type Database = {
           currency?: string
           default_rate?: number
           id?: string
+          label?: string | null
           mode?: string
+          origin_country?: string | null
           rate_unit?: string
           updated_at?: string
         }
