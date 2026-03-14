@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { fromTable } from "@/lib/supabase-helpers";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Header } from "@/components/Header";
