@@ -57,6 +57,15 @@ const initialData: ApplicationData = {
   status: "draft",
 };
 
+interface VendorApplicationLocalDraft {
+  savedAt: number;
+  step: number;
+  form: ApplicationData;
+  docs: DocFile[];
+}
+
+const LOCAL_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 export default function BecomeVendorPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
