@@ -296,7 +296,7 @@ function SupportChatInner({
     if (!messageInput.trim() || sending) return;
     setSending(true);
     try {
-      const { error } = await (supabase.from("support_messages") as any)
+      const { error } = await fromTable("support_messages")
         .insert({
           ticket_id: ticketId,
           sender_id: userId,
