@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
   Plane, Ship, TruckIcon, Plus, Trash2, Edit2, Search, Calculator, MapPin,
