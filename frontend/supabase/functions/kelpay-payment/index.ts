@@ -8,30 +8,11 @@ const corsHeaders = {
 
 const KELPAY_URL = "https://pay.keccel.com/kelpay/v1/payment.asp";
 
-/**
- * Normalise un numéro RDC vers le format 0XXXXXXXXX (10 chiffres)
- * KelPay attend le format 0XXXXXXXXX ou 243XXXXXXXXX
- */
 function normalizePhone(raw: string): string | null {
-  // Remove all non-digit characters
   let digits = raw.replace(/\D/g, "");
-
-  // If starts with 243 and has 12 digits → valid international format
-  if (digits.startsWith("243") && digits.length === 12) {
-    return digits; // 243XXXXXXXXX
-  }
-
-  // If starts with 0 and has 10 digits → valid local format
-  if (digits.startsWith("0") && digits.length === 10) {
-    return digits; // 0XXXXXXXXX
-  }
-
-  // If 9 digits without prefix → add 0
-  if (!digits.startsWith("0") && !digits.startsWith("243") && digits.length === 9) {
-    return "0" + digits;
-  }
-
-  // Invalid format
+  if (digits.startsWith("243") && digits.length === 12) return digits;
+  if (digits.startsWith("0") && digits.length === 10) return digits;
+  if (!digits.startsWith("0") && !digits.startsWith("243") && digits.length === 9) return "0" + digits;
   return null;
 }
 
@@ -62,20 +43,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify user
+    // Verify user via getUser (correct Supabase method)
     const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: claimsData, error: claimsErr } = await supabaseUser.auth.getClaims(
-      authHeader.replace("Bearer ", "")
-    );
-    if (claimsErr || !claimsData?.claims) {
+    const { data: userData, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const userId = claimsData.claims.sub as string;
+    const userId = userData.user.id;
 
     const body = await req.json();
     const { order_id, phone_number, amount, currency, provider } = body;
@@ -87,24 +66,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Normalize and validate phone number
     const cleanPhone = normalizePhone(phone_number);
     if (!cleanPhone) {
       return new Response(
-        JSON.stringify({ 
-          error: "Numéro de téléphone invalide. Format attendu : 0XXXXXXXXX ou 243XXXXXXXXX (RDC)" 
-        }),
+        JSON.stringify({ error: "Numéro de téléphone invalide. Format attendu : 0XXXXXXXXX ou 243XXXXXXXXX (RDC)" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Fix floating-point precision: round to 2 decimal places
     const cleanAmount = Math.round(Number(amount) * 100) / 100;
-
-    // Generate unique reference
     const reference = `ZPY-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
-    // Build callback URL
     const callbackUrl = `${supabaseUrl}/functions/v1/kelpay-callback`;
 
     console.log("KelPay request:", JSON.stringify({
@@ -116,7 +87,6 @@ Deno.serve(async (req) => {
       callbackurl: callbackUrl,
     }));
 
-    // Call KelPay API
     const kelpayResponse = await fetch(KELPAY_URL, {
       method: "POST",
       headers: {
@@ -137,11 +107,9 @@ Deno.serve(async (req) => {
     const kelpayData = await kelpayResponse.json();
     console.log("KelPay response:", JSON.stringify(kelpayData));
 
-    // Use service role to insert payment transaction (bypasses RLS)
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     if (kelpayData.code === "0") {
-      // Request accepted by KelPay
       await supabaseAdmin.from("payment_transactions").insert({
         order_id,
         user_id: userId,
@@ -155,7 +123,6 @@ Deno.serve(async (req) => {
         status: "pending",
       });
 
-      // Update order payment_method
       await supabaseAdmin
         .from("orders")
         .update({ payment_method: "mobile_money" })
@@ -171,7 +138,6 @@ Deno.serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } else {
-      // Request rejected by KelPay
       await supabaseAdmin.from("payment_transactions").insert({
         order_id,
         user_id: userId,

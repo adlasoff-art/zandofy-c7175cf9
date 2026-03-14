@@ -66,6 +66,7 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
     setLoading(true);
     try {
       const { data, error } = await fromTable("support_tickets")
+        .select("*")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false });
       if (error) throw error;
