@@ -76,6 +76,22 @@ const EMPTY_FORM = {
   height_cm: 0,
 };
 
+type ProductFormState = typeof EMPTY_FORM;
+
+interface ProductDraftSnapshot {
+  updatedAt: number;
+  mode: "create" | "edit";
+  productId: string | null;
+  form: ProductFormState;
+  mainImage: MediaItem[];
+  variationMedia: MediaItem[];
+  sizes: SizeVariant[];
+  colors: ColorVariant[];
+  dynamicSelections: DynamicVariantSelection[];
+}
+
+const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+
 export function VendorProductManager({ storeId }: { storeId: string }) {
   const { user } = useAuth();
   const { subscription, tierConfig, canAddProduct } = useVendorSubscription(storeId);
