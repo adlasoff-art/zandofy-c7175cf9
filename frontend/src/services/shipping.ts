@@ -45,6 +45,8 @@ export interface ShippingDefault {
   default_rate: number;
   rate_unit: string;
   currency: string;
+  origin_country: string | null;
+  label: string | null;
 }
 
 export interface ShippingQuote {

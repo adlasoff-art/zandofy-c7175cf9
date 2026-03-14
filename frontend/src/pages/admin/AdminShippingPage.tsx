@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
   Plane, Ship, TruckIcon, Plus, Trash2, Edit2, Search, Calculator, MapPin,
@@ -446,9 +447,11 @@ const AdminShippingPage: React.FC = () => {
   const [cityImporting, setCityImporting] = useState(false);
   const [cityImportResult, setCityImportResult] = useState<string | null>(null);
 
-  // Default rates inline editing
+  // Default rates editing
   const [editingDefaults, setEditingDefaults] = useState(false);
-  const [defaultForms, setDefaultForms] = useState<Record<string, { rate: number; unit: string }>>({});
+  const [defaultForms, setDefaultForms] = useState<Record<string, { rate: number; unit: string; origin_country: string; label: string }>>({});
+  const [showAddDefault, setShowAddDefault] = useState(false);
+  const [newDefault, setNewDefault] = useState({ mode: "air", rate: 0, unit: "kg", origin_country: "", label: "" });
 
   const load = async () => {
     setLoading(true);
@@ -515,23 +518,54 @@ const AdminShippingPage: React.FC = () => {
 
   // Save defaults
   const handleSaveDefaults = async () => {
-    for (const mode of ["air", "sea", "road", "rail"]) {
-      const f = defaultForms[mode];
+    for (const key of Object.keys(defaultForms)) {
+      const f = defaultForms[key];
       if (!f) continue;
-      const existing = defaults.find(d => d.mode === mode);
-      await upsertShippingDefault({ id: existing?.id, mode, default_rate: f.rate, rate_unit: f.unit, currency: "USD" });
+      const existing = defaults.find(d => `${d.mode}-${d.origin_country || "global"}` === key);
+      await upsertShippingDefault({
+        id: existing?.id,
+        mode: key.split("-")[0],
+        default_rate: f.rate,
+        rate_unit: f.unit,
+        currency: "USD",
+        origin_country: f.origin_country || null,
+        label: f.label || null,
+      } as any);
     }
     toast.success("Tarifs par défaut mis à jour");
     setEditingDefaults(false);
     load();
   };
 
+  const handleAddDefault = async () => {
+    await upsertShippingDefault({
+      mode: newDefault.mode,
+      default_rate: newDefault.rate,
+      rate_unit: newDefault.unit,
+      currency: "USD",
+      origin_country: newDefault.origin_country || null,
+      label: newDefault.label || null,
+    } as any);
+    toast.success("Tarif ajouté");
+    setShowAddDefault(false);
+    setNewDefault({ mode: "air", rate: 0, unit: "kg", origin_country: "", label: "" });
+    load();
+  };
+
+  const handleDeleteDefault = async (id: string) => {
+    if (!confirm("Supprimer ce tarif par défaut ?")) return;
+    const { error } = await supabase.from("shipping_defaults").delete().eq("id", id);
+    if (error) { toast.error("Erreur: " + error.message); return; }
+    toast.success("Tarif supprimé");
+    load();
+  };
+
   useEffect(() => {
     if (editingDefaults) {
-      const forms: Record<string, { rate: number; unit: string }> = {};
-      for (const mode of ["air", "sea", "road", "rail"]) {
-        const d = defaults.find(x => x.mode === mode);
-        forms[mode] = { rate: d?.default_rate || 0, unit: d?.rate_unit || (mode === "sea" ? "cbm" : mode === "road" ? "fixed" : "kg") };
+      const forms: Record<string, { rate: number; unit: string; origin_country: string; label: string }> = {};
+      for (const d of defaults) {
+        const key = `${d.mode}-${d.origin_country || "global"}`;
+        forms[key] = { rate: d.default_rate, unit: d.rate_unit, origin_country: d.origin_country || "", label: d.label || "" };
       }
       setDefaultForms(forms);
     }
@@ -849,51 +883,112 @@ const AdminShippingPage: React.FC = () => {
 
             {/* ── Defaults Tab ── */}
             <TabsContent value="defaults" className="space-y-4">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-wrap justify-between items-center gap-2">
                 <div>
-                  <p className="text-sm text-muted-foreground">Tarifs de repli globaux utilisés quand aucune route spécifique n'est trouvée.</p>
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><AlertTriangle size={12} /> Ex : $19/kg pour l'aérien est un standard industriel.</p>
+                  <p className="text-sm text-muted-foreground">Tarifs de repli par origine et mode de transport.</p>
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><AlertTriangle size={12} /> Les tarifs avec un pays d'origine sont prioritaires. Sans pays = repli global.</p>
                 </div>
-                <Button size="sm" variant={editingDefaults ? "default" : "outline"} onClick={() => editingDefaults ? handleSaveDefaults() : setEditingDefaults(true)}>
-                  {editingDefaults ? <><Save size={14} className="mr-1" /> Sauvegarder</> : <><Edit2 size={14} className="mr-1" /> Modifier</>}
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setShowAddDefault(true)}>
+                    <Plus size={14} className="mr-1" /> Ajouter
+                  </Button>
+                  <Button size="sm" variant={editingDefaults ? "default" : "outline"} onClick={() => editingDefaults ? handleSaveDefaults() : setEditingDefaults(true)}>
+                    {editingDefaults ? <><Save size={14} className="mr-1" /> Sauvegarder</> : <><Edit2 size={14} className="mr-1" /> Modifier</>}
+                  </Button>
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {["air", "sea", "road", "rail"].map(mode => {
-                  const d = defaults.find(x => x.mode === mode);
-                  return (
-                    <div key={mode} className="bg-card border border-border rounded-xl p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        {MODE_ICONS[mode]}
-                        <span className="font-semibold text-sm">{MODE_LABELS[mode]}</span>
-                      </div>
-                      {editingDefaults ? (
-                        <div className="space-y-2">
-                          <div><Label className="text-xs">Tarif par défaut (USD)</Label>
-                            <Input type="number" step="0.01" className="h-8" value={defaultForms[mode]?.rate || 0}
-                              onChange={e => setDefaultForms(f => ({ ...f, [mode]: { ...f[mode], rate: parseFloat(e.target.value) || 0 } }))} />
-                          </div>
-                          <div><Label className="text-xs">Unité</Label>
-                            <Select value={defaultForms[mode]?.unit || "kg"} onValueChange={v => setDefaultForms(f => ({ ...f, [mode]: { ...f[mode], unit: v } }))}>
-                              <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="kg">par kg</SelectItem>
-                                <SelectItem value="cbm">par CBM</SelectItem>
-                                <SelectItem value="fixed">Fixe</SelectItem>
-                                <SelectItem value="km">par km</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center">
-                          <p className="text-2xl font-bold text-primary">${d?.default_rate?.toFixed(2) || "0.00"}</p>
-                          <p className="text-xs text-muted-foreground">{UNIT_LABELS[d?.rate_unit || "kg"]}</p>
-                        </div>
-                      )}
+
+              {/* Add new default form */}
+              {showAddDefault && (
+                <div className="bg-muted/30 border border-border rounded-xl p-4 space-y-3">
+                  <h4 className="text-sm font-semibold">Nouveau tarif par défaut</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <div>
+                      <Label className="text-xs">Mode</Label>
+                      <Select value={newDefault.mode} onValueChange={v => setNewDefault(f => ({ ...f, mode: v }))}>
+                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="air">✈️ Aérien</SelectItem>
+                          <SelectItem value="sea">🚢 Maritime</SelectItem>
+                          <SelectItem value="road">🚛 Routier</SelectItem>
+                          <SelectItem value="rail">🚂 Ferroviaire</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  );
-                })}
+                    <div>
+                      <Label className="text-xs">Pays d'origine (ISO)</Label>
+                      <Input value={newDefault.origin_country} onChange={e => setNewDefault(f => ({ ...f, origin_country: e.target.value.toUpperCase() }))} placeholder="CN, TR, AE..." maxLength={3} className="h-8" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Tarif (USD)</Label>
+                      <Input type="number" step="0.01" value={newDefault.rate} onChange={e => setNewDefault(f => ({ ...f, rate: parseFloat(e.target.value) || 0 }))} className="h-8" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Unité</Label>
+                      <Select value={newDefault.unit} onValueChange={v => setNewDefault(f => ({ ...f, unit: v }))}>
+                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="kg">par kg</SelectItem>
+                          <SelectItem value="cbm">par CBM</SelectItem>
+                          <SelectItem value="fixed">Fixe</SelectItem>
+                          <SelectItem value="km">par km</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Label</Label>
+                      <Input value={newDefault.label} onChange={e => setNewDefault(f => ({ ...f, label: e.target.value }))} placeholder="Ex: Aérien Chine" className="h-8" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleAddDefault}><Save size={14} className="mr-1" /> Enregistrer</Button>
+                    <Button size="sm" variant="outline" onClick={() => setShowAddDefault(false)}>Annuler</Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Defaults table */}
+              <div className="border border-border rounded-xl overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Mode</TableHead>
+                      <TableHead>Origine</TableHead>
+                      <TableHead>Label</TableHead>
+                      <TableHead>Tarif</TableHead>
+                      <TableHead>Unité</TableHead>
+                      <TableHead className="w-16"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {defaults.length === 0 ? (
+                      <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground text-sm">Aucun tarif par défaut</TableCell></TableRow>
+                    ) : defaults.map(d => {
+                      const key = `${d.mode}-${d.origin_country || "global"}`;
+                      return (
+                        <TableRow key={d.id}>
+                          <TableCell><Badge variant="outline" className="gap-1 text-xs">{MODE_ICONS[d.mode]} {MODE_LABELS[d.mode]}</Badge></TableCell>
+                          <TableCell className="text-sm font-medium">{d.origin_country || <span className="text-muted-foreground italic">Global</span>}</TableCell>
+                          <TableCell className="text-sm">{d.label || "—"}</TableCell>
+                          <TableCell>
+                            {editingDefaults ? (
+                              <Input type="number" step="0.01" className="h-7 w-24 text-xs" value={defaultForms[key]?.rate ?? d.default_rate}
+                                onChange={e => setDefaultForms(f => ({ ...f, [key]: { ...f[key], rate: parseFloat(e.target.value) || 0 } }))} />
+                            ) : (
+                              <span className="font-mono text-sm font-bold text-primary">${d.default_rate.toFixed(2)}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs">{UNIT_LABELS[d.rate_unit]}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteDefault(d.id)}>
+                              <Trash2 size={13} />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
             </TabsContent>
 

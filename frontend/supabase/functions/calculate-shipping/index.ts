@@ -100,11 +100,18 @@ Deno.serve(async (req) => {
       transit_max = route.transit_days_max;
     } else {
       routeType = "default";
-      const { data: def } = await supabase
+      // Try origin-specific default first, then global fallback
+      const { data: defs } = await supabase
         .from("shipping_defaults")
         .select("*")
         .eq("mode", mode)
-        .maybeSingle();
+        .order("origin_country", { ascending: true, nullsFirst: false });
+
+      const originCountry = origin.country_code;
+      const specificDef = (defs || []).find((d: any) => d.origin_country === originCountry);
+      const globalDef = (defs || []).find((d: any) => !d.origin_country);
+      const def = specificDef || globalDef;
+
       if (!def) {
         return new Response(
           JSON.stringify({ error: "No rate found for this route/mode" }),
