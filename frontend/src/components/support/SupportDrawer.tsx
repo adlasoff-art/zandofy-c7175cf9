@@ -97,7 +97,7 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
         .single();
       if (ticketErr || !ticket) throw ticketErr;
 
-      const { error: msgErr } = await (supabase.from("support_messages") as any)
+      const { error: msgErr } = await fromTable("support_messages")
         .insert({
           ticket_id: ticket.id,
           sender_id: user.id,
