@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -76,6 +76,22 @@ const EMPTY_FORM = {
   height_cm: 0,
 };
 
+type ProductFormState = typeof EMPTY_FORM;
+
+interface ProductDraftSnapshot {
+  updatedAt: number;
+  mode: "create" | "edit";
+  productId: string | null;
+  form: ProductFormState;
+  mainImage: MediaItem[];
+  variationMedia: MediaItem[];
+  sizes: SizeVariant[];
+  colors: ColorVariant[];
+  dynamicSelections: DynamicVariantSelection[];
+}
+
+const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+
 export function VendorProductManager({ storeId }: { storeId: string }) {
   const { user } = useAuth();
   const { subscription, tierConfig, canAddProduct } = useVendorSubscription(storeId);
@@ -84,7 +100,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Product | null>(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState<ProductFormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [mainImage, setMainImage] = useState<MediaItem[]>([]);
@@ -92,6 +108,18 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
   const [sizes, setSizes] = useState<SizeVariant[]>([]);
   const [colors, setColors] = useState<ColorVariant[]>([]);
   const [dynamicSelections, setDynamicSelections] = useState<DynamicVariantSelection[]>([]);
+
+  const showForm = creating || !!editing;
+  const draftStorageKey = useMemo(
+    () => `zandofy_vendor_product_draft:${user?.id ?? "anon"}:${storeId}`,
+    [storeId, user?.id]
+  );
+  const hasRestoredDraftRef = useRef(false);
+
+  const clearDraft = useCallback(() => {
+    if (typeof localStorage === "undefined") return;
+    localStorage.removeItem(draftStorageKey);
+  }, [draftStorageKey]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -134,6 +162,82 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       if (data) setCategories(data);
     });
   }, [loadProducts]);
+
+  useEffect(() => {
+    if (hasRestoredDraftRef.current || loading || showForm) return;
+    hasRestoredDraftRef.current = true;
+    if (!user || typeof localStorage === "undefined") return;
+
+    try {
+      const raw = localStorage.getItem(draftStorageKey);
+      if (!raw) return;
+
+      const snapshot = JSON.parse(raw) as ProductDraftSnapshot;
+      if (!snapshot?.updatedAt || Date.now() - snapshot.updatedAt > DRAFT_TTL_MS) {
+        localStorage.removeItem(draftStorageKey);
+        return;
+      }
+
+      const mode = snapshot.mode ?? "create";
+      const editTarget = snapshot.productId ? products.find((p) => p.id === snapshot.productId) : null;
+
+      setEditing(mode === "edit" ? editTarget ?? null : null);
+      setCreating(mode === "create" || (mode === "edit" && !editTarget));
+      setForm({ ...EMPTY_FORM, ...(snapshot.form || {}) });
+      setMainImage(snapshot.mainImage || []);
+      setVariationMedia(snapshot.variationMedia || []);
+      setSizes(snapshot.sizes || []);
+      setColors(snapshot.colors || []);
+      setDynamicSelections(snapshot.dynamicSelections || []);
+      toast.success("Brouillon restauré automatiquement.");
+    } catch {
+      localStorage.removeItem(draftStorageKey);
+    }
+  }, [draftStorageKey, loading, products, showForm, user]);
+
+  useEffect(() => {
+    if (!user || !showForm || typeof localStorage === "undefined") return;
+
+    const timeout = window.setTimeout(() => {
+      const snapshot: ProductDraftSnapshot = {
+        updatedAt: Date.now(),
+        mode: editing ? "edit" : "create",
+        productId: editing?.id ?? null,
+        form,
+        mainImage,
+        variationMedia,
+        sizes,
+        colors,
+        dynamicSelections,
+      };
+      localStorage.setItem(draftStorageKey, JSON.stringify(snapshot));
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    draftStorageKey,
+    dynamicSelections,
+    editing,
+    form,
+    mainImage,
+    showForm,
+    sizes,
+    colors,
+    user,
+    variationMedia,
+  ]);
+
+  useEffect(() => {
+    if (!showForm) return;
+
+    const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", beforeUnloadHandler);
+    return () => window.removeEventListener("beforeunload", beforeUnloadHandler);
+  }, [showForm]);
 
   const toLocalDatetime = (iso: string | null) => {
     if (!iso) return "";
@@ -208,6 +312,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
   };
 
   const cancelForm = () => {
+    clearDraft();
     setEditing(null);
     setCreating(false);
   };
@@ -316,6 +421,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       }
     }
 
+    clearDraft();
     toast.success(editing ? "Produit mis à jour" : "Produit sauvegardé en brouillon");
     cancelForm();
     loadProducts();
@@ -344,7 +450,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     setDeleting(null);
   };
 
-  const showForm = creating || editing;
+  
 
   if (showForm) {
     return (

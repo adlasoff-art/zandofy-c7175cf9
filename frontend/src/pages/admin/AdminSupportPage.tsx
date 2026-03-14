@@ -58,7 +58,8 @@ export default function AdminSupportPage() {
       if (filterStatus !== "all") params.set("status_filter", filterStatus);
       if (filterCategory !== "all") params.set("category", filterCategory);
       const data = await apiFetch<{ tickets: Ticket[]; total: number }>(
-        `/api/support/tickets?${params.toString()}`
+        `/api/support/tickets?${params.toString()}`,
+        { token }
       );
       setTickets(data.tickets);
       setTotal(data.total);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,6 +57,15 @@ const initialData: ApplicationData = {
   status: "draft",
 };
 
+interface VendorApplicationLocalDraft {
+  savedAt: number;
+  step: number;
+  form: ApplicationData;
+  docs: DocFile[];
+}
+
+const LOCAL_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 export default function BecomeVendorPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -68,10 +77,14 @@ export default function BecomeVendorPage() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [existingApp, setExistingApp] = useState(false);
   const [appLoading, setAppLoading] = useState(true);
+  const localDraftKey = useMemo(() => (user ? `zandofy_vendor_application_draft:${user.id}` : null), [user?.id]);
+  const hasRestoredLocalDraftRef = useRef(false);
 
   // Load existing application
   useEffect(() => {
+    hasRestoredLocalDraftRef.current = false;
     if (!user) { setAppLoading(false); return; }
+
     (async () => {
       const { data } = await supabase
         .from("vendor_applications")
@@ -101,6 +114,10 @@ export default function BecomeVendorPage() {
         setStep(data.current_step || 1);
         setExistingApp(true);
 
+        if (localDraftKey && typeof localStorage !== "undefined") {
+          localStorage.removeItem(localDraftKey);
+        }
+
         // Load docs
         const { data: docData } = await supabase
           .from("vendor_documents")
@@ -110,9 +127,75 @@ export default function BecomeVendorPage() {
           setDocs(docData.map((d: any) => ({ type: d.document_type, url: d.document_url, file_name: d.file_name, id: d.id })));
         }
       }
+
       setAppLoading(false);
     })();
-  }, [user]);
+  }, [localDraftKey, user]);
+
+  useEffect(() => {
+    if (hasRestoredLocalDraftRef.current || appLoading || existingApp || form.id || !localDraftKey || typeof localStorage === "undefined") {
+      return;
+    }
+    hasRestoredLocalDraftRef.current = true;
+
+    try {
+      const raw = localStorage.getItem(localDraftKey);
+      if (!raw) return;
+
+      const draft = JSON.parse(raw) as VendorApplicationLocalDraft;
+      if (!draft?.savedAt || Date.now() - draft.savedAt > LOCAL_DRAFT_TTL_MS) {
+        localStorage.removeItem(localDraftKey);
+        return;
+      }
+
+      if (draft.form) {
+        setForm((prev) => ({ ...prev, ...draft.form }));
+      }
+      if (typeof draft.step === "number" && draft.step >= 1 && draft.step <= 4) {
+        setStep(draft.step);
+      }
+      if (Array.isArray(draft.docs)) {
+        setDocs(draft.docs);
+      }
+
+      toast({ title: "Brouillon restauré", description: "Votre progression locale a été récupérée." });
+    } catch {
+      localStorage.removeItem(localDraftKey);
+    }
+  }, [appLoading, existingApp, form.id, localDraftKey]);
+
+  useEffect(() => {
+    if (appLoading || !localDraftKey || typeof localStorage === "undefined") return;
+    if (!user || !["draft", "revision_requested"].includes(form.status)) return;
+
+    const timeout = window.setTimeout(() => {
+      const payload: VendorApplicationLocalDraft = {
+        savedAt: Date.now(),
+        step,
+        form,
+        docs,
+      };
+      localStorage.setItem(localDraftKey, JSON.stringify(payload));
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [appLoading, docs, form, localDraftKey, step, user]);
+
+  const hasUnsavedDraft =
+    ["draft", "revision_requested"].includes(form.status) &&
+    (!!form.full_name || !!form.store_name || docs.length > 0);
+
+  useEffect(() => {
+    if (!hasUnsavedDraft) return;
+
+    const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", beforeUnloadHandler);
+    return () => window.removeEventListener("beforeunload", beforeUnloadHandler);
+  }, [hasUnsavedDraft]);
 
   if (authLoading || appLoading) {
     return (
@@ -232,6 +315,9 @@ export default function BecomeVendorPage() {
         toast({ title: "Erreur", description: "Impossible de soumettre la demande. Veuillez réessayer.", variant: "destructive" });
         return;
       }
+    }
+    if (localDraftKey && typeof localStorage !== "undefined") {
+      localStorage.removeItem(localDraftKey);
     }
     setForm((prev) => ({ ...prev, status: "submitted" }));
     setSaving(false);
