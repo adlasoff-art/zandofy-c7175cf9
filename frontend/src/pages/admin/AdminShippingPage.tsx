@@ -515,23 +515,54 @@ const AdminShippingPage: React.FC = () => {
 
   // Save defaults
   const handleSaveDefaults = async () => {
-    for (const mode of ["air", "sea", "road", "rail"]) {
-      const f = defaultForms[mode];
+    for (const key of Object.keys(defaultForms)) {
+      const f = defaultForms[key];
       if (!f) continue;
-      const existing = defaults.find(d => d.mode === mode);
-      await upsertShippingDefault({ id: existing?.id, mode, default_rate: f.rate, rate_unit: f.unit, currency: "USD" });
+      const existing = defaults.find(d => `${d.mode}-${d.origin_country || "global"}` === key);
+      await upsertShippingDefault({
+        id: existing?.id,
+        mode: key.split("-")[0],
+        default_rate: f.rate,
+        rate_unit: f.unit,
+        currency: "USD",
+        origin_country: f.origin_country || null,
+        label: f.label || null,
+      } as any);
     }
     toast.success("Tarifs par défaut mis à jour");
     setEditingDefaults(false);
     load();
   };
 
+  const handleAddDefault = async () => {
+    await upsertShippingDefault({
+      mode: newDefault.mode,
+      default_rate: newDefault.rate,
+      rate_unit: newDefault.unit,
+      currency: "USD",
+      origin_country: newDefault.origin_country || null,
+      label: newDefault.label || null,
+    } as any);
+    toast.success("Tarif ajouté");
+    setShowAddDefault(false);
+    setNewDefault({ mode: "air", rate: 0, unit: "kg", origin_country: "", label: "" });
+    load();
+  };
+
+  const handleDeleteDefault = async (id: string) => {
+    if (!confirm("Supprimer ce tarif par défaut ?")) return;
+    const { error } = await supabase.from("shipping_defaults").delete().eq("id", id);
+    if (error) { toast.error("Erreur: " + error.message); return; }
+    toast.success("Tarif supprimé");
+    load();
+  };
+
   useEffect(() => {
     if (editingDefaults) {
-      const forms: Record<string, { rate: number; unit: string }> = {};
-      for (const mode of ["air", "sea", "road", "rail"]) {
-        const d = defaults.find(x => x.mode === mode);
-        forms[mode] = { rate: d?.default_rate || 0, unit: d?.rate_unit || (mode === "sea" ? "cbm" : mode === "road" ? "fixed" : "kg") };
+      const forms: Record<string, { rate: number; unit: string; origin_country: string; label: string }> = {};
+      for (const d of defaults) {
+        const key = `${d.mode}-${d.origin_country || "global"}`;
+        forms[key] = { rate: d.default_rate, unit: d.rate_unit, origin_country: d.origin_country || "", label: d.label || "" };
       }
       setDefaultForms(forms);
     }
