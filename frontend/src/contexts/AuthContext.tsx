@@ -65,6 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) {
+        void ensureProfile(session.user);
+      }
       setLoading(false);
     }).catch(() => {
       // Handle LockManager timeout gracefully
