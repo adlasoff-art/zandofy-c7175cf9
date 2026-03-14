@@ -158,11 +158,18 @@ export async function calculateDynamicQuote(req: DynamicQuoteRequest): Promise<D
     dest_zone_name = route.destination_zone?.name || dest_zone_name;
   } else {
     routeType = "default";
-    const { data: def } = await supabase
+    // Try origin-specific default first, then global fallback
+    const { data: defs } = await supabase
       .from("shipping_defaults")
       .select("*")
       .eq("mode", req.mode)
-      .maybeSingle();
+      .order("origin_country", { ascending: true, nullsFirst: false });
+
+    const originCountry = origin.country_code;
+    const specificDef = (defs || []).find((d: any) => d.origin_country === originCountry);
+    const globalDef = (defs || []).find((d: any) => !d.origin_country);
+    const def = specificDef || globalDef;
+
     if (!def) return null;
     rate_price = Number(def.default_rate);
     rate_unit = def.rate_unit;
