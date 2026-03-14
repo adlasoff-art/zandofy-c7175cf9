@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Headphones, Plus, ArrowLeft, Send, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiFetch, apiWsUrl } from "@/services/api-client";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/contexts/I18nContext";
 
@@ -19,8 +19,6 @@ export interface SupportTicket {
   assigned_to: string | null;
   created_at: string;
   updated_at: string;
-  last_message_preview?: string | null;
-  unread_count?: number;
 }
 
 export interface SupportMessage {
@@ -48,7 +46,7 @@ const CATEGORIES = [
 ];
 
 export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const { t } = useI18n();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
@@ -62,38 +60,57 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
   const [messageInput, setMessageInput] = useState("");
   const [sending, setSending] = useState(false);
 
-  const token = session?.access_token ?? undefined;
-
   const fetchTickets = useCallback(async () => {
-    if (!user || !token) return;
+    if (!user) return;
     setLoading(true);
     try {
-      const data = await apiFetch<{ tickets: SupportTicket[] }>("/api/support/tickets", { token });
-      setTickets(data.tickets);
-    } catch (err) {
+      const { data, error } = await supabase
+        .from("support_tickets")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      setTickets(data || []);
+    } catch (err: any) {
       console.error("Fetch tickets error:", err);
-      toast({ title: t("common.error") || "Erreur", description: "Impossible de charger les tickets", variant: "destructive" });
+      toast({ title: "Erreur", description: "Impossible de charger les tickets", variant: "destructive" });
     }
     setLoading(false);
-  }, [user, token, toast, t]);
+  }, [user, toast]);
 
   useEffect(() => {
     if (open && user) fetchTickets();
   }, [open, user, fetchTickets]);
 
   const handleCreate = async () => {
-    if (!user || !subject.trim() || !message.trim() || !token) return;
+    if (!user || !subject.trim() || !message.trim()) return;
     setLoading(true);
     try {
-      const ticket = await apiFetch<SupportTicket>("/api/support/tickets", {
-        method: "POST",
-        body: JSON.stringify({
+      // Create ticket
+      const { data: ticket, error: ticketErr } = await supabase
+        .from("support_tickets")
+        .insert({
+          user_id: user.id,
           subject: subject.trim(),
           category,
-          initial_message: message.trim(),
-        }),
-        token,
-      });
+          status: "open",
+          priority: "medium",
+        })
+        .select()
+        .single();
+      if (ticketErr || !ticket) throw ticketErr;
+
+      // Create initial message
+      const { error: msgErr } = await supabase
+        .from("support_messages")
+        .insert({
+          ticket_id: ticket.id,
+          sender_id: user.id,
+          content: message.trim(),
+          is_staff: false,
+        });
+      if (msgErr) throw msgErr;
+
       setSubject("");
       setCategory("other");
       setMessage("");
@@ -102,8 +119,8 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
       setView("chat");
       setMessages([]);
       toast({ title: "Ticket créé", description: "Notre équipe vous répondra bientôt." });
-    } catch (err) {
-      toast({ title: t("common.error") || "Erreur", description: "Impossible de créer le ticket.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Erreur", description: "Impossible de créer le ticket.", variant: "destructive" });
     }
     setLoading(false);
   };
@@ -167,15 +184,14 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
           <SupportChatInner
             ticketId={selectedTicket.id}
             subject={selectedTicket.subject}
-            token={token}
+            userId={user.id}
             messages={messages}
             setMessages={setMessages}
             messageInput={messageInput}
             setMessageInput={setMessageInput}
             sending={sending}
             setSending={setSending}
-            onBack={() => { setView("list"); setSelectedTicket(null); setMessages([]); }}
-            onOpenChange={onOpenChange}
+            onBack={() => { setView("list"); setSelectedTicket(null); setMessages([]); fetchTickets(); }}
           />
         ) : (
           <div className="flex-1 flex flex-col py-4">
@@ -188,14 +204,24 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
               <p className="text-sm text-muted-foreground text-center py-8">Aucun ticket. Créez-en un pour nous contacter.</p>
             ) : (
               <div className="space-y-1 overflow-y-auto">
-                {tickets.map((t) => (
+                {tickets.map((tk) => (
                   <button
-                    key={t.id}
-                    onClick={() => openChat(t)}
+                    key={tk.id}
+                    onClick={() => openChat(tk)}
                     className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
                   >
-                    <p className="font-medium text-sm text-foreground truncate">{t.subject}</p>
-                    <p className="text-xs text-muted-foreground truncate">{t.last_message_preview || t.status}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-sm text-foreground truncate flex-1">{tk.subject}</p>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                        tk.status === "open" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        : tk.status === "in_progress" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                        : tk.status === "resolved" || tk.status === "closed" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-muted text-muted-foreground"
+                      }`}>
+                        {tk.status === "open" ? "Ouvert" : tk.status === "in_progress" ? "En cours" : tk.status === "resolved" ? "Résolu" : tk.status === "closed" ? "Fermé" : tk.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{CATEGORIES.find(c => c.value === tk.category)?.label || tk.category}</p>
                   </button>
                 ))}
               </div>
@@ -210,7 +236,7 @@ export function SupportDrawer({ open, onOpenChange }: SupportDrawerProps) {
 function SupportChatInner({
   ticketId,
   subject,
-  token,
+  userId,
   messages,
   setMessages,
   messageInput,
@@ -218,11 +244,10 @@ function SupportChatInner({
   sending,
   setSending,
   onBack,
-  onOpenChange,
 }: {
   ticketId: string;
   subject: string;
-  token: string | undefined;
+  userId: string;
   messages: SupportMessage[];
   setMessages: React.Dispatch<React.SetStateAction<SupportMessage[]>>;
   messageInput: string;
@@ -230,48 +255,67 @@ function SupportChatInner({
   sending: boolean;
   setSending: (v: boolean) => void;
   onBack: () => void;
-  onOpenChange: (open: boolean) => void;
 }) {
-  useEffect(() => {
-    if (!ticketId || !token) return;
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (!ticketId) return;
+
+    // Fetch messages
     (async () => {
-      try {
-        const data = await apiFetch<{ messages: SupportMessage[] }>(`/api/support/tickets/${ticketId}/messages`, { token });
-        setMessages(data.messages);
-      } catch (err) {
-        console.error("Fetch messages error:", err);
-      }
+      const { data } = await supabase
+        .from("support_messages")
+        .select("*")
+        .eq("ticket_id", ticketId)
+        .order("created_at", { ascending: true });
+      setMessages(data || []);
     })();
 
-    const ws = new WebSocket(apiWsUrl(`/api/support/tickets/${ticketId}/ws`));
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "auth", token }));
-    };
-    ws.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        if (payload.type === "new_message") {
-          setMessages((prev) => [...prev, payload.data]);
+    // Realtime subscription
+    const channel = supabase
+      .channel(`support-messages-${ticketId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "support_messages",
+          filter: `ticket_id=eq.${ticketId}`,
+        },
+        (payload) => {
+          const newMsg = payload.new as SupportMessage;
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
         }
-      } catch {}
-    };
-    ws.onerror = () => {};
-    return () => { ws.close(); };
-  }, [ticketId, token, setMessages]);
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [ticketId, setMessages]);
+
+  // Auto-scroll
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleSend = async () => {
-    if (!messageInput.trim() || !token || sending) return;
+    if (!messageInput.trim() || sending) return;
     setSending(true);
     try {
-      const formData = new FormData();
-      formData.append("content", messageInput.trim());
-      await apiFetch(`/api/support/tickets/${ticketId}/messages`, {
-        method: "POST",
-        body: formData,
-        token,
-      });
+      const { error } = await supabase
+        .from("support_messages")
+        .insert({
+          ticket_id: ticketId,
+          sender_id: userId,
+          content: messageInput.trim(),
+          is_staff: false,
+        });
+      if (error) throw error;
       setMessageInput("");
+      // Update ticket updated_at
+      await supabase.from("support_tickets").update({ updated_at: new Date().toISOString() }).eq("id", ticketId);
     } catch (err) {
       console.error("Send message error:", err);
     }
@@ -291,6 +335,7 @@ function SupportChatInner({
             className={`flex ${m.is_staff ? "justify-start" : "justify-end"}`}
           >
             <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${m.is_staff ? "bg-muted text-foreground" : "bg-primary text-primary-foreground"}`}>
+              {m.is_staff && <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Support</p>}
               <p className="whitespace-pre-wrap break-words">{m.content}</p>
               {m.attachment_url && (
                 <a href={m.attachment_url} target="_blank" rel="noopener noreferrer" className="text-xs underline mt-1 block">Pièce jointe</a>
@@ -298,6 +343,7 @@ function SupportChatInner({
             </div>
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
       <div className="flex gap-2">
         <Input
