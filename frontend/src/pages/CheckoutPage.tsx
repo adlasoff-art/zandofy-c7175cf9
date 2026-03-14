@@ -16,6 +16,7 @@ import {
   CreditCard, Smartphone, Truck, ChevronRight, Check, ShieldCheck,
   ArrowLeft, Package, MapPin, Banknote, Tag, Plus, Trash2, Home, Briefcase, X, Loader2, Coins
 } from "lucide-react";
+import { usePaymentMethods } from "@/hooks/use-payment-methods";
 
 type Step = "shipping" | "payment" | "confirmation";
 type PaymentMethod = "stripe" | "mobile_money" | "cod";
