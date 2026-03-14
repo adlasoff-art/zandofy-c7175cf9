@@ -258,7 +258,7 @@ function SupportChatInner({
     if (!ticketId) return;
 
     (async () => {
-      const { data } = await (supabase.from("support_messages") as any)
+      const { data } = await fromTable("support_messages")
         .select("*")
         .eq("ticket_id", ticketId)
         .order("created_at", { ascending: true });
