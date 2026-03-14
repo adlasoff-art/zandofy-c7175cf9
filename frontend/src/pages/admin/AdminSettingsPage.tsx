@@ -73,6 +73,8 @@ export default function AdminSettingsPage() {
             });
           } else if (row.key === "newness_duration_days") {
             setNewnessDays(Number(v) || 14);
+          } else if (row.key === "payment_methods") {
+            setPaymentMethods({ mobile_money: v.mobile_money !== false, stripe: v.stripe !== false, cod: v.cod !== false });
           }
         });
       });
