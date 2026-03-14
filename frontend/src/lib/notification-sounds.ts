@@ -40,25 +40,62 @@ export function playNotificationSound() {
   }
 }
 
-/** Play a distinct order alert sound (three-tone "cash register" chime) */
+/** Play a bright Shopify-style "ka-ching" bell — a satisfying cash-register chime */
 export function playOrderAlertSound() {
   try {
     const ctx = getAudioContext();
     const now = ctx.currentTime;
 
-    // Three-tone ascending "ka-ching" pattern
-    [880, 1100, 1320].forEach((freq, i) => {
+    // --- Layer 1: Bright bell strike (two harmonics) ---
+    const bellNotes = [
+      { freq: 2637, start: 0, dur: 0.6, vol: 0.18 },      // E7 — sharp attack
+      { freq: 3520, start: 0.005, dur: 0.5, vol: 0.10 },   // A7 — shimmer overtone
+    ];
+
+    bellNotes.forEach(({ freq, start, dur, vol }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(vol, now + start);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + start);
+      osc.stop(now + start + dur + 0.05);
+    });
+
+    // --- Layer 2: "Ka-ching" coin trill (3 fast ascending tones) ---
+    const trill = [
+      { freq: 1318, delay: 0.08 },  // E6
+      { freq: 1568, delay: 0.15 },  // G6
+      { freq: 2093, delay: 0.22 },  // C7
+    ];
+
+    trill.forEach(({ freq, delay }) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "triangle";
       osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.2, now + i * 0.1);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.4);
+      gain.gain.setValueAtTime(0.13, now + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.25);
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.start(now + i * 0.1);
-      osc.stop(now + i * 0.1 + 0.45);
+      osc.start(now + delay);
+      osc.stop(now + delay + 0.3);
     });
+
+    // --- Layer 3: Subtle high sparkle (sells the "bell" feel) ---
+    const sparkle = ctx.createOscillator();
+    const sparkleGain = ctx.createGain();
+    sparkle.type = "sine";
+    sparkle.frequency.value = 4186; // C8 — very high shimmer
+    sparkleGain.gain.setValueAtTime(0.04, now + 0.1);
+    sparkleGain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+    sparkle.connect(sparkleGain);
+    sparkleGain.connect(ctx.destination);
+    sparkle.start(now + 0.1);
+    sparkle.stop(now + 0.75);
   } catch (e) {
     console.warn("Could not play order alert sound:", e);
   }
