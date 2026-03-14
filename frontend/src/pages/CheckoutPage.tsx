@@ -67,6 +67,7 @@ export default function CheckoutPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { data: paymentConfig } = usePaymentMethods();
 
   const [step, setStep] = useState<Step>("shipping");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("mobile_money");
