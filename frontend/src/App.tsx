@@ -92,6 +92,12 @@ function SupportDrawerWrapper() {
 
 function CmsThemeInjector() { useCmsTheme(); return null; }
 
+function AnalyticsTrackerInjector() {
+  const { useAnalyticsTracker } = require("@/hooks/use-analytics");
+  useAnalyticsTracker();
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
