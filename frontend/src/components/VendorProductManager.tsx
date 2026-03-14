@@ -100,7 +100,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Product | null>(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState<ProductFormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [mainImage, setMainImage] = useState<MediaItem[]>([]);
@@ -108,6 +108,18 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
   const [sizes, setSizes] = useState<SizeVariant[]>([]);
   const [colors, setColors] = useState<ColorVariant[]>([]);
   const [dynamicSelections, setDynamicSelections] = useState<DynamicVariantSelection[]>([]);
+
+  const showForm = creating || !!editing;
+  const draftStorageKey = useMemo(
+    () => `zandofy_vendor_product_draft:${user?.id ?? "anon"}:${storeId}`,
+    [storeId, user?.id]
+  );
+  const hasRestoredDraftRef = useRef(false);
+
+  const clearDraft = useCallback(() => {
+    if (typeof localStorage === "undefined") return;
+    localStorage.removeItem(draftStorageKey);
+  }, [draftStorageKey]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
