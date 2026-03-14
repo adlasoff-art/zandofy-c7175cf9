@@ -55,6 +55,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        if (session?.user) {
+          void ensureProfile(session.user);
+        }
         setLoading(false);
       }
     );
