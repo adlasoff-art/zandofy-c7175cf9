@@ -264,13 +264,22 @@ function QuoteCalculator({ zones, routes, defaults }: {
   const [origin, setOrigin] = useState("");
   const [dest, setDest] = useState("");
   const [mode, setMode] = useState("air");
-  const [weight, setWeight] = useState(1000);
-  const [volume, setVolume] = useState(1);
+  const [weightKg, setWeightKg] = useState(1);
+  const [quantity, setQuantity] = useState(1);
+  const [lengthCm, setLengthCm] = useState(0);
+  const [widthCm, setWidthCm] = useState(0);
+  const [heightCm, setHeightCm] = useState(0);
   const [distance, setDistance] = useState(100);
   const [quote, setQuote] = useState<ReturnType<typeof calculateShippingQuote> | null>(null);
 
+  const computedCbm = useMemo(() => {
+    if (lengthCm > 0 && widthCm > 0 && heightCm > 0) {
+      return (lengthCm * widthCm * heightCm) / 1_000_000;
+    }
+    return 0;
+  }, [lengthCm, widthCm, heightCm]);
+
   const calculate = () => {
-    // Find route
     const matchedRoute = routes.find(r =>
       r.origin_zone_id === origin && r.destination_zone_id === dest && r.transport_mode === mode && r.is_active
     );
@@ -289,13 +298,18 @@ function QuoteCalculator({ zones, routes, defaults }: {
       };
     }
 
+    const totalWeightGrams = Math.round(weightKg * 1000 * quantity);
+    const totalCbm = computedCbm * Math.max(quantity, 1);
+
     setQuote(calculateShippingQuote({
       route: effectiveRoute,
-      weightGrams: weight,
-      volumeCBM: volume,
+      weightGrams: totalWeightGrams,
+      volumeCBM: totalCbm,
       distanceKm: distance,
     }));
   };
+
+  const isSea = mode === "sea";
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 space-y-3">
@@ -328,8 +342,33 @@ function QuoteCalculator({ zones, routes, defaults }: {
           </SelectContent>
         </Select>
       </div>
-      {(mode === "air" || mode === "rail") && <div><Label className="text-xs">Poids (grammes)</Label><Input type="number" min="1" value={weight} onChange={e => setWeight(parseInt(e.target.value) || 0)} className="h-8 text-xs" /></div>}
-      {mode === "sea" && <div><Label className="text-xs">Volume (CBM)</Label><Input type="number" min="0.001" step="0.01" value={volume} onChange={e => setVolume(parseFloat(e.target.value) || 0)} className="h-8 text-xs" /></div>}
+      {/* Weight in KG (always shown except road) */}
+      {mode !== "road" && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label className="text-xs">Poids (kg)</Label>
+            <Input type="number" min="0.01" step="0.01" value={weightKg} onChange={e => setWeightKg(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+            <p className="text-[10px] text-muted-foreground">{Math.round(weightKg * 1000)} g</p>
+          </div>
+          <div>
+            <Label className="text-xs">Quantité</Label>
+            <Input type="number" min="1" value={quantity} onChange={e => setQuantity(parseInt(e.target.value) || 1)} className="h-8 text-xs" />
+            <p className="text-[10px] text-muted-foreground">Total: {(weightKg * quantity).toFixed(2)} kg</p>
+          </div>
+        </div>
+      )}
+      {/* Dimensions for maritime */}
+      {isSea && (
+        <div className="space-y-2">
+          <Label className="text-xs">Dimensions (cm) — L × l × H</Label>
+          <div className="grid grid-cols-3 gap-1">
+            <Input type="number" min="0" placeholder="L" value={lengthCm || ""} onChange={e => setLengthCm(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+            <Input type="number" min="0" placeholder="l" value={widthCm || ""} onChange={e => setWidthCm(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+            <Input type="number" min="0" placeholder="H" value={heightCm || ""} onChange={e => setHeightCm(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+          </div>
+          {computedCbm > 0 && <p className="text-[10px] text-muted-foreground">Volume: {computedCbm.toFixed(4)} CBM{quantity > 1 ? ` × ${quantity} = ${(computedCbm * quantity).toFixed(4)} CBM` : ""}</p>}
+        </div>
+      )}
       {mode === "road" && <div><Label className="text-xs">Distance (km)</Label><Input type="number" min="1" value={distance} onChange={e => setDistance(parseInt(e.target.value) || 0)} className="h-8 text-xs" /></div>}
       <Button size="sm" className="w-full" onClick={calculate} disabled={!origin || !dest}>
         <Calculator size={14} className="mr-1" /> Calculer
@@ -346,7 +385,7 @@ function QuoteCalculator({ zones, routes, defaults }: {
           {quote.packEfficiency && (
             <div className="mt-2 p-2 bg-accent/20 rounded text-xs">
               <Package size={12} className="inline mr-1" />
-              <strong>Pack Efficiency:</strong> {quote.packEfficiency.weightGrams}g/unité → {quote.packEfficiency.unitsPerKg} unités/kg pour optimiser les coûts
+              <strong>Pack Efficiency:</strong> {quote.packEfficiency.weightGrams}g/unité → {quote.packEfficiency.unitsPerKg} unités/kg
             </div>
           )}
         </div>
