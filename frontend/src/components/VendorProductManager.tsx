@@ -163,6 +163,82 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     });
   }, [loadProducts]);
 
+  useEffect(() => {
+    if (hasRestoredDraftRef.current || loading || showForm) return;
+    hasRestoredDraftRef.current = true;
+    if (!user || typeof localStorage === "undefined") return;
+
+    try {
+      const raw = localStorage.getItem(draftStorageKey);
+      if (!raw) return;
+
+      const snapshot = JSON.parse(raw) as ProductDraftSnapshot;
+      if (!snapshot?.updatedAt || Date.now() - snapshot.updatedAt > DRAFT_TTL_MS) {
+        localStorage.removeItem(draftStorageKey);
+        return;
+      }
+
+      const mode = snapshot.mode ?? "create";
+      const editTarget = snapshot.productId ? products.find((p) => p.id === snapshot.productId) : null;
+
+      setEditing(mode === "edit" ? editTarget ?? null : null);
+      setCreating(mode === "create" || (mode === "edit" && !editTarget));
+      setForm({ ...EMPTY_FORM, ...(snapshot.form || {}) });
+      setMainImage(snapshot.mainImage || []);
+      setVariationMedia(snapshot.variationMedia || []);
+      setSizes(snapshot.sizes || []);
+      setColors(snapshot.colors || []);
+      setDynamicSelections(snapshot.dynamicSelections || []);
+      toast.success("Brouillon restauré automatiquement.");
+    } catch {
+      localStorage.removeItem(draftStorageKey);
+    }
+  }, [draftStorageKey, loading, products, showForm, user]);
+
+  useEffect(() => {
+    if (!user || !showForm || typeof localStorage === "undefined") return;
+
+    const timeout = window.setTimeout(() => {
+      const snapshot: ProductDraftSnapshot = {
+        updatedAt: Date.now(),
+        mode: editing ? "edit" : "create",
+        productId: editing?.id ?? null,
+        form,
+        mainImage,
+        variationMedia,
+        sizes,
+        colors,
+        dynamicSelections,
+      };
+      localStorage.setItem(draftStorageKey, JSON.stringify(snapshot));
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    draftStorageKey,
+    dynamicSelections,
+    editing,
+    form,
+    mainImage,
+    showForm,
+    sizes,
+    colors,
+    user,
+    variationMedia,
+  ]);
+
+  useEffect(() => {
+    if (!showForm) return;
+
+    const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", beforeUnloadHandler);
+    return () => window.removeEventListener("beforeunload", beforeUnloadHandler);
+  }, [showForm]);
+
   const toLocalDatetime = (iso: string | null) => {
     if (!iso) return "";
     try {
