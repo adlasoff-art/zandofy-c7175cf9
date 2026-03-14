@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isBanned, setIsBanned] = useState(false);
 
-  const ensureProfile = async (authUser: User) => {
+  const ensureProfile = useCallback(async (authUser: User) => {
     const metadata = (authUser.user_metadata ?? {}) as Record<string, unknown>;
     const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
     const firstNameMeta = typeof metadata.first_name === "string" ? metadata.first_name.trim() : "";
@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) {
       console.warn("ensureProfile failed", error.message);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
