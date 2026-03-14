@@ -132,6 +132,71 @@ export default function BecomeVendorPage() {
     })();
   }, [localDraftKey, user]);
 
+  useEffect(() => {
+    if (hasRestoredLocalDraftRef.current || appLoading || existingApp || form.id || !localDraftKey || typeof localStorage === "undefined") {
+      return;
+    }
+    hasRestoredLocalDraftRef.current = true;
+
+    try {
+      const raw = localStorage.getItem(localDraftKey);
+      if (!raw) return;
+
+      const draft = JSON.parse(raw) as VendorApplicationLocalDraft;
+      if (!draft?.savedAt || Date.now() - draft.savedAt > LOCAL_DRAFT_TTL_MS) {
+        localStorage.removeItem(localDraftKey);
+        return;
+      }
+
+      if (draft.form) {
+        setForm((prev) => ({ ...prev, ...draft.form }));
+      }
+      if (typeof draft.step === "number" && draft.step >= 1 && draft.step <= 4) {
+        setStep(draft.step);
+      }
+      if (Array.isArray(draft.docs)) {
+        setDocs(draft.docs);
+      }
+
+      toast({ title: "Brouillon restauré", description: "Votre progression locale a été récupérée." });
+    } catch {
+      localStorage.removeItem(localDraftKey);
+    }
+  }, [appLoading, existingApp, form.id, localDraftKey]);
+
+  useEffect(() => {
+    if (appLoading || !localDraftKey || typeof localStorage === "undefined") return;
+    if (!user || !["draft", "revision_requested"].includes(form.status)) return;
+
+    const timeout = window.setTimeout(() => {
+      const payload: VendorApplicationLocalDraft = {
+        savedAt: Date.now(),
+        step,
+        form,
+        docs,
+      };
+      localStorage.setItem(localDraftKey, JSON.stringify(payload));
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [appLoading, docs, form, localDraftKey, step, user]);
+
+  const hasUnsavedDraft =
+    ["draft", "revision_requested"].includes(form.status) &&
+    (!!form.full_name || !!form.store_name || docs.length > 0);
+
+  useEffect(() => {
+    if (!hasUnsavedDraft) return;
+
+    const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", beforeUnloadHandler);
+    return () => window.removeEventListener("beforeunload", beforeUnloadHandler);
+  }, [hasUnsavedDraft]);
+
   if (authLoading || appLoading) {
     return (
       <div className="min-h-screen bg-background">
