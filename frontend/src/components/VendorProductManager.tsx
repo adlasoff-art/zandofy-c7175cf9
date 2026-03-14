@@ -421,6 +421,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       }
     }
 
+    clearDraft();
     toast.success(editing ? "Produit mis à jour" : "Produit sauvegardé en brouillon");
     cancelForm();
     loadProducts();
