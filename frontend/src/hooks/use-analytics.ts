@@ -66,7 +66,7 @@ async function trackEvent(
   if (userId) row.user_id = userId;
 
   try {
-    await (supabase.from("analytics_events") as any).insert(row);
+    await fromTable("analytics_events").insert(row);
   } catch {
     // Silent fail
   }
