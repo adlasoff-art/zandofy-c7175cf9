@@ -203,7 +203,7 @@ export default function AdminEmailTemplatesPage() {
   );
 
   return (
-    <AdminLayout>
+    <AdminLayout title="Templates Email">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
