@@ -180,6 +180,7 @@ const App = () => (
                 <Route path="/admin/seo" element={<RoleGuard allowedRoles={["admin"]}><AdminSEOPage /></RoleGuard>} />
                 <Route path="/admin/countries" element={<RoleGuard allowedRoles={["admin"]}><AdminCountriesPage /></RoleGuard>} />
                 <Route path="/admin/popups" element={<RoleGuard allowedRoles={["admin"]}><AdminPopupsPage /></RoleGuard>} />
+                <Route path="/admin/analytics" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminAnalyticsPage /></RoleGuard>} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
