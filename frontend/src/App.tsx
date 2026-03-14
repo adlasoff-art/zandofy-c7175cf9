@@ -111,6 +111,7 @@ const App = () => (
           <ThemeProvider>
           <UIConfigProvider>
             <CmsThemeInjector />
+            <AnalyticsTrackerInjector />
             <Toaster />
             <Sonner />
             <NotificationListener />
