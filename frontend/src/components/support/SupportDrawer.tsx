@@ -305,7 +305,7 @@ function SupportChatInner({
         });
       if (error) throw error;
       setMessageInput("");
-      await (supabase.from("support_tickets") as any).update({ updated_at: new Date().toISOString() }).eq("id", ticketId);
+      await fromTable("support_tickets").update({ updated_at: new Date().toISOString() }).eq("id", ticketId);
     } catch (err) {
       console.error("Send message error:", err);
     }

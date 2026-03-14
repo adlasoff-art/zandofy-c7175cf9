@@ -40,7 +40,7 @@ export default function AdminAnalyticsPage() {
   const { data: events, isLoading } = useQuery({
     queryKey: ["admin-analytics", period],
     queryFn: async () => {
-      const { data } = await (supabase.from("analytics_events") as any)
+      const { data } = await fromTable("analytics_events")
         .select("event_type, page_path, product_id, store_id, device_type, os, browser, is_pwa, session_id, user_id, duration_seconds, created_at, metadata")
         .gte("created_at", since)
         .order("created_at", { ascending: false })
