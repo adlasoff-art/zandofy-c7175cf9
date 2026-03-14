@@ -77,6 +77,8 @@ export default function BecomeVendorPage() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [existingApp, setExistingApp] = useState(false);
   const [appLoading, setAppLoading] = useState(true);
+  const localDraftKey = useMemo(() => (user ? `zandofy_vendor_application_draft:${user.id}` : null), [user]);
+  const hasRestoredLocalDraftRef = useRef(false);
 
   // Load existing application
   useEffect(() => {
