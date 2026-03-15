@@ -211,7 +211,12 @@ export default function DashboardPage() {
           <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={24} /></div>
         ) : (
           <>
-            {activeTab === "overview" && <OverviewTab orders={orders} user={user} />}
+            {activeTab === "overview" && (
+              <>
+                {needsKyc && <KycBanner kycStatus={kycStatus} needsKyc={needsKyc} isOrderBlocked={isOrderBlocked} onStartKyc={() => setActiveTab("kyc")} />}
+                <OverviewTab orders={orders} user={user} />
+              </>
+            )}
             {activeTab === "orders" && (
               <OrdersTab
                 orders={orders}
