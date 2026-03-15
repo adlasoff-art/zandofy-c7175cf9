@@ -89,6 +89,7 @@ export default function ProductPage() {
   const [shippingCountry, setShippingCountry] = useState("France");
   const [sizeUnit, setSizeUnit] = useState<"CM" | "IN">("CM");
   const [quantity, setQuantity] = useState<number | null>(null);
+  const [variantDrawerOpen, setVariantDrawerOpen] = useState(false);
 
   const { data: product, isLoading } = useQuery({
     queryKey: ["product", id],
