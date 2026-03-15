@@ -148,6 +148,7 @@ const App = () => (
                 <Route path="/wishlist" element={<WishlistPage />} />
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/faq" element={<FAQPage />} />
+                <Route path="/help-center" element={<HelpCenterPage />} />
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/tracking" element={<TrackingPage />} />
