@@ -70,6 +70,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const { data: paymentConfig } = usePaymentMethods();
+  const { isVerified: isKycVerified, isOrderBlocked, needsKyc, kycStatus } = useKycStatus();
 
   const [step, setStep] = useState<Step>("shipping");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("mobile_money");
