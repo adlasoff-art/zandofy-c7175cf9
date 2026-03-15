@@ -100,6 +100,12 @@ function mapProduct(row: any): Product {
   // Attach promo dates for flash sales
   (p as any).promoEndDate = row.promo_end_date || null;
   (p as any).promoStartDate = row.promo_start_date || null;
+  // Attach full color details for variant drawer
+  (p as any).productColors = (row.product_colors || []).map((c: any) => ({
+    hex: c.color_hex,
+    name: c.color_name || "",
+    imageUrl: c.image_url || null,
+  }));
   return p;
 }
 
@@ -107,7 +113,7 @@ const PRODUCT_SELECT = `
   *,
   categories(name, name_fr),
   product_images(image_url, position),
-  product_colors(color_hex, color_name),
+  product_colors(color_hex, color_name, image_url),
   product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
   stores!products_store_id_fkey(id, name, is_verified, verified_years, verified_years_override, is_online, sales_count, sales_override, followers_count, followers_override)
 `;
@@ -209,7 +215,7 @@ export async function fetchProductById(
       *,
       categories(name, name_fr),
       product_images(image_url, position),
-      product_colors(color_hex, color_name),
+      product_colors(color_hex, color_name, image_url),
       product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
       stores!products_store_id_fkey(id, name, logo_url, is_verified, verified_years, verified_years_override, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, whatsapp_number, rating, response_rate, response_time)
     `)

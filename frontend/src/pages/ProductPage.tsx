@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, lazy, Suspense } from "react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -34,6 +34,7 @@ import {
 import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimate";
 import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd } from "@/components/SEOHead";
+import { VariantOrderDrawer } from "@/components/VariantOrderDrawer";
 
 // ─── Gallery from product_images ──────────────────────────────
 interface GalleryItem {
@@ -88,6 +89,7 @@ export default function ProductPage() {
   const [shippingCountry, setShippingCountry] = useState("France");
   const [sizeUnit, setSizeUnit] = useState<"CM" | "IN">("CM");
   const [quantity, setQuantity] = useState<number | null>(null);
+  const [variantDrawerOpen, setVariantDrawerOpen] = useState(false);
 
   const { data: product, isLoading } = useQuery({
     queryKey: ["product", id],
@@ -429,13 +431,30 @@ export default function ProductPage() {
               {!tieredResult && product.originalPrice && (
                 <span className="text-base text-muted-foreground line-through">${product.originalPrice.toFixed(2)}</span>
               )}
-              {product.isSale && product.discount && <span className="text-sm font-bold text-sale bg-sale/10 px-2 py-0.5 rounded">-{product.discount}%</span>}
+            {product.isSale && product.discount && <span className="text-sm font-bold text-sale bg-sale/10 px-2 py-0.5 rounded">-{product.discount}%</span>}
               {tieredResult && tieredResult.tier.discountValue > 0 && (
                 <span className="text-sm font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
                   Palier {tieredResult.tier.tierLabel}
                 </span>
               )}
             </div>
+
+            {/* ★ SELECT OPTIONS TRIGGER (Alibaba-style) */}
+            <button
+              onClick={() => setVariantDrawerOpen(true)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-muted/50 hover:bg-muted rounded-lg border border-border transition-colors group"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-foreground">Sélectionner les options</span>
+                {(product.colors?.length ?? 0) > 0 && (
+                  <span className="text-xs text-muted-foreground">{product.colors!.length} couleur{product.colors!.length > 1 ? "s" : ""}</span>
+                )}
+                {(product.sizes?.length ?? 0) > 0 && (
+                  <span className="text-xs text-muted-foreground">· {product.sizes!.length} taille{product.sizes!.length > 1 ? "s" : ""}</span>
+                )}
+              </div>
+              <ChevronRight size={16} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+            </button>
 
             {/* Flash Timer FOMO */}
             {product.isSale && (
@@ -828,6 +847,21 @@ export default function ProductPage() {
       </main>
       <Footer />
       <FloatingActions />
+
+      {/* ═══ VARIANT ORDER DRAWER (Alibaba-style) ═══ */}
+      <VariantOrderDrawer
+        open={variantDrawerOpen}
+        onOpenChange={setVariantDrawerOpen}
+        product={product}
+        colors={(product as any).productColors || product.colors?.map((hex: string, i: number) => ({
+          hex,
+          name: (product as any).colorNames?.[i] || `Couleur ${i + 1}`,
+          imageUrl: (product as any).colorImages?.[i] || null,
+        })) || []}
+        sizes={product.sizes?.map((s: string) => ({ label: s })) || []}
+        pricingTiers={pricingTiers}
+        moq={moq}
+      />
     </div>
   );
 }
