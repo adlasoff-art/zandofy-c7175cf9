@@ -20,6 +20,7 @@ import { STATUS_CONFIG, STATUS_FLOW, CUSTOMER_TRACKING_STEPS, getStepIndex } fro
 import { useI18n } from "@/contexts/I18nContext";
 import { DeliveryMap } from "@/components/DeliveryMap";
 import { useRiderLocationSubscription } from "@/hooks/use-rider-location";
+import { useCustomerLocationBroadcast } from "@/hooks/use-customer-location";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
