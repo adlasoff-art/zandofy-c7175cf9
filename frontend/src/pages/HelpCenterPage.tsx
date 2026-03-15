@@ -149,7 +149,7 @@ export default function HelpCenterPage() {
       .maybeSingle()
       .then(({ data }) => {
         if (data?.value) {
-          setCmsFaq(data.value as { fr: FaqCategory[]; en: FaqCategory[] });
+          setCmsFaq(data.value as unknown as { fr: FaqCategory[]; en: FaqCategory[] });
         }
       });
   }, []);
