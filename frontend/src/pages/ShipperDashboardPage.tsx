@@ -285,8 +285,8 @@ function AddShipmentModal({ onClose, onSubmit, loading }: { onClose: () => void;
           <input placeholder="Destination" value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })}
             className="px-3 py-2.5 bg-background border border-border rounded-lg text-sm" />
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {(["air", "sea", "road"] as const).map((m) => (
+        <div className="grid grid-cols-4 gap-2">
+          {(["air", "sea", "road", "rail"] as const).map((m) => (
             <button key={m} onClick={() => setForm({ ...form, mode: m })}
               className={`py-2 text-xs rounded-lg border ${form.mode === m ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border text-foreground"}`}>
               {modeLabels[m]}
