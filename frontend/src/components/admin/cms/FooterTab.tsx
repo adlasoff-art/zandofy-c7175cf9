@@ -13,6 +13,8 @@ export default function FooterTab() {
     description: "E-commerce généraliste proposant mode, électronique, maison et bien plus.",
     social_links: { facebook: "#", instagram: "#", twitter: "#", youtube: "#", linkedin: "#" },
     newsletter_email: "newsletter@zandofy.com",
+    phone: "+1 (800) ZANDOFY",
+    address: "Worldwide",
   });
 
   useEffect(() => {
@@ -23,6 +25,8 @@ export default function FooterTab() {
           description: v.description || config.description,
           social_links: { ...config.social_links, ...v.social_links },
           newsletter_email: v.newsletter_email || config.newsletter_email,
+          phone: v.phone || config.phone,
+          address: v.address || config.address,
         });
       }
       setLoading(false);
@@ -53,6 +57,20 @@ export default function FooterTab() {
       <div className="bg-card border border-border rounded-xl p-4 space-y-4">
         <h3 className="text-sm font-semibold text-foreground">Texte de description</h3>
         <Textarea value={config.description} onChange={e => setConfig(prev => ({ ...prev, description: e.target.value }))} rows={3} className="text-sm" />
+      </div>
+
+      <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+        <h3 className="text-sm font-semibold text-foreground">Coordonnées</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Téléphone</label>
+            <input type="text" value={config.phone} onChange={e => setConfig(prev => ({ ...prev, phone: e.target.value }))} className={inputClass} placeholder="+243 000 000 000" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Adresse / Localisation</label>
+            <input type="text" value={config.address} onChange={e => setConfig(prev => ({ ...prev, address: e.target.value }))} className={inputClass} placeholder="Kinshasa, RDC" />
+          </div>
+        </div>
       </div>
 
       <div className="bg-card border border-border rounded-xl p-4 space-y-4">
