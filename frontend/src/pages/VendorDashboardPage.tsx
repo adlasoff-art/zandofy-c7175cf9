@@ -319,7 +319,7 @@ export default function VendorDashboardPage() {
             />
 
             {/* Tab navigation */}
-            <div className="flex gap-1 mb-4">
+            <div className="flex gap-1 mb-4 overflow-x-auto pb-2 scrollbar-hide">
               {[
                 { key: "catalogue" as const, label: "Catalogue", icon: Package },
                 { key: "orders" as const, label: "Commandes", icon: ShoppingBag },
