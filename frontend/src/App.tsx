@@ -188,6 +188,7 @@ const App = () => (
             </Suspense>
             </BanGuard>
             </MaintenanceGuard>
+            </SupportDrawerProvider>
           </UIConfigProvider>
           </ThemeProvider>
           </I18nProvider>
