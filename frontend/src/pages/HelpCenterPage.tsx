@@ -386,7 +386,7 @@ export default function HelpCenterPage() {
 
     setSendingGuestReply(true);
     try {
-      const { error } = await supabase.rpc("add_guest_support_message", {
+      const { error } = await (supabase as any).rpc("add_guest_support_message", {
         p_ticket_id: ticketId,
         p_requester_email: guestLookupEmail.trim().toLowerCase(),
         p_content: guestReply.trim(),
