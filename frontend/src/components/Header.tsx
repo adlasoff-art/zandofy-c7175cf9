@@ -45,7 +45,6 @@ export function Header() {
   const { setDrawerOpen, itemCount } = useCart();
   const unreadCount = useUnreadMessages();
   const unreadSupportCount = useUnreadSupport();
-  const { setOpen: setSupportDrawerOpen } = useSupportDrawer();
   const { count: wishlistCount } = useWishlist();
   const { t, locale, currency, setLocale, setCurrency } = useI18n();
   const { theme, setTheme } = useTheme();
