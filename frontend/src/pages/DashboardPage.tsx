@@ -54,6 +54,7 @@ const TABS = [
   { key: "notifications", label: "Notifications", icon: Bell },
   { key: "messages", label: "Messages", icon: MessageCircle },
   { key: "profile", label: "Profil", icon: UserIcon },
+  { key: "kyc", label: "Vérification", icon: ShieldCheck },
   { key: "addresses", label: "Adresses", icon: MapPin },
 ];
 
