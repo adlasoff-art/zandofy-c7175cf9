@@ -138,10 +138,10 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
     reader.onload = async (ev) => {
       const base64 = ev.target?.result as string;
       try {
-        const data = await apiFetch<{ keywords?: { keywords_fr?: string[] }; products?: unknown[] }>("/api/visual-search", {
-          method: "POST",
-          body: JSON.stringify({ image_base64: base64 }),
+        const { data, error } = await supabase.functions.invoke("visual-search", {
+          body: { image_base64: base64 },
         });
+        if (error) throw error;
         sessionStorage.setItem("visual-search-results", JSON.stringify(data));
         navigate("/search?visual=true");
         onClose?.();
