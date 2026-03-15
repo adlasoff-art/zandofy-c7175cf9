@@ -323,6 +323,7 @@ export default function VendorDashboardPage() {
               {[
                 { key: "catalogue" as const, label: "Catalogue", icon: Package },
                 { key: "orders" as const, label: "Commandes", icon: ShoppingBag },
+                { key: "deliveries" as const, label: "Livraisons", icon: Bike },
                 { key: "promos" as const, label: "Promos", icon: Flame },
                 { key: "coupons" as const, label: "Coupons", icon: Crown },
                 { key: "wallet" as const, label: "Wallet", icon: Wallet },
