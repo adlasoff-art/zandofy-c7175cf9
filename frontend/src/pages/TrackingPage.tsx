@@ -347,10 +347,13 @@ function ConfirmationCodeEntry({ order, onConfirmed }: { order: OrderTrackingRes
   );
 }
 
-// ── Live Rider Tracking Map ──
-function LiveRiderMap({ deliveryId }: { deliveryId: string }) {
+// ── Live Rider Tracking Map (bidirectional) ──
+function LiveRiderMap({ deliveryId, orderId, userId }: { deliveryId: string; orderId?: string; userId?: string }) {
   const [riderLat, setRiderLat] = useState<number | null>(null);
   const [riderLng, setRiderLng] = useState<number | null>(null);
+
+  // Broadcast customer position
+  useCustomerLocationBroadcast(userId, orderId, !!userId && !!orderId);
 
   useRiderLocationSubscription(deliveryId, useCallback((lat: number, lng: number) => {
     setRiderLat(lat);
@@ -362,6 +365,7 @@ function LiveRiderMap({ deliveryId }: { deliveryId: string }) {
       <div className="bg-muted/30 rounded-xl p-6 text-center">
         <Bike size={24} className="text-muted-foreground mx-auto mb-2" />
         <p className="text-sm text-muted-foreground">En attente de la position du livreur...</p>
+        <p className="text-xs text-muted-foreground mt-1">Votre position GPS est partagée avec le livreur</p>
       </div>
     );
   }
@@ -369,10 +373,10 @@ function LiveRiderMap({ deliveryId }: { deliveryId: string }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
-        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-        <span className="text-xs font-medium text-foreground">Livreur en route</span>
+        <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+        <span className="text-xs font-medium text-foreground">Livreur en route — GPS bidirectionnel actif</span>
       </div>
-      <DeliveryMap riderLat={riderLat} riderLng={riderLng} className="h-[300px]" />
+      <DeliveryMap riderLat={riderLat} riderLng={riderLng} showPolylines showEta className="h-[300px]" />
     </div>
   );
 }
