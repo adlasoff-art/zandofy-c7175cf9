@@ -311,6 +311,20 @@ export default function CheckoutPage() {
     );
   }
 
+  if (isOrderBlocked) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container py-16 text-center space-y-4">
+          <Package size={48} className="mx-auto text-muted-foreground" />
+          <h1 className="text-xl font-bold text-foreground">Vérification requise</h1>
+          <p className="text-muted-foreground">Vous avez atteint la limite de commandes sans vérification d'identité. Complétez votre KYC pour continuer.</p>
+          <Link to="/dashboard"><Button>Compléter la vérification</Button></Link>
+        </main>
+      </div>
+    );
+  }
+
   if (items.length === 0 && step !== "confirmation") {
     return (
       <div className="min-h-screen bg-background">
