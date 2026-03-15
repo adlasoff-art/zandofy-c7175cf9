@@ -68,18 +68,21 @@ export default function AdminKycPage() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
 
-  // KYC Settings
   const [kycActivationOrders, setKycActivationOrders] = useState(2);
   const [kycOrderLimit, setKycOrderLimit] = useState(10);
   const [kycReminderDays, setKycReminderDays] = useState(7);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
+  const [frontUrl, setFrontUrl] = useState("");
+  const [backUrl, setBackUrl] = useState("");
+  const [selfieUrl, setSelfieUrl] = useState("");
+
   const fetchRows = useCallback(async () => {
     setLoading(true);
-    let query = supabase
+    let query = (supabase as any)
       .from("kyc_verifications")
-      .select("*, profiles!kyc_verifications_user_id_fkey(first_name, last_name, email)")
+      .select("*, profiles(first_name, last_name, email)")
       .order("created_at", { ascending: false });
     if (filter !== "all") {
       query = query.eq("status", filter);
@@ -91,7 +94,6 @@ export default function AdminKycPage() {
 
   useEffect(() => { fetchRows(); }, [fetchRows]);
 
-  // Load KYC settings
   useEffect(() => {
     supabase
       .from("platform_settings")
@@ -112,7 +114,7 @@ export default function AdminKycPage() {
     setSettingsLoading(true);
     const { error } = await supabase.from("platform_settings").upsert({
       key: "kyc_settings",
-      value: { kyc_activation_orders: kycActivationOrders, kyc_order_limit: kycOrderLimit, kyc_reminder_days: kycReminderDays },
+      value: { kyc_activation_orders: kycActivationOrders, kyc_order_limit: kycOrderLimit, kyc_reminder_days: kycReminderDays } as any,
       updated_by: user?.id,
     }, { onConflict: "key" });
     setSettingsLoading(false);
@@ -128,7 +130,7 @@ export default function AdminKycPage() {
     setRejectionReason(row.rejection_reason || "");
     setAdminNotes(row.admin_notes || "");
 
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from("kyc_audit_logs")
       .select("*")
       .eq("kyc_id", row.id)
@@ -140,10 +142,6 @@ export default function AdminKycPage() {
     const { data } = await supabase.storage.from("kyc-documents").createSignedUrl(path, 300);
     return data?.signedUrl || "";
   };
-
-  const [frontUrl, setFrontUrl] = useState("");
-  const [backUrl, setBackUrl] = useState("");
-  const [selfieUrl, setSelfieUrl] = useState("");
 
   useEffect(() => {
     if (!selected) return;
@@ -163,7 +161,7 @@ export default function AdminKycPage() {
     }
     setActionLoading(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("kyc_verifications")
         .update({
           status: newStatus,
@@ -175,7 +173,7 @@ export default function AdminKycPage() {
         .eq("id", selected.id);
       if (error) throw error;
 
-      await supabase.from("kyc_audit_logs").insert({
+      await (supabase as any).from("kyc_audit_logs").insert({
         kyc_id: selected.id,
         action: newStatus === "approved" ? "approved" : newStatus === "rejected" ? "rejected" : "resubmission_requested",
         performed_by: user.id,
@@ -202,16 +200,14 @@ export default function AdminKycPage() {
     return name.includes(s) || email.includes(s) || r.id.includes(s);
   });
 
-  // Detail view
   if (selected) {
     return (
-      <AdminLayout title="Détail KYC" subtitle="Examen de la vérification d'identité">
+      <AdminLayout title="Détail KYC">
         <Button variant="ghost" size="sm" onClick={() => setSelected(null)} className="mb-4">
           <ChevronLeft size={16} /> Retour à la liste
         </Button>
 
         <div className="grid lg:grid-cols-2 gap-6">
-          {/* Left: User info + documents */}
           <div className="space-y-6">
             <div className="bg-card rounded-lg p-5 border border-border space-y-4">
               <div className="flex items-center justify-between">
@@ -226,7 +222,6 @@ export default function AdminKycPage() {
               </div>
             </div>
 
-            {/* Address */}
             <div className="bg-card rounded-lg p-5 border border-border space-y-3">
               <h3 className="font-bold text-foreground flex items-center gap-2"><MapPin size={16} /> Adresse déclarée</h3>
               <div className="text-sm space-y-1 text-foreground">
@@ -237,7 +232,6 @@ export default function AdminKycPage() {
               </div>
             </div>
 
-            {/* Documents */}
             <div className="bg-card rounded-lg p-5 border border-border space-y-4">
               <h3 className="font-bold text-foreground flex items-center gap-2"><FileImage size={16} /> Documents</h3>
               <div className="space-y-3">
@@ -259,7 +253,6 @@ export default function AdminKycPage() {
             </div>
           </div>
 
-          {/* Right: Actions + Audit */}
           <div className="space-y-6">
             {selected.status === "pending" || selected.status === "resubmission_required" ? (
               <div className="bg-card rounded-lg p-5 border border-border space-y-4">
@@ -288,7 +281,7 @@ export default function AdminKycPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={() => handleAction("approved")} disabled={actionLoading}>
+                  <Button className="flex-1" onClick={() => handleAction("approved")} disabled={actionLoading}>
                     <CheckCircle size={16} className="mr-1" /> Approuver
                   </Button>
                   <Button variant="destructive" className="flex-1" onClick={() => handleAction("rejected")} disabled={actionLoading}>
@@ -314,7 +307,6 @@ export default function AdminKycPage() {
               </div>
             )}
 
-            {/* Audit log */}
             <div className="bg-card rounded-lg p-5 border border-border space-y-3">
               <h3 className="font-bold text-foreground flex items-center gap-2"><Clock size={16} /> Historique</h3>
               {auditLogs.length === 0 ? (
@@ -340,10 +332,9 @@ export default function AdminKycPage() {
   }
 
   return (
-    <AdminLayout title="Vérification KYC" subtitle="Gestion des vérifications d'identité">
+    <AdminLayout title="Vérification KYC">
       <div className="space-y-6">
-        {/* Settings toggle */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -373,7 +364,6 @@ export default function AdminKycPage() {
           </Button>
         </div>
 
-        {/* Settings panel */}
         {showSettings && (
           <div className="bg-card rounded-lg p-5 border border-border space-y-4">
             <h3 className="font-bold text-foreground">Paramètres KYC</h3>
@@ -401,7 +391,6 @@ export default function AdminKycPage() {
           </div>
         )}
 
-        {/* Table */}
         <div className="bg-card rounded-lg border border-border overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-16">

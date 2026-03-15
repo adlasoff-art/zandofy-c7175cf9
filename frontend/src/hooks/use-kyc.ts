@@ -43,14 +43,14 @@ export function useKycStatus() {
     queryKey: ["kyc-verification", user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("kyc_verifications")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      return data as KycVerification | null;
+      return (data as KycVerification | null);
     },
     enabled: !!user,
     staleTime: 30_000,

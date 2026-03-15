@@ -31,7 +31,6 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
   const [step, setStep] = useState<Step>("document");
   const [submitting, setSubmitting] = useState(false);
 
-  // Document
   const [docType, setDocType] = useState<DocType>(
     (existingKyc?.document_type as DocType) || "national_id"
   );
@@ -40,11 +39,9 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
   const [backPreview, setBackPreview] = useState<string | null>(null);
 
-  // Selfie
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
 
-  // Address
   const [country, setCountry] = useState(existingKyc?.address_country || "CD");
   const [city, setCity] = useState(existingKyc?.address_city || "");
   const [street, setStreet] = useState(existingKyc?.address_street || "");
@@ -57,7 +54,6 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = useCallback((file: File, setter: (f: File | null) => void, previewSetter: (s: string | null) => void) => {
-    // Compress by limiting to 2MB
     if (file.size > 5 * 1024 * 1024) {
       toast({ title: "Fichier trop volumineux", description: "Maximum 5 Mo par fichier.", variant: "destructive" });
       return;
@@ -105,7 +101,7 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
 
       const payload = {
         user_id: user.id,
-        status: "pending" as const,
+        status: "pending",
         document_type: docType,
         document_front_url: frontUrl,
         document_back_url: backUrl,
@@ -119,13 +115,13 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
       };
 
       if (existingKyc && (existingKyc.status === "rejected" || existingKyc.status === "resubmission_required")) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("kyc_verifications")
           .update(payload)
           .eq("id", existingKyc.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("kyc_verifications")
           .insert(payload);
         if (error) throw error;
@@ -171,7 +167,6 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
       </div>
       <p className="text-center text-sm font-medium text-foreground">{steps[currentIdx]?.label}</p>
 
-      {/* Step 1: Document */}
       {step === "document" && (
         <div className="space-y-5">
           <div className="space-y-2">
@@ -187,7 +182,6 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
             </select>
           </div>
 
-          {/* Front */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Recto du document *</Label>
             <input ref={frontInputRef} type="file" accept="image/*" className="hidden" onChange={e => {
@@ -218,7 +212,6 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
             )}
           </div>
 
-          {/* Back */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Verso du document (optionnel)</Label>
             <input ref={backInputRef} type="file" accept="image/*" className="hidden" onChange={e => {
@@ -252,7 +245,6 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
         </div>
       )}
 
-      {/* Step 2: Selfie */}
       {step === "selfie" && (
         <div className="space-y-5">
           <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground space-y-2">
@@ -306,7 +298,6 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
         </div>
       )}
 
-      {/* Step 3: Address */}
       {step === "address" && (
         <div className="space-y-4">
           <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground">
@@ -353,7 +344,6 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
         </div>
       )}
 
-      {/* Step 4: Review */}
       {step === "review" && (
         <div className="space-y-5">
           <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
