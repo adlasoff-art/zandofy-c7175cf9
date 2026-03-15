@@ -52,14 +52,6 @@ serve(async (req) => {
   }
 
   try {
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "OPENAI_API_KEY not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const { image_base64 } = await req.json();
     if (!image_base64) {
       return new Response(
@@ -68,62 +60,140 @@ serve(async (req) => {
       );
     }
 
-    let imageUrl = image_base64;
-    if (!imageUrl.startsWith("data:")) {
-      imageUrl = `data:image/jpeg;base64,${imageUrl}`;
+    // Strip data URL prefix to get raw base64, then rebuild clean data URL
+    let rawBase64 = image_base64;
+    let mimeType = "image/jpeg";
+    if (rawBase64.startsWith("data:")) {
+      const match = rawBase64.match(/^data:(image\/\w+);base64,(.+)$/s);
+      if (match) {
+        mimeType = match[1];
+        rawBase64 = match[2];
+      } else {
+        rawBase64 = rawBase64.replace(/^data:[^;]+;base64,/, "");
+      }
     }
 
-    // Call OpenAI GPT-4o Vision
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: USER_PROMPT },
-              { type: "image_url", image_url: { url: imageUrl } },
-            ],
-          },
-        ],
-        tools: [EXTRACT_KEYWORDS_TOOL],
-        tool_choice: { type: "function", function: { name: "extract_keywords" } },
-        max_tokens: 500,
-      }),
-    });
+    // Clean base64: remove whitespace/newlines
+    rawBase64 = rawBase64.replace(/\s/g, "");
+    const imageUrl = `data:${mimeType};base64,${rawBase64}`;
 
-    if (!openaiResponse.ok) {
-      const errText = await openaiResponse.text();
-      console.error("OpenAI error:", openaiResponse.status, errText);
-      return new Response(
-        JSON.stringify({ error: "AI analysis failed", detail: errText }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    console.log("Image size (base64 chars):", rawBase64.length, "MIME:", mimeType);
 
-    const aiData = await openaiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+    // Use Lovable AI Gateway with Gemini (vision-capable, no external API key needed)
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    
+    // Fallback to OpenAI if no Lovable key
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
-    if (!toolCall) {
-      return new Response(
-        JSON.stringify({
-          keywords: { keywords_fr: [], keywords_en: [], product_type: "unknown" },
-          products: [],
+    let extracted: Record<string, unknown> | null = null;
+
+    if (LOVABLE_API_KEY) {
+      // Use Lovable AI Gateway with Gemini 2.5 Flash (supports vision + tool calling)
+      console.log("Using Lovable AI Gateway");
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: USER_PROMPT },
+                { type: "image_url", image_url: { url: imageUrl } },
+              ],
+            },
+          ],
+          tools: [EXTRACT_KEYWORDS_TOOL],
+          tool_choice: { type: "function", function: { name: "extract_keywords" } },
+          max_tokens: 500,
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      });
+
+      if (!aiResponse.ok) {
+        const errText = await aiResponse.text();
+        console.error("Lovable AI error:", aiResponse.status, errText);
+        
+        if (aiResponse.status === 429) {
+          return new Response(
+            JSON.stringify({ error: "Service temporairement surchargé, réessayez." }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        if (aiResponse.status === 402) {
+          return new Response(
+            JSON.stringify({ error: "Crédits AI épuisés." }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        // Fall through to OpenAI if available
+        if (!OPENAI_API_KEY) {
+          return new Response(
+            JSON.stringify({ error: "AI analysis failed", detail: errText }),
+            { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } else {
+        const aiData = await aiResponse.json();
+        const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+        if (toolCall) {
+          try {
+            extracted = JSON.parse(toolCall.function.arguments);
+          } catch { /* fallback below */ }
+        }
+      }
     }
 
-    let extracted: Record<string, unknown>;
-    try {
-      extracted = JSON.parse(toolCall.function.arguments);
-    } catch {
+    // Fallback: OpenAI GPT-4o
+    if (!extracted && OPENAI_API_KEY) {
+      console.log("Falling back to OpenAI");
+      const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: USER_PROMPT },
+                { type: "image_url", image_url: { url: imageUrl } },
+              ],
+            },
+          ],
+          tools: [EXTRACT_KEYWORDS_TOOL],
+          tool_choice: { type: "function", function: { name: "extract_keywords" } },
+          max_tokens: 500,
+        }),
+      });
+
+      if (!openaiResponse.ok) {
+        const errText = await openaiResponse.text();
+        console.error("OpenAI error:", openaiResponse.status, errText);
+        return new Response(
+          JSON.stringify({ error: "AI analysis failed", detail: errText }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const aiData = await openaiResponse.json();
+      const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+      if (toolCall) {
+        try {
+          extracted = JSON.parse(toolCall.function.arguments);
+        } catch { /* ignore */ }
+      }
+    }
+
+    if (!extracted) {
       return new Response(
         JSON.stringify({
           keywords: { keywords_fr: [], keywords_en: [], product_type: "unknown" },
@@ -152,8 +222,7 @@ serve(async (req) => {
       ...(keywords.color ? [keywords.color] : []),
     ].filter(Boolean);
 
-    // Build OR search across name, name_fr, description
-    let orFilter = allKeywords
+    const orFilter = allKeywords
       .flatMap((kw) => [
         `name.ilike.%${kw}%`,
         `name_fr.ilike.%${kw}%`,
@@ -168,13 +237,10 @@ serve(async (req) => {
       .or(orFilter)
       .limit(20);
 
-    if (dbError) {
-      console.error("DB error:", dbError);
-    }
+    if (dbError) console.error("DB error:", dbError);
 
     const productList = products || [];
 
-    // Get images for found products
     let productImages: Record<string, string> = {};
     if (productList.length > 0) {
       const productIds = productList.map((p) => p.id);
