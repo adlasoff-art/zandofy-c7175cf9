@@ -8,8 +8,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { SignatureCanvas } from "@/components/rider/SignatureCanvas";
 import { PhotoCapture } from "@/components/rider/PhotoCapture";
-import { DeliveryMap } from "@/components/DeliveryMap";
+import { DeliveryMap, type MapMarker } from "@/components/DeliveryMap";
 import { useRiderLocationBroadcast } from "@/hooks/use-rider-location";
+import { useCustomerLocationSubscription } from "@/hooks/use-customer-location";
 import { generateConfirmationCode } from "@/components/vendor/OrderTransitionModals";
 import { STATUS_CONFIG } from "@/lib/order-status";
 
