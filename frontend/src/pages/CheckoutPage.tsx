@@ -17,6 +17,8 @@ import {
   ArrowLeft, Package, MapPin, Banknote, Tag, Plus, Trash2, Home, Briefcase, X, Loader2, Coins
 } from "lucide-react";
 import { usePaymentMethods } from "@/hooks/use-payment-methods";
+import { useKycStatus } from "@/hooks/use-kyc";
+import { KycBanner } from "@/components/kyc/KycBanner";
 
 type Step = "shipping" | "payment" | "confirmation";
 type PaymentMethod = "stripe" | "mobile_money" | "cod";
