@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Package, Truck, MapPin, Clock, Ship, Plane, TruckIcon, FileText, Search, Bell, User, Home, BarChart3, Loader2, DollarSign, CheckCircle, AlertTriangle, Plus } from "lucide-react";
+import { Package, Truck, MapPin, Clock, Ship, Plane, TruckIcon, Train, FileText, Search, Bell, User, Home, BarChart3, Loader2, DollarSign, CheckCircle, AlertTriangle, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRoles } from "@/hooks/use-roles";
 import { Navigate, NavLink } from "react-router-dom";
