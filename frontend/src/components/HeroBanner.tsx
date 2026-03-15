@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useSwipe } from "@/hooks/use-swipe";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface BannerItem {
@@ -16,7 +15,12 @@ interface BannerItem {
 }
 
 export function HeroBanner() {
-  const [current, setCurrent] = useState<number>(0);
+  const [current, setCurrent] = useState(0);
+  const [direction, setDirection] = useState<"left" | "right">("left");
+  const [isAnimating, setIsAnimating] = useState(false);
+  const touchStartX = useRef(0);
+  const touchDeltaX = useRef(0);
+  const sliderRef = useRef<HTMLDivElement>(null);
 
   const { data: heroSlides = [] } = useQuery({
     queryKey: ["cms-banners", "hero_slide"],
@@ -60,21 +64,28 @@ export function HeroBanner() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const goTo = useCallback((index: number, dir: "left" | "right") => {
+    if (isAnimating || heroSlides.length === 0) return;
+    setDirection(dir);
+    setIsAnimating(true);
+    setCurrent(index);
+    setTimeout(() => setIsAnimating(false), 700);
+  }, [isAnimating, heroSlides.length]);
+
   const goNext = useCallback(() => {
     if (heroSlides.length === 0) return;
-    setCurrent((c) => (c + 1) % heroSlides.length);
-  }, [heroSlides.length]);
+    goTo((current + 1) % heroSlides.length, "left");
+  }, [current, heroSlides.length, goTo]);
 
   const goPrev = useCallback(() => {
     if (heroSlides.length === 0) return;
-    setCurrent((c) => (c - 1 + heroSlides.length) % heroSlides.length);
-  }, [heroSlides.length]);
+    goTo((current - 1 + heroSlides.length) % heroSlides.length, "right");
+  }, [current, heroSlides.length, goTo]);
 
-  const swipeHandlers = useSwipe(goNext, goPrev);
-
+  // Auto-play
   useEffect(() => {
-    if (heroSlides.length === 0) return;
-    const timer = setInterval(goNext, 4000);
+    if (heroSlides.length <= 1) return;
+    const timer = setInterval(goNext, 5000);
     return () => clearInterval(timer);
   }, [goNext, heroSlides.length]);
 
@@ -83,27 +94,41 @@ export function HeroBanner() {
     if (current >= heroSlides.length && heroSlides.length > 0) setCurrent(0);
   }, [heroSlides.length, current]);
 
+  // Touch handlers for swipe
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchDeltaX.current = 0;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const dx = e.touches[0].clientX - touchStartX.current;
+    touchDeltaX.current = dx;
+  };
+
+  const handleTouchEnd = () => {
+    if (touchDeltaX.current < -50) goNext();
+    else if (touchDeltaX.current > 50) goPrev();
+  };
+
   if (heroSlides.length === 0) {
     return (
       <section className="bg-muted">
         <div className="container py-3">
-          <Skeleton className="h-[340px] rounded-md" />
+          <Skeleton className="h-[260px] md:h-[380px] rounded-xl" />
         </div>
       </section>
     );
   }
 
-  const slide = heroSlides[current];
-
   return (
     <section className="bg-muted">
       <div className="container py-3">
-        <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr_180px] gap-2.5" style={{ minHeight: 340 }}>
+        <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr_180px] gap-2.5" style={{ minHeight: 380 }}>
           {/* Left sidebar banners */}
-          <div className="hidden lg:flex flex-col gap-2" style={{ height: 340 }}>
+          <div className="hidden lg:flex flex-col gap-2" style={{ height: 380 }}>
             {leftBanners.map((b) => (
-              <Link key={b.id} to={b.link || "/"} className="relative block rounded-md overflow-hidden group" style={{ flex: 1 }}>
-                <img src={b.image_url || "/placeholder.svg"} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <Link key={b.id} to={b.link || "/"} className="relative block rounded-xl overflow-hidden group" style={{ flex: 1 }}>
+                <img src={b.image_url || "/placeholder.svg"} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
                 <div className="absolute inset-0 bg-foreground/40 flex items-center justify-center">
                   <span className="text-card text-sm font-bold">{b.title}</span>
                 </div>
@@ -111,50 +136,73 @@ export function HeroBanner() {
             ))}
           </div>
 
-          {/* Center carousel */}
+          {/* Center carousel with horizontal slide animation */}
           <div
-            className="relative rounded-md overflow-hidden touch-pan-y"
-            style={{ height: 340 }}
-            {...swipeHandlers}
+            ref={sliderRef}
+            className="relative rounded-xl overflow-hidden touch-pan-y select-none"
+            style={{ height: 380 }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           >
-            <img
-              src={slide.image_url || "/placeholder.svg"}
-              alt={slide.title}
-              className="w-full h-full object-cover transition-opacity duration-500"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-foreground/50 to-transparent flex flex-col justify-center pl-8 md:pl-12">
-              <h2 className="text-card text-2xl md:text-4xl font-bold tracking-wide">{slide.title}</h2>
-              {slide.subtitle && <p className="text-card/80 text-sm md:text-base mt-1">{slide.subtitle}</p>}
-              {slide.cta && (
-                <Link to={slide.link || "/"} className="mt-4 inline-block w-fit px-6 py-2.5 text-xs font-bold bg-card text-foreground rounded-sm hover:bg-card/90 transition-colors uppercase tracking-wider">
-                  {slide.cta}
-                </Link>
-              )}
-            </div>
+            {heroSlides.map((slide, i) => (
+              <div
+                key={slide.id}
+                className="absolute inset-0 w-full h-full"
+                style={{
+                  transform: i === current
+                    ? "translateX(0)"
+                    : direction === "left"
+                      ? "translateX(100%)"
+                      : "translateX(-100%)",
+                  transition: isAnimating ? "transform 700ms cubic-bezier(0.4, 0, 0.2, 1)" : "none",
+                  zIndex: i === current ? 2 : 1,
+                  visibility: i === current || isAnimating ? "visible" : "hidden",
+                }}
+              >
+                <img
+                  src={slide.image_url || "/placeholder.svg"}
+                  alt={slide.title}
+                  className="w-full h-full object-cover"
+                  loading={i === 0 ? "eager" : "lazy"}
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-foreground/50 to-transparent flex flex-col justify-center pl-6 md:pl-12">
+                  <h2 className="text-card text-xl md:text-4xl font-bold tracking-wide max-w-md">{slide.title}</h2>
+                  {slide.subtitle && <p className="text-card/80 text-sm md:text-base mt-1 max-w-sm">{slide.subtitle}</p>}
+                  {slide.cta && (
+                    <Link to={slide.link || "/"} className="mt-4 inline-block w-fit px-6 py-2.5 text-xs font-bold bg-card text-foreground rounded-sm hover:bg-card/90 transition-colors uppercase tracking-wider">
+                      {slide.cta}
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ))}
 
-            <button onClick={goPrev} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-card/70 rounded-full flex items-center justify-center hover:bg-card transition-colors">
-              <ChevronLeft size={16} className="text-foreground" />
+            {/* Navigation arrows */}
+            <button onClick={goPrev} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-card/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-card transition-colors z-10 shadow-md">
+              <ChevronLeft size={18} className="text-foreground" />
             </button>
-            <button onClick={goNext} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-card/70 rounded-full flex items-center justify-center hover:bg-card transition-colors">
-              <ChevronRight size={16} className="text-foreground" />
+            <button onClick={goNext} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-card/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-card transition-colors z-10 shadow-md">
+              <ChevronRight size={18} className="text-foreground" />
             </button>
 
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+            {/* Dots */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
               {heroSlides.map((_, i) => (
                 <button
                   key={i}
-                  onClick={() => setCurrent(i)}
-                  className={`w-2 h-2 rounded-full transition-colors ${i === current ? "bg-card" : "bg-card/40"}`}
+                  onClick={() => goTo(i, i > current ? "left" : "right")}
+                  className={`rounded-full transition-all duration-300 ${i === current ? "bg-card w-6 h-2" : "bg-card/40 w-2 h-2 hover:bg-card/60"}`}
                 />
               ))}
             </div>
           </div>
 
           {/* Right sidebar banners */}
-          <div className="hidden lg:flex flex-col gap-2" style={{ height: 340 }}>
+          <div className="hidden lg:flex flex-col gap-2" style={{ height: 380 }}>
             {rightBanners.map((b) => (
-              <Link key={b.id} to={b.link || "/"} className="relative block rounded-md overflow-hidden group" style={{ flex: 1 }}>
-                <img src={b.image_url || "/placeholder.svg"} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <Link key={b.id} to={b.link || "/"} className="relative block rounded-xl overflow-hidden group" style={{ flex: 1 }}>
+                <img src={b.image_url || "/placeholder.svg"} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
                 <div className="absolute inset-0 bg-foreground/40 flex items-center justify-center">
                   <span className="text-card text-sm font-bold">{b.title}</span>
                 </div>
