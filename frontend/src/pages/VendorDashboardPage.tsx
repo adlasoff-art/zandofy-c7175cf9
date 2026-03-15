@@ -336,7 +336,7 @@ export default function VendorDashboardPage() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full border transition-all ${
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap border transition-all ${
                     activeTab === tab.key
                       ? "bg-foreground text-card border-foreground"
                       : "bg-card text-foreground border-border hover:border-foreground"

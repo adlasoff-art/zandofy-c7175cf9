@@ -540,6 +540,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "search.searching": "Searching...",
     "search.noResultsFor": "No results for",
     "search.trending": "Trending",
+    "search.searchBtn": "Search",
     // Auth
     "auth.login": "Log In",
     "auth.signup": "Create Account",

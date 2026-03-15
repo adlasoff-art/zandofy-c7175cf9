@@ -108,7 +108,7 @@ export function Header() {
             Zandofy
           </Link>
 
-          <div className="hidden md:flex flex-1 max-w-2xl mx-4">
+          <div className="hidden md:flex flex-1 max-w-2xl mx-auto px-6">
             <PredictiveSearch />
           </div>
 
