@@ -11,7 +11,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useUnreadMessages } from "@/hooks/use-unread-messages";
 import { useUnreadSupport } from "@/hooks/use-unread-support";
-import { useSupportDrawer } from "@/contexts/SupportDrawerContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useI18n, LOCALES, CURRENCIES, type CurrencyCode } from "@/contexts/I18nContext";
 import { useTheme } from "@/contexts/ThemeContext";
