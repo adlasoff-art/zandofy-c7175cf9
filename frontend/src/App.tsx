@@ -45,6 +45,7 @@ const WishlistPage = lazy(() => import("./pages/WishlistPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const FAQPage = lazy(() => import("./pages/FAQPage"));
+const HelpCenterPage = lazy(() => import("./pages/HelpCenterPage"));
 const TermsPage = lazy(() => import("./pages/TermsPage"));
 const PrivacyPage = lazy(() => import("./pages/PrivacyPage"));
 const TrackingPage = lazy(() => import("./pages/TrackingPage"));
@@ -147,6 +148,7 @@ const App = () => (
                 <Route path="/wishlist" element={<WishlistPage />} />
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/faq" element={<FAQPage />} />
+                <Route path="/help-center" element={<HelpCenterPage />} />
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/tracking" element={<TrackingPage />} />
