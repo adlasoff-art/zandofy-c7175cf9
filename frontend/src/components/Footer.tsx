@@ -41,7 +41,7 @@ export function Footer() {
     {
       title: t("footer.customerService"),
       links: [
-        { label: t("footer.helpCenter"), to: "/faq" },
+        { label: t("footer.helpCenter"), to: "/help-center" },
         { label: t("footer.orderTracking"), to: "/tracking" },
         { label: t("footer.shippingDelivery"), to: "/faq" },
         { label: t("footer.returnsRefunds"), to: "/faq" },
