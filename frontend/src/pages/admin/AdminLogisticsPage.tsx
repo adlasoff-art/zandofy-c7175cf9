@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { DeliveryMap } from "@/components/DeliveryMap";
+import { DeliveryMap, type MapMarker } from "@/components/DeliveryMap";
 
 type TabKey = "overview" | "deliveries" | "assign";
 
