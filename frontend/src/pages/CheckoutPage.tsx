@@ -17,6 +17,8 @@ import {
   ArrowLeft, Package, MapPin, Banknote, Tag, Plus, Trash2, Home, Briefcase, X, Loader2, Coins
 } from "lucide-react";
 import { usePaymentMethods } from "@/hooks/use-payment-methods";
+import { useKycStatus } from "@/hooks/use-kyc";
+import { KycBanner } from "@/components/kyc/KycBanner";
 
 type Step = "shipping" | "payment" | "confirmation";
 type PaymentMethod = "stripe" | "mobile_money" | "cod";
@@ -68,6 +70,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const { data: paymentConfig } = usePaymentMethods();
+  const { isVerified: isKycVerified, isOrderBlocked, needsKyc, kycStatus } = useKycStatus();
 
   const [step, setStep] = useState<Step>("shipping");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("mobile_money");
@@ -303,6 +306,20 @@ export default function CheckoutPage() {
           <h1 className="text-xl font-bold text-foreground">{t("checkout.loginRequired")}</h1>
           <p className="text-muted-foreground">{t("checkout.loginRequiredDesc")}</p>
           <Link to="/auth"><Button>{t("checkout.loginButton")}</Button></Link>
+        </main>
+      </div>
+    );
+  }
+
+  if (isOrderBlocked) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container py-16 text-center space-y-4">
+          <Package size={48} className="mx-auto text-muted-foreground" />
+          <h1 className="text-xl font-bold text-foreground">Vérification requise</h1>
+          <p className="text-muted-foreground">Vous avez atteint la limite de commandes sans vérification d'identité. Complétez votre KYC pour continuer.</p>
+          <Link to="/dashboard"><Button>Compléter la vérification</Button></Link>
         </main>
       </div>
     );
@@ -740,8 +757,8 @@ export default function CheckoutPage() {
                   {([
                     { id: "stripe" as const, label: t("checkout.creditCard"), sub: "Visa, Mastercard, AMEX", icon: <CreditCard size={20} />, configKey: "stripe" as const },
                     { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, Wave, MTN", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
-                    { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: "Cash on Delivery", icon: <Banknote size={20} />, configKey: "cod" as const },
-                  ]).filter(m => paymentConfig?.[m.configKey] !== false).map(method => (
+                    { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
+                  ]).filter(m => paymentConfig?.[m.configKey] !== false).filter(m => m.id !== "cod" || isKycVerified).map(method => (
                     <button
                       key={method.id}
                       onClick={() => setPaymentMethod(method.id)}

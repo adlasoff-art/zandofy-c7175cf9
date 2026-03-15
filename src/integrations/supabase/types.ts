@@ -981,6 +981,110 @@ export type Database = {
         }
         Relationships: []
       }
+      kyc_audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          kyc_id: string
+          new_status: Database["public"]["Enums"]["kyc_status"] | null
+          notes: string | null
+          old_status: Database["public"]["Enums"]["kyc_status"] | null
+          performed_by: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          kyc_id: string
+          new_status?: Database["public"]["Enums"]["kyc_status"] | null
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["kyc_status"] | null
+          performed_by: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          kyc_id?: string
+          new_status?: Database["public"]["Enums"]["kyc_status"] | null
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["kyc_status"] | null
+          performed_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kyc_audit_logs_kyc_id_fkey"
+            columns: ["kyc_id"]
+            isOneToOne: false
+            referencedRelation: "kyc_verifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kyc_verifications: {
+        Row: {
+          address_city: string
+          address_country: string
+          address_district: string | null
+          address_postal_code: string | null
+          address_street: string
+          admin_notes: string | null
+          created_at: string
+          document_back_url: string | null
+          document_front_url: string
+          document_type: Database["public"]["Enums"]["kyc_document_type"]
+          id: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          selfie_url: string
+          status: Database["public"]["Enums"]["kyc_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address_city: string
+          address_country?: string
+          address_district?: string | null
+          address_postal_code?: string | null
+          address_street: string
+          admin_notes?: string | null
+          created_at?: string
+          document_back_url?: string | null
+          document_front_url: string
+          document_type: Database["public"]["Enums"]["kyc_document_type"]
+          id?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_url: string
+          status?: Database["public"]["Enums"]["kyc_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address_city?: string
+          address_country?: string
+          address_district?: string | null
+          address_postal_code?: string | null
+          address_street?: string
+          admin_notes?: string | null
+          created_at?: string
+          document_back_url?: string | null
+          document_front_url?: string
+          document_type?: Database["public"]["Enums"]["kyc_document_type"]
+          id?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_url?: string
+          status?: Database["public"]["Enums"]["kyc_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       logistic_zones: {
         Row: {
           continent: string
@@ -3085,6 +3189,7 @@ export type Database = {
         }
         Returns: Json
       }
+      check_kyc_required: { Args: { p_user_id: string }; Returns: boolean }
       create_guest_support_ticket: {
         Args: {
           p_category: string
@@ -3164,6 +3269,8 @@ export type Database = {
         Returns: number
       }
       increment_helpful: { Args: { review_id: string }; Returns: undefined }
+      is_kyc_order_blocked: { Args: { p_user_id: string }; Returns: boolean }
+      is_kyc_verified: { Args: { p_user_id: string }; Returns: boolean }
       release_vendor_pending_funds: { Args: never; Returns: number }
       track_delivery: {
         Args: { p_order_ref: string }
@@ -3196,6 +3303,17 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "vendor" | "shipper" | "rider"
+      kyc_document_type:
+        | "national_id"
+        | "voter_card"
+        | "passport"
+        | "drivers_license"
+      kyc_status:
+        | "not_started"
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "resubmission_required"
       product_status: "draft" | "pending_approval" | "published" | "rejected"
       vendor_tier: "beginner" | "pro" | "grand_supplier"
     }
@@ -3326,6 +3444,19 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "vendor", "shipper", "rider"],
+      kyc_document_type: [
+        "national_id",
+        "voter_card",
+        "passport",
+        "drivers_license",
+      ],
+      kyc_status: [
+        "not_started",
+        "pending",
+        "approved",
+        "rejected",
+        "resubmission_required",
+      ],
       product_status: ["draft", "pending_approval", "published", "rejected"],
       vendor_tier: ["beginner", "pro", "grand_supplier"],
     },

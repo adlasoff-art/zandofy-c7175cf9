@@ -37,6 +37,11 @@ import {
   CUSTOMER_TRACKING_STEPS,
   getStepIndex,
 } from "@/lib/order-status";
+import { useKycStatus } from "@/hooks/use-kyc";
+import { KycBanner } from "@/components/kyc/KycBanner";
+import { KycSubmissionForm } from "@/components/kyc/KycSubmissionForm";
+import { KycStatusBadge } from "@/components/kyc/KycStatusBadge";
+import { ShieldCheck } from "lucide-react";
 
 const TABS = [
   { key: "overview", label: "Aperçu", icon: Package },
@@ -49,6 +54,7 @@ const TABS = [
   { key: "notifications", label: "Notifications", icon: Bell },
   { key: "messages", label: "Messages", icon: MessageCircle },
   { key: "profile", label: "Profil", icon: UserIcon },
+  { key: "kyc", label: "Vérification", icon: ShieldCheck },
   { key: "addresses", label: "Adresses", icon: MapPin },
 ];
 
@@ -133,6 +139,8 @@ export default function DashboardPage() {
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
   const [statusHistory, setStatusHistory] = useState<StatusHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const { kycStatus, needsKyc, isOrderBlocked, kycVerification, canResubmit, refetchKyc } = useKycStatus();
+  const [showKycForm, setShowKycForm] = useState(false);
 
   const loadOrders = useCallback(async () => {
     if (!user) return;
@@ -203,7 +211,12 @@ export default function DashboardPage() {
           <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={24} /></div>
         ) : (
           <>
-            {activeTab === "overview" && <OverviewTab orders={orders} user={user} />}
+            {activeTab === "overview" && (
+              <>
+                {needsKyc && <KycBanner kycStatus={kycStatus} needsKyc={needsKyc} isOrderBlocked={isOrderBlocked} onStartKyc={() => setActiveTab("kyc")} />}
+                <OverviewTab orders={orders} user={user} />
+              </>
+            )}
             {activeTab === "orders" && (
               <OrdersTab
                 orders={orders}
@@ -222,6 +235,38 @@ export default function DashboardPage() {
             {activeTab === "notifications" && <NotificationsTab />}
             {activeTab === "messages" && <MessagesRedirectTab />}
             {activeTab === "profile" && <ProfileTab user={user} />}
+            {activeTab === "kyc" && (
+              <div className="space-y-6">
+                <KycBanner kycStatus={kycStatus} needsKyc={needsKyc} isOrderBlocked={isOrderBlocked} onStartKyc={() => setShowKycForm(true)} />
+                {kycStatus !== "not_started" && !showKycForm && (
+                  <div className="bg-card rounded-lg p-5 border border-border space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-bold text-foreground">Statut de vérification</h3>
+                      <KycStatusBadge status={kycStatus} />
+                    </div>
+                    {kycVerification?.rejection_reason && (
+                      <p className="text-sm text-destructive">Raison : {kycVerification.rejection_reason}</p>
+                    )}
+                    {canResubmit && (
+                      <Button size="sm" onClick={() => setShowKycForm(true)}>Resoumettre les documents</Button>
+                    )}
+                  </div>
+                )}
+                {(showKycForm || kycStatus === "not_started") && kycStatus !== "pending" && kycStatus !== "approved" && (
+                  <div className="bg-card rounded-lg p-6 border border-border">
+                    <h3 className="font-bold text-foreground mb-4">Vérification d'identité</h3>
+                    <KycSubmissionForm existingKyc={canResubmit ? kycVerification : null} onSuccess={() => { setShowKycForm(false); refetchKyc(); }} />
+                  </div>
+                )}
+                {kycStatus === "approved" && (
+                  <div className="bg-card rounded-lg p-6 border border-border text-center space-y-2">
+                    <ShieldCheck size={32} className="mx-auto text-primary" />
+                    <h3 className="font-bold text-foreground">Identité vérifiée</h3>
+                    <p className="text-sm text-muted-foreground">Vous avez accès à toutes les options de paiement et livraison avancées.</p>
+                  </div>
+                )}
+              </div>
+            )}
             {activeTab === "addresses" && <AddressesTab userId={user.id} />}
           </>
         )}
