@@ -83,6 +83,7 @@ const AdminProductModerationPage = lazy(() => import("./pages/admin/AdminProduct
 const AdminVariantTypesPage = lazy(() => import("./pages/admin/AdminVariantTypesPage"));
 const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage"));
 const AdminEmailTemplatesPage = lazy(() => import("./pages/admin/AdminEmailTemplatesPage"));
+const AdminKycPage = lazy(() => import("./pages/admin/AdminKycPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1 } },
