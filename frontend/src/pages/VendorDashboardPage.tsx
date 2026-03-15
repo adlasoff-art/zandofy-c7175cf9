@@ -15,6 +15,7 @@ import { VendorCouponAnalytics } from "@/components/vendor/VendorCouponAnalytics
 import { VendorWalletTab } from "@/components/vendor/VendorWalletTab";
 import { VendorReturnsTab } from "@/components/vendor/VendorReturnsTab";
 import { VendorDisputesTab } from "@/components/vendor/VendorDisputesTab";
+import { VendorRiderTracking } from "@/components/vendor/VendorRiderTracking";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
