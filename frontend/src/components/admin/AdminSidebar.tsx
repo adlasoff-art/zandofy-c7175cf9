@@ -19,6 +19,7 @@ const adminItems = [
   { title: "Catégories", url: "/admin/categories", icon: FolderTree },
   { title: "Types de variations", url: "/admin/variant-types", icon: Layers },
   { title: "Modération produits", url: "/admin/product-moderation", icon: ShieldCheck },
+  { title: "Vérification KYC", url: "/admin/kyc", icon: ShieldCheck },
   { title: "Commandes", url: "/admin/orders", icon: Package },
   { title: "Support client", url: "/admin/support", icon: Headphones },
   { title: "Logistique", url: "/admin/logistics", icon: Truck },
