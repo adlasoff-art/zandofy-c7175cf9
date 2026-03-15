@@ -689,9 +689,9 @@ export default function TrackingPage() {
               {orderResult.delivery_id && (
                 <div className="border-t border-border pt-4">
                   <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <Bike size={16} className="text-primary" /> Suivi du livreur en direct
+                    <Bike size={16} className="text-primary" /> Suivi en direct — GPS bidirectionnel
                   </h3>
-                  <LiveRiderMap deliveryId={orderResult.delivery_id} />
+                  <LiveRiderMap deliveryId={orderResult.delivery_id} orderId={orderResult.id} userId={user?.id} />
                 </div>
               )}
 
