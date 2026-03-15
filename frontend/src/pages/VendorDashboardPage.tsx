@@ -356,6 +356,8 @@ export default function VendorDashboardPage() {
 
             {activeTab === "orders" && <VendorOrderManager storeId={store!.id} />}
 
+            {activeTab === "deliveries" && <VendorRiderTracking storeId={store!.id} />}
+
             {activeTab === "promos" && <VendorPromotionsTab storeId={store!.id} />}
 
             {activeTab === "coupons" && (
