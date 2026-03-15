@@ -22,7 +22,67 @@ const statusStyles: Record<DeliveryStatus, string> = {
 
 type TabKey = "route" | "orders" | "map" | "history" | "profile";
 
-export default function RiderDashboardPage() {
+function RiderMapTabContent({ activeDelivery }: { activeDelivery: any }) {
+  const [customerLat, setCustomerLat] = useState<number | null>(null);
+  const [customerLng, setCustomerLng] = useState<number | null>(null);
+
+  useCustomerLocationSubscription(
+    activeDelivery?.order_id,
+    useCallback((lat: number, lng: number) => {
+      setCustomerLat(lat);
+      setCustomerLng(lng);
+    }, [])
+  );
+
+  if (!activeDelivery) {
+    return (
+      <div className="px-4 mt-4 text-center py-12">
+        <MapIcon size={48} className="text-muted-foreground mx-auto mb-3" />
+        <p className="text-sm text-muted-foreground">Démarrez une livraison pour voir la carte</p>
+      </div>
+    );
+  }
+
+  const markers: MapMarker[] = [];
+  if (activeDelivery.delivery_lat && activeDelivery.delivery_lng) {
+    markers.push({ lat: activeDelivery.delivery_lat, lng: activeDelivery.delivery_lng, type: "destination", label: "📍 Destination", id: "dest" });
+  }
+  if (customerLat && customerLng) {
+    markers.push({ lat: customerLat, lng: customerLng, type: "customer", label: "📱 Client (GPS)", id: "customer-gps" });
+  }
+
+  return (
+    <div className="px-4 mt-4 space-y-3">
+      <h2 className="text-sm font-semibold text-foreground">Carte de livraison</h2>
+      <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
+        <MapPin size={16} className="text-primary shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground">{activeDelivery.customer_name}</p>
+          <p className="text-xs text-muted-foreground truncate">{activeDelivery.address}</p>
+        </div>
+      </div>
+      {customerLat && customerLng && (
+        <div className="flex items-center gap-2 text-xs bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <span className="text-foreground font-medium">Client GPS actif — position en temps réel</span>
+        </div>
+      )}
+      <DeliveryMap markers={markers} showPolylines={!!customerLat} showEta={!!customerLat} className="h-[400px]" />
+      <p className="text-[10px] text-muted-foreground text-center">
+        Votre position GPS est partagée en temps réel avec le client
+        {activeDelivery.address && (
+          <>
+            {" · "}
+            <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(activeDelivery.address)}`} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+              Naviguer (Google Maps)
+            </a>
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
   const { user, loading: authLoading } = useAuth();
   const { isRider, isAdmin, loading: rolesLoading } = useRoles();
   const [tab, setTab] = useState<TabKey>("route");
