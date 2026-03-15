@@ -322,13 +322,13 @@ export default function HelpCenterPage() {
 
     setGuestThreadLoading(true);
     try {
-      const { data, error } = await supabase.rpc("get_guest_support_ticket", {
+      const { data, error } = await (supabase as any).rpc("get_guest_support_ticket", {
         p_ticket_id: ticketId,
         p_requester_email: emailValue.trim().toLowerCase(),
       });
       if (error) throw error;
 
-      const payload = data as { ticket: SupportTicket; messages: SupportMessage[] };
+      const payload = data as unknown as { ticket: SupportTicket; messages: SupportMessage[] };
       setGuestThread({
         ticket: payload.ticket,
         messages: payload.messages || [],
@@ -348,7 +348,7 @@ export default function HelpCenterPage() {
     if (!guestEmail.trim() || !guestSubject.trim() || !guestMessage.trim()) return;
     setCreatingGuestTicket(true);
     try {
-      const { data, error } = await supabase.rpc("create_guest_support_ticket", {
+      const { data, error } = await (supabase as any).rpc("create_guest_support_ticket", {
         p_subject: guestSubject.trim(),
         p_category: guestCategory,
         p_priority: guestPriority,
@@ -358,9 +358,9 @@ export default function HelpCenterPage() {
       });
       if (error) throw error;
 
-      const created = Array.isArray(data) ? data[0] : data;
-      const ticketId = created?.ticket_id as string;
-      const ticketReference = (created?.ticket_reference as string) || toTicketReference(ticketId);
+      const created = (Array.isArray(data) ? data[0] : data) as { ticket_id?: string; ticket_reference?: string } | null;
+      const ticketId = created?.ticket_id || "";
+      const ticketReference = created?.ticket_reference || toTicketReference(ticketId);
 
       setGuestLookupRef(ticketId);
       setGuestLookupEmail(guestEmail.trim().toLowerCase());
