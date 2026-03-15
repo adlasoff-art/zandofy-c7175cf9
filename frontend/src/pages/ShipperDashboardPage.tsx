@@ -199,7 +199,7 @@ export default function ShipperDashboardPage() {
           </div>
           <div className="bg-card border border-border rounded-xl p-4">
             <h3 className="text-xs font-semibold text-foreground mb-3">Par mode de transport</h3>
-            {(["air", "sea", "road"] as const).map((mode) => {
+            {(["air", "sea", "road", "rail"] as const).map((mode) => {
               const ModeIcon = modeIcons[mode];
               const count = shipments.filter((s: any) => s.mode === mode).length;
               const pct = shipments.length ? Math.round((count / shipments.length) * 100) : 0;
