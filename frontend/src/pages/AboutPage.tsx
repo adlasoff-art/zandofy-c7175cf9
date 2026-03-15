@@ -3,9 +3,48 @@ import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
 import { Shield, Globe, Heart, Users, Truck, Award } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from "react";
 
 export default function AboutPage() {
   const { t } = useI18n();
+
+  // Dynamic stats from real data
+  const { data: dynamicStats } = useQuery({
+    queryKey: ["about-dynamic-stats"],
+    queryFn: async () => {
+      const [productsRes, storesRes, reviewsRes, countriesRes] = await Promise.all([
+        supabase.from("products").select("id", { count: "exact", head: true }).eq("publish_status", "published"),
+        supabase.from("stores").select("id", { count: "exact", head: true }).eq("is_verified", true),
+        supabase.from("reviews").select("user_id", { count: "exact", head: true }),
+        supabase.from("cities").select("country_code"),
+      ]);
+      const uniqueCountries = new Set((countriesRes.data || []).map((c: any) => c.country_code));
+      return {
+        products: productsRes.count || 0,
+        sellers: storesRes.count || 0,
+        customers: reviewsRes.count || 0,
+        countries: uniqueCountries.size || 0,
+      };
+    },
+    staleTime: 300_000,
+  });
+
+  // CMS-editable content
+  const [cmsContent, setCmsContent] = useState<{ story_fr?: string; story_en?: string } | null>(null);
+  useEffect(() => {
+    supabase.from("platform_settings").select("value").eq("key", "cms_about").maybeSingle().then(({ data }) => {
+      if (data?.value) setCmsContent(data.value as any);
+    });
+  }, []);
+
+  const { locale } = useI18n();
+
+  const formatNum = (n: number) => {
+    if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K+`;
+    return `${n}+`;
+  };
 
   const values = [
     { icon: Globe, titleKey: "about.globalReach", descKey: "about.globalReachDesc" },
@@ -17,11 +56,15 @@ export default function AboutPage() {
   ];
 
   const stats = [
-    { num: "10K+", labelKey: "about.products" },
-    { num: "500+", labelKey: "about.verifiedSellers" },
-    { num: "50K+", labelKey: "about.satisfiedCustomers" },
-    { num: "30+", labelKey: "about.countriesServed" },
+    { num: dynamicStats ? formatNum(dynamicStats.products) : "—", labelKey: "about.products" },
+    { num: dynamicStats ? formatNum(dynamicStats.sellers) : "—", labelKey: "about.verifiedSellers" },
+    { num: dynamicStats ? formatNum(dynamicStats.customers) : "—", labelKey: "about.satisfiedCustomers" },
+    { num: dynamicStats ? formatNum(dynamicStats.countries) : "—", labelKey: "about.countriesServed" },
   ];
+
+  const storyContent = cmsContent
+    ? (locale === "en" ? cmsContent.story_en : cmsContent.story_fr) || t("about.storyContent")
+    : t("about.storyContent");
 
   return (
     <div className="min-h-screen bg-background">
@@ -48,7 +91,7 @@ export default function AboutPage() {
         <section className="container py-12 md:py-16">
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-2xl font-bold text-foreground mb-4">{t("about.storyTitle")}</h2>
-            <p className="text-muted-foreground leading-relaxed">{t("about.storyContent")}</p>
+            <p className="text-muted-foreground leading-relaxed">{storyContent}</p>
           </div>
         </section>
 

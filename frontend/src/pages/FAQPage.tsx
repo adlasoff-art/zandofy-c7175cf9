@@ -3,8 +3,15 @@ import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useI18n } from "@/contexts/I18nContext";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
-const faqCategoriesFr = [
+interface FaqCategory {
+  title: string;
+  items: { q: string; a: string }[];
+}
+
+const defaultFaqFr: FaqCategory[] = [
   {
     title: "Commandes & Paiements",
     items: [
@@ -39,7 +46,7 @@ const faqCategoriesFr = [
   },
 ];
 
-const faqCategoriesEn = [
+const defaultFaqEn: FaqCategory[] = [
   {
     title: "Orders & Payments",
     items: [
@@ -76,7 +83,17 @@ const faqCategoriesEn = [
 
 export default function FAQPage() {
   const { t, locale } = useI18n();
-  const faqCategories = locale === "en" ? faqCategoriesEn : faqCategoriesFr;
+  const [cmsFaq, setCmsFaq] = useState<{ fr: FaqCategory[]; en: FaqCategory[] } | null>(null);
+
+  useEffect(() => {
+    supabase.from("platform_settings").select("value").eq("key", "cms_faq").maybeSingle().then(({ data }) => {
+      if (data?.value) setCmsFaq(data.value as any);
+    });
+  }, []);
+
+  const faqCategories = cmsFaq
+    ? (locale === "en" ? cmsFaq.en : cmsFaq.fr)
+    : (locale === "en" ? defaultFaqEn : defaultFaqFr);
 
   const jsonLd = {
     "@context": "https://schema.org",

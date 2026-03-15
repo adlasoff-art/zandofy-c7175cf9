@@ -14,6 +14,8 @@ export function Footer() {
     description: "",
     social_links: { facebook: "#", instagram: "#", twitter: "#", youtube: "#", linkedin: "#" },
     newsletter_email: "",
+    phone: "+1 (800) ZANDOFY",
+    address: "Worldwide",
   });
 
   useEffect(() => {
@@ -25,6 +27,8 @@ export function Footer() {
             description: v.description || prev.description,
             social_links: { ...prev.social_links, ...v.social_links },
             newsletter_email: v.newsletter_email || prev.newsletter_email,
+            phone: v.phone || prev.phone,
+            address: v.address || prev.address,
           }));
         } else if (row.key === "free_shipping_threshold" && v.enabled) {
           setFreeShippingAmount(Number(v.amount) || 999);
@@ -50,8 +54,8 @@ export function Footer() {
         { label: t("footer.aboutUs"), to: "/about" },
         { label: t("footer.socialResponsibility"), to: "/about" },
         { label: t("footer.careers"), to: "/about" },
-        { label: t("footer.blog"), to: "#" },
-        { label: t("footer.affiliates"), to: "#" },
+        { label: t("footer.blog"), to: "/faq" },
+        { label: t("footer.affiliates"), to: "/dashboard" },
       ],
     },
     {
@@ -59,8 +63,8 @@ export function Footer() {
       links: [
         { label: t("footer.sizeGuide"), to: "/faq" },
         { label: t("footer.faq"), to: "/faq" },
-        { label: t("footer.giftCard"), to: "#" },
-        { label: t("footer.loyaltyProgram"), to: "#" },
+        { label: t("footer.giftCard"), to: "/dashboard" },
+        { label: t("footer.loyaltyProgram"), to: "/dashboard" },
         { label: t("footer.sellOnZandofy"), to: "/become-vendor" },
       ],
     },
@@ -76,7 +80,7 @@ export function Footer() {
   const legalLinks = [
     { label: t("footer.privacyPolicy"), to: "/privacy" },
     { label: t("footer.cookiePolicy"), to: "/privacy" },
-    { label: t("footer.manageCookies"), to: "#" },
+    { label: t("footer.manageCookies"), to: "/privacy" },
     { label: t("footer.terms"), to: "/terms" },
   ];
 
@@ -150,11 +154,11 @@ export function Footer() {
             <p className="text-xs text-muted-foreground leading-relaxed mb-4">{footerConfig.description || t("footer.description")}</p>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <MapPin size={12} />
-              <span>{t("footer.worldwide")}</span>
+              <span>{footerConfig.address}</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1.5">
               <Phone size={12} />
-              <span>+1 (800) ZANDOFY</span>
+              <span>{footerConfig.phone}</span>
             </div>
           </div>
 

@@ -117,11 +117,10 @@ const App = () => (
             <Sonner />
             <NotificationListener />
             <OrderAlertListener />
+            <SupportDrawerProvider>
             <ScrollRestoration />
             <CartDrawer />
-            <SupportDrawerProvider>
-              <SupportDrawerWrapper />
-            </SupportDrawerProvider>
+            <SupportDrawerWrapper />
             <MobileBottomNav />
             <PWAInstallBanner />
             <OfflineIndicator />
@@ -189,6 +188,7 @@ const App = () => (
             </Suspense>
             </BanGuard>
             </MaintenanceGuard>
+            </SupportDrawerProvider>
           </UIConfigProvider>
           </ThemeProvider>
           </I18nProvider>

@@ -2,8 +2,10 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
 import { useI18n } from "@/contexts/I18nContext";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
-const sectionsFr = [
+const defaultSectionsFr = [
   { title: "1. Objet", content: "Les présentes Conditions Générales de Vente (CGV) régissent l'ensemble des transactions effectuées sur la plateforme Zandofy. En passant commande, vous acceptez sans réserve les présentes conditions." },
   { title: "2. Inscription", content: "L'utilisation de certains services nécessite la création d'un compte. Vous êtes responsable de la confidentialité de vos identifiants. Toute activité réalisée depuis votre compte est présumée effectuée par vous." },
   { title: "3. Produits & Prix", content: "Les produits sont proposés dans la limite des stocks disponibles. Les prix sont affichés en dollars US (USD) et incluent les taxes applicables. Zandofy se réserve le droit de modifier ses prix à tout moment, les commandes en cours restant au prix convenu." },
@@ -18,7 +20,7 @@ const sectionsFr = [
   { title: "12. Droit Applicable", content: "Les présentes CGV sont soumises au droit applicable dans le pays de résidence de l'utilisateur. En cas de litige, une solution amiable sera recherchée avant toute action judiciaire." },
 ];
 
-const sectionsEn = [
+const defaultSectionsEn = [
   { title: "1. Purpose", content: "These Terms and Conditions govern all transactions made on the Zandofy platform. By placing an order, you accept these conditions without reservation." },
   { title: "2. Registration", content: "Use of certain services requires creating an account. You are responsible for the confidentiality of your credentials. Any activity from your account is assumed to be performed by you." },
   { title: "3. Products & Prices", content: "Products are offered subject to availability. Prices are displayed in US Dollars (USD) and include applicable taxes. Zandofy reserves the right to modify prices at any time, with current orders remaining at the agreed price." },
@@ -35,20 +37,26 @@ const sectionsEn = [
 
 export default function TermsPage() {
   const { t, locale } = useI18n();
-  const sections = locale === "en" ? sectionsEn : sectionsFr;
+  const [cmsData, setCmsData] = useState<{ fr: typeof defaultSectionsFr; en: typeof defaultSectionsEn } | null>(null);
+
+  useEffect(() => {
+    supabase.from("platform_settings").select("value").eq("key", "cms_terms").maybeSingle().then(({ data }) => {
+      if (data?.value) setCmsData(data.value as any);
+    });
+  }, []);
+
+  const sections = cmsData
+    ? (locale === "en" ? cmsData.en : cmsData.fr)
+    : (locale === "en" ? defaultSectionsEn : defaultSectionsFr);
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead
-        title={`${t("terms.title")} | Zandofy`}
-        description={t("terms.title")}
-      />
+      <SEOHead title={`${t("terms.title")} | Zandofy`} description={t("terms.title")} />
       <Header />
       <main className="container py-10 md:py-16">
         <div className="max-w-3xl mx-auto">
           <h1 className="text-3xl font-bold text-foreground mb-2">{t("terms.title")}</h1>
           <p className="text-sm text-muted-foreground mb-8">{t("terms.lastUpdate")}</p>
-
           <div className="space-y-6">
             {sections.map(s => (
               <article key={s.title}>
