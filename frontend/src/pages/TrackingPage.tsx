@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Search, Package, Plane, Ship, Truck, MapPin, Clock, CheckCircle2,
   CircleDot, Circle, Loader2, AlertCircle, Globe, ShoppingBag,
-  Box, UserCheck, Users, Gift, XCircle, RotateCcw, Bike, Home, Store, Hash,
+  Box, UserCheck, Users, Gift, XCircle, RotateCcw, Bike, Home, Store, Hash, Train,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { mapInternalShipment, detectCarrier, type TrackingResult } from "@/lib/tracking-providers";
