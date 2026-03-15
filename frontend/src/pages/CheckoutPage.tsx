@@ -757,8 +757,8 @@ export default function CheckoutPage() {
                   {([
                     { id: "stripe" as const, label: t("checkout.creditCard"), sub: "Visa, Mastercard, AMEX", icon: <CreditCard size={20} />, configKey: "stripe" as const },
                     { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, Wave, MTN", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
-                    { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: "Cash on Delivery", icon: <Banknote size={20} />, configKey: "cod" as const },
-                  ]).filter(m => paymentConfig?.[m.configKey] !== false).map(method => (
+                    { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
+                  ]).filter(m => paymentConfig?.[m.configKey] !== false).filter(m => m.id !== "cod" || isKycVerified).map(method => (
                     <button
                       key={method.id}
                       onClick={() => setPaymentMethod(method.id)}
