@@ -37,6 +37,11 @@ import {
   CUSTOMER_TRACKING_STEPS,
   getStepIndex,
 } from "@/lib/order-status";
+import { useKycStatus } from "@/hooks/use-kyc";
+import { KycBanner } from "@/components/kyc/KycBanner";
+import { KycSubmissionForm } from "@/components/kyc/KycSubmissionForm";
+import { KycStatusBadge } from "@/components/kyc/KycStatusBadge";
+import { ShieldCheck } from "lucide-react";
 
 const TABS = [
   { key: "overview", label: "Aperçu", icon: Package },
