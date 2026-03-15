@@ -67,7 +67,7 @@ const DELIVERY_STEPS = [
   { key: "delivered", label: "Livré", icon: CheckCircle2 },
 ];
 
-const modeIcons: Record<string, typeof Plane> = { air: Plane, sea: Ship, road: Truck };
+const modeIcons: Record<string, typeof Plane> = { air: Plane, sea: Ship, road: Truck, rail: Train };
 
 function getStepIdx(steps: { key: string }[], status: string) {
   const idx = steps.findIndex((s) => s.key === status);
