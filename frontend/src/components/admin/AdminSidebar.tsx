@@ -1,9 +1,12 @@
 import {
-  LayoutDashboard, Users, Image, FolderTree, Bell, Settings, ShieldCheck, Truck, Package, DollarSign, Store, PenLine, Crown, ScrollText, Heart, Coins, Ticket, Banknote, RotateCcw, AlertTriangle, ArrowLeftRight, Globe, Megaphone, Headphones, Layers, BarChart3, Mail,
+  LayoutDashboard, Users, Image, FolderTree, Bell, Settings, ShieldCheck, Truck, Package, DollarSign, Store, PenLine, Crown, ScrollText, Heart, Coins, Ticket, Banknote, RotateCcw, AlertTriangle, ArrowLeftRight, Globe, Megaphone, Headphones, Layers, BarChart3, Mail, User,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useRoles } from "@/hooks/use-roles";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
@@ -45,11 +48,48 @@ export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { isAdmin } = useRoles();
+  const { user } = useAuth();
   const location = useLocation();
+
+  const { data: profile } = useQuery({
+    queryKey: ["admin-sidebar-profile", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, avatar_url, email")
+        .eq("id", user.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const displayName = profile?.first_name
+    ? `${profile.first_name} ${profile.last_name || ""}`.trim()
+    : user?.email?.split("@")[0] || "";
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
       <SidebarContent>
+        {/* User avatar section */}
+        <div className={cn("flex items-center gap-3 px-3 py-3 border-b border-border", collapsed && "justify-center")}>
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 border border-border" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <User size={16} className="text-primary" />
+            </div>
+          )}
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
+              <p className="text-[10px] text-muted-foreground truncate">{user?.email}</p>
+            </div>
+          )}
+        </div>
+
         <SidebarGroup>
           <SidebarGroupLabel className="gap-2">
             <ShieldCheck size={16} className="text-primary" />

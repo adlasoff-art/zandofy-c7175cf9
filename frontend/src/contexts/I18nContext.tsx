@@ -187,6 +187,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "search.searching": "Recherche...",
     "search.noResultsFor": "Aucun résultat pour",
     "search.trending": "Tendances",
+    "search.searchBtn": "Rechercher",
     // Auth
     "auth.login": "Connexion",
     "auth.signup": "Créer un compte",
@@ -539,6 +540,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "search.searching": "Searching...",
     "search.noResultsFor": "No results for",
     "search.trending": "Trending",
+    "search.searchBtn": "Search",
     // Auth
     "auth.login": "Log In",
     "auth.signup": "Create Account",

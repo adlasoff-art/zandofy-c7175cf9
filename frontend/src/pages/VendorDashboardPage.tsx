@@ -319,7 +319,7 @@ export default function VendorDashboardPage() {
             />
 
             {/* Tab navigation */}
-            <div className="flex gap-1 mb-4">
+            <div className="flex gap-1 mb-4 overflow-x-auto pb-2 scrollbar-hide">
               {[
                 { key: "catalogue" as const, label: "Catalogue", icon: Package },
                 { key: "orders" as const, label: "Commandes", icon: ShoppingBag },
@@ -336,7 +336,7 @@ export default function VendorDashboardPage() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full border transition-all ${
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap border transition-all ${
                     activeTab === tab.key
                       ? "bg-foreground text-card border-foreground"
                       : "bg-card text-foreground border-border hover:border-foreground"

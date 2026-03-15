@@ -202,16 +202,16 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
   return (
     <>
       <div ref={wrapperRef} className={`relative w-full ${mobile ? "overflow-visible" : ""}`}>
-        <form onSubmit={handleSubmit} className="relative flex items-center">
+        <form onSubmit={handleSubmit} className="relative flex items-center h-10">
           {/* Search input with animated placeholder */}
-          <div className="relative flex-1">
+          <div className="relative flex-1 h-full">
             <input
               type="text"
               value={query}
               onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
               onFocus={() => setOpen(true)}
               placeholder=""
-              className="w-full pl-4 pr-12 py-2.5 md:py-3 text-[16px] md:text-sm bg-card rounded-l-full border-2 border-r-0 border-primary/30 outline-none focus:border-primary transition-colors text-foreground"
+              className="w-full h-full pl-4 pr-10 text-[16px] md:text-sm bg-card rounded-l-full border-2 border-r-0 border-primary/30 outline-none focus:border-primary transition-colors text-foreground"
               autoFocus={mobile}
             />
             {/* Animated placeholder */}
@@ -244,19 +244,19 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
             type="button"
             onClick={() => setVisualModalOpen(true)}
             disabled={visualLoading}
-            className="flex items-center justify-center w-11 h-full py-2.5 md:py-3 border-2 border-l-0 border-r-0 border-primary/30 bg-card text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+            className="flex items-center justify-center w-10 h-full border-2 border-l-0 border-r-0 border-primary/30 bg-card text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
             aria-label="Recherche visuelle"
           >
-            {visualLoading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+            {visualLoading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
           </button>
 
           {/* Search button with gradient */}
           <button
             type="submit"
-            className="flex items-center gap-1.5 px-5 md:px-6 py-2.5 md:py-3 bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-r-full font-semibold text-sm whitespace-nowrap hover:opacity-90 transition-opacity shrink-0"
+            className="flex items-center gap-1.5 px-4 md:px-5 h-full bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-r-full font-semibold text-sm whitespace-nowrap hover:opacity-90 transition-opacity shrink-0"
           >
-            <Search size={16} />
-            <span className="hidden sm:inline">{t("search.searchBtn") || "Rechercher"}</span>
+            <Search size={15} />
+            <span className="hidden sm:inline">{t("search.searchBtn")}</span>
           </button>
         </form>
 
