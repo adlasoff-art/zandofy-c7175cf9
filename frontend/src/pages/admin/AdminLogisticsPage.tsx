@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Truck, Bike, MapPin, CheckCircle, Package, Loader2, Store, Plus, X, Eye, UserPlus, ShoppingBag } from "lucide-react";
+import { Truck, Bike, MapPin, CheckCircle, Package, Loader2, Store, Plus, X, Eye, UserPlus, ShoppingBag, Train } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
