@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, lazy, Suspense } from "react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
