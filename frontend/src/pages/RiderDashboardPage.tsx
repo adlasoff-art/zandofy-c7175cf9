@@ -367,31 +367,7 @@ export default function RiderDashboardPage() {
       )}
 
       {tab === "map" && (
-        <div className="px-4 mt-4 space-y-3">
-          <h2 className="text-sm font-semibold text-foreground">Carte de livraison</h2>
-          {activeDelivery ? (
-            <>
-              <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
-                <MapPin size={16} className="text-primary shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground">{activeDelivery.customer_name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{activeDelivery.address}</p>
-                </div>
-              </div>
-              <DeliveryMap
-                customerLat={activeDelivery.delivery_lat}
-                customerLng={activeDelivery.delivery_lng}
-                className="h-[400px]"
-              />
-              <p className="text-[10px] text-muted-foreground text-center">Votre position GPS est partagée en temps réel avec le client</p>
-            </>
-          ) : (
-            <div className="text-center py-12">
-              <MapIcon size={48} className="text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">Démarrez une livraison pour voir la carte</p>
-            </div>
-          )}
-        </div>
+        <RiderMapTab activeDelivery={activeDelivery} />
       )}
 
       {tab === "history" && (
