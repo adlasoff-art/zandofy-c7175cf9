@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Bike, MapPin, CheckCircle, Clock, Phone, Navigation, User, Home, Camera, Loader2, Star, Calendar, Map as MapIcon, Hash, Package, ShoppingBag } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRoles } from "@/hooks/use-roles";
