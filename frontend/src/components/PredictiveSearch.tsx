@@ -127,35 +127,55 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
     onClose?.();
   };
 
+  const compressImage = (file: File, maxWidth = 1024, quality = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let w = img.width;
+        let h = img.height;
+        if (w > maxWidth) {
+          h = Math.round((h * maxWidth) / w);
+          w = maxWidth;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas not supported"));
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const processVisualSearch = async (file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "Image trop volumineuse", description: "Maximum 5 Mo.", variant: "destructive" });
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "Image trop volumineuse", description: "Maximum 10 Mo.", variant: "destructive" });
       return;
     }
     setVisualLoading(true);
     setVisualModalOpen(false);
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const base64 = ev.target?.result as string;
-      try {
-        const { data, error } = await supabase.functions.invoke("visual-search", {
-          body: { image_base64: base64 },
-        });
-        if (error) throw error;
-        sessionStorage.setItem("visual-search-results", JSON.stringify(data));
-        navigate("/search?visual=true");
-        onClose?.();
-        if (!data?.products?.length) {
-          toast({ title: "Aucun produit trouvé", description: "Les mots-clés détectés sont affichés sur la page." });
-        }
-      } catch (err) {
-        console.error("Visual search error:", err);
-        toast({ title: "Erreur", description: "Impossible d'analyser l'image.", variant: "destructive" });
-      } finally {
-        setVisualLoading(false);
+    try {
+      const base64 = await compressImage(file);
+      const { data, error } = await supabase.functions.invoke("visual-search", {
+        body: { image_base64: base64 },
+      });
+      if (error) throw error;
+      sessionStorage.setItem("visual-search-results", JSON.stringify(data));
+      navigate("/search?visual=true");
+      onClose?.();
+      if (!data?.products?.length) {
+        toast({ title: "Aucun produit trouvé", description: "Les mots-clés détectés sont affichés sur la page." });
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Visual search error:", err);
+      toast({ title: "Erreur", description: "Impossible d'analyser l'image.", variant: "destructive" });
+    } finally {
+      setVisualLoading(false);
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
