@@ -4,7 +4,7 @@ import { Search, Camera, TrendingUp, X, Loader2, Upload, ImageIcon } from "lucid
 import { autocompleteProducts } from "@/services/search";
 import type { Product } from "@/services/api";
 import { useI18n } from "@/contexts/I18nContext";
-import { apiFetch } from "@/services/api-client";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 interface PredictiveSearchProps {
