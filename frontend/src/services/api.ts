@@ -100,6 +100,12 @@ function mapProduct(row: any): Product {
   // Attach promo dates for flash sales
   (p as any).promoEndDate = row.promo_end_date || null;
   (p as any).promoStartDate = row.promo_start_date || null;
+  // Attach full color details for variant drawer
+  (p as any).productColors = (row.product_colors || []).map((c: any) => ({
+    hex: c.color_hex,
+    name: c.color_name || "",
+    imageUrl: c.image_url || null,
+  }));
   return p;
 }
 
