@@ -2416,6 +2416,7 @@ export type Database = {
           created_at: string
           id: string
           is_staff: boolean
+          sender_email: string | null
           sender_id: string
           ticket_id: string
         }
@@ -2425,6 +2426,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_staff?: boolean
+          sender_email?: string | null
           sender_id: string
           ticket_id: string
         }
@@ -2434,6 +2436,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_staff?: boolean
+          sender_email?: string | null
           sender_id?: string
           ticket_id?: string
         }
@@ -2455,10 +2458,13 @@ export type Database = {
           id: string
           order_id: string | null
           priority: string
+          requester_email: string | null
+          requester_name: string | null
+          requester_type: string
           status: string
           subject: string
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           assigned_to?: string | null
@@ -2467,10 +2473,13 @@ export type Database = {
           id?: string
           order_id?: string | null
           priority?: string
+          requester_email?: string | null
+          requester_name?: string | null
+          requester_type?: string
           status?: string
           subject: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           assigned_to?: string | null
@@ -2479,10 +2488,13 @@ export type Database = {
           id?: string
           order_id?: string | null
           priority?: string
+          requester_email?: string | null
+          requester_name?: string | null
+          requester_type?: string
           status?: string
           subject?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -3030,6 +3042,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_guest_support_message: {
+        Args: {
+          p_content: string
+          p_requester_email: string
+          p_ticket_id: string
+        }
+        Returns: Json
+      }
+      create_guest_support_ticket: {
+        Args: {
+          p_category: string
+          p_message: string
+          p_priority: string
+          p_requester_email: string
+          p_requester_name?: string
+          p_subject: string
+        }
+        Returns: {
+          ticket_id: string
+          ticket_reference: string
+        }[]
+      }
       expire_inactive_points: {
         Args: { months_limit?: number }
         Returns: number
@@ -3049,6 +3083,10 @@ export type Database = {
           total_orders: number
           total_spent: number
         }[]
+      }
+      get_guest_support_ticket: {
+        Args: { p_requester_email: string; p_ticket_id: string }
+        Returns: Json
       }
       get_product_rating_summary: {
         Args: { p_product_id: string }
