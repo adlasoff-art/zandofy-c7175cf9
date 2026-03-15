@@ -7,8 +7,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-const modeIcons: Record<string, React.ElementType> = { air: Plane, sea: Ship, road: TruckIcon };
-const modeLabels: Record<string, string> = { air: "Aérien", sea: "Maritime", road: "Routier" };
+const modeIcons: Record<string, React.ElementType> = { air: Plane, sea: Ship, road: TruckIcon, rail: Train };
+const modeLabels: Record<string, string> = { air: "Aérien", sea: "Maritime", road: "Routier", rail: "Ferroviaire" };
 const statusLabels: Record<string, string> = {
   in_transit: "En transit", customs: "Dédouanement", arrived: "Arrivé au hub", loading: "Chargement", delivered: "Livré",
 };
