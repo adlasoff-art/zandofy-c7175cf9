@@ -138,14 +138,14 @@ export function Header() {
               <PackageSearch size={20} />
             </Link>
 
-            <button onClick={() => setSupportDrawerOpen(true)} className="hidden md:flex p-2 text-foreground hover:text-primary transition-colors relative" aria-label={t("header.support")} title={t("header.support")}>
+            <Link to="/help-center" className="flex p-2 text-foreground hover:text-primary transition-colors relative" aria-label={t("header.support")} title={t("header.support")}>
               <Headphones size={20} />
               {unreadSupportCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
                   {unreadSupportCount > 9 ? "9+" : unreadSupportCount}
                 </span>
               )}
-            </button>
+            </Link>
 
             <div className="relative hidden md:block">
               <button
