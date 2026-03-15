@@ -847,6 +847,21 @@ export default function ProductPage() {
       </main>
       <Footer />
       <FloatingActions />
+
+      {/* ═══ VARIANT ORDER DRAWER (Alibaba-style) ═══ */}
+      <VariantOrderDrawer
+        open={variantDrawerOpen}
+        onOpenChange={setVariantDrawerOpen}
+        product={product}
+        colors={(product as any).productColors || product.colors?.map((hex: string, i: number) => ({
+          hex,
+          name: (product as any).colorNames?.[i] || `Couleur ${i + 1}`,
+          imageUrl: (product as any).colorImages?.[i] || null,
+        })) || []}
+        sizes={product.sizes?.map((s: string) => ({ label: s })) || []}
+        pricingTiers={pricingTiers}
+        moq={moq}
+      />
     </div>
   );
 }
