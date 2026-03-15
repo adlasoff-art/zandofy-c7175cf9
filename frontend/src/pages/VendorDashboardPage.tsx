@@ -15,10 +15,11 @@ import { VendorCouponAnalytics } from "@/components/vendor/VendorCouponAnalytics
 import { VendorWalletTab } from "@/components/vendor/VendorWalletTab";
 import { VendorReturnsTab } from "@/components/vendor/VendorReturnsTab";
 import { VendorDisputesTab } from "@/components/vendor/VendorDisputesTab";
+import { VendorRiderTracking } from "@/components/vendor/VendorRiderTracking";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
-  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe,
+  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { VENDOR_TIERS } from "@/lib/vendor-tiers";
@@ -61,7 +62,7 @@ export default function VendorDashboardPage() {
   const [noStore, setNoStore] = useState(false);
   const [selectedConv, setSelectedConv] = useState<VendorConversation | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "stats" | "settings">("catalogue");
+  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "stats" | "settings">("catalogue");
   const [orderCounters, setOrderCounters] = useState<OrderCounters>({ total: 0, in_progress: 0, delivered: 0 });
 
   // Realtime channel ref for cleanup
@@ -322,6 +323,7 @@ export default function VendorDashboardPage() {
               {[
                 { key: "catalogue" as const, label: "Catalogue", icon: Package },
                 { key: "orders" as const, label: "Commandes", icon: ShoppingBag },
+                { key: "deliveries" as const, label: "Livraisons", icon: Bike },
                 { key: "promos" as const, label: "Promos", icon: Flame },
                 { key: "coupons" as const, label: "Coupons", icon: Crown },
                 { key: "wallet" as const, label: "Wallet", icon: Wallet },
@@ -354,6 +356,8 @@ export default function VendorDashboardPage() {
             {activeTab === "catalogue" && <VendorProductManager storeId={store!.id} />}
 
             {activeTab === "orders" && <VendorOrderManager storeId={store!.id} />}
+
+            {activeTab === "deliveries" && <VendorRiderTracking storeId={store!.id} />}
 
             {activeTab === "promos" && <VendorPromotionsTab storeId={store!.id} />}
 

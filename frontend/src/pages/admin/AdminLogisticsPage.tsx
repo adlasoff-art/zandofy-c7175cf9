@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Truck, Bike, MapPin, CheckCircle, Package, Loader2, Store, Plus, X, Eye, UserPlus, ShoppingBag } from "lucide-react";
+import { Truck, Bike, MapPin, CheckCircle, Package, Loader2, Store, Plus, X, Eye, UserPlus, ShoppingBag, Train } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { DeliveryMap } from "@/components/DeliveryMap";
+import { DeliveryMap, type MapMarker } from "@/components/DeliveryMap";
 
 type TabKey = "overview" | "deliveries" | "assign";
 
@@ -201,18 +201,30 @@ export default function AdminLogisticsPage() {
             ))}
           </div>
 
-          {/* Rider locations map */}
+          {/* Multi-rider fleet map */}
           {riderLocations.length > 0 && (
             <div className="bg-card border border-border rounded-xl p-4 mb-4">
               <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <MapPin size={16} className="text-primary" /> Livreurs en temps réel
+                <MapPin size={16} className="text-primary" /> Flotte en temps réel
               </h2>
               <DeliveryMap
-                riderLat={riderLocations[0]?.latitude}
-                riderLng={riderLocations[0]?.longitude}
-                className="h-[300px]"
+                markers={riderLocations.map((rl: any, i: number) => ({
+                  lat: rl.latitude,
+                  lng: rl.longitude,
+                  type: "rider" as const,
+                  label: `🚴 Livreur ${i + 1}${rl.delivery_id ? " (en livraison)" : ""}`,
+                  id: `rider-${rl.rider_id}`,
+                }))}
+                fleetMode
+                className="h-[350px]"
               />
-              <p className="text-[10px] text-muted-foreground mt-2">{riderLocations.length} livreur(s) en ligne</p>
+              <div className="flex items-center gap-3 mt-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full" style={{ background: "#1a5c2e" }} />
+                  <span className="text-[10px] text-muted-foreground">Livreur</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground">{riderLocations.length} livreur(s) en ligne</span>
+              </div>
             </div>
           )}
 

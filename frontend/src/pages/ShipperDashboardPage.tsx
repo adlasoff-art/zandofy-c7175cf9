@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Package, Truck, MapPin, Clock, Ship, Plane, TruckIcon, FileText, Search, Bell, User, Home, BarChart3, Loader2, DollarSign, CheckCircle, AlertTriangle, Plus } from "lucide-react";
+import { Package, Truck, MapPin, Clock, Ship, Plane, TruckIcon, Train, FileText, Search, Bell, User, Home, BarChart3, Loader2, DollarSign, CheckCircle, AlertTriangle, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRoles } from "@/hooks/use-roles";
 import { Navigate, NavLink } from "react-router-dom";
@@ -7,8 +7,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-const modeIcons: Record<string, React.ElementType> = { air: Plane, sea: Ship, road: TruckIcon };
-const modeLabels: Record<string, string> = { air: "Aérien", sea: "Maritime", road: "Routier" };
+const modeIcons: Record<string, React.ElementType> = { air: Plane, sea: Ship, road: TruckIcon, rail: Train };
+const modeLabels: Record<string, string> = { air: "Aérien", sea: "Maritime", road: "Routier", rail: "Ferroviaire" };
 const statusLabels: Record<string, string> = {
   in_transit: "En transit", customs: "Dédouanement", arrived: "Arrivé au hub", loading: "Chargement", delivered: "Livré",
 };
@@ -199,7 +199,7 @@ export default function ShipperDashboardPage() {
           </div>
           <div className="bg-card border border-border rounded-xl p-4">
             <h3 className="text-xs font-semibold text-foreground mb-3">Par mode de transport</h3>
-            {(["air", "sea", "road"] as const).map((mode) => {
+            {(["air", "sea", "road", "rail"] as const).map((mode) => {
               const ModeIcon = modeIcons[mode];
               const count = shipments.filter((s: any) => s.mode === mode).length;
               const pct = shipments.length ? Math.round((count / shipments.length) * 100) : 0;
@@ -285,8 +285,8 @@ function AddShipmentModal({ onClose, onSubmit, loading }: { onClose: () => void;
           <input placeholder="Destination" value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })}
             className="px-3 py-2.5 bg-background border border-border rounded-lg text-sm" />
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {(["air", "sea", "road"] as const).map((m) => (
+        <div className="grid grid-cols-4 gap-2">
+          {(["air", "sea", "road", "rail"] as const).map((m) => (
             <button key={m} onClick={() => setForm({ ...form, mode: m })}
               className={`py-2 text-xs rounded-lg border ${form.mode === m ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border text-foreground"}`}>
               {modeLabels[m]}

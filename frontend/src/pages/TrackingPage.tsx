@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Search, Package, Plane, Ship, Truck, MapPin, Clock, CheckCircle2,
   CircleDot, Circle, Loader2, AlertCircle, Globe, ShoppingBag,
-  Box, UserCheck, Users, Gift, XCircle, RotateCcw, Bike, Home, Store, Hash,
+  Box, UserCheck, Users, Gift, XCircle, RotateCcw, Bike, Home, Store, Hash, Train,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { mapInternalShipment, detectCarrier, type TrackingResult } from "@/lib/tracking-providers";
@@ -20,6 +20,7 @@ import { STATUS_CONFIG, STATUS_FLOW, CUSTOMER_TRACKING_STEPS, getStepIndex } fro
 import { useI18n } from "@/contexts/I18nContext";
 import { DeliveryMap } from "@/components/DeliveryMap";
 import { useRiderLocationSubscription } from "@/hooks/use-rider-location";
+import { useCustomerLocationBroadcast } from "@/hooks/use-customer-location";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
@@ -66,7 +67,7 @@ const DELIVERY_STEPS = [
   { key: "delivered", label: "Livré", icon: CheckCircle2 },
 ];
 
-const modeIcons: Record<string, typeof Plane> = { air: Plane, sea: Ship, road: Truck };
+const modeIcons: Record<string, typeof Plane> = { air: Plane, sea: Ship, road: Truck, rail: Train };
 
 function getStepIdx(steps: { key: string }[], status: string) {
   const idx = steps.findIndex((s) => s.key === status);
@@ -346,10 +347,13 @@ function ConfirmationCodeEntry({ order, onConfirmed }: { order: OrderTrackingRes
   );
 }
 
-// ── Live Rider Tracking Map ──
-function LiveRiderMap({ deliveryId }: { deliveryId: string }) {
+// ── Live Rider Tracking Map (bidirectional) ──
+function LiveRiderMap({ deliveryId, orderId, userId }: { deliveryId: string; orderId?: string; userId?: string }) {
   const [riderLat, setRiderLat] = useState<number | null>(null);
   const [riderLng, setRiderLng] = useState<number | null>(null);
+
+  // Broadcast customer position
+  useCustomerLocationBroadcast(userId, orderId, !!userId && !!orderId);
 
   useRiderLocationSubscription(deliveryId, useCallback((lat: number, lng: number) => {
     setRiderLat(lat);
@@ -361,6 +365,7 @@ function LiveRiderMap({ deliveryId }: { deliveryId: string }) {
       <div className="bg-muted/30 rounded-xl p-6 text-center">
         <Bike size={24} className="text-muted-foreground mx-auto mb-2" />
         <p className="text-sm text-muted-foreground">En attente de la position du livreur...</p>
+        <p className="text-xs text-muted-foreground mt-1">Votre position GPS est partagée avec le livreur</p>
       </div>
     );
   }
@@ -368,10 +373,10 @@ function LiveRiderMap({ deliveryId }: { deliveryId: string }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
-        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-        <span className="text-xs font-medium text-foreground">Livreur en route</span>
+        <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+        <span className="text-xs font-medium text-foreground">Livreur en route — GPS bidirectionnel actif</span>
       </div>
-      <DeliveryMap riderLat={riderLat} riderLng={riderLng} className="h-[300px]" />
+      <DeliveryMap riderLat={riderLat} riderLng={riderLng} showPolylines showEta className="h-[300px]" />
     </div>
   );
 }
@@ -684,9 +689,9 @@ export default function TrackingPage() {
               {orderResult.delivery_id && (
                 <div className="border-t border-border pt-4">
                   <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <Bike size={16} className="text-primary" /> Suivi du livreur en direct
+                    <Bike size={16} className="text-primary" /> Suivi en direct — GPS bidirectionnel
                   </h3>
-                  <LiveRiderMap deliveryId={orderResult.delivery_id} />
+                  <LiveRiderMap deliveryId={orderResult.delivery_id} orderId={orderResult.id} userId={user?.id} />
                 </div>
               )}
 

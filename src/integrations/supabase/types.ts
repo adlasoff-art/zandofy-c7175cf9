@@ -668,6 +668,41 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_locations: {
+        Row: {
+          id: string
+          latitude: number
+          longitude: number
+          order_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          latitude?: number
+          longitude?: number
+          order_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          latitude?: number
+          longitude?: number
+          order_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_locations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_tiers: {
         Row: {
           badge_label: string
