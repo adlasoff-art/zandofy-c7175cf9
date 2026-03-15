@@ -139,6 +139,8 @@ export default function DashboardPage() {
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
   const [statusHistory, setStatusHistory] = useState<StatusHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const { kycStatus, needsKyc, isOrderBlocked, kycVerification, canResubmit, refetchKyc } = useKycStatus();
+  const [showKycForm, setShowKycForm] = useState(false);
 
   const loadOrders = useCallback(async () => {
     if (!user) return;
