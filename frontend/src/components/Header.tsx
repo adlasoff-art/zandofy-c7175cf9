@@ -234,10 +234,10 @@ export function Header() {
       <nav className="hidden lg:block border-b border-border bg-card relative">
         <div className="container">
           <div className="flex items-center gap-0 overflow-x-auto scrollbar-thin">
-            {NAV_LINK_KEYS.map((link) => (
+            {navLinks.map((link, idx) => (
               <div
-                key={link.labelKey}
-                className={`relative ${link.fixed ? "shrink-0 sticky left-0 z-10 bg-card" : ""}`}
+                key={link.label + idx}
+                className={`relative ${link.hasMega ? "shrink-0 sticky left-0 z-10 bg-card" : ""}`}
                 onMouseEnter={link.hasMega ? handleMegaEnter : undefined}
                 onMouseLeave={link.hasMega ? handleMegaLeave : undefined}
               >
@@ -248,7 +248,7 @@ export function Header() {
                   } ${link.hasMega ? "font-bold" : ""}`}
                   onClick={link.hasMega ? (e) => e.preventDefault() : undefined}
                 >
-                  {t(link.labelKey)}
+                  {link.label}
                   {link.hasMega && <ChevronRight size={12} className="rotate-90" />}
                 </Link>
               </div>
