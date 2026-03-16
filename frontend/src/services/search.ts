@@ -124,6 +124,7 @@ export async function autocompleteProducts(query: string): Promise<Product[]> {
   const { data, error } = await supabase
     .from("products")
     .select("id, name, name_fr, price, currency, product_images(image_url, position)")
+    .eq("publish_status", "published")
     .or(`name.ilike.%${query}%,name_fr.ilike.%${query}%`)
     .limit(6);
 

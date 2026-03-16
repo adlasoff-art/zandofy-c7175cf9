@@ -172,7 +172,7 @@ serve(async (req) => {
     const { data: products, error: dbError } = await supabase
       .from("products")
       .select("id, name, name_fr, price, currency, description, rating, review_count, store_id")
-      .neq("publish_status", "archived")
+      .eq("publish_status", "published")
       .or(orFilter)
       .limit(20);
 
