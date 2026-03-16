@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { VENDOR_TIERS } from "@/lib/vendor-tiers";
+import { useStorePresence } from "@/hooks/useStorePresence";
 
 interface VendorConversation {
   id: string;
