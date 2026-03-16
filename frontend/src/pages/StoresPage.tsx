@@ -103,18 +103,21 @@ function StoreCard({ store }: { store: StoreRow }) {
       className="group relative flex flex-col bg-card border border-border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-0.5"
     >
       {/* Banner */}
-      <div className="relative h-28 sm:h-32 overflow-hidden bg-primary/10">
+      <div className="relative h-28 sm:h-32 overflow-hidden bg-muted">
         {store.banner_url ? (
-          <img
-            src={store.banner_url}
-            alt=""
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
+          <>
+            <img
+              src={store.banner_url}
+              alt=""
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-card/60 backdrop-blur-[1px]" />
+          </>
         ) : (
           <div className="absolute inset-0 bg-primary/15" />
         )}
         {/* Overlay gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-card via-card/30 to-transparent" />
 
         {/* Online indicator */}
         <span className={`absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-card/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium shadow-sm border border-border ${store.is_online ? "text-emerald-600" : "text-amber-600"}`}>

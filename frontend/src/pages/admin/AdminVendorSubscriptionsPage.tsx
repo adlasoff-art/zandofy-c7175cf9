@@ -287,32 +287,54 @@ export default function AdminVendorSubscriptionsPage() {
                       />
                     </div>
 
-                    {/* Max collaborators override */}
+                    {/* Collaborators toggle */}
                     <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1">
                       <label className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Users size={12} /> Max collabs
+                        <Users size={12} /> Équipe
                       </label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={50}
-                        placeholder={String(VENDOR_TIERS[tier].maxCollaborators)}
-                        defaultValue={store.max_collaborators_override ?? ""}
-                        onBlur={async (e) => {
-                          const val = e.target.value.trim();
-                          const override = val === "" ? null : parseInt(val, 10);
+                      <Switch
+                        checked={store.collaborators_enabled || false}
+                        onCheckedChange={async (v) => {
                           const { error } = await supabase
                             .from("stores")
-                            .update({ max_collaborators_override: override } as any)
+                            .update({ collaborators_enabled: v } as any)
                             .eq("id", store.id);
                           if (!error) {
                             queryClient.invalidateQueries({ queryKey: ["admin-vendor-subs"] });
-                            toast.success("Limite collaborateurs mise à jour");
+                            toast.success(v ? "Collaborateurs activés" : "Collaborateurs désactivés");
                           } else toast.error("Erreur");
                         }}
-                        className="w-16 px-2 py-1 text-sm bg-card border border-border rounded-md text-center"
                       />
                     </div>
+
+                    {/* Max collaborators override (only if enabled) */}
+                    {store.collaborators_enabled && (
+                      <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1">
+                        <label className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Users size={12} /> Max collabs
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={50}
+                          placeholder={String(VENDOR_TIERS[tier].maxCollaborators)}
+                          defaultValue={store.max_collaborators_override ?? ""}
+                          onBlur={async (e) => {
+                            const val = e.target.value.trim();
+                            const override = val === "" ? null : parseInt(val, 10);
+                            const { error } = await supabase
+                              .from("stores")
+                              .update({ max_collaborators_override: override } as any)
+                              .eq("id", store.id);
+                            if (!error) {
+                              queryClient.invalidateQueries({ queryKey: ["admin-vendor-subs"] });
+                              toast.success("Limite collaborateurs mise à jour");
+                            } else toast.error("Erreur");
+                          }}
+                          className="w-16 px-2 py-1 text-sm bg-card border border-border rounded-md text-center"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               );
