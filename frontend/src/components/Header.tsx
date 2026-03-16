@@ -17,22 +17,22 @@ import { useI18n, LOCALES, CURRENCIES, type CurrencyCode } from "@/contexts/I18n
 import { useTheme } from "@/contexts/ThemeContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-// Static nav items with category slug mappings
+// Fallback static nav items (used if CMS query fails)
 const NAV_LINK_KEYS = [
-  { labelKey: "nav.categories", href: "#", hasMega: true, fixed: true },
-  { labelKey: "nav.newArrivals", href: "/category/nouveautes" },
-  { labelKey: "nav.sales", href: "/category/soldes", highlight: true },
-  { labelKey: "nav.electronics", href: "/category/electronics" },
-  { labelKey: "nav.swimwear", href: "/search?q=maillots+de+bain" },
-  { labelKey: "nav.homeDecor", href: "/category/home" },
-  { labelKey: "nav.womenClothing", href: "/category/women" },
-  { labelKey: "nav.menClothing", href: "/category/men" },
-  { labelKey: "nav.shoes", href: "/category/shoes" },
-  { labelKey: "nav.jewelryAccessories", href: "/category/accessories" },
-  { labelKey: "nav.beautyHealth", href: "/search?q=beauté+santé" },
-  { labelKey: "nav.bagsLuggage", href: "/category/bags" },
-  { labelKey: "nav.sportsOutdoor", href: "/search?q=sports" },
-  { labelKey: "nav.kids", href: "/category/kids" },
+  { label: "Catégories", href: "#", hasMega: true, highlight: false },
+  { label: "Nouveautés", href: "/category/nouveautes", hasMega: false, highlight: false },
+  { label: "Soldes", href: "/category/soldes", hasMega: false, highlight: true },
+  { label: "Électronique", href: "/category/electronics", hasMega: false, highlight: false },
+  { label: "Maillots de bain", href: "/search?q=maillots+de+bain", hasMega: false, highlight: false },
+  { label: "Maison & Déco", href: "/category/home", hasMega: false, highlight: false },
+  { label: "Vêtements Femme", href: "/category/women", hasMega: false, highlight: false },
+  { label: "Vêtements Homme", href: "/category/men", hasMega: false, highlight: false },
+  { label: "Chaussures", href: "/category/shoes", hasMega: false, highlight: false },
+  { label: "Bijoux & Accessoires", href: "/category/accessories", hasMega: false, highlight: false },
+  { label: "Beauté & Santé", href: "/search?q=beauté+santé", hasMega: false, highlight: false },
+  { label: "Sacs & Bagages", href: "/category/bags", hasMega: false, highlight: false },
+  { label: "Sports & Plein air", href: "/search?q=sports", hasMega: false, highlight: false },
+  { label: "Enfants", href: "/category/kids", hasMega: false, highlight: false },
 ];
 
 export function Header() {
@@ -55,6 +55,33 @@ export function Header() {
     t("topbar.freeReturns"),
     t("topbar.noHiddenFees"),
   ];
+
+  // Dynamic category nav from CMS
+  const { data: cmsNavItems } = useQuery({
+    queryKey: ["cms-category-nav"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cms_menu_items")
+        .select("*")
+        .eq("menu_group", "category_nav")
+        .eq("is_visible", true)
+        .is("parent_id", null)
+        .order("sort_order");
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Build nav links: CMS data or fallback
+  const navLinks = (cmsNavItems && cmsNavItems.length > 0)
+    ? cmsNavItems.map((item: any) => ({
+        label: item.label,
+        href: item.url,
+        hasMega: item.has_mega ?? false,
+        highlight: item.highlight ?? false,
+      }))
+    : NAV_LINK_KEYS;
 
   const { data: mobileCategories } = useQuery({
     queryKey: ["mobile-categories"],
@@ -207,10 +234,10 @@ export function Header() {
       <nav className="hidden lg:block border-b border-border bg-card relative">
         <div className="container">
           <div className="flex items-center gap-0 overflow-x-auto scrollbar-thin">
-            {NAV_LINK_KEYS.map((link) => (
+            {navLinks.map((link, idx) => (
               <div
-                key={link.labelKey}
-                className={`relative ${link.fixed ? "shrink-0 sticky left-0 z-10 bg-card" : ""}`}
+                key={link.label + idx}
+                className={`relative ${link.hasMega ? "shrink-0 sticky left-0 z-10 bg-card" : ""}`}
                 onMouseEnter={link.hasMega ? handleMegaEnter : undefined}
                 onMouseLeave={link.hasMega ? handleMegaLeave : undefined}
               >
@@ -221,7 +248,7 @@ export function Header() {
                   } ${link.hasMega ? "font-bold" : ""}`}
                   onClick={link.hasMega ? (e) => e.preventDefault() : undefined}
                 >
-                  {t(link.labelKey)}
+                  {link.label}
                   {link.hasMega && <ChevronRight size={12} className="rotate-90" />}
                 </Link>
               </div>
