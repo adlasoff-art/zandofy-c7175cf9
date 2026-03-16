@@ -103,7 +103,7 @@ function StoreCard({ store }: { store: StoreRow }) {
       className="group relative flex flex-col bg-card border border-border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-0.5"
     >
       {/* Banner */}
-      <div className="relative h-28 sm:h-32 overflow-hidden bg-gradient-to-br from-primary/20 via-accent/10 to-secondary">
+      <div className="relative h-28 sm:h-32 overflow-hidden bg-primary/10">
         {store.banner_url ? (
           <img
             src={store.banner_url}
@@ -111,14 +111,14 @@ function StoreCard({ store }: { store: StoreRow }) {
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
-          <div className="absolute inset-0 bg-[var(--brand-gradient)] opacity-40" />
+          <div className="absolute inset-0 bg-primary/15" />
         )}
         {/* Overlay gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-card via-card/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
 
         {/* Online indicator */}
         {store.is_online && (
-          <span className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-card/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium text-emerald-600 shadow-sm">
+          <span className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-card/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium text-emerald-600 shadow-sm border border-border">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -129,7 +129,7 @@ function StoreCard({ store }: { store: StoreRow }) {
 
         {/* Verified badge */}
         {verified && (
-          <span className="absolute top-2.5 left-2.5 flex items-center gap-1 rounded-full bg-primary/90 text-primary-foreground px-2 py-0.5 text-[10px] font-semibold shadow-sm backdrop-blur-sm">
+          <span className="absolute top-2.5 left-2.5 flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-semibold shadow-sm">
             <ShieldCheck size={11} /> Vérifié
             {verifiedYears > 0 && <span>· {verifiedYears}a</span>}
           </span>
