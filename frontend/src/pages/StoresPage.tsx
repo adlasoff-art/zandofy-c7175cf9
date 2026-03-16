@@ -117,15 +117,15 @@ function StoreCard({ store }: { store: StoreRow }) {
         <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
 
         {/* Online indicator */}
-        {store.is_online && (
-          <span className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-card/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium text-amber-600 shadow-sm border border-border">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
-            </span>
-            Actif maintenant
+        <span className={`absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-card/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium shadow-sm border border-border ${store.is_online ? "text-emerald-600" : "text-amber-600"}`}>
+          <span className="relative flex h-2 w-2">
+            {store.is_online && (
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            )}
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${store.is_online ? "bg-emerald-500" : "bg-amber-500"}`} />
           </span>
-        )}
+          {store.is_online ? "En ligne" : "Hors ligne"}
+        </span>
 
         {/* Verified badge */}
         {verified && (
