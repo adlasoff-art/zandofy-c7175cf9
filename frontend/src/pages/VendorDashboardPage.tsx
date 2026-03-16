@@ -395,6 +395,8 @@ export default function VendorDashboardPage() {
 
             {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
 
+            {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
+
             {activeTab === "messages" && (
               <>
                 {conversations.length === 0 ? (
