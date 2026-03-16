@@ -52,8 +52,8 @@ export function Footer() {
       title: t("footer.aboutZandofy"),
       links: [
         { label: t("footer.aboutUs"), to: "/about" },
-        { label: t("footer.socialResponsibility"), to: "/about" },
-        { label: t("footer.careers"), to: "/about" },
+        { label: t("footer.socialResponsibility"), to: "/social-responsibility" },
+        { label: t("footer.careers"), to: "/careers" },
         { label: t("footer.blog"), to: "/faq" },
         { label: t("footer.affiliates"), to: "/affiliate-program" },
       ],

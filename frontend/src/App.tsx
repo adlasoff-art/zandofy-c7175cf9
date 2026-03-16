@@ -54,6 +54,8 @@ const BannedPage = lazy(() => import("./pages/BannedPage"));
 const DriverPage = lazy(() => import("./pages/DriverPage"));
 const AffiliateProgramPage = lazy(() => import("./pages/AffiliateProgramPage"));
 const LoyaltyProgramPage = lazy(() => import("./pages/LoyaltyProgramPage"));
+const CareersPage = lazy(() => import("./pages/CareersPage"));
+const SocialResponsibilityPage = lazy(() => import("./pages/SocialResponsibilityPage"));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -159,6 +161,8 @@ const App = () => (
                 <Route path="/driver" element={<DriverPage />} />
                 <Route path="/affiliate-program" element={<AffiliateProgramPage />} />
                 <Route path="/loyalty-program" element={<LoyaltyProgramPage />} />
+                <Route path="/careers" element={<CareersPage />} />
+                <Route path="/social-responsibility" element={<SocialResponsibilityPage />} />
                 {/* Admin routes */}
                 <Route path="/admin" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDashboard /></RoleGuard>} />
                 <Route path="/admin/users" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminUsersPage /></RoleGuard>} />
