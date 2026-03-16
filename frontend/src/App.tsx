@@ -32,6 +32,7 @@ const Index = lazy(() => import("./pages/Index"));
 const CategoryPage = lazy(() => import("./pages/CategoryPage"));
 const ProductPage = lazy(() => import("./pages/ProductPage"));
 const StorePage = lazy(() => import("./pages/StorePage"));
+const StoresPage = lazy(() => import("./pages/StoresPage"));
 const MessagesPage = lazy(() => import("./pages/MessagesPage"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -140,6 +141,7 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/product/:id" element={<ProductPage />} />
                 <Route path="/category/:slug" element={<CategoryPage />} />
+                <Route path="/stores" element={<StoresPage />} />
                 <Route path="/store/:id" element={<StorePage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
