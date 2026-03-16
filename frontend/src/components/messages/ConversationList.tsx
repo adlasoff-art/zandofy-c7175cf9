@@ -163,6 +163,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
         is_store_owner: conv.is_store_owner,
         other_party_name: otherPartyName,
         other_party_avatar: otherPartyAvatar,
+        store_is_online: (store as any)?.is_online ?? false,
       });
     }
 
