@@ -54,6 +54,8 @@ const BannedPage = lazy(() => import("./pages/BannedPage"));
 const DriverPage = lazy(() => import("./pages/DriverPage"));
 const AffiliateProgramPage = lazy(() => import("./pages/AffiliateProgramPage"));
 const LoyaltyProgramPage = lazy(() => import("./pages/LoyaltyProgramPage"));
+const CareersPage = lazy(() => import("./pages/CareersPage"));
+const SocialResponsibilityPage = lazy(() => import("./pages/SocialResponsibilityPage"));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
