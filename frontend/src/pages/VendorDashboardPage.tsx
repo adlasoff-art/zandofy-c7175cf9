@@ -100,7 +100,7 @@ export default function VendorDashboardPage() {
       setLoading(true);
 
       // Find store owned by user
-      const { data: storeData } = await supabase
+      const { data: storeData } = await (supabase as any)
         .from("stores")
         .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled")
         .eq("owner_id", user!.id)
