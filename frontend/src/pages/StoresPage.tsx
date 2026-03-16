@@ -327,14 +327,14 @@ export default function StoresPage() {
           <div className="container relative z-10 text-center space-y-5">
             <div className="inline-flex items-center gap-2 rounded-full bg-primary-foreground/15 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-primary-foreground/90">
               <Store size={14} />
-              {isLoading ? "..." : `${totalStores} boutiques`} sur Zandofy
+              {isLoading ? "..." : `${totalStores} fournisseurs`} sur Zandofy
             </div>
 
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-primary-foreground tracking-tight">
-              Explorez nos <span className="underline decoration-primary-foreground/30 decoration-4 underline-offset-4">Boutiques</span>
+              Explorez nos <span className="underline decoration-primary-foreground/30 decoration-4 underline-offset-4">Fournisseurs</span>
             </h1>
             <p className="text-sm md:text-base text-primary-foreground/80 max-w-xl mx-auto leading-relaxed">
-              Comparez les vendeurs, découvrez leurs produits et trouvez les boutiques qui correspondent à vos besoins.
+              Comparez les fournisseurs, découvrez leurs produits et trouvez ceux qui correspondent à vos besoins.
             </p>
 
             {/* Search bar */}
