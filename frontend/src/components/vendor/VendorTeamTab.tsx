@@ -98,7 +98,7 @@ export function VendorTeamTab({ storeId }: Props) {
         throw new Error("Vous ne pouvez pas vous ajouter vous-même.");
       }
 
-      const { error } = await supabase.from("store_collaborators").insert({
+      const { error } = await (supabase as any).from("store_collaborators").insert({
         store_id: storeId,
         user_id: profile.id,
         invited_email: inviteEmail.toLowerCase().trim(),
