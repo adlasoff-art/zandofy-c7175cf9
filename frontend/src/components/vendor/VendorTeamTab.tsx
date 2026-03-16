@@ -32,12 +32,12 @@ export function VendorTeamTab({ storeId }: Props) {
   const { data: storeData } = useQuery({
     queryKey: ["store-collab-limit", storeId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("stores")
         .select("max_collaborators_override")
         .eq("id", storeId)
         .single();
-      return data;
+      return data as { max_collaborators_override: number | null } | null;
     },
   });
 
