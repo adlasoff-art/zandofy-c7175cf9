@@ -340,21 +340,37 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
             <ArrowLeft size={20} />
           </button>
         )}
-        {conversation.other_party_avatar ? (
-          <img
-            src={conversation.other_party_avatar}
-            alt=""
-            className="w-9 h-9 rounded-full object-cover shrink-0"
-          />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0">
-            <MessageCircle size={14} className="text-muted-foreground" />
-          </div>
-        )}
+        {/* Avatar with online indicator */}
+        <div className="relative shrink-0">
+          {conversation.other_party_avatar ? (
+            <img
+              src={conversation.other_party_avatar}
+              alt=""
+              className="w-9 h-9 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+              <MessageCircle size={14} className="text-muted-foreground" />
+            </div>
+          )}
+          {!conversation.is_store_owner && (
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center">
+              {conversation.store_is_online && (
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              )}
+              <span className={`relative inline-flex h-2.5 w-2.5 rounded-full border-[1.5px] border-card ${conversation.store_is_online ? "bg-emerald-500" : "bg-amber-500/60"}`} />
+            </span>
+          )}
+        </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">
             {conversation.other_party_name}
           </p>
+          {!conversation.is_store_owner && (
+            <p className={`text-[10px] font-medium ${conversation.store_is_online ? "text-emerald-600" : "text-amber-600"}`}>
+              {conversation.store_is_online ? "En ligne" : "Hors ligne"}
+            </p>
+          )}
           {conversation.product_name && (
             <p className="text-[11px] text-primary truncate">{conversation.product_name}</p>
           )}

@@ -268,18 +268,29 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
                   conv.unread_count > 0 && "bg-primary/5"
                 )}
               >
-                {/* Avatar */}
-                {conv.other_party_avatar ? (
-                  <img
-                    src={conv.other_party_avatar}
-                    alt={conv.other_party_name}
-                    className="w-10 h-10 rounded-full object-cover shrink-0"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                    <MessageCircle size={16} className="text-muted-foreground" />
-                  </div>
-                )}
+                {/* Avatar with online indicator */}
+                <div className="relative shrink-0">
+                  {conv.other_party_avatar ? (
+                    <img
+                      src={conv.other_party_avatar}
+                      alt={conv.other_party_name}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                      <MessageCircle size={16} className="text-muted-foreground" />
+                    </div>
+                  )}
+                  {/* Online dot — only show for stores (customer view) */}
+                  {!conv.is_store_owner && (
+                    <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center">
+                      {conv.store_is_online && (
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                      )}
+                      <span className={`relative inline-flex h-3 w-3 rounded-full border-2 border-card ${conv.store_is_online ? "bg-emerald-500" : "bg-amber-500/60"}`} />
+                    </span>
+                  )}
+                </div>
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">

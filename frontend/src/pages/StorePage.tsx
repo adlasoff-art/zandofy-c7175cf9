@@ -295,7 +295,8 @@ export default function StorePage() {
                         <Store size={32} className="text-primary-foreground" />
                       </div>
                     )}
-                    <span className="absolute bottom-1 right-1 flex h-4.5 w-4.5 items-center justify-center translate-x-[10%] translate-y-[10%]">
+                    {/* Online indicator — bottom-right of avatar */}
+                    <span className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center">
                       {store.is_online && (
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                       )}
