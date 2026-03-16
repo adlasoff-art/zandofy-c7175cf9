@@ -21,6 +21,7 @@ export interface ConversationItem {
   is_store_owner: boolean;
   other_party_name: string;
   other_party_avatar: string | null;
+  store_is_online: boolean;
 }
 
 type FilterType = "all" | "unread" | "starred";
