@@ -357,7 +357,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       if (error) { toast.error("Erreur lors de la mise à jour"); setSaving(false); return; }
     } else {
       const { data, error } = await supabase.from("products").insert(payload).select("id").single();
-      if (error || !data) { toast.error("Erreur lors de la création"); setSaving(false); return; }
+      if (error || !data) { console.error("Product insert error:", error); toast.error("Erreur lors de la création : " + (error?.message || "inconnue")); setSaving(false); return; }
       productId = data.id;
     }
 
