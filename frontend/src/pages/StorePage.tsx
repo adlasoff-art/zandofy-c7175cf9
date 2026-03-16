@@ -297,12 +297,12 @@ export default function StorePage() {
                     )}
                     <span className="absolute bottom-1 right-1 flex h-4.5 w-4.5 items-center justify-center translate-x-[10%] translate-y-[10%]">
                       {store.is_online && (
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
                       )}
                       <span
                         className={`relative inline-flex h-4 w-4 rounded-full border-2 border-card ${
                           store.is_online
-                            ? "bg-emerald-500 shadow-[0_0_8px_2px_rgba(16,185,129,0.5)]"
+                            ? "bg-amber-500 shadow-[0_0_8px_2px_rgba(245,158,11,0.5)]"
                             : "bg-muted-foreground/30"
                         }`}
                       />
