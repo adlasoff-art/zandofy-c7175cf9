@@ -2505,6 +2505,7 @@ export type Database = {
           chat_links_allowed: boolean
           chat_media_enabled: boolean | null
           chat_phone_allowed: boolean
+          collaborators_enabled: boolean
           created_at: string
           description: string | null
           flash_timer_duration_hours: number | null
@@ -2545,6 +2546,7 @@ export type Database = {
           chat_links_allowed?: boolean
           chat_media_enabled?: boolean | null
           chat_phone_allowed?: boolean
+          collaborators_enabled?: boolean
           created_at?: string
           description?: string | null
           flash_timer_duration_hours?: number | null
@@ -2585,6 +2587,7 @@ export type Database = {
           chat_links_allowed?: boolean
           chat_media_enabled?: boolean | null
           chat_phone_allowed?: boolean
+          collaborators_enabled?: boolean
           created_at?: string
           description?: string | null
           flash_timer_duration_hours?: number | null
