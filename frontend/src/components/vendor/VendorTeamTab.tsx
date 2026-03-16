@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { useAuth } from "@/contexts/AuthContext";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { VENDOR_TIERS } from "@/lib/vendor-tiers";
 import { toast } from "sonner";
