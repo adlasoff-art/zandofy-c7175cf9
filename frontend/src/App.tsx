@@ -52,6 +52,8 @@ const TrackingPage = lazy(() => import("./pages/TrackingPage"));
 const BecomeVendorPage = lazy(() => import("./pages/BecomeVendorPage"));
 const BannedPage = lazy(() => import("./pages/BannedPage"));
 const DriverPage = lazy(() => import("./pages/DriverPage"));
+const AffiliateProgramPage = lazy(() => import("./pages/AffiliateProgramPage"));
+const LoyaltyProgramPage = lazy(() => import("./pages/LoyaltyProgramPage"));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
