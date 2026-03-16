@@ -48,7 +48,7 @@ export function VendorTeamTab({ storeId }: Props) {
   const { data: collaborators = [], isLoading } = useQuery({
     queryKey: ["store-collaborators", storeId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("store_collaborators")
         .select("*")
         .eq("store_id", storeId)
