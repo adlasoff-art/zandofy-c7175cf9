@@ -47,6 +47,7 @@ interface VendorStore {
   pending_name: string | null;
   name_change_status: string | null;
   can_create_coupons: boolean;
+  collaborators_enabled: boolean;
 }
 
 interface OrderCounters {
