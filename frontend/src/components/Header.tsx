@@ -8,6 +8,7 @@ import { MegaMenu } from "@/components/MegaMenu";
 import { CurrencySwitcher } from "@/components/CurrencySwitcher";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRoles } from "@/hooks/use-roles";
 import { useCart } from "@/contexts/CartContext";
 import { useUnreadMessages } from "@/hooks/use-unread-messages";
 import { useUnreadSupport } from "@/hooks/use-unread-support";
@@ -42,6 +43,7 @@ export function Header() {
   const [expandedMobileCat, setExpandedMobileCat] = useState<string | null>(null);
   const megaTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const { user, signOut } = useAuth();
+  const { isStaff } = useRoles();
   const { setDrawerOpen, itemCount } = useCart();
   const unreadCount = useUnreadMessages();
   const unreadSupportCount = useUnreadSupport();
@@ -171,7 +173,7 @@ export function Header() {
                   <DropdownMenuItem asChild><Link to="/messages">{t("header.messages")} {unreadCount > 0 && `(${unreadCount})`}</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link to="/vendor">{t("header.vendorSpace")}</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link to="/become-vendor" className="text-primary font-medium">{t("header.becomeVendor")}</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to="/admin">{t("header.admin")}</Link></DropdownMenuItem>
+                  {isStaff && <DropdownMenuItem asChild><Link to="/admin">{t("header.admin")}</Link></DropdownMenuItem>}
                   <DropdownMenuItem onClick={signOut} className="text-destructive"><LogOut size={14} className="mr-2" /> {t("header.logout")}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

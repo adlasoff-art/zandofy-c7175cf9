@@ -52,6 +52,8 @@ const TrackingPage = lazy(() => import("./pages/TrackingPage"));
 const BecomeVendorPage = lazy(() => import("./pages/BecomeVendorPage"));
 const BannedPage = lazy(() => import("./pages/BannedPage"));
 const DriverPage = lazy(() => import("./pages/DriverPage"));
+const AffiliateProgramPage = lazy(() => import("./pages/AffiliateProgramPage"));
+const LoyaltyProgramPage = lazy(() => import("./pages/LoyaltyProgramPage"));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -155,6 +157,8 @@ const App = () => (
                 <Route path="/tracking" element={<TrackingPage />} />
                 <Route path="/become-vendor" element={<BecomeVendorPage />} />
                 <Route path="/driver" element={<DriverPage />} />
+                <Route path="/affiliate-program" element={<AffiliateProgramPage />} />
+                <Route path="/loyalty-program" element={<LoyaltyProgramPage />} />
                 {/* Admin routes */}
                 <Route path="/admin" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDashboard /></RoleGuard>} />
                 <Route path="/admin/users" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminUsersPage /></RoleGuard>} />
