@@ -32,6 +32,7 @@ const Index = lazy(() => import("./pages/Index"));
 const CategoryPage = lazy(() => import("./pages/CategoryPage"));
 const ProductPage = lazy(() => import("./pages/ProductPage"));
 const StorePage = lazy(() => import("./pages/StorePage"));
+const StoresPage = lazy(() => import("./pages/StoresPage"));
 const MessagesPage = lazy(() => import("./pages/MessagesPage"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
