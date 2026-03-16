@@ -37,7 +37,7 @@ export default function AdminVendorSubscriptionsPage() {
     queryFn: async () => {
       const { data: storesData } = await supabase
         .from("stores")
-        .select("id, name, owner_id, products_count, is_verified, can_create_coupons, max_collaborators_override")
+        .select("id, name, owner_id, products_count, is_verified, can_create_coupons, collaborators_enabled, max_collaborators_override")
         .order("name") as { data: any[] | null };
 
       if (!storesData) return [];
