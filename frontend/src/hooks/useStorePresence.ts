@@ -12,14 +12,13 @@ export function useStorePresence(storeId: string | null | undefined) {
     if (!storeId) return;
 
     const heartbeat = () => {
-      supabase.rpc("update_store_presence", { p_store_id: storeId }).then(({ error }) => {
+      (supabase.rpc as any)("update_store_presence", { p_store_id: storeId }).then(({ error }: any) => {
         if (error) console.warn("Presence heartbeat error:", error.message);
       });
     };
 
     const goOffline = () => {
-      // Use sendBeacon-style: fire and forget
-      supabase.rpc("set_store_offline", { p_store_id: storeId });
+      (supabase.rpc as any)("set_store_offline", { p_store_id: storeId });
     };
 
     // Initial heartbeat
