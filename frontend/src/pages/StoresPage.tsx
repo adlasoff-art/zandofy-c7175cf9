@@ -146,7 +146,7 @@ function StoreCard({ store }: { store: StoreRow }) {
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full bg-[var(--brand-gradient)] flex items-center justify-center">
+            <div className="w-full h-full bg-primary flex items-center justify-center">
               <Store size={28} className="text-primary-foreground" />
             </div>
           )}
