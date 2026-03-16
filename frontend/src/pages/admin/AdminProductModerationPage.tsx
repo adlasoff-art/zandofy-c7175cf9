@@ -3,7 +3,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShieldCheck, Search, Loader2, Check, X, Eye, Store, Filter } from "lucide-react";
+import { ShieldCheck, Search, Loader2, Check, X, Eye, Store, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 
 type StatusFilter = "pending_approval" | "published" | "rejected" | "draft" | "all";
@@ -16,56 +16,88 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "Tous" },
 ];
 
+const PAGE_SIZE = 20;
+
 export default function AdminProductModerationPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending_approval");
+  const [page, setPage] = useState(0);
   const queryClient = useQueryClient();
 
-  const { data: products = [], isLoading } = useQuery({
-    queryKey: ["admin-product-moderation", statusFilter],
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-product-moderation", statusFilter, page],
     queryFn: async () => {
+      let countQuery = supabase
+        .from("products")
+        .select("id", { count: "exact", head: true });
+
+      if (statusFilter !== "all") {
+        countQuery = countQuery.eq("publish_status", statusFilter);
+      }
+
+      const { count } = await countQuery;
+
       let query = supabase
         .from("products")
         .select("id, name_fr, name, price, currency, publish_status, store_id, created_at, stock_quantity")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (statusFilter !== "all") {
         query = query.eq("publish_status", statusFilter);
       }
 
-      const { data, error } = await query;
+      const { data: products, error } = await query;
       if (error) throw error;
-      if (!data || data.length === 0) return [];
+      if (!products || products.length === 0) return { products: [], totalCount: count || 0 };
 
-      // Fetch store names
-      const storeIds = [...new Set(data.filter(p => p.store_id).map(p => p.store_id!))];
-      const { data: stores } = await supabase
-        .from("stores")
-        .select("id, name")
-        .in("id", storeIds);
+      const storeIds = [...new Set(products.filter(p => p.store_id).map(p => p.store_id!))];
+      let storeMap = new Map<string, string>();
+      if (storeIds.length > 0) {
+        const { data: stores } = await supabase
+          .from("stores")
+          .select("id, name")
+          .in("id", storeIds);
+        storeMap = new Map((stores || []).map(s => [s.id, s.name]));
+      }
 
-      const storeMap = new Map((stores || []).map(s => [s.id, s.name]));
-
-      return data.map(p => ({
-        ...p,
-        store_name: p.store_id ? storeMap.get(p.store_id) || "—" : "—",
-      }));
+      return {
+        products: products.map(p => ({
+          ...p,
+          store_name: p.store_id ? storeMap.get(p.store_id) || "—" : "—",
+        })),
+        totalCount: count || 0,
+      };
     },
   });
 
+  const products = data?.products || [];
+  const totalCount = data?.totalCount || 0;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
   const updateStatus = useMutation({
     mutationFn: async ({ productId, status }: { productId: string; status: string }) => {
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from("products")
         .update({ publish_status: status } as any)
-        .eq("id", productId);
+        .eq("id", productId)
+        .select("id, publish_status");
+
       if (error) throw error;
+
+      if (!updated || updated.length === 0) {
+        throw new Error("Mise à jour bloquée — vérifiez vos permissions.");
+      }
+
+      if (updated[0].publish_status !== status) {
+        throw new Error("Le statut n'a pas été modifié.");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-product-moderation"] });
       toast.success("Statut du produit mis à jour");
     },
-    onError: () => toast.error("Erreur lors de la mise à jour"),
+    onError: (err: Error) => toast.error(err.message || "Erreur lors de la mise à jour"),
   });
 
   const filtered = products.filter(p =>
@@ -74,7 +106,7 @@ export default function AdminProductModerationPage() {
     p.store_name?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const pendingCount = products.filter(p => p.publish_status === "pending_approval").length;
+  const pendingCount = statusFilter === "pending_approval" ? totalCount : 0;
 
   return (
     <AdminLayout title="Modération produits">
@@ -109,7 +141,7 @@ export default function AdminProductModerationPage() {
               {STATUS_FILTERS.map(f => (
                 <button
                   key={f.value}
-                  onClick={() => setStatusFilter(f.value)}
+                  onClick={() => { setStatusFilter(f.value); setPage(0); }}
                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                     statusFilter === f.value
                       ? "bg-primary text-primary-foreground"
@@ -133,76 +165,108 @@ export default function AdminProductModerationPage() {
             <p className="text-sm">Aucun produit trouvé pour ce filtre.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {filtered.map((product) => {
-              const statusCfg = PUBLISH_STATUS_CONFIG[product.publish_status] || PUBLISH_STATUS_CONFIG.draft;
-              const isPending = product.publish_status === "pending_approval";
+          <>
+            <div className="space-y-3">
+              {filtered.map((product) => {
+                const statusCfg = PUBLISH_STATUS_CONFIG[product.publish_status] || PUBLISH_STATUS_CONFIG.draft;
+                const isPending = product.publish_status === "pending_approval";
 
-              return (
-                <div
-                  key={product.id}
-                  className={`bg-card border rounded-lg p-4 transition-colors ${
-                    isPending ? "border-amber-300 dark:border-amber-700" : "border-border"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-semibold text-foreground truncate">
-                          {product.name_fr || product.name}
-                        </h3>
-                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${statusCfg.badgeClass}`}>
-                          {statusCfg.label}
-                        </span>
+                return (
+                  <div
+                    key={product.id}
+                    className={`bg-card border rounded-lg p-4 transition-colors ${
+                      isPending ? "border-amber-300 dark:border-amber-700" : "border-border"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-sm font-semibold text-foreground truncate">
+                            {product.name_fr || product.name}
+                          </h3>
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${statusCfg.badgeClass}`}>
+                            {statusCfg.label}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Store size={12} />
+                            {product.store_name}
+                          </span>
+                          <span>{product.price} {product.currency}</span>
+                          <span>Stock: {product.stock_quantity ?? "—"}</span>
+                          <span>{new Date(product.created_at).toLocaleDateString("fr-FR")}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Store size={12} />
-                          {product.store_name}
-                        </span>
-                        <span>{product.price} {product.currency}</span>
-                        <span>Stock: {product.stock_quantity ?? "—"}</span>
-                        <span>{new Date(product.created_at).toLocaleDateString("fr-FR")}</span>
-                      </div>
-                    </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {product.publish_status !== "published" && (
-                        <button
-                          onClick={() => updateStatus.mutate({ productId: product.id, status: "published" })}
-                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition-colors"
-                          title="Approuver et publier"
-                        >
-                          <Check size={14} />
-                          Approuver
-                        </button>
-                      )}
-                      {product.publish_status !== "rejected" && (
-                        <button
-                          onClick={() => updateStatus.mutate({ productId: product.id, status: "rejected" })}
-                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
-                          title="Rejeter le produit"
-                        >
-                          <X size={14} />
-                          Rejeter
-                        </button>
-                      )}
-                      {product.publish_status === "published" && (
-                        <button
-                          onClick={() => updateStatus.mutate({ productId: product.id, status: "pending_approval" })}
-                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
-                          title="Retirer de la publication"
-                        >
-                          <Eye size={14} />
-                          Dépublier
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {product.publish_status !== "published" && (
+                          <button
+                            onClick={() => updateStatus.mutate({ productId: product.id, status: "published" })}
+                            disabled={updateStatus.isPending}
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition-colors disabled:opacity-50"
+                            title="Approuver et publier"
+                          >
+                            <Check size={14} />
+                            Approuver
+                          </button>
+                        )}
+                        {product.publish_status !== "rejected" && (
+                          <button
+                            onClick={() => updateStatus.mutate({ productId: product.id, status: "rejected" })}
+                            disabled={updateStatus.isPending}
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50"
+                            title="Rejeter le produit"
+                          >
+                            <X size={14} />
+                            Rejeter
+                          </button>
+                        )}
+                        {product.publish_status === "published" && (
+                          <button
+                            onClick={() => updateStatus.mutate({ productId: product.id, status: "pending_approval" })}
+                            disabled={updateStatus.isPending}
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
+                            title="Retirer de la publication"
+                          >
+                            <Eye size={14} />
+                            Dépublier
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-4 border-t border-border">
+                <p className="text-xs text-muted-foreground">
+                  Page {page + 1} sur {totalPages} ({totalCount} produits)
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage(p => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-40"
+                  >
+                    <ChevronLeft size={14} />
+                    Précédent
+                  </button>
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                    disabled={page >= totalPages - 1}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-40"
+                  >
+                    Suivant
+                    <ChevronRight size={14} />
+                  </button>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </AdminLayout>
