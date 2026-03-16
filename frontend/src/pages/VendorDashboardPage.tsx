@@ -66,6 +66,9 @@ export default function VendorDashboardPage() {
   const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "stats" | "settings">("catalogue");
   const [orderCounters, setOrderCounters] = useState<OrderCounters>({ total: 0, in_progress: 0, delivered: 0 });
 
+  // Presence heartbeat — marks store as online while vendor is on dashboard
+  useStorePresence(store?.id);
+
   // Realtime channel ref for cleanup
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
