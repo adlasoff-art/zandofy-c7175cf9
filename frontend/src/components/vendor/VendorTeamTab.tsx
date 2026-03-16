@@ -121,7 +121,7 @@ export function VendorTeamTab({ storeId }: Props) {
 
   const removeCollaborator = useMutation({
     mutationFn: async (collabId: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("store_collaborators")
         .delete()
         .eq("id", collabId)
