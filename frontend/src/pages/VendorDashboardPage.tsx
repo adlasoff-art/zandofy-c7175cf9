@@ -64,7 +64,7 @@ export default function VendorDashboardPage() {
   const [noStore, setNoStore] = useState(false);
   const [selectedConv, setSelectedConv] = useState<VendorConversation | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "stats" | "settings">("catalogue");
+  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "stats" | "team" | "settings">("catalogue");
   const [orderCounters, setOrderCounters] = useState<OrderCounters>({ total: 0, in_progress: 0, delivered: 0 });
 
   // Presence heartbeat — marks store as online while vendor is on dashboard
