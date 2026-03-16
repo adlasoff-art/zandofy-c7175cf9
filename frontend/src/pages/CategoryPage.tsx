@@ -73,14 +73,19 @@ export default function CategoryPage() {
     queryFn: async () => {
       if (isSpecial) return { id: slug!, name: slug!, name_fr: slug === "nouveautes" ? "Nouveautés" : "Soldes", icon: slug === "nouveautes" ? "🆕" : "🔥", subcategories: [], parent: null };
       
+      const decodedSlug = decodeURIComponent(slug || "").toLowerCase().trim();
       const { data, error } = await supabase
         .from("categories")
         .select("id, name, name_fr, icon, parent_id, image_url")
         .order("name");
       if (error) throw error;
       const all = data || [];
+      // Match by name, name_fr, or ID — case-insensitive, trimmed
       const match = all.find(
-        (c) => c.name.toLowerCase() === slug?.toLowerCase() || c.name_fr.toLowerCase() === slug?.toLowerCase()
+        (c) =>
+          c.name.toLowerCase().trim() === decodedSlug ||
+          c.name_fr.toLowerCase().trim() === decodedSlug ||
+          c.id === slug
       );
       if (!match) return null;
       const subs = all.filter((c) => c.parent_id === match.id);
@@ -88,6 +93,7 @@ export default function CategoryPage() {
       return { ...match, subcategories: subs, parent };
     },
     enabled: !!slug,
+    retry: 2,
   });
 
   // Fetch products
