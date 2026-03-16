@@ -2321,6 +2321,47 @@ export type Database = {
         }
         Relationships: []
       }
+      store_collaborators: {
+        Row: {
+          created_at: string
+          id: string
+          invited_email: string | null
+          role: string
+          status: string
+          store_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_email?: string | null
+          role?: string
+          status?: string
+          store_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_email?: string | null
+          role?: string
+          status?: string
+          store_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_collaborators_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_coupons: {
         Row: {
           code: string
@@ -2473,7 +2514,10 @@ export type Database = {
           id: string
           is_online: boolean | null
           is_verified: boolean | null
+          last_seen_at: string | null
           logo_url: string | null
+          max_collaborators: number
+          max_collaborators_override: number | null
           max_products_limit: number | null
           meta_description: string | null
           meta_title: string | null
@@ -2510,7 +2554,10 @@ export type Database = {
           id?: string
           is_online?: boolean | null
           is_verified?: boolean | null
+          last_seen_at?: string | null
           logo_url?: string | null
+          max_collaborators?: number
+          max_collaborators_override?: number | null
           max_products_limit?: number | null
           meta_description?: string | null
           meta_title?: string | null
@@ -2547,7 +2594,10 @@ export type Database = {
           id?: string
           is_online?: boolean | null
           is_verified?: boolean | null
+          last_seen_at?: string | null
           logo_url?: string | null
+          max_collaborators?: number
+          max_collaborators_override?: number | null
           max_products_limit?: number | null
           meta_description?: string | null
           meta_title?: string | null
@@ -3295,6 +3345,7 @@ export type Database = {
       is_kyc_order_blocked: { Args: { p_user_id: string }; Returns: boolean }
       is_kyc_verified: { Args: { p_user_id: string }; Returns: boolean }
       release_vendor_pending_funds: { Args: never; Returns: number }
+      set_store_offline: { Args: { p_store_id: string }; Returns: undefined }
       track_delivery: {
         Args: { p_order_ref: string }
         Returns: {
@@ -3322,6 +3373,10 @@ export type Database = {
           status: string
           updated_at: string
         }[]
+      }
+      update_store_presence: {
+        Args: { p_store_id: string }
+        Returns: undefined
       }
     }
     Enums: {
