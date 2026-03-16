@@ -75,7 +75,7 @@ export function Header() {
 
   // Build nav links: CMS data or fallback
   const navLinks = (cmsNavItems && cmsNavItems.length > 0)
-    ? cmsNavItems.map((item) => ({
+    ? cmsNavItems.map((item: any) => ({
         label: item.label,
         href: item.url,
         hasMega: item.has_mega ?? false,
