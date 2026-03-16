@@ -335,6 +335,7 @@ export default function VendorDashboardPage() {
                 { key: "returns" as const, label: "Retours", icon: RotateCcw },
                 { key: "disputes" as const, label: "Litiges", icon: AlertTriangle },
                 { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
+                { key: "team" as const, label: "Équipe", icon: Users },
                 { key: "messages" as const, label: "Messages", icon: MessageCircle },
                 { key: "settings" as const, label: "Paramètres", icon: Settings },
               ].map((tab) => (
