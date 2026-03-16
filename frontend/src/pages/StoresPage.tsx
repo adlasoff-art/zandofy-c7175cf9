@@ -415,11 +415,11 @@ export default function StoresPage() {
           ) : filtered.length === 0 ? (
             <div className="text-center py-20 space-y-3">
               <Store size={48} className="mx-auto text-muted-foreground/20" />
-              <h2 className="text-lg font-semibold text-foreground">Aucune boutique trouvée</h2>
+              <h2 className="text-lg font-semibold text-foreground">Aucun fournisseur trouvé</h2>
               <p className="text-sm text-muted-foreground">
                 {search
                   ? `Aucun résultat pour « ${search} ». Essayez un autre terme.`
-                  : "Aucune boutique ne correspond aux filtres sélectionnés."}
+                  : "Aucun fournisseur ne correspond aux filtres sélectionnés."}
               </p>
               {(search || filter !== "all") && (
                 <Button
