@@ -141,6 +141,7 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/product/:id" element={<ProductPage />} />
                 <Route path="/category/:slug" element={<CategoryPage />} />
+                <Route path="/stores" element={<StoresPage />} />
                 <Route path="/store/:id" element={<StorePage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
