@@ -227,7 +227,7 @@ function StoreCardSkeleton() {
 const FILTER_OPTIONS = [
   { value: "all", label: "Tous", icon: Store },
   { value: "verified", label: "Vérifiés", icon: ShieldCheck },
-  { value: "online", label: "Actifs", icon: Sparkles },
+  { value: "online", label: "En ligne", icon: Sparkles },
   { value: "top_rated", label: "Top noté", icon: Crown },
 ];
 

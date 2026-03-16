@@ -321,8 +321,8 @@ export default function StorePage() {
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {store.is_online ? (
-                        <span className="text-amber-600 font-medium">Actif maintenant</span>
-                      ) : "Hors ligne"}
+                        <span className="text-emerald-600 font-medium">En ligne</span>
+                      ) : <span className="text-amber-600">Hors ligne</span>}
                       {store.verified_years && store.verified_years > 0 && (
                         <span className="ml-2">
                           · <ShieldCheck size={12} className="inline" /> Vérifié depuis {store.verified_years} ans
