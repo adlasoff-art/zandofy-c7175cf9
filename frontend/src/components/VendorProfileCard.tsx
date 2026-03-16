@@ -41,7 +41,7 @@ function StatusDot({ isOnline }: { isOnline: boolean }) {
         className={`relative inline-flex h-3 w-3 rounded-full border-2 border-background ${
           isOnline
             ? "bg-emerald-500 shadow-[0_0_6px_2px_rgba(16,185,129,0.45)]"
-            : "bg-muted-foreground/30"
+            : "bg-amber-500/60"
         }`}
       />
     </span>
@@ -97,8 +97,8 @@ export function VendorProfileCard({ store, productName, productId, originCountry
                 <Globe size={10} /> Origine : {getCountryName(originCountry)}
               </span>
             )}
-            <span className={isOnline ? "text-amber-600 font-medium" : ""}>
-              {isOnline ? "Actif maintenant" : "Hors ligne"}
+            <span className={isOnline ? "text-emerald-600 font-medium" : "text-amber-600"}>
+              {isOnline ? "En ligne" : "Hors ligne"}
             </span>
           </div>
         </div>

@@ -103,29 +103,32 @@ function StoreCard({ store }: { store: StoreRow }) {
       className="group relative flex flex-col bg-card border border-border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-0.5"
     >
       {/* Banner */}
-      <div className="relative h-28 sm:h-32 overflow-hidden bg-primary/10">
+      <div className="relative h-28 sm:h-32 overflow-hidden bg-muted">
         {store.banner_url ? (
-          <img
-            src={store.banner_url}
-            alt=""
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
+          <>
+            <img
+              src={store.banner_url}
+              alt=""
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-card/60 backdrop-blur-[1px]" />
+          </>
         ) : (
           <div className="absolute inset-0 bg-primary/15" />
         )}
         {/* Overlay gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-card via-card/30 to-transparent" />
 
         {/* Online indicator */}
-        {store.is_online && (
-          <span className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-card/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium text-amber-600 shadow-sm border border-border">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
-            </span>
-            Actif maintenant
+        <span className={`absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-card/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium shadow-sm border border-border ${store.is_online ? "text-emerald-600" : "text-amber-600"}`}>
+          <span className="relative flex h-2 w-2">
+            {store.is_online && (
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            )}
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${store.is_online ? "bg-emerald-500" : "bg-amber-500"}`} />
           </span>
-        )}
+          {store.is_online ? "En ligne" : "Hors ligne"}
+        </span>
 
         {/* Verified badge */}
         {verified && (
@@ -227,7 +230,7 @@ function StoreCardSkeleton() {
 const FILTER_OPTIONS = [
   { value: "all", label: "Tous", icon: Store },
   { value: "verified", label: "Vérifiés", icon: ShieldCheck },
-  { value: "online", label: "Actifs", icon: Sparkles },
+  { value: "online", label: "En ligne", icon: Sparkles },
   { value: "top_rated", label: "Top noté", icon: Crown },
 ];
 

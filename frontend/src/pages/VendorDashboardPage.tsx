@@ -47,6 +47,7 @@ interface VendorStore {
   pending_name: string | null;
   name_change_status: string | null;
   can_create_coupons: boolean;
+  collaborators_enabled: boolean;
 }
 
 interface OrderCounters {
@@ -99,9 +100,9 @@ export default function VendorDashboardPage() {
       setLoading(true);
 
       // Find store owned by user
-      const { data: storeData } = await supabase
+      const { data: storeData } = await (supabase as any)
         .from("stores")
-        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons")
+        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled")
         .eq("owner_id", user!.id)
         .maybeSingle();
 
@@ -335,7 +336,7 @@ export default function VendorDashboardPage() {
                 { key: "returns" as const, label: "Retours", icon: RotateCcw },
                 { key: "disputes" as const, label: "Litiges", icon: AlertTriangle },
                 { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
-                { key: "team" as const, label: "Équipe", icon: Users },
+                ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
                 { key: "messages" as const, label: "Messages", icon: MessageCircle },
                 { key: "settings" as const, label: "Paramètres", icon: Settings },
               ].map((tab) => (
