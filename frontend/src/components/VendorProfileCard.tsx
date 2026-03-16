@@ -97,8 +97,8 @@ export function VendorProfileCard({ store, productName, productId, originCountry
                 <Globe size={10} /> Origine : {getCountryName(originCountry)}
               </span>
             )}
-            <span className={isOnline ? "text-emerald-600 font-medium" : ""}>
-              {isOnline ? "En ligne" : "Hors ligne"}
+            <span className={isOnline ? "text-amber-600 font-medium" : ""}>
+              {isOnline ? "Actif maintenant" : "Hors ligne"}
             </span>
           </div>
         </div>

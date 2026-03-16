@@ -3,7 +3,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Crown, Store, Search, Loader2, Check, X, MessageCircle, Truck, Eye, EyeOff, Ticket } from "lucide-react";
+import { Crown, Store, Search, Loader2, Check, X, MessageCircle, Truck, Eye, EyeOff, Ticket, Users } from "lucide-react";
 import { VENDOR_TIERS, PUBLISH_STATUS_CONFIG, type VendorTier } from "@/lib/vendor-tiers";
 import { Switch } from "@/components/ui/switch";
 
@@ -14,6 +14,7 @@ interface StoreWithSub {
   products_count: number | null;
   is_verified: boolean | null;
   can_create_coupons: boolean;
+  max_collaborators_override: number | null;
   subscription: {
     id: string;
     tier: VendorTier;
@@ -35,8 +36,8 @@ export default function AdminVendorSubscriptionsPage() {
     queryFn: async () => {
       const { data: storesData } = await supabase
         .from("stores")
-        .select("id, name, owner_id, products_count, is_verified, can_create_coupons")
-        .order("name");
+        .select("id, name, owner_id, products_count, is_verified, can_create_coupons, max_collaborators_override")
+        .order("name") as { data: any[] | null };
 
       if (!storesData) return [];
 
@@ -208,7 +209,7 @@ export default function AdminVendorSubscriptionsPage() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                     {/* Tier selector */}
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block">Plan</label>
@@ -282,6 +283,33 @@ export default function AdminVendorSubscriptionsPage() {
                             toast.success(v ? "Coupons activés" : "Coupons désactivés");
                           } else toast.error("Erreur");
                         }}
+                      />
+                    </div>
+
+                    {/* Max collaborators override */}
+                    <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1">
+                      <label className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Users size={12} /> Max collabs
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={50}
+                        placeholder={String(VENDOR_TIERS[tier].maxCollaborators)}
+                        defaultValue={store.max_collaborators_override ?? ""}
+                        onBlur={async (e) => {
+                          const val = e.target.value.trim();
+                          const override = val === "" ? null : parseInt(val, 10);
+                          const { error } = await supabase
+                            .from("stores")
+                            .update({ max_collaborators_override: override } as any)
+                            .eq("id", store.id);
+                          if (!error) {
+                            queryClient.invalidateQueries({ queryKey: ["admin-vendor-subs"] });
+                            toast.success("Limite collaborateurs mise à jour");
+                          } else toast.error("Erreur");
+                        }}
+                        className="w-16 px-2 py-1 text-sm bg-card border border-border rounded-md text-center"
                       />
                     </div>
                   </div>

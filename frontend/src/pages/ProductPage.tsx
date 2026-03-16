@@ -787,9 +787,9 @@ export default function ProductPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-foreground">{(product as any).store.name}</span>
                             <VerificationBadge variant="icon-only" verifiedYears={(product as any).store.verified_years} />
-                            <span className={`w-2 h-2 rounded-full ${(product as any).store.is_online ? "bg-emerald-500" : "bg-muted-foreground/30"}`} />
-                            <span className={`text-xs ${(product as any).store.is_online ? "text-emerald-600" : "text-muted-foreground"}`}>
-                              {(product as any).store.is_online ? "En ligne" : "Hors ligne"}
+                            <span className={`w-2 h-2 rounded-full ${(product as any).store.is_online ? "bg-amber-500" : "bg-muted-foreground/30"}`} />
+                            <span className={`text-xs ${(product as any).store.is_online ? "text-amber-600" : "text-muted-foreground"}`}>
+                              {(product as any).store.is_online ? "Actif maintenant" : "Hors ligne"}
                             </span>
                           </div>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">

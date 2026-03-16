@@ -118,12 +118,12 @@ function StoreCard({ store }: { store: StoreRow }) {
 
         {/* Online indicator */}
         {store.is_online && (
-          <span className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-card/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium text-emerald-600 shadow-sm border border-border">
+          <span className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-card/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium text-amber-600 shadow-sm border border-border">
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
             </span>
-            En ligne
+            Actif maintenant
           </span>
         )}
 
@@ -225,9 +225,9 @@ function StoreCardSkeleton() {
 
 /* ─── Filter Chips ─── */
 const FILTER_OPTIONS = [
-  { value: "all", label: "Toutes", icon: Store },
-  { value: "verified", label: "Vérifiées", icon: ShieldCheck },
-  { value: "online", label: "En ligne", icon: Sparkles },
+  { value: "all", label: "Tous", icon: Store },
+  { value: "verified", label: "Vérifiés", icon: ShieldCheck },
+  { value: "online", label: "Actifs", icon: Sparkles },
   { value: "top_rated", label: "Top noté", icon: Crown },
 ];
 
@@ -327,14 +327,14 @@ export default function StoresPage() {
           <div className="container relative z-10 text-center space-y-5">
             <div className="inline-flex items-center gap-2 rounded-full bg-primary-foreground/15 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-primary-foreground/90">
               <Store size={14} />
-              {isLoading ? "..." : `${totalStores} boutiques`} sur Zandofy
+              {isLoading ? "..." : `${totalStores} fournisseurs`} sur Zandofy
             </div>
 
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-primary-foreground tracking-tight">
-              Explorez nos <span className="underline decoration-primary-foreground/30 decoration-4 underline-offset-4">Boutiques</span>
+              Explorez nos <span className="underline decoration-primary-foreground/30 decoration-4 underline-offset-4">Fournisseurs</span>
             </h1>
             <p className="text-sm md:text-base text-primary-foreground/80 max-w-xl mx-auto leading-relaxed">
-              Comparez les vendeurs, découvrez leurs produits et trouvez les boutiques qui correspondent à vos besoins.
+              Comparez les fournisseurs, découvrez leurs produits et trouvez ceux qui correspondent à vos besoins.
             </p>
 
             {/* Search bar */}
@@ -343,7 +343,7 @@ export default function StoresPage() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher une boutique..."
+                placeholder="Rechercher un fournisseur..."
                 className="pl-10 pr-10 h-12 rounded-full bg-card border-border shadow-lg text-sm placeholder:text-muted-foreground/70"
               />
               {search && (
@@ -415,11 +415,11 @@ export default function StoresPage() {
           ) : filtered.length === 0 ? (
             <div className="text-center py-20 space-y-3">
               <Store size={48} className="mx-auto text-muted-foreground/20" />
-              <h2 className="text-lg font-semibold text-foreground">Aucune boutique trouvée</h2>
+              <h2 className="text-lg font-semibold text-foreground">Aucun fournisseur trouvé</h2>
               <p className="text-sm text-muted-foreground">
                 {search
                   ? `Aucun résultat pour « ${search} ». Essayez un autre terme.`
-                  : "Aucune boutique ne correspond aux filtres sélectionnés."}
+                  : "Aucun fournisseur ne correspond aux filtres sélectionnés."}
               </p>
               {(search || filter !== "all") && (
                 <Button
