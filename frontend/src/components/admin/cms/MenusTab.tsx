@@ -7,6 +7,23 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Edit2, Trash2, Eye, EyeOff, GripVertical, Save, X, Loader2, ChevronRight, Sparkles, PanelTop } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const MENU_GROUPS = [
   { value: "category_nav", label: "Barre catégories (Header)" },
@@ -32,6 +49,11 @@ export default function MenusTab() {
     open_in_new_tab: false,
   });
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
@@ -53,18 +75,60 @@ export default function MenusTab() {
     parent_id: null, highlight: false, has_mega: false, icon: "", open_in_new_tab: false,
   });
 
+  const persistSortOrder = async (reorderedItems: any[]) => {
+    const updates = reorderedItems.map((item, idx) => 
+      supabase.from("cms_menu_items").update({ sort_order: idx }).eq("id", item.id)
+    );
+    await Promise.all(updates);
+  };
+
+  const handleDragEndParents = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = parentItems.findIndex((i) => i.id === active.id);
+    const newIndex = parentItems.findIndex((i) => i.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(parentItems, oldIndex, newIndex);
+
+    // Optimistic update
+    setItems((prev) => {
+      const others = prev.filter((i) => i.menu_group !== activeGroup || i.parent_id);
+      const updated = reordered.map((item, idx) => ({ ...item, sort_order: idx }));
+      return [...others, ...updated, ...prev.filter((i) => i.menu_group === activeGroup && i.parent_id)].sort((a, b) => a.sort_order - b.sort_order);
+    });
+
+    await persistSortOrder(reordered);
+  };
+
+  const handleDragEndChildren = async (parentId: string, event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const children = getChildren(parentId);
+    const oldIndex = children.findIndex((i) => i.id === active.id);
+    const newIndex = children.findIndex((i) => i.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(children, oldIndex, newIndex);
+
+    setItems((prev) => {
+      const others = prev.filter((i) => !(i.menu_group === activeGroup && i.parent_id === parentId));
+      const updated = reordered.map((item, idx) => ({ ...item, sort_order: idx }));
+      return [...others, ...updated].sort((a, b) => a.sort_order - b.sort_order);
+    });
+
+    await persistSortOrder(reordered);
+  };
+
   const handleSave = async () => {
     if (!form.label.trim()) return;
     const payload: any = {
-      label: form.label,
-      url: form.url,
-      is_visible: form.is_visible,
-      menu_group: form.menu_group,
-      parent_id: form.parent_id || null,
-      highlight: form.highlight,
-      has_mega: form.has_mega,
-      icon: form.icon || null,
-      open_in_new_tab: form.open_in_new_tab,
+      label: form.label, url: form.url, is_visible: form.is_visible,
+      menu_group: form.menu_group, parent_id: form.parent_id || null,
+      highlight: form.highlight, has_mega: form.has_mega,
+      icon: form.icon || null, open_in_new_tab: form.open_in_new_tab,
     };
     if (editing) {
       await supabase.from("cms_menu_items").update(payload).eq("id", editing.id);
@@ -202,40 +266,63 @@ export default function MenusTab() {
         </div>
       </div>
 
-      {/* Items list */}
+      {/* Items list with DnD */}
       <div className="bg-card border border-border rounded-xl p-4">
         <h3 className="text-sm font-semibold text-foreground mb-3">
           {MENU_GROUPS.find((g) => g.value === activeGroup)?.label} ({filteredItems.length})
         </h3>
-        <div className="space-y-1">
-          {parentItems.map((m) => {
-            const children = getChildren(m.id);
-            return (
-              <div key={m.id}>
-                <MenuItemRow item={m} onEdit={startEdit} onDelete={handleDelete} onToggle={handleToggle} />
-                {children.length > 0 && (
-                  <div className="ml-6 border-l-2 border-border/50 pl-2 space-y-1">
-                    {children.map((child) => (
-                      <MenuItemRow key={child.id} item={child} onEdit={startEdit} onDelete={handleDelete} onToggle={handleToggle} isChild />
-                    ))}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndParents}>
+          <SortableContext items={parentItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-1">
+              {parentItems.map((m) => {
+                const children = getChildren(m.id);
+                return (
+                  <div key={m.id}>
+                    <SortableMenuItemRow item={m} onEdit={startEdit} onDelete={handleDelete} onToggle={handleToggle} />
+                    {children.length > 0 && (
+                      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEndChildren(m.id, e)}>
+                        <SortableContext items={children.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+                          <div className="ml-6 border-l-2 border-border/50 pl-2 space-y-1">
+                            {children.map((child) => (
+                              <SortableMenuItemRow key={child.id} item={child} onEdit={startEdit} onDelete={handleDelete} onToggle={handleToggle} isChild />
+                            ))}
+                          </div>
+                        </SortableContext>
+                      </DndContext>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
-          {filteredItems.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Aucun élément dans ce groupe</p>}
-        </div>
+                );
+              })}
+              {filteredItems.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Aucun élément dans ce groupe</p>}
+            </div>
+          </SortableContext>
+        </DndContext>
       </div>
     </div>
   );
 }
 
-function MenuItemRow({ item: m, onEdit, onDelete, onToggle, isChild }: {
+function SortableMenuItemRow({ item: m, onEdit, onDelete, onToggle, isChild }: {
   item: any; onEdit: (m: any) => void; onDelete: (id: string) => void; onToggle: (id: string, visible: boolean) => void; isChild?: boolean;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: m.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
   return (
-    <div className={`flex items-center gap-3 p-2.5 rounded-lg transition-colors ${isChild ? "bg-muted/20" : "bg-muted/30"}`}>
-      <GripVertical size={14} className="text-muted-foreground/40 cursor-grab shrink-0" />
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 p-2.5 rounded-lg transition-colors ${isChild ? "bg-muted/20" : "bg-muted/30"} ${isDragging ? "shadow-lg ring-2 ring-primary/30" : ""}`}
+    >
+      <button {...attributes} {...listeners} className="touch-none cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-muted shrink-0">
+        <GripVertical size={14} className="text-muted-foreground/60" />
+      </button>
       {m.icon && <span className="text-sm">{m.icon}</span>}
       <span className={`text-sm flex-1 ${m.highlight ? "text-sale font-bold" : "text-foreground"} ${!m.is_visible ? "opacity-40 line-through" : ""}`}>
         {m.label}
