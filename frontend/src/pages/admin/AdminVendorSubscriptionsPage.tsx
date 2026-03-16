@@ -209,7 +209,7 @@ export default function AdminVendorSubscriptionsPage() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                     {/* Tier selector */}
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block">Plan</label>
