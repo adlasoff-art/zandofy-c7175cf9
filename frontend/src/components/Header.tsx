@@ -43,6 +43,7 @@ export function Header() {
   const [expandedMobileCat, setExpandedMobileCat] = useState<string | null>(null);
   const megaTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const { user, signOut } = useAuth();
+  const { isStaff } = useRoles();
   const { setDrawerOpen, itemCount } = useCart();
   const unreadCount = useUnreadMessages();
   const unreadSupportCount = useUnreadSupport();
