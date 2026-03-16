@@ -64,7 +64,7 @@ export function Footer() {
         { label: t("footer.sizeGuide"), to: "/faq" },
         { label: t("footer.faq"), to: "/faq" },
         { label: t("footer.giftCard"), to: "/dashboard" },
-        { label: t("footer.loyaltyProgram"), to: "/dashboard" },
+        { label: t("footer.loyaltyProgram"), to: "/loyalty-program" },
         { label: t("footer.sellOnZandofy"), to: "/become-vendor" },
       ],
     },

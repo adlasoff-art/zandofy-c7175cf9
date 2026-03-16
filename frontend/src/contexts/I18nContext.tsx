@@ -469,7 +469,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "footer.socialResponsibility": "Social Responsibility",
     "footer.careers": "Careers",
     "footer.blog": "Blog",
-    "footer.affiliates": "Affiliates",
+    "footer.affiliates": "Affiliate Program",
     "footer.helpSupport": "HELP & SUPPORT",
     "footer.sizeGuide": "Size Guide",
     "footer.faq": "FAQ",

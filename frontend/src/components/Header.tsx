@@ -173,7 +173,7 @@ export function Header() {
                   <DropdownMenuItem asChild><Link to="/messages">{t("header.messages")} {unreadCount > 0 && `(${unreadCount})`}</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link to="/vendor">{t("header.vendorSpace")}</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link to="/become-vendor" className="text-primary font-medium">{t("header.becomeVendor")}</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to="/admin">{t("header.admin")}</Link></DropdownMenuItem>
+                  {isStaff && <DropdownMenuItem asChild><Link to="/admin">{t("header.admin")}</Link></DropdownMenuItem>}
                   <DropdownMenuItem onClick={signOut} className="text-destructive"><LogOut size={14} className="mr-2" /> {t("header.logout")}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

@@ -292,7 +292,7 @@ export function VariantOrderDrawer({
           isMobile
             ? "h-[92vh] rounded-t-2xl"
             : "w-[560px] max-w-[90vw]"
-        }`}
+        } [&>button.absolute]:hidden`}
       >
         {/* ── HEADER ── */}
         <div className="px-5 pt-5 pb-3 border-b border-border shrink-0">
