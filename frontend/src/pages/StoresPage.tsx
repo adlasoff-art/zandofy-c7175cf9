@@ -225,9 +225,9 @@ function StoreCardSkeleton() {
 
 /* ─── Filter Chips ─── */
 const FILTER_OPTIONS = [
-  { value: "all", label: "Toutes", icon: Store },
-  { value: "verified", label: "Vérifiées", icon: ShieldCheck },
-  { value: "online", label: "En ligne", icon: Sparkles },
+  { value: "all", label: "Tous", icon: Store },
+  { value: "verified", label: "Vérifiés", icon: ShieldCheck },
+  { value: "online", label: "Actifs", icon: Sparkles },
   { value: "top_rated", label: "Top noté", icon: Crown },
 ];
 
