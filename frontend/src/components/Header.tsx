@@ -8,6 +8,7 @@ import { MegaMenu } from "@/components/MegaMenu";
 import { CurrencySwitcher } from "@/components/CurrencySwitcher";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRoles } from "@/hooks/use-roles";
 import { useCart } from "@/contexts/CartContext";
 import { useUnreadMessages } from "@/hooks/use-unread-messages";
 import { useUnreadSupport } from "@/hooks/use-unread-support";
