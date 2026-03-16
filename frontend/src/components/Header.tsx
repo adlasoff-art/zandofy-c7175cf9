@@ -17,22 +17,22 @@ import { useI18n, LOCALES, CURRENCIES, type CurrencyCode } from "@/contexts/I18n
 import { useTheme } from "@/contexts/ThemeContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-// Static nav items with category slug mappings
+// Fallback static nav items (used if CMS query fails)
 const NAV_LINK_KEYS = [
-  { labelKey: "nav.categories", href: "#", hasMega: true, fixed: true },
-  { labelKey: "nav.newArrivals", href: "/category/nouveautes" },
-  { labelKey: "nav.sales", href: "/category/soldes", highlight: true },
-  { labelKey: "nav.electronics", href: "/category/electronics" },
-  { labelKey: "nav.swimwear", href: "/search?q=maillots+de+bain" },
-  { labelKey: "nav.homeDecor", href: "/category/home" },
-  { labelKey: "nav.womenClothing", href: "/category/women" },
-  { labelKey: "nav.menClothing", href: "/category/men" },
-  { labelKey: "nav.shoes", href: "/category/shoes" },
-  { labelKey: "nav.jewelryAccessories", href: "/category/accessories" },
-  { labelKey: "nav.beautyHealth", href: "/search?q=beauté+santé" },
-  { labelKey: "nav.bagsLuggage", href: "/category/bags" },
-  { labelKey: "nav.sportsOutdoor", href: "/search?q=sports" },
-  { labelKey: "nav.kids", href: "/category/kids" },
+  { label: "Catégories", href: "#", hasMega: true, highlight: false },
+  { label: "Nouveautés", href: "/category/nouveautes", hasMega: false, highlight: false },
+  { label: "Soldes", href: "/category/soldes", hasMega: false, highlight: true },
+  { label: "Électronique", href: "/category/electronics", hasMega: false, highlight: false },
+  { label: "Maillots de bain", href: "/search?q=maillots+de+bain", hasMega: false, highlight: false },
+  { label: "Maison & Déco", href: "/category/home", hasMega: false, highlight: false },
+  { label: "Vêtements Femme", href: "/category/women", hasMega: false, highlight: false },
+  { label: "Vêtements Homme", href: "/category/men", hasMega: false, highlight: false },
+  { label: "Chaussures", href: "/category/shoes", hasMega: false, highlight: false },
+  { label: "Bijoux & Accessoires", href: "/category/accessories", hasMega: false, highlight: false },
+  { label: "Beauté & Santé", href: "/search?q=beauté+santé", hasMega: false, highlight: false },
+  { label: "Sacs & Bagages", href: "/category/bags", hasMega: false, highlight: false },
+  { label: "Sports & Plein air", href: "/search?q=sports", hasMega: false, highlight: false },
+  { label: "Enfants", href: "/category/kids", hasMega: false, highlight: false },
 ];
 
 export function Header() {
