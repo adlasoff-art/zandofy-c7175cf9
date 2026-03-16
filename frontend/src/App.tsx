@@ -157,6 +157,8 @@ const App = () => (
                 <Route path="/tracking" element={<TrackingPage />} />
                 <Route path="/become-vendor" element={<BecomeVendorPage />} />
                 <Route path="/driver" element={<DriverPage />} />
+                <Route path="/affiliate-program" element={<AffiliateProgramPage />} />
+                <Route path="/loyalty-program" element={<LoyaltyProgramPage />} />
                 {/* Admin routes */}
                 <Route path="/admin" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDashboard /></RoleGuard>} />
                 <Route path="/admin/users" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminUsersPage /></RoleGuard>} />
