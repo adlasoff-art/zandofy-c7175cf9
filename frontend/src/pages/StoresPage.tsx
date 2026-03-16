@@ -66,7 +66,7 @@ function renderStars(rating: number) {
     stars.push(<StarHalf key="h" size={13} className="fill-amber-400 text-amber-400" />);
   const empty = 5 - stars.length;
   for (let i = 0; i < empty; i++)
-    stars.push(<Star key={`e${i}`} size={13} className="text-border" />);
+    stars.push(<Star key={`e${i}`} size={13} className="text-muted-foreground/40" />);
   return stars;
 }
 
