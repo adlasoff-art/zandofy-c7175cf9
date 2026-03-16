@@ -16,6 +16,7 @@ import { VendorWalletTab } from "@/components/vendor/VendorWalletTab";
 import { VendorReturnsTab } from "@/components/vendor/VendorReturnsTab";
 import { VendorDisputesTab } from "@/components/vendor/VendorDisputesTab";
 import { VendorRiderTracking } from "@/components/vendor/VendorRiderTracking";
+import { VendorTeamTab } from "@/components/vendor/VendorTeamTab";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
@@ -63,7 +64,7 @@ export default function VendorDashboardPage() {
   const [noStore, setNoStore] = useState(false);
   const [selectedConv, setSelectedConv] = useState<VendorConversation | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "stats" | "settings">("catalogue");
+  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "stats" | "team" | "settings">("catalogue");
   const [orderCounters, setOrderCounters] = useState<OrderCounters>({ total: 0, in_progress: 0, delivered: 0 });
 
   // Presence heartbeat — marks store as online while vendor is on dashboard
@@ -334,6 +335,7 @@ export default function VendorDashboardPage() {
                 { key: "returns" as const, label: "Retours", icon: RotateCcw },
                 { key: "disputes" as const, label: "Litiges", icon: AlertTriangle },
                 { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
+                { key: "team" as const, label: "Équipe", icon: Users },
                 { key: "messages" as const, label: "Messages", icon: MessageCircle },
                 { key: "settings" as const, label: "Paramètres", icon: Settings },
               ].map((tab) => (
@@ -392,6 +394,8 @@ export default function VendorDashboardPage() {
             {activeTab === "disputes" && <VendorDisputesTab storeId={store!.id} />}
 
             {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
+
+            {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
 
             {activeTab === "messages" && (
               <>
