@@ -567,6 +567,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
   const [submittingName, setSubmittingName] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(store.logo_url || null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
   // SEO fields
   const [seoTitle, setSeoTitle] = useState("");
@@ -575,20 +579,77 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   const [seoLoading, setSeoLoading] = useState(true);
 
   useEffect(() => {
-    supabase
+    // Load banner_url + SEO
+    (supabase as any)
       .from("stores")
-      .select("meta_title, meta_description, seo_keywords")
+      .select("meta_title, meta_description, seo_keywords, banner_url")
       .eq("id", store.id)
       .single()
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         if (data) {
           setSeoTitle(data.meta_title || "");
           setSeoDesc(data.meta_description || "");
           setSeoKeywords((data.seo_keywords || []).join(", "));
+          setBannerPreview(data.banner_url || null);
         }
         setSeoLoading(false);
       });
   }, [store.id]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Format accepté : JPG, PNG ou WebP");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("La photo de profil ne doit pas dépasser 2 Mo");
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${store.id}/logo-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("product-media").upload(path, file, { upsert: true });
+      if (upErr) { toast.error("Erreur upload logo"); return; }
+      const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
+      const url = urlData.publicUrl;
+      await supabase.from("stores").update({ logo_url: url } as any).eq("id", store.id);
+      setLogoPreview(url);
+      onUpdate({ ...store, logo_url: url });
+      toast.success("Photo de profil mise à jour");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Format accepté : JPG, PNG ou WebP");
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error("La bannière ne doit pas dépasser 3 Mo");
+      return;
+    }
+    setUploadingBanner(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${store.id}/banner-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("product-media").upload(path, file, { upsert: true });
+      if (upErr) { toast.error("Erreur upload bannière"); return; }
+      const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
+      const url = urlData.publicUrl;
+      await (supabase as any).from("stores").update({ banner_url: url }).eq("id", store.id);
+      setBannerPreview(url);
+      toast.success("Bannière mise à jour");
+    } finally {
+      setUploadingBanner(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -635,6 +696,64 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
       <h3 className="text-base font-bold text-foreground flex items-center gap-2">
         <Settings size={16} /> Paramètres de la boutique
       </h3>
+
+      {/* ═══ PHOTO DE PROFIL & BANNIÈRE ═══ */}
+      <div className="bg-card border border-border rounded-lg p-4 space-y-4">
+        <label className="text-sm font-medium text-foreground flex items-center gap-2">
+          <Store size={14} className="text-primary" />
+          Identité visuelle
+        </label>
+
+        {/* Banner preview + upload */}
+        <div>
+          <p className="text-xs text-muted-foreground mb-1.5">
+            Bannière <span className="text-muted-foreground/60">(Résolution idéale : 1200×400 px · Max 3 Mo)</span>
+          </p>
+          <div className="relative h-32 rounded-lg overflow-hidden border border-border bg-muted group">
+            {bannerPreview ? (
+              <>
+                <img src={bannerPreview} alt="Bannière" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-card/60 via-transparent to-transparent" />
+              </>
+            ) : (
+              <div className="w-full h-full bg-primary/10 flex items-center justify-center">
+                <p className="text-xs text-muted-foreground">Aucune bannière</p>
+              </div>
+            )}
+            <label className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors cursor-pointer">
+              <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-card/90 backdrop-blur-sm text-xs font-medium text-foreground px-3 py-1.5 rounded-full shadow">
+                {uploadingBanner ? "Upload..." : "Changer la bannière"}
+              </span>
+              <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleBannerUpload} disabled={uploadingBanner} />
+            </label>
+          </div>
+        </div>
+
+        {/* Logo/profile photo */}
+        <div>
+          <p className="text-xs text-muted-foreground mb-1.5">
+            Photo de profil <span className="text-muted-foreground/60">(Résolution idéale : 400×400 px · Max 2 Mo)</span>
+          </p>
+          <div className="flex items-center gap-4">
+            <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-border bg-muted group shrink-0">
+              {logoPreview ? (
+                <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-primary flex items-center justify-center">
+                  <Store size={24} className="text-primary-foreground" />
+                </div>
+              )}
+              <label className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 transition-colors cursor-pointer rounded-full">
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-medium text-white">
+                  {uploadingLogo ? "..." : "Modifier"}
+                </span>
+                <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleLogoUpload} disabled={uploadingLogo} />
+              </label>
+            </div>
+            <p className="text-xs text-muted-foreground">Cliquez sur la photo pour la modifier. Formats : JPG, PNG, WebP.</p>
+          </div>
+        </div>
+      </div>
 
       {/* Store Name Section */}
       <div className="bg-card border border-border rounded-lg p-4 space-y-3">
