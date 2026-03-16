@@ -317,23 +317,23 @@ export default function StoresPage() {
 
       <main className="pb-24">
         {/* ═══ HERO ═══ */}
-        <section className="relative overflow-hidden bg-[var(--brand-gradient)] py-12 md:py-16">
+        <section className="relative overflow-hidden bg-primary py-12 md:py-16">
           {/* Decorative elements */}
           <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
-            <div className="absolute bottom-0 left-0 w-72 h-72 bg-white/5 rounded-full blur-2xl translate-y-1/2 -translate-x-1/4" />
+            <div className="absolute top-0 right-0 w-96 h-96 bg-black/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
+            <div className="absolute bottom-0 left-0 w-72 h-72 bg-black/5 rounded-full blur-2xl translate-y-1/2 -translate-x-1/4" />
           </div>
 
           <div className="container relative z-10 text-center space-y-5">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-white/90">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary-foreground/15 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-primary-foreground/90">
               <Store size={14} />
               {isLoading ? "..." : `${totalStores} boutiques`} sur Zandofy
             </div>
 
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white tracking-tight">
-              Explorez nos <span className="underline decoration-white/30 decoration-4 underline-offset-4">Boutiques</span>
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-primary-foreground tracking-tight">
+              Explorez nos <span className="underline decoration-primary-foreground/30 decoration-4 underline-offset-4">Boutiques</span>
             </h1>
-            <p className="text-sm md:text-base text-white/75 max-w-xl mx-auto leading-relaxed">
+            <p className="text-sm md:text-base text-primary-foreground/80 max-w-xl mx-auto leading-relaxed">
               Comparez les vendeurs, découvrez leurs produits et trouvez les boutiques qui correspondent à vos besoins.
             </p>
 
@@ -344,7 +344,7 @@ export default function StoresPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Rechercher une boutique..."
-                className="pl-10 pr-10 h-12 rounded-full bg-card/95 backdrop-blur-sm border-white/20 shadow-lg text-sm focus-visible:ring-white/30 placeholder:text-muted-foreground/70"
+                className="pl-10 pr-10 h-12 rounded-full bg-card border-border shadow-lg text-sm placeholder:text-muted-foreground/70"
               />
               {search && (
                 <button
