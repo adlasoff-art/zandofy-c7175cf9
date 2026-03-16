@@ -14,6 +14,7 @@ interface StoreWithSub {
   products_count: number | null;
   is_verified: boolean | null;
   can_create_coupons: boolean;
+  max_collaborators_override: number | null;
   subscription: {
     id: string;
     tier: VendorTier;
