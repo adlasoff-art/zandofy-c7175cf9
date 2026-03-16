@@ -343,7 +343,7 @@ export default function StoresPage() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher une boutique..."
+                placeholder="Rechercher un fournisseur..."
                 className="pl-10 pr-10 h-12 rounded-full bg-card border-border shadow-lg text-sm placeholder:text-muted-foreground/70"
               />
               {search && (
