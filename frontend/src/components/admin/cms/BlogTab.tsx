@@ -64,7 +64,7 @@ function PostsManager() {
   const { data: posts = [], isLoading } = useQuery({
     queryKey: ["admin-blog-posts"],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await sb
         .from("blog_posts")
         .select("*, blog_categories(name, color)")
         .order("created_at", { ascending: false });
