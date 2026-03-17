@@ -113,6 +113,7 @@ function AnalyticsTrackerInjector() {
 }
 
 const App = () => (
+  <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
     <TooltipProvider>
