@@ -344,7 +344,7 @@ function PostsManager() {
             </summary>
             <div className="mt-4">
               <p className="text-[11px] text-muted-foreground mb-2">
-                Format JSON : [{"url": "...", "title": "...", "showControls": true, "showInfo": false}]
+                {"Format JSON : [{\"url\": \"...\", \"title\": \"...\", \"showControls\": true, \"showInfo\": false}]"}
               </p>
               <textarea
                 value={form.video_embeds}
