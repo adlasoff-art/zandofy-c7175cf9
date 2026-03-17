@@ -56,7 +56,7 @@ function PostsManager() {
   const { data: categories = [] } = useQuery({
     queryKey: ["admin-blog-categories"],
     queryFn: async () => {
-      const { data } = await supabase.from("blog_categories").select("*").order("sort_order");
+      const { data } = await sb.from("blog_categories").select("*").order("sort_order");
       return data || [];
     },
   });
