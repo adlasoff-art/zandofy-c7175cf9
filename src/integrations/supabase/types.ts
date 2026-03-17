@@ -1191,6 +1191,146 @@ export type Database = {
         }
         Relationships: []
       }
+      featured_placement_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          desired_duration_days: number | null
+          desired_end_date: string | null
+          desired_start_date: string | null
+          id: string
+          message: string | null
+          price_quoted: number | null
+          product_ids: string[]
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          desired_duration_days?: number | null
+          desired_end_date?: string | null
+          desired_start_date?: string | null
+          id?: string
+          message?: string | null
+          price_quoted?: number | null
+          product_ids?: string[]
+          requested_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          desired_duration_days?: number | null
+          desired_end_date?: string | null
+          desired_start_date?: string | null
+          id?: string
+          message?: string | null
+          price_quoted?: number | null
+          product_ids?: string[]
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_placement_requests_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      featured_placements: {
+        Row: {
+          bg_color: string | null
+          created_at: string
+          created_by: string | null
+          cta_link: string | null
+          cta_text: string | null
+          end_date: string
+          id: string
+          image_url: string | null
+          is_active: boolean
+          placement_type: string
+          price_charged: number | null
+          product_id: string | null
+          sort_order: number
+          start_date: string
+          store_id: string | null
+          text_color: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          bg_color?: string | null
+          created_at?: string
+          created_by?: string | null
+          cta_link?: string | null
+          cta_text?: string | null
+          end_date: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          placement_type?: string
+          price_charged?: number | null
+          product_id?: string | null
+          sort_order?: number
+          start_date?: string
+          store_id?: string | null
+          text_color?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bg_color?: string | null
+          created_at?: string
+          created_by?: string | null
+          cta_link?: string | null
+          cta_text?: string | null
+          end_date?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          placement_type?: string
+          price_charged?: number | null
+          product_id?: string | null
+          sort_order?: number
+          start_date?: string
+          store_id?: string | null
+          text_color?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "featured_placements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "featured_placements_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gift_cards: {
         Row: {
           code: string
