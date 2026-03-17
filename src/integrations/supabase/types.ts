@@ -1929,6 +1929,10 @@ export type Database = {
           material: string | null
           meta_description: string | null
           meta_title: string | null
+          moderated_at: string | null
+          moderated_by: string | null
+          moderation_reason: string | null
+          moderation_reason_link: string | null
           moq: number | null
           name: string
           name_fr: string
@@ -1970,6 +1974,10 @@ export type Database = {
           material?: string | null
           meta_description?: string | null
           meta_title?: string | null
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_reason?: string | null
+          moderation_reason_link?: string | null
           moq?: number | null
           name: string
           name_fr: string
@@ -2011,6 +2019,10 @@ export type Database = {
           material?: string | null
           meta_description?: string | null
           meta_title?: string | null
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_reason?: string | null
+          moderation_reason_link?: string | null
           moq?: number | null
           name?: string
           name_fr?: string
