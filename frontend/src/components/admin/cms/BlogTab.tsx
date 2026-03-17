@@ -579,7 +579,7 @@ function EditorsManager() {
   };
 
   const removeEditor = async (id: string) => {
-    await supabase.from("blog_editors").delete().eq("id", id);
+    await sb.from("blog_editors").delete().eq("id", id);
     qc.invalidateQueries({ queryKey: ["admin-blog-editors"] });
     toast({ title: "Rédacteur retiré" });
   };
