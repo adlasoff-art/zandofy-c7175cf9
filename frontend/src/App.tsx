@@ -57,6 +57,8 @@ const AffiliateProgramPage = lazy(() => import("./pages/AffiliateProgramPage"));
 const LoyaltyProgramPage = lazy(() => import("./pages/LoyaltyProgramPage"));
 const CareersPage = lazy(() => import("./pages/CareersPage"));
 const SocialResponsibilityPage = lazy(() => import("./pages/SocialResponsibilityPage"));
+const BlogPage = lazy(() => import("./pages/BlogPage"));
+const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -165,6 +167,8 @@ const App = () => (
                 <Route path="/loyalty-program" element={<LoyaltyProgramPage />} />
                 <Route path="/careers" element={<CareersPage />} />
                 <Route path="/social-responsibility" element={<SocialResponsibilityPage />} />
+                <Route path="/blog" element={<BlogPage />} />
+                <Route path="/blog/:slug" element={<BlogPostPage />} />
                 {/* Admin routes */}
                 <Route path="/admin" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDashboard /></RoleGuard>} />
                 <Route path="/admin/users" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminUsersPage /></RoleGuard>} />
