@@ -91,6 +91,7 @@ function PlacementsTab() {
       setImagePreview(null);
     },
     onError: () => toast.error("Erreur lors de l'ajout"),
+    onSettled: () => setUploading(false),
   });
 
   const toggleMutation = useMutation({
