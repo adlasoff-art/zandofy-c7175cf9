@@ -164,7 +164,7 @@ export default function AdminVendorApplicationsPage() {
           <p>Votre demande de vendeur pour la boutique <strong>"${selected.store_name}"</strong> nécessite quelques modifications.</p>
           ${adminNotes ? `<p><strong>Commentaire :</strong> ${adminNotes}</p>` : ""}
           <p>Veuillez corriger les éléments mentionnés et resoumettre votre demande.</p>
-          <a href="https://zandofy.lovable.app/become-vendor" style="display:inline-block;background:#f59e0b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Corriger ma demande</a>
+          <a href="${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/become-vendor" style="display:inline-block;background:#f59e0b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Corriger ma demande</a>
           <p style="color:#888;margin-top:24px;font-size:12px;">— L'équipe Zandofy</p>
         </div>`
       );

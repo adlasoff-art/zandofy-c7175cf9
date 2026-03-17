@@ -94,7 +94,7 @@ const AdminKycPage = lazy(() => import("./pages/admin/AdminKycPage"));
 const AdminFeaturedPlacementsPage = lazy(() => import("./pages/admin/AdminFeaturedPlacementsPage"));
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1 } },
+  defaultOptions: { queries: { retry: 1, staleTime: 30 * 1000 } },
 });
 
 function SupportDrawerWrapper() {

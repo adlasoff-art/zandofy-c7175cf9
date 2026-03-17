@@ -131,7 +131,7 @@ export function buildBreadcrumbJsonLd(items: { name: string; url: string }[]) {
       "@type": "ListItem",
       position: i + 1,
       name: item.name,
-      item: item.url.startsWith("http") ? item.url : `https://zandofy.lovable.app${item.url}`,
+      item: item.url.startsWith("http") ? item.url : `${SITE_URL}${item.url}`,
     })),
   };
 }
