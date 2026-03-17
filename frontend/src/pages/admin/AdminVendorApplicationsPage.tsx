@@ -118,7 +118,7 @@ export default function AdminVendorApplicationsPage() {
           <p>Bonjour <strong>${selected.full_name || "Vendeur"}</strong>,</p>
           <p>Votre demande de vendeur pour la boutique <strong>"${selected.store_name}"</strong> a été <span style="color:#16a34a;font-weight:bold;">approuvée</span>.</p>
           <p>Vous pouvez maintenant accéder à votre espace vendeur et commencer à ajouter vos produits.</p>
-          <a href="https://zandofy.lovable.app/vendor" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Accéder à ma boutique</a>
+          <a href="${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/vendor" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Accéder à ma boutique</a>
           <p style="color:#888;margin-top:24px;font-size:12px;">— L'équipe Zandofy</p>
         </div>`
       );
