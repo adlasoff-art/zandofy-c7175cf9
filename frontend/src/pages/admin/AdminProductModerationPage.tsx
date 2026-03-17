@@ -3,13 +3,16 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShieldCheck, Search, Loader2, Check, X, Eye, Store, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { ShieldCheck, Search, Loader2, Check, X, Eye, Store, Filter, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
+import { ProductModerationDetail } from "@/components/admin/ProductModerationDetail";
+import { ModerationActionDialog } from "@/components/admin/ModerationActionDialog";
 
-type StatusFilter = "pending_approval" | "published" | "rejected" | "draft" | "all";
+type StatusFilter = "pending_approval" | "published" | "rejected" | "revision_requested" | "draft" | "all";
 
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "pending_approval", label: "En attente" },
+  { value: "revision_requested", label: "Révision" },
   { value: "published", label: "Publiés" },
   { value: "rejected", label: "Refusés" },
   { value: "draft", label: "Brouillons" },
@@ -23,6 +26,15 @@ export default function AdminProductModerationPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending_approval");
   const [page, setPage] = useState(0);
   const queryClient = useQueryClient();
+
+  // Detail dialog
+  const [detailProductId, setDetailProductId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  // Action dialog
+  const [actionProduct, setActionProduct] = useState<{ id: string; name: string } | null>(null);
+  const [actionType, setActionType] = useState<"rejected" | "revision_requested">("rejected");
+  const [actionOpen, setActionOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-product-moderation", statusFilter, page],
@@ -75,29 +87,54 @@ export default function AdminProductModerationPage() {
   const totalCount = data?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
+  // Simple approve (no reason needed)
   const updateStatus = useMutation({
     mutationFn: async ({ productId, status }: { productId: string; status: string }) => {
-      const { data: updated, error } = await supabase
+      const { data: updated, error } = await (supabase as any)
         .from("products")
-        .update({ publish_status: status } as any)
+        .update({
+          publish_status: status,
+          moderation_reason: null,
+          moderation_reason_link: null,
+          moderated_at: new Date().toISOString(),
+        })
         .eq("id", productId)
         .select("id, publish_status");
 
       if (error) throw error;
-
-      if (!updated || updated.length === 0) {
-        throw new Error("Mise à jour bloquée — vérifiez vos permissions.");
-      }
-
-      if (updated[0].publish_status !== status) {
-        throw new Error("Le statut n'a pas été modifié.");
-      }
+      if (!updated || updated.length === 0) throw new Error("Mise à jour bloquée — vérifiez vos permissions.");
+      if (updated[0].publish_status !== status) throw new Error("Le statut n'a pas été modifié.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-product-moderation"] });
-      toast.success("Statut du produit mis à jour");
+      toast.success("Produit approuvé et publié !");
     },
     onError: (err: Error) => toast.error(err.message || "Erreur lors de la mise à jour"),
+  });
+
+  // Reject or revision with reason
+  const moderateWithReason = useMutation({
+    mutationFn: async ({ productId, status, reason, link }: { productId: string; status: string; reason: string; link: string | null }) => {
+      const { data: updated, error } = await (supabase as any)
+        .from("products")
+        .update({
+          publish_status: status,
+          moderation_reason: reason,
+          moderation_reason_link: link,
+          moderated_at: new Date().toISOString(),
+        })
+        .eq("id", productId)
+        .select("id, publish_status");
+
+      if (error) throw error;
+      if (!updated || updated.length === 0) throw new Error("Mise à jour bloquée — vérifiez vos permissions.");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-product-moderation"] });
+      setActionOpen(false);
+      toast.success(actionType === "rejected" ? "Produit rejeté" : "Produit renvoyé pour révision");
+    },
+    onError: (err: Error) => toast.error(err.message || "Erreur"),
   });
 
   const filtered = products.filter(p =>
@@ -107,6 +144,12 @@ export default function AdminProductModerationPage() {
   );
 
   const pendingCount = statusFilter === "pending_approval" ? totalCount : 0;
+
+  const openAction = (product: { id: string; name_fr: string; name: string }, type: "rejected" | "revision_requested") => {
+    setActionProduct({ id: product.id, name: product.name_fr || product.name });
+    setActionType(type);
+    setActionOpen(true);
+  };
 
   return (
     <AdminLayout title="Modération produits">
@@ -170,12 +213,13 @@ export default function AdminProductModerationPage() {
               {filtered.map((product) => {
                 const statusCfg = PUBLISH_STATUS_CONFIG[product.publish_status] || PUBLISH_STATUS_CONFIG.draft;
                 const isPending = product.publish_status === "pending_approval";
+                const isRevision = product.publish_status === "revision_requested";
 
                 return (
                   <div
                     key={product.id}
                     className={`bg-card border rounded-lg p-4 transition-colors ${
-                      isPending ? "border-amber-300 dark:border-amber-700" : "border-border"
+                      isPending ? "border-amber-300 dark:border-amber-700" : isRevision ? "border-orange-300 dark:border-orange-700" : "border-border"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -200,6 +244,17 @@ export default function AdminProductModerationPage() {
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
+                        {/* View details */}
+                        <button
+                          onClick={() => { setDetailProductId(product.id); setDetailOpen(true); }}
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                          title="Voir les détails"
+                        >
+                          <Eye size={14} />
+                          Détails
+                        </button>
+
+                        {/* Approve */}
                         {product.publish_status !== "published" && (
                           <button
                             onClick={() => updateStatus.mutate({ productId: product.id, status: "published" })}
@@ -211,10 +266,12 @@ export default function AdminProductModerationPage() {
                             Approuver
                           </button>
                         )}
+
+                        {/* Reject */}
                         {product.publish_status !== "rejected" && (
                           <button
-                            onClick={() => updateStatus.mutate({ productId: product.id, status: "rejected" })}
-                            disabled={updateStatus.isPending}
+                            onClick={() => openAction(product, "rejected")}
+                            disabled={moderateWithReason.isPending}
                             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50"
                             title="Rejeter le produit"
                           >
@@ -222,6 +279,21 @@ export default function AdminProductModerationPage() {
                             Rejeter
                           </button>
                         )}
+
+                        {/* Revision */}
+                        {product.publish_status !== "revision_requested" && product.publish_status !== "published" && (
+                          <button
+                            onClick={() => openAction(product, "revision_requested")}
+                            disabled={moderateWithReason.isPending}
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50 transition-colors disabled:opacity-50"
+                            title="Renvoyer pour révision"
+                          >
+                            <RotateCcw size={14} />
+                            Révision
+                          </button>
+                        )}
+
+                        {/* Unpublish */}
                         {product.publish_status === "published" && (
                           <button
                             onClick={() => updateStatus.mutate({ productId: product.id, status: "pending_approval" })}
@@ -229,7 +301,6 @@ export default function AdminProductModerationPage() {
                             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-muted text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
                             title="Retirer de la publication"
                           >
-                            <Eye size={14} />
                             Dépublier
                           </button>
                         )}
@@ -269,6 +340,32 @@ export default function AdminProductModerationPage() {
           </>
         )}
       </div>
+
+      {/* Product detail dialog */}
+      <ProductModerationDetail
+        productId={detailProductId}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+      />
+
+      {/* Moderation action dialog (reject / revision) */}
+      {actionProduct && (
+        <ModerationActionDialog
+          open={actionOpen}
+          onOpenChange={setActionOpen}
+          actionType={actionType}
+          productName={actionProduct.name}
+          isLoading={moderateWithReason.isPending}
+          onConfirm={(reason, link) => {
+            moderateWithReason.mutate({
+              productId: actionProduct.id,
+              status: actionType,
+              reason,
+              link,
+            });
+          }}
+        />
+      )}
     </AdminLayout>
   );
 }
