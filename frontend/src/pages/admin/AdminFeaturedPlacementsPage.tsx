@@ -33,6 +33,8 @@ function PlacementsTab() {
     price_charged: "0",
     is_active: true,
     sort_order: 0,
+    show_timer: false,
+    timer_color: "#ffffff",
   });
 
   const { data: placements = [], isLoading } = useQuery({

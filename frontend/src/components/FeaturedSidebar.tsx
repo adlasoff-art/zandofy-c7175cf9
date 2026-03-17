@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
@@ -15,17 +15,62 @@ interface FeaturedPlacement {
   cta_link: string | null;
   bg_color: string | null;
   text_color: string | null;
+  start_date: string;
+  end_date: string;
+  show_timer: boolean;
+  timer_color: string | null;
+}
+
+function CountdownTimer({ endDate, color }: { endDate: string; color: string }) {
+  const [remaining, setRemaining] = useState(() => Math.max(0, new Date(endDate).getTime() - Date.now()));
+
+  useEffect(() => {
+    if (remaining <= 0) return;
+    const interval = setInterval(() => {
+      const r = Math.max(0, new Date(endDate).getTime() - Date.now());
+      setRemaining(r);
+      if (r <= 0) clearInterval(interval);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [endDate, remaining > 0]);
+
+  if (remaining <= 0) return null;
+
+  const totalSeconds = Math.floor(remaining / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  return (
+    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex items-center gap-1 pointer-events-none">
+      {[pad(hours), pad(minutes), pad(seconds)].map((v, i) => (
+        <span key={i} className="flex items-center gap-1">
+          <span
+            className="text-sm font-bold px-1.5 py-0.5 rounded-md backdrop-blur-sm"
+            style={{ color, backgroundColor: "rgba(0,0,0,0.45)" }}
+          >
+            {v}
+          </span>
+          {i < 2 && <span style={{ color }} className="text-sm font-bold">:</span>}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export function FeaturedSidebar() {
   const [placements, setPlacements] = useState<FeaturedPlacement[]>([]);
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [hovered, setHovered] = useState(false);
+  const [slideDir, setSlideDir] = useState<"left" | "right">("left");
+  const [animating, setAnimating] = useState(false);
 
   useEffect(() => {
     const now = new Date().toISOString();
     (supabase.from("featured_placements" as any) as any)
-      .select("id, placement_type, product_id, store_id, title, image_url, cta_text, cta_link, bg_color, text_color")
+      .select("id, placement_type, product_id, store_id, title, image_url, cta_text, cta_link, bg_color, text_color, start_date, end_date, show_timer, timer_color")
       .eq("is_active", true)
       .lte("start_date", now)
       .gte("end_date", now)
@@ -36,17 +81,27 @@ export function FeaturedSidebar() {
       });
   }, []);
 
-  // Auto-slide every 5s
+  // Auto-slide every 5s, paused on hover
   useEffect(() => {
-    if (placements.length <= 1) return;
+    if (placements.length <= 1 || hovered) return;
     const interval = setInterval(() => {
-      setCurrent((c) => (c + 1) % placements.length);
+      goTo((current + 1) % placements.length, "left");
     }, 5000);
     return () => clearInterval(interval);
-  }, [placements.length]);
+  }, [placements.length, hovered, current]);
 
-  const prev = useCallback(() => setCurrent((c) => (c - 1 + placements.length) % placements.length), [placements.length]);
-  const next = useCallback(() => setCurrent((c) => (c + 1) % placements.length), [placements.length]);
+  const goTo = useCallback((idx: number, dir: "left" | "right") => {
+    if (animating) return;
+    setSlideDir(dir);
+    setAnimating(true);
+    setTimeout(() => {
+      setCurrent(idx);
+      setTimeout(() => setAnimating(false), 50);
+    }, 300);
+  }, [animating]);
+
+  const prev = useCallback(() => goTo((current - 1 + placements.length) % placements.length, "right"), [current, placements.length, goTo]);
+  const next = useCallback(() => goTo((current + 1) % placements.length, "left"), [current, placements.length, goTo]);
 
   if (loading || placements.length === 0) return null;
 
@@ -64,8 +119,10 @@ export function FeaturedSidebar() {
 
         {/* Card */}
         <div
-          className="relative rounded-xl overflow-hidden shadow-md border border-border"
+          className="relative rounded-xl overflow-hidden shadow-md border border-border group"
           style={{ aspectRatio: "300/600", maxHeight: 600 }}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
         >
           <Link to={link} className="block w-full h-full">
             {/* Background */}
@@ -74,13 +131,27 @@ export function FeaturedSidebar() {
               style={{ backgroundColor: item.bg_color || "hsl(var(--card))" }}
             />
 
-            {/* Image */}
+            {/* Image with zoom on hover & slide animation */}
             {item.image_url && (
               <img
                 src={item.image_url}
                 alt={item.title || "Promotion"}
-                className="absolute inset-0 w-full h-full object-cover"
+                className={cn(
+                  "absolute inset-0 w-full h-full object-cover transition-all duration-500",
+                  hovered ? "scale-105" : "scale-100",
+                  animating && slideDir === "left" && "animate-[slideOutLeft_300ms_ease-in-out_forwards]",
+                  animating && slideDir === "right" && "animate-[slideOutRight_300ms_ease-in-out_forwards]",
+                  !animating && "animate-[slideIn_300ms_ease-in-out]"
+                )}
                 loading="lazy"
+              />
+            )}
+
+            {/* Countdown timer */}
+            {item.show_timer && (
+              <CountdownTimer
+                endDate={item.end_date}
+                color={item.timer_color || "#ffffff"}
               />
             )}
 
@@ -123,7 +194,7 @@ export function FeaturedSidebar() {
                 {placements.map((_, i) => (
                   <button
                     key={i}
-                    onClick={(e) => { e.preventDefault(); setCurrent(i); }}
+                    onClick={(e) => { e.preventDefault(); goTo(i, i > current ? "left" : "right"); }}
                     className={cn(
                       "w-1.5 h-1.5 rounded-full transition-all",
                       i === current ? "bg-primary w-4" : "bg-white/60"
