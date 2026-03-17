@@ -43,12 +43,33 @@ function PlacementsTab() {
     },
   });
 
+  const uploadImage = async (): Promise<string | null> => {
+    if (!imageFile || !user) return null;
+    const ext = imageFile.name.split(".").pop();
+    const path = `featured/admin/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("cms-assets").upload(path, imageFile, { upsert: true });
+    if (error) throw error;
+    const { data: urlData } = supabase.storage.from("cms-assets").getPublicUrl(path);
+    return urlData.publicUrl;
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { toast.error("Max 3 Mo"); return; }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
   const addMutation = useMutation({
     mutationFn: async () => {
+      setUploading(true);
+      let imageUrl: string | null = null;
+      if (imageFile) imageUrl = await uploadImage();
       const { error } = await (supabase.from("featured_placements" as any) as any).insert({
         placement_type: form.placement_type,
         title: form.title || null,
-        image_url: form.image_url || null,
+        image_url: imageUrl,
         cta_text: form.cta_text || "Voir",
         cta_link: form.cta_link || null,
         bg_color: form.bg_color,
@@ -66,6 +87,8 @@ function PlacementsTab() {
       toast.success("Emplacement ajouté");
       queryClient.invalidateQueries({ queryKey: ["admin-featured-placements"] });
       setShowAdd(false);
+      setImageFile(null);
+      setImagePreview(null);
     },
     onError: () => toast.error("Erreur lors de l'ajout"),
   });
