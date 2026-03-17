@@ -117,22 +117,8 @@ const BlogPostPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Helmet>
-        <title>{post.meta_title || post.title} — Blog Zandofy</title>
-        <meta name="description" content={post.meta_description || post.excerpt || ""} />
-        <meta name="keywords" content={post.seo_keywords?.join(", ") || ""} />
-        <meta property="og:title" content={post.meta_title || post.title} />
-        <meta property="og:description" content={post.meta_description || post.excerpt || ""} />
-        <meta property="og:image" content={post.og_image_url || post.cover_image_url || ""} />
-        <meta property="og:type" content="article" />
-        <meta property="article:published_time" content={post.published_at || ""} />
-        <meta property="article:modified_time" content={post.updated_at} />
-        {post.tags?.map((tag: string) => (
-          <meta key={tag} property="article:tag" content={tag} />
-        ))}
-        {post.canonical_url && <link rel="canonical" href={post.canonical_url} />}
-        <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
-      </Helmet>
+      {/* SEO JSON-LD injected via script */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <Header />
 
       <article className="flex-1">

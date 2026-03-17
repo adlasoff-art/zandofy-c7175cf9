@@ -585,7 +585,7 @@ function EditorsManager() {
   };
 
   const toggleActive = async (id: string, current: boolean) => {
-    await supabase.from("blog_editors").update({ is_active: !current }).eq("id", id);
+    await sb.from("blog_editors").update({ is_active: !current }).eq("id", id);
     qc.invalidateQueries({ queryKey: ["admin-blog-editors"] });
   };
 
