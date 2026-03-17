@@ -141,7 +141,7 @@ export default function AdminVendorApplicationsPage() {
           <p>Votre demande de vendeur pour la boutique <strong>"${selected.store_name}"</strong> n'a malheureusement pas été approuvée.</p>
           ${adminNotes ? `<p><strong>Motif :</strong> ${adminNotes}</p>` : ""}
           <p>Vous pouvez soumettre une nouvelle demande à tout moment.</p>
-          <a href="https://zandofy.lovable.app/become-vendor" style="display:inline-block;background:#dc2626;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Nouvelle demande</a>
+          <a href="${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/become-vendor" style="display:inline-block;background:#dc2626;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Nouvelle demande</a>
           <p style="color:#888;margin-top:24px;font-size:12px;">— L'équipe Zandofy</p>
         </div>`
       );
