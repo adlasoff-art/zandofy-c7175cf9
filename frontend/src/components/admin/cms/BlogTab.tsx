@@ -571,7 +571,7 @@ function EditorsManager() {
       .eq("email", email.toLowerCase().trim())
       .maybeSingle();
     if (!profile) return toast({ title: "Utilisateur introuvable", variant: "destructive" });
-    const { error } = await supabase.from("blog_editors").insert({ user_id: profile.id, granted_by: user!.id });
+    const { error } = await sb.from("blog_editors").insert({ user_id: profile.id, granted_by: user!.id });
     if (error) return toast({ title: "Erreur", description: error.message, variant: "destructive" });
     setEmail("");
     qc.invalidateQueries({ queryKey: ["admin-blog-editors"] });
