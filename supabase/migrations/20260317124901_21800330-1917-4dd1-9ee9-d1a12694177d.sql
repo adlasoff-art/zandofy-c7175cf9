@@ -1,0 +1,1 @@
+ALTER TABLE public.featured_placement_requests ADD COLUMN IF NOT EXISTS image_url TEXT;

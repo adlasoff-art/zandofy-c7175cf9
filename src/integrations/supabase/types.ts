@@ -1199,6 +1199,7 @@ export type Database = {
           desired_end_date: string | null
           desired_start_date: string | null
           id: string
+          image_url: string | null
           message: string | null
           price_quoted: number | null
           product_ids: string[]
@@ -1216,6 +1217,7 @@ export type Database = {
           desired_end_date?: string | null
           desired_start_date?: string | null
           id?: string
+          image_url?: string | null
           message?: string | null
           price_quoted?: number | null
           product_ids?: string[]
@@ -1233,6 +1235,7 @@ export type Database = {
           desired_end_date?: string | null
           desired_start_date?: string | null
           id?: string
+          image_url?: string | null
           message?: string | null
           price_quoted?: number | null
           product_ids?: string[]
