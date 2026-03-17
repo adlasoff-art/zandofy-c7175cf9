@@ -445,7 +445,7 @@ function CategoriesManager() {
   const save = async () => {
     if (!name.trim()) return;
     const s = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    const { error } = await supabase.from("blog_categories").insert({ name, slug: s, color });
+    const { error } = await sb.from("blog_categories").insert({ name, slug: s, color });
     if (error) return toast({ title: "Erreur", description: error.message, variant: "destructive" });
     setName(""); setSlug(""); setColor("#10b981");
     qc.invalidateQueries({ queryKey: ["admin-blog-categories"] });
