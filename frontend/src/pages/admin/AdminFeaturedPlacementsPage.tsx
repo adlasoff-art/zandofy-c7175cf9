@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Sparkles, Plus, Trash2, Check, X, Eye, Loader2, Clock, ImagePlus } from "lucide-react";
+import { Sparkles, Plus, Trash2, Check, X, Eye, Loader2, Clock, ImagePlus, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,29 +13,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 
 // ─── Active Placements Tab ────────────────────────────────────
+const emptyForm = {
+  placement_type: "product" as string,
+  title: "",
+  cta_text: "Voir",
+  cta_link: "",
+  bg_color: "#ffffff",
+  text_color: "#000000",
+  start_date: new Date().toISOString().slice(0, 16),
+  end_date: "",
+  price_charged: "0",
+  is_active: true,
+  sort_order: 0,
+  show_timer: false,
+  timer_color: "#ffffff",
+};
+
 function PlacementsTab() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [showAdd, setShowAdd] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [form, setForm] = useState({
-    placement_type: "product" as string,
-    title: "",
-    cta_text: "Voir",
-    cta_link: "",
-    bg_color: "#ffffff",
-    text_color: "#000000",
-    start_date: new Date().toISOString().slice(0, 16),
-    end_date: "",
-    price_charged: "0",
-    is_active: true,
-    sort_order: 0,
-    show_timer: false,
-    timer_color: "#ffffff",
-  });
+  const [form, setForm] = useState({ ...emptyForm });
 
   const { data: placements = [], isLoading } = useQuery({
     queryKey: ["admin-featured-placements"],
@@ -63,15 +66,47 @@ function PlacementsTab() {
     setImagePreview(URL.createObjectURL(file));
   };
 
-  const addMutation = useMutation({
+  const openAdd = () => {
+    setEditId(null);
+    setForm({ ...emptyForm });
+    setImageFile(null);
+    setImagePreview(null);
+    setShowDialog(true);
+  };
+
+  const openEdit = (p: any) => {
+    setEditId(p.id);
+    setForm({
+      placement_type: p.placement_type || "product",
+      title: p.title || "",
+      cta_text: p.cta_text || "Voir",
+      cta_link: p.cta_link || "",
+      bg_color: p.bg_color || "#ffffff",
+      text_color: p.text_color || "#000000",
+      start_date: p.start_date ? new Date(p.start_date).toISOString().slice(0, 16) : "",
+      end_date: p.end_date ? new Date(p.end_date).toISOString().slice(0, 16) : "",
+      price_charged: String(p.price_charged || 0),
+      is_active: p.is_active ?? true,
+      sort_order: p.sort_order || 0,
+      show_timer: p.show_timer ?? false,
+      timer_color: p.timer_color || "#ffffff",
+    });
+    setImageFile(null);
+    setImagePreview(p.image_url || null);
+    setShowDialog(true);
+  };
+
+  const saveMutation = useMutation({
     mutationFn: async () => {
       setUploading(true);
-      let imageUrl: string | null = null;
-      if (imageFile) imageUrl = await uploadImage();
-      const { error } = await (supabase.from("featured_placements" as any) as any).insert({
+      let imageUrl: string | null | undefined;
+      if (imageFile) {
+        imageUrl = await uploadImage();
+      }
+
+      const payload: any = {
         placement_type: form.placement_type,
         title: form.title || null,
-        image_url: imageUrl,
         cta_text: form.cta_text || "Voir",
         cta_link: form.cta_link || null,
         bg_color: form.bg_color,
@@ -83,18 +118,29 @@ function PlacementsTab() {
         sort_order: form.sort_order,
         show_timer: form.show_timer,
         timer_color: form.timer_color,
-        created_by: user?.id,
-      });
-      if (error) throw error;
+      };
+
+      if (imageUrl) payload.image_url = imageUrl;
+
+      if (editId) {
+        const { error } = await (supabase.from("featured_placements" as any) as any).update(payload).eq("id", editId);
+        if (error) throw error;
+      } else {
+        payload.image_url = imageUrl || null;
+        payload.created_by = user?.id;
+        const { error } = await (supabase.from("featured_placements" as any) as any).insert(payload);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
-      toast.success("Emplacement ajouté");
+      toast.success(editId ? "Emplacement modifié" : "Emplacement ajouté");
       queryClient.invalidateQueries({ queryKey: ["admin-featured-placements"] });
-      setShowAdd(false);
+      setShowDialog(false);
+      setEditId(null);
       setImageFile(null);
       setImagePreview(null);
     },
-    onError: () => toast.error("Erreur lors de l'ajout"),
+    onError: () => toast.error("Erreur lors de l'enregistrement"),
     onSettled: () => setUploading(false),
   });
 
@@ -121,7 +167,7 @@ function PlacementsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">Gérez les emplacements sponsorisés visibles sur la page d'accueil.</p>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90">
+        <button onClick={openAdd} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90">
           <Plus size={14} /> Ajouter
         </button>
       </div>
@@ -144,6 +190,9 @@ function PlacementsTab() {
                 </div>
               </div>
               <Switch checked={p.is_active} onCheckedChange={() => toggleMutation.mutate({ id: p.id, active: p.is_active })} />
+              <button onClick={() => openEdit(p)} className="p-1.5 text-primary hover:bg-primary/10 rounded-md" title="Modifier">
+                <Pencil size={14} />
+              </button>
               <button onClick={() => deleteMutation.mutate(p.id)} className="p-1.5 text-destructive hover:bg-destructive/10 rounded-md">
                 <Trash2 size={14} />
               </button>
@@ -152,10 +201,10 @@ function PlacementsTab() {
         </div>
       )}
 
-      {/* Add Dialog */}
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+      {/* Add / Edit Dialog */}
+      <Dialog open={showDialog} onOpenChange={(v) => { if (!v) { setShowDialog(false); setEditId(null); } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Nouvel emplacement sponsorisé</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editId ? "Modifier l'emplacement" : "Nouvel emplacement sponsorisé"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
               <label className="text-xs font-medium text-muted-foreground">Type</label>
@@ -250,9 +299,9 @@ function PlacementsTab() {
             </div>
           </div>
           <DialogFooter>
-            <button onClick={() => setShowAdd(false)} className="px-4 py-2 text-sm border border-border rounded-lg">Annuler</button>
-            <button onClick={() => addMutation.mutate()} disabled={!form.end_date || addMutation.isPending} className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg disabled:opacity-50">
-              {addMutation.isPending ? "..." : "Créer"}
+            <button onClick={() => { setShowDialog(false); setEditId(null); }} className="px-4 py-2 text-sm border border-border rounded-lg">Annuler</button>
+            <button onClick={() => saveMutation.mutate()} disabled={!form.end_date || saveMutation.isPending} className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg disabled:opacity-50">
+              {saveMutation.isPending ? "..." : editId ? "Enregistrer" : "Créer"}
             </button>
           </DialogFooter>
         </DialogContent>
