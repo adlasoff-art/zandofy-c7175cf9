@@ -29,6 +29,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "colors", label: "Thème & Couleurs", icon: Palette },
   { key: "texts", label: "Textes i18n", icon: Languages },
   { key: "legal", label: "FAQ & Légal", icon: Scale },
+  { key: "blog", label: "Blog", icon: BookOpen },
   { key: "footer", label: "Footer", icon: FootprintsIcon },
 ];
 
