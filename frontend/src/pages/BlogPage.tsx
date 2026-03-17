@@ -34,7 +34,7 @@ const BlogPage: React.FC = () => {
   const { data: postsData, isLoading } = useQuery({
     queryKey: ["blog-posts", page, selectedCategory, selectedTag, search],
     queryFn: async () => {
-      let query = supabase
+      let query = sb
         .from("blog_posts")
         .select("*, blog_categories(name, slug, color)", { count: "exact" })
         .eq("status", "published")
