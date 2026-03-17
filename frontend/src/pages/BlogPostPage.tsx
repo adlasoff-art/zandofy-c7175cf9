@@ -19,7 +19,7 @@ const BlogPostPage: React.FC = () => {
   const { data: post, isLoading } = useQuery({
     queryKey: ["blog-post", slug],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from("blog_posts")
         .select("*, blog_categories(name, slug, color)")
         .eq("slug", slug!)
