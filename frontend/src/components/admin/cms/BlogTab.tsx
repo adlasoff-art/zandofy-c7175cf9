@@ -554,7 +554,7 @@ function EditorsManager() {
   const { data: editors = [] } = useQuery({
     queryKey: ["admin-blog-editors"],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await sb
         .from("blog_editors")
         .select("*, profiles:user_id(first_name, last_name, email)")
         .order("created_at", { ascending: false });
