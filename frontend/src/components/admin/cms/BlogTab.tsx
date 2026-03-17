@@ -453,7 +453,7 @@ function CategoriesManager() {
   };
 
   const remove = async (id: string) => {
-    await supabase.from("blog_categories").delete().eq("id", id);
+    await sb.from("blog_categories").delete().eq("id", id);
     qc.invalidateQueries({ queryKey: ["admin-blog-categories"] });
     toast({ title: "Supprimée" });
   };
