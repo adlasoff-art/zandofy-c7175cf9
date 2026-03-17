@@ -167,7 +167,7 @@ function PostsManager() {
 
   const deletePost = async (id: string) => {
     if (!confirm("Supprimer cet article ?")) return;
-    await supabase.from("blog_posts").delete().eq("id", id);
+    await sb.from("blog_posts").delete().eq("id", id);
     qc.invalidateQueries({ queryKey: ["admin-blog-posts"] });
     toast({ title: "Article supprimé" });
   };
