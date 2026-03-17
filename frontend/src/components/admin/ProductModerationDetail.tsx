@@ -16,7 +16,7 @@ export function ProductModerationDetail({ productId, open, onOpenChange }: Props
     queryKey: ["admin-product-detail", productId],
     enabled: !!productId && open,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("products")
         .select("*, product_images(id, image_url, position), product_colors(id, color_hex, color_name, image_url), product_sizes(id, size_label, region, bust_cm, waist_cm, hips_cm), product_pricing_tiers(id, tier_label, min_quantity, discount_type, discount_value)")
         .eq("id", productId!)
