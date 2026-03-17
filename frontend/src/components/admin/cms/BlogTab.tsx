@@ -512,7 +512,7 @@ function CommentsManager() {
   };
 
   const remove = async (id: string) => {
-    await supabase.from("blog_comments").delete().eq("id", id);
+    await sb.from("blog_comments").delete().eq("id", id);
     qc.invalidateQueries({ queryKey: ["admin-blog-comments"] });
     toast({ title: "Commentaire supprimé" });
   };
