@@ -35,7 +35,7 @@ const BlogPostPage: React.FC = () => {
   const { data: relatedPosts } = useQuery({
     queryKey: ["blog-related", post?.category_id, post?.id],
     queryFn: async () => {
-      let query = supabase
+      let query = sb
         .from("blog_posts")
         .select("id, title, slug, cover_image_url, reading_time_min, views_count, published_at, blog_categories(name, color)")
         .eq("status", "published")
