@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Sparkles, Plus, Trash2, Check, X, Eye, Loader2, Clock } from "lucide-react";
+import { Sparkles, Plus, Trash2, Check, X, Eye, Loader2, Clock, ImagePlus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,10 +17,13 @@ function PlacementsTab() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [showAdd, setShowAdd] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     placement_type: "product" as string,
     title: "",
-    image_url: "",
     cta_text: "Voir",
     cta_link: "",
     bg_color: "#ffffff",
@@ -40,12 +43,33 @@ function PlacementsTab() {
     },
   });
 
+  const uploadImage = async (): Promise<string | null> => {
+    if (!imageFile || !user) return null;
+    const ext = imageFile.name.split(".").pop();
+    const path = `featured/admin/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("cms-assets").upload(path, imageFile, { upsert: true });
+    if (error) throw error;
+    const { data: urlData } = supabase.storage.from("cms-assets").getPublicUrl(path);
+    return urlData.publicUrl;
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { toast.error("Max 3 Mo"); return; }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
   const addMutation = useMutation({
     mutationFn: async () => {
+      setUploading(true);
+      let imageUrl: string | null = null;
+      if (imageFile) imageUrl = await uploadImage();
       const { error } = await (supabase.from("featured_placements" as any) as any).insert({
         placement_type: form.placement_type,
         title: form.title || null,
-        image_url: form.image_url || null,
+        image_url: imageUrl,
         cta_text: form.cta_text || "Voir",
         cta_link: form.cta_link || null,
         bg_color: form.bg_color,
@@ -63,8 +87,11 @@ function PlacementsTab() {
       toast.success("Emplacement ajouté");
       queryClient.invalidateQueries({ queryKey: ["admin-featured-placements"] });
       setShowAdd(false);
+      setImageFile(null);
+      setImagePreview(null);
     },
     onError: () => toast.error("Erreur lors de l'ajout"),
+    onSettled: () => setUploading(false),
   });
 
   const toggleMutation = useMutation({
@@ -139,8 +166,29 @@ function PlacementsTab() {
               <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex: Soldes d'été -40%" />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground">URL Image (300×600 recommandé)</label>
-              <Input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." />
+              <label className="text-xs font-medium text-muted-foreground">
+                Image de l'annonce <span className="text-muted-foreground/60">(300×600 recommandé · Max 3 Mo)</span>
+              </label>
+              {imagePreview ? (
+                <div className="relative mt-1.5 w-[150px] h-[300px] rounded-lg overflow-hidden border border-border">
+                  <img src={imagePreview} alt="" className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => { setImageFile(null); setImagePreview(null); }}
+                    className="absolute top-1 right-1 p-1 bg-card/90 rounded-full hover:bg-destructive/20"
+                  >
+                    <X size={12} className="text-destructive" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="mt-1.5 w-full border-2 border-dashed border-border rounded-lg py-8 flex flex-col items-center gap-2 hover:border-primary/40 transition-colors"
+                >
+                  <ImagePlus size={24} className="text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Cliquez pour importer une image</span>
+                </button>
+              )}
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageSelect} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -262,6 +310,7 @@ function RequestsTab() {
         <div className="space-y-2">
           {requests.map((r: any) => (
             <div key={r.id} className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
+              {r.image_url && <img src={r.image_url} alt="" className="w-12 h-16 object-cover rounded-md shrink-0" />}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">
                   {r.product_ids?.length || 0} produit(s) • Boutique: <span className="text-primary">{r.store_id?.slice(0, 8)}…</span>
@@ -297,6 +346,12 @@ function RequestsTab() {
                 <p><strong>Durée souhaitée :</strong> {reviewItem.desired_duration_days || "—"} jours</p>
                 <p><strong>Message :</strong> {reviewItem.message || "—"}</p>
               </div>
+              {reviewItem.image_url && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Image soumise</label>
+                  <img src={reviewItem.image_url} alt="" className="mt-1 w-[100px] h-[200px] object-cover rounded-lg border border-border" />
+                </div>
+              )}
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Prix à facturer ($)</label>
                 <Input type="number" value={priceQuoted} onChange={(e) => setPriceQuoted(e.target.value)} placeholder="0" />

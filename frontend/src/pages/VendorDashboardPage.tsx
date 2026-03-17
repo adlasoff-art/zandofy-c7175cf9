@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { InternalChat } from "@/components/InternalChat";
 import { VendorProductManager } from "@/components/VendorProductManager";
+import { VendorFeaturedRequestTab } from "@/components/vendor/VendorFeaturedRequestTab";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { VendorOrderManager } from "@/components/vendor/VendorOrderManager";
 import { VendorStatsTab } from "@/components/vendor/VendorStatsTab";
@@ -20,7 +21,7 @@ import { VendorTeamTab } from "@/components/vendor/VendorTeamTab";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
-  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike,
+  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { VENDOR_TIERS } from "@/lib/vendor-tiers";
@@ -65,7 +66,7 @@ export default function VendorDashboardPage() {
   const [noStore, setNoStore] = useState(false);
   const [selectedConv, setSelectedConv] = useState<VendorConversation | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "stats" | "team" | "settings">("catalogue");
+  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "team" | "settings">("catalogue");
   const [orderCounters, setOrderCounters] = useState<OrderCounters>({ total: 0, in_progress: 0, delivered: 0 });
 
   // Presence heartbeat — marks store as online while vendor is on dashboard
@@ -335,6 +336,7 @@ export default function VendorDashboardPage() {
                 { key: "wallet" as const, label: "Wallet", icon: Wallet },
                 { key: "returns" as const, label: "Retours", icon: RotateCcw },
                 { key: "disputes" as const, label: "Litiges", icon: AlertTriangle },
+                { key: "featured" as const, label: "Mise en avant", icon: Sparkles },
                 { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
                 ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
                 { key: "messages" as const, label: "Messages", icon: MessageCircle },
@@ -393,6 +395,8 @@ export default function VendorDashboardPage() {
             {activeTab === "returns" && <VendorReturnsTab storeId={store!.id} />}
 
             {activeTab === "disputes" && <VendorDisputesTab storeId={store!.id} />}
+
+            {activeTab === "featured" && <VendorFeaturedRequestTab storeId={store!.id} />}
 
             {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
 
