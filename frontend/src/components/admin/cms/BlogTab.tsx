@@ -153,7 +153,7 @@ function PostsManager() {
     };
 
     if (editing) {
-      const { error } = await supabase.from("blog_posts").update(payload).eq("id", editing.id);
+      const { error } = await sb.from("blog_posts").update(payload).eq("id", editing.id);
       if (error) return toast({ title: "Erreur", description: error.message, variant: "destructive" });
       toast({ title: "Article mis à jour" });
     } else {
