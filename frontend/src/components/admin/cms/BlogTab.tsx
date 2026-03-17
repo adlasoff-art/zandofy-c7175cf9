@@ -157,7 +157,7 @@ function PostsManager() {
       if (error) return toast({ title: "Erreur", description: error.message, variant: "destructive" });
       toast({ title: "Article mis à jour" });
     } else {
-      const { error } = await supabase.from("blog_posts").insert({ ...payload, author_id: user!.id });
+      const { error } = await sb.from("blog_posts").insert({ ...payload, author_id: user!.id });
       if (error) return toast({ title: "Erreur", description: error.message, variant: "destructive" });
       toast({ title: "Article créé" });
     }
