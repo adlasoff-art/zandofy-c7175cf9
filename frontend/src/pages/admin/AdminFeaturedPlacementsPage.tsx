@@ -165,8 +165,29 @@ function PlacementsTab() {
               <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex: Soldes d'été -40%" />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground">URL Image (300×600 recommandé)</label>
-              <Input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." />
+              <label className="text-xs font-medium text-muted-foreground">
+                Image de l'annonce <span className="text-muted-foreground/60">(300×600 recommandé · Max 3 Mo)</span>
+              </label>
+              {imagePreview ? (
+                <div className="relative mt-1.5 w-[150px] h-[300px] rounded-lg overflow-hidden border border-border">
+                  <img src={imagePreview} alt="" className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => { setImageFile(null); setImagePreview(null); }}
+                    className="absolute top-1 right-1 p-1 bg-card/90 rounded-full hover:bg-destructive/20"
+                  >
+                    <X size={12} className="text-destructive" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="mt-1.5 w-full border-2 border-dashed border-border rounded-lg py-8 flex flex-col items-center gap-2 hover:border-primary/40 transition-colors"
+                >
+                  <ImagePlus size={24} className="text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Cliquez pour importer une image</span>
+                </button>
+              )}
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageSelect} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
