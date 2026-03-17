@@ -81,6 +81,8 @@ function PlacementsTab() {
         price_charged: parseFloat(form.price_charged) || 0,
         is_active: form.is_active,
         sort_order: form.sort_order,
+        show_timer: form.show_timer,
+        timer_color: form.timer_color,
         created_by: user?.id,
       });
       if (error) throw error;
