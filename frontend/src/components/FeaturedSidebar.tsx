@@ -24,14 +24,13 @@ export function FeaturedSidebar() {
 
   useEffect(() => {
     const now = new Date().toISOString();
-    supabase
-      .from("featured_placements")
+    (supabase.from("featured_placements" as any) as any)
       .select("id, placement_type, product_id, store_id, title, image_url, cta_text, cta_link, bg_color, text_color")
       .eq("is_active", true)
       .lte("start_date", now)
       .gte("end_date", now)
       .order("sort_order")
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         setPlacements(data || []);
         setLoading(false);
       });

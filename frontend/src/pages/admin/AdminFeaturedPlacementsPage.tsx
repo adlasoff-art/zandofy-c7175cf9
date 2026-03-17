@@ -35,14 +35,14 @@ function PlacementsTab() {
   const { data: placements = [], isLoading } = useQuery({
     queryKey: ["admin-featured-placements"],
     queryFn: async () => {
-      const { data } = await supabase.from("featured_placements").select("*").order("sort_order");
-      return data || [];
+      const { data } = await (supabase.from("featured_placements" as any) as any).select("*").order("sort_order");
+      return (data || []) as any[];
     },
   });
 
   const addMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("featured_placements").insert({
+      const { error } = await (supabase.from("featured_placements" as any) as any).insert({
         placement_type: form.placement_type,
         title: form.title || null,
         image_url: form.image_url || null,
@@ -69,14 +69,14 @@ function PlacementsTab() {
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
-      await supabase.from("featured_placements").update({ is_active: !active }).eq("id", id);
+      await (supabase.from("featured_placements" as any) as any).update({ is_active: !active }).eq("id", id);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-featured-placements"] }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await supabase.from("featured_placements").delete().eq("id", id);
+      await (supabase.from("featured_placements" as any) as any).delete().eq("id", id);
     },
     onSuccess: () => {
       toast.success("Supprimé");
@@ -210,14 +210,14 @@ function RequestsTab() {
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["admin-featured-requests"],
     queryFn: async () => {
-      const { data } = await supabase.from("featured_placement_requests").select("*").order("created_at", { ascending: false });
-      return data || [];
+      const { data } = await (supabase.from("featured_placement_requests" as any) as any).select("*").order("created_at", { ascending: false });
+      return (data || []) as any[];
     },
   });
 
   const reviewMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await supabase.from("featured_placement_requests").update({
+      await (supabase.from("featured_placement_requests" as any) as any).update({
         status,
         admin_notes: adminNotes || null,
         price_quoted: priceQuoted ? parseFloat(priceQuoted) : null,
@@ -324,7 +324,7 @@ function RequestsTab() {
 // ─── Main Page ────────────────────────────────────────────────
 export default function AdminFeaturedPlacementsPage() {
   return (
-    <AdminLayout>
+    <AdminLayout title="Mises en avant">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-primary/10 rounded-xl"><Sparkles className="text-primary" size={20} /></div>

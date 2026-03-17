@@ -5,6 +5,7 @@ import { CategoryBanner } from "@/components/CategoryBanner";
 import { FlashSales } from "@/components/FlashSales";
 import { TopTrends } from "@/components/TopTrends";
 import { ProductGrid } from "@/components/ProductGrid";
+import { FeaturedSidebar } from "@/components/FeaturedSidebar";
 import { Footer } from "@/components/Footer";
 import { FloatingActions } from "@/components/FloatingActions";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
@@ -15,7 +16,6 @@ const Index = () => {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleRefresh = useCallback(async () => {
-    // Trigger a re-render of all sections by changing key
     await new Promise((resolve) => setTimeout(resolve, 600));
     setRefreshKey((k) => k + 1);
   }, []);
@@ -63,8 +63,21 @@ const Index = () => {
         <HeroBanner />
         <CategoryBanner />
         <FlashSales />
-        <TopTrends />
-        <ProductGrid />
+
+        {/* Featured sidebar + content layout */}
+        <div className="container">
+          <div className="flex flex-col lg:flex-row gap-4 py-4">
+            {/* Featured sidebar – left on desktop, horizontal card on mobile */}
+            <div className="order-2 lg:order-1">
+              <FeaturedSidebar />
+            </div>
+            {/* Main content area */}
+            <div className="flex-1 min-w-0 order-1 lg:order-2">
+              <TopTrends />
+              <ProductGrid />
+            </div>
+          </div>
+        </div>
       </main>
       <Footer />
       <FloatingActions />
