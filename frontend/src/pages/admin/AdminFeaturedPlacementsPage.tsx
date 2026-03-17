@@ -33,6 +33,8 @@ function PlacementsTab() {
     price_charged: "0",
     is_active: true,
     sort_order: 0,
+    show_timer: false,
+    timer_color: "#ffffff",
   });
 
   const { data: placements = [], isLoading } = useQuery({
@@ -79,6 +81,8 @@ function PlacementsTab() {
         price_charged: parseFloat(form.price_charged) || 0,
         is_active: form.is_active,
         sort_order: form.sort_order,
+        show_timer: form.show_timer,
+        timer_color: form.timer_color,
         created_by: user?.id,
       });
       if (error) throw error;
@@ -230,6 +234,16 @@ function PlacementsTab() {
                 <Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })} />
               </div>
             </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={form.show_timer} onCheckedChange={(v) => setForm({ ...form, show_timer: v })} />
+              <span className="text-sm">Afficher minuterie (décompte)</span>
+            </div>
+            {form.show_timer && (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Couleur du timer</label>
+                <Input type="color" value={form.timer_color} onChange={(e) => setForm({ ...form, timer_color: e.target.value })} />
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} />
               <span className="text-sm">Actif immédiatement</span>

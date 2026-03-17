@@ -64,20 +64,22 @@ const Index = () => {
         <CategoryBanner />
         <FlashSales />
 
-        {/* Featured sidebar + content layout */}
+        {/* Featured sidebar + TopTrends only */}
         <div className="container">
           <div className="flex flex-col lg:flex-row gap-4 py-4">
-            {/* Featured sidebar – left on desktop, horizontal card on mobile */}
+            {/* Featured sidebar – left on desktop */}
             <div className="order-2 lg:order-1">
               <FeaturedSidebar />
             </div>
-            {/* Main content area */}
+            {/* TopTrends beside sidebar */}
             <div className="flex-1 min-w-0 order-1 lg:order-2">
               <TopTrends />
-              <ProductGrid />
             </div>
           </div>
         </div>
+
+        {/* ProductGrid returns to full width */}
+        <ProductGrid />
       </main>
       <Footer />
       <FloatingActions />
