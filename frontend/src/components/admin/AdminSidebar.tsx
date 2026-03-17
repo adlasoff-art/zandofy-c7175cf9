@@ -43,6 +43,7 @@ const adminItems = [
   { title: "Paramètres", url: "/admin/settings", icon: Settings },
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
   { title: "Templates Email", url: "/admin/email-templates", icon: Mail },
+  { title: "Mises en avant", url: "/admin/featured-placements", icon: Megaphone },
 ];
 
 export function AdminSidebar() {
