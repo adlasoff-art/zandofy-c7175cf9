@@ -6,7 +6,8 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Clock, Eye, Search, ChevronLeft, ChevronRight, ArrowRight, Calendar, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Helmet } from "react-helmet-async";
+
+const sb = supabase as any;
 
 import blogHeroImg from "@/assets/blog/blog-ecommerce-trends.jpg";
 

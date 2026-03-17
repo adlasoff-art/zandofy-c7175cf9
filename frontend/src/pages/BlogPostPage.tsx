@@ -5,10 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Clock, Eye, Calendar, ArrowLeft, Tag, Share2, MessageCircle, Heart, ChevronRight } from "lucide-react";
-import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/contexts/AuthContext";
 import { BlogComments } from "@/components/blog/BlogComments";
 import { VideoEmbed } from "@/components/blog/VideoEmbed";
+
+const sb = supabase as any;
 
 const BlogPostPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
