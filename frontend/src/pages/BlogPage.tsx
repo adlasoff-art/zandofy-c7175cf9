@@ -71,14 +71,7 @@ const BlogPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Helmet>
-        <title>Blog Zandofy — Tendances, Conseils & Inspiration</title>
-        <meta name="description" content="Découvrez les dernières tendances e-commerce, conseils pour vendeurs, mode africaine et innovations logistiques sur le blog Zandofy." />
-        <meta property="og:title" content="Blog Zandofy" />
-        <meta property="og:description" content="Tendances, conseils et inspiration pour le commerce en ligne en Afrique." />
-        <meta property="og:type" content="website" />
-        <link rel="canonical" href="/blog" />
-      </Helmet>
+      {/* SEO meta tags are set via document.title */}
       <Header />
 
       {/* Hero */}

@@ -56,7 +56,7 @@ const BlogPostPage: React.FC = () => {
     viewTracked.current = true;
     const sessionId = sessionStorage.getItem("zandofy_session") || crypto.randomUUID();
     sessionStorage.setItem("zandofy_session", sessionId);
-    supabase.rpc("increment_blog_post_views", { p_post_id: post.id, p_session_id: sessionId }).then();
+    sb.rpc("increment_blog_post_views", { p_post_id: post.id, p_session_id: sessionId }).then();
   }, [post?.id]);
 
   const formatDate = (d: string) =>

@@ -51,7 +51,7 @@ export const BlogComments: React.FC<BlogCommentsProps> = ({ postId }) => {
 
   const addComment = useMutation({
     mutationFn: async ({ text, parentId }: { text: string; parentId?: string }) => {
-      const { error } = await supabase.from("blog_comments").insert({
+      const { error } = await sb.from("blog_comments").insert({
         post_id: postId,
         user_id: user!.id,
         content: text.trim(),
