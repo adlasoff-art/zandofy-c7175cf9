@@ -118,7 +118,7 @@ export default function AdminVendorApplicationsPage() {
           <p>Bonjour <strong>${selected.full_name || "Vendeur"}</strong>,</p>
           <p>Votre demande de vendeur pour la boutique <strong>"${selected.store_name}"</strong> a été <span style="color:#16a34a;font-weight:bold;">approuvée</span>.</p>
           <p>Vous pouvez maintenant accéder à votre espace vendeur et commencer à ajouter vos produits.</p>
-          <a href="https://zandofy.lovable.app/vendor" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Accéder à ma boutique</a>
+          <a href="${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/vendor" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Accéder à ma boutique</a>
           <p style="color:#888;margin-top:24px;font-size:12px;">— L'équipe Zandofy</p>
         </div>`
       );
@@ -141,7 +141,7 @@ export default function AdminVendorApplicationsPage() {
           <p>Votre demande de vendeur pour la boutique <strong>"${selected.store_name}"</strong> n'a malheureusement pas été approuvée.</p>
           ${adminNotes ? `<p><strong>Motif :</strong> ${adminNotes}</p>` : ""}
           <p>Vous pouvez soumettre une nouvelle demande à tout moment.</p>
-          <a href="https://zandofy.lovable.app/become-vendor" style="display:inline-block;background:#dc2626;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Nouvelle demande</a>
+          <a href="${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/become-vendor" style="display:inline-block;background:#dc2626;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Nouvelle demande</a>
           <p style="color:#888;margin-top:24px;font-size:12px;">— L'équipe Zandofy</p>
         </div>`
       );
@@ -164,7 +164,7 @@ export default function AdminVendorApplicationsPage() {
           <p>Votre demande de vendeur pour la boutique <strong>"${selected.store_name}"</strong> nécessite quelques modifications.</p>
           ${adminNotes ? `<p><strong>Commentaire :</strong> ${adminNotes}</p>` : ""}
           <p>Veuillez corriger les éléments mentionnés et resoumettre votre demande.</p>
-          <a href="https://zandofy.lovable.app/become-vendor" style="display:inline-block;background:#f59e0b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Corriger ma demande</a>
+          <a href="${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/become-vendor" style="display:inline-block;background:#f59e0b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Corriger ma demande</a>
           <p style="color:#888;margin-top:24px;font-size:12px;">— L'équipe Zandofy</p>
         </div>`
       );

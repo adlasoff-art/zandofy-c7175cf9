@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -143,7 +144,7 @@ export function ProductModerationDetail({ productId, open, onOpenChange }: Props
                 <p className="text-sm text-muted-foreground mb-2 italic">{product.short_description}</p>
               )}
               {product.description ? (
-                <div className="text-sm text-foreground prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: product.description }} />
+                <div className="text-sm text-foreground prose prose-sm max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.description || "") }} />
               ) : (
                 <p className="text-sm text-muted-foreground italic">Aucune description</p>
               )}

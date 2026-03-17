@@ -166,7 +166,7 @@ export function PrecisionShippingEstimate({
         )
       );
       const valid = quoteResults.filter(Boolean) as DynamicQuoteResult[];
-      console.log("[ShippingEstimate] Quotes:", valid.length, "for", origin.name, "→", dest.name);
+      // Quotes computed silently
       setRawQuotes(valid);
     } catch (err) {
       console.error("[ShippingEstimate] Quote calculation error:", err);

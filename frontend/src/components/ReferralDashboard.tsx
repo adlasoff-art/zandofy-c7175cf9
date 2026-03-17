@@ -102,13 +102,15 @@ export function ReferralDashboard() {
     toast.success("Code copié !");
   };
 
+  const siteUrl = import.meta.env.VITE_SITE_URL || "https://zandofy.com";
+
   const shareWhatsApp = () => {
-    const msg = `🎁 Rejoins Zandofy avec mon code ${referralCode} et obtiens une réduction sur ta première commande ! https://zandofy.lovable.app/auth?ref=${referralCode}`;
+    const msg = `🎁 Rejoins Zandofy avec mon code ${referralCode} et obtiens une réduction sur ta première commande ! ${siteUrl}/auth?ref=${referralCode}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
   const shareSMS = () => {
-    const msg = `Rejoins Zandofy avec mon code ${referralCode} et obtiens une réduction ! https://zandofy.lovable.app/auth?ref=${referralCode}`;
+    const msg = `Rejoins Zandofy avec mon code ${referralCode} et obtiens une réduction ! ${siteUrl}/auth?ref=${referralCode}`;
     window.open(`sms:?body=${encodeURIComponent(msg)}`, "_blank");
   };
 

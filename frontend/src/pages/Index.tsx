@@ -35,10 +35,10 @@ const Index = () => {
           "@context": "https://schema.org",
           "@type": "WebSite",
           name: "Zandofy",
-          url: "https://zandofy.lovable.app",
+          url: import.meta.env.VITE_SITE_URL || "https://zandofy.com",
           potentialAction: {
             "@type": "SearchAction",
-            target: "https://zandofy.lovable.app/search?q={search_term_string}",
+            target: `${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/search?q={search_term_string}`,
             "query-input": "required name=search_term_string",
           },
         }}

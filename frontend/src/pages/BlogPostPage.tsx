@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import DOMPurify from "dompurify";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -219,7 +220,7 @@ const BlogPostPage: React.FC = () => {
                 prose-img:rounded-xl prose-img:shadow-md
                 prose-li:text-foreground/80
                 mb-10"
-              dangerouslySetInnerHTML={{ __html: post.content }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content || "") }}
             />
 
             {/* Video embeds */}

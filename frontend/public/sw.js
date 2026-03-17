@@ -1,7 +1,7 @@
-const CACHE_NAME = "zandofy-v6";
-const STATIC_CACHE = "zandofy-static-v6";
-const API_CACHE = "zandofy-api-v1";
-const IMG_CACHE = "zandofy-images-v1";
+const CACHE_NAME = "zandofy-v7";
+const STATIC_CACHE = "zandofy-static-v7";
+const API_CACHE = "zandofy-api-v2";
+const IMG_CACHE = "zandofy-images-v2";
 
 const PRECACHE_URLS = ["/", "/index.html", "/offline.html", "/icons/icon-192.png", "/icons/icon-512.png"];
 const API_CACHE_MAX = 50;
@@ -49,33 +49,39 @@ self.addEventListener("fetch", (event) => {
   // Skip OAuth paths
   if (url.pathname.startsWith("/~oauth")) return;
 
-  // Navigation: stale-while-revalidate — show cached shell instantly, update in background
+  // Navigation: NETWORK-FIRST with cache fallback
+  // This prevents stale HTML from being served after deployments
   if (request.mode === "navigate") {
     event.respondWith(
-      caches.open(STATIC_CACHE).then(async (cache) => {
-        const cached = await cache.match("/index.html");
-        const networkFetch = fetch(request)
-          .then((response) => {
-            if (response.ok) cache.put("/index.html", response.clone());
-            return response;
-          })
-          .catch(() => null);
-
-        // Return cached shell immediately if available, otherwise wait for network
-        if (cached) {
-          // Fire-and-forget update
-          networkFetch;
-          return cached;
-        }
-        const networkResponse = await networkFetch;
-        return networkResponse || caches.match("/offline.html") || new Response("Offline", { status: 503 });
-      })
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(STATIC_CACHE).then((cache) => cache.put("/index.html", clone));
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.open(STATIC_CACHE).then((cache) =>
+            cache.match("/index.html")
+          ).then((cached) =>
+            cached || caches.match("/offline.html") || new Response("Offline", { status: 503 })
+          )
+        )
     );
     return;
   }
 
   // API calls (Supabase): network-first with cache fallback
+  // Skip caching API calls with auth tokens to avoid stale user data
   if (url.hostname.includes("supabase") || url.pathname.startsWith("/rest/") || url.pathname.startsWith("/functions/")) {
+    const hasAuth = request.headers.get("authorization") || request.headers.get("apikey");
+    // Only cache unauthenticated public API requests
+    if (hasAuth) {
+      // Network-only for authenticated requests
+      event.respondWith(fetch(request));
+      return;
+    }
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -150,7 +156,7 @@ async function syncPendingActions() {
       }
     }
   } catch (e) {
-    console.log("Sync failed, will retry:", e);
+    // Sync failed, will retry on next sync event
   }
 }
 
@@ -198,4 +204,14 @@ self.addEventListener("notificationclick", (event) => {
       return self.clients.openWindow(url);
     })
   );
+});
+
+// Listen for messages from the app to trigger cache clearing
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+  if (event.data && event.data.type === "CLEAR_CACHES") {
+    caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
+  }
 });

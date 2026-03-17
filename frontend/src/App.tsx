@@ -23,6 +23,7 @@ import { MaintenanceGuard } from "@/components/MaintenanceGuard";
 import { CookieConsent } from "@/components/CookieConsent";
 import { AnnouncementPopup } from "@/components/AnnouncementPopup";
 import { Suspense, lazy } from "react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoadingSkeleton } from "@/components/PageLoadingSkeleton";
 import { RoleGuard } from "@/components/admin/RoleGuard";
 import { BanGuard } from "@/components/BanGuard";
@@ -94,7 +95,7 @@ const AdminKycPage = lazy(() => import("./pages/admin/AdminKycPage"));
 const AdminFeaturedPlacementsPage = lazy(() => import("./pages/admin/AdminFeaturedPlacementsPage"));
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1 } },
+  defaultOptions: { queries: { retry: 1, staleTime: 30 * 1000 } },
 });
 
 function SupportDrawerWrapper() {
@@ -112,6 +113,7 @@ function AnalyticsTrackerInjector() {
 }
 
 const App = () => (
+  <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
     <TooltipProvider>
@@ -218,6 +220,7 @@ const App = () => (
     </TooltipProvider>
     </BrowserRouter>
   </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
