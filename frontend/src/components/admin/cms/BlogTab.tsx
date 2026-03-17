@@ -497,7 +497,7 @@ function CommentsManager() {
   const { data: comments = [], isLoading } = useQuery({
     queryKey: ["admin-blog-comments"],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await sb
         .from("blog_comments")
         .select("*, blog_posts(title), profiles:user_id(first_name, last_name)")
         .order("created_at", { ascending: false })
