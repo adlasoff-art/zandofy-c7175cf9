@@ -167,6 +167,8 @@ const App = () => (
                 <Route path="/loyalty-program" element={<LoyaltyProgramPage />} />
                 <Route path="/careers" element={<CareersPage />} />
                 <Route path="/social-responsibility" element={<SocialResponsibilityPage />} />
+                <Route path="/blog" element={<BlogPage />} />
+                <Route path="/blog/:slug" element={<BlogPostPage />} />
                 {/* Admin routes */}
                 <Route path="/admin" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDashboard /></RoleGuard>} />
                 <Route path="/admin/users" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminUsersPage /></RoleGuard>} />
