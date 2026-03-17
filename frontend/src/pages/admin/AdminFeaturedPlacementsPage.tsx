@@ -311,6 +311,7 @@ function RequestsTab() {
           {requests.map((r: any) => (
             <div key={r.id} className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
               {r.image_url && <img src={r.image_url} alt="" className="w-12 h-16 object-cover rounded-md shrink-0" />}
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">
                   {r.product_ids?.length || 0} produit(s) • Boutique: <span className="text-primary">{r.store_id?.slice(0, 8)}…</span>
                 </p>
