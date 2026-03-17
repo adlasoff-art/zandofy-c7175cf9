@@ -235,6 +235,16 @@ function PlacementsTab() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Switch checked={form.show_timer} onCheckedChange={(v) => setForm({ ...form, show_timer: v })} />
+              <span className="text-sm">Afficher minuterie (décompte)</span>
+            </div>
+            {form.show_timer && (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Couleur du timer</label>
+                <Input type="color" value={form.timer_color} onChange={(e) => setForm({ ...form, timer_color: e.target.value })} />
+              </div>
+            )}
+            <div className="flex items-center gap-2">
               <Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} />
               <span className="text-sm">Actif immédiatement</span>
             </div>
