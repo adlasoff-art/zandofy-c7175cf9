@@ -37,7 +37,7 @@ export const BlogComments: React.FC<BlogCommentsProps> = ({ postId }) => {
   const { data: replies = [] } = useQuery({
     queryKey: ["blog-replies", postId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await sb
         .from("blog_comments")
         .select("*, profiles:user_id(first_name, last_name, avatar_url)")
         .eq("post_id", postId)
