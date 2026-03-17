@@ -17,10 +17,13 @@ function PlacementsTab() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [showAdd, setShowAdd] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     placement_type: "product" as string,
     title: "",
-    image_url: "",
     cta_text: "Voir",
     cta_link: "",
     bg_color: "#ffffff",
