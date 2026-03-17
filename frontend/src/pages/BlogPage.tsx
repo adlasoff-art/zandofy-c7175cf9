@@ -22,7 +22,7 @@ const BlogPage: React.FC = () => {
   const { data: categories } = useQuery({
     queryKey: ["blog-categories"],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await sb
         .from("blog_categories")
         .select("*")
         .order("sort_order");
