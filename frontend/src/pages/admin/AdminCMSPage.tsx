@@ -18,7 +18,7 @@ const TextsTab = lazy(() => import("@/components/admin/cms/TextsTab"));
 const LegalPagesTab = lazy(() => import("@/components/admin/cms/LegalPagesTab"));
 const BlogTab = lazy(() => import("@/components/admin/cms/BlogTab"));
 
-type Tab = "hero" | "banners" | "menus" | "pages" | "sections" | "colors" | "footer" | "texts" | "legal";
+type Tab = "hero" | "banners" | "menus" | "pages" | "sections" | "colors" | "footer" | "texts" | "legal" | "blog";
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "hero", label: "Hero Banner", icon: Image },
