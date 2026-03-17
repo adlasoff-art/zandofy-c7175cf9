@@ -37,9 +37,9 @@ Deno.serve(async (req) => {
       return new Response("OK", { status: 200, headers: corsHeaders });
     }
 
-    // Don't process if already finalized
-    if (tx.status === "success" || tx.status === "failed") {
-      console.log("Transaction already finalized:", tx.status);
+    // Don't process if already successful
+    if (tx.status === "success") {
+      console.log("Transaction already successful, skipping");
       return new Response("OK", { status: 200, headers: corsHeaders });
     }
 

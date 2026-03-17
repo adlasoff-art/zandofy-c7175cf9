@@ -109,7 +109,12 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    if (kelpayData.code === "0") {
+    const isAccepted = kelpayData.code === "0";
+    const isSentToMobile =
+      String(kelpayData.code) === "1" &&
+      kelpayData.transactionstatus === "Sent";
+
+    if (isAccepted || isSentToMobile) {
       await supabaseAdmin.from("payment_transactions").insert({
         order_id,
         user_id: userId,
@@ -119,8 +124,9 @@ Deno.serve(async (req) => {
         amount: cleanAmount,
         currency: currency.toUpperCase(),
         reference,
-        transaction_id: kelpayData.transactionid,
+        transaction_id: kelpayData.transactionid || null,
         status: "pending",
+        callback_payload: kelpayData,
       });
 
       await supabaseAdmin
@@ -133,7 +139,7 @@ Deno.serve(async (req) => {
           success: true,
           reference,
           transaction_id: kelpayData.transactionid,
-          message: kelpayData.description,
+          message: kelpayData.description || "Paiement envoyé, confirmez sur votre téléphone",
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
