@@ -159,6 +159,20 @@
   100% { background-position: 200% 0; }
 }
 
+/* Featured sidebar slide animations */
+@keyframes slideOutLeft {
+  from { transform: translateX(0) scale(1); opacity: 1; }
+  to { transform: translateX(-100%) scale(0.95); opacity: 0; }
+}
+@keyframes slideOutRight {
+  from { transform: translateX(0) scale(1); opacity: 1; }
+  to { transform: translateX(100%) scale(0.95); opacity: 0; }
+}
+@keyframes slideIn {
+  from { transform: translateX(30%) scale(0.95); opacity: 0; }
+  to { transform: translateX(0) scale(1); opacity: 1; }
+}
+
 .skeleton-shimmer {
   background: linear-gradient(90deg, hsl(120 20% 92%) 25%, hsl(120 20% 96%) 50%, hsl(120 20% 92%) 75%);
   background-size: 200% 100%;
