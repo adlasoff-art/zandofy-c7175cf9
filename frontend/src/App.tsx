@@ -23,6 +23,7 @@ import { MaintenanceGuard } from "@/components/MaintenanceGuard";
 import { CookieConsent } from "@/components/CookieConsent";
 import { AnnouncementPopup } from "@/components/AnnouncementPopup";
 import { Suspense, lazy } from "react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoadingSkeleton } from "@/components/PageLoadingSkeleton";
 import { RoleGuard } from "@/components/admin/RoleGuard";
 import { BanGuard } from "@/components/BanGuard";
