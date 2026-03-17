@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
           .eq("reference", checkData.reference)
           .maybeSingle();
 
-        if (tx && tx.status === "pending") {
+        if (tx && tx.status !== "success") {
           await supabaseAdmin
             .from("payment_transactions")
             .update({
