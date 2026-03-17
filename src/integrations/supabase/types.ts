@@ -1270,10 +1270,12 @@ export type Database = {
           placement_type: string
           price_charged: number | null
           product_id: string | null
+          show_timer: boolean
           sort_order: number
           start_date: string
           store_id: string | null
           text_color: string | null
+          timer_color: string | null
           title: string | null
           updated_at: string
         }
@@ -1290,10 +1292,12 @@ export type Database = {
           placement_type?: string
           price_charged?: number | null
           product_id?: string | null
+          show_timer?: boolean
           sort_order?: number
           start_date?: string
           store_id?: string | null
           text_color?: string | null
+          timer_color?: string | null
           title?: string | null
           updated_at?: string
         }
@@ -1310,10 +1314,12 @@ export type Database = {
           placement_type?: string
           price_charged?: number | null
           product_id?: string | null
+          show_timer?: boolean
           sort_order?: number
           start_date?: string
           store_id?: string | null
           text_color?: string | null
+          timer_color?: string | null
           title?: string | null
           updated_at?: string
         }
