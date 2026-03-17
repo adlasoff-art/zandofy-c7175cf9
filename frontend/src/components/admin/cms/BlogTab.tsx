@@ -507,7 +507,7 @@ function CommentsManager() {
   });
 
   const toggleApproval = async (id: string, current: boolean) => {
-    await supabase.from("blog_comments").update({ is_approved: !current }).eq("id", id);
+    await sb.from("blog_comments").update({ is_approved: !current }).eq("id", id);
     qc.invalidateQueries({ queryKey: ["admin-blog-comments"] });
   };
 
