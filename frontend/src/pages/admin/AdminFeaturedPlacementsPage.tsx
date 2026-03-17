@@ -346,6 +346,12 @@ function RequestsTab() {
                 <p><strong>Durée souhaitée :</strong> {reviewItem.desired_duration_days || "—"} jours</p>
                 <p><strong>Message :</strong> {reviewItem.message || "—"}</p>
               </div>
+              {reviewItem.image_url && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Image soumise</label>
+                  <img src={reviewItem.image_url} alt="" className="mt-1 w-[100px] h-[200px] object-cover rounded-lg border border-border" />
+                </div>
+              )}
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Prix à facturer ($)</label>
                 <Input type="number" value={priceQuoted} onChange={(e) => setPriceQuoted(e.target.value)} placeholder="0" />
