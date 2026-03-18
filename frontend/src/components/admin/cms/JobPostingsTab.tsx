@@ -60,7 +60,7 @@ const JobPostingsTab: React.FC = () => {
 
   const fetchPostings = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("job_postings")
       .select("*")
       .order("created_at", { ascending: false });
