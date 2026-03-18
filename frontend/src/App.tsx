@@ -136,6 +136,7 @@ const App = () => (
             <SupportDrawerWrapper />
             <MobileBottomNav />
             <PWAInstallBanner />
+            <PWAUpdatePrompt />
             <OfflineIndicator />
             <CookieConsent />
             <AnnouncementPopup />
