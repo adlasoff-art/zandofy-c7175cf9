@@ -1,8 +1,13 @@
+import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useI18n } from "@/contexts/I18nContext";
-import { Briefcase, Globe2, Heart, Rocket, Users, Zap, ArrowRight, CheckCircle2, MapPin, Clock } from "lucide-react";
-import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  Briefcase, Globe2, Heart, Rocket, Users, Zap, ArrowRight, CheckCircle2,
+  MapPin, Clock, GraduationCap, CalendarDays, Megaphone, Gavel, Star,
+} from "lucide-react";
+import { format } from "date-fns";
 
 const values = [
   { icon: Rocket, title: "Innovation", desc: "Nous repoussons les limites du e-commerce africain avec des solutions technologiques de pointe." },
@@ -20,16 +25,48 @@ const benefits = [
   "Opportunités d'évolution rapide",
 ];
 
-const openings = [
-  { title: "Développeur Full-Stack", department: "Technologie", location: "Kinshasa / Remote", type: "CDI" },
-  { title: "Responsable Marketing Digital", department: "Marketing", location: "Kinshasa", type: "CDI" },
-  { title: "Chargé(e) Logistique", department: "Opérations", location: "Kinshasa", type: "CDI" },
-  { title: "Community Manager", department: "Communication", location: "Remote", type: "CDD" },
-  { title: "Analyste Données", department: "Data", location: "Kinshasa / Remote", type: "CDI" },
-];
+interface JobPosting {
+  id: string;
+  title: string;
+  department: string;
+  location: string;
+  contract_type: string;
+  posting_type: string;
+  description: string;
+  requirements: string[];
+  skills: string[];
+  education_level: string;
+  experience_years: string;
+  salary_range: string | null;
+  deadline: string | null;
+  is_active: boolean;
+}
+
+const POSTING_TYPE_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
+  job_offer: { label: "Offre d'emploi", icon: Briefcase, color: "bg-primary/10 text-primary" },
+  call_for_applications: { label: "Appel à candidature", icon: Megaphone, color: "bg-accent text-accent-foreground" },
+  tender: { label: "Appel d'offres", icon: Gavel, color: "bg-secondary text-secondary-foreground" },
+};
 
 export default function CareersPage() {
   const { t } = useI18n();
+  const [postings, setPostings] = useState<JobPosting[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>("all");
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("job_postings")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
+      if (data) setPostings(data);
+      setLoading(false);
+    })();
+  }, []);
+
+  const filtered = filter === "all" ? postings : postings.filter(p => p.posting_type === filter);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -95,28 +132,149 @@ export default function CareersPage() {
 
         {/* Open positions */}
         <section id="openings" className="py-16 md:py-20 container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center text-foreground mb-4">Postes Ouverts</h2>
-          <p className="text-center text-muted-foreground mb-12 max-w-xl mx-auto">
+          <h2 className="text-3xl font-bold text-center text-foreground mb-4">Postes Ouverts & Appels</h2>
+          <p className="text-center text-muted-foreground mb-8 max-w-xl mx-auto">
             Découvrez nos opportunités actuelles et trouvez le rôle qui vous correspond.
           </p>
-          <div className="max-w-3xl mx-auto space-y-4">
-            {openings.map((job, i) => (
-              <div key={i} className="bg-card rounded-2xl p-6 border border-border hover:shadow-md transition-shadow flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="flex-1">
-                  <h3 className="font-bold text-foreground text-lg">{job.title}</h3>
-                  <p className="text-muted-foreground text-sm">{job.department}</p>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <span className="flex items-center gap-1"><MapPin className="w-4 h-4" />{job.location}</span>
-                  <span className="flex items-center gap-1"><Clock className="w-4 h-4" />{job.type}</span>
-                </div>
-                <a href={`mailto:careers@zandofy.com?subject=Candidature : ${job.title}`}
-                  className="inline-flex items-center gap-1 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold hover:bg-primary/20 transition-colors whitespace-nowrap">
-                  Postuler <ArrowRight className="w-4 h-4" />
-                </a>
-              </div>
+
+          {/* Filters */}
+          <div className="flex justify-center gap-2 mb-10 flex-wrap">
+            {[
+              { key: "all", label: "Tout" },
+              { key: "job_offer", label: "Offres d'emploi" },
+              { key: "call_for_applications", label: "Appels à candidature" },
+              { key: "tender", label: "Appels d'offres" },
+            ].map(f => (
+              <button key={f.key} onClick={() => setFilter(f.key)}
+                className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                  filter === f.key
+                    ? "bg-foreground text-card border-foreground"
+                    : "bg-card text-foreground border-border hover:border-foreground"
+                }`}>
+                {f.label}
+              </button>
             ))}
           </div>
+
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="text-center text-muted-foreground py-12">Aucune offre disponible pour le moment.</p>
+          ) : (
+            <div className="max-w-4xl mx-auto space-y-5">
+              {filtered.map(job => {
+                const meta = POSTING_TYPE_META[job.posting_type] || POSTING_TYPE_META.job_offer;
+                const TypeIcon = meta.icon;
+                const isExpired = job.deadline && new Date(job.deadline) < new Date();
+                const daysLeft = job.deadline ? Math.ceil((new Date(job.deadline).getTime() - Date.now()) / 86400000) : null;
+
+                return (
+                  <div key={job.id} className="bg-card rounded-2xl border border-border hover:shadow-lg transition-shadow overflow-hidden">
+                    {/* Header */}
+                    <div className="p-6 pb-4">
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${meta.color}`}>
+                              <TypeIcon className="w-3 h-3" /> {meta.label}
+                            </span>
+                            {job.contract_type && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium bg-muted text-muted-foreground px-2.5 py-1 rounded-full">
+                                <Clock className="w-3 h-3" /> {job.contract_type}
+                              </span>
+                            )}
+                            {isExpired && (
+                              <span className="text-xs font-medium bg-destructive/10 text-destructive px-2.5 py-1 rounded-full">Expiré</span>
+                            )}
+                          </div>
+                          <h3 className="font-bold text-foreground text-xl">{job.title}</h3>
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-1">
+                            {job.department && <span>{job.department}</span>}
+                            {job.location && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{job.location}</span>}
+                          </div>
+                        </div>
+
+                        {/* Deadline badge */}
+                        {job.deadline && !isExpired && daysLeft !== null && (
+                          <div className="text-center shrink-0 bg-primary/5 border border-primary/20 rounded-xl px-4 py-2">
+                            <CalendarDays className="w-5 h-5 text-primary mx-auto mb-1" />
+                            <div className="text-lg font-bold text-primary">{daysLeft}</div>
+                            <div className="text-[10px] text-muted-foreground uppercase tracking-wide">jours restants</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {job.description && (
+                        <p className="text-sm text-muted-foreground mt-3 line-clamp-3">{job.description}</p>
+                      )}
+                    </div>
+
+                    {/* Details grid */}
+                    <div className="px-6 pb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {job.education_level && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <GraduationCap className="w-4 h-4 text-primary shrink-0" />
+                          <span className="text-foreground font-medium">{job.education_level}</span>
+                        </div>
+                      )}
+                      {job.experience_years && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Star className="w-4 h-4 text-primary shrink-0" />
+                          <span className="text-foreground font-medium">{job.experience_years}</span>
+                        </div>
+                      )}
+                      {job.deadline && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <CalendarDays className="w-4 h-4 text-primary shrink-0" />
+                          <span className="text-foreground font-medium">Limite : {format(new Date(job.deadline), "dd/MM/yyyy")}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Skills */}
+                    {job.skills.length > 0 && (
+                      <div className="px-6 pb-4">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Compétences</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {job.skills.map((s, i) => (
+                            <span key={i} className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">{s}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Requirements */}
+                    {job.requirements.length > 0 && (
+                      <div className="px-6 pb-4">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Exigences</p>
+                        <ul className="space-y-1">
+                          {job.requirements.map((r, i) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                              <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                              {r}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* CTA */}
+                    <div className="px-6 pb-6 pt-2 border-t border-border/50">
+                      <a href={`mailto:careers@zandofy.com?subject=Candidature : ${job.title}`}
+                        className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-full text-sm font-bold hover:opacity-90 transition-opacity">
+                        Postuler <ArrowRight className="w-4 h-4" />
+                      </a>
+                      {job.salary_range && (
+                        <span className="ml-4 text-sm text-muted-foreground">{job.salary_range}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* CTA */}
