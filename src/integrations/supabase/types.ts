@@ -1379,6 +1379,66 @@ export type Database = {
         }
         Relationships: []
       }
+      job_postings: {
+        Row: {
+          contract_type: string
+          created_at: string
+          created_by: string | null
+          deadline: string | null
+          department: string
+          description: string
+          education_level: string
+          experience_years: string
+          id: string
+          is_active: boolean
+          location: string
+          posting_type: string
+          requirements: string[]
+          salary_range: string | null
+          skills: string[]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          contract_type?: string
+          created_at?: string
+          created_by?: string | null
+          deadline?: string | null
+          department?: string
+          description?: string
+          education_level?: string
+          experience_years?: string
+          id?: string
+          is_active?: boolean
+          location?: string
+          posting_type?: string
+          requirements?: string[]
+          salary_range?: string | null
+          skills?: string[]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          contract_type?: string
+          created_at?: string
+          created_by?: string | null
+          deadline?: string | null
+          department?: string
+          description?: string
+          education_level?: string
+          experience_years?: string
+          id?: string
+          is_active?: boolean
+          location?: string
+          posting_type?: string
+          requirements?: string[]
+          salary_range?: string | null
+          skills?: string[]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       kyc_audit_logs: {
         Row: {
           action: string
