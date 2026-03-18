@@ -114,7 +114,7 @@ const JobPostingsTab: React.FC = () => {
   };
 
   const toggleActive = async (p: JobPosting) => {
-    await supabase.from("job_postings").update({ is_active: !p.is_active }).eq("id", p.id);
+    await (supabase as any).from("job_postings").update({ is_active: !p.is_active }).eq("id", p.id);
     fetchPostings();
   };
 
