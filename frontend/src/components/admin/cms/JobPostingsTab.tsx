@@ -108,7 +108,7 @@ const JobPostingsTab: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Supprimer cette offre ?")) return;
-    await supabase.from("job_postings").delete().eq("id", id);
+    await (supabase as any).from("job_postings").delete().eq("id", id);
     toast({ title: "Offre supprimée" });
     fetchPostings();
   };
