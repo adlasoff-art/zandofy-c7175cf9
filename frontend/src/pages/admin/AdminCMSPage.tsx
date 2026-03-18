@@ -74,6 +74,7 @@ const AdminCMSPage: React.FC = () => {
         {tab === "texts" && <TextsTab />}
         {tab === "legal" && <LegalPagesTab />}
         {tab === "blog" && <BlogTab />}
+        {tab === "jobs" && <JobPostingsTab />}
       </Suspense>
     </AdminLayout>
   );
