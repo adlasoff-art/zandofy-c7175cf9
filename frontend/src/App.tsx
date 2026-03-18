@@ -17,6 +17,7 @@ import { OrderAlertListener } from "@/components/OrderAlertListener";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { ScrollRestoration } from "@/components/ScrollRestoration";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
+import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 import { useCmsTheme } from "@/hooks/use-cms-theme";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { MaintenanceGuard } from "@/components/MaintenanceGuard";
@@ -135,6 +136,7 @@ const App = () => (
             <SupportDrawerWrapper />
             <MobileBottomNav />
             <PWAInstallBanner />
+            <PWAUpdatePrompt />
             <OfflineIndicator />
             <CookieConsent />
             <AnnouncementPopup />

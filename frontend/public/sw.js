@@ -12,7 +12,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE_URLS))
   );
-  self.skipWaiting();
+  // Do NOT call self.skipWaiting() here — let the app prompt the user first
 });
 
 // Activate — clean old caches immediately
