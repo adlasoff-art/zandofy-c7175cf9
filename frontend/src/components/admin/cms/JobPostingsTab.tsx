@@ -93,11 +93,11 @@ const JobPostingsTab: React.FC = () => {
     };
 
     if (editing.id) {
-      const { error } = await supabase.from("job_postings").update(payload).eq("id", editing.id);
+      const { error } = await (supabase as any).from("job_postings").update(payload).eq("id", editing.id);
       if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
       else toast({ title: "Offre mise à jour" });
     } else {
-      const { error } = await supabase.from("job_postings").insert({ ...payload, created_by: user?.id });
+      const { error } = await (supabase as any).from("job_postings").insert({ ...payload, created_by: user?.id });
       if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
       else toast({ title: "Offre créée" });
     }
