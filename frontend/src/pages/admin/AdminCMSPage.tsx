@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
-  Image, Menu, FileText, LayoutDashboard, Palette, MapPin, FootprintsIcon, Languages, Scale, BookOpen,
+  Image, Menu, FileText, LayoutDashboard, Palette, MapPin, FootprintsIcon, Languages, Scale, BookOpen, Briefcase,
 } from "lucide-react";
 import { HeroBannerEditor } from "@/components/admin/HeroBannerEditor";
 import { ColorPaletteEditor } from "@/components/admin/ColorPaletteEditor";
