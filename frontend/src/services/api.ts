@@ -64,6 +64,7 @@ function mapProduct(row: any): Product {
 
   const p: Product = {
     id: row.id,
+    slug: row.slug || row.id,
     name: row.name,
     nameFr: row.name_fr,
     price: Number(row.price),
