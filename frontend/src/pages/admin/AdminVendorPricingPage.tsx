@@ -102,10 +102,17 @@ export default function AdminVendorPricingPage() {
 
     // Update is_platform_owned on store
     if (edit.is_platform_owned !== (store.is_platform_owned ?? false)) {
-      await (supabase as any)
+      const { data: storeUpdateData, error: storeUpdateError } = await (supabase as any)
         .from("stores")
         .update({ is_platform_owned: edit.is_platform_owned })
-        .eq("id", store.id);
+        .eq("id", store.id)
+        .select();
+
+      if (storeUpdateError || !storeUpdateData?.length) {
+        toast({ title: "Erreur", description: storeUpdateError?.message || "Impossible de modifier le statut plateforme. Vérifiez vos permissions.", variant: "destructive" });
+        setSavingId(null);
+        return;
+      }
     }
 
     const payload = {
