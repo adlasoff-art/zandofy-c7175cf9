@@ -76,6 +76,7 @@ const AdminShippingPage = lazy(() => import("./pages/admin/AdminShippingPage"));
 const AdminVendorApplicationsPage = lazy(() => import("./pages/admin/AdminVendorApplicationsPage"));
 const AdminStoreNamesPage = lazy(() => import("./pages/admin/AdminStoreNamesPage"));
 const AdminVendorSubscriptionsPage = lazy(() => import("./pages/admin/AdminVendorSubscriptionsPage"));
+const AdminVendorPricingPage = lazy(() => import("./pages/admin/AdminVendorPricingPage"));
 const AdminAuditPage = lazy(() => import("./pages/admin/AdminAuditPage"));
 const AdminLoyaltyPage = lazy(() => import("./pages/admin/AdminLoyaltyPage"));
 const AdminPointsPage = lazy(() => import("./pages/admin/AdminPointsPage"));
@@ -192,6 +193,7 @@ const App = () => (
                 <Route path="/admin/vendor-applications" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminVendorApplicationsPage /></RoleGuard>} />
                 <Route path="/admin/store-names" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminStoreNamesPage /></RoleGuard>} />
                 <Route path="/admin/vendor-subscriptions" element={<RoleGuard allowedRoles={["admin"]}><AdminVendorSubscriptionsPage /></RoleGuard>} />
+                <Route path="/admin/vendor-pricing" element={<RoleGuard allowedRoles={["admin"]}><AdminVendorPricingPage /></RoleGuard>} />
                 <Route path="/admin/audit" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminAuditPage /></RoleGuard>} />
                 <Route path="/admin/loyalty" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminLoyaltyPage /></RoleGuard>} />
                 <Route path="/admin/points" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminPointsPage /></RoleGuard>} />

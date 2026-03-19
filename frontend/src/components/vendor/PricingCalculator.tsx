@@ -34,7 +34,13 @@ export function PricingCalculator({
   onVendorExtraMarginChange, onPriceChange, onOriginalPriceChange,
 }: PricingCalculatorProps) {
   const [settings, setSettings] = useState<PricingDefaults>(DEFAULT_PRICING);
-  const [overrides, setOverrides] = useState<{ max_multiplier?: number; max_extra_margin?: number } | null>(null);
+  const [overrides, setOverrides] = useState<{
+    max_multiplier?: number;
+    max_extra_margin?: number;
+    vendor_extra_margin_enabled?: boolean;
+    margin_pct?: number;
+    multiplier?: number;
+  } | null>(null);
 
   useEffect(() => {
     // Load global pricing settings
@@ -58,7 +64,7 @@ export function PricingCalculator({
     // Load vendor-specific overrides
     (supabase as any)
       .from("vendor_pricing_overrides")
-      .select("max_multiplier, max_extra_margin")
+      .select("max_multiplier, max_extra_margin, vendor_extra_margin_enabled, margin_pct, multiplier")
       .eq("store_id", storeId)
       .maybeSingle()
       .then(({ data }: any) => {
@@ -66,18 +72,20 @@ export function PricingCalculator({
       });
   }, [storeId]);
 
-  const effectiveMultiplier = overrides?.max_multiplier
-    ? Math.min(settings.multiplier, overrides.max_multiplier)
-    : settings.multiplier;
+  // Per-store overrides take priority, then global defaults
+  const effectiveMarginPct = overrides?.margin_pct ?? settings.margin_pct;
+  const effectiveMultiplier = overrides?.multiplier ?? settings.multiplier;
+  const vendorExtraMarginAllowed = overrides?.vendor_extra_margin_enabled ?? false;
 
   // Recalculate when inputs change
   const recalculate = useCallback(() => {
     if (!autoPricingEnabled || costCalc <= 0) return;
-    const sp = calculateSalePrice(costCalc, settings.margin_pct, effectiveMultiplier, vendorExtraMargin);
+    const extraMargin = vendorExtraMarginAllowed ? vendorExtraMargin : 0;
+    const sp = calculateSalePrice(costCalc, effectiveMarginPct, effectiveMultiplier, extraMargin);
     const op = calculateOldPrice(sp);
     onPriceChange(sp);
     onOriginalPriceChange(op);
-  }, [costCalc, settings, effectiveMultiplier, vendorExtraMargin, autoPricingEnabled, onPriceChange, onOriginalPriceChange]);
+  }, [costCalc, effectiveMarginPct, effectiveMultiplier, vendorExtraMargin, vendorExtraMarginAllowed, autoPricingEnabled, onPriceChange, onOriginalPriceChange]);
 
   useEffect(() => {
     recalculate();
@@ -144,7 +152,7 @@ export function PricingCalculator({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Marge (%)</label>
-              <input type="number" value={settings.margin_pct} readOnly className={inputClass + " bg-muted/50 cursor-not-allowed"} />
+              <input type="number" value={effectiveMarginPct} readOnly className={inputClass + " bg-muted/50 cursor-not-allowed"} />
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Multiplicateur</label>
@@ -152,8 +160,8 @@ export function PricingCalculator({
             </div>
           </div>
 
-          {/* Vendor extra margin */}
-          {effectiveMaxExtra > 0 && (
+          {/* Vendor extra margin — only if admin enabled it for this store */}
+          {vendorExtraMarginAllowed && effectiveMaxExtra > 0 && (
             <div>
               <label className="text-xs text-muted-foreground block mb-1">
                 Marge vendeur (+${effectiveMaxExtra.toFixed(2)} max)
