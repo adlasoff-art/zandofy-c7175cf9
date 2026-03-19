@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Calculator, Search, Store, Save, Loader2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Calculator, Search, Store, Save, Loader2, ToggleLeft, ToggleRight, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
