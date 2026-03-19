@@ -150,7 +150,7 @@ export default function DashboardPage() {
       .from("orders")
       .select("id, order_ref, created_at, total, status, subtotal, shipping_cost, discount_amount, coupon_code, shipping_first_name, shipping_last_name, shipping_address, shipping_city, shipping_country, payment_method, tracking_number, assigned_rider_name, delivery_choice, last_mile_fee, confirmation_code")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false }) as any;
     setOrders(data || []);
     setLoading(false);
   }, [user]);
