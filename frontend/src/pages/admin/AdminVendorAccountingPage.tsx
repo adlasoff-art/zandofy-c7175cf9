@@ -104,10 +104,10 @@ export default function AdminVendorAccountingPage() {
   const { data: products } = useQuery({
     queryKey: ["accounting-products"],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("products")
         .select("id, cost_real, vendor_extra_margin, store_id, name");
-      return data || [];
+      return (data || []) as { id: string; cost_real: number | null; vendor_extra_margin: number | null; store_id: string | null; name: string }[];
     },
   });
 
