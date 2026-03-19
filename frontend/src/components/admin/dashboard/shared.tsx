@@ -52,7 +52,7 @@ export function KpiCard({ icon: Icon, label, value, color = "text-primary", sub 
 }
 
 export function KpiCardRow({ icon: Icon, label, value, color = "text-primary" }: {
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: React.ComponentType<any>;
   label: string;
   value: string;
   color?: string;
