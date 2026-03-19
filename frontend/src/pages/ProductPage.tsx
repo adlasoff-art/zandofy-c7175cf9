@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, lazy, Suspense } from "react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchProductById, fetchProducts, fetchPricingTiers, type Product } from "@/services/api";
+import { fetchProductBySlug, fetchProducts, fetchPricingTiers, type Product } from "@/services/api";
 import { Header } from "@/components/Header";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
