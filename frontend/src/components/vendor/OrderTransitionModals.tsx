@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Truck, User, DollarSign, Hash } from "lucide-react";
+import { Loader2, Truck, User, DollarSign, Hash, Edit2 } from "lucide-react";
 
 function generateConfirmationCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -86,6 +86,82 @@ export function TrackingNumberModal({
   );
 }
 
+/** Modal: edit tracking number and supplier order number without changing order status */
+export function EditTrackingModal({
+  currentTracking,
+  currentSupplierOrder,
+  onConfirm,
+  onCancel,
+  loading,
+}: {
+  currentTracking: string;
+  currentSupplierOrder: string;
+  onConfirm: (trackingNumber: string, supplierOrderNumber: string) => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  const [trackingValue, setTrackingValue] = useState(currentTracking);
+  const [supplierOrderValue, setSupplierOrderValue] = useState(currentSupplierOrder);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+      <div className="bg-card rounded-xl w-full max-w-sm p-5 space-y-4 border border-border" onClick={e => e.stopPropagation()}>
+        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <Edit2 size={16} className="text-primary" /> Modifier les informations de suivi
+        </h3>
+
+        <div>
+          <label className="text-xs font-medium text-foreground mb-1 block">
+            N° de commande fournisseur
+          </label>
+          <input
+            type="text"
+            value={supplierOrderValue}
+            onChange={e => setSupplierOrderValue(e.target.value)}
+            placeholder="Ex: 73829461023847"
+            maxLength={200}
+            className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+            autoFocus
+            style={{ fontSize: "16px" }}
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-medium text-foreground mb-1 block">
+            N° de suivi (tracking)
+          </label>
+          <p className="text-[11px] text-muted-foreground mb-1.5">
+            AWB ou numéro de tracking du transporteur. Indispensable pour le suivi client.
+          </p>
+          <input
+            type="text"
+            value={trackingValue}
+            onChange={e => setTrackingValue(e.target.value)}
+            placeholder="Ex: AWB-2026-001234"
+            maxLength={200}
+            className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+            style={{ fontSize: "16px" }}
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={onCancel} className="flex-1 px-4 py-2.5 text-sm border border-border rounded-lg hover:bg-muted">
+            Annuler
+          </button>
+          <button
+            onClick={() => onConfirm(trackingValue.trim(), supplierOrderValue.trim())}
+            disabled={loading}
+            className="flex-1 px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <Edit2 size={14} />}
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface RiderOption {
   id: string;
   name: string;
@@ -112,7 +188,6 @@ export function RiderAssignmentModal({
 
   useEffect(() => {
     async function fetchRiders() {
-      // Get all users with rider role
       const { data: roleData } = await supabase
         .from("user_roles")
         .select("user_id")

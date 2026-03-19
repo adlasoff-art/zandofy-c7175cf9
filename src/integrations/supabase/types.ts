@@ -1736,8 +1736,10 @@ export type Database = {
           id: string
           last_mile_fee: number | null
           last_mile_payment_method: string | null
+          last_mile_payment_status: string | null
           order_ref: string
           payment_method: string | null
+          rider_cash_collected: boolean | null
           shipping_address: string | null
           shipping_city: string | null
           shipping_cost: number
@@ -1745,6 +1747,7 @@ export type Database = {
           shipping_email: string | null
           shipping_first_name: string | null
           shipping_last_name: string | null
+          shipping_payment_status: string | null
           shipping_phone: string | null
           shipping_postal_code: string | null
           status: string
@@ -1767,8 +1770,10 @@ export type Database = {
           id?: string
           last_mile_fee?: number | null
           last_mile_payment_method?: string | null
+          last_mile_payment_status?: string | null
           order_ref: string
           payment_method?: string | null
+          rider_cash_collected?: boolean | null
           shipping_address?: string | null
           shipping_city?: string | null
           shipping_cost?: number
@@ -1776,6 +1781,7 @@ export type Database = {
           shipping_email?: string | null
           shipping_first_name?: string | null
           shipping_last_name?: string | null
+          shipping_payment_status?: string | null
           shipping_phone?: string | null
           shipping_postal_code?: string | null
           status?: string
@@ -1798,8 +1804,10 @@ export type Database = {
           id?: string
           last_mile_fee?: number | null
           last_mile_payment_method?: string | null
+          last_mile_payment_status?: string | null
           order_ref?: string
           payment_method?: string | null
+          rider_cash_collected?: boolean | null
           shipping_address?: string | null
           shipping_city?: string | null
           shipping_cost?: number
@@ -1807,6 +1815,7 @@ export type Database = {
           shipping_email?: string | null
           shipping_first_name?: string | null
           shipping_last_name?: string | null
+          shipping_payment_status?: string | null
           shipping_phone?: string | null
           shipping_postal_code?: string | null
           status?: string

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send } from "lucide-react";
+import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send, Edit2, Truck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { triggerOrderStatusNotification } from "@/services/order-notifications";
@@ -12,7 +12,7 @@ import {
   canAdminAdvance,
 } from "@/lib/order-status";
 import { useRoles } from "@/hooks/use-roles";
-import { TrackingNumberModal, RiderAssignmentModal, DeliveryFeeModal, generateConfirmationCode } from "./OrderTransitionModals";
+import { TrackingNumberModal, RiderAssignmentModal, DeliveryFeeModal, EditTrackingModal, generateConfirmationCode } from "./OrderTransitionModals";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -70,6 +70,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
   const [trackingModal, setTrackingModal] = useState<string | null>(null);
   const [riderModal, setRiderModal] = useState<string | null>(null);
   const [deliveryFeeModal, setDeliveryFeeModal] = useState<string | null>(null);
+  const [editTrackingModal, setEditTrackingModal] = useState<string | null>(null);
   const [hasSelfDelivery, setHasSelfDelivery] = useState(false);
 
   // Check if store has self-delivery
@@ -89,7 +90,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code")
+      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status")
       .eq("store_id", storeId)
       .order("created_at", { ascending: false }) as any;
 
@@ -272,6 +273,17 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                   </div>
                 )}
 
+                {/* Edit tracking button — available when in_shipping or later, before delivered */}
+                {["in_shipping", "shipped", "assigning_rider", "rider_assigned", "out_for_delivery"].includes(order.status) && (
+                  <button
+                    onClick={() => setEditTrackingModal(order.id)}
+                    className="w-full py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-md hover:bg-primary/5 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Edit2 size={12} />
+                    {order.tracking_number ? "Modifier les infos de suivi" : "Ajouter le n° de suivi (tracking)"}
+                  </button>
+                )}
+
                 {/* Assigned rider */}
                 {order.assigned_rider_name && (
                   <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
@@ -305,7 +317,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                 )}
 
                 {/* Mini stepper with dates */}
-                <OrderMiniStepper status={order.status} history={order.history} />
+                <OrderMiniStepper status={order.status} history={order.history} trackingNumber={order.tracking_number} />
 
                 {/* Items */}
                 <div className="space-y-1.5">
@@ -407,6 +419,34 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
         />
       )}
 
+      {/* Edit tracking modal — no status change */}
+      {editTrackingModal && (() => {
+        const editOrder = orders.find(o => o.id === editTrackingModal);
+        return (
+          <EditTrackingModal
+            currentTracking={editOrder?.tracking_number || ""}
+            currentSupplierOrder={editOrder?.supplier_order_number || ""}
+            loading={!!updatingId}
+            onCancel={() => setEditTrackingModal(null)}
+            onConfirm={async (trackingNumber, supplierOrderNumber) => {
+              setUpdatingId(editTrackingModal);
+              const updates: any = {};
+              if (trackingNumber) updates.tracking_number = trackingNumber;
+              if (supplierOrderNumber) updates.supplier_order_number = supplierOrderNumber;
+              const { error } = await supabase.from("orders").update(updates).eq("id", editTrackingModal);
+              if (error) {
+                toast.error("Erreur lors de la mise à jour");
+              } else {
+                toast.success("Informations de suivi mises à jour");
+                setOrders(prev => prev.map(o => o.id === editTrackingModal ? { ...o, ...updates } : o));
+              }
+              setUpdatingId(null);
+              setEditTrackingModal(null);
+            }}
+          />
+        );
+      })()}
+
       {/* Rider assignment modal */}
       {riderModal && (
         <RiderAssignmentModal
@@ -430,7 +470,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
 }
 
 /** Order stepper with date/time under each step — enlarged for readability */
-function OrderMiniStepper({ status, history }: { status: string; history: StatusHistoryEntry[] }) {
+function OrderMiniStepper({ status, history, trackingNumber }: { status: string; history: StatusHistoryEntry[]; trackingNumber?: string | null }) {
   const currentIdx = STATUS_FLOW.indexOf(status as any);
   const isCancelled = status === "cancelled" || status === "returned";
   const historyMap = new Map(history.map((h) => [h.status, h.created_at]));
@@ -468,6 +508,10 @@ function OrderMiniStepper({ status, history }: { status: string; history: Status
                 >
                   <cfg.icon size={14} />
                 </div>
+                {/* Tracking indicator on in_shipping step */}
+                {step === "in_shipping" && trackingNumber && (
+                  <span className="mt-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" title="Tracking disponible" />
+                )}
                 <span className={`text-[9px] sm:text-[10px] mt-1 text-center leading-tight max-w-[56px] sm:max-w-[68px] ${
                   done ? "text-foreground font-medium" : "text-muted-foreground"
                 }`}>
