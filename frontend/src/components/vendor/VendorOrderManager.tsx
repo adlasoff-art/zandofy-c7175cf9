@@ -335,7 +335,34 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                   </div>
                 )}
 
-                {/* Confirmation code (visible to vendor) */}
+                {/* Payment proof uploads (vendor view) */}
+                {order.shipping_payment_status === "deferred" && (
+                  <PaymentProofUpload
+                    orderId={order.id}
+                    field="shipping_payment_proof_url"
+                    label="Preuve paiement expédition (client)"
+                    existingUrl={order.shipping_payment_proof_url}
+                  />
+                )}
+
+                {order.delivery_choice === "hub_pickup" && order.status !== "delivered" && order.status !== "cancelled" && (
+                  <PaymentProofUpload
+                    orderId={order.id}
+                    field="hub_pickup_proof_url"
+                    label="Preuve de remise au Hub (photo)"
+                    existingUrl={order.hub_pickup_proof_url}
+                  />
+                )}
+
+                {order.delivery_choice === "home_delivery" && order.last_mile_payment_method === "cash" && (
+                  <PaymentProofUpload
+                    orderId={order.id}
+                    field="last_mile_payment_proof_url"
+                    label="Preuve paiement livraison (cash)"
+                    existingUrl={order.last_mile_payment_proof_url}
+                  />
+                )}
+
                 {order.confirmation_code && (
                   <div className="flex items-center gap-2 text-xs bg-primary/10 rounded-md p-2">
                     <span className="text-muted-foreground">Code confirmation :</span>
