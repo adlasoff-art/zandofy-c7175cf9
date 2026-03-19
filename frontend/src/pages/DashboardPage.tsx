@@ -345,9 +345,9 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
 
   // Filter orders
   const filtered = orders.filter(o => {
-    if (statusFilter === "active") return !["delivered", "cancelled", "returned"].includes(o.status);
+    if (statusFilter === "active") return ACTIVE_ORDER_STATUSES.includes(o.status as never);
     if (statusFilter === "delivered") return o.status === "delivered";
-    if (statusFilter === "cancelled") return o.status === "cancelled" || o.status === "returned";
+    if (statusFilter === "cancelled") return ["cancelled", "returned", "payment_failed"].includes(o.status);
     return true;
   }).filter(o => {
     if (!searchQuery.trim()) return true;

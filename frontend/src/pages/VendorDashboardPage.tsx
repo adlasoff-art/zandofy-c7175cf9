@@ -85,10 +85,9 @@ export default function VendorDashboardPage() {
     let storeIdForRealtime: string | null = null;
 
     async function fetchOrderCounters(storeId: string) {
-      const ACTIVE_STATUSES = ["pending", "confirmed", "preparing", "in_shipping", "shipped", "assigning_rider", "rider_assigned", "out_for_delivery"];
       const [totalRes, activeRes, deliveredRes] = await Promise.all([
-        supabase.from("orders").select("id", { count: "exact", head: true }).eq("store_id", storeId),
-        supabase.from("orders").select("id", { count: "exact", head: true }).eq("store_id", storeId).in("status", ACTIVE_STATUSES),
+        supabase.from("orders").select("id", { count: "exact", head: true }).eq("store_id", storeId).not("status", "in", `(${NON_REVENUE_ORDER_STATUSES.map((status) => `"${status}"`).join(",")})`),
+        supabase.from("orders").select("id", { count: "exact", head: true }).eq("store_id", storeId).in("status", [...ACTIVE_ORDER_STATUSES]),
         supabase.from("orders").select("id", { count: "exact", head: true }).eq("store_id", storeId).eq("status", "delivered"),
       ]);
       setOrderCounters({

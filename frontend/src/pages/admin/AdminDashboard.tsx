@@ -247,8 +247,8 @@ export default function AdminDashboard() {
   const orderHealthStats = [
     { label: "Livrées", value: (orderStats?.deliveredCount ?? 0).toString(), icon: CheckCircle2, color: "text-primary" },
     { label: "En attente", value: (orderStats?.pendingCount ?? 0).toString(), icon: Clock, color: "text-amber-500" },
-    { label: "Annulées", value: (orderStats?.cancelledCount ?? 0).toString(), icon: XCircle, color: "text-destructive" },
-    { label: "Montant annulé", value: `$${(orderStats?.cancelledRevenue ?? 0).toLocaleString()}`, icon: Ban, color: "text-destructive" },
+    { label: "Annulées / retournées", value: (orderStats?.cancelledCount ?? 0).toString(), icon: XCircle, color: "text-destructive" },
+    { label: "Montant perdu", value: `$${(orderStats?.cancelledRevenue ?? 0).toLocaleString()}`, icon: Ban, color: "text-destructive" },
   ];
 
   const afterSalesStats = [
