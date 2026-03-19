@@ -33,6 +33,7 @@ interface PricingConfig {
   multiplier: number;
   max_extra_margin_under_50: number;
   max_extra_margin_over_100: number;
+  platform_commission_default: number;
 }
 
 export default function AdminSettingsPage() {
