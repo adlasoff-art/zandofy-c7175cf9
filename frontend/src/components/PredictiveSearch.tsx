@@ -291,7 +291,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
                   {suggestions.map((p) => (
                     <Link
                       key={p.id}
-                      to={`/product/${p.id}`}
+                      to={`/product/${(p as any).slug || p.id}`}
                       onClick={handleSuggestionClick}
                       onMouseEnter={() => !mobile && handleSuggestionHover(p.name)}
                       onMouseLeave={() => !mobile && setHoveredSuggestion(null)}
