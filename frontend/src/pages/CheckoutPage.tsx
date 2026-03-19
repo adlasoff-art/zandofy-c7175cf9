@@ -170,7 +170,8 @@ export default function CheckoutPage() {
   const discountAmount = couponDiscount + loyaltyDiscount;
   const pointsDiscount = usePoints ? Math.min(pointsToUse, pointsBalance) : 0;
 
-  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + shippingCost);
+  const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
+  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping);
 
   // Load saved addresses
   useEffect(() => {
