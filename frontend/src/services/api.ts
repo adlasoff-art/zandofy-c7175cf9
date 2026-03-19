@@ -221,21 +221,14 @@ export async function fetchProductBySlug(
   `;
 
   // Try slug first, fall back to UUID for backward compatibility
-  let query = supabase
-    .from("products")
-    .select(productSelect)
-    .eq("publish_status", "published");
-
-  // Detect if it's a UUID pattern
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
 
-  if (isUuid) {
-    query = query.eq("id", slug);
-  } else {
-    query = query.eq("slug", slug);
-  }
-
-  const { data, error } = await query.maybeSingle();
+  const { data, error } = await (supabase
+    .from("products")
+    .select(productSelect)
+    .eq("publish_status", "published") as any)
+    .eq(isUuid ? "id" : "slug", slug)
+    .maybeSingle();
 
   if (error || !data) {
     console.error("Error fetching product:", error);
