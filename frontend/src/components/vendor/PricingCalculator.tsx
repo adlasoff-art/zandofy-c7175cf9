@@ -160,8 +160,8 @@ export function PricingCalculator({
             </div>
           </div>
 
-          {/* Vendor extra margin */}
-          {effectiveMaxExtra > 0 && (
+          {/* Vendor extra margin — only if admin enabled it for this store */}
+          {vendorExtraMarginAllowed && effectiveMaxExtra > 0 && (
             <div>
               <label className="text-xs text-muted-foreground block mb-1">
                 Marge vendeur (+${effectiveMaxExtra.toFixed(2)} max)
