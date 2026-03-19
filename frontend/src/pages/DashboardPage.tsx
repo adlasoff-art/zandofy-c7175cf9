@@ -84,6 +84,7 @@ interface OrderRow {
   shipping_country: string | null;
   payment_method: string | null;
   tracking_number: string | null;
+  supplier_order_number: string | null;
   assigned_rider_name: string | null;
   delivery_choice: string | null;
   last_mile_fee: number | null;
