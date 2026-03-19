@@ -94,7 +94,7 @@ export function ProductGrid() {
           {loading
             ? Array.from({ length: 12 }).map((_, i) => <ProductCardSkeleton key={i} />)
             : products.map((product, i) => (
-                <Link to={`/product/${product.id}`} key={product.id} className="block">
+                <Link to={`/product/${product.slug || product.id}`} key={product.id} className="block">
                   <ProductCard product={product} index={i} />
                 </Link>
               ))}
@@ -109,7 +109,7 @@ export function ProductGrid() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 md:gap-2">
               {section.products.map((product, i) => (
-                <Link to={`/product/${product.id}`} key={product.id} className="block">
+                <Link to={`/product/${product.slug || product.id}`} key={product.id} className="block">
                   <ProductCard product={product} index={i} />
                 </Link>
               ))}

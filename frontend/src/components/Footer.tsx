@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { BrandLogo } from "@/components/BrandLogo";
 import { Mail, MapPin, Phone, CreditCard, Shield, Truck, RotateCcw, Facebook, Instagram, Twitter, Youtube, Linkedin } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useState, useEffect } from "react";
@@ -150,7 +151,7 @@ export function Footer() {
       <div className="container py-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <h4 className="text-base tracking-[0.08em] text-foreground mb-3" style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 400 }}>Zandofy</h4>
+            <div className="mb-3"><BrandLogo variant="footer" /></div>
             <p className="text-xs text-muted-foreground leading-relaxed mb-4">{footerConfig.description || t("footer.description")}</p>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <MapPin size={12} />

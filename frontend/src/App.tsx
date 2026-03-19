@@ -23,6 +23,7 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { MaintenanceGuard } from "@/components/MaintenanceGuard";
 import { CookieConsent } from "@/components/CookieConsent";
 import { AnnouncementPopup } from "@/components/AnnouncementPopup";
+import { DynamicFavicon } from "@/components/DynamicFavicon";
 import { Suspense, lazy } from "react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoadingSkeleton } from "@/components/PageLoadingSkeleton";
@@ -126,6 +127,7 @@ const App = () => (
           <UIConfigProvider>
             <CmsThemeInjector />
             <AnalyticsTrackerInjector />
+            <DynamicFavicon />
             <Toaster />
             <Sonner />
             <NotificationListener />
@@ -146,7 +148,7 @@ const App = () => (
               <Routes>
                 <Route path="/banned" element={<BannedPage />} />
                 <Route path="/" element={<Index />} />
-                <Route path="/product/:id" element={<ProductPage />} />
+                <Route path="/product/:slug" element={<ProductPage />} />
                 <Route path="/category/:slug" element={<CategoryPage />} />
                 <Route path="/stores" element={<StoresPage />} />
                 <Route path="/store/:id" element={<StorePage />} />

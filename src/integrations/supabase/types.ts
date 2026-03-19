@@ -2185,6 +2185,7 @@ export type Database = {
           seo_keywords: string[] | null
           short_description: string | null
           sku: string | null
+          slug: string
           stock_quantity: number | null
           store_id: string | null
           style: string | null
@@ -2230,6 +2231,7 @@ export type Database = {
           seo_keywords?: string[] | null
           short_description?: string | null
           sku?: string | null
+          slug?: string
           stock_quantity?: number | null
           store_id?: string | null
           style?: string | null
@@ -2275,6 +2277,7 @@ export type Database = {
           seo_keywords?: string[] | null
           short_description?: string | null
           sku?: string | null
+          slug?: string
           stock_quantity?: number | null
           store_id?: string | null
           style?: string | null

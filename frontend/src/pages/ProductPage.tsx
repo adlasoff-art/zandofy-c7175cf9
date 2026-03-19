@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, lazy, Suspense } from "react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchProductById, fetchProducts, fetchPricingTiers, type Product } from "@/services/api";
+import { fetchProductBySlug, fetchProducts, fetchPricingTiers, type Product } from "@/services/api";
 import { Header } from "@/components/Header";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
@@ -79,7 +79,8 @@ export default function ProductPage() {
   const { addItem } = useCart();
   const { toast } = useToast();
   const { isInWishlist, toggleWishlist } = useWishlist();
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
+  const id = slug; // For backward compatibility in component logic
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -92,9 +93,9 @@ export default function ProductPage() {
   const [variantDrawerOpen, setVariantDrawerOpen] = useState(false);
 
   const { data: product, isLoading } = useQuery({
-    queryKey: ["product", id],
-    queryFn: () => fetchProductById(id!),
-    enabled: !!id,
+    queryKey: ["product", slug],
+    queryFn: () => fetchProductBySlug(slug!),
+    enabled: !!slug,
   });
 
   const { data: relatedProducts } = useQuery({
@@ -195,7 +196,7 @@ export default function ProductPage() {
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
     { name: "Accueil", url: "/" },
     { name: product.categoryFr, url: `/category/${product.categoryFr?.toLowerCase()}` },
-    { name: product.nameFr, url: `/product/${product.id}` },
+    { name: product.nameFr, url: `/product/${product.slug || product.id}` },
   ]);
 
   return (
@@ -203,7 +204,7 @@ export default function ProductPage() {
       <SEOHead
         title={`${product.nameFr} — ${product.categoryFr}`}
         description={seoDescription}
-        canonical={`/product/${product.id}`}
+        canonical={`/product/${product.slug || product.id}`}
         ogImage={gallery[0]?.url || product.image}
         ogType="product"
         jsonLd={productJsonLd}
@@ -351,7 +352,7 @@ export default function ProductPage() {
                   </h3>
                   <div className="grid grid-cols-3 gap-2">
                     {relatedProducts.filter(p => p.id !== product.id).slice(0, 6).map((p) => (
-                      <Link to={`/product/${p.id}`} key={p.id} className="group">
+                      <Link to={`/product/${(p as any).slug || p.id}`} key={p.id} className="group">
                         <div className="aspect-square rounded-sm overflow-hidden bg-muted">
                           <img src={p.image} alt={p.nameFr} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                         </div>
@@ -839,7 +840,7 @@ export default function ProductPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {relatedProducts.filter(p => p.id !== product.id).slice(0, 15).map((p, i) => (
-                <Link to={`/product/${p.id}`} key={p.id}><ProductCard product={p} index={i} /></Link>
+                <Link to={`/product/${(p as any).slug || p.id}`} key={p.id}><ProductCard product={p} index={i} /></Link>
               ))}
             </div>
           </section>

@@ -30,7 +30,7 @@ export function TopTrends() {
           {loading
             ? Array.from({ length: 12 }).map((_, i) => <ProductCardSkeleton key={i} />)
             : products.map((product, i) => (
-                <Link to={`/product/${product.id}`} key={product.id}>
+                <Link to={`/product/${product.slug || product.id}`} key={product.id}>
                   <ProductCard product={product} index={i} />
                 </Link>
               ))}

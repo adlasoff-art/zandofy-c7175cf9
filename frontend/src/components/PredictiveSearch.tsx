@@ -291,7 +291,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
                   {suggestions.map((p) => (
                     <Link
                       key={p.id}
-                      to={`/product/${p.id}`}
+                      to={`/product/${(p as any).slug || p.id}`}
                       onClick={handleSuggestionClick}
                       onMouseEnter={() => !mobile && handleSuggestionHover(p.name)}
                       onMouseLeave={() => !mobile && setHoveredSuggestion(null)}
@@ -325,7 +325,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
                         {previewProducts.map((pp) => (
                           <Link
                             key={pp.id}
-                            to={`/product/${pp.id}`}
+                            to={`/product/${(pp as any).slug || pp.id}`}
                             onClick={handleSuggestionClick}
                             className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-card transition-colors"
                           >

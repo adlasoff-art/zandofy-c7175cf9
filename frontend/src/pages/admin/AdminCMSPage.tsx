@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
-  Image, Menu, FileText, LayoutDashboard, Palette, MapPin, FootprintsIcon, Languages, Scale, BookOpen, Briefcase,
+  Image, Menu, FileText, LayoutDashboard, Palette, MapPin, FootprintsIcon, Languages, Scale, BookOpen, Briefcase, Stamp,
 } from "lucide-react";
 import { HeroBannerEditor } from "@/components/admin/HeroBannerEditor";
 import { ColorPaletteEditor } from "@/components/admin/ColorPaletteEditor";
@@ -18,12 +18,14 @@ const TextsTab = lazy(() => import("@/components/admin/cms/TextsTab"));
 const LegalPagesTab = lazy(() => import("@/components/admin/cms/LegalPagesTab"));
 const BlogTab = lazy(() => import("@/components/admin/cms/BlogTab"));
 const JobPostingsTab = lazy(() => import("@/components/admin/cms/JobPostingsTab"));
+const BrandingTab = lazy(() => import("@/components/admin/cms/BrandingTab"));
 
-type Tab = "hero" | "banners" | "menus" | "pages" | "sections" | "colors" | "footer" | "texts" | "legal" | "blog" | "jobs";
+type Tab = "hero" | "banners" | "menus" | "pages" | "sections" | "colors" | "branding" | "footer" | "texts" | "legal" | "blog" | "jobs";
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "hero", label: "Hero Banner", icon: Image },
   { key: "banners", label: "Bannières", icon: MapPin },
+  { key: "branding", label: "Branding & Logo", icon: Stamp },
   { key: "menus", label: "Menus", icon: Menu },
   { key: "pages", label: "Pages", icon: FileText },
   { key: "sections", label: "Sections", icon: LayoutDashboard },
@@ -67,6 +69,7 @@ const AdminCMSPage: React.FC = () => {
       {tab === "banners" && <PositionableBannersEditor />}
       {tab === "colors" && <ColorPaletteEditor />}
       <Suspense fallback={<FallbackLoader />}>
+        {tab === "branding" && <BrandingTab />}
         {tab === "menus" && <MenusTab />}
         {tab === "pages" && <PagesTab />}
         {tab === "sections" && <SectionsTab />}
