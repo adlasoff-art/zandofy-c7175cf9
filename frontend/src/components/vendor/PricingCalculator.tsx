@@ -152,7 +152,7 @@ export function PricingCalculator({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Marge (%)</label>
-              <input type="number" value={settings.margin_pct} readOnly className={inputClass + " bg-muted/50 cursor-not-allowed"} />
+              <input type="number" value={effectiveMarginPct} readOnly className={inputClass + " bg-muted/50 cursor-not-allowed"} />
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Multiplicateur</label>
