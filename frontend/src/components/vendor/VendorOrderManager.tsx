@@ -59,6 +59,9 @@ interface Order {
   shipping_payment_status: string | null;
   last_mile_payment_method: string | null;
   rider_cash_collected: boolean | null;
+  shipping_payment_proof_url: string | null;
+  last_mile_payment_proof_url: string | null;
+  hub_pickup_proof_url: string | null;
   items: OrderItem[];
   history: StatusHistoryEntry[];
 }
