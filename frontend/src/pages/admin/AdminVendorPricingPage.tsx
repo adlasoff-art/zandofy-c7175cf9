@@ -100,12 +100,21 @@ export default function AdminVendorPricingPage() {
     setSavingId(store.id);
     const edit = getEdit(store);
 
+    // Update is_platform_owned on store
+    if (edit.is_platform_owned !== (store.is_platform_owned ?? false)) {
+      await (supabase as any)
+        .from("stores")
+        .update({ is_platform_owned: edit.is_platform_owned })
+        .eq("id", store.id);
+    }
+
     const payload = {
       store_id: store.id,
       margin_pct: edit.margin_pct ? Number(edit.margin_pct) : null,
       multiplier: edit.multiplier ? Number(edit.multiplier) : null,
       max_extra_margin: edit.max_extra_margin ? Number(edit.max_extra_margin) : null,
       vendor_extra_margin_enabled: edit.vendor_extra_margin_enabled,
+      commission_rate: edit.commission_rate ? Number(edit.commission_rate) : null,
       updated_at: new Date().toISOString(),
     };
 
