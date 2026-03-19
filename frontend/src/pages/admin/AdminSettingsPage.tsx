@@ -186,7 +186,71 @@ export default function AdminSettingsPage() {
           </div>
         </section>
 
-        <section className="bg-card border-2 border-destructive/30 rounded-xl p-5">
+        {/* Pricing Defaults */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Calculator size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Tarification intelligente</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Paramètres par défaut du calcul automatique des prix pour les vendeurs.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Marge (%)</label>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                step={1}
+                value={pricing.margin_pct}
+                onChange={(e) => setPricing((p) => ({ ...p, margin_pct: Number(e.target.value) || 15 }))}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Multiplicateur</label>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                step={0.5}
+                value={pricing.multiplier}
+                onChange={(e) => setPricing((p) => ({ ...p, multiplier: Number(e.target.value) || 3 }))}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Marge vendeur max (&lt;50$)</label>
+              <input
+                type="number"
+                min={0}
+                max={5}
+                step={0.1}
+                value={pricing.max_extra_margin_under_50}
+                onChange={(e) => setPricing((p) => ({ ...p, max_extra_margin_under_50: Number(e.target.value) || 0 }))}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Marge vendeur max (≥100$)</label>
+              <input
+                type="number"
+                min={0}
+                max={10}
+                step={0.1}
+                value={pricing.max_extra_margin_over_100}
+                onChange={(e) => setPricing((p) => ({ ...p, max_extra_margin_over_100: Number(e.target.value) || 0 }))}
+                className={inputClass}
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-3">
+            Formule : prix = coût + (coût × marge% / 100) × multiplicateur. Arrondi stratégique (.99/.49).
+          </p>
+        </section>
+
+
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle size={18} className="text-destructive" />
             <h2 className="text-sm font-semibold text-foreground">Mode maintenance</h2>
