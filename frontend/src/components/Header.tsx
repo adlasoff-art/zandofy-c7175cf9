@@ -133,9 +133,7 @@ export function Header() {
             {mobileOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
 
-          <Link to="/" className="text-xl md:text-2xl tracking-[0.08em] text-foreground shrink-0" style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, letterSpacing: "0.08em" }}>
-            Zandofy
-          </Link>
+          <BrandLogo variant="header" />
 
           <div className="hidden md:flex flex-1 max-w-2xl mx-auto px-6">
             <PredictiveSearch />
