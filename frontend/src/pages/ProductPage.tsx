@@ -352,7 +352,7 @@ export default function ProductPage() {
                   </h3>
                   <div className="grid grid-cols-3 gap-2">
                     {relatedProducts.filter(p => p.id !== product.id).slice(0, 6).map((p) => (
-                      <Link to={`/product/${p.id}`} key={p.id} className="group">
+                      <Link to={`/product/${(p as any).slug || p.id}`} key={p.id} className="group">
                         <div className="aspect-square rounded-sm overflow-hidden bg-muted">
                           <img src={p.image} alt={p.nameFr} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                         </div>
