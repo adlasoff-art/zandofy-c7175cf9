@@ -34,8 +34,10 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import {
-  STATUS_CONFIG,
+  ACTIVE_ORDER_STATUSES,
   CUSTOMER_TRACKING_STEPS,
+  NON_REVENUE_ORDER_STATUSES,
+  STATUS_CONFIG,
   getStepIndex,
 } from "@/lib/order-status";
 import { useKycStatus } from "@/hooks/use-kyc";

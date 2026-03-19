@@ -24,6 +24,7 @@ import {
   Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
+import { ACTIVE_ORDER_STATUSES, NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
 import { VENDOR_TIERS } from "@/lib/vendor-tiers";
 import { useStorePresence } from "@/hooks/useStorePresence";
 

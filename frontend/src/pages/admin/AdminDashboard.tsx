@@ -13,6 +13,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
+import { NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
 
 const statusColor: Record<string, string> = {
   delivered: "bg-primary/10 text-primary",
