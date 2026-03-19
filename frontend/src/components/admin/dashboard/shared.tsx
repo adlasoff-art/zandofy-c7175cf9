@@ -33,7 +33,7 @@ export const statusLabels: Record<string, string> = {
 };
 
 export function KpiCard({ icon: Icon, label, value, color = "text-primary", sub }: {
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: React.ComponentType<any>;
   label: string;
   value: string;
   color?: string;
