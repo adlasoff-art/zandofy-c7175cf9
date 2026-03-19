@@ -1173,7 +1173,7 @@ export default function CheckoutPage() {
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t("cart.shipping")} ({shippingMode})</span>
+                    <span className="text-muted-foreground">Expédition ({shippingMode})</span>
                     {shippingPaymentChoice === "pay_on_arrival" && shippingCost > 0 ? (
                       <span className="text-amber-600 font-medium text-xs">
                         ${shippingCost.toFixed(2)} — à l'arrivée
@@ -1184,6 +1184,22 @@ export default function CheckoutPage() {
                       </span>
                     )}
                   </div>
+                  {deliveryOption === "home_delivery" && lastMileFee > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Livraison domicile</span>
+                      {lastMilePayment === "pay_cash_on_delivery" ? (
+                        <span className="text-amber-600 font-medium text-xs">${lastMileFee.toFixed(2)} — cash</span>
+                      ) : (
+                        <span className="text-foreground">${lastMileFee.toFixed(2)}</span>
+                      )}
+                    </div>
+                  )}
+                  {deliveryOption === "hub_pickup" && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Livraison</span>
+                      <span className="text-primary font-medium">Retrait Hub (gratuit)</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-bold text-foreground pt-2 border-t border-border text-base">
                     <span>{t("cart.total")}</span>
                     <span>${total.toFixed(2)}</span>
