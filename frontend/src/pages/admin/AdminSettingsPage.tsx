@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle } from "lucide-react";
+import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +28,13 @@ interface MaintenanceConfig {
   duration_minutes: number;
 }
 
+interface PricingConfig {
+  margin_pct: number;
+  multiplier: number;
+  max_extra_margin_under_50: number;
+  max_extra_margin_over_100: number;
+}
+
 export default function AdminSettingsPage() {
   const [trackingProvider, setTrackingProvider] = useState("17track");
   const [freeShipping, setFreeShipping] = useState<FreeShippingConfig>({ enabled: true, amount: 49, currency: "USD" });
@@ -41,6 +48,7 @@ export default function AdminSettingsPage() {
   });
   const [newnessDays, setNewnessDays] = useState(14);
   const [paymentMethods, setPaymentMethods] = useState({ mobile_money: true, stripe: true, cod: true });
+  const [pricing, setPricing] = useState<PricingConfig>({ margin_pct: 15, multiplier: 3, max_extra_margin_under_50: 0.50, max_extra_margin_over_100: 1.00 });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
@@ -48,7 +56,7 @@ export default function AdminSettingsPage() {
     supabase
       .from("platform_settings")
       .select("key, value")
-      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods"])
+      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults"])
       .then(({ data }) => {
         data?.forEach((row) => {
           const v = row.value as any;
@@ -75,6 +83,13 @@ export default function AdminSettingsPage() {
             setNewnessDays(Number(v) || 14);
           } else if (row.key === "payment_methods") {
             setPaymentMethods({ mobile_money: v.mobile_money !== false, stripe: v.stripe !== false, cod: v.cod !== false });
+          } else if (row.key === "pricing_defaults") {
+            setPricing({
+              margin_pct: Number(v.margin_pct) || 15,
+              multiplier: Number(v.multiplier) || 3,
+              max_extra_margin_under_50: Number(v.max_extra_margin_under_50) || 0.50,
+              max_extra_margin_over_100: Number(v.max_extra_margin_over_100) || 1.00,
+            });
           }
         });
       });
@@ -110,7 +125,11 @@ export default function AdminSettingsPage() {
       .from("platform_settings")
       .upsert({ key: "payment_methods", value: paymentMethods as any, updated_at: now }, { onConflict: "key" });
 
-    const error = e1 || e2 || e3 || e4 || e5;
+    const { error: e6 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "pricing_defaults", value: pricing as any, updated_at: now }, { onConflict: "key" });
+
+    const error = e1 || e2 || e3 || e4 || e5 || e6;
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
@@ -165,6 +184,70 @@ export default function AdminSettingsPage() {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* Pricing Defaults */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Calculator size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Tarification intelligente</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Paramètres par défaut du calcul automatique des prix pour les vendeurs.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Marge (%)</label>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                step={1}
+                value={pricing.margin_pct}
+                onChange={(e) => setPricing((p) => ({ ...p, margin_pct: Number(e.target.value) || 15 }))}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Multiplicateur</label>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                step={0.5}
+                value={pricing.multiplier}
+                onChange={(e) => setPricing((p) => ({ ...p, multiplier: Number(e.target.value) || 3 }))}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Marge vendeur max (&lt;50$)</label>
+              <input
+                type="number"
+                min={0}
+                max={5}
+                step={0.1}
+                value={pricing.max_extra_margin_under_50}
+                onChange={(e) => setPricing((p) => ({ ...p, max_extra_margin_under_50: Number(e.target.value) || 0 }))}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Marge vendeur max (≥100$)</label>
+              <input
+                type="number"
+                min={0}
+                max={10}
+                step={0.1}
+                value={pricing.max_extra_margin_over_100}
+                onChange={(e) => setPricing((p) => ({ ...p, max_extra_margin_over_100: Number(e.target.value) || 0 }))}
+                className={inputClass}
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-3">
+            Formule : prix = coût + (coût × marge% / 100) × multiplicateur. Arrondi stratégique (.99/.49).
+          </p>
         </section>
 
         <section className="bg-card border-2 border-destructive/30 rounded-xl p-5">

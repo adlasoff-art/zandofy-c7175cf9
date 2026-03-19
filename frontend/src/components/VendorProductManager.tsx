@@ -11,6 +11,7 @@ import { MediaUploader } from "@/components/vendor/MediaUploader";
 import { ShippingEstimator } from "@/components/vendor/ShippingEstimator";
 import { PromotionTimer } from "@/components/vendor/PromotionTimer";
 import { ProductVariantsEditor, type SizeVariant, type ColorVariant, type DynamicVariantSelection } from "@/components/vendor/ProductVariantsEditor";
+import { PricingCalculator } from "@/components/vendor/PricingCalculator";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 
@@ -74,6 +75,10 @@ const EMPTY_FORM = {
   length_cm: 0,
   width_cm: 0,
   height_cm: 0,
+  cost_real: 0,
+  cost_calc: 0,
+  auto_pricing_enabled: true,
+  vendor_extra_margin: 0,
 };
 
 type ProductFormState = typeof EMPTY_FORM;
@@ -287,6 +292,10 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       length_cm: (product as any).length_cm || 0,
       width_cm: (product as any).width_cm || 0,
       height_cm: (product as any).height_cm || 0,
+      cost_real: (product as any).cost_real || 0,
+      cost_calc: (product as any).cost_calc || 0,
+      auto_pricing_enabled: (product as any).auto_pricing_enabled !== false,
+      vendor_extra_margin: (product as any).vendor_extra_margin || 0,
     });
     // Split images: position 0 = main, rest = variations
     const sorted = [...product.images].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
@@ -348,6 +357,10 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       length_cm: form.length_cm || null,
       width_cm: form.width_cm || null,
       height_cm: form.height_cm || null,
+      cost_real: form.cost_real || null,
+      cost_calc: form.cost_calc || null,
+      auto_pricing_enabled: form.auto_pricing_enabled,
+      vendor_extra_margin: form.vendor_extra_margin || 0,
     };
 
     let productId = editing?.id;
@@ -483,9 +496,26 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
 
           <Field label="Nom (FR) *" value={form.name_fr} onChange={(v) => setForm({ ...form, name_fr: v })} />
           <Field label="Nom (EN)" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
+          {/* Pricing Calculator */}
+          <PricingCalculator
+            costReal={form.cost_real}
+            costCalc={form.cost_calc}
+            autoPricingEnabled={form.auto_pricing_enabled}
+            vendorExtraMargin={form.vendor_extra_margin}
+            price={form.price}
+            originalPrice={form.original_price}
+            storeId={storeId}
+            onCostRealChange={(v) => setForm((f) => ({ ...f, cost_real: v }))}
+            onCostCalcChange={(v) => setForm((f) => ({ ...f, cost_calc: v }))}
+            onAutoPricingChange={(v) => setForm((f) => ({ ...f, auto_pricing_enabled: v }))}
+            onVendorExtraMarginChange={(v) => setForm((f) => ({ ...f, vendor_extra_margin: v }))}
+            onPriceChange={(v) => setForm((f) => ({ ...f, price: v }))}
+            onOriginalPriceChange={(v) => setForm((f) => ({ ...f, original_price: v }))}
+          />
+
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Prix *" type="number" value={String(form.price)} onChange={(v) => setForm({ ...form, price: Number(v) })} />
-            <Field label="Ancien prix" type="number" value={String(form.original_price || "")} onChange={(v) => setForm({ ...form, original_price: v ? Number(v) : null })} />
+            <Field label="Prix *" type="number" value={String(form.price)} onChange={(v) => setForm({ ...form, price: Number(v) })} disabled={form.auto_pricing_enabled} />
+            <Field label="Ancien prix" type="number" value={String(form.original_price || "")} onChange={(v) => setForm({ ...form, original_price: v ? Number(v) : null })} disabled={form.auto_pricing_enabled} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="MOQ" type="number" value={String(form.moq)} onChange={(v) => setForm({ ...form, moq: Number(v) })} />
@@ -680,18 +710,19 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
 }
 
 function Field({
-  label, value, onChange, type = "text",
+  label, value, onChange, type = "text", disabled = false,
 }: {
-  label: string; value: string; onChange: (v: string) => void; type?: string;
+  label: string; value: string; onChange: (v: string) => void; type?: string; disabled?: boolean;
 }) {
   return (
     <div>
       <label className="text-xs text-muted-foreground">{label}</label>
       <input
         type={type}
-        className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md"
+        className={`w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md ${disabled ? "bg-muted/50 cursor-not-allowed" : ""}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
       />
     </div>
   );
