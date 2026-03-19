@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send, Edit2, Truck } from "lucide-react";
+import { PaymentProofUpload } from "@/components/PaymentProofUpload";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { triggerOrderStatusNotification } from "@/services/order-notifications";
