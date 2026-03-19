@@ -83,6 +83,13 @@ export default function AdminSettingsPage() {
             setNewnessDays(Number(v) || 14);
           } else if (row.key === "payment_methods") {
             setPaymentMethods({ mobile_money: v.mobile_money !== false, stripe: v.stripe !== false, cod: v.cod !== false });
+          } else if (row.key === "pricing_defaults") {
+            setPricing({
+              margin_pct: Number(v.margin_pct) || 15,
+              multiplier: Number(v.multiplier) || 3,
+              max_extra_margin_under_50: Number(v.max_extra_margin_under_50) || 0.50,
+              max_extra_margin_over_100: Number(v.max_extra_margin_over_100) || 1.00,
+            });
           }
         });
       });
