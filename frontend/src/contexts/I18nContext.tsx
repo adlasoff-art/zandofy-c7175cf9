@@ -96,7 +96,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "cart.continueShopping": "Continuer mes achats",
     "cart.checkout": "Commander",
     "cart.subtotal": "Sous-total",
-    "cart.shipping": "Livraison",
+    "cart.shipping": "Expédition",
     "cart.free": "Gratuit",
     "cart.total": "Total",
     // Footer
