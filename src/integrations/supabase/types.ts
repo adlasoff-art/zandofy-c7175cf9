@@ -3003,6 +3003,7 @@ export type Database = {
           followers_override: number | null
           id: string
           is_online: boolean | null
+          is_platform_owned: boolean
           is_verified: boolean | null
           last_seen_at: string | null
           logo_url: string | null
@@ -3044,6 +3045,7 @@ export type Database = {
           followers_override?: number | null
           id?: string
           is_online?: boolean | null
+          is_platform_owned?: boolean
           is_verified?: boolean | null
           last_seen_at?: string | null
           logo_url?: string | null
@@ -3085,6 +3087,7 @@ export type Database = {
           followers_override?: number | null
           id?: string
           is_online?: boolean | null
+          is_platform_owned?: boolean
           is_verified?: boolean | null
           last_seen_at?: string | null
           logo_url?: string | null
@@ -3482,6 +3485,7 @@ export type Database = {
       }
       vendor_pricing_overrides: {
         Row: {
+          commission_rate: number | null
           created_at: string
           id: string
           margin_pct: number | null
@@ -3494,6 +3498,7 @@ export type Database = {
           vendor_extra_margin_enabled: boolean
         }
         Insert: {
+          commission_rate?: number | null
           created_at?: string
           id?: string
           margin_pct?: number | null
@@ -3506,6 +3511,7 @@ export type Database = {
           vendor_extra_margin_enabled?: boolean
         }
         Update: {
+          commission_rate?: number | null
           created_at?: string
           id?: string
           margin_pct?: number | null

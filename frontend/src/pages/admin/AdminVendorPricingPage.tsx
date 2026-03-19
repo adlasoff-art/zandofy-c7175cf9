@@ -10,12 +10,14 @@ interface StoreWithOverride {
   id: string;
   name: string;
   owner_id: string;
+  is_platform_owned: boolean;
   override: {
     id?: string;
     margin_pct: number | null;
     multiplier: number | null;
     max_extra_margin: number | null;
     vendor_extra_margin_enabled: boolean;
+    commission_rate: number | null;
   } | null;
 }
 
@@ -27,6 +29,8 @@ export default function AdminVendorPricingPage() {
     multiplier: string;
     max_extra_margin: string;
     vendor_extra_margin_enabled: boolean;
+    commission_rate: string;
+    is_platform_owned: boolean;
   }>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -46,7 +50,7 @@ export default function AdminVendorPricingPage() {
   const { data: stores, isLoading } = useQuery({
     queryKey: ["admin-stores-pricing", search],
     queryFn: async () => {
-      let q = supabase.from("stores").select("id, name, owner_id").order("name");
+      let q = (supabase as any).from("stores").select("id, name, owner_id, is_platform_owned").order("name");
       if (search) q = q.ilike("name", `%${search}%`);
       const { data: storesData } = await q.limit(50);
       if (!storesData?.length) return [];
@@ -74,6 +78,8 @@ export default function AdminVendorPricingPage() {
       multiplier: o?.multiplier != null ? String(o.multiplier) : "",
       max_extra_margin: o?.max_extra_margin != null ? String(o.max_extra_margin) : "",
       vendor_extra_margin_enabled: o?.vendor_extra_margin_enabled ?? false,
+      commission_rate: o?.commission_rate != null ? String(o.commission_rate) : "",
+      is_platform_owned: store.is_platform_owned ?? false,
     };
   };
 
@@ -85,8 +91,8 @@ export default function AdminVendorPricingPage() {
   };
 
   const getEditForId = (storeId: string) => {
-    const store = stores?.find((s) => s.id === storeId);
-    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false };
+    const store = stores?.find((s: any) => s.id === storeId);
+    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false };
     return getEdit(store);
   };
 
@@ -94,12 +100,21 @@ export default function AdminVendorPricingPage() {
     setSavingId(store.id);
     const edit = getEdit(store);
 
+    // Update is_platform_owned on store
+    if (edit.is_platform_owned !== (store.is_platform_owned ?? false)) {
+      await (supabase as any)
+        .from("stores")
+        .update({ is_platform_owned: edit.is_platform_owned })
+        .eq("id", store.id);
+    }
+
     const payload = {
       store_id: store.id,
       margin_pct: edit.margin_pct ? Number(edit.margin_pct) : null,
       multiplier: edit.multiplier ? Number(edit.multiplier) : null,
       max_extra_margin: edit.max_extra_margin ? Number(edit.max_extra_margin) : null,
       vendor_extra_margin_enabled: edit.vendor_extra_margin_enabled,
+      commission_rate: edit.commission_rate ? Number(edit.commission_rate) : null,
       updated_at: new Date().toISOString(),
     };
 
@@ -177,6 +192,12 @@ export default function AdminVendorPricingPage() {
                   <div className="flex items-center gap-2">
                     <Store size={16} className="text-primary" />
                     <span className="text-sm font-semibold text-foreground">{store.name}</span>
+                    {edit.is_platform_owned && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded-full font-medium">Plateforme</span>
+                    )}
+                    {!edit.is_platform_owned && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-muted text-muted-foreground rounded-full font-medium">Indépendant</span>
+                    )}
                   </div>
                   <button
                     onClick={() => handleSave(store)}
@@ -186,6 +207,18 @@ export default function AdminVendorPricingPage() {
                     {savingId === store.id ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                     Enregistrer
                   </button>
+                </div>
+
+                {/* Platform toggle */}
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Boutique plateforme</p>
+                    <p className="text-[10px] text-muted-foreground">Pas de commission déduite, revenus restent à la plateforme</p>
+                  </div>
+                  <Switch
+                    checked={edit.is_platform_owned}
+                    onCheckedChange={(v) => updateEdit(store.id, "is_platform_owned", v)}
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -247,6 +280,25 @@ export default function AdminVendorPricingPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Commission rate — only for independent stores */}
+                {!edit.is_platform_owned && (
+                  <div className="pt-2 border-t border-border">
+                    <label className="text-xs text-muted-foreground block mb-1">
+                      Commission plateforme (%) <span className="text-[10px] opacity-60">défaut: {globalDefaults?.platform_commission_default ?? 10}%</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={50}
+                      step={0.5}
+                      value={edit.commission_rate}
+                      onChange={(e) => updateEdit(store.id, "commission_rate", e.target.value)}
+                      className={inputClass + " max-w-[200px]"}
+                      placeholder={String(globalDefaults?.platform_commission_default ?? 10)}
+                    />
+                  </div>
+                )}
 
                 {isDirty && (
                   <p className="text-[10px] text-amber-600">Modifications non enregistrées</p>

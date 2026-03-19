@@ -33,6 +33,7 @@ interface PricingConfig {
   multiplier: number;
   max_extra_margin_under_50: number;
   max_extra_margin_over_100: number;
+  platform_commission_default: number;
 }
 
 export default function AdminSettingsPage() {
@@ -48,7 +49,7 @@ export default function AdminSettingsPage() {
   });
   const [newnessDays, setNewnessDays] = useState(14);
   const [paymentMethods, setPaymentMethods] = useState({ mobile_money: true, stripe: true, cod: true });
-  const [pricing, setPricing] = useState<PricingConfig>({ margin_pct: 15, multiplier: 3, max_extra_margin_under_50: 0.50, max_extra_margin_over_100: 1.00 });
+  const [pricing, setPricing] = useState<PricingConfig>({ margin_pct: 15, multiplier: 3, max_extra_margin_under_50: 0.50, max_extra_margin_over_100: 1.00, platform_commission_default: 10 });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
@@ -89,6 +90,7 @@ export default function AdminSettingsPage() {
               multiplier: Number(v.multiplier) || 3,
               max_extra_margin_under_50: Number(v.max_extra_margin_under_50) || 0.50,
               max_extra_margin_over_100: Number(v.max_extra_margin_over_100) || 1.00,
+              platform_commission_default: Number(v.platform_commission_default) || 10,
             });
           }
         });
@@ -248,6 +250,19 @@ export default function AdminSettingsPage() {
           <p className="text-[10px] text-muted-foreground mt-3">
             Formule : prix = coût + (coût × marge% / 100) × multiplicateur. Arrondi stratégique (.99/.49).
           </p>
+          <div className="mt-4 pt-4 border-t border-border">
+            <label className="text-xs text-muted-foreground block mb-1">Commission plateforme par défaut (%)</label>
+            <p className="text-[10px] text-muted-foreground mb-2">Appliquée aux vendeurs indépendants sans surcharge spécifique.</p>
+            <input
+              type="number"
+              min={0}
+              max={50}
+              step={0.5}
+              value={pricing.platform_commission_default}
+              onChange={(e) => setPricing((p) => ({ ...p, platform_commission_default: Number(e.target.value) || 10 }))}
+              className={inputClass + " max-w-[200px]"}
+            />
+          </div>
         </section>
 
         <section className="bg-card border-2 border-destructive/30 rounded-xl p-5">
