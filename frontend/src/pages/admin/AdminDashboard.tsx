@@ -238,8 +238,8 @@ export default function AdminDashboard() {
   // ─── KPI sections ───
   const commerceStats = [
     { label: "Utilisateurs", value: profileCount.toLocaleString(), icon: Users, color: "text-primary" },
-    { label: "Commandes totales", value: (orderStats?.count ?? 0).toLocaleString(), icon: ShoppingBag, color: "text-primary" },
-    { label: "Revenu réel (hors annulées)", value: `$${(orderStats?.revenue ?? 0).toLocaleString()}`, icon: DollarSign, color: "text-primary" },
+    { label: "Commandes valides", value: (orderStats?.count ?? 0).toLocaleString(), icon: ShoppingBag, color: "text-primary" },
+    { label: "Revenu réel encaissé", value: `$${(orderStats?.revenue ?? 0).toLocaleString()}`, icon: DollarSign, color: "text-primary" },
     { label: "Produits", value: productCount.toLocaleString(), icon: Package, color: "text-primary" },
     { label: "Boutiques", value: storeCount.toLocaleString(), icon: StoreIcon, color: "text-primary" },
   ];
