@@ -588,10 +588,18 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-foreground truncate">{item.product_name}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Qté: {item.quantity}
-                    {item.size && ` · ${item.size}`}
-                    {item.color && ` · ${item.color}`}
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1 flex-wrap">
+                    <span>Qté: {item.quantity}</span>
+                    {item.size && <span>· {item.size}</span>}
+                    {item.color && (() => {
+                      const cd = getColorDisplay(item.color);
+                      return cd ? (
+                        <span className="inline-flex items-center gap-1">
+                          · {cd.hex && <span className="w-2.5 h-2.5 rounded-full border border-border inline-block shrink-0" style={{ backgroundColor: cd.hex }} />}
+                          {cd.name}
+                        </span>
+                      ) : null;
+                    })()}
                   </p>
                 </div>
                 <span className="text-sm font-medium text-foreground">${(Number(item.price) * item.quantity).toFixed(2)}</span>
