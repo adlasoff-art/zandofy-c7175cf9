@@ -184,7 +184,14 @@ export default function CheckoutPage() {
   const pointsDiscount = usePoints ? Math.min(pointsToUse, pointsBalance) : 0;
 
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
-  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping);
+  
+  // Calculate last-mile delivery fee (only if home delivery + pay_with_shipping)
+  const lastMileFee = dynamicShippingCost !== null && deliveryOption === "home_delivery" 
+    ? Math.max(dynamicShippingCost * 0.15, 2) // 15% of shipping as delivery fee, min $2
+    : 0;
+  const effectiveLastMile = (deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping") ? lastMileFee : 0;
+  
+  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping + effectiveLastMile);
 
   // Load saved addresses
   useEffect(() => {
