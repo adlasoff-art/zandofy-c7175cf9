@@ -54,6 +54,9 @@ interface Order {
   delivery_choice: string | null;
   last_mile_fee: number | null;
   confirmation_code: string | null;
+  shipping_payment_status: string | null;
+  last_mile_payment_method: string | null;
+  rider_cash_collected: boolean | null;
   items: OrderItem[];
   history: StatusHistoryEntry[];
 }
