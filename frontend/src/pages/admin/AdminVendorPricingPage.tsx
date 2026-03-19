@@ -192,6 +192,12 @@ export default function AdminVendorPricingPage() {
                   <div className="flex items-center gap-2">
                     <Store size={16} className="text-primary" />
                     <span className="text-sm font-semibold text-foreground">{store.name}</span>
+                    {edit.is_platform_owned && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded-full font-medium">Plateforme</span>
+                    )}
+                    {!edit.is_platform_owned && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-muted text-muted-foreground rounded-full font-medium">Indépendant</span>
+                    )}
                   </div>
                   <button
                     onClick={() => handleSave(store)}
@@ -201,6 +207,18 @@ export default function AdminVendorPricingPage() {
                     {savingId === store.id ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                     Enregistrer
                   </button>
+                </div>
+
+                {/* Platform toggle */}
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Boutique plateforme</p>
+                    <p className="text-[10px] text-muted-foreground">Pas de commission déduite, revenus restent à la plateforme</p>
+                  </div>
+                  <Switch
+                    checked={edit.is_platform_owned}
+                    onCheckedChange={(v) => updateEdit(store.id, "is_platform_owned", v)}
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
