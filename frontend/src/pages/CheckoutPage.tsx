@@ -59,6 +59,9 @@ interface CouponData {
 
 const FALLBACK_SHIPPING_COST = 5.99;
 
+type DeliveryOption = "none" | "home_delivery" | "hub_pickup";
+type LastMilePayment = "pay_with_shipping" | "pay_cash_on_delivery";
+
 const emptyShipping: ShippingInfo = {
   firstName: "", lastName: "", email: "", phone: "",
   address: "", city: "", country: "CD", postalCode: "",
@@ -80,6 +83,15 @@ export default function CheckoutPage() {
 
   // Deferred shipping payment
   const [shippingPaymentChoice, setShippingPaymentChoice] = useState<"pay_now" | "pay_on_arrival">("pay_now");
+
+  // Delivery option (home vs hub)
+  const [deliveryOption, setDeliveryOption] = useState<DeliveryOption>("none");
+  const [lastMilePayment, setLastMilePayment] = useState<LastMilePayment>("pay_with_shipping");
+
+  // Deferred payment retry state
+  const [retryPhone, setRetryPhone] = useState("");
+  const [retryProvider, setRetryProvider] = useState("orange_money");
+  const [showRetryForm, setShowRetryForm] = useState(false);
 
   // Mobile Money KelPay state
   const [mobileMoneyPhone, setMobileMoneyPhone] = useState("");
@@ -172,7 +184,14 @@ export default function CheckoutPage() {
   const pointsDiscount = usePoints ? Math.min(pointsToUse, pointsBalance) : 0;
 
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
-  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping);
+  
+  // Calculate last-mile delivery fee (only if home delivery + pay_with_shipping)
+  const lastMileFee = dynamicShippingCost !== null && deliveryOption === "home_delivery" 
+    ? Math.max(dynamicShippingCost * 0.15, 2) // 15% of shipping as delivery fee, min $2
+    : 0;
+  const effectiveLastMile = (deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping") ? lastMileFee : 0;
+  
+  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping + effectiveLastMile);
 
   // Load saved addresses
   useEffect(() => {
@@ -402,9 +421,11 @@ export default function CheckoutPage() {
 
     for (const [storeId, storeItems] of storeGroups) {
       const orderSubtotal = storeItems.reduce((s, i) => s + i.price * i.quantity, 0);
-      const orderTotal = shippingPaymentChoice === "pay_on_arrival"
-        ? Math.max(0, orderSubtotal - discountAmount)
-        : Math.max(0, orderSubtotal - discountAmount + shippingCost);
+      const orderShippingCost = shippingCost;
+      const orderLastMile = deliveryOption === "home_delivery" ? lastMileFee : 0;
+      const effectiveShip = shippingPaymentChoice === "pay_on_arrival" ? 0 : orderShippingCost;
+      const effectiveLM = (deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping") ? orderLastMile : 0;
+      const orderTotal = Math.max(0, orderSubtotal - discountAmount + effectiveShip + effectiveLM);
 
       const { data: order, error: orderErr } = await supabase
         .from("orders")
@@ -422,13 +443,19 @@ export default function CheckoutPage() {
           shipping_country: shipping.country,
           shipping_postal_code: shipping.postalCode,
           subtotal: orderSubtotal,
-          shipping_cost: shippingCost,
+          shipping_cost: orderShippingCost,
           total: orderTotal,
           order_ref: mockOrderRef,
           coupon_code: appliedCoupon?.code || null,
           discount_amount: discountAmount,
           shipping_payment_status: shippingPaymentChoice === "pay_on_arrival" ? "deferred" : "paid",
-        })
+          delivery_choice: deliveryOption !== "none" ? (deliveryOption === "home_delivery" ? "home" : "hub") : null,
+          last_mile_fee: orderLastMile,
+          last_mile_payment_method: deliveryOption === "home_delivery" ? (lastMilePayment === "pay_cash_on_delivery" ? "cash" : "mobile_money") : null,
+          last_mile_payment_status: deliveryOption === "home_delivery" 
+            ? (lastMilePayment === "pay_with_shipping" ? "paid_online" : "pending")
+            : null,
+        } as any)
         .select("id")
         .single();
 
@@ -746,7 +773,7 @@ export default function CheckoutPage() {
                       <div className="space-y-2">
                         {[
                           { key: "pay_now" as const, label: "Payer maintenant", desc: `Inclure $${shippingCost.toFixed(2)} dans le total` },
-                          { key: "pay_on_arrival" as const, label: "Payer à l'arrivée", desc: "Régler les frais d'expédition quand la commande arrive au Hub" },
+                          { key: "pay_on_arrival" as const, label: "Payer à l'arrivée au Hub", desc: "Régler les frais d'expédition quand la commande arrive (obligatoire avant livraison)" },
                         ].map(opt => (
                           <button
                             key={opt.key}
@@ -772,6 +799,74 @@ export default function CheckoutPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Delivery option: home vs hub */}
+                  <div className="pt-3 border-t border-border space-y-2">
+                    <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                      <Home size={14} className="text-primary" /> Option de livraison
+                    </p>
+                    <div className="space-y-2">
+                      {[
+                        { key: "home_delivery" as DeliveryOption, label: "🚚 Livraison à domicile", desc: "Recevez votre colis directement chez vous — rapide et sans effort !" },
+                        { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait au Hub", desc: "Récupérez votre colis au point de collecte (gratuit)" },
+                      ].map(opt => (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => setDeliveryOption(opt.key)}
+                          className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${
+                            deliveryOption === opt.key
+                              ? "border-primary bg-secondary"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                            deliveryOption === opt.key ? "border-primary" : "border-border"
+                          }`}>
+                            {deliveryOption === opt.key && <div className="w-2 h-2 rounded-full bg-primary" />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                            <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Last-mile payment option (only for home delivery) */}
+                    {deliveryOption === "home_delivery" && lastMileFee > 0 && (
+                      <div className="ml-4 mt-2 space-y-2 border-l-2 border-primary/30 pl-3">
+                        <p className="text-xs font-medium text-foreground">
+                          Frais de livraison à domicile : <strong className="text-primary">${lastMileFee.toFixed(2)}</strong>
+                        </p>
+                        {[
+                          { key: "pay_with_shipping" as LastMilePayment, label: "Payer maintenant", desc: "Inclure dans le total actuel" },
+                          { key: "pay_cash_on_delivery" as LastMilePayment, label: "Payer au livreur (cash)", desc: "Régler en espèces à la réception" },
+                        ].map(opt => (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => setLastMilePayment(opt.key)}
+                            className={`w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left text-xs ${
+                              lastMilePayment === opt.key
+                                ? "border-primary bg-secondary"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                              lastMilePayment === opt.key ? "border-primary" : "border-border"
+                            }`}>
+                              {lastMilePayment === opt.key && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">{opt.label}</p>
+                              <p className="text-[10px] text-muted-foreground">{opt.desc}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   <Button type="submit" className="w-full h-12 font-bold mt-2">
                     {t("checkout.continueToPayment")} <ChevronRight size={16} />
@@ -882,22 +977,110 @@ export default function CheckoutPage() {
                 )}
 
                 {paymentMethod === "mobile_money" && paymentPending && (
-                  <div className="space-y-4 pt-2 border-t border-border text-center">
-                    <div className="flex flex-col items-center gap-3 py-4">
+                  <div className="space-y-4 pt-2 border-t border-border">
+                    <div className="flex flex-col items-center gap-3 py-4 text-center">
                       <Loader2 size={32} className="animate-spin text-primary" />
                       <p className="text-sm font-medium text-foreground">En attente de validation...</p>
                       <p className="text-xs text-muted-foreground max-w-xs">
                         Ouvrez l'application {mobileMoneyProvider === "orange_money" ? "Orange Money" : mobileMoneyProvider === "mpesa" ? "M-Pesa" : mobileMoneyProvider === "airtel_money" ? "Airtel Money" : "AfriMoney"} sur votre téléphone et validez le paiement avec votre PIN.
                       </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={handleCheckPaymentStatus}
-                      className="w-full"
-                    >
-                      <ShieldCheck size={14} className="mr-2" />
-                      Vérifier le statut du paiement
+                    <Button variant="outline" onClick={handleCheckPaymentStatus} className="w-full">
+                      <ShieldCheck size={14} className="mr-2" /> Vérifier le statut du paiement
                     </Button>
+
+                    {/* Retry with different number */}
+                    {!showRetryForm ? (
+                      <button
+                        onClick={() => { setShowRetryForm(true); setRetryPhone(""); }}
+                        className="w-full text-xs text-primary hover:underline py-1"
+                      >
+                        Le paiement ne fonctionne pas ? Essayer avec un autre numéro
+                      </button>
+                    ) : (
+                      <div className="space-y-3 bg-muted/50 rounded-lg p-3">
+                        <p className="text-xs font-medium text-foreground">Réessayer avec un autre numéro</p>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Opérateur</Label>
+                          <select
+                            value={retryProvider}
+                            onChange={e => setRetryProvider(e.target.value)}
+                            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md text-foreground"
+                          >
+                            <option value="orange_money">Orange Money</option>
+                            <option value="mpesa">M-Pesa</option>
+                            <option value="airtel_money">Airtel Money</option>
+                            <option value="afrimoney">AfriMoney</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Nouveau numéro</Label>
+                          <Input
+                            type="tel"
+                            placeholder="243 XXX XXX XXX"
+                            value={retryPhone}
+                            onChange={e => setRetryPhone(e.target.value)}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setShowRetryForm(false)} className="flex-1 text-xs">
+                            Annuler
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="flex-1 text-xs"
+                            disabled={!retryPhone.replace(/[\s\-\+]/g, "") || retryPhone.replace(/[\s\-\+]/g, "").length < 9 || processing}
+                            onClick={async () => {
+                              setProcessing(true);
+                              // Remove old channel
+                              if (paymentChannelRef.current) {
+                                supabase.removeChannel(paymentChannelRef.current);
+                                paymentChannelRef.current = null;
+                              }
+                              try {
+                                const cleanPhone = retryPhone.replace(/[\s\-\+]/g, "");
+                                const { data, error } = await supabase.functions.invoke("kelpay-payment", {
+                                  body: {
+                                    order_id: orderId, // reuse same order
+                                    phone_number: cleanPhone,
+                                    amount: total,
+                                    currency: "USD",
+                                    provider: retryProvider,
+                                  },
+                                });
+                                if (error || !data?.success) {
+                                  toast({ title: "Paiement refusé", description: data?.error || error?.message || "Réessayez.", variant: "destructive" });
+                                } else {
+                                  setPaymentTransactionId(data.transaction_id);
+                                  setPaymentReference(data.reference);
+                                  setMobileMoneyPhone(cleanPhone);
+                                  setMobileMoneyProvider(retryProvider);
+                                  setShowRetryForm(false);
+                                  toast({ title: "Nouvelle demande envoyée", description: "Validez sur votre téléphone." });
+                                  // Re-subscribe
+                                  const channel = supabase
+                                    .channel(`payment-retry-${data.reference}`)
+                                    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "payment_transactions", filter: `reference=eq.${data.reference}` },
+                                      (payload: any) => {
+                                        const ns = payload.new?.status;
+                                        if (ns === "success") { setPaymentPending(false); clearCart(); setStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel); }
+                                        else if (ns === "failed") { setPaymentPending(false); toast({ title: "Paiement échoué", variant: "destructive" }); supabase.removeChannel(channel); }
+                                      }
+                                    ).subscribe();
+                                  paymentChannelRef.current = channel;
+                                }
+                              } catch (err: any) {
+                                toast({ title: "Erreur", description: err.message, variant: "destructive" });
+                              }
+                              setProcessing(false);
+                            }}
+                          >
+                            {processing ? <Loader2 size={12} className="animate-spin mr-1" /> : <Smartphone size={12} className="mr-1" />}
+                            Réessayer
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1078,7 +1261,7 @@ export default function CheckoutPage() {
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t("cart.shipping")} ({shippingMode})</span>
+                    <span className="text-muted-foreground">Expédition ({shippingMode})</span>
                     {shippingPaymentChoice === "pay_on_arrival" && shippingCost > 0 ? (
                       <span className="text-amber-600 font-medium text-xs">
                         ${shippingCost.toFixed(2)} — à l'arrivée
@@ -1089,6 +1272,22 @@ export default function CheckoutPage() {
                       </span>
                     )}
                   </div>
+                  {deliveryOption === "home_delivery" && lastMileFee > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Livraison domicile</span>
+                      {lastMilePayment === "pay_cash_on_delivery" ? (
+                        <span className="text-amber-600 font-medium text-xs">${lastMileFee.toFixed(2)} — cash</span>
+                      ) : (
+                        <span className="text-foreground">${lastMileFee.toFixed(2)}</span>
+                      )}
+                    </div>
+                  )}
+                  {deliveryOption === "hub_pickup" && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Livraison</span>
+                      <span className="text-primary font-medium">Retrait Hub (gratuit)</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-bold text-foreground pt-2 border-t border-border text-base">
                     <span>{t("cart.total")}</span>
                     <span>${total.toFixed(2)}</span>

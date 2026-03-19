@@ -1731,11 +1731,15 @@ export type Database = {
           confirmation_code: string | null
           coupon_code: string | null
           created_at: string
+          deferred_payment_phone: string | null
+          deferred_payment_provider: string | null
           delivery_choice: string | null
           discount_amount: number | null
+          hub_pickup_proof_url: string | null
           id: string
           last_mile_fee: number | null
           last_mile_payment_method: string | null
+          last_mile_payment_proof_url: string | null
           last_mile_payment_status: string | null
           order_ref: string
           payment_method: string | null
@@ -1747,6 +1751,7 @@ export type Database = {
           shipping_email: string | null
           shipping_first_name: string | null
           shipping_last_name: string | null
+          shipping_payment_proof_url: string | null
           shipping_payment_status: string | null
           shipping_phone: string | null
           shipping_postal_code: string | null
@@ -1765,11 +1770,15 @@ export type Database = {
           confirmation_code?: string | null
           coupon_code?: string | null
           created_at?: string
+          deferred_payment_phone?: string | null
+          deferred_payment_provider?: string | null
           delivery_choice?: string | null
           discount_amount?: number | null
+          hub_pickup_proof_url?: string | null
           id?: string
           last_mile_fee?: number | null
           last_mile_payment_method?: string | null
+          last_mile_payment_proof_url?: string | null
           last_mile_payment_status?: string | null
           order_ref: string
           payment_method?: string | null
@@ -1781,6 +1790,7 @@ export type Database = {
           shipping_email?: string | null
           shipping_first_name?: string | null
           shipping_last_name?: string | null
+          shipping_payment_proof_url?: string | null
           shipping_payment_status?: string | null
           shipping_phone?: string | null
           shipping_postal_code?: string | null
@@ -1799,11 +1809,15 @@ export type Database = {
           confirmation_code?: string | null
           coupon_code?: string | null
           created_at?: string
+          deferred_payment_phone?: string | null
+          deferred_payment_provider?: string | null
           delivery_choice?: string | null
           discount_amount?: number | null
+          hub_pickup_proof_url?: string | null
           id?: string
           last_mile_fee?: number | null
           last_mile_payment_method?: string | null
+          last_mile_payment_proof_url?: string | null
           last_mile_payment_status?: string | null
           order_ref?: string
           payment_method?: string | null
@@ -1815,6 +1829,7 @@ export type Database = {
           shipping_email?: string | null
           shipping_first_name?: string | null
           shipping_last_name?: string | null
+          shipping_payment_proof_url?: string | null
           shipping_payment_status?: string | null
           shipping_phone?: string | null
           shipping_postal_code?: string | null
