@@ -254,6 +254,15 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                   </div>
                 </div>
 
+                {/* Supplier order number */}
+                {order.supplier_order_number && (
+                  <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
+                    <Hash size={12} className="text-primary shrink-0" />
+                    <span className="text-muted-foreground">N° commande fournisseur :</span>
+                    <span className="font-mono font-bold text-foreground">{order.supplier_order_number}</span>
+                  </div>
+                )}
+
                 {/* Tracking number */}
                 {order.tracking_number && (
                   <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
