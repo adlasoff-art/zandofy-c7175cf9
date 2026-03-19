@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { BrandLogo } from "@/components/BrandLogo";
 import { Mail, MapPin, Phone, CreditCard, Shield, Truck, RotateCcw, Facebook, Instagram, Twitter, Youtube, Linkedin } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useState, useEffect } from "react";

@@ -840,7 +840,7 @@ export default function ProductPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {relatedProducts.filter(p => p.id !== product.id).slice(0, 15).map((p, i) => (
-                <Link to={`/product/${p.id}`} key={p.id}><ProductCard product={p} index={i} /></Link>
+                <Link to={`/product/${(p as any).slug || p.id}`} key={p.id}><ProductCard product={p} index={i} /></Link>
               ))}
             </div>
           </section>

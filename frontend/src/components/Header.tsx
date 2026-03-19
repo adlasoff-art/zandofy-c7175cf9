@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PredictiveSearch } from "@/components/PredictiveSearch";
+import { BrandLogo } from "@/components/BrandLogo";
 import { MegaMenu } from "@/components/MegaMenu";
 import { CurrencySwitcher } from "@/components/CurrencySwitcher";
 import { NotificationCenter } from "@/components/NotificationCenter";
