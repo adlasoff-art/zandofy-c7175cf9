@@ -77,6 +77,9 @@ export default function CheckoutPage() {
   const [processing, setProcessing] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
 
+  // Deferred shipping payment
+  const [shippingPaymentChoice, setShippingPaymentChoice] = useState<"pay_now" | "pay_on_arrival">("pay_now");
+
   // Mobile Money KelPay state
   const [mobileMoneyPhone, setMobileMoneyPhone] = useState("");
   const [mobileMoneyProvider, setMobileMoneyProvider] = useState("orange_money");
