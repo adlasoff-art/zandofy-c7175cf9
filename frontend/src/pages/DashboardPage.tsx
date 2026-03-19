@@ -547,6 +547,15 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         <DeliveryChoicePanel order={order} />
       )}
 
+      {/* Deferred shipping payment notice */}
+      {order.shipping_payment_status === "deferred" && order.status !== "delivered" && order.status !== "cancelled" && (
+        <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
+          <span className="text-amber-700 dark:text-amber-400 font-medium">
+            ⏳ Frais d'expédition à régler à l'arrivée : <strong>${Number(order.shipping_cost || 0).toFixed(2)}</strong>
+          </span>
+        </div>
+      )}
+
       {/* Show chosen delivery method */}
       {order.delivery_choice && (
         <div className={`flex items-center gap-2 text-sm rounded-md p-2.5 ${
