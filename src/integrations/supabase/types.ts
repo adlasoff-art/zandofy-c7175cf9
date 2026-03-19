@@ -2150,7 +2150,10 @@ export type Database = {
       }
       products: {
         Row: {
+          auto_pricing_enabled: boolean
           category_id: string | null
+          cost_calc: number | null
+          cost_real: number | null
           created_at: string
           currency: string
           description: string | null
@@ -2190,13 +2193,17 @@ export type Database = {
           store_id: string | null
           style: string | null
           updated_at: string
+          vendor_extra_margin: number | null
           verified_years: number | null
           verified_years_override: number | null
           weight_grams: number | null
           width_cm: number | null
         }
         Insert: {
+          auto_pricing_enabled?: boolean
           category_id?: string | null
+          cost_calc?: number | null
+          cost_real?: number | null
           created_at?: string
           currency?: string
           description?: string | null
@@ -2236,13 +2243,17 @@ export type Database = {
           store_id?: string | null
           style?: string | null
           updated_at?: string
+          vendor_extra_margin?: number | null
           verified_years?: number | null
           verified_years_override?: number | null
           weight_grams?: number | null
           width_cm?: number | null
         }
         Update: {
+          auto_pricing_enabled?: boolean
           category_id?: string | null
+          cost_calc?: number | null
+          cost_real?: number | null
           created_at?: string
           currency?: string
           description?: string | null
@@ -2282,6 +2293,7 @@ export type Database = {
           store_id?: string | null
           style?: string | null
           updated_at?: string
+          vendor_extra_margin?: number | null
           verified_years?: number | null
           verified_years_override?: number | null
           weight_grams?: number | null
@@ -3464,6 +3476,44 @@ export type Database = {
             columns: ["application_id"]
             isOneToOne: false
             referencedRelation: "vendor_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendor_pricing_overrides: {
+        Row: {
+          created_at: string
+          id: string
+          max_extra_margin: number | null
+          max_multiplier: number | null
+          notes: string | null
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          max_extra_margin?: number | null
+          max_multiplier?: number | null
+          notes?: string | null
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          max_extra_margin?: number | null
+          max_multiplier?: number | null
+          notes?: string | null
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_pricing_overrides_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: true
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
         ]
