@@ -69,6 +69,7 @@ const AdminCMSPage: React.FC = () => {
       {tab === "banners" && <PositionableBannersEditor />}
       {tab === "colors" && <ColorPaletteEditor />}
       <Suspense fallback={<FallbackLoader />}>
+        {tab === "branding" && <BrandingTab />}
         {tab === "menus" && <MenusTab />}
         {tab === "pages" && <PagesTab />}
         {tab === "sections" && <SectionsTab />}
