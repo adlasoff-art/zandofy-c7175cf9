@@ -39,6 +39,8 @@ export default function AdminOrdersPage() {
         .from("orders")
         .select("id, order_ref, shipping_first_name, shipping_last_name, shipping_phone, shipping_address, shipping_city, shipping_country, total, status, created_at, store_id, tracking_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code")
         .order("created_at", { ascending: false })
+        .limit(200) as any;
+        .order("created_at", { ascending: false })
         .limit(200);
       return data ?? [];
     },
