@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send, Edit2, Truck } from "lucide-react";
+import { PaymentProofUpload } from "@/components/PaymentProofUpload";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { triggerOrderStatusNotification } from "@/services/order-notifications";
@@ -58,6 +59,9 @@ interface Order {
   shipping_payment_status: string | null;
   last_mile_payment_method: string | null;
   rider_cash_collected: boolean | null;
+  shipping_payment_proof_url: string | null;
+  last_mile_payment_proof_url: string | null;
+  hub_pickup_proof_url: string | null;
   items: OrderItem[];
   history: StatusHistoryEntry[];
 }
@@ -94,7 +98,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected")
+      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected, shipping_payment_proof_url, last_mile_payment_proof_url, hub_pickup_proof_url")
       .eq("store_id", storeId)
       .order("created_at", { ascending: false }) as any;
 
@@ -331,7 +335,34 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                   </div>
                 )}
 
-                {/* Confirmation code (visible to vendor) */}
+                {/* Payment proof uploads (vendor view) */}
+                {order.shipping_payment_status === "deferred" && (
+                  <PaymentProofUpload
+                    orderId={order.id}
+                    field="shipping_payment_proof_url"
+                    label="Preuve paiement expédition (client)"
+                    existingUrl={order.shipping_payment_proof_url}
+                  />
+                )}
+
+                {order.delivery_choice === "hub_pickup" && order.status !== "delivered" && order.status !== "cancelled" && (
+                  <PaymentProofUpload
+                    orderId={order.id}
+                    field="hub_pickup_proof_url"
+                    label="Preuve de remise au Hub (photo)"
+                    existingUrl={order.hub_pickup_proof_url}
+                  />
+                )}
+
+                {order.delivery_choice === "home_delivery" && order.last_mile_payment_method === "cash" && (
+                  <PaymentProofUpload
+                    orderId={order.id}
+                    field="last_mile_payment_proof_url"
+                    label="Preuve paiement livraison (cash)"
+                    existingUrl={order.last_mile_payment_proof_url}
+                  />
+                )}
+
                 {order.confirmation_code && (
                   <div className="flex items-center gap-2 text-xs bg-primary/10 rounded-md p-2">
                     <span className="text-muted-foreground">Code confirmation :</span>
