@@ -204,7 +204,7 @@ export default function ProductPage() {
       <SEOHead
         title={`${product.nameFr} — ${product.categoryFr}`}
         description={seoDescription}
-        canonical={`/product/${product.id}`}
+        canonical={`/product/${product.slug || product.id}`}
         ogImage={gallery[0]?.url || product.image}
         ogType="product"
         jsonLd={productJsonLd}
