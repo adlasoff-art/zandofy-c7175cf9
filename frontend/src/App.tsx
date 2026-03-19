@@ -193,6 +193,7 @@ const App = () => (
                 <Route path="/admin/vendor-applications" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminVendorApplicationsPage /></RoleGuard>} />
                 <Route path="/admin/store-names" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminStoreNamesPage /></RoleGuard>} />
                 <Route path="/admin/vendor-subscriptions" element={<RoleGuard allowedRoles={["admin"]}><AdminVendorSubscriptionsPage /></RoleGuard>} />
+                <Route path="/admin/vendor-pricing" element={<RoleGuard allowedRoles={["admin"]}><AdminVendorPricingPage /></RoleGuard>} />
                 <Route path="/admin/audit" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminAuditPage /></RoleGuard>} />
                 <Route path="/admin/loyalty" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminLoyaltyPage /></RoleGuard>} />
                 <Route path="/admin/points" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminPointsPage /></RoleGuard>} />

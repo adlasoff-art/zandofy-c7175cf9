@@ -27,6 +27,7 @@ const adminItems = [
   { title: "Demandes Vendeur", url: "/admin/vendor-applications", icon: Store },
   { title: "Noms de boutique", url: "/admin/store-names", icon: PenLine },
   { title: "Abonnements", url: "/admin/vendor-subscriptions", icon: Crown },
+  { title: "Tarification boutiques", url: "/admin/vendor-pricing", icon: DollarSign },
   { title: "Fidélité", url: "/admin/loyalty", icon: Heart },
   { title: "Audit Points", url: "/admin/points", icon: Coins },
   { title: "Coupons", url: "/admin/coupons", icon: Ticket },
