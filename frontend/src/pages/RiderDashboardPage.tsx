@@ -212,8 +212,27 @@ export default function RiderDashboardPage() {
     }
   };
 
-  // Mark order as delivered (for home delivery with code)
-  const markOrderDelivered = async (orderId: string) => {
+  // Rider confirms cash collected from customer
+  const confirmCashCollected = async (orderId: string) => {
+    const { error } = await supabase
+      .from("orders")
+      .update({ rider_cash_collected: true, last_mile_payment_status: "paid_cash" } as any)
+      .eq("id", orderId);
+    if (error) {
+      toast.error("Erreur lors de la confirmation du paiement");
+    } else {
+      toast.success("Paiement cash confirmé !");
+      queryClient.invalidateQueries({ queryKey: ["rider-assigned-orders"] });
+    }
+  };
+
+  // Mark order as delivered (for home delivery with code) — requires cash confirmation if cash payment
+  const markOrderDelivered = async (orderId: string, order: any) => {
+    // Block if cash payment and not yet confirmed
+    if (order.last_mile_payment_method === "cash" && !order.rider_cash_collected) {
+      toast.error("Confirmez d'abord la réception du paiement cash avant de marquer comme livré.");
+      return;
+    }
     const { error } = await supabase
       .from("orders")
       .update({ status: "delivered" })
