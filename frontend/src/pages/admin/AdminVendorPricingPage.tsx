@@ -10,12 +10,14 @@ interface StoreWithOverride {
   id: string;
   name: string;
   owner_id: string;
+  is_platform_owned: boolean;
   override: {
     id?: string;
     margin_pct: number | null;
     multiplier: number | null;
     max_extra_margin: number | null;
     vendor_extra_margin_enabled: boolean;
+    commission_rate: number | null;
   } | null;
 }
 
