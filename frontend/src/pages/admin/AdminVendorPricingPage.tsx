@@ -78,6 +78,8 @@ export default function AdminVendorPricingPage() {
       multiplier: o?.multiplier != null ? String(o.multiplier) : "",
       max_extra_margin: o?.max_extra_margin != null ? String(o.max_extra_margin) : "",
       vendor_extra_margin_enabled: o?.vendor_extra_margin_enabled ?? false,
+      commission_rate: o?.commission_rate != null ? String(o.commission_rate) : "",
+      is_platform_owned: store.is_platform_owned ?? false,
     };
   };
 
