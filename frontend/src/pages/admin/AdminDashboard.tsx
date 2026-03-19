@@ -69,20 +69,21 @@ export default function AdminDashboard() {
       let cancelledCount = 0;
       let deliveredCount = 0;
       let pendingCount = 0;
+      let operationalCount = 0;
       data.forEach((o) => {
         byStatus[o.status] = (byStatus[o.status] || 0) + 1;
-        if (o.status === "cancelled") {
+        if (o.status === "cancelled" || o.status === "returned") {
           cancelledRevenue += Number(o.total);
           cancelledCount++;
-        } else if (o.status === "payment_failed") {
-          // Don't count payment_failed orders in revenue
-        } else {
+        }
+        if (!NON_REVENUE_ORDER_STATUSES.includes(o.status as never)) {
+          operationalCount++;
           revenue += Number(o.total);
         }
         if (o.status === "delivered") deliveredCount++;
         if (o.status === "pending") pendingCount++;
       });
-      return { count: data.length, revenue, cancelledRevenue, cancelledCount, deliveredCount, pendingCount, byStatus };
+      return { count: operationalCount, revenue, cancelledRevenue, cancelledCount, deliveredCount, pendingCount, byStatus };
     },
   });
 
