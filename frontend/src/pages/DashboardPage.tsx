@@ -289,10 +289,13 @@ export default function DashboardPage() {
 }
 
 function OverviewTab({ orders, user }: { orders: OrderRow[]; user: any }) {
-  const activeOrders = orders.filter(o => !["delivered", "cancelled", "returned"].includes(o.status)).length;
-  const completedStatuses = ["confirmed", "processing", "shipped", "delivered"];
-  const completedOrders = orders.filter(o => completedStatuses.includes(o.status));
-  const totalSpent = completedOrders.reduce((s, o) => s + Number(o.total), 0);
+  const validOrders = orders.filter((o) => !NON_REVENUE_ORDER_STATUSES.includes(o.status as never));
+  const activeOrders = orders.filter((o) => ACTIVE_ORDER_STATUSES.includes(o.status as never)).length;
+  const totalSpent = validOrders.reduce((sum, order) => {
+    const subtotal = Number(order.subtotal || 0);
+    const discount = Number(order.discount_amount || 0);
+    return sum + Math.max(0, subtotal - discount);
+  }, 0);
   const cancelledCount = orders.filter(o => o.status === "cancelled").length;
   const returnedCount = orders.filter(o => o.status === "returned").length;
   return (
