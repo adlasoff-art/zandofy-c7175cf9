@@ -48,6 +48,7 @@ export default function AdminSettingsPage() {
   });
   const [newnessDays, setNewnessDays] = useState(14);
   const [paymentMethods, setPaymentMethods] = useState({ mobile_money: true, stripe: true, cod: true });
+  const [pricing, setPricing] = useState<PricingConfig>({ margin_pct: 15, multiplier: 3, max_extra_margin_under_50: 0.50, max_extra_margin_over_100: 1.00 });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
