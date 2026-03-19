@@ -34,8 +34,10 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import {
-  STATUS_CONFIG,
+  ACTIVE_ORDER_STATUSES,
   CUSTOMER_TRACKING_STEPS,
+  NON_REVENUE_ORDER_STATUSES,
+  STATUS_CONFIG,
   getStepIndex,
 } from "@/lib/order-status";
 import { useKycStatus } from "@/hooks/use-kyc";
@@ -287,10 +289,13 @@ export default function DashboardPage() {
 }
 
 function OverviewTab({ orders, user }: { orders: OrderRow[]; user: any }) {
-  const activeOrders = orders.filter(o => !["delivered", "cancelled", "returned"].includes(o.status)).length;
-  const completedStatuses = ["confirmed", "processing", "shipped", "delivered"];
-  const completedOrders = orders.filter(o => completedStatuses.includes(o.status));
-  const totalSpent = completedOrders.reduce((s, o) => s + Number(o.total), 0);
+  const validOrders = orders.filter((o) => !NON_REVENUE_ORDER_STATUSES.includes(o.status as never));
+  const activeOrders = orders.filter((o) => ACTIVE_ORDER_STATUSES.includes(o.status as never)).length;
+  const totalSpent = validOrders.reduce((sum, order) => {
+    const subtotal = Number(order.subtotal || 0);
+    const discount = Number(order.discount_amount || 0);
+    return sum + Math.max(0, subtotal - discount);
+  }, 0);
   const cancelledCount = orders.filter(o => o.status === "cancelled").length;
   const returnedCount = orders.filter(o => o.status === "returned").length;
   return (
@@ -306,7 +311,7 @@ function OverviewTab({ orders, user }: { orders: OrderRow[]; user: any }) {
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-xs text-muted-foreground">Total commandes</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{orders.length}</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{validOrders.length}</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-xs text-muted-foreground">Total dépensé</p>
@@ -340,9 +345,9 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
 
   // Filter orders
   const filtered = orders.filter(o => {
-    if (statusFilter === "active") return !["delivered", "cancelled", "returned"].includes(o.status);
+    if (statusFilter === "active") return ACTIVE_ORDER_STATUSES.includes(o.status as never);
     if (statusFilter === "delivered") return o.status === "delivered";
-    if (statusFilter === "cancelled") return o.status === "cancelled" || o.status === "returned";
+    if (statusFilter === "cancelled") return ["cancelled", "returned", "payment_failed"].includes(o.status);
     return true;
   }).filter(o => {
     if (!searchQuery.trim()) return true;

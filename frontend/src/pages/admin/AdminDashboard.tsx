@@ -13,6 +13,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
+import { NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
 
 const statusColor: Record<string, string> = {
   delivered: "bg-primary/10 text-primary",
@@ -68,20 +69,21 @@ export default function AdminDashboard() {
       let cancelledCount = 0;
       let deliveredCount = 0;
       let pendingCount = 0;
+      let operationalCount = 0;
       data.forEach((o) => {
         byStatus[o.status] = (byStatus[o.status] || 0) + 1;
-        if (o.status === "cancelled") {
+        if (o.status === "cancelled" || o.status === "returned") {
           cancelledRevenue += Number(o.total);
           cancelledCount++;
-        } else if (o.status === "payment_failed") {
-          // Don't count payment_failed orders in revenue
-        } else {
+        }
+        if (!NON_REVENUE_ORDER_STATUSES.includes(o.status as never)) {
+          operationalCount++;
           revenue += Number(o.total);
         }
         if (o.status === "delivered") deliveredCount++;
         if (o.status === "pending") pendingCount++;
       });
-      return { count: data.length, revenue, cancelledRevenue, cancelledCount, deliveredCount, pendingCount, byStatus };
+      return { count: operationalCount, revenue, cancelledRevenue, cancelledCount, deliveredCount, pendingCount, byStatus };
     },
   });
 
@@ -236,8 +238,8 @@ export default function AdminDashboard() {
   // ─── KPI sections ───
   const commerceStats = [
     { label: "Utilisateurs", value: profileCount.toLocaleString(), icon: Users, color: "text-primary" },
-    { label: "Commandes totales", value: (orderStats?.count ?? 0).toLocaleString(), icon: ShoppingBag, color: "text-primary" },
-    { label: "Revenu réel (hors annulées)", value: `$${(orderStats?.revenue ?? 0).toLocaleString()}`, icon: DollarSign, color: "text-primary" },
+    { label: "Commandes valides", value: (orderStats?.count ?? 0).toLocaleString(), icon: ShoppingBag, color: "text-primary" },
+    { label: "Revenu réel encaissé", value: `$${(orderStats?.revenue ?? 0).toLocaleString()}`, icon: DollarSign, color: "text-primary" },
     { label: "Produits", value: productCount.toLocaleString(), icon: Package, color: "text-primary" },
     { label: "Boutiques", value: storeCount.toLocaleString(), icon: StoreIcon, color: "text-primary" },
   ];
@@ -245,8 +247,8 @@ export default function AdminDashboard() {
   const orderHealthStats = [
     { label: "Livrées", value: (orderStats?.deliveredCount ?? 0).toString(), icon: CheckCircle2, color: "text-primary" },
     { label: "En attente", value: (orderStats?.pendingCount ?? 0).toString(), icon: Clock, color: "text-amber-500" },
-    { label: "Annulées", value: (orderStats?.cancelledCount ?? 0).toString(), icon: XCircle, color: "text-destructive" },
-    { label: "Montant annulé", value: `$${(orderStats?.cancelledRevenue ?? 0).toLocaleString()}`, icon: Ban, color: "text-destructive" },
+    { label: "Annulées / retournées", value: (orderStats?.cancelledCount ?? 0).toString(), icon: XCircle, color: "text-destructive" },
+    { label: "Montant perdu", value: `$${(orderStats?.cancelledRevenue ?? 0).toLocaleString()}`, icon: Ban, color: "text-destructive" },
   ];
 
   const afterSalesStats = [
