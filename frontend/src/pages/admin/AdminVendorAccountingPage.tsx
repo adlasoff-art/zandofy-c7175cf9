@@ -55,8 +55,6 @@ export default function AdminVendorAccountingPage() {
       return (data || []) as { id: string; name: string; owner_id: string; is_platform_owned: boolean }[];
     },
   });
-    },
-  });
 
   // Fetch vendor pricing overrides (commission rates)
   const { data: overrides } = useQuery({
