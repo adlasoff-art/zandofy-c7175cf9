@@ -31,6 +31,7 @@ const adminItems = [
   { title: "Fidélité", url: "/admin/loyalty", icon: Heart },
   { title: "Audit Points", url: "/admin/points", icon: Coins },
   { title: "Coupons", url: "/admin/coupons", icon: Ticket },
+  { title: "Comptabilité vendeurs", url: "/admin/vendor-accounting", icon: Receipt },
   { title: "Retraits", url: "/admin/withdrawals", icon: Banknote },
   { title: "Retours", url: "/admin/returns", icon: RotateCcw },
   { title: "Litiges", url: "/admin/disputes", icon: AlertTriangle },

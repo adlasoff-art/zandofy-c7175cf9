@@ -211,6 +211,7 @@ const App = () => (
                 <Route path="/admin/email-templates" element={<RoleGuard allowedRoles={["admin"]}><AdminEmailTemplatesPage /></RoleGuard>} />
                 <Route path="/admin/kyc" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminKycPage /></RoleGuard>} />
                 <Route path="/admin/featured-placements" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminFeaturedPlacementsPage /></RoleGuard>} />
+                <Route path="/admin/vendor-accounting" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminVendorAccountingPage /></RoleGuard>} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
