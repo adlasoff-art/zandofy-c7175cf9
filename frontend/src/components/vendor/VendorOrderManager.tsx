@@ -48,6 +48,7 @@ interface Order {
   total: number;
   created_at: string;
   tracking_number: string | null;
+  supplier_order_number: string | null;
   assigned_rider_name: string | null;
   assigned_rider_id: string | null;
   delivery_choice: string | null;
