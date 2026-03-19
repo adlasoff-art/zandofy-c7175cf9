@@ -311,19 +311,41 @@ export default function AdminOrdersPage() {
                         </div>
                       )}
 
-                      {/* Delivery choice & fee */}
+                      {/* Payment & delivery info */}
+                      <div className="flex flex-wrap gap-1.5 text-[10px]">
+                        {o.payment_method && (
+                          <span className="px-2 py-0.5 rounded-full bg-muted font-medium">
+                            Paiement : {o.payment_method === "mobile_money" ? "Mobile Money" : o.payment_method === "cod" ? "Cash à la livraison" : o.payment_method}
+                          </span>
+                        )}
+                        {o.shipping_payment_status && (
+                          <span className={`px-2 py-0.5 rounded-full font-medium ${o.shipping_payment_status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                            Expédition : {o.shipping_payment_status === "paid" ? "Payée" : o.shipping_payment_status === "deferred" ? "Différé" : o.shipping_payment_status}
+                          </span>
+                        )}
+                        {o.delivery_choice && (
+                          <span className={`px-2 py-0.5 rounded-full font-medium ${o.delivery_choice === "home_delivery" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                            {o.delivery_choice === "home_delivery" ? "Livraison domicile" : "Retrait Hub"}
+                          </span>
+                        )}
+                        {o.last_mile_payment_method && (
+                          <span className="px-2 py-0.5 rounded-full bg-muted font-medium">
+                            Dernier km : {o.last_mile_payment_method === "cash" ? "Cash au livreur" : o.last_mile_payment_method === "mobile_money" ? "Mobile Money" : o.last_mile_payment_method}
+                          </span>
+                        )}
+                        {o.last_mile_payment_status && o.last_mile_payment_status !== "pending" && (
+                          <span className={`px-2 py-0.5 rounded-full font-medium ${o.last_mile_payment_status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                            Paiement livraison : {o.last_mile_payment_status === "paid" ? "Payé" : o.last_mile_payment_status}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Delivery fee */}
                       {o.last_mile_fee != null && Number(o.last_mile_fee) > 0 && (
                         <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
                           <DollarSign size={12} className="text-primary shrink-0" />
                           <span className="text-muted-foreground">Frais livraison :</span>
                           <span className="font-bold">${Number(o.last_mile_fee).toFixed(2)}</span>
-                          {o.delivery_choice && (
-                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
-                              o.delivery_choice === "home_delivery" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"
-                            }`}>
-                              {o.delivery_choice === "home_delivery" ? "Domicile" : "Hub"}
-                            </span>
-                          )}
                         </div>
                       )}
 
