@@ -150,7 +150,7 @@ export function Footer() {
       <div className="container py-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <h4 className="text-base tracking-[0.08em] text-foreground mb-3" style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 400 }}>Zandofy</h4>
+            <BrandLogo variant="footer" />
             <p className="text-xs text-muted-foreground leading-relaxed mb-4">{footerConfig.description || t("footer.description")}</p>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <MapPin size={12} />
