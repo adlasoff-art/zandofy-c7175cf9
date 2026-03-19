@@ -273,6 +273,17 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                   </div>
                 )}
 
+                {/* Edit tracking button — available when in_shipping or later, before delivered */}
+                {["in_shipping", "shipped", "assigning_rider", "rider_assigned", "out_for_delivery"].includes(order.status) && (
+                  <button
+                    onClick={() => setEditTrackingModal(order.id)}
+                    className="w-full py-1.5 text-xs font-medium text-primary border border-primary/30 rounded-md hover:bg-primary/5 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Edit2 size={12} />
+                    {order.tracking_number ? "Modifier les infos de suivi" : "Ajouter le n° de suivi (tracking)"}
+                  </button>
+                )}
+
                 {/* Assigned rider */}
                 {order.assigned_rider_name && (
                   <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
