@@ -400,6 +400,10 @@ export default function CheckoutPage() {
 
     for (const [storeId, storeItems] of storeGroups) {
       const orderSubtotal = storeItems.reduce((s, i) => s + i.price * i.quantity, 0);
+      const orderTotal = shippingPaymentChoice === "pay_on_arrival"
+        ? Math.max(0, orderSubtotal - discountAmount)
+        : Math.max(0, orderSubtotal - discountAmount + shippingCost);
+
       const { data: order, error: orderErr } = await supabase
         .from("orders")
         .insert({
@@ -417,10 +421,11 @@ export default function CheckoutPage() {
           shipping_postal_code: shipping.postalCode,
           subtotal: orderSubtotal,
           shipping_cost: shippingCost,
-          total: Math.max(0, orderSubtotal - discountAmount + shippingCost),
+          total: orderTotal,
           order_ref: mockOrderRef,
           coupon_code: appliedCoupon?.code || null,
           discount_amount: discountAmount,
+          shipping_payment_status: shippingPaymentChoice === "pay_on_arrival" ? "deferred" : "paid",
         })
         .select("id")
         .single();
