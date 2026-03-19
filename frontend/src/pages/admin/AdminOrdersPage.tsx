@@ -347,7 +347,7 @@ export default function AdminOrdersPage() {
                         </button>
                       )}
 
-                      {/* God Mode: set any status */}
+                      {/* Admin: set any status */}
                       <div className="flex flex-wrap gap-1.5">
                         {STATUS_FLOW.map((s) => {
                           const sc = STATUS_CONFIG[s];
