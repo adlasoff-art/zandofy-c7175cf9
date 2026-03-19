@@ -19,7 +19,7 @@ import {
 import { TrackingNumberModal, RiderAssignmentModal, DeliveryFeeModal } from "@/components/vendor/OrderTransitionModals";
 
 export default function AdminOrdersPage() {
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | "all" | "payment_failed">("all");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
