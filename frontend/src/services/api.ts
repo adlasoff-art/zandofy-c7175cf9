@@ -208,22 +208,34 @@ export async function fetchCategories(): Promise<Category[]> {
   }));
 }
 
-export async function fetchProductById(
-  id: string
+export async function fetchProductBySlug(
+  slug: string
 ): Promise<Product | undefined> {
-  const { data, error } = await supabase
+  const productSelect = `
+    *,
+    categories(name, name_fr),
+    product_images(image_url, position),
+    product_colors(color_hex, color_name, image_url),
+    product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
+    stores!products_store_id_fkey(id, name, logo_url, is_verified, verified_years, verified_years_override, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, whatsapp_number, rating, response_rate, response_time)
+  `;
+
+  // Try slug first, fall back to UUID for backward compatibility
+  let query = supabase
     .from("products")
-    .select(`
-      *,
-      categories(name, name_fr),
-      product_images(image_url, position),
-      product_colors(color_hex, color_name, image_url),
-      product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
-      stores!products_store_id_fkey(id, name, logo_url, is_verified, verified_years, verified_years_override, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, whatsapp_number, rating, response_rate, response_time)
-    `)
-    .eq("id", id)
-    .eq("publish_status", "published")
-    .maybeSingle();
+    .select(productSelect)
+    .eq("publish_status", "published");
+
+  // Detect if it's a UUID pattern
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
+
+  if (isUuid) {
+    query = query.eq("id", slug);
+  } else {
+    query = query.eq("slug", slug);
+  }
+
+  const { data, error } = await query.maybeSingle();
 
   if (error || !data) {
     console.error("Error fetching product:", error);

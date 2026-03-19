@@ -93,9 +93,9 @@ export default function ProductPage() {
   const [variantDrawerOpen, setVariantDrawerOpen] = useState(false);
 
   const { data: product, isLoading } = useQuery({
-    queryKey: ["product", id],
-    queryFn: () => fetchProductById(id!),
-    enabled: !!id,
+    queryKey: ["product", slug],
+    queryFn: () => fetchProductBySlug(slug!),
+    enabled: !!slug,
   });
 
   const { data: relatedProducts } = useQuery({

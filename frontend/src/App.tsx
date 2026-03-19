@@ -146,7 +146,7 @@ const App = () => (
               <Routes>
                 <Route path="/banned" element={<BannedPage />} />
                 <Route path="/" element={<Index />} />
-                <Route path="/product/:id" element={<ProductPage />} />
+                <Route path="/product/:slug" element={<ProductPage />} />
                 <Route path="/category/:slug" element={<CategoryPage />} />
                 <Route path="/stores" element={<StoresPage />} />
                 <Route path="/store/:id" element={<StorePage />} />
