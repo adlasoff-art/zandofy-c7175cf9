@@ -317,7 +317,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                 )}
 
                 {/* Mini stepper with dates */}
-                <OrderMiniStepper status={order.status} history={order.history} />
+                <OrderMiniStepper status={order.status} history={order.history} trackingNumber={order.tracking_number} />
 
                 {/* Items */}
                 <div className="space-y-1.5">
