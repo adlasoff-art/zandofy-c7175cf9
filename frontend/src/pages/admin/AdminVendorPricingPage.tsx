@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Calculator, Search, Store, Save, Loader2, ToggleLeft, ToggleRight, ShieldAlert } from "lucide-react";
+import { Search, Store, Save, Loader2, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,7 +55,7 @@ export default function AdminVendorPricingPage() {
       const { data: storesData } = await q.limit(50);
       if (!storesData?.length) return [];
 
-      const storeIds = storesData.map((s) => s.id);
+      const storeIds = storesData.map((s: any) => s.id);
       const { data: overrides } = await (supabase as any)
         .from("vendor_pricing_overrides")
         .select("*")
@@ -63,12 +63,54 @@ export default function AdminVendorPricingPage() {
 
       const overrideMap = new Map((overrides || []).map((o: any) => [o.store_id, o]));
 
-      return storesData.map((s) => ({
+      return storesData.map((s: any) => ({
         ...s,
         override: overrideMap.get(s.id) || null,
       })) as StoreWithOverride[];
     },
   });
+
+  // Fetch pending ownership claims for badge display
+  const { data: pendingClaims } = useQuery({
+    queryKey: ["admin-pending-claims"],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("platform_ownership_claims")
+        .select("id, store_id, status, expires_at")
+        .in("status", ["pending", "accepted"]);
+      return (data || []) as { id: string; store_id: string; status: string; expires_at: string }[];
+    },
+  });
+
+  const claimsByStore = new Map((pendingClaims || []).map((c) => [c.store_id, c]));
+
+  const handleResolveClaim = async (claimId: string, newStatus: "dismissed" | "accepted", storeId: string) => {
+    setSavingId(storeId);
+
+    if (newStatus === "accepted") {
+      // Vendor contested → revert to independent
+      const { error: storeErr } = await (supabase as any)
+        .from("stores")
+        .update({ is_platform_owned: false })
+        .eq("id", storeId)
+        .select();
+      if (storeErr) {
+        toast({ title: "Erreur", description: storeErr.message, variant: "destructive" });
+        setSavingId(null);
+        return;
+      }
+    }
+
+    await (supabase as any)
+      .from("platform_ownership_claims")
+      .update({ status: newStatus, resolved_at: new Date().toISOString() })
+      .eq("id", claimId);
+
+    toast({ title: "Contestation traitée", description: newStatus === "accepted" ? "Boutique remise en indépendante." : "Contestation rejetée." });
+    queryClient.invalidateQueries({ queryKey: ["admin-stores-pricing"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-pending-claims"] });
+    setSavingId(null);
+  };
 
   const getEdit = (store: StoreWithOverride) => {
     if (edits[store.id]) return edits[store.id];
@@ -91,7 +133,7 @@ export default function AdminVendorPricingPage() {
   };
 
   const getEditForId = (storeId: string) => {
-    const store = stores?.find((s: any) => s.id === storeId);
+    const store = stores?.find((s) => s.id === storeId);
     if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false };
     return getEdit(store);
   };
@@ -151,6 +193,7 @@ export default function AdminVendorPricingPage() {
         return next;
       });
       queryClient.invalidateQueries({ queryKey: ["admin-stores-pricing"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-pending-claims"] });
     }
     setSavingId(null);
   };
@@ -192,18 +235,24 @@ export default function AdminVendorPricingPage() {
           {stores?.map((store) => {
             const edit = getEdit(store);
             const isDirty = !!edits[store.id];
+            const claim = claimsByStore.get(store.id);
 
             return (
               <div key={store.id} className="bg-card border border-border rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Store size={16} className="text-primary" />
                     <span className="text-sm font-semibold text-foreground">{store.name}</span>
-                    {edit.is_platform_owned && (
+                    {edit.is_platform_owned ? (
                       <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded-full font-medium">Plateforme</span>
-                    )}
-                    {!edit.is_platform_owned && (
+                    ) : (
                       <span className="text-[10px] px-1.5 py-0.5 bg-muted text-muted-foreground rounded-full font-medium">Indépendant</span>
+                    )}
+                    {claim && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-destructive/10 text-destructive rounded-full font-medium flex items-center gap-1">
+                        <ShieldAlert size={10} />
+                        {claim.status === "accepted" ? "Contestation reçue" : "Contestation en cours"}
+                      </span>
                     )}
                   </div>
                   <button
@@ -215,6 +264,31 @@ export default function AdminVendorPricingPage() {
                     Enregistrer
                   </button>
                 </div>
+
+                {/* Claim resolution UI */}
+                {claim && claim.status === "accepted" && (
+                  <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 space-y-2">
+                    <p className="text-xs text-destructive font-medium">
+                      Le vendeur a contesté le statut "Boutique plateforme".
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleResolveClaim(claim.id, "accepted", store.id)}
+                        disabled={savingId === store.id}
+                        className="px-3 py-1 text-xs font-medium bg-accent text-accent-foreground rounded-md hover:bg-accent/80 transition-colors"
+                      >
+                        Accepter (remettre indépendant)
+                      </button>
+                      <button
+                        onClick={() => handleResolveClaim(claim.id, "dismissed", store.id)}
+                        disabled={savingId === store.id}
+                        className="px-3 py-1 text-xs font-medium bg-muted text-muted-foreground rounded-md hover:bg-muted/80 transition-colors"
+                      >
+                        Rejeter
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Platform toggle */}
                 <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
@@ -308,7 +382,7 @@ export default function AdminVendorPricingPage() {
                 )}
 
                 {isDirty && (
-                  <p className="text-[10px] text-amber-600">Modifications non enregistrées</p>
+                  <p className="text-[10px] text-destructive/70">Modifications non enregistrées</p>
                 )}
               </div>
             );
