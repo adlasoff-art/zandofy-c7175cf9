@@ -1,4 +1,5 @@
 import { useCart } from "@/contexts/CartContext";
+import { getColorDisplay } from "@/utils/colorName";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
