@@ -160,7 +160,7 @@ export default function AdminOrdersPage() {
     toast.success(`${filtered.length} commandes exportées`);
   };
 
-  const filterTabs: (OrderStatus | "all")[] = ["all", ...STATUS_FLOW, "cancelled", "returned"];
+  const filterTabs: (OrderStatus | "all" | "payment_failed")[] = ["all", ...STATUS_FLOW, "cancelled", "returned", "payment_failed"];
 
   return (
     <AdminLayout title="Commandes">
