@@ -557,11 +557,39 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
 
       {/* Deferred shipping payment notice */}
       {order.shipping_payment_status === "deferred" && order.status !== "delivered" && order.status !== "cancelled" && (
-        <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
-          <span className="text-amber-700 dark:text-amber-400 font-medium">
-            ⏳ Frais d'expédition à régler à l'arrivée : <strong>${Number(order.shipping_cost || 0).toFixed(2)}</strong>
-          </span>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
+            <span className="text-amber-700 dark:text-amber-400 font-medium">
+              ⏳ Frais d'expédition à régler à l'arrivée : <strong>${Number(order.shipping_cost || 0).toFixed(2)}</strong>
+            </span>
+          </div>
+          <PaymentProofUpload
+            orderId={order.id}
+            field="shipping_payment_proof_url"
+            label="Preuve de paiement expédition"
+            existingUrl={order.shipping_payment_proof_url}
+          />
         </div>
+      )}
+
+      {/* Last-mile payment proof for cash delivery */}
+      {order.delivery_choice === "home_delivery" && order.last_mile_payment_method === "cash" && order.status !== "delivered" && order.status !== "cancelled" && (
+        <PaymentProofUpload
+          orderId={order.id}
+          field="last_mile_payment_proof_url"
+          label="Preuve de paiement livraison (cash)"
+          existingUrl={order.last_mile_payment_proof_url}
+        />
+      )}
+
+      {/* Hub pickup proof upload */}
+      {order.delivery_choice === "hub_pickup" && order.status !== "delivered" && order.status !== "cancelled" && (
+        <PaymentProofUpload
+          orderId={order.id}
+          field="hub_pickup_proof_url"
+          label="Preuve de retrait au Hub"
+          existingUrl={order.hub_pickup_proof_url}
+        />
       )}
 
       {/* Show chosen delivery method */}
