@@ -75,6 +75,10 @@ const EMPTY_FORM = {
   length_cm: 0,
   width_cm: 0,
   height_cm: 0,
+  cost_real: 0,
+  cost_calc: 0,
+  auto_pricing_enabled: true,
+  vendor_extra_margin: 0,
 };
 
 type ProductFormState = typeof EMPTY_FORM;
