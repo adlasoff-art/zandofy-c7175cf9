@@ -375,8 +375,11 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
         <TrackingNumberModal
           loading={!!updatingId}
           onCancel={() => setTrackingModal(null)}
-          onConfirm={(trackingNumber) => {
-            updateStatus(trackingModal, "in_shipping", { tracking_number: trackingNumber || null });
+          onConfirm={(trackingNumber, supplierOrderNumber) => {
+            updateStatus(trackingModal, "in_shipping", {
+              tracking_number: trackingNumber || null,
+              supplier_order_number: supplierOrderNumber || null,
+            });
             setTrackingModal(null);
           }}
         />
