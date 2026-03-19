@@ -376,7 +376,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                 {/* Totals */}
                 <div className="text-xs space-y-1 border-t border-border pt-2">
                   <div className="flex justify-between"><span className="text-muted-foreground">Sous-total</span><span>${Number(order.subtotal).toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Livraison</span><span>${Number(order.shipping_cost).toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Expédition</span><span>${Number(order.shipping_cost).toFixed(2)}</span></div>
                   <div className="flex justify-between font-bold text-foreground"><span>Total</span><span>${Number(order.total).toFixed(2)}</span></div>
                 </div>
 
