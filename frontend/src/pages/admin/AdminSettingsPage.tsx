@@ -250,6 +250,19 @@ export default function AdminSettingsPage() {
           <p className="text-[10px] text-muted-foreground mt-3">
             Formule : prix = coût + (coût × marge% / 100) × multiplicateur. Arrondi stratégique (.99/.49).
           </p>
+          <div className="mt-4 pt-4 border-t border-border">
+            <label className="text-xs text-muted-foreground block mb-1">Commission plateforme par défaut (%)</label>
+            <p className="text-[10px] text-muted-foreground mb-2">Appliquée aux vendeurs indépendants sans surcharge spécifique.</p>
+            <input
+              type="number"
+              min={0}
+              max={50}
+              step={0.5}
+              value={pricing.platform_commission_default}
+              onChange={(e) => setPricing((p) => ({ ...p, platform_commission_default: Number(e.target.value) || 10 }))}
+              className={inputClass + " max-w-[200px]"}
+            />
+          </div>
         </section>
 
         <section className="bg-card border-2 border-destructive/30 rounded-xl p-5">
