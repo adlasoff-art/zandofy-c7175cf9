@@ -72,18 +72,20 @@ export function PricingCalculator({
       });
   }, [storeId]);
 
-  const effectiveMultiplier = overrides?.max_multiplier
-    ? Math.min(settings.multiplier, overrides.max_multiplier)
-    : settings.multiplier;
+  // Per-store overrides take priority, then global defaults
+  const effectiveMarginPct = overrides?.margin_pct ?? settings.margin_pct;
+  const effectiveMultiplier = overrides?.multiplier ?? settings.multiplier;
+  const vendorExtraMarginAllowed = overrides?.vendor_extra_margin_enabled ?? false;
 
   // Recalculate when inputs change
   const recalculate = useCallback(() => {
     if (!autoPricingEnabled || costCalc <= 0) return;
-    const sp = calculateSalePrice(costCalc, settings.margin_pct, effectiveMultiplier, vendorExtraMargin);
+    const extraMargin = vendorExtraMarginAllowed ? vendorExtraMargin : 0;
+    const sp = calculateSalePrice(costCalc, effectiveMarginPct, effectiveMultiplier, extraMargin);
     const op = calculateOldPrice(sp);
     onPriceChange(sp);
     onOriginalPriceChange(op);
-  }, [costCalc, settings, effectiveMultiplier, vendorExtraMargin, autoPricingEnabled, onPriceChange, onOriginalPriceChange]);
+  }, [costCalc, effectiveMarginPct, effectiveMultiplier, vendorExtraMargin, vendorExtraMarginAllowed, autoPricingEnabled, onPriceChange, onOriginalPriceChange]);
 
   useEffect(() => {
     recalculate();
