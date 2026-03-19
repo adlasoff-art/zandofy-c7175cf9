@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface Product {
   id: string;
+  slug: string;
   name: string;
   nameFr: string;
   price: number;
