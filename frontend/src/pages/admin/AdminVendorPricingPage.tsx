@@ -91,8 +91,8 @@ export default function AdminVendorPricingPage() {
   };
 
   const getEditForId = (storeId: string) => {
-    const store = stores?.find((s) => s.id === storeId);
-    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false };
+    const store = stores?.find((s: any) => s.id === storeId);
+    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false };
     return getEdit(store);
   };
 
