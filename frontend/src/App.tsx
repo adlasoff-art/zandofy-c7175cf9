@@ -23,6 +23,7 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { MaintenanceGuard } from "@/components/MaintenanceGuard";
 import { CookieConsent } from "@/components/CookieConsent";
 import { AnnouncementPopup } from "@/components/AnnouncementPopup";
+import { DynamicFavicon } from "@/components/DynamicFavicon";
 import { Suspense, lazy } from "react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoadingSkeleton } from "@/components/PageLoadingSkeleton";
