@@ -90,6 +90,7 @@ export default function AdminSettingsPage() {
               multiplier: Number(v.multiplier) || 3,
               max_extra_margin_under_50: Number(v.max_extra_margin_under_50) || 0.50,
               max_extra_margin_over_100: Number(v.max_extra_margin_over_100) || 1.00,
+              platform_commission_default: Number(v.platform_commission_default) || 10,
             });
           }
         });
