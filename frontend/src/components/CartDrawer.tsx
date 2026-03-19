@@ -1,4 +1,5 @@
 import { useCart } from "@/contexts/CartContext";
+import { getColorDisplay } from "@/utils/colorName";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -41,11 +42,15 @@ export function CartDrawer() {
                   <div className="flex-1 min-w-0 space-y-1">
                     <p className="text-sm font-medium text-foreground line-clamp-2">{item.nameFr}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {item.color && (
-                        <span className="inline-flex items-center gap-1">
-                          <span className="w-3 h-3 rounded-full border border-border" style={{ backgroundColor: item.color }} />
-                        </span>
-                      )}
+                      {item.color && (() => {
+                        const cd = getColorDisplay(item.color);
+                        return cd ? (
+                          <span className="inline-flex items-center gap-1">
+                            {cd.hex && <span className="w-3 h-3 rounded-full border border-border" style={{ backgroundColor: cd.hex }} />}
+                            <span>{cd.name}</span>
+                          </span>
+                        ) : null;
+                      })()}
                       {item.size && <span>Taille: {item.size}</span>}
                     </div>
                     <div className="flex items-center justify-between">
