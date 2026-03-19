@@ -163,7 +163,7 @@ export default function AdminOrdersPage() {
   const filterTabs: (OrderStatus | "all")[] = ["all", ...STATUS_FLOW, "cancelled", "returned"];
 
   return (
-    <AdminLayout title="Commandes — God Mode">
+    <AdminLayout title="Commandes">
       {/* Pending cancellation requests */}
       {cancelRequests.length > 0 && (
         <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl space-y-2">
