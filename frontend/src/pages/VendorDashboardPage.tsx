@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { InternalChat } from "@/components/InternalChat";
+import { VendorPlatformClaimBanner } from "@/components/vendor/VendorPlatformClaimBanner";
 import { VendorProductManager } from "@/components/VendorProductManager";
 import { VendorFeaturedRequestTab } from "@/components/vendor/VendorFeaturedRequestTab";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
