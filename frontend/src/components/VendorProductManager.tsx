@@ -11,6 +11,7 @@ import { MediaUploader } from "@/components/vendor/MediaUploader";
 import { ShippingEstimator } from "@/components/vendor/ShippingEstimator";
 import { PromotionTimer } from "@/components/vendor/PromotionTimer";
 import { ProductVariantsEditor, type SizeVariant, type ColorVariant, type DynamicVariantSelection } from "@/components/vendor/ProductVariantsEditor";
+import { PricingCalculator } from "@/components/vendor/PricingCalculator";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 
