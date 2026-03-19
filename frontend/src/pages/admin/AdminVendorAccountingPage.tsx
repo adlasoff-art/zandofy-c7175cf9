@@ -140,9 +140,9 @@ export default function AdminVendorAccountingPage() {
       storeItemsMap.get(storeId)!.push(item);
     }
 
-    return stores
-      .filter((s) => !search || s.name.toLowerCase().includes(search.toLowerCase()))
-      .map((store) => {
+    return (stores as any[])
+      .filter((s: any) => !search || s.name.toLowerCase().includes(search.toLowerCase()))
+      .map((store: any) => {
         const items = storeItemsMap.get(store.id) || [];
         const override = overrideMap.get(store.id) as any;
         const wallet = walletMap.get(store.id) as any;
