@@ -84,6 +84,15 @@ export default function CheckoutPage() {
   // Deferred shipping payment
   const [shippingPaymentChoice, setShippingPaymentChoice] = useState<"pay_now" | "pay_on_arrival">("pay_now");
 
+  // Delivery option (home vs hub)
+  const [deliveryOption, setDeliveryOption] = useState<DeliveryOption>("none");
+  const [lastMilePayment, setLastMilePayment] = useState<LastMilePayment>("pay_with_shipping");
+
+  // Deferred payment retry state
+  const [retryPhone, setRetryPhone] = useState("");
+  const [retryProvider, setRetryProvider] = useState("orange_money");
+  const [showRetryForm, setShowRetryForm] = useState(false);
+
   // Mobile Money KelPay state
   const [mobileMoneyPhone, setMobileMoneyPhone] = useState("");
   const [mobileMoneyProvider, setMobileMoneyProvider] = useState("orange_money");
