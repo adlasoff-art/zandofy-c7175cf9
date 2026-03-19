@@ -352,9 +352,9 @@ export default function AdminVendorAccountingPage() {
                       <TableCell className="text-right text-sm font-semibold">${fmt(store.netDueVendor)}</TableCell>
                       <TableCell className="text-right">
                         <div className="text-[10px]">
-                          <span className="text-emerald-600">${fmt(store.walletAvailable)}</span>
+                          <span className="text-emerald-600 dark:text-emerald-400">${fmt(store.walletAvailable)}</span>
                           {" / "}
-                          <span className="text-amber-600">${fmt(store.walletPending)}</span>
+                          <span className="text-amber-600 dark:text-amber-400">${fmt(store.walletPending)}</span>
                         </div>
                       </TableCell>
                     </TableRow>
