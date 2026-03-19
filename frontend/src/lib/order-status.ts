@@ -33,6 +33,7 @@ export const STATUS_CONFIG: Record<
   delivered:         { label: "Livrée",               icon: Gift,        color: "text-emerald-500",  badgeClass: "bg-primary/10 text-primary" },
   cancelled:         { label: "Annulée",              icon: XCircle,     color: "text-destructive",  badgeClass: "bg-destructive/10 text-destructive" },
   returned:          { label: "Retournée",            icon: RotateCcw,   color: "text-rose-500",     badgeClass: "bg-rose-100 text-rose-700" },
+  payment_failed:    { label: "Paiement échoué",      icon: XCircle,     color: "text-destructive",  badgeClass: "bg-destructive/10 text-destructive" },
 };
 
 /** The linear happy-path flow (excludes cancelled/returned) */
