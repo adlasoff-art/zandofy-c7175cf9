@@ -357,6 +357,10 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       length_cm: form.length_cm || null,
       width_cm: form.width_cm || null,
       height_cm: form.height_cm || null,
+      cost_real: form.cost_real || null,
+      cost_calc: form.cost_calc || null,
+      auto_pricing_enabled: form.auto_pricing_enabled,
+      vendor_extra_margin: form.vendor_extra_margin || 0,
     };
 
     let productId = editing?.id;
