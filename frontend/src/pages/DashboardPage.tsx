@@ -496,11 +496,29 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         </div>
       )}
 
-      {order.payment_method && (
-        <p className="text-xs text-muted-foreground">
-          Paiement : {order.payment_method === "stripe" ? "Carte bancaire" : order.payment_method === "mobile_money" ? "Mobile Money" : "À la livraison"}
-        </p>
-      )}
+      {/* Payment & delivery details */}
+      <div className="flex flex-wrap gap-1.5 text-[10px]">
+        {order.payment_method && (
+          <span className="px-2 py-0.5 rounded-full bg-muted font-medium">
+            Paiement : {order.payment_method === "stripe" ? "Carte bancaire" : order.payment_method === "mobile_money" ? "Mobile Money" : order.payment_method === "cod" ? "Cash à la livraison" : order.payment_method}
+          </span>
+        )}
+        {order.shipping_payment_status && (
+          <span className={`px-2 py-0.5 rounded-full font-medium ${order.shipping_payment_status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+            Expédition : {order.shipping_payment_status === "paid" ? "Payée" : order.shipping_payment_status === "deferred" ? "Paiement différé" : order.shipping_payment_status}
+          </span>
+        )}
+        {order.delivery_choice && (
+          <span className={`px-2 py-0.5 rounded-full font-medium ${order.delivery_choice === "home_delivery" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+            {order.delivery_choice === "home_delivery" ? "Livraison domicile" : "Retrait Hub"}
+          </span>
+        )}
+        {order.last_mile_payment_method && (
+          <span className="px-2 py-0.5 rounded-full bg-muted font-medium">
+            Dernier km : {order.last_mile_payment_method === "cash" ? "Cash au livreur" : "Mobile Money"}
+          </span>
+        )}
+      </div>
 
       {/* Shipping info - full address */}
       {(order.shipping_first_name || order.shipping_last_name) && (

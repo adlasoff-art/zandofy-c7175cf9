@@ -19,7 +19,7 @@ import {
 import { TrackingNumberModal, RiderAssignmentModal, DeliveryFeeModal } from "@/components/vendor/OrderTransitionModals";
 
 export default function AdminOrdersPage() {
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | "all" | "payment_failed">("all");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export default function AdminOrdersPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("orders")
-        .select("id, order_ref, shipping_first_name, shipping_last_name, shipping_phone, shipping_address, shipping_city, shipping_country, total, status, created_at, store_id, tracking_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code")
+        .select("id, order_ref, shipping_first_name, shipping_last_name, shipping_phone, shipping_address, shipping_city, shipping_country, total, subtotal, shipping_cost, status, created_at, store_id, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, payment_method, shipping_payment_status, last_mile_payment_method, last_mile_payment_status, deferred_payment_provider, discount_amount, coupon_code")
         .order("created_at", { ascending: false })
         .limit(200) as any;
       return (data ?? []) as any[];
@@ -160,10 +160,10 @@ export default function AdminOrdersPage() {
     toast.success(`${filtered.length} commandes exportées`);
   };
 
-  const filterTabs: (OrderStatus | "all")[] = ["all", ...STATUS_FLOW, "cancelled", "returned"];
+  const filterTabs: (OrderStatus | "all" | "payment_failed")[] = ["all", ...STATUS_FLOW, "cancelled", "returned", "payment_failed"];
 
   return (
-    <AdminLayout title="Commandes — God Mode">
+    <AdminLayout title="Commandes">
       {/* Pending cancellation requests */}
       {cancelRequests.length > 0 && (
         <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl space-y-2">
@@ -311,19 +311,41 @@ export default function AdminOrdersPage() {
                         </div>
                       )}
 
-                      {/* Delivery choice & fee */}
+                      {/* Payment & delivery info */}
+                      <div className="flex flex-wrap gap-1.5 text-[10px]">
+                        {o.payment_method && (
+                          <span className="px-2 py-0.5 rounded-full bg-muted font-medium">
+                            Paiement : {o.payment_method === "mobile_money" ? "Mobile Money" : o.payment_method === "cod" ? "Cash à la livraison" : o.payment_method}
+                          </span>
+                        )}
+                        {o.shipping_payment_status && (
+                          <span className={`px-2 py-0.5 rounded-full font-medium ${o.shipping_payment_status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                            Expédition : {o.shipping_payment_status === "paid" ? "Payée" : o.shipping_payment_status === "deferred" ? "Différé" : o.shipping_payment_status}
+                          </span>
+                        )}
+                        {o.delivery_choice && (
+                          <span className={`px-2 py-0.5 rounded-full font-medium ${o.delivery_choice === "home_delivery" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+                            {o.delivery_choice === "home_delivery" ? "Livraison domicile" : "Retrait Hub"}
+                          </span>
+                        )}
+                        {o.last_mile_payment_method && (
+                          <span className="px-2 py-0.5 rounded-full bg-muted font-medium">
+                            Dernier km : {o.last_mile_payment_method === "cash" ? "Cash au livreur" : o.last_mile_payment_method === "mobile_money" ? "Mobile Money" : o.last_mile_payment_method}
+                          </span>
+                        )}
+                        {o.last_mile_payment_status && o.last_mile_payment_status !== "pending" && (
+                          <span className={`px-2 py-0.5 rounded-full font-medium ${o.last_mile_payment_status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                            Paiement livraison : {o.last_mile_payment_status === "paid" ? "Payé" : o.last_mile_payment_status}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Delivery fee */}
                       {o.last_mile_fee != null && Number(o.last_mile_fee) > 0 && (
                         <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
                           <DollarSign size={12} className="text-primary shrink-0" />
                           <span className="text-muted-foreground">Frais livraison :</span>
                           <span className="font-bold">${Number(o.last_mile_fee).toFixed(2)}</span>
-                          {o.delivery_choice && (
-                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
-                              o.delivery_choice === "home_delivery" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"
-                            }`}>
-                              {o.delivery_choice === "home_delivery" ? "Domicile" : "Hub"}
-                            </span>
-                          )}
                         </div>
                       )}
 
@@ -347,7 +369,7 @@ export default function AdminOrdersPage() {
                         </button>
                       )}
 
-                      {/* God Mode: set any status */}
+                      {/* Admin: set any status */}
                       <div className="flex flex-wrap gap-1.5">
                         {STATUS_FLOW.map((s) => {
                           const sc = STATUS_CONFIG[s];

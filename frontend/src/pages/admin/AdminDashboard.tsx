@@ -73,6 +73,8 @@ export default function AdminDashboard() {
         if (o.status === "cancelled") {
           cancelledRevenue += Number(o.total);
           cancelledCount++;
+        } else if (o.status === "payment_failed") {
+          // Don't count payment_failed orders in revenue
         } else {
           revenue += Number(o.total);
         }

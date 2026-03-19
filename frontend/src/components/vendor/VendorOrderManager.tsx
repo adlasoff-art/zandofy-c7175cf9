@@ -259,8 +259,26 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                   </div>
                   <div>
                     <span className="text-muted-foreground">Paiement</span>
-                    <p className="font-medium text-foreground">{order.payment_method || "—"}</p>
+                    <p className="font-medium text-foreground">{order.payment_method === "mobile_money" ? "Mobile Money" : order.payment_method === "cod" ? "Cash à la livraison" : order.payment_method || "—"}</p>
                   </div>
+                  {order.shipping_payment_status && (
+                    <div>
+                      <span className="text-muted-foreground">Expédition</span>
+                      <p className="font-medium text-foreground">{order.shipping_payment_status === "paid" ? "Payée" : order.shipping_payment_status === "deferred" ? "Paiement différé" : order.shipping_payment_status}</p>
+                    </div>
+                  )}
+                  {order.delivery_choice && (
+                    <div>
+                      <span className="text-muted-foreground">Mode de livraison</span>
+                      <p className="font-medium text-foreground">{order.delivery_choice === "home_delivery" ? "Livraison domicile" : "Retrait Hub"}</p>
+                    </div>
+                  )}
+                  {order.last_mile_payment_method && (
+                    <div>
+                      <span className="text-muted-foreground">Paiement dernier km</span>
+                      <p className="font-medium text-foreground">{order.last_mile_payment_method === "cash" ? "Cash au livreur" : "Mobile Money"}</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Supplier order number */}
