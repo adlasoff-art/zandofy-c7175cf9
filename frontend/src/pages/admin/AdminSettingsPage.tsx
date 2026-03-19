@@ -28,6 +28,13 @@ interface MaintenanceConfig {
   duration_minutes: number;
 }
 
+interface PricingConfig {
+  margin_pct: number;
+  multiplier: number;
+  max_extra_margin_under_50: number;
+  max_extra_margin_over_100: number;
+}
+
 export default function AdminSettingsPage() {
   const [trackingProvider, setTrackingProvider] = useState("17track");
   const [freeShipping, setFreeShipping] = useState<FreeShippingConfig>({ enabled: true, amount: 49, currency: "USD" });
