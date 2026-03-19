@@ -495,7 +495,7 @@ export default function StorePage() {
                           : "grid grid-cols-1 md:grid-cols-2 gap-3"
                       }>
                         {filteredProducts.map((product) => (
-                          <Link to={`/product/${product.id}`} key={product.id}>
+                          <Link to={`/product/${product.slug || product.id}`} key={product.id}>
                             <ProductCard product={product} />
                           </Link>
                         ))}

@@ -325,7 +325,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
                         {previewProducts.map((pp) => (
                           <Link
                             key={pp.id}
-                            to={`/product/${pp.id}`}
+                            to={`/product/${(pp as any).slug || pp.id}`}
                             onClick={handleSuggestionClick}
                             className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-card transition-colors"
                           >
