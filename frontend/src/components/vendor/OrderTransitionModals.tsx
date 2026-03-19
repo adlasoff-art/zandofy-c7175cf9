@@ -7,44 +7,74 @@ function generateConfirmationCode(): string {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
-/** Modal: enter tracking number when advancing preparing → in_shipping */
+/** Modal: enter supplier order number (required) + tracking number (optional) when advancing preparing → in_shipping */
 export function TrackingNumberModal({
   onConfirm,
   onCancel,
   loading,
 }: {
-  onConfirm: (trackingNumber: string) => void;
+  onConfirm: (trackingNumber: string, supplierOrderNumber: string) => void;
   onCancel: () => void;
   loading: boolean;
 }) {
-  const [value, setValue] = useState("");
+  const [trackingValue, setTrackingValue] = useState("");
+  const [supplierOrderValue, setSupplierOrderValue] = useState("");
+
+  const canSubmit = supplierOrderValue.trim().length > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
       <div className="bg-card rounded-xl w-full max-w-sm p-5 space-y-4 border border-border" onClick={e => e.stopPropagation()}>
         <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-          <Hash size={16} className="text-primary" /> Numéro de suivi
+          <Hash size={16} className="text-primary" /> Informations fournisseur
         </h3>
-        <p className="text-xs text-muted-foreground">
-          Renseignez le numéro de suivi (AWB, tracking) pour cette commande.
-        </p>
-        <input
-          type="text"
-          value={value}
-          onChange={e => setValue(e.target.value)}
-          placeholder="Ex: AWB-2026-001234"
-          maxLength={100}
-          className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
-          autoFocus
-          style={{ fontSize: "16px" }}
-        />
+
+        {/* Supplier order number — required */}
+        <div>
+          <label className="text-xs font-medium text-foreground mb-1 block">
+            N° de commande fournisseur <span className="text-destructive">*</span>
+          </label>
+          <p className="text-[11px] text-muted-foreground mb-1.5">
+            Référence de commande Alibaba, 1688, Pinduoduo, AliExpress, Taobao, etc.
+          </p>
+          <input
+            type="text"
+            value={supplierOrderValue}
+            onChange={e => setSupplierOrderValue(e.target.value)}
+            placeholder="Ex: 73829461023847"
+            maxLength={200}
+            className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+            autoFocus
+            style={{ fontSize: "16px" }}
+          />
+        </div>
+
+        {/* Tracking number — optional */}
+        <div>
+          <label className="text-xs font-medium text-foreground mb-1 block">
+            N° de suivi (tracking)
+          </label>
+          <p className="text-[11px] text-muted-foreground mb-1.5">
+            AWB ou numéro de tracking du colis. Peut être ajouté plus tard si indisponible.
+          </p>
+          <input
+            type="text"
+            value={trackingValue}
+            onChange={e => setTrackingValue(e.target.value)}
+            placeholder="Ex: AWB-2026-001234"
+            maxLength={200}
+            className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+            style={{ fontSize: "16px" }}
+          />
+        </div>
+
         <div className="flex gap-2">
           <button onClick={onCancel} className="flex-1 px-4 py-2.5 text-sm border border-border rounded-lg hover:bg-muted">
             Annuler
           </button>
           <button
-            onClick={() => onConfirm(value.trim())}
-            disabled={loading}
+            onClick={() => onConfirm(trackingValue.trim(), supplierOrderValue.trim())}
+            disabled={loading || !canSubmit}
             className="flex-1 px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
