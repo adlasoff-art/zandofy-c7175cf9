@@ -311,6 +311,25 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                   </div>
                 )}
 
+                {/* Deferred shipping payment badge */}
+                {order.shipping_payment_status === "deferred" && (
+                  <div className="flex items-center gap-2 text-xs bg-amber-50 border border-amber-200 rounded-md p-2">
+                    <span className="text-amber-700 font-medium">⏳ Expédition à payer à l'arrivée : ${Number(order.shipping_cost || 0).toFixed(2)}</span>
+                  </div>
+                )}
+
+                {/* Rider cash collection status */}
+                {order.last_mile_payment_method === "cash" && order.delivery_choice === "home_delivery" && (
+                  <div className={`flex items-center gap-2 text-xs rounded-md p-2 ${
+                    order.rider_cash_collected ? "bg-primary/10 text-primary" : "bg-amber-50 border border-amber-200 text-amber-700"
+                  }`}>
+                    {order.rider_cash_collected
+                      ? "✅ Cash collecté par le livreur"
+                      : "⏳ En attente de confirmation cash par le livreur"
+                    }
+                  </div>
+                )}
+
                 {/* Confirmation code (visible to vendor) */}
                 {order.confirmation_code && (
                   <div className="flex items-center gap-2 text-xs bg-primary/10 rounded-md p-2">
