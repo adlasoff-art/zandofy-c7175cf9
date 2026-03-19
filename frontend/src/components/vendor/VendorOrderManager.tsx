@@ -54,6 +54,9 @@ interface Order {
   delivery_choice: string | null;
   last_mile_fee: number | null;
   confirmation_code: string | null;
+  shipping_payment_status: string | null;
+  last_mile_payment_method: string | null;
+  rider_cash_collected: boolean | null;
   items: OrderItem[];
   history: StatusHistoryEntry[];
 }
@@ -90,7 +93,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status")
+      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected")
       .eq("store_id", storeId)
       .order("created_at", { ascending: false }) as any;
 
@@ -305,6 +308,25 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                         {order.delivery_choice === "home_delivery" ? "Livraison domicile" : "Retrait Hub"}
                       </span>
                     )}
+                  </div>
+                )}
+
+                {/* Deferred shipping payment badge */}
+                {order.shipping_payment_status === "deferred" && (
+                  <div className="flex items-center gap-2 text-xs bg-amber-50 border border-amber-200 rounded-md p-2">
+                    <span className="text-amber-700 font-medium">⏳ Expédition à payer à l'arrivée : ${Number(order.shipping_cost || 0).toFixed(2)}</span>
+                  </div>
+                )}
+
+                {/* Rider cash collection status */}
+                {order.last_mile_payment_method === "cash" && order.delivery_choice === "home_delivery" && (
+                  <div className={`flex items-center gap-2 text-xs rounded-md p-2 ${
+                    order.rider_cash_collected ? "bg-primary/10 text-primary" : "bg-amber-50 border border-amber-200 text-amber-700"
+                  }`}>
+                    {order.rider_cash_collected
+                      ? "✅ Cash collecté par le livreur"
+                      : "⏳ En attente de confirmation cash par le livreur"
+                    }
                   </div>
                 )}
 

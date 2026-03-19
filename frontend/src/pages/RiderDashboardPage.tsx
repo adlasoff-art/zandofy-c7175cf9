@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Bike, MapPin, CheckCircle, Clock, Phone, Navigation, User, Home, Camera, Loader2, Star, Calendar, Map as MapIcon, Hash, Package, ShoppingBag } from "lucide-react";
+import { Bike, MapPin, CheckCircle, Clock, Phone, Navigation, User, Home, Camera, Loader2, Star, Calendar, Map as MapIcon, Hash, Package, ShoppingBag, Banknote } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRoles } from "@/hooks/use-roles";
 import { Navigate, NavLink } from "react-router-dom";
@@ -110,7 +110,7 @@ export default function RiderDashboardPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_ref, status, total, shipping_address, shipping_city, shipping_country, shipping_phone, shipping_first_name, shipping_last_name, delivery_choice, last_mile_fee, last_mile_payment_method, confirmation_code, created_at, updated_at")
+        .select("id, order_ref, status, total, shipping_address, shipping_city, shipping_country, shipping_phone, shipping_first_name, shipping_last_name, delivery_choice, last_mile_fee, last_mile_payment_method, last_mile_payment_status, rider_cash_collected, confirmation_code, created_at, updated_at, shipping_cost, shipping_payment_status")
         .eq("assigned_rider_id", user!.id)
         .order("updated_at", { ascending: false });
       if (error) throw error;
@@ -212,8 +212,27 @@ export default function RiderDashboardPage() {
     }
   };
 
-  // Mark order as delivered (for home delivery with code)
-  const markOrderDelivered = async (orderId: string) => {
+  // Rider confirms cash collected from customer
+  const confirmCashCollected = async (orderId: string) => {
+    const { error } = await supabase
+      .from("orders")
+      .update({ rider_cash_collected: true, last_mile_payment_status: "paid_cash" } as any)
+      .eq("id", orderId);
+    if (error) {
+      toast.error("Erreur lors de la confirmation du paiement");
+    } else {
+      toast.success("Paiement cash confirmé !");
+      queryClient.invalidateQueries({ queryKey: ["rider-assigned-orders"] });
+    }
+  };
+
+  // Mark order as delivered (for home delivery with code) — requires cash confirmation if cash payment
+  const markOrderDelivered = async (orderId: string, order: any) => {
+    // Block if cash payment and not yet confirmed
+    if (order.last_mile_payment_method === "cash" && !order.rider_cash_collected) {
+      toast.error("Confirmez d'abord la réception du paiement cash avant de marquer comme livré.");
+      return;
+    }
     const { error } = await supabase
       .from("orders")
       .update({ status: "delivered" })
@@ -373,12 +392,36 @@ export default function RiderDashboardPage() {
                           </a>
                         )}
 
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                           <span className="font-semibold text-foreground">${Number(o.total).toFixed(2)}</span>
                           {o.delivery_choice === "home" && o.last_mile_fee > 0 && (
                             <span>Frais livraison: ${Number(o.last_mile_fee).toFixed(2)} ({o.last_mile_payment_method === "mobile_money" ? "Mobile Money" : "Cash"})</span>
                           )}
+                          {o.shipping_payment_status === "deferred" && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-medium">
+                              Expédition à payer: ${Number(o.shipping_cost || 0).toFixed(2)}
+                            </span>
+                          )}
                         </div>
+
+                        {/* Cash confirmation for rider */}
+                        {o.delivery_choice === "home" && o.last_mile_payment_method === "cash" && (
+                          <div className="border-t border-border pt-3 space-y-2">
+                            {o.rider_cash_collected ? (
+                              <div className="flex items-center gap-2 bg-primary/5 rounded-lg px-3 py-2">
+                                <CheckCircle size={14} className="text-primary" />
+                                <span className="text-xs font-medium text-primary">Paiement cash confirmé</span>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => confirmCashCollected(o.id)}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-amber-500 text-white rounded-lg text-xs font-medium active:scale-95 touch-manipulation"
+                              >
+                                <Banknote size={14} /> Confirmer paiement cash reçu
+                              </button>
+                            )}
+                          </div>
+                        )}
 
                         {/* Confirmation code section */}
                         {o.delivery_choice === "home" && (
@@ -395,6 +438,17 @@ export default function RiderDashboardPage() {
                                 className="flex items-center gap-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-xs active:scale-95 touch-manipulation"
                               >
                                 <Hash size={14} /> Générer code de confirmation
+                              </button>
+                            )}
+
+                            {/* Mark as delivered - blocked if cash not confirmed */}
+                            {o.confirmation_code && (
+                              <button
+                                onClick={() => markOrderDelivered(o.id, o)}
+                                disabled={o.last_mile_payment_method === "cash" && !o.rider_cash_collected}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium active:scale-95 touch-manipulation disabled:opacity-50"
+                              >
+                                <CheckCircle size={14} /> Marquer comme livré
                               </button>
                             )}
                           </div>

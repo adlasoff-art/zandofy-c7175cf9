@@ -77,6 +77,9 @@ export default function CheckoutPage() {
   const [processing, setProcessing] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
 
+  // Deferred shipping payment
+  const [shippingPaymentChoice, setShippingPaymentChoice] = useState<"pay_now" | "pay_on_arrival">("pay_now");
+
   // Mobile Money KelPay state
   const [mobileMoneyPhone, setMobileMoneyPhone] = useState("");
   const [mobileMoneyProvider, setMobileMoneyProvider] = useState("orange_money");
@@ -167,7 +170,8 @@ export default function CheckoutPage() {
   const discountAmount = couponDiscount + loyaltyDiscount;
   const pointsDiscount = usePoints ? Math.min(pointsToUse, pointsBalance) : 0;
 
-  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + shippingCost);
+  const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
+  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping);
 
   // Load saved addresses
   useEffect(() => {
@@ -397,6 +401,10 @@ export default function CheckoutPage() {
 
     for (const [storeId, storeItems] of storeGroups) {
       const orderSubtotal = storeItems.reduce((s, i) => s + i.price * i.quantity, 0);
+      const orderTotal = shippingPaymentChoice === "pay_on_arrival"
+        ? Math.max(0, orderSubtotal - discountAmount)
+        : Math.max(0, orderSubtotal - discountAmount + shippingCost);
+
       const { data: order, error: orderErr } = await supabase
         .from("orders")
         .insert({
@@ -414,10 +422,11 @@ export default function CheckoutPage() {
           shipping_postal_code: shipping.postalCode,
           subtotal: orderSubtotal,
           shipping_cost: shippingCost,
-          total: Math.max(0, orderSubtotal - discountAmount + shippingCost),
+          total: orderTotal,
           order_ref: mockOrderRef,
           coupon_code: appliedCoupon?.code || null,
           discount_amount: discountAmount,
+          shipping_payment_status: shippingPaymentChoice === "pay_on_arrival" ? "deferred" : "paid",
         })
         .select("id")
         .single();
@@ -727,6 +736,42 @@ export default function CheckoutPage() {
                     </div>
                   )}
 
+                  {/* Deferred shipping payment option */}
+                  {shippingCost > 0 && (
+                    <div className="pt-3 border-t border-border space-y-2">
+                      <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                        <Truck size={14} className="text-primary" /> Paiement des frais d'expédition
+                      </p>
+                      <div className="space-y-2">
+                        {[
+                          { key: "pay_now" as const, label: "Payer maintenant", desc: `Inclure $${shippingCost.toFixed(2)} dans le total` },
+                          { key: "pay_on_arrival" as const, label: "Payer à l'arrivée", desc: "Régler les frais d'expédition quand la commande arrive au Hub" },
+                        ].map(opt => (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => setShippingPaymentChoice(opt.key)}
+                            className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${
+                              shippingPaymentChoice === opt.key
+                                ? "border-primary bg-secondary"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                              shippingPaymentChoice === opt.key ? "border-primary" : "border-border"
+                            }`}>
+                              {shippingPaymentChoice === opt.key && <div className="w-2 h-2 rounded-full bg-primary" />}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                              <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <Button type="submit" className="w-full h-12 font-bold mt-2">
                     {t("checkout.continueToPayment")} <ChevronRight size={16} />
                   </Button>
@@ -1025,9 +1070,15 @@ export default function CheckoutPage() {
                   )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">{t("cart.shipping")} ({shippingMode})</span>
-                    <span className={shippingCost === 0 ? "text-primary font-medium" : "text-foreground"}>
-                      {shippingCost === 0 ? t("cart.free") : `$${shippingCost.toFixed(2)}`}
-                    </span>
+                    {shippingPaymentChoice === "pay_on_arrival" && shippingCost > 0 ? (
+                      <span className="text-amber-600 font-medium text-xs">
+                        ${shippingCost.toFixed(2)} — à l'arrivée
+                      </span>
+                    ) : (
+                      <span className={shippingCost === 0 ? "text-primary font-medium" : "text-foreground"}>
+                        {shippingCost === 0 ? t("cart.free") : `$${shippingCost.toFixed(2)}`}
+                      </span>
+                    )}
                   </div>
                   <div className="flex justify-between font-bold text-foreground pt-2 border-t border-border text-base">
                     <span>{t("cart.total")}</span>

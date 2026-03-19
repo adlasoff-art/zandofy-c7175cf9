@@ -89,6 +89,7 @@ interface OrderRow {
   delivery_choice: string | null;
   last_mile_fee: number | null;
   confirmation_code: string | null;
+  shipping_payment_status: string | null;
 }
 
 interface OrderItemRow {
@@ -544,6 +545,15 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       )}
       {order.status === "shipped" && !order.delivery_choice && (order.last_mile_fee == null || Number(order.last_mile_fee) === 0) && (
         <DeliveryChoicePanel order={order} />
+      )}
+
+      {/* Deferred shipping payment notice */}
+      {order.shipping_payment_status === "deferred" && order.status !== "delivered" && order.status !== "cancelled" && (
+        <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
+          <span className="text-amber-700 dark:text-amber-400 font-medium">
+            ⏳ Frais d'expédition à régler à l'arrivée : <strong>${Number(order.shipping_cost || 0).toFixed(2)}</strong>
+          </span>
+        </div>
       )}
 
       {/* Show chosen delivery method */}
