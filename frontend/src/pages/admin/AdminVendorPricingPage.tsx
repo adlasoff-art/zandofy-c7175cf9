@@ -281,6 +281,25 @@ export default function AdminVendorPricingPage() {
                   </div>
                 </div>
 
+                {/* Commission rate — only for independent stores */}
+                {!edit.is_platform_owned && (
+                  <div className="pt-2 border-t border-border">
+                    <label className="text-xs text-muted-foreground block mb-1">
+                      Commission plateforme (%) <span className="text-[10px] opacity-60">défaut: {globalDefaults?.platform_commission_default ?? 10}%</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={50}
+                      step={0.5}
+                      value={edit.commission_rate}
+                      onChange={(e) => updateEdit(store.id, "commission_rate", e.target.value)}
+                      className={inputClass + " max-w-[200px]"}
+                      placeholder={String(globalDefaults?.platform_commission_default ?? 10)}
+                    />
+                  </div>
+                )}
+
                 {isDirty && (
                   <p className="text-[10px] text-amber-600">Modifications non enregistrées</p>
                 )}
