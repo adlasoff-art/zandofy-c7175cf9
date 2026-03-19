@@ -250,7 +250,7 @@ export default function AdminSettingsPage() {
           </p>
         </section>
 
-
+        <section className="bg-card border-2 border-destructive/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle size={18} className="text-destructive" />
             <h2 className="text-sm font-semibold text-foreground">Mode maintenance</h2>
