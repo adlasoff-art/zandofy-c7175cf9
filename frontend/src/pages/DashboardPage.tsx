@@ -922,7 +922,7 @@ function DeliveryChoicePanel({ order }: { order: OrderRow }) {
         </button>
       </div>
       <p className="text-[10px] text-muted-foreground">
-        En choisissant le retrait, vous économisez les frais de livraison.
+        🚀 Profitez d'une livraison rapide et sans effort directement chez vous !
       </p>
     </div>
   );
