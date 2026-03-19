@@ -292,6 +292,10 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       length_cm: (product as any).length_cm || 0,
       width_cm: (product as any).width_cm || 0,
       height_cm: (product as any).height_cm || 0,
+      cost_real: (product as any).cost_real || 0,
+      cost_calc: (product as any).cost_calc || 0,
+      auto_pricing_enabled: (product as any).auto_pricing_enabled !== false,
+      vendor_extra_margin: (product as any).vendor_extra_margin || 0,
     });
     // Split images: position 0 = main, rest = variations
     const sorted = [...product.images].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
