@@ -29,6 +29,8 @@ export default function AdminVendorPricingPage() {
     multiplier: string;
     max_extra_margin: string;
     vendor_extra_margin_enabled: boolean;
+    commission_rate: string;
+    is_platform_owned: boolean;
   }>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
