@@ -15,6 +15,7 @@ import { useRoles } from "@/hooks/use-roles";
 import { TrackingNumberModal, RiderAssignmentModal, DeliveryFeeModal, EditTrackingModal, generateConfirmationCode } from "./OrderTransitionModals";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { getColorDisplay } from "@/utils/colorName";
 
 interface OrderItem {
   id: string;
