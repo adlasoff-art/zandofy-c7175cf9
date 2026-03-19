@@ -42,8 +42,6 @@ export default function AdminOrdersPage() {
         .limit(200) as any;
       return (data ?? []) as any[];
     },
-      return data ?? [];
-    },
   });
 
   // Cancellation requests
