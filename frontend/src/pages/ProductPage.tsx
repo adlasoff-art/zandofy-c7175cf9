@@ -196,7 +196,7 @@ export default function ProductPage() {
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
     { name: "Accueil", url: "/" },
     { name: product.categoryFr, url: `/category/${product.categoryFr?.toLowerCase()}` },
-    { name: product.nameFr, url: `/product/${product.id}` },
+    { name: product.nameFr, url: `/product/${product.slug || product.id}` },
   ]);
 
   return (
