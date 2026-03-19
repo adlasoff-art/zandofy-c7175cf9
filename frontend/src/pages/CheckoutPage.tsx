@@ -1070,9 +1070,15 @@ export default function CheckoutPage() {
                   )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">{t("cart.shipping")} ({shippingMode})</span>
-                    <span className={shippingCost === 0 ? "text-primary font-medium" : "text-foreground"}>
-                      {shippingCost === 0 ? t("cart.free") : `$${shippingCost.toFixed(2)}`}
-                    </span>
+                    {shippingPaymentChoice === "pay_on_arrival" && shippingCost > 0 ? (
+                      <span className="text-amber-600 font-medium text-xs">
+                        ${shippingCost.toFixed(2)} — à l'arrivée
+                      </span>
+                    ) : (
+                      <span className={shippingCost === 0 ? "text-primary font-medium" : "text-foreground"}>
+                        {shippingCost === 0 ? t("cart.free") : `$${shippingCost.toFixed(2)}`}
+                      </span>
+                    )}
                   </div>
                   <div className="flex justify-between font-bold text-foreground pt-2 border-t border-border text-base">
                     <span>{t("cart.total")}</span>

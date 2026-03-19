@@ -110,7 +110,7 @@ export default function RiderDashboardPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_ref, status, total, shipping_address, shipping_city, shipping_country, shipping_phone, shipping_first_name, shipping_last_name, delivery_choice, last_mile_fee, last_mile_payment_method, confirmation_code, created_at, updated_at")
+        .select("id, order_ref, status, total, shipping_address, shipping_city, shipping_country, shipping_phone, shipping_first_name, shipping_last_name, delivery_choice, last_mile_fee, last_mile_payment_method, last_mile_payment_status, rider_cash_collected, confirmation_code, created_at, updated_at, shipping_cost, shipping_payment_status")
         .eq("assigned_rider_id", user!.id)
         .order("updated_at", { ascending: false });
       if (error) throw error;
