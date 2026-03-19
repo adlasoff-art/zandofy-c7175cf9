@@ -419,6 +419,34 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
         />
       )}
 
+      {/* Edit tracking modal — no status change */}
+      {editTrackingModal && (() => {
+        const editOrder = orders.find(o => o.id === editTrackingModal);
+        return (
+          <EditTrackingModal
+            currentTracking={editOrder?.tracking_number || ""}
+            currentSupplierOrder={editOrder?.supplier_order_number || ""}
+            loading={!!updatingId}
+            onCancel={() => setEditTrackingModal(null)}
+            onConfirm={async (trackingNumber, supplierOrderNumber) => {
+              setUpdatingId(editTrackingModal);
+              const updates: any = {};
+              if (trackingNumber) updates.tracking_number = trackingNumber;
+              if (supplierOrderNumber) updates.supplier_order_number = supplierOrderNumber;
+              const { error } = await supabase.from("orders").update(updates).eq("id", editTrackingModal);
+              if (error) {
+                toast.error("Erreur lors de la mise à jour");
+              } else {
+                toast.success("Informations de suivi mises à jour");
+                setOrders(prev => prev.map(o => o.id === editTrackingModal ? { ...o, ...updates } : o));
+              }
+              setUpdatingId(null);
+              setEditTrackingModal(null);
+            }}
+          />
+        );
+      })()}
+
       {/* Rider assignment modal */}
       {riderModal && (
         <RiderAssignmentModal
