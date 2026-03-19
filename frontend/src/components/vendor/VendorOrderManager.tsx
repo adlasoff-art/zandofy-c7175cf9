@@ -470,7 +470,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
 }
 
 /** Order stepper with date/time under each step — enlarged for readability */
-function OrderMiniStepper({ status, history }: { status: string; history: StatusHistoryEntry[] }) {
+function OrderMiniStepper({ status, history, trackingNumber }: { status: string; history: StatusHistoryEntry[]; trackingNumber?: string | null }) {
   const currentIdx = STATUS_FLOW.indexOf(status as any);
   const isCancelled = status === "cancelled" || status === "returned";
   const historyMap = new Map(history.map((h) => [h.status, h.created_at]));
