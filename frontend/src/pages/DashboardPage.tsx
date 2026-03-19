@@ -89,6 +89,8 @@ interface OrderRow {
   delivery_choice: string | null;
   last_mile_fee: number | null;
   confirmation_code: string | null;
+  shipping_payment_status: string | null;
+  shipping_cost: number;
 }
 
 interface OrderItemRow {
