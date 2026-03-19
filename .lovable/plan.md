@@ -1,92 +1,80 @@
 
 
-# Plan : Système de Pricing Intelligent pour Vendeurs
+# Plan : Guides d'utilisation Markdown (3 fichiers)
 
-## Résumé
+## Objectif
+Générer 3 fichiers Markdown complets dans `/mnt/documents/` couvrant toutes les fonctionnalités implémentées, destinés aux 3 profils d'utilisateurs.
 
-Ajouter un module de calcul automatique des prix dans le formulaire produit vendeur. Le vendeur renseigne le **coût d'achat réel** et le **coût d'achat de calcul**, et la plateforme génère automatiquement le **prix de vente** et l'**ancien prix** (prix barré marketing). Le vendeur peut désactiver le calcul auto pour revenir en mode manuel. L'admin configure les paramètres globaux (marges, multiplicateurs, marges parallèles).
+## Fichiers à créer
 
----
+### 1. `guide-vendeur.md` — Guide Vendeur
+- **Inscription & Onboarding** : Créer un compte, postuler comme vendeur (BecomeVendorPage — formulaire multi-étapes : infos perso, boutique, documents KYB)
+- **Tableau de bord vendeur** (`/vendor`) : Navigation par onglets (catalogue, commandes, livraisons, promos, coupons, wallet, retours, litiges, featured, stats, équipe, paramètres)
+- **Gestion du catalogue** : Ajouter/modifier un produit, variantes (tailles, couleurs), images, statuts de publication (brouillon → en attente → publié/refusé), limites par abonnement
+- **Système de tarification intelligent** : Coût d'achat réel vs calcul, calcul automatique prix de vente + ancien prix, marge vendeur (si activée par admin), désactiver le calcul auto
+- **Abonnements** : Beginner (10 produits), Pro (100), Grand Supplier (illimité)
+- **Gestion des commandes** : Statuts (reçue → confirmée → préparation → expédition → livrée), tracking, numéros Zandofy/fournisseur
+- **Promotions & Coupons** : Créer des promos, coupons de réduction, analytics coupons
+- **Wallet & Retraits** : Solde en attente (30j rétention), solde disponible, demandes de retrait
+- **Retours & Litiges** : Gestion côté vendeur
+- **Messagerie** : Chat modéré avec clients
+- **Équipe** : Collaborateurs (selon tier)
+- **Self-delivery** : Livraison autonome, suivi livreur
+- **Mises en avant** : Demander un placement featured
 
-## Formule de calcul
+### 2. `guide-client.md` — Guide Client
+- **Inscription & Connexion** : Email/mot de passe, Google OAuth, réinitialisation, rate-limiting
+- **Navigation** : Recherche prédictive, méga-menu, catégories, filtres, tri
+- **Fiche produit** : Variantes, estimateur livraison, avis, boutique
+- **Panier & Checkout** : Adresses sauvegardées, calcul frais de port, coupons (global + boutique), modes de paiement (Stripe, Mobile Money, COD), paiement expédition différé, livraison last-mile (en ligne ou cash au livreur)
+- **Dashboard client** (`/dashboard`) : Onglets (aperçu, commandes, suivi, retours, litiges, parrainage, affiliation, notifications, messages, profil, vérification KYC, adresses)
+- **Suivi de commande** : Stepper visuel, tracking en temps réel, preuve de livraison
+- **Retours** : Formulaire de demande de retour
+- **Litiges** : Ouverture et suivi de litiges
+- **Programme de fidélité** : Tiers (Bronze → Diamant), remises progressives
+- **Programme d'affiliation** : Code de parrainage, commission, tiers d'affiliation
+- **KYC** : Soumission de documents, statut de vérification
+- **Wishlist, Notifications, Messages**
 
-```text
-Entrées vendeur :
-  - cost_real      : coût d'achat réel (pour stats marges)
-  - cost_calc      : coût d'achat pour calcul (≥ cost_real)
+### 3. `guide-administrateur.md` — Guide Administrateur
+- **Tableau de bord** (`/admin`) : KPIs temps réel (utilisateurs, commandes, revenus, par statut), graphiques, commandes récentes
+- **Gestion des utilisateurs** : Liste, détails, rôles (admin, manager, vendor, shipper, rider)
+- **CMS** : Bannières hero, bannières positionnables, pages statiques (FAQ, CGV, Confidentialité, À propos), menus, sections homepage, pied de page, palette couleurs, textes bilingues
+- **Catégories & Types de variations** : Arborescence catégories, types de variantes personnalisées
+- **Modération produits** : Approuver, refuser (avec raisons), demander révision
+- **KYC** : Valider/refuser les documents vendeurs et clients
+- **Commandes** : Vue admin complète, historique statuts
+- **Support client** : Gestion des tickets
+- **Logistique** : Gestion des expéditions, livreurs
+- **Tarification fret** : Configuration des frais d'expédition
+- **Demandes vendeur** : Approuver/refuser les candidatures
+- **Noms de boutique** : Modération des changements de nom
+- **Abonnements vendeur** : Gestion des tiers et limites
+- **Tarification par boutique** (`/admin/vendor-pricing`) : Marge %, multiplicateur, marge vendeur max, toggle marge vendeur par boutique
+- **Tarification intelligente** (dans Paramètres) : Défauts globaux (margin_pct, multiplier, seuils marge parallèle)
+- **Fidélité** : Configuration des tiers clients
+- **Audit Points** : Suivi des transactions de points
+- **Coupons** : Coupons globaux plateforme
+- **Retraits** : Validation des demandes de retrait vendeur
+- **Retours & Litiges** : Arbitrage admin
+- **Taux de change** : Configuration multi-devises
+- **Paliers affiliation** : Configuration des tiers et commissions
+- **SEO** : Métadonnées par page
+- **Pays actifs** : Activation/désactivation des pays
+- **Popups & Cookies** : Annonces, consentement cookies
+- **Journal d'audit** : Historique des actions admin
+- **Notifications** : Diffusion de notifications
+- **Paramètres** : Tracking provider, livraison gratuite, parrainage, maintenance, moyens de paiement, durée "nouveau produit"
+- **Analytics** : Analyse comportementale
+- **Templates Email** : Personnalisation des emails
+- **Mises en avant** : Gestion des placements featured
 
-Paramètres configurables (défauts) :
-  - margin_pct     : 15 (%)
-  - multiplier     : 3
+## Approche d'exécution
 
-Prix de vente :
-  sale_price = cost_calc + (cost_calc × margin_pct / 100) × multiplier
-  sale_price = arrondi stratégique (terminaison .99 ou .49)
+Par itération comme demandé :
+1. **Itération 1** : `guide-vendeur.md`
+2. **Itération 2** : `guide-client.md`
+3. **Itération 3** : `guide-administrateur.md`
 
-Ancien prix (marketing) selon sale_price :
-  < 10$   → sale_price × 3
-  < 20$   → sale_price × 2.5
-  < 50$   → sale_price × 2
-  < 100$  → sale_price × 2
-  < 150$  → sale_price × 1.8
-  ≥ 150$  → sale_price × 1.5
-  + terminaison stratégique .99
-
-Marge parallèle vendeur (optionnelle, activable) :
-  sale_price < 50$  → max +0.50$
-  sale_price ≥ 100$ → max +1.00$
-```
-
----
-
-## Changements techniques
-
-### 1. Migration DB — nouvelles colonnes `products` + settings
-
-- **`products`** : ajouter `cost_real`, `cost_calc`, `auto_pricing_enabled` (bool, default true), `vendor_extra_margin` (numeric)
-- **`platform_settings`** : insérer clé `pricing_defaults` avec valeurs `{ margin_pct: 15, multiplier: 3, max_extra_margin_under_50: 0.50, max_extra_margin_over_100: 1.00 }`
-- **`vendor_pricing_overrides`** (nouvelle table optionnelle) : `store_id`, `max_multiplier`, `max_extra_margin` — permet à l'admin de limiter un vendeur spécifique
-
-### 2. Frontend — Module de pricing dans `VendorProductManager.tsx`
-
-- Ajouter les champs dans `EMPTY_FORM` : `cost_real`, `cost_calc`, `auto_pricing_enabled`, `vendor_extra_margin`
-- Nouveau composant `<PricingCalculator>` affiché au-dessus des champs Prix/Ancien prix :
-  - Inputs : Coût d'achat réel, Coût d'achat calcul, % marge (défaut 15, lecture seule sauf admin), Multiplicateur (défaut 3, lecture seule sauf admin)
-  - Switch "Calcul automatique" (on/off)
-  - Quand activé : les champs Prix et Ancien prix deviennent **lecture seule** et se remplissent automatiquement
-  - Quand désactivé : le vendeur saisit manuellement comme aujourd'hui
-  - Input optionnel "Marge vendeur" avec limite affichée
-  - Aperçu en temps réel : prix calculé, ancien prix, marge brute (cost_real vs sale_price)
-
-### 3. Frontend — Admin Settings (pricing global)
-
-- Nouvelle section dans `AdminSettingsPage.tsx` : "Tarification"
-  - Champs : margin_pct, multiplier, seuils marge parallèle
-  - Sauvegardé dans `platform_settings` clé `pricing_defaults`
-
-### 4. Logique de calcul — Utilitaire partagé
-
-- Fichier `frontend/src/lib/pricing-utils.ts` :
-  - `calculateSalePrice(costCalc, marginPct, multiplier, vendorExtra?)` → prix arrondi stratégique
-  - `calculateOldPrice(salePrice)` → ancien prix selon tranches
-  - `strategicRound(price)` → arrondi à .99 ou .49
-  - `getMaxExtraMargin(salePrice, settings)` → limite marge vendeur
-
-### 5. Payload produit
-
-- Le `save` dans `VendorProductManager` inclura `cost_real`, `cost_calc`, `auto_pricing_enabled`, `vendor_extra_margin` dans le payload vers Supabase
-
----
-
-## Ce qui ne change PAS
-
-- L'affichage côté client (ProductCard, ProductDetail) reste identique : `price` et `original_price`
-- Les commandes/panier utilisent toujours `price`
-- Le vendeur peut toujours désactiver le calcul auto et saisir ses prix manuellement
-
----
-
-## Rappel post-implémentation
-
-Après ce module : implémenter le système de **pricing par vendeur avec overrides admin** (table `vendor_pricing_overrides`).
+Chaque guide suivra une structure cohérente : introduction, table des matières, puis chaque fonctionnalité avec description, étapes concrètes et captures d'écran textuelles (descriptions des éléments UI). Les guides seront livrés en français et en `.md` dans `/mnt/documents/`.
 
