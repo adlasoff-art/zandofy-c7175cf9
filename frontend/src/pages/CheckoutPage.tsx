@@ -773,7 +773,7 @@ export default function CheckoutPage() {
                       <div className="space-y-2">
                         {[
                           { key: "pay_now" as const, label: "Payer maintenant", desc: `Inclure $${shippingCost.toFixed(2)} dans le total` },
-                          { key: "pay_on_arrival" as const, label: "Payer à l'arrivée", desc: "Régler les frais d'expédition quand la commande arrive au Hub" },
+                          { key: "pay_on_arrival" as const, label: "Payer à l'arrivée au Hub", desc: "Régler les frais d'expédition quand la commande arrive (obligatoire avant livraison)" },
                         ].map(opt => (
                           <button
                             key={opt.key}
@@ -799,6 +799,74 @@ export default function CheckoutPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Delivery option: home vs hub */}
+                  <div className="pt-3 border-t border-border space-y-2">
+                    <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                      <Home size={14} className="text-primary" /> Option de livraison
+                    </p>
+                    <div className="space-y-2">
+                      {[
+                        { key: "home_delivery" as DeliveryOption, label: "🚚 Livraison à domicile", desc: "Recevez votre colis directement chez vous — rapide et sans effort !" },
+                        { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait au Hub", desc: "Récupérez votre colis au point de collecte (gratuit)" },
+                      ].map(opt => (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => setDeliveryOption(opt.key)}
+                          className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${
+                            deliveryOption === opt.key
+                              ? "border-primary bg-secondary"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                            deliveryOption === opt.key ? "border-primary" : "border-border"
+                          }`}>
+                            {deliveryOption === opt.key && <div className="w-2 h-2 rounded-full bg-primary" />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                            <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Last-mile payment option (only for home delivery) */}
+                    {deliveryOption === "home_delivery" && lastMileFee > 0 && (
+                      <div className="ml-4 mt-2 space-y-2 border-l-2 border-primary/30 pl-3">
+                        <p className="text-xs font-medium text-foreground">
+                          Frais de livraison à domicile : <strong className="text-primary">${lastMileFee.toFixed(2)}</strong>
+                        </p>
+                        {[
+                          { key: "pay_with_shipping" as LastMilePayment, label: "Payer maintenant", desc: "Inclure dans le total actuel" },
+                          { key: "pay_cash_on_delivery" as LastMilePayment, label: "Payer au livreur (cash)", desc: "Régler en espèces à la réception" },
+                        ].map(opt => (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => setLastMilePayment(opt.key)}
+                            className={`w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left text-xs ${
+                              lastMilePayment === opt.key
+                                ? "border-primary bg-secondary"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                              lastMilePayment === opt.key ? "border-primary" : "border-border"
+                            }`}>
+                              {lastMilePayment === opt.key && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">{opt.label}</p>
+                              <p className="text-[10px] text-muted-foreground">{opt.desc}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   <Button type="submit" className="w-full h-12 font-bold mt-2">
                     {t("checkout.continueToPayment")} <ChevronRight size={16} />
