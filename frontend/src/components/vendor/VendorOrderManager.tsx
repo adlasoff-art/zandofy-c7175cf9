@@ -90,7 +90,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code")
+      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status")
       .eq("store_id", storeId)
       .order("created_at", { ascending: false }) as any;
 
