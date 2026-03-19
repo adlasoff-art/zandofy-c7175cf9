@@ -1911,6 +1911,44 @@ export type Database = {
           },
         ]
       }
+      platform_ownership_claims: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          resolved_at: string | null
+          status: string
+          store_id: string
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          resolved_at?: string | null
+          status?: string
+          store_id: string
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          resolved_at?: string | null
+          status?: string
+          store_id?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_ownership_claims_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_settings: {
         Row: {
           key: string
