@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send } from "lucide-react";
+import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send, Edit2, Truck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { triggerOrderStatusNotification } from "@/services/order-notifications";
@@ -12,7 +12,7 @@ import {
   canAdminAdvance,
 } from "@/lib/order-status";
 import { useRoles } from "@/hooks/use-roles";
-import { TrackingNumberModal, RiderAssignmentModal, DeliveryFeeModal, generateConfirmationCode } from "./OrderTransitionModals";
+import { TrackingNumberModal, RiderAssignmentModal, DeliveryFeeModal, EditTrackingModal, generateConfirmationCode } from "./OrderTransitionModals";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
