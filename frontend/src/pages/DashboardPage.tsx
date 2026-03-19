@@ -91,6 +91,12 @@ interface OrderRow {
   last_mile_fee: number | null;
   confirmation_code: string | null;
   shipping_payment_status: string | null;
+  last_mile_payment_method: string | null;
+  last_mile_payment_status: string | null;
+  rider_cash_collected: boolean | null;
+  shipping_payment_proof_url: string | null;
+  last_mile_payment_proof_url: string | null;
+  hub_pickup_proof_url: string | null;
 }
 
 interface OrderItemRow {
