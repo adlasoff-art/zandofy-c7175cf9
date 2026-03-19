@@ -504,6 +504,15 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         </div>
       )}
 
+      {/* Supplier order number */}
+      {order.supplier_order_number && (
+        <div className="flex items-center gap-2 text-sm bg-muted/30 rounded-md p-2.5">
+          <Package size={14} className="text-primary shrink-0" />
+          <span className="text-muted-foreground">N° commande fournisseur :</span>
+          <span className="font-mono font-bold text-foreground">{order.supplier_order_number}</span>
+        </div>
+      )}
+
       {/* Tracking number */}
       {order.tracking_number && (
         <div className="flex items-center gap-2 text-sm bg-muted/30 rounded-md p-2.5">
