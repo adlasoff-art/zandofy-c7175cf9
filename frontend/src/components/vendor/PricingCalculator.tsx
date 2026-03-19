@@ -34,7 +34,13 @@ export function PricingCalculator({
   onVendorExtraMarginChange, onPriceChange, onOriginalPriceChange,
 }: PricingCalculatorProps) {
   const [settings, setSettings] = useState<PricingDefaults>(DEFAULT_PRICING);
-  const [overrides, setOverrides] = useState<{ max_multiplier?: number; max_extra_margin?: number } | null>(null);
+  const [overrides, setOverrides] = useState<{
+    max_multiplier?: number;
+    max_extra_margin?: number;
+    vendor_extra_margin_enabled?: boolean;
+    margin_pct?: number;
+    multiplier?: number;
+  } | null>(null);
 
   useEffect(() => {
     // Load global pricing settings
@@ -58,7 +64,7 @@ export function PricingCalculator({
     // Load vendor-specific overrides
     (supabase as any)
       .from("vendor_pricing_overrides")
-      .select("max_multiplier, max_extra_margin")
+      .select("max_multiplier, max_extra_margin, vendor_extra_margin_enabled, margin_pct, multiplier")
       .eq("store_id", storeId)
       .maybeSingle()
       .then(({ data }: any) => {
