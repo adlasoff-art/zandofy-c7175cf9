@@ -1,52 +1,61 @@
 
 
-# Boutiques plateforme vs vendeurs indépendants
+# Correction du toggle "Boutique plateforme" + Système de contestation vendeur
 
-## Concept
+## Problème identifié
 
-Deux types de boutiques coexistent :
-- **Boutiques plateforme** : appartiennent à Zandofy, pas de commission déduite (100% du CA revient à la plateforme), les vendeurs sont "salariés". Le champ `vendor_extra_margin` sert de bonus/gratification.
-- **Boutiques indépendantes** : vendeurs externes, commission déduite (par défaut 10%, configurable par boutique). Le wallet reçoit `subtotal × (1 - commission_rate)`.
+Le toggle ne fonctionne pas car la politique RLS sur la table `stores` pour UPDATE ne permet que `owner_id = auth.uid()`. L'administrateur n'est pas le propriétaire des boutiques tierces, donc la mise à jour de `is_platform_owned` échoue silencieusement (0 rows updated, pas d'erreur retournée).
 
-## Modifications
+## Plan d'implémentation
 
 ### 1. Migration SQL
-- Ajouter `is_platform_owned BOOLEAN DEFAULT false` à la table `stores`
-- Ajouter `commission_rate NUMERIC(5,2) DEFAULT 10.00` à la table `vendor_pricing_overrides` (commission en %, configurable par boutique)
 
-### 2. Trigger `credit_vendor_wallet_on_delivery` (modification)
-Adapter la logique existante :
-- Si `stores.is_platform_owned = true` → **pas de crédit wallet** (l'argent reste à la plateforme)
-- Si `is_platform_owned = false` → créditer le wallet avec `subtotal × (1 - commission_rate/100)`, en utilisant le `commission_rate` de `vendor_pricing_overrides` si défini, sinon le défaut global (10%)
+**a) Ajouter une politique RLS admin UPDATE sur `stores`**
+```sql
+CREATE POLICY "Admins update any store"
+  ON public.stores FOR UPDATE
+  TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'::app_role));
+```
 
-### 3. Page admin `/admin/vendor-pricing` (modification)
-- Ajouter un **toggle "Boutique plateforme"** par boutique (badge visuel distinct)
-- Ajouter un champ **"Commission (%)"** éditable par boutique (uniquement affiché pour les indépendants)
-- Afficher un badge "Plateforme" ou "Indépendant" dans la liste
+**b) Créer la table `platform_ownership_claims`** pour gérer les contestations vendeur (72h)
+- `id`, `store_id` (FK stores), `vendor_id` (owner), `status` (pending/accepted/expired/dismissed), `created_at`, `resolved_at`, `expires_at` (created_at + 72h)
+- RLS : vendeurs lisent/créent les leurs, admins voient tout
 
-### 4. Admin Sidebar
-- Ajouter l'entrée "Comptabilité vendeurs" (`/admin/vendor-accounting`) dans la sidebar
+**c) Trigger** : quand `stores.is_platform_owned` passe de `false` à `true`, insérer automatiquement une notification au `owner_id` + créer un claim `pending` avec `expires_at = now() + interval '3 days'`.
 
-### 5. Page `/admin/vendor-accounting` (nouvelle)
-Tableau récapitulatif par boutique avec filtre période + recherche :
-- Colonnes : Boutique, Type (Plateforme/Indépendant), CA livré, Coût achat, Marge vendeur (bonus), Commission plateforme, Net dû vendeur
-- Pour les boutiques **plateforme** : commission = 0%, net dû = uniquement la somme des `vendor_extra_margin` (bonus)
-- Pour les boutiques **indépendantes** : net dû = CA − commission (déjà dans le wallet)
-- Détail par produit en expandable
-- Graphique top 10 par CA
+### 2. Page `AdminVendorPricingPage.tsx` — Correction du save
 
-### 6. Paramètres globaux (`AdminSettingsPage`)
-- Ajouter un champ "Commission plateforme par défaut (%)" dans les paramètres globaux (clé `platform_commission_default` dans `platform_settings`)
+Après le `.update({ is_platform_owned })`, vérifier le résultat (`data`, `error`, `count`) et afficher un toast d'erreur si ça échoue. Actuellement l'erreur RLS passe inaperçue car le code ne vérifie pas le résultat du update sur stores.
 
-## Résumé technique
+### 3. Notification vendeur (app + email)
+
+Quand l'admin active `is_platform_owned` :
+- **Notification in-app** : insérée via le trigger SQL dans `notifications` (type: `system`, lien vers `/vendor`)
+- **Email** : envoyé via le service SMTP existant (appel depuis le code frontend après save réussi, ou via une edge function)
+
+### 4. Bouton "Revendiquer indépendante" côté vendeur
+
+Dans `VendorDashboardPage.tsx`, afficher une **bannière d'alerte** quand :
+- Le store a `is_platform_owned = true`
+- Il existe un claim `pending` non expiré pour ce store
+
+La bannière affiche : "Votre boutique a été marquée comme appartenant à la plateforme. Si c'est une erreur, vous avez jusqu'au [date] pour contester."
+
+Bouton "Revendiquer indépendante" → crée/met à jour le claim et notifie l'admin.
+
+Après 72h (expires_at dépassé), le bouton disparaît et le statut est considéré confirmé.
+
+### 5. Vue admin des contestations
+
+Dans `AdminVendorPricingPage.tsx`, afficher un badge "Contestation en cours" à côté des boutiques ayant un claim `pending`. L'admin peut voir le détail et choisir d'accepter (repasser en indépendant) ou de rejeter.
+
+### Résumé des fichiers
 
 | Fichier | Action |
 |---------|--------|
-| Migration SQL | `ALTER TABLE stores ADD is_platform_owned`, `ALTER TABLE vendor_pricing_overrides ADD commission_rate` |
-| Fonction `credit_vendor_wallet_on_delivery` | Recréer pour tenir compte du type de boutique |
-| `AdminVendorPricingPage.tsx` | Ajouter toggle plateforme + champ commission |
-| `AdminVendorAccountingPage.tsx` | Nouvelle page comptabilité |
-| `AdminSidebar.tsx` | Ajouter lien comptabilité |
-| `App.tsx` | Ajouter route `/admin/vendor-accounting` |
-| `AdminSettingsPage.tsx` | Ajouter commission par défaut |
+| Migration SQL | RLS admin update stores + table `platform_ownership_claims` + trigger notification |
+| `AdminVendorPricingPage.tsx` | Fix save, vérifier résultat update, badge contestation |
+| `VendorDashboardPage.tsx` | Bannière alerte + bouton "Revendiquer indépendante" |
+| `AdminSidebar.tsx` | Pas de changement (contestations visibles inline) |
 
