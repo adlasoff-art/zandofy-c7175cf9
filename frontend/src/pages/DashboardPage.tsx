@@ -311,7 +311,7 @@ function OverviewTab({ orders, user }: { orders: OrderRow[]; user: any }) {
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-xs text-muted-foreground">Total commandes</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{orders.length}</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{validOrders.length}</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-xs text-muted-foreground">Total dépensé</p>
