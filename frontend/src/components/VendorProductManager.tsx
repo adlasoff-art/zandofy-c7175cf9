@@ -710,18 +710,19 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
 }
 
 function Field({
-  label, value, onChange, type = "text",
+  label, value, onChange, type = "text", disabled = false,
 }: {
-  label: string; value: string; onChange: (v: string) => void; type?: string;
+  label: string; value: string; onChange: (v: string) => void; type?: string; disabled?: boolean;
 }) {
   return (
     <div>
       <label className="text-xs text-muted-foreground">{label}</label>
       <input
         type={type}
-        className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md"
+        className={`w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md ${disabled ? "bg-muted/50 cursor-not-allowed" : ""}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
       />
     </div>
   );
