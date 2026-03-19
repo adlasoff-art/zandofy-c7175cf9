@@ -496,9 +496,26 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
 
           <Field label="Nom (FR) *" value={form.name_fr} onChange={(v) => setForm({ ...form, name_fr: v })} />
           <Field label="Nom (EN)" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
+          {/* Pricing Calculator */}
+          <PricingCalculator
+            costReal={form.cost_real}
+            costCalc={form.cost_calc}
+            autoPricingEnabled={form.auto_pricing_enabled}
+            vendorExtraMargin={form.vendor_extra_margin}
+            price={form.price}
+            originalPrice={form.original_price}
+            storeId={storeId}
+            onCostRealChange={(v) => setForm((f) => ({ ...f, cost_real: v }))}
+            onCostCalcChange={(v) => setForm((f) => ({ ...f, cost_calc: v }))}
+            onAutoPricingChange={(v) => setForm((f) => ({ ...f, auto_pricing_enabled: v }))}
+            onVendorExtraMarginChange={(v) => setForm((f) => ({ ...f, vendor_extra_margin: v }))}
+            onPriceChange={(v) => setForm((f) => ({ ...f, price: v }))}
+            onOriginalPriceChange={(v) => setForm((f) => ({ ...f, original_price: v }))}
+          />
+
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Prix *" type="number" value={String(form.price)} onChange={(v) => setForm({ ...form, price: Number(v) })} />
-            <Field label="Ancien prix" type="number" value={String(form.original_price || "")} onChange={(v) => setForm({ ...form, original_price: v ? Number(v) : null })} />
+            <Field label="Prix *" type="number" value={String(form.price)} onChange={(v) => setForm({ ...form, price: Number(v) })} disabled={form.auto_pricing_enabled} />
+            <Field label="Ancien prix" type="number" value={String(form.original_price || "")} onChange={(v) => setForm({ ...form, original_price: v ? Number(v) : null })} disabled={form.auto_pricing_enabled} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="MOQ" type="number" value={String(form.moq)} onChange={(v) => setForm({ ...form, moq: Number(v) })} />
