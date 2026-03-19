@@ -1,80 +1,82 @@
 
 
-# Plan : Guides d'utilisation Markdown (3 fichiers)
+# Refonte du tableau de bord admin — Dashboard analytique avancé
 
-## Objectif
-Générer 3 fichiers Markdown complets dans `/mnt/documents/` couvrant toutes les fonctionnalités implémentées, destinés aux 3 profils d'utilisateurs.
+## Résumé
 
-## Fichiers à créer
+Réorganiser le dashboard admin actuel en un système à **onglets** avec des graphiques temporels détaillés, un sélecteur de période, et de nouveaux KPIs (top vendeurs, top clients, top parrains). Le contenu existant est conservé et redistribué dans les onglets.
 
-### 1. `guide-vendeur.md` — Guide Vendeur
-- **Inscription & Onboarding** : Créer un compte, postuler comme vendeur (BecomeVendorPage — formulaire multi-étapes : infos perso, boutique, documents KYB)
-- **Tableau de bord vendeur** (`/vendor`) : Navigation par onglets (catalogue, commandes, livraisons, promos, coupons, wallet, retours, litiges, featured, stats, équipe, paramètres)
-- **Gestion du catalogue** : Ajouter/modifier un produit, variantes (tailles, couleurs), images, statuts de publication (brouillon → en attente → publié/refusé), limites par abonnement
-- **Système de tarification intelligent** : Coût d'achat réel vs calcul, calcul automatique prix de vente + ancien prix, marge vendeur (si activée par admin), désactiver le calcul auto
-- **Abonnements** : Beginner (10 produits), Pro (100), Grand Supplier (illimité)
-- **Gestion des commandes** : Statuts (reçue → confirmée → préparation → expédition → livrée), tracking, numéros Zandofy/fournisseur
-- **Promotions & Coupons** : Créer des promos, coupons de réduction, analytics coupons
-- **Wallet & Retraits** : Solde en attente (30j rétention), solde disponible, demandes de retrait
-- **Retours & Litiges** : Gestion côté vendeur
-- **Messagerie** : Chat modéré avec clients
-- **Équipe** : Collaborateurs (selon tier)
-- **Self-delivery** : Livraison autonome, suivi livreur
-- **Mises en avant** : Demander un placement featured
+## Architecture par onglets
 
-### 2. `guide-client.md` — Guide Client
-- **Inscription & Connexion** : Email/mot de passe, Google OAuth, réinitialisation, rate-limiting
-- **Navigation** : Recherche prédictive, méga-menu, catégories, filtres, tri
-- **Fiche produit** : Variantes, estimateur livraison, avis, boutique
-- **Panier & Checkout** : Adresses sauvegardées, calcul frais de port, coupons (global + boutique), modes de paiement (Stripe, Mobile Money, COD), paiement expédition différé, livraison last-mile (en ligne ou cash au livreur)
-- **Dashboard client** (`/dashboard`) : Onglets (aperçu, commandes, suivi, retours, litiges, parrainage, affiliation, notifications, messages, profil, vérification KYC, adresses)
-- **Suivi de commande** : Stepper visuel, tracking en temps réel, preuve de livraison
-- **Retours** : Formulaire de demande de retour
-- **Litiges** : Ouverture et suivi de litiges
-- **Programme de fidélité** : Tiers (Bronze → Diamant), remises progressives
-- **Programme d'affiliation** : Code de parrainage, commission, tiers d'affiliation
-- **KYC** : Soumission de documents, statut de vérification
-- **Wishlist, Notifications, Messages**
+```text
+┌─────────────┬────────────┬──────────────┬──────────────┬────────────────┐
+│  Vue d'ens.  │   Ventes   │  Logistique  │  Vendeurs    │  Clients &     │
+│  (Overview)  │            │              │              │  Parrainage    │
+└─────────────┴────────────┴──────────────┴──────────────┴────────────────┘
+```
 
-### 3. `guide-administrateur.md` — Guide Administrateur
-- **Tableau de bord** (`/admin`) : KPIs temps réel (utilisateurs, commandes, revenus, par statut), graphiques, commandes récentes
-- **Gestion des utilisateurs** : Liste, détails, rôles (admin, manager, vendor, shipper, rider)
-- **CMS** : Bannières hero, bannières positionnables, pages statiques (FAQ, CGV, Confidentialité, À propos), menus, sections homepage, pied de page, palette couleurs, textes bilingues
-- **Catégories & Types de variations** : Arborescence catégories, types de variantes personnalisées
-- **Modération produits** : Approuver, refuser (avec raisons), demander révision
-- **KYC** : Valider/refuser les documents vendeurs et clients
-- **Commandes** : Vue admin complète, historique statuts
-- **Support client** : Gestion des tickets
-- **Logistique** : Gestion des expéditions, livreurs
-- **Tarification fret** : Configuration des frais d'expédition
-- **Demandes vendeur** : Approuver/refuser les candidatures
-- **Noms de boutique** : Modération des changements de nom
-- **Abonnements vendeur** : Gestion des tiers et limites
-- **Tarification par boutique** (`/admin/vendor-pricing`) : Marge %, multiplicateur, marge vendeur max, toggle marge vendeur par boutique
-- **Tarification intelligente** (dans Paramètres) : Défauts globaux (margin_pct, multiplier, seuils marge parallèle)
-- **Fidélité** : Configuration des tiers clients
-- **Audit Points** : Suivi des transactions de points
-- **Coupons** : Coupons globaux plateforme
-- **Retraits** : Validation des demandes de retrait vendeur
-- **Retours & Litiges** : Arbitrage admin
-- **Taux de change** : Configuration multi-devises
-- **Paliers affiliation** : Configuration des tiers et commissions
-- **SEO** : Métadonnées par page
-- **Pays actifs** : Activation/désactivation des pays
-- **Popups & Cookies** : Annonces, consentement cookies
-- **Journal d'audit** : Historique des actions admin
-- **Notifications** : Diffusion de notifications
-- **Paramètres** : Tracking provider, livraison gratuite, parrainage, maintenance, moyens de paiement, durée "nouveau produit"
-- **Analytics** : Analyse comportementale
-- **Templates Email** : Personnalisation des emails
-- **Mises en avant** : Gestion des placements featured
+### Sélecteur de période (global, en haut)
+Options : Aujourd'hui, 7 jours, 14 jours, 30 jours, 3 mois, 6 mois, 9 mois, 1 an.
+Toutes les requêtes de tous les onglets filtrent par cette période.
 
-## Approche d'exécution
+### Onglet 1 — Vue d'ensemble
+- KPI cards existants (utilisateurs, commandes, revenu, produits, boutiques)
+- KPI santé des commandes (livrées, en attente, annulées, montant perdu)
+- KPI après-vente & paiements
+- Commandes récentes (tableau existant)
+- Répartition des rôles + statuts commandes (sidebar existante)
 
-Par itération comme demandé :
-1. **Itération 1** : `guide-vendeur.md`
-2. **Itération 2** : `guide-client.md`
-3. **Itération 3** : `guide-administrateur.md`
+### Onglet 2 — Ventes
+- **Histogramme : Ventes par jour/semaine/mois** (barres groupées avec revenu + nombre de commandes)
+- **Courbe d'évolution du CA** (AreaChart cumulatif sur la période)
+- **Camembert : Répartition des commandes par statut**
+- **Camembert : Répartition des modes de paiement** (Stripe, Mobile Money, COD)
 
-Chaque guide suivra une structure cohérente : introduction, table des matières, puis chaque fonctionnalité avec description, étapes concrètes et captures d'écran textuelles (descriptions des éléments UI). Les guides seront livrés en français et en `.md` dans `/mnt/documents/`.
+### Onglet 3 — Logistique
+- KPI logistique existants (expéditions, livraisons, livrées, en cours)
+- **Histogramme : Livraisons par jour** (delivered vs pending vs in_progress) — étendu à la période choisie
+- **Camembert : Expéditions par mode** (existant, relocalisé)
+- **Histogramme : Statuts des expéditions** (existant, relocalisé)
+- **Histogramme : Colis par étape du pipeline** (pending → processing → shipped → in_transit → delivered)
+
+### Onglet 4 — Vendeurs
+- **Histogramme : Top 10 vendeurs par CA** sur la période
+- **Histogramme : Top 10 vendeurs par nombre de commandes**
+- **Tableau : Classement vendeurs** (boutique, CA, commandes, produits, note)
+- KPI : nombre de vendeurs, nouvelles boutiques sur la période
+
+### Onglet 5 — Clients & Parrainage
+- **Histogramme : Top 10 clients par dépenses**
+- **Histogramme : Top 10 parrains** (par nombre de filleuls ou points gagnés)
+- **Courbe : Nouveaux inscrits par jour/semaine**
+- KPI : nouveaux clients sur la période, taux de conversion (inscrits → acheteurs)
+
+## Plan technique
+
+### Fichiers modifiés
+1. **`AdminDashboard.tsx`** — Refonte complète :
+   - Ajouter un state `period` (sélecteur de période) et un state `tab`
+   - Utiliser `<Tabs>` de shadcn pour la navigation
+   - Extraire les requêtes existantes + ajouter les nouvelles (toutes filtrées par période)
+   - Nouvelles requêtes Supabase :
+     - Ventes par jour : `orders` groupé par `date_trunc` de `created_at`
+     - Top vendeurs : `order_items` JOIN `orders` JOIN `stores`, agrégé par store
+     - Top clients : `orders` agrégé par `user_id` JOIN `profiles`
+     - Top parrains : `referrals` JOIN `profiles`, comptage filleuls
+     - Nouveaux inscrits par jour : `profiles` groupé par `created_at`
+     - Paiements par méthode : `payment_transactions` groupé par `payment_method`
+   - Les agrégations se font côté client (on fetch les données brutes filtrées par période, puis on agrège en JS)
+
+2. **Aucune migration nécessaire** — toutes les données existent déjà dans les tables `orders`, `order_items`, `stores`, `profiles`, `referrals`, `deliveries`, `shipments`, `payment_transactions`
+
+### Composants UI utilisés
+- `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent` (shadcn)
+- `Select` pour le sélecteur de période
+- `BarChart`, `AreaChart`, `PieChart` de recharts (déjà importés)
+- `Card` pour structurer chaque bloc
+
+### Approche
+- Le fichier actuel fait 525 lignes. La refonte sera dans le même fichier mais avec les blocs mieux organisés par onglet.
+- Chaque onglet utilise ses propres `useQuery` hooks avec la période en `queryKey` pour le refetch automatique.
+- Les graphiques utilisent les mêmes styles visuels que ceux existants (gradients, couleurs `hsl(var(--primary))`).
 
