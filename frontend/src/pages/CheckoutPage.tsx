@@ -421,9 +421,11 @@ export default function CheckoutPage() {
 
     for (const [storeId, storeItems] of storeGroups) {
       const orderSubtotal = storeItems.reduce((s, i) => s + i.price * i.quantity, 0);
-      const orderTotal = shippingPaymentChoice === "pay_on_arrival"
-        ? Math.max(0, orderSubtotal - discountAmount)
-        : Math.max(0, orderSubtotal - discountAmount + shippingCost);
+      const orderShippingCost = shippingCost;
+      const orderLastMile = deliveryOption === "home_delivery" ? lastMileFee : 0;
+      const effectiveShip = shippingPaymentChoice === "pay_on_arrival" ? 0 : orderShippingCost;
+      const effectiveLM = (deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping") ? orderLastMile : 0;
+      const orderTotal = Math.max(0, orderSubtotal - discountAmount + effectiveShip + effectiveLM);
 
       const { data: order, error: orderErr } = await supabase
         .from("orders")
@@ -441,13 +443,19 @@ export default function CheckoutPage() {
           shipping_country: shipping.country,
           shipping_postal_code: shipping.postalCode,
           subtotal: orderSubtotal,
-          shipping_cost: shippingCost,
+          shipping_cost: orderShippingCost,
           total: orderTotal,
           order_ref: mockOrderRef,
           coupon_code: appliedCoupon?.code || null,
           discount_amount: discountAmount,
           shipping_payment_status: shippingPaymentChoice === "pay_on_arrival" ? "deferred" : "paid",
-        })
+          delivery_choice: deliveryOption !== "none" ? (deliveryOption === "home_delivery" ? "home" : "hub") : null,
+          last_mile_fee: orderLastMile,
+          last_mile_payment_method: deliveryOption === "home_delivery" ? (lastMilePayment === "pay_cash_on_delivery" ? "cash" : "mobile_money") : null,
+          last_mile_payment_status: deliveryOption === "home_delivery" 
+            ? (lastMilePayment === "pay_with_shipping" ? "paid_online" : "pending")
+            : null,
+        } as any)
         .select("id")
         .single();
 
