@@ -151,7 +151,7 @@ export function Footer() {
       <div className="container py-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <BrandLogo variant="footer" />
+            <div className="mb-3"><BrandLogo variant="footer" /></div>
             <p className="text-xs text-muted-foreground leading-relaxed mb-4">{footerConfig.description || t("footer.description")}</p>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <MapPin size={12} />
