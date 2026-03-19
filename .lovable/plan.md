@@ -1,82 +1,52 @@
 
 
-# Refonte du tableau de bord admin — Dashboard analytique avancé
+# Boutiques plateforme vs vendeurs indépendants
 
-## Résumé
+## Concept
 
-Réorganiser le dashboard admin actuel en un système à **onglets** avec des graphiques temporels détaillés, un sélecteur de période, et de nouveaux KPIs (top vendeurs, top clients, top parrains). Le contenu existant est conservé et redistribué dans les onglets.
+Deux types de boutiques coexistent :
+- **Boutiques plateforme** : appartiennent à Zandofy, pas de commission déduite (100% du CA revient à la plateforme), les vendeurs sont "salariés". Le champ `vendor_extra_margin` sert de bonus/gratification.
+- **Boutiques indépendantes** : vendeurs externes, commission déduite (par défaut 10%, configurable par boutique). Le wallet reçoit `subtotal × (1 - commission_rate)`.
 
-## Architecture par onglets
+## Modifications
 
-```text
-┌─────────────┬────────────┬──────────────┬──────────────┬────────────────┐
-│  Vue d'ens.  │   Ventes   │  Logistique  │  Vendeurs    │  Clients &     │
-│  (Overview)  │            │              │              │  Parrainage    │
-└─────────────┴────────────┴──────────────┴──────────────┴────────────────┘
-```
+### 1. Migration SQL
+- Ajouter `is_platform_owned BOOLEAN DEFAULT false` à la table `stores`
+- Ajouter `commission_rate NUMERIC(5,2) DEFAULT 10.00` à la table `vendor_pricing_overrides` (commission en %, configurable par boutique)
 
-### Sélecteur de période (global, en haut)
-Options : Aujourd'hui, 7 jours, 14 jours, 30 jours, 3 mois, 6 mois, 9 mois, 1 an.
-Toutes les requêtes de tous les onglets filtrent par cette période.
+### 2. Trigger `credit_vendor_wallet_on_delivery` (modification)
+Adapter la logique existante :
+- Si `stores.is_platform_owned = true` → **pas de crédit wallet** (l'argent reste à la plateforme)
+- Si `is_platform_owned = false` → créditer le wallet avec `subtotal × (1 - commission_rate/100)`, en utilisant le `commission_rate` de `vendor_pricing_overrides` si défini, sinon le défaut global (10%)
 
-### Onglet 1 — Vue d'ensemble
-- KPI cards existants (utilisateurs, commandes, revenu, produits, boutiques)
-- KPI santé des commandes (livrées, en attente, annulées, montant perdu)
-- KPI après-vente & paiements
-- Commandes récentes (tableau existant)
-- Répartition des rôles + statuts commandes (sidebar existante)
+### 3. Page admin `/admin/vendor-pricing` (modification)
+- Ajouter un **toggle "Boutique plateforme"** par boutique (badge visuel distinct)
+- Ajouter un champ **"Commission (%)"** éditable par boutique (uniquement affiché pour les indépendants)
+- Afficher un badge "Plateforme" ou "Indépendant" dans la liste
 
-### Onglet 2 — Ventes
-- **Histogramme : Ventes par jour/semaine/mois** (barres groupées avec revenu + nombre de commandes)
-- **Courbe d'évolution du CA** (AreaChart cumulatif sur la période)
-- **Camembert : Répartition des commandes par statut**
-- **Camembert : Répartition des modes de paiement** (Stripe, Mobile Money, COD)
+### 4. Admin Sidebar
+- Ajouter l'entrée "Comptabilité vendeurs" (`/admin/vendor-accounting`) dans la sidebar
 
-### Onglet 3 — Logistique
-- KPI logistique existants (expéditions, livraisons, livrées, en cours)
-- **Histogramme : Livraisons par jour** (delivered vs pending vs in_progress) — étendu à la période choisie
-- **Camembert : Expéditions par mode** (existant, relocalisé)
-- **Histogramme : Statuts des expéditions** (existant, relocalisé)
-- **Histogramme : Colis par étape du pipeline** (pending → processing → shipped → in_transit → delivered)
+### 5. Page `/admin/vendor-accounting` (nouvelle)
+Tableau récapitulatif par boutique avec filtre période + recherche :
+- Colonnes : Boutique, Type (Plateforme/Indépendant), CA livré, Coût achat, Marge vendeur (bonus), Commission plateforme, Net dû vendeur
+- Pour les boutiques **plateforme** : commission = 0%, net dû = uniquement la somme des `vendor_extra_margin` (bonus)
+- Pour les boutiques **indépendantes** : net dû = CA − commission (déjà dans le wallet)
+- Détail par produit en expandable
+- Graphique top 10 par CA
 
-### Onglet 4 — Vendeurs
-- **Histogramme : Top 10 vendeurs par CA** sur la période
-- **Histogramme : Top 10 vendeurs par nombre de commandes**
-- **Tableau : Classement vendeurs** (boutique, CA, commandes, produits, note)
-- KPI : nombre de vendeurs, nouvelles boutiques sur la période
+### 6. Paramètres globaux (`AdminSettingsPage`)
+- Ajouter un champ "Commission plateforme par défaut (%)" dans les paramètres globaux (clé `platform_commission_default` dans `platform_settings`)
 
-### Onglet 5 — Clients & Parrainage
-- **Histogramme : Top 10 clients par dépenses**
-- **Histogramme : Top 10 parrains** (par nombre de filleuls ou points gagnés)
-- **Courbe : Nouveaux inscrits par jour/semaine**
-- KPI : nouveaux clients sur la période, taux de conversion (inscrits → acheteurs)
+## Résumé technique
 
-## Plan technique
-
-### Fichiers modifiés
-1. **`AdminDashboard.tsx`** — Refonte complète :
-   - Ajouter un state `period` (sélecteur de période) et un state `tab`
-   - Utiliser `<Tabs>` de shadcn pour la navigation
-   - Extraire les requêtes existantes + ajouter les nouvelles (toutes filtrées par période)
-   - Nouvelles requêtes Supabase :
-     - Ventes par jour : `orders` groupé par `date_trunc` de `created_at`
-     - Top vendeurs : `order_items` JOIN `orders` JOIN `stores`, agrégé par store
-     - Top clients : `orders` agrégé par `user_id` JOIN `profiles`
-     - Top parrains : `referrals` JOIN `profiles`, comptage filleuls
-     - Nouveaux inscrits par jour : `profiles` groupé par `created_at`
-     - Paiements par méthode : `payment_transactions` groupé par `payment_method`
-   - Les agrégations se font côté client (on fetch les données brutes filtrées par période, puis on agrège en JS)
-
-2. **Aucune migration nécessaire** — toutes les données existent déjà dans les tables `orders`, `order_items`, `stores`, `profiles`, `referrals`, `deliveries`, `shipments`, `payment_transactions`
-
-### Composants UI utilisés
-- `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent` (shadcn)
-- `Select` pour le sélecteur de période
-- `BarChart`, `AreaChart`, `PieChart` de recharts (déjà importés)
-- `Card` pour structurer chaque bloc
-
-### Approche
-- Le fichier actuel fait 525 lignes. La refonte sera dans le même fichier mais avec les blocs mieux organisés par onglet.
-- Chaque onglet utilise ses propres `useQuery` hooks avec la période en `queryKey` pour le refetch automatique.
-- Les graphiques utilisent les mêmes styles visuels que ceux existants (gradients, couleurs `hsl(var(--primary))`).
+| Fichier | Action |
+|---------|--------|
+| Migration SQL | `ALTER TABLE stores ADD is_platform_owned`, `ALTER TABLE vendor_pricing_overrides ADD commission_rate` |
+| Fonction `credit_vendor_wallet_on_delivery` | Recréer pour tenir compte du type de boutique |
+| `AdminVendorPricingPage.tsx` | Ajouter toggle plateforme + champ commission |
+| `AdminVendorAccountingPage.tsx` | Nouvelle page comptabilité |
+| `AdminSidebar.tsx` | Ajouter lien comptabilité |
+| `App.tsx` | Ajouter route `/admin/vendor-accounting` |
+| `AdminSettingsPage.tsx` | Ajouter commission par défaut |
 
