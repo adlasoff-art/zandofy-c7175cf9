@@ -39,8 +39,8 @@ export default function AdminOrdersPage() {
         .from("orders")
         .select("id, order_ref, shipping_first_name, shipping_last_name, shipping_phone, shipping_address, shipping_city, shipping_country, total, status, created_at, store_id, tracking_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code")
         .order("created_at", { ascending: false })
-        .limit(200);
-      return data ?? [];
+        .limit(200) as any;
+      return (data ?? []) as any[];
     },
   });
 
@@ -284,6 +284,15 @@ export default function AdminOrdersPage() {
                         </div>
                       </div>
 
+                      {/* Supplier order number */}
+                      {o.supplier_order_number && (
+                        <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
+                          <Hash size={12} className="text-primary shrink-0" />
+                          <span className="text-muted-foreground">N° commande fournisseur :</span>
+                          <span className="font-mono font-bold text-foreground">{o.supplier_order_number}</span>
+                        </div>
+                      )}
+
                       {/* Tracking number */}
                       {o.tracking_number && (
                         <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
@@ -393,8 +402,11 @@ export default function AdminOrdersPage() {
         <TrackingNumberModal
           loading={!!updatingId}
           onCancel={() => setTrackingModal(null)}
-          onConfirm={(trackingNumber) => {
-            updateStatus(trackingModal, "in_shipping", { tracking_number: trackingNumber || null });
+          onConfirm={(trackingNumber, supplierOrderNumber) => {
+            updateStatus(trackingModal, "in_shipping", {
+              tracking_number: trackingNumber || null,
+              supplier_order_number: supplierOrderNumber || null,
+            });
             setTrackingModal(null);
           }}
         />

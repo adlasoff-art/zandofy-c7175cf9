@@ -48,6 +48,7 @@ interface Order {
   total: number;
   created_at: string;
   tracking_number: string | null;
+  supplier_order_number: string | null;
   assigned_rider_name: string | null;
   assigned_rider_id: string | null;
   delivery_choice: string | null;
@@ -90,7 +91,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
       .from("orders")
       .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code")
       .eq("store_id", storeId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false }) as any;
 
     if (error || !data) {
       setOrders([]);
@@ -253,6 +254,15 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                   </div>
                 </div>
 
+                {/* Supplier order number */}
+                {order.supplier_order_number && (
+                  <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
+                    <Hash size={12} className="text-primary shrink-0" />
+                    <span className="text-muted-foreground">N° commande fournisseur :</span>
+                    <span className="font-mono font-bold text-foreground">{order.supplier_order_number}</span>
+                  </div>
+                )}
+
                 {/* Tracking number */}
                 {order.tracking_number && (
                   <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
@@ -375,8 +385,11 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
         <TrackingNumberModal
           loading={!!updatingId}
           onCancel={() => setTrackingModal(null)}
-          onConfirm={(trackingNumber) => {
-            updateStatus(trackingModal, "in_shipping", { tracking_number: trackingNumber || null });
+          onConfirm={(trackingNumber, supplierOrderNumber) => {
+            updateStatus(trackingModal, "in_shipping", {
+              tracking_number: trackingNumber || null,
+              supplier_order_number: supplierOrderNumber || null,
+            });
             setTrackingModal(null);
           }}
         />

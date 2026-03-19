@@ -84,6 +84,7 @@ interface OrderRow {
   shipping_country: string | null;
   payment_method: string | null;
   tracking_number: string | null;
+  supplier_order_number: string | null;
   assigned_rider_name: string | null;
   delivery_choice: string | null;
   last_mile_fee: number | null;
@@ -149,7 +150,7 @@ export default function DashboardPage() {
       .from("orders")
       .select("id, order_ref, created_at, total, status, subtotal, shipping_cost, discount_amount, coupon_code, shipping_first_name, shipping_last_name, shipping_address, shipping_city, shipping_country, payment_method, tracking_number, assigned_rider_name, delivery_choice, last_mile_fee, confirmation_code")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false }) as any;
     setOrders(data || []);
     setLoading(false);
   }, [user]);
@@ -500,6 +501,15 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           <p className="text-xs text-muted-foreground mt-0.5">
             {[order.shipping_address, order.shipping_city, order.shipping_country].filter(Boolean).join(", ")}
           </p>
+        </div>
+      )}
+
+      {/* Supplier order number */}
+      {order.supplier_order_number && (
+        <div className="flex items-center gap-2 text-sm bg-muted/30 rounded-md p-2.5">
+          <Package size={14} className="text-primary shrink-0" />
+          <span className="text-muted-foreground">N° commande fournisseur :</span>
+          <span className="font-mono font-bold text-foreground">{order.supplier_order_number}</span>
         </div>
       )}
 

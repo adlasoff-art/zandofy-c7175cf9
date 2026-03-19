@@ -1750,6 +1750,7 @@ export type Database = {
           status: string
           store_id: string | null
           subtotal: number
+          supplier_order_number: string | null
           total: number
           tracking_number: string | null
           updated_at: string
@@ -1780,6 +1781,7 @@ export type Database = {
           status?: string
           store_id?: string | null
           subtotal?: number
+          supplier_order_number?: string | null
           total?: number
           tracking_number?: string | null
           updated_at?: string
@@ -1810,6 +1812,7 @@ export type Database = {
           status?: string
           store_id?: string | null
           subtotal?: number
+          supplier_order_number?: string | null
           total?: number
           tracking_number?: string | null
           updated_at?: string
