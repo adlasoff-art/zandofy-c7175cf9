@@ -59,6 +59,9 @@ interface CouponData {
 
 const FALLBACK_SHIPPING_COST = 5.99;
 
+type DeliveryOption = "none" | "home_delivery" | "hub_pickup";
+type LastMilePayment = "pay_with_shipping" | "pay_cash_on_delivery";
+
 const emptyShipping: ShippingInfo = {
   firstName: "", lastName: "", email: "", phone: "",
   address: "", city: "", country: "CD", postalCode: "",
