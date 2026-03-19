@@ -326,6 +326,13 @@ export default function VendorDashboardPage() {
               storeId={store!.id}
             />
 
+            {/* Platform ownership claim banner */}
+            <VendorPlatformClaimBanner
+              storeId={store!.id}
+              userId={user!.id}
+              storeName={store!.name}
+            />
+
             {/* Tab navigation */}
             <div className="flex gap-1 mb-4 overflow-x-auto pb-2 scrollbar-hide">
               {[
