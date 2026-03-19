@@ -977,22 +977,110 @@ export default function CheckoutPage() {
                 )}
 
                 {paymentMethod === "mobile_money" && paymentPending && (
-                  <div className="space-y-4 pt-2 border-t border-border text-center">
-                    <div className="flex flex-col items-center gap-3 py-4">
+                  <div className="space-y-4 pt-2 border-t border-border">
+                    <div className="flex flex-col items-center gap-3 py-4 text-center">
                       <Loader2 size={32} className="animate-spin text-primary" />
                       <p className="text-sm font-medium text-foreground">En attente de validation...</p>
                       <p className="text-xs text-muted-foreground max-w-xs">
                         Ouvrez l'application {mobileMoneyProvider === "orange_money" ? "Orange Money" : mobileMoneyProvider === "mpesa" ? "M-Pesa" : mobileMoneyProvider === "airtel_money" ? "Airtel Money" : "AfriMoney"} sur votre téléphone et validez le paiement avec votre PIN.
                       </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={handleCheckPaymentStatus}
-                      className="w-full"
-                    >
-                      <ShieldCheck size={14} className="mr-2" />
-                      Vérifier le statut du paiement
+                    <Button variant="outline" onClick={handleCheckPaymentStatus} className="w-full">
+                      <ShieldCheck size={14} className="mr-2" /> Vérifier le statut du paiement
                     </Button>
+
+                    {/* Retry with different number */}
+                    {!showRetryForm ? (
+                      <button
+                        onClick={() => { setShowRetryForm(true); setRetryPhone(""); }}
+                        className="w-full text-xs text-primary hover:underline py-1"
+                      >
+                        Le paiement ne fonctionne pas ? Essayer avec un autre numéro
+                      </button>
+                    ) : (
+                      <div className="space-y-3 bg-muted/50 rounded-lg p-3">
+                        <p className="text-xs font-medium text-foreground">Réessayer avec un autre numéro</p>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Opérateur</Label>
+                          <select
+                            value={retryProvider}
+                            onChange={e => setRetryProvider(e.target.value)}
+                            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md text-foreground"
+                          >
+                            <option value="orange_money">Orange Money</option>
+                            <option value="mpesa">M-Pesa</option>
+                            <option value="airtel_money">Airtel Money</option>
+                            <option value="afrimoney">AfriMoney</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Nouveau numéro</Label>
+                          <Input
+                            type="tel"
+                            placeholder="243 XXX XXX XXX"
+                            value={retryPhone}
+                            onChange={e => setRetryPhone(e.target.value)}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setShowRetryForm(false)} className="flex-1 text-xs">
+                            Annuler
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="flex-1 text-xs"
+                            disabled={!retryPhone.replace(/[\s\-\+]/g, "") || retryPhone.replace(/[\s\-\+]/g, "").length < 9 || processing}
+                            onClick={async () => {
+                              setProcessing(true);
+                              // Remove old channel
+                              if (paymentChannelRef.current) {
+                                supabase.removeChannel(paymentChannelRef.current);
+                                paymentChannelRef.current = null;
+                              }
+                              try {
+                                const cleanPhone = retryPhone.replace(/[\s\-\+]/g, "");
+                                const { data, error } = await supabase.functions.invoke("kelpay-payment", {
+                                  body: {
+                                    order_id: orderId, // reuse same order
+                                    phone_number: cleanPhone,
+                                    amount: total,
+                                    currency: "USD",
+                                    provider: retryProvider,
+                                  },
+                                });
+                                if (error || !data?.success) {
+                                  toast({ title: "Paiement refusé", description: data?.error || error?.message || "Réessayez.", variant: "destructive" });
+                                } else {
+                                  setPaymentTransactionId(data.transaction_id);
+                                  setPaymentReference(data.reference);
+                                  setMobileMoneyPhone(cleanPhone);
+                                  setMobileMoneyProvider(retryProvider);
+                                  setShowRetryForm(false);
+                                  toast({ title: "Nouvelle demande envoyée", description: "Validez sur votre téléphone." });
+                                  // Re-subscribe
+                                  const channel = supabase
+                                    .channel(`payment-retry-${data.reference}`)
+                                    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "payment_transactions", filter: `reference=eq.${data.reference}` },
+                                      (payload: any) => {
+                                        const ns = payload.new?.status;
+                                        if (ns === "success") { setPaymentPending(false); clearCart(); setStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel); }
+                                        else if (ns === "failed") { setPaymentPending(false); toast({ title: "Paiement échoué", variant: "destructive" }); supabase.removeChannel(channel); }
+                                      }
+                                    ).subscribe();
+                                  paymentChannelRef.current = channel;
+                                }
+                              } catch (err: any) {
+                                toast({ title: "Erreur", description: err.message, variant: "destructive" });
+                              }
+                              setProcessing(false);
+                            }}
+                          >
+                            {processing ? <Loader2 size={12} className="animate-spin mr-1" /> : <Smartphone size={12} className="mr-1" />}
+                            Réessayer
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
