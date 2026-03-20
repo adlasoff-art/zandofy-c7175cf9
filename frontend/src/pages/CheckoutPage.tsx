@@ -130,6 +130,7 @@ export default function CheckoutPage() {
   const [pointsBalance, setPointsBalance] = useState(0);
   const [usePoints, setUsePoints] = useState(false);
   const [pointsToUse, setPointsToUse] = useState(0);
+  const [pointsPerDollar, setPointsPerDollar] = useState(50);
 
   useEffect(() => {
     if (!user) return;
