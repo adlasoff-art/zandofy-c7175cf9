@@ -40,7 +40,7 @@ interface PricingConfig {
 export default function AdminSettingsPage() {
   const [trackingProvider, setTrackingProvider] = useState("17track");
   const [freeShipping, setFreeShipping] = useState<FreeShippingConfig>({ enabled: true, amount: 49, currency: "USD" });
-  const [referral, setReferral] = useState<ReferralConfig>({ enabled: true, commission_pct: 5, max_rewarded_orders: 5, welcome_discount_pct: 10, gift_card_enabled: false, points_expiry_months: 12, points_per_dollar: 50 });
+  const [referral, setReferral] = useState<ReferralConfig>({ enabled: true, commission_pct: 3, max_rewarded_orders: 3, welcome_discount_pct: 5, gift_card_enabled: true, points_expiry_months: 6, points_per_dollar: 100 });
   const [maintenance, setMaintenance] = useState<MaintenanceConfig>({
     enabled: false,
     title: "Maintenance en cours",
