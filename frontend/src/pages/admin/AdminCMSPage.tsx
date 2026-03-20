@@ -19,8 +19,9 @@ const LegalPagesTab = lazy(() => import("@/components/admin/cms/LegalPagesTab"))
 const BlogTab = lazy(() => import("@/components/admin/cms/BlogTab"));
 const JobPostingsTab = lazy(() => import("@/components/admin/cms/JobPostingsTab"));
 const BrandingTab = lazy(() => import("@/components/admin/cms/BrandingTab"));
+const TrendTagsTab = lazy(() => import("@/components/admin/cms/TrendTagsTabWrapper"));
 
-type Tab = "hero" | "banners" | "menus" | "pages" | "sections" | "colors" | "branding" | "footer" | "texts" | "legal" | "blog" | "jobs";
+type Tab = "hero" | "banners" | "menus" | "pages" | "sections" | "trends" | "colors" | "branding" | "footer" | "texts" | "legal" | "blog" | "jobs";
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "hero", label: "Hero Banner", icon: Image },
