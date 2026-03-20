@@ -65,18 +65,19 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
     <div
       ref={ref}
       className="group relative bg-card overflow-hidden rounded-sm shadow-card hover:shadow-card-hover transition-shadow duration-200 ease-in-out border border-border/40 flex flex-col h-full"
-      /* no hover state needed */
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {/* Image — fixed aspect ratio */}
+      {/* Image — fixed aspect ratio, object-contain to avoid blur */}
       <div className="relative aspect-[3/4] overflow-hidden bg-muted shrink-0">
         {!loaded && inView && (
           <div className="absolute inset-0 skeleton-shimmer" />
         )}
         {inView && (
           <img
-            src={imgError ? "/placeholder.svg" : product.image}
+            src={displayImage}
             alt={product.nameFr}
-            className={`w-full h-full object-cover transition-opacity duration-300 ${
+            className={`w-full h-full object-contain transition-opacity duration-300 ${
               loaded ? "opacity-100" : "opacity-0"
             }`}
             loading="lazy"
