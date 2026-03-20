@@ -952,6 +952,54 @@ export type Database = {
           },
         ]
       }
+      customer_ratings: {
+        Row: {
+          comment: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          order_id: string
+          rating: number
+          store_id: string
+          vendor_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          order_id: string
+          rating: number
+          store_id: string
+          vendor_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          order_id?: string
+          rating?: number
+          store_id?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_ratings_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_ratings_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_tiers: {
         Row: {
           badge_label: string
@@ -1488,9 +1536,12 @@ export type Database = {
           address_postal_code: string | null
           address_street: string
           admin_notes: string | null
+          confidence_score: number | null
           created_at: string
           document_back_url: string | null
+          document_expiry: string | null
           document_front_url: string
+          document_number: string | null
           document_type: Database["public"]["Enums"]["kyc_document_type"]
           id: string
           rejection_reason: string | null
@@ -1508,9 +1559,12 @@ export type Database = {
           address_postal_code?: string | null
           address_street: string
           admin_notes?: string | null
+          confidence_score?: number | null
           created_at?: string
           document_back_url?: string | null
+          document_expiry?: string | null
           document_front_url: string
+          document_number?: string | null
           document_type: Database["public"]["Enums"]["kyc_document_type"]
           id?: string
           rejection_reason?: string | null
@@ -1528,9 +1582,12 @@ export type Database = {
           address_postal_code?: string | null
           address_street?: string
           admin_notes?: string | null
+          confidence_score?: number | null
           created_at?: string
           document_back_url?: string | null
+          document_expiry?: string | null
           document_front_url?: string
+          document_number?: string | null
           document_type?: Database["public"]["Enums"]["kyc_document_type"]
           id?: string
           rejection_reason?: string | null
@@ -1851,6 +1908,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payment_methods: {
+        Row: {
+          created_at: string
+          id: string
+          is_default: boolean | null
+          label: string | null
+          phone_number: string
+          provider: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          label?: string | null
+          phone_number: string
+          provider: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          label?: string | null
+          phone_number?: string
+          provider?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       payment_transactions: {
         Row: {
@@ -2357,6 +2444,7 @@ export type Database = {
       profiles: {
         Row: {
           affiliate_tier: string | null
+          allowed_channels: string[] | null
           avatar_url: string | null
           ban_reason: string | null
           banned_at: string | null
@@ -2364,18 +2452,32 @@ export type Database = {
           created_at: string
           customer_tier: string
           date_of_birth: string | null
+          display_id: number
           email: string | null
           first_name: string | null
+          gdpr_consent_at: string | null
           gender: string | null
           id: string
           is_banned: boolean
+          last_known_geo_at: string | null
+          last_known_lat: number | null
+          last_known_lng: number | null
+          last_login_at: string | null
           last_name: string | null
+          login_count: number | null
+          nationality: string | null
+          notifications_enabled: boolean | null
           phone: string | null
+          preferred_contact_channel: string | null
+          preferred_language: string | null
           referral_code: string | null
+          residence_address: string | null
+          residence_city: string | null
           updated_at: string
         }
         Insert: {
           affiliate_tier?: string | null
+          allowed_channels?: string[] | null
           avatar_url?: string | null
           ban_reason?: string | null
           banned_at?: string | null
@@ -2383,18 +2485,32 @@ export type Database = {
           created_at?: string
           customer_tier?: string
           date_of_birth?: string | null
+          display_id?: number
           email?: string | null
           first_name?: string | null
+          gdpr_consent_at?: string | null
           gender?: string | null
           id: string
           is_banned?: boolean
+          last_known_geo_at?: string | null
+          last_known_lat?: number | null
+          last_known_lng?: number | null
+          last_login_at?: string | null
           last_name?: string | null
+          login_count?: number | null
+          nationality?: string | null
+          notifications_enabled?: boolean | null
           phone?: string | null
+          preferred_contact_channel?: string | null
+          preferred_language?: string | null
           referral_code?: string | null
+          residence_address?: string | null
+          residence_city?: string | null
           updated_at?: string
         }
         Update: {
           affiliate_tier?: string | null
+          allowed_channels?: string[] | null
           avatar_url?: string | null
           ban_reason?: string | null
           banned_at?: string | null
@@ -2402,14 +2518,27 @@ export type Database = {
           created_at?: string
           customer_tier?: string
           date_of_birth?: string | null
+          display_id?: number
           email?: string | null
           first_name?: string | null
+          gdpr_consent_at?: string | null
           gender?: string | null
           id?: string
           is_banned?: boolean
+          last_known_geo_at?: string | null
+          last_known_lat?: number | null
+          last_known_lng?: number | null
+          last_login_at?: string | null
           last_name?: string | null
+          login_count?: number | null
+          nationality?: string | null
+          notifications_enabled?: boolean | null
           phone?: string | null
+          preferred_contact_channel?: string | null
+          preferred_language?: string | null
           referral_code?: string | null
+          residence_address?: string | null
+          residence_city?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -3250,6 +3379,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_activity_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
