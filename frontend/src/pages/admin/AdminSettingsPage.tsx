@@ -18,6 +18,7 @@ interface ReferralConfig {
   welcome_discount_pct: number;
   gift_card_enabled: boolean;
   points_expiry_months: number;
+  points_per_dollar: number;
 }
 
 interface MaintenanceConfig {
