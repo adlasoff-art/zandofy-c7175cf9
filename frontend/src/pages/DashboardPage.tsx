@@ -1241,7 +1241,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
       .from("profiles")
       .update(payload)
       .eq("id", user.id)
-      .select("first_name, last_name, phone, avatar_url, gender, date_of_birth, nationality, residence_address, residence_city, preferred_language, preferred_contact_channel")
+      .select("*")
       .single();
     setSaving(false);
     if (error) {
