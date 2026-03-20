@@ -168,6 +168,9 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     supabase.from("categories").select("id, name_fr").then(({ data }) => {
       if (data) setCategories(data);
     });
+    (supabase as any).from("trend_tags").select("id, name_fr").eq("is_active", true).order("sort_order").then(({ data }: any) => {
+      if (data) setTrendTags(data);
+    });
   }, [loadProducts]);
 
   useEffect(() => {
