@@ -194,7 +194,7 @@ export function ReferralDashboard() {
           </div>
         </div>
         <p className="text-[10px] text-muted-foreground mt-2 text-center">
-          1 point = $1 · Utilisable uniquement pour vos achats sur Zandofy
+          {pointsPerDollar} points = $1 · Utilisable uniquement pour vos achats sur Zandofy
         </p>
         {wallet.balance > 0 && monthsUntilExpiry <= 3 && (
           <div className="mt-2 flex items-center gap-1.5 justify-center text-[10px] text-amber-600 dark:text-amber-400">
