@@ -172,17 +172,30 @@ export default function DashboardPage() {
     setLoading(false);
   }, [user]);
 
+  const loadProfileName = useCallback(async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("profiles")
+      .select("first_name, last_name, avatar_url")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    setProfileName({
+      first_name: (data as any)?.first_name || "",
+      last_name: (data as any)?.last_name || "",
+      avatar_url: (data as any)?.avatar_url || "",
+    });
+  }, [user]);
+
   useEffect(() => {
     if (!user) {
       navigate("/auth");
       return;
     }
-    loadOrders();
-    // Load profile name for sidebar
-    supabase.from("profiles").select("first_name, last_name, avatar_url").eq("id", user.id).maybeSingle().then(({ data }) => {
-      if (data) setProfileName({ first_name: (data as any).first_name || "", last_name: (data as any).last_name || "", avatar_url: (data as any).avatar_url || "" });
-    });
-  }, [user, navigate, loadOrders]);
+    void loadOrders();
+    void loadProfileName();
+  }, [user, navigate, loadOrders, loadProfileName]);
 
   useEffect(() => {
     if (!selectedOrder) { setOrderItems([]); setStatusHistory([]); return; }
@@ -208,7 +221,8 @@ export default function DashboardPage() {
 
   const displayName = profileName.first_name || profileName.last_name
     ? `${profileName.first_name} ${profileName.last_name}`.trim()
-    : user.email?.split("@")[0] || "Client";
+    : "Client";
+  const welcomeName = profileName.first_name || displayName;
 
   // KPI data (always visible)
   const validOrders = orders.filter((o) => !NON_REVENUE_ORDER_STATUSES.includes(o.status as never));
@@ -255,7 +269,7 @@ export default function DashboardPage() {
         {activeTab === "affiliate" && <AffiliateDashboard />}
         {activeTab === "notifications" && <NotificationsTab />}
         {activeTab === "messages" && <MessagesRedirectTab />}
-        {activeTab === "profile" && <ProfileTab user={user} />}
+        {activeTab === "profile" && <ProfileTab user={user} onProfileUpdated={loadProfileName} />}
         {activeTab === "kyc" && (
           <div className="space-y-6">
             <KycBanner kycStatus={kycStatus} needsKyc={needsKyc} isOrderBlocked={isOrderBlocked} onStartKyc={() => setShowKycForm(true)} />
@@ -313,7 +327,7 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
-                <p className="text-sm font-bold text-foreground truncate">Bienvenue, {profileName.first_name || "Client"}</p>
+                <p className="text-sm font-bold text-foreground truncate">Bienvenue, {welcomeName}</p>
                 <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
               </div>
 
@@ -389,7 +403,7 @@ export default function DashboardPage() {
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-foreground truncate">Bienvenue, {profileName.first_name || "Client"}</p>
+              <p className="text-sm font-bold text-foreground truncate">Bienvenue, {welcomeName}</p>
               <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
             </div>
           </div>
@@ -1174,7 +1188,7 @@ function TrackingTab({ orders }: { orders: OrderRow[] }) {
   );
 }
 
-function ProfileTab({ user }: { user: any }) {
+function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: () => Promise<void> | void }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1210,7 +1224,7 @@ function ProfileTab({ user }: { user: any }) {
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase.from("profiles").update({
+    const payload = {
       first_name: profile.first_name || null,
       last_name: profile.last_name || null,
       phone: profile.phone || null,
@@ -1222,11 +1236,38 @@ function ProfileTab({ user }: { user: any }) {
       residence_city: profile.residence_city || null,
       preferred_language: profile.preferred_language || 'fr',
       preferred_contact_channel: profile.preferred_contact_channel || 'chat',
-    }).eq("id", user.id);
+    };
+    const { data, error } = await supabase
+      .from("profiles")
+      .update(payload)
+      .eq("id", user.id)
+      .select("first_name, last_name, phone, avatar_url, gender, date_of_birth, nationality, residence_address, residence_city, preferred_language, preferred_contact_channel")
+      .single();
     setSaving(false);
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
+      setProfile({
+        first_name: data.first_name || "",
+        last_name: data.last_name || "",
+        phone: data.phone || "",
+        avatar_url: data.avatar_url || "",
+        gender: data.gender || "",
+        date_of_birth: data.date_of_birth || "",
+        nationality: data.nationality || "",
+        residence_address: data.residence_address || "",
+        residence_city: data.residence_city || "",
+        preferred_language: data.preferred_language || "fr",
+        preferred_contact_channel: data.preferred_contact_channel || "chat",
+      });
+      await supabase.auth.updateUser({
+        data: {
+          first_name: data.first_name || null,
+          last_name: data.last_name || null,
+          full_name: [data.first_name, data.last_name].filter(Boolean).join(" ") || null,
+        },
+      });
+      await onProfileUpdated?.();
       toast({ title: "Profil mis à jour !" });
     }
   };
