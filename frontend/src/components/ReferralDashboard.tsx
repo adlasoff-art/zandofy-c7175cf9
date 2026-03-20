@@ -223,7 +223,7 @@ export function ReferralDashboard() {
               max={wallet.balance}
               value={giftCardAmount || ""}
               onChange={(e) => setGiftCardAmount(Math.min(Number(e.target.value), wallet.balance))}
-              placeholder={`Max: ${wallet.balance}`}
+              placeholder={`Max: ${wallet.balance} pts`}
               className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-background"
             />
             <button
@@ -235,6 +235,11 @@ export function ReferralDashboard() {
               Convertir
             </button>
           </div>
+          {giftCardAmount > 0 && (
+            <p className="text-xs text-primary font-medium mt-2 text-center">
+              {giftCardAmount} pts → ${(giftCardAmount / pointsPerDollar).toFixed(2)} USD
+            </p>
+          )}
         </div>
       )}
 
