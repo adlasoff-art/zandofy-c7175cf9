@@ -1071,7 +1071,7 @@ function ProfileTab({ user }: { user: any }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "" });
+  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "", nationality: "", residence_address: "", residence_city: "", preferred_language: "fr", preferred_contact_channel: "chat" });
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
