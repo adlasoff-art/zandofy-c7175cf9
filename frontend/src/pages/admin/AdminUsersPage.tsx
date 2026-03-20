@@ -216,7 +216,8 @@ export default function AdminUsersPage() {
                     className={`border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors cursor-pointer ${u.is_banned ? "opacity-60" : ""}`}
                     onClick={() => setSelectedUserId(u.id)}
                   >
-                    <td className="p-3">
+                     <td className="p-3 text-xs text-muted-foreground font-mono">#{u.display_id || "—"}</td>
+                     <td className="p-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
                           {(u.first_name?.[0] || u.email?.[0] || "?").toUpperCase()}
