@@ -1239,7 +1239,7 @@ export default function CheckoutPage() {
                           onChange={e => setPointsToUse(Number(e.target.value))}
                           className="flex-1 accent-primary"
                         />
-                        <span className="text-sm font-bold text-primary w-14 text-right">{pointsToUse} pts</span>
+                        <span className="text-sm font-bold text-primary w-24 text-right">{pointsToUse} pts (${(pointsToUse / pointsPerDollar).toFixed(2)})</span>
                       </div>
                     )}
                   </div>
