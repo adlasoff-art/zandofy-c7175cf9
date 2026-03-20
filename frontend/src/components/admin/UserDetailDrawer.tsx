@@ -261,6 +261,7 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">#{user.display_id || "—"}</span>
                 <h3 className="font-semibold text-foreground truncate">
                   {user.first_name || ""} {user.last_name || ""}
                 </h3>
@@ -270,6 +271,8 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
               </div>
               <p className="text-sm text-muted-foreground truncate">{user.email}</p>
               {user.phone && <p className="text-xs text-muted-foreground">{user.phone}</p>}
+              {user.nationality && <p className="text-xs text-muted-foreground">🌍 {user.nationality}</p>}
+              <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{user.id}</p>
             </div>
           </div>
 
