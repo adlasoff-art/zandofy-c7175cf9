@@ -86,10 +86,13 @@ export default function AdminUsersPage() {
   const handleStatusFilter = (val: StatusFilter) => { setStatusFilter(val); setCurrentPage(1); };
 
   const exportCSV = () => {
-    const headers = ["Nom", "Email", "Rôles", "Statut", "Inscrit le"];
+    const headers = ["ID", "Nom", "Email", "Téléphone", "Nationalité", "Rôles", "Statut", "Inscrit le"];
     const rows = filtered.map(u => [
+      `#${u.display_id || ""}`,
       `${u.first_name || ""} ${u.last_name || ""}`.trim(),
       u.email || "",
+      u.phone || "",
+      u.nationality || "",
       u.roles.length > 0 ? u.roles.map(r => roleLabels[r]).join(", ") : "Client",
       u.is_banned ? "Banni" : "Actif",
       format(new Date(u.created_at), "yyyy-MM-dd"),
