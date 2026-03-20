@@ -139,6 +139,11 @@ interface ProfileData {
   avatar_url: string;
   gender: string;
   date_of_birth: string;
+  nationality: string;
+  residence_address: string;
+  residence_city: string;
+  preferred_language: string;
+  preferred_contact_channel: string;
 }
 
 export default function DashboardPage() {
