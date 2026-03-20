@@ -74,16 +74,28 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
           <div className="absolute inset-0 skeleton-shimmer" />
         )}
         {inView && (
-          <img
-            src={displayImage}
-            alt={product.nameFr}
-            className={`w-full h-full object-contain transition-opacity duration-300 ${
-              loaded ? "opacity-100" : "opacity-0"
-            }`}
-            loading="lazy"
-            onLoad={onLoad}
-            onError={handleImgError}
-          />
+          <>
+            <img
+              src={imgError ? "/placeholder.svg" : product.image}
+              alt={product.nameFr}
+              className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
+                loaded ? "opacity-100" : "opacity-0"
+              } ${hovered && secondImage ? "opacity-0 scale-105" : ""}`}
+              loading="lazy"
+              onLoad={onLoad}
+              onError={handleImgError}
+            />
+            {secondImage && (
+              <img
+                src={secondImage}
+                alt={product.nameFr}
+                className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
+                  hovered ? "opacity-100 scale-100" : "opacity-0 scale-95"
+                }`}
+                loading="lazy"
+              />
+            )}
+          </>
         )}
 
         {/* Discount badge - top left */}
