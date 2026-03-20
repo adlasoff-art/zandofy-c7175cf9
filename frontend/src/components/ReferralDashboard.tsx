@@ -45,6 +45,7 @@ export function ReferralDashboard() {
   const [convertingGiftCard, setConvertingGiftCard] = useState(false);
   const [giftCardEnabled, setGiftCardEnabled] = useState(false);
   const [pointsExpiryMonths, setPointsExpiryMonths] = useState(12);
+  const [pointsPerDollar, setPointsPerDollar] = useState(50);
   const [lastActivity, setLastActivity] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -88,6 +89,7 @@ export function ReferralDashboard() {
       if (row.key === "referral_settings") {
         setGiftCardEnabled(!!v.gift_card_enabled);
         setPointsExpiryMonths(Number(v.points_expiry_months) || 12);
+        setPointsPerDollar(Number(v.points_per_dollar) || 50);
       }
     });
 
@@ -118,6 +120,7 @@ export function ReferralDashboard() {
     if (!user || giftCardAmount <= 0 || giftCardAmount > wallet.balance) return;
     setConvertingGiftCard(true);
 
+    const dollarValue = giftCardAmount / pointsPerDollar;
     const code = `ZCARD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
     // Deduct points
@@ -128,12 +131,12 @@ export function ReferralDashboard() {
 
     if (ptErr) { toast.error(ptErr.message); setConvertingGiftCard(false); return; }
 
-    // Create gift card
+    // Create gift card with dollar value
     await supabase.from("gift_cards").insert({
       user_id: user.id,
       code,
-      original_amount: giftCardAmount,
-      remaining_amount: giftCardAmount,
+      original_amount: dollarValue,
+      remaining_amount: dollarValue,
       points_used: giftCardAmount,
       expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
     });
@@ -143,10 +146,10 @@ export function ReferralDashboard() {
       user_id: user.id,
       type: "spent",
       amount: -giftCardAmount,
-      description: `Conversion en carte cadeau ${code}`,
+      description: `Conversion en carte cadeau ${code} (${giftCardAmount} pts → $${dollarValue.toFixed(2)})`,
     });
 
-    toast.success(`Carte cadeau créée : ${code}`);
+    toast.success(`Carte cadeau créée : ${code} — Valeur : $${dollarValue.toFixed(2)}`);
     setGiftCardAmount(0);
     setConvertingGiftCard(false);
     load();
@@ -191,7 +194,7 @@ export function ReferralDashboard() {
           </div>
         </div>
         <p className="text-[10px] text-muted-foreground mt-2 text-center">
-          1 point = $1 · Utilisable uniquement pour vos achats sur Zandofy
+          {pointsPerDollar} points = $1 · Utilisable uniquement pour vos achats sur Zandofy
         </p>
         {wallet.balance > 0 && monthsUntilExpiry <= 3 && (
           <div className="mt-2 flex items-center gap-1.5 justify-center text-[10px] text-amber-600 dark:text-amber-400">
@@ -211,7 +214,7 @@ export function ReferralDashboard() {
             <h3 className="text-sm font-bold text-foreground">Convertir en carte cadeau</h3>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
-            Transformez vos ZandoPoints en carte cadeau utilisable lors de vos prochains achats.
+            Transformez vos ZandoPoints en carte cadeau. Taux : {pointsPerDollar} pts = $1.
           </p>
           <div className="flex items-center gap-2">
             <input
@@ -220,7 +223,7 @@ export function ReferralDashboard() {
               max={wallet.balance}
               value={giftCardAmount || ""}
               onChange={(e) => setGiftCardAmount(Math.min(Number(e.target.value), wallet.balance))}
-              placeholder={`Max: ${wallet.balance}`}
+              placeholder={`Max: ${wallet.balance} pts`}
               className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-background"
             />
             <button
@@ -232,6 +235,11 @@ export function ReferralDashboard() {
               Convertir
             </button>
           </div>
+          {giftCardAmount > 0 && (
+            <p className="text-xs text-primary font-medium mt-2 text-center">
+              {giftCardAmount} pts → ${(giftCardAmount / pointsPerDollar).toFixed(2)} USD
+            </p>
+          )}
         </div>
       )}
 

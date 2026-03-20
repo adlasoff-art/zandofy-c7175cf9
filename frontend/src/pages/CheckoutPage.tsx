@@ -130,6 +130,7 @@ export default function CheckoutPage() {
   const [pointsBalance, setPointsBalance] = useState(0);
   const [usePoints, setUsePoints] = useState(false);
   const [pointsToUse, setPointsToUse] = useState(0);
+  const [pointsPerDollar, setPointsPerDollar] = useState(50);
 
   useEffect(() => {
     if (!user) return;
@@ -152,6 +153,13 @@ export default function CheckoutPage() {
     // Fetch ZandoPoints balance
     supabase.from("zando_points").select("balance").eq("user_id", user.id).maybeSingle().then(({ data }) => {
       if (data) setPointsBalance(Number(data.balance));
+    });
+    // Fetch points_per_dollar rate
+    supabase.from("platform_settings").select("value").eq("key", "referral_settings").maybeSingle().then(({ data }) => {
+      if (data?.value) {
+        const v = data.value as any;
+        setPointsPerDollar(Number(v.points_per_dollar) || 50);
+      }
     });
   }, [user]);
 
@@ -181,7 +189,7 @@ export default function CheckoutPage() {
 
   const loyaltyDiscount = loyaltyPct > 0 ? (subtotal * loyaltyPct) / 100 : 0;
   const discountAmount = couponDiscount + loyaltyDiscount;
-  const pointsDiscount = usePoints ? Math.min(pointsToUse, pointsBalance) : 0;
+  const pointsDiscount = usePoints ? Math.min(pointsToUse, pointsBalance) / pointsPerDollar : 0;
 
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
@@ -1231,7 +1239,7 @@ export default function CheckoutPage() {
                           onChange={e => setPointsToUse(Number(e.target.value))}
                           className="flex-1 accent-primary"
                         />
-                        <span className="text-sm font-bold text-primary w-14 text-right">{pointsToUse} pts</span>
+                        <span className="text-sm font-bold text-primary w-24 text-right">{pointsToUse} pts (${(pointsToUse / pointsPerDollar).toFixed(2)})</span>
                       </div>
                     )}
                   </div>

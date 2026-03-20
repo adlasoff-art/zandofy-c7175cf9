@@ -18,6 +18,7 @@ interface ReferralConfig {
   welcome_discount_pct: number;
   gift_card_enabled: boolean;
   points_expiry_months: number;
+  points_per_dollar: number;
 }
 
 interface MaintenanceConfig {
@@ -39,7 +40,7 @@ interface PricingConfig {
 export default function AdminSettingsPage() {
   const [trackingProvider, setTrackingProvider] = useState("17track");
   const [freeShipping, setFreeShipping] = useState<FreeShippingConfig>({ enabled: true, amount: 49, currency: "USD" });
-  const [referral, setReferral] = useState<ReferralConfig>({ enabled: true, commission_pct: 5, max_rewarded_orders: 5, welcome_discount_pct: 10, gift_card_enabled: false, points_expiry_months: 12 });
+  const [referral, setReferral] = useState<ReferralConfig>({ enabled: true, commission_pct: 5, max_rewarded_orders: 5, welcome_discount_pct: 10, gift_card_enabled: false, points_expiry_months: 12, points_per_dollar: 50 });
   const [maintenance, setMaintenance] = useState<MaintenanceConfig>({
     enabled: false,
     title: "Maintenance en cours",
@@ -71,6 +72,7 @@ export default function AdminSettingsPage() {
               welcome_discount_pct: Number(v.welcome_discount_pct) || 10,
               gift_card_enabled: !!v.gift_card_enabled,
               points_expiry_months: Number(v.points_expiry_months) || 12,
+              points_per_dollar: Number(v.points_per_dollar) || 50,
             });
           } else if (row.key === "maintenance_mode") {
             setMaintenance({
@@ -417,6 +419,13 @@ export default function AdminSettingsPage() {
                     <p className="text-xs text-muted-foreground">Permettre aux clients de convertir leurs points en carte cadeau</p>
                   </div>
                   <Switch checked={referral.gift_card_enabled} onCheckedChange={(checked) => setReferral(prev => ({ ...prev, gift_card_enabled: checked }))} />
+                </div>
+                <div className="mt-3">
+                  <label className="text-xs text-muted-foreground block mb-1">Taux de conversion (points pour 1$)</label>
+                  <input type="number" min={1} max={500} step={1} value={referral.points_per_dollar} onChange={(e) => setReferral(prev => ({ ...prev, points_per_dollar: Math.max(1, Number(e.target.value)) }))} className={inputClass} />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {referral.points_per_dollar} ZandoPoints = $1 USD · Exemple : 500 pts = ${(500 / referral.points_per_dollar).toFixed(2)}
+                  </p>
                 </div>
               </>
             )}
