@@ -72,6 +72,7 @@ export default function AdminSettingsPage() {
               welcome_discount_pct: Number(v.welcome_discount_pct) || 10,
               gift_card_enabled: !!v.gift_card_enabled,
               points_expiry_months: Number(v.points_expiry_months) || 12,
+              points_per_dollar: Number(v.points_per_dollar) || 50,
             });
           } else if (row.key === "maintenance_mode") {
             setMaintenance({
