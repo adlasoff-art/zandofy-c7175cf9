@@ -23,18 +23,7 @@ export const DEFAULT_PRICING: PricingDefaults = {
  */
 export function strategicRound(price: number): number {
   if (price <= 0) return 0;
-  const floor = Math.floor(price);
-  const decimal = price - floor;
-  // If we're above .50, round to floor.99
-  // If we're above .00, round to (floor-1).99 or floor.49
-  if (decimal >= 0.50) {
-    return floor + 0.99;
-  }
-  if (decimal >= 0.25) {
-    return floor + 0.49;
-  }
-  // Below 0.25 → (floor - 1).99 but keep minimum
-  return floor > 0 ? (floor - 1) + 0.99 : 0.99;
+  return Math.floor(price) + 0.99;
 }
 
 /**
