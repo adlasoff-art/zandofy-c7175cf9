@@ -16,6 +16,7 @@ interface ProductCardProps {
 export const ProductCard = memo(function ProductCard({ product, index = 0 }: ProductCardProps) {
   const { ref, inView, loaded, onLoad } = useLazyImage(product.image);
   const [imgError, setImgError] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const { addItem } = useCart();
   const { user } = useAuth();
   const { isInWishlist, toggleWishlist } = useWishlist();
@@ -23,6 +24,13 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
   const wishlisted = isInWishlist(product.id);
   const [cartSuccess, setCartSuccess] = useState(false);
   const successTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Second image from gallery (first variant/additional image)
+  const galleryImages = (product as any).galleryImages as Array<{ image_url: string; position: number | null }> | undefined;
+  const secondImage = galleryImages && galleryImages.length > 1
+    ? galleryImages.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))[1]?.image_url
+    : null;
+  const displayImage = hovered && secondImage ? secondImage : (imgError ? "/placeholder.svg" : product.image);
 
   const handleAddToCart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -57,18 +65,19 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
     <div
       ref={ref}
       className="group relative bg-card overflow-hidden rounded-sm shadow-card hover:shadow-card-hover transition-shadow duration-200 ease-in-out border border-border/40 flex flex-col h-full"
-      /* no hover state needed */
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {/* Image — fixed aspect ratio */}
+      {/* Image — fixed aspect ratio, object-contain to avoid blur */}
       <div className="relative aspect-[3/4] overflow-hidden bg-muted shrink-0">
         {!loaded && inView && (
           <div className="absolute inset-0 skeleton-shimmer" />
         )}
         {inView && (
           <img
-            src={imgError ? "/placeholder.svg" : product.image}
+            src={displayImage}
             alt={product.nameFr}
-            className={`w-full h-full object-cover transition-opacity duration-300 ${
+            className={`w-full h-full object-contain transition-opacity duration-300 ${
               loaded ? "opacity-100" : "opacity-0"
             }`}
             loading="lazy"

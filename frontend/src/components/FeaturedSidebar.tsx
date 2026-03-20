@@ -11,6 +11,7 @@ interface FeaturedPlacement {
   store_id: string | null;
   title: string | null;
   image_url: string | null;
+  image_url_2: string | null;
   cta_text: string | null;
   cta_link: string | null;
   bg_color: string | null;
@@ -59,6 +60,44 @@ function CountdownTimer({ endDate, color }: { endDate: string; color: string }) 
   );
 }
 
+/** For placements with 2 images: auto-alternates between them */
+function DualImageSlider({ image1, image2, hovered }: { image1: string; image2: string; hovered: boolean }) {
+  const [showSecond, setShowSecond] = useState(false);
+
+  useEffect(() => {
+    if (!image2) return;
+    const interval = setInterval(() => {
+      setShowSecond((prev) => !prev);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [image2]);
+
+  return (
+    <>
+      <img
+        src={image1}
+        alt="Promo 1"
+        className={cn(
+          "absolute inset-0 w-full h-full object-cover transition-all duration-700",
+          showSecond ? "opacity-0" : "opacity-100",
+          hovered ? "scale-105" : "scale-100"
+        )}
+        loading="lazy"
+      />
+      <img
+        src={image2}
+        alt="Promo 2"
+        className={cn(
+          "absolute inset-0 w-full h-full object-cover transition-all duration-700",
+          showSecond ? "opacity-100" : "opacity-0",
+          hovered ? "scale-105" : "scale-100"
+        )}
+        loading="lazy"
+      />
+    </>
+  );
+}
+
 export function FeaturedSidebar() {
   const [placements, setPlacements] = useState<FeaturedPlacement[]>([]);
   const [current, setCurrent] = useState(0);
@@ -70,7 +109,7 @@ export function FeaturedSidebar() {
   useEffect(() => {
     const now = new Date().toISOString();
     (supabase.from("featured_placements" as any) as any)
-      .select("id, placement_type, product_id, store_id, title, image_url, cta_text, cta_link, bg_color, text_color, start_date, end_date, show_timer, timer_color")
+      .select("id, placement_type, product_id, store_id, title, image_url, image_url_2, cta_text, cta_link, bg_color, text_color, start_date, end_date, show_timer, timer_color")
       .eq("is_active", true)
       .lte("start_date", now)
       .gte("end_date", now)
@@ -81,7 +120,7 @@ export function FeaturedSidebar() {
       });
   }, []);
 
-  // Auto-slide every 5s, paused on hover
+  // Auto-slide every 5s between placements, paused on hover
   useEffect(() => {
     if (placements.length <= 1 || hovered) return;
     const interval = setInterval(() => {
@@ -107,6 +146,7 @@ export function FeaturedSidebar() {
 
   const item = placements[current];
   const link = item.cta_link || (item.product_id ? `/product/${item.product_id}` : "#");
+  const hasDualImages = !!(item.image_url && item.image_url_2);
 
   return (
     <div className="w-full lg:w-[300px] shrink-0">
@@ -131,8 +171,14 @@ export function FeaturedSidebar() {
               style={{ backgroundColor: item.bg_color || "hsl(var(--card))" }}
             />
 
-            {/* Image with zoom on hover & slide animation */}
-            {item.image_url && (
+            {/* Image(s) */}
+            {hasDualImages ? (
+              <DualImageSlider
+                image1={item.image_url!}
+                image2={item.image_url_2!}
+                hovered={hovered}
+              />
+            ) : item.image_url ? (
               <img
                 src={item.image_url}
                 alt={item.title || "Promotion"}
@@ -145,7 +191,7 @@ export function FeaturedSidebar() {
                 )}
                 loading="lazy"
               />
-            )}
+            ) : null}
 
             {/* Countdown timer */}
             {item.show_timer && (

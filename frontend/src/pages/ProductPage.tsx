@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, lazy, Suspense } from "react";
+import { ImageZoomLens } from "@/components/ImageZoomLens";
 import { useI18n } from "@/contexts/I18nContext";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -265,10 +266,15 @@ export default function ProductPage() {
                     muted
                     loop
                     playsInline
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                 ) : (
-                  <img src={gallery[selectedImage]?.url} alt={product.nameFr} className="w-full h-full object-cover" />
+                  <ImageZoomLens
+                    src={gallery[selectedImage]?.url || ""}
+                    alt={product.nameFr}
+                    className="w-full h-full"
+                    zoomFactor={2.5}
+                  />
                 )}
                 {product.isSale && product.discount && (
                   <span className="absolute top-3 left-3 px-3 py-1.5 text-sm font-bold bg-sale text-sale-foreground rounded-sm">-{product.discount}%</span>
