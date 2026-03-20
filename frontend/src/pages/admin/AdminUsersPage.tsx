@@ -45,8 +45,8 @@ export default function AdminUsersPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, phone, avatar_url, created_at, is_banned, ban_reason, banned_at");
-      return data ?? [];
+        .select("*");
+      return (data ?? []) as any[];
     },
   });
 
