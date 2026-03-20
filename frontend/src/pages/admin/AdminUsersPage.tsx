@@ -45,8 +45,8 @@ export default function AdminUsersPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, phone, avatar_url, created_at, is_banned, ban_reason, banned_at");
-      return data ?? [];
+        .select("*");
+      return (data ?? []) as any[];
     },
   });
 
@@ -86,10 +86,13 @@ export default function AdminUsersPage() {
   const handleStatusFilter = (val: StatusFilter) => { setStatusFilter(val); setCurrentPage(1); };
 
   const exportCSV = () => {
-    const headers = ["Nom", "Email", "Rôles", "Statut", "Inscrit le"];
+    const headers = ["ID", "Nom", "Email", "Téléphone", "Nationalité", "Rôles", "Statut", "Inscrit le"];
     const rows = filtered.map(u => [
+      `#${u.display_id || ""}`,
       `${u.first_name || ""} ${u.last_name || ""}`.trim(),
       u.email || "",
+      u.phone || "",
+      u.nationality || "",
       u.roles.length > 0 ? u.roles.map(r => roleLabels[r]).join(", ") : "Client",
       u.is_banned ? "Banni" : "Actif",
       format(new Date(u.created_at), "yyyy-MM-dd"),
@@ -200,13 +203,14 @@ export default function AdminUsersPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-muted-foreground border-b border-border bg-muted/30">
-                  <th className="text-left p-3 font-medium">Utilisateur</th>
-                  <th className="text-left p-3 font-medium">Rôle(s)</th>
-                  <th className="text-left p-3 font-medium hidden sm:table-cell">Statut</th>
-                  <th className="text-left p-3 font-medium hidden md:table-cell">Inscrit le</th>
-                  <th className="text-right p-3 font-medium">Détails</th>
-                </tr>
+                 <tr className="text-xs text-muted-foreground border-b border-border bg-muted/30">
+                   <th className="text-left p-3 font-medium w-16">ID</th>
+                   <th className="text-left p-3 font-medium">Utilisateur</th>
+                   <th className="text-left p-3 font-medium">Rôle(s)</th>
+                   <th className="text-left p-3 font-medium hidden sm:table-cell">Statut</th>
+                   <th className="text-left p-3 font-medium hidden md:table-cell">Inscrit le</th>
+                   <th className="text-right p-3 font-medium">Détails</th>
+                 </tr>
               </thead>
               <tbody>
                 {paginated.map((u) => (
@@ -215,7 +219,8 @@ export default function AdminUsersPage() {
                     className={`border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors cursor-pointer ${u.is_banned ? "opacity-60" : ""}`}
                     onClick={() => setSelectedUserId(u.id)}
                   >
-                    <td className="p-3">
+                     <td className="p-3 text-xs text-muted-foreground font-mono">#{u.display_id || "—"}</td>
+                     <td className="p-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
                           {(u.first_name?.[0] || u.email?.[0] || "?").toUpperCase()}

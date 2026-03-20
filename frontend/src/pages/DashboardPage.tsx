@@ -139,6 +139,11 @@ interface ProfileData {
   avatar_url: string;
   gender: string;
   date_of_birth: string;
+  nationality: string;
+  residence_address: string;
+  residence_city: string;
+  preferred_language: string;
+  preferred_contact_channel: string;
 }
 
 export default function DashboardPage() {
@@ -1066,7 +1071,7 @@ function ProfileTab({ user }: { user: any }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "" });
+  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "", nationality: "", residence_address: "", residence_city: "", preferred_language: "fr", preferred_contact_channel: "chat" });
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -1075,15 +1080,21 @@ function ProfileTab({ user }: { user: any }) {
   const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
-    supabase.from("profiles").select("first_name, last_name, phone, avatar_url, gender, date_of_birth").eq("id", user.id).maybeSingle().then(({ data }) => {
+    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle().then(({ data }) => {
       if (data) {
+        const d = data as any;
         setProfile({
-          first_name: data.first_name || "",
-          last_name: data.last_name || "",
-          phone: (data as any).phone || "",
-          avatar_url: data.avatar_url || "",
-          gender: (data as any).gender || "",
-          date_of_birth: (data as any).date_of_birth || "",
+          first_name: d.first_name || "",
+          last_name: d.last_name || "",
+          phone: d.phone || "",
+          avatar_url: d.avatar_url || "",
+          gender: d.gender || "",
+          date_of_birth: d.date_of_birth || "",
+          nationality: d.nationality || "",
+          residence_address: d.residence_address || "",
+          residence_city: d.residence_city || "",
+          preferred_language: d.preferred_language || "fr",
+          preferred_contact_channel: d.preferred_contact_channel || "chat",
         });
       }
       setLoading(false);
@@ -1099,6 +1110,11 @@ function ProfileTab({ user }: { user: any }) {
       avatar_url: profile.avatar_url || null,
       gender: profile.gender || null,
       date_of_birth: profile.date_of_birth || null,
+      nationality: profile.nationality || null,
+      residence_address: profile.residence_address || null,
+      residence_city: profile.residence_city || null,
+      preferred_language: profile.preferred_language || 'fr',
+      preferred_contact_channel: profile.preferred_contact_channel || 'chat',
     }).eq("id", user.id);
     setSaving(false);
     if (error) {
@@ -1220,6 +1236,46 @@ function ProfileTab({ user }: { user: any }) {
               />
             </div>
           </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Nationalité</Label>
+            <Input className="mt-1" value={profile.nationality} onChange={e => setProfile(p => ({ ...p, nationality: e.target.value }))} placeholder="Ex: Congolaise" />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Adresse de résidence</Label>
+            <Input className="mt-1" value={profile.residence_address} onChange={e => setProfile(p => ({ ...p, residence_address: e.target.value }))} placeholder="Votre adresse" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Ville de résidence</Label>
+              <Input className="mt-1" value={profile.residence_city} onChange={e => setProfile(p => ({ ...p, residence_city: e.target.value }))} placeholder="Votre ville" />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Langue préférée</Label>
+              <select
+                className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-card"
+                value={profile.preferred_language}
+                onChange={e => setProfile(p => ({ ...p, preferred_language: e.target.value }))}
+              >
+                <option value="fr">Français</option>
+                <option value="en">English</option>
+                <option value="ln">Lingala</option>
+                <option value="sw">Swahili</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Canal de contact préféré</Label>
+            <select
+              className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-card"
+              value={profile.preferred_contact_channel}
+              onChange={e => setProfile(p => ({ ...p, preferred_contact_channel: e.target.value }))}
+            >
+              <option value="chat">Chat interne</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="sms">SMS</option>
+              <option value="email">Email</option>
+            </select>
+          </div>
           <Button onClick={handleSave} disabled={saving} className="mt-2">
             {saving ? <Loader2 className="animate-spin mr-2" size={14} /> : <Save size={14} className="mr-2" />}
             Sauvegarder
@@ -1330,6 +1386,9 @@ function AddressesTab({ userId }: { userId: string }) {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ label: "Domicile", first_name: "", last_name: "", phone: "", address: "", city: "", country: "Sénégal", postal_code: "" });
   const [saving, setSaving] = useState(false);
+  const [isKycVerified, setIsKycVerified] = useState(false);
+
+  const maxAddresses = isKycVerified ? 5 : 2;
 
   const fetchAddresses = useCallback(async () => {
     setLoading(true);
@@ -1339,6 +1398,13 @@ function AddressesTab({ userId }: { userId: string }) {
   }, [userId]);
 
   useEffect(() => { fetchAddresses(); }, [fetchAddresses]);
+
+  // Check KYC status
+  useEffect(() => {
+    (supabase as any).from("kyc_verifications").select("id").eq("user_id", userId).eq("status", "approved").limit(1).then(({ data }: any) => {
+      setIsKycVerified((data ?? []).length > 0);
+    });
+  }, [userId]);
 
   const resetForm = () => {
     setForm({ label: "Domicile", first_name: "", last_name: "", phone: "", address: "", city: "", country: "Sénégal", postal_code: "" });
@@ -1490,13 +1556,18 @@ function AddressesTab({ userId }: { userId: string }) {
         </div>
       )}
 
-      {!showForm && (
+      {!showForm && addresses.length < maxAddresses && (
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
           className="w-full py-3 text-sm font-medium border border-dashed border-border rounded-lg text-muted-foreground hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2"
         >
-          <Plus size={16} /> Ajouter une adresse
+          <Plus size={16} /> Ajouter une adresse ({addresses.length}/{maxAddresses})
         </button>
+      )}
+      {!showForm && addresses.length >= maxAddresses && (
+        <p className="text-xs text-muted-foreground text-center py-2">
+          Limite atteinte ({maxAddresses} adresses). {!isKycVerified && "Vérifiez votre identité pour en ajouter jusqu'à 5."}
+        </p>
       )}
     </div>
   );

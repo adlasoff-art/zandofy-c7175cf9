@@ -27,6 +27,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isBanned, setIsBanned] = useState(false);
 
   const ensureProfile = useCallback(async (authUser: User) => {
+    // Only INSERT if profile doesn't exist yet — never overwrite existing data
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", authUser.id)
+      .maybeSingle();
+
+    if (existing) return; // Profile already exists, don't overwrite
+
     const metadata = (authUser.user_metadata ?? {}) as Record<string, unknown>;
     const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
     const firstNameMeta = typeof metadata.first_name === "string" ? metadata.first_name.trim() : "";
@@ -35,17 +44,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const firstName = firstNameMeta || (fullName ? fullName.split(" ")[0] : null);
     const lastName = lastNameMeta || (fullName.includes(" ") ? fullName.split(" ").slice(1).join(" ") : null);
 
-    const { error } = await supabase.from("profiles").upsert(
-      {
-        id: authUser.id,
-        email: authUser.email ?? null,
-        first_name: firstName || null,
-        last_name: lastName || null,
-      },
-      { onConflict: "id" }
-    );
+    const { error } = await supabase.from("profiles").insert({
+      id: authUser.id,
+      email: authUser.email ?? null,
+      first_name: firstName || null,
+      last_name: lastName || null,
+    });
 
-    if (error) {
+    if (error && error.code !== "23505") {
+      // 23505 = unique violation (profile already exists via trigger) — ignore
       console.warn("ensureProfile failed", error.message);
     }
   }, []);

@@ -46,6 +46,17 @@ interface UserProfile {
   is_banned: boolean;
   ban_reason: string | null;
   banned_at: string | null;
+  display_id?: number | null;
+  nationality?: string | null;
+  residence_address?: string | null;
+  residence_city?: string | null;
+  last_known_lat?: number | null;
+  last_known_lng?: number | null;
+  last_login_at?: string | null;
+  login_count?: number | null;
+  preferred_language?: string | null;
+  preferred_contact_channel?: string | null;
+  customer_tier?: string | null;
 }
 
 interface UserDetailDrawerProps {
@@ -250,6 +261,7 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">#{user.display_id || "—"}</span>
                 <h3 className="font-semibold text-foreground truncate">
                   {user.first_name || ""} {user.last_name || ""}
                 </h3>
@@ -259,6 +271,8 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
               </div>
               <p className="text-sm text-muted-foreground truncate">{user.email}</p>
               {user.phone && <p className="text-xs text-muted-foreground">{user.phone}</p>}
+              {user.nationality && <p className="text-xs text-muted-foreground">🌍 {user.nationality}</p>}
+              <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{user.id}</p>
             </div>
           </div>
 
@@ -289,16 +303,51 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
               <div>
                 <span className="text-muted-foreground">Dernière connexion</span>
                 <p className="font-medium text-foreground">
-                  {authDetails?.last_sign_in_at ? format(new Date(authDetails.last_sign_in_at), "d MMM yyyy HH:mm", { locale: fr }) : "—"}
+                  {user.last_login_at ? format(new Date(user.last_login_at), "d MMM yyyy HH:mm", { locale: fr }) : authDetails?.last_sign_in_at ? format(new Date(authDetails.last_sign_in_at), "d MMM yyyy HH:mm", { locale: fr }) : "—"}
                 </p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Connexions</span>
+                <p className="font-medium text-foreground">{user.login_count ?? "—"}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Email confirmé</span>
                 <p className="font-medium text-foreground">{authDetails?.email_confirmed_at ? "✓ Oui" : "✗ Non"}</p>
               </div>
               <div>
+                <span className="text-muted-foreground">Tier client</span>
+                <p className="font-medium text-foreground capitalize">{user.customer_tier || "bronze"}</p>
+              </div>
+              <div>
                 <span className="text-muted-foreground">Providers</span>
                 <p className="font-medium text-foreground">{authDetails?.providers?.join(", ") || "email"}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Location & Preferences */}
+          <div className="bg-muted/20 rounded-xl p-4 space-y-2">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Localisation & Préférences</h4>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground">Résidence</span>
+                <p className="font-medium text-foreground">{user.residence_address ? `${user.residence_address}, ${user.residence_city || ""}` : "—"}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">GPS</span>
+                <p className="font-medium text-foreground">
+                  {user.last_known_lat && user.last_known_lng
+                    ? `${user.last_known_lat.toFixed(4)}, ${user.last_known_lng.toFixed(4)}`
+                    : "Non disponible"}
+                </p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Langue</span>
+                <p className="font-medium text-foreground">{user.preferred_language === "fr" ? "Français" : user.preferred_language === "en" ? "English" : user.preferred_language || "fr"}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Canal préféré</span>
+                <p className="font-medium text-foreground capitalize">{user.preferred_contact_channel || "chat"}</p>
               </div>
             </div>
           </div>
