@@ -120,6 +120,7 @@ export function ReferralDashboard() {
     if (!user || giftCardAmount <= 0 || giftCardAmount > wallet.balance) return;
     setConvertingGiftCard(true);
 
+    const dollarValue = giftCardAmount / pointsPerDollar;
     const code = `ZCARD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
     // Deduct points
@@ -130,12 +131,12 @@ export function ReferralDashboard() {
 
     if (ptErr) { toast.error(ptErr.message); setConvertingGiftCard(false); return; }
 
-    // Create gift card
+    // Create gift card with dollar value
     await supabase.from("gift_cards").insert({
       user_id: user.id,
       code,
-      original_amount: giftCardAmount,
-      remaining_amount: giftCardAmount,
+      original_amount: dollarValue,
+      remaining_amount: dollarValue,
       points_used: giftCardAmount,
       expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
     });
@@ -145,10 +146,10 @@ export function ReferralDashboard() {
       user_id: user.id,
       type: "spent",
       amount: -giftCardAmount,
-      description: `Conversion en carte cadeau ${code}`,
+      description: `Conversion en carte cadeau ${code} (${giftCardAmount} pts → $${dollarValue.toFixed(2)})`,
     });
 
-    toast.success(`Carte cadeau créée : ${code}`);
+    toast.success(`Carte cadeau créée : ${code} — Valeur : $${dollarValue.toFixed(2)}`);
     setGiftCardAmount(0);
     setConvertingGiftCard(false);
     load();
