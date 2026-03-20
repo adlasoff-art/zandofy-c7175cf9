@@ -1401,8 +1401,8 @@ function AddressesTab({ userId }: { userId: string }) {
 
   // Check KYC status
   useEffect(() => {
-    supabase.rpc("is_kyc_verified", { p_user_id: userId }).then(({ data }) => {
-      setIsKycVerified(data === true);
+    supabase.from("kyc_verifications").select("id").eq("user_id", userId).eq("status", "approved").limit(1).then(({ data }) => {
+      setIsKycVerified((data ?? []).length > 0);
     });
   }, [userId]);
 
