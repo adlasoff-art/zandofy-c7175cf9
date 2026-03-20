@@ -293,17 +293,111 @@ export default function VendorDashboardPage() {
 
   const totalUnread = conversations.reduce((s, c) => s + c.unread_count, 0);
 
+  const VENDOR_TABS = [
+    { key: "catalogue" as const, label: "Catalogue", icon: Package },
+    { key: "orders" as const, label: "Commandes", icon: ShoppingBag },
+    { key: "deliveries" as const, label: "Livraisons", icon: Bike },
+    { key: "promos" as const, label: "Promos", icon: Flame },
+    { key: "coupons" as const, label: "Coupons", icon: Crown },
+    { key: "wallet" as const, label: "Wallet", icon: Wallet },
+    { key: "returns" as const, label: "Retours", icon: RotateCcw },
+    { key: "disputes" as const, label: "Litiges", icon: AlertTriangle },
+    { key: "featured" as const, label: "Mise en avant", icon: Sparkles },
+    { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
+    ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
+    { key: "messages" as const, label: "Messages", icon: MessageCircle },
+    { key: "settings" as const, label: "Paramètres", icon: Settings },
+  ];
+
+  const renderTabContent = () => (
+    <>
+      {activeTab === "catalogue" && <VendorProductManager storeId={store!.id} />}
+      {activeTab === "orders" && <VendorOrderManager storeId={store!.id} />}
+      {activeTab === "deliveries" && <VendorRiderTracking storeId={store!.id} />}
+      {activeTab === "promos" && <VendorPromotionsTab storeId={store!.id} />}
+      {activeTab === "coupons" && (
+        <div className="space-y-6">
+          {store?.can_create_coupons ? (
+            <>
+              <VendorCouponsTab storeId={store!.id} />
+              <div className="border-t border-border pt-4">
+                <h3 className="text-base font-bold text-foreground mb-3">📊 Analytics Coupons</h3>
+                <VendorCouponAnalytics storeId={store!.id} />
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-12 space-y-2">
+              <Ticket size={40} className="mx-auto text-muted-foreground/20" />
+              <p className="text-sm font-medium text-foreground">Coupons non activés</p>
+              <p className="text-xs text-muted-foreground">Contactez l'administration pour activer la création de coupons pour votre boutique.</p>
+            </div>
+          )}
+        </div>
+      )}
+      {activeTab === "wallet" && <VendorWalletTab storeId={store!.id} />}
+      {activeTab === "returns" && <VendorReturnsTab storeId={store!.id} />}
+      {activeTab === "disputes" && <VendorDisputesTab storeId={store!.id} />}
+      {activeTab === "featured" && <VendorFeaturedRequestTab storeId={store!.id} />}
+      {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
+      {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
+      {activeTab === "messages" && (
+        <>
+          {conversations.length === 0 ? (
+            <div className="text-center py-12 space-y-2">
+              <MessageCircle size={40} className="mx-auto text-muted-foreground/20" />
+              <p className="text-sm text-muted-foreground">Aucun message reçu pour le moment.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {conversations.map((conv) => (
+                <button
+                  key={conv.id}
+                  onClick={() => openChat(conv)}
+                  className="w-full bg-card border border-border rounded-lg p-4 flex items-center gap-3 text-left hover:border-primary/30 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                    <Users size={16} className="text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-foreground truncate">
+                        {conv.customer_email}
+                      </span>
+                      {conv.unread_count > 0 && (
+                        <span className="w-5 h-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center shrink-0">
+                          {conv.unread_count}
+                        </span>
+                      )}
+                    </div>
+                    {conv.product_name && (
+                      <p className="text-[11px] text-primary truncate">{conv.product_name}</p>
+                    )}
+                    {conv.last_message && (
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">{conv.last_message}</p>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground shrink-0">
+                    {new Date(conv.updated_at).toLocaleDateString("fr-FR", {
+                      day: "2-digit",
+                      month: "short",
+                    })}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      {activeTab === "settings" && store && (
+        <VendorSettings store={store} onUpdate={(updated) => setStore(updated)} />
+      )}
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container py-6 max-w-3xl">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate("/dashboard")} className="text-muted-foreground hover:text-foreground">
-            <ChevronLeft size={20} />
-          </button>
-          <h1 className="text-xl font-bold text-foreground">Tableau de bord vendeur</h1>
-        </div>
-
+      <main className="container py-6">
         {loading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="animate-spin text-primary" size={28} />
@@ -318,150 +412,116 @@ export default function VendorDashboardPage() {
           </div>
         ) : (
           <>
-            {/* Store summary */}
-            <VendorSummaryWidgets
-              store={store!}
-              orderCounters={orderCounters}
-              totalUnread={totalUnread}
-              storeId={store!.id}
-            />
+            {/* ═══ DESKTOP LAYOUT: Sidebar + Content ═══ */}
+            <div className="hidden lg:flex gap-6">
+              {/* Sidebar */}
+              <nav className="w-56 shrink-0">
+                <div className="sticky top-20 space-y-4">
+                  {/* Store identity */}
+                  <div className="bg-card border border-border rounded-lg p-4 text-center">
+                    <div className="w-14 h-14 rounded-full bg-muted mx-auto mb-2 overflow-hidden border-2 border-border">
+                      {store?.logo_url ? (
+                        <img src={store.logo_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-primary flex items-center justify-center">
+                          <Store size={22} className="text-primary-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-sm font-bold text-foreground truncate">{store?.name}</p>
+                    <VendorTierBadge storeId={store!.id} />
+                  </div>
 
-            {/* Platform ownership claim banner */}
-            <VendorPlatformClaimBanner
-              storeId={store!.id}
-              userId={user!.id}
-              storeName={store!.name}
-            />
+                  {/* Navigation items */}
+                  <div className="bg-card border border-border rounded-lg py-1">
+                    <button
+                      onClick={() => navigate("/dashboard")}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                    >
+                      <ChevronLeft size={16} />
+                      Mon espace
+                    </button>
+                    <div className="h-px bg-border mx-3" />
+                    {VENDOR_TABS.map(tab => {
+                      const isActive = activeTab === tab.key;
+                      return (
+                        <button
+                          key={tab.key}
+                          onClick={() => setActiveTab(tab.key)}
+                          className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${
+                            isActive
+                              ? "bg-primary/10 text-primary font-semibold border-r-2 border-primary"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                          }`}
+                        >
+                          <tab.icon size={16} />
+                          {tab.label}
+                          {tab.key === "messages" && totalUnread > 0 && (
+                            <span className="ml-auto w-5 h-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
+                              {totalUnread}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </nav>
 
-            {/* Tab navigation */}
-            <div className="flex gap-1 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-              {[
-                { key: "catalogue" as const, label: "Catalogue", icon: Package },
-                { key: "orders" as const, label: "Commandes", icon: ShoppingBag },
-                { key: "deliveries" as const, label: "Livraisons", icon: Bike },
-                { key: "promos" as const, label: "Promos", icon: Flame },
-                { key: "coupons" as const, label: "Coupons", icon: Crown },
-                { key: "wallet" as const, label: "Wallet", icon: Wallet },
-                { key: "returns" as const, label: "Retours", icon: RotateCcw },
-                { key: "disputes" as const, label: "Litiges", icon: AlertTriangle },
-                { key: "featured" as const, label: "Mise en avant", icon: Sparkles },
-                { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
-                ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
-                { key: "messages" as const, label: "Messages", icon: MessageCircle },
-                { key: "settings" as const, label: "Paramètres", icon: Settings },
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap border transition-all ${
-                    activeTab === tab.key
-                      ? "bg-foreground text-card border-foreground"
-                      : "bg-card text-foreground border-border hover:border-foreground"
-                  }`}
-                >
-                  <tab.icon size={14} />
-                  {tab.label}
-                  {tab.key === "messages" && totalUnread > 0 && (
-                    <span className="w-5 h-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
-                      {totalUnread}
-                    </span>
-                  )}
-                </button>
-              ))}
+              {/* Main content */}
+              <div className="flex-1 min-w-0 space-y-4">
+                {/* Platform claim banner */}
+                <VendorPlatformClaimBanner storeId={store!.id} userId={user!.id} storeName={store!.name} />
+
+                {/* KPI Widgets — always visible */}
+                <VendorSummaryWidgets store={store!} orderCounters={orderCounters} totalUnread={totalUnread} storeId={store!.id} />
+
+                {/* Tab content */}
+                {renderTabContent()}
+              </div>
             </div>
 
-            {activeTab === "catalogue" && <VendorProductManager storeId={store!.id} />}
-
-            {activeTab === "orders" && <VendorOrderManager storeId={store!.id} />}
-
-            {activeTab === "deliveries" && <VendorRiderTracking storeId={store!.id} />}
-
-            {activeTab === "promos" && <VendorPromotionsTab storeId={store!.id} />}
-
-            {activeTab === "coupons" && (
-              <div className="space-y-6">
-                {store?.can_create_coupons ? (
-                  <>
-                    <VendorCouponsTab storeId={store!.id} />
-                    <div className="border-t border-border pt-4">
-                      <h3 className="text-base font-bold text-foreground mb-3">📊 Analytics Coupons</h3>
-                      <VendorCouponAnalytics storeId={store!.id} />
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center py-12 space-y-2">
-                    <Ticket size={40} className="mx-auto text-muted-foreground/20" />
-                    <p className="text-sm font-medium text-foreground">Coupons non activés</p>
-                    <p className="text-xs text-muted-foreground">Contactez l'administration pour activer la création de coupons pour votre boutique.</p>
-                  </div>
-                )}
+            {/* ═══ MOBILE LAYOUT: Classic pills ═══ */}
+            <div className="lg:hidden space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <button onClick={() => navigate("/dashboard")} className="text-muted-foreground hover:text-foreground">
+                  <ChevronLeft size={20} />
+                </button>
+                <h1 className="text-xl font-bold text-foreground">Tableau de bord vendeur</h1>
               </div>
-            )}
 
-            {activeTab === "wallet" && <VendorWalletTab storeId={store!.id} />}
+              {/* Summary widgets */}
+              <VendorSummaryWidgets store={store!} orderCounters={orderCounters} totalUnread={totalUnread} storeId={store!.id} />
 
-            {activeTab === "returns" && <VendorReturnsTab storeId={store!.id} />}
+              {/* Platform claim banner */}
+              <VendorPlatformClaimBanner storeId={store!.id} userId={user!.id} storeName={store!.name} />
 
-            {activeTab === "disputes" && <VendorDisputesTab storeId={store!.id} />}
+              {/* Horizontal scrollable tabs */}
+              <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide">
+                {VENDOR_TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap border transition-all ${
+                      activeTab === tab.key
+                        ? "bg-foreground text-card border-foreground"
+                        : "bg-card text-foreground border-border hover:border-foreground"
+                    }`}
+                  >
+                    <tab.icon size={14} />
+                    {tab.label}
+                    {tab.key === "messages" && totalUnread > 0 && (
+                      <span className="w-5 h-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
+                        {totalUnread}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
 
-            {activeTab === "featured" && <VendorFeaturedRequestTab storeId={store!.id} />}
-
-            {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
-
-            {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
-
-            {activeTab === "messages" && (
-              <>
-                {conversations.length === 0 ? (
-                  <div className="text-center py-12 space-y-2">
-                    <MessageCircle size={40} className="mx-auto text-muted-foreground/20" />
-                    <p className="text-sm text-muted-foreground">Aucun message reçu pour le moment.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {conversations.map((conv) => (
-                      <button
-                        key={conv.id}
-                        onClick={() => openChat(conv)}
-                        className="w-full bg-card border border-border rounded-lg p-4 flex items-center gap-3 text-left hover:border-primary/30 transition-colors"
-                      >
-                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                          <Users size={16} className="text-muted-foreground" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-foreground truncate">
-                              {conv.customer_email}
-                            </span>
-                            {conv.unread_count > 0 && (
-                              <span className="w-5 h-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center shrink-0">
-                                {conv.unread_count}
-                              </span>
-                            )}
-                          </div>
-                          {conv.product_name && (
-                            <p className="text-[11px] text-primary truncate">{conv.product_name}</p>
-                          )}
-                          {conv.last_message && (
-                            <p className="text-xs text-muted-foreground truncate mt-0.5">{conv.last_message}</p>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-muted-foreground shrink-0">
-                          {new Date(conv.updated_at).toLocaleDateString("fr-FR", {
-                            day: "2-digit",
-                            month: "short",
-                          })}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            {activeTab === "settings" && store && (
-              <VendorSettings store={store} onUpdate={(updated) => setStore(updated)} />
-            )}
+              {/* Tab content */}
+              {renderTabContent()}
+            </div>
           </>
         )}
       </main>
@@ -497,6 +557,17 @@ export default function VendorDashboardPage() {
 
       <Footer />
     </div>
+  );
+}
+
+/** Small badge component showing vendor tier */
+function VendorTierBadge({ storeId }: { storeId: string }) {
+  const { tierConfig } = useVendorSubscription(storeId);
+  return (
+    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 mt-1 ${tierConfig.badgeClass}`}>
+      <Crown size={8} />
+      {tierConfig.label}
+    </span>
   );
 }
 

@@ -439,48 +439,9 @@ export default function DashboardPage() {
   );
 }
 
-function OverviewTab({ orders, user }: { orders: OrderRow[]; user: any }) {
-  const validOrders = orders.filter((o) => !NON_REVENUE_ORDER_STATUSES.includes(o.status as never));
-  const activeOrders = orders.filter((o) => ACTIVE_ORDER_STATUSES.includes(o.status as never)).length;
-  const totalSpent = validOrders.reduce((sum, order) => {
-    const subtotal = Number(order.subtotal || 0);
-    const discount = Number(order.discount_amount || 0);
-    return sum + Math.max(0, subtotal - discount);
-  }, 0);
-  const cancelledCount = orders.filter(o => o.status === "cancelled").length;
-  const returnedCount = orders.filter(o => o.status === "returned").length;
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">Bienvenue</p>
-          <p className="text-sm font-bold text-foreground mt-1 truncate">{user.email}</p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">En cours</p>
-          <p className="text-2xl font-bold text-primary mt-1">{activeOrders}</p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">Total commandes</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{validOrders.length}</p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">Total dépensé</p>
-          <p className="text-2xl font-bold text-foreground mt-1">${totalSpent.toFixed(2)}</p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">Annulées</p>
-          <p className="text-2xl font-bold text-destructive mt-1">{cancelledCount}</p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">Retournées</p>
-          <p className="text-2xl font-bold text-orange-500 mt-1">{returnedCount}</p>
-        </div>
-      </div>
-      <LoyaltyProgress />
-    </div>
-  );
-}
+// OverviewTab removed — KPIs are now always visible above the tab content.
+// The "overview" tab now only shows LoyaltyProgress (rendered inline in renderTabContent).
+
 
 function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, statusHistory, onCancelSuccess }: {
   orders: OrderRow[];
