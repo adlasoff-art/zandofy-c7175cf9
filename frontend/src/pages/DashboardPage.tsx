@@ -1556,13 +1556,18 @@ function AddressesTab({ userId }: { userId: string }) {
         </div>
       )}
 
-      {!showForm && (
+      {!showForm && addresses.length < maxAddresses && (
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
           className="w-full py-3 text-sm font-medium border border-dashed border-border rounded-lg text-muted-foreground hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2"
         >
-          <Plus size={16} /> Ajouter une adresse
+          <Plus size={16} /> Ajouter une adresse ({addresses.length}/{maxAddresses})
         </button>
+      )}
+      {!showForm && addresses.length >= maxAddresses && (
+        <p className="text-xs text-muted-foreground text-center py-2">
+          Limite atteinte ({maxAddresses} adresses). {!isKycVerified && "Vérifiez votre identité pour en ajouter jusqu'à 5."}
+        </p>
       )}
     </div>
   );
