@@ -351,6 +351,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       material: form.material || null,
       origin_country: form.origin_country || null,
       category_id: form.category_id || null,
+      trend_tag_id: form.trend_tag_id || null,
       store_id: storeId,
       flash_timer_enabled: form.flash_timer_enabled,
       promo_start_date: form.promo_start_date ? new Date(form.promo_start_date).toISOString() : null,
