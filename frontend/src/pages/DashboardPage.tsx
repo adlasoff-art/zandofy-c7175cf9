@@ -1236,6 +1236,45 @@ function ProfileTab({ user }: { user: any }) {
               />
             </div>
           </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Nationalité</Label>
+            <Input className="mt-1" value={profile.nationality} onChange={e => setProfile(p => ({ ...p, nationality: e.target.value }))} placeholder="Ex: Congolaise" />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Adresse de résidence</Label>
+            <Input className="mt-1" value={profile.residence_address} onChange={e => setProfile(p => ({ ...p, residence_address: e.target.value }))} placeholder="Votre adresse" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Ville de résidence</Label>
+              <Input className="mt-1" value={profile.residence_city} onChange={e => setProfile(p => ({ ...p, residence_city: e.target.value }))} placeholder="Votre ville" />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Langue préférée</Label>
+              <select
+                className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-card"
+                value={profile.preferred_language}
+                onChange={e => setProfile(p => ({ ...p, preferred_language: e.target.value }))}
+              >
+                <option value="fr">Français</option>
+                <option value="en">English</option>
+                <option value="ln">Lingala</option>
+                <option value="sw">Swahili</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Canal de contact préféré</Label>
+            <select
+              className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-card"
+              value={profile.preferred_contact_channel}
+              onChange={e => setProfile(p => ({ ...p, preferred_contact_channel: e.target.value }))}
+            >
+              <option value="chat">Chat interne</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="sms">SMS</option>
+              <option value="email">Email</option>
+            </select>
           <Button onClick={handleSave} disabled={saving} className="mt-2">
             {saving ? <Loader2 className="animate-spin mr-2" size={14} /> : <Save size={14} className="mr-2" />}
             Sauvegarder
