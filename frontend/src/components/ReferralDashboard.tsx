@@ -45,6 +45,7 @@ export function ReferralDashboard() {
   const [convertingGiftCard, setConvertingGiftCard] = useState(false);
   const [giftCardEnabled, setGiftCardEnabled] = useState(false);
   const [pointsExpiryMonths, setPointsExpiryMonths] = useState(12);
+  const [pointsPerDollar, setPointsPerDollar] = useState(50);
   const [lastActivity, setLastActivity] = useState<string | null>(null);
 
   const load = useCallback(async () => {
