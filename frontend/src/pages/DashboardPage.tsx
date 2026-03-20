@@ -1080,20 +1080,21 @@ function ProfileTab({ user }: { user: any }) {
   const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
-    supabase.from("profiles").select("first_name, last_name, phone, avatar_url, gender, date_of_birth, nationality, residence_address, residence_city, preferred_language, preferred_contact_channel").eq("id", user.id).maybeSingle().then(({ data }) => {
+    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle().then(({ data }) => {
       if (data) {
+        const d = data as any;
         setProfile({
-          first_name: data.first_name || "",
-          last_name: data.last_name || "",
-          phone: (data as any).phone || "",
-          avatar_url: data.avatar_url || "",
-          gender: (data as any).gender || "",
-          date_of_birth: (data as any).date_of_birth || "",
-          nationality: (data as any).nationality || "",
-          residence_address: (data as any).residence_address || "",
-          residence_city: (data as any).residence_city || "",
-          preferred_language: (data as any).preferred_language || "fr",
-          preferred_contact_channel: (data as any).preferred_contact_channel || "chat",
+          first_name: d.first_name || "",
+          last_name: d.last_name || "",
+          phone: d.phone || "",
+          avatar_url: d.avatar_url || "",
+          gender: d.gender || "",
+          date_of_birth: d.date_of_birth || "",
+          nationality: d.nationality || "",
+          residence_address: d.residence_address || "",
+          residence_city: d.residence_city || "",
+          preferred_language: d.preferred_language || "fr",
+          preferred_contact_channel: d.preferred_contact_channel || "chat",
         });
       }
       setLoading(false);
