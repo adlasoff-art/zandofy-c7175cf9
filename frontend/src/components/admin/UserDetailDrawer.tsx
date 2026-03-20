@@ -46,6 +46,17 @@ interface UserProfile {
   is_banned: boolean;
   ban_reason: string | null;
   banned_at: string | null;
+  display_id?: number | null;
+  nationality?: string | null;
+  residence_address?: string | null;
+  residence_city?: string | null;
+  last_known_lat?: number | null;
+  last_known_lng?: number | null;
+  last_login_at?: string | null;
+  login_count?: number | null;
+  preferred_language?: string | null;
+  preferred_contact_channel?: string | null;
+  customer_tier?: string | null;
 }
 
 interface UserDetailDrawerProps {
