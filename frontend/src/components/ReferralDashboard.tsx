@@ -214,7 +214,7 @@ export function ReferralDashboard() {
             <h3 className="text-sm font-bold text-foreground">Convertir en carte cadeau</h3>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
-            Transformez vos ZandoPoints en carte cadeau utilisable lors de vos prochains achats.
+            Transformez vos ZandoPoints en carte cadeau. Taux : {pointsPerDollar} pts = $1.
           </p>
           <div className="flex items-center gap-2">
             <input
