@@ -158,6 +158,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const { kycStatus, needsKyc, isOrderBlocked, kycVerification, canResubmit, refetchKyc } = useKycStatus();
   const [showKycForm, setShowKycForm] = useState(false);
+  const [profileName, setProfileName] = useState<{ first_name: string; last_name: string; avatar_url: string }>({ first_name: "", last_name: "", avatar_url: "" });
 
   const loadOrders = useCallback(async () => {
     if (!user) return;
@@ -177,6 +178,10 @@ export default function DashboardPage() {
       return;
     }
     loadOrders();
+    // Load profile name for sidebar
+    supabase.from("profiles").select("first_name, last_name, avatar_url").eq("id", user.id).maybeSingle().then(({ data }) => {
+      if (data) setProfileName({ first_name: (data as any).first_name || "", last_name: (data as any).last_name || "", avatar_url: (data as any).avatar_url || "" });
+    });
   }, [user, navigate, loadOrders]);
 
   useEffect(() => {
@@ -201,99 +206,11 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
-  return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="container py-6">
-        <h1 className="text-xl font-bold text-foreground mb-4">{t("dashboard.title")}</h1>
+  const displayName = profileName.first_name || profileName.last_name
+    ? `${profileName.first_name} ${profileName.last_name}`.trim()
+    : user.email?.split("@")[0] || "Client";
 
-        <div className="flex gap-1 overflow-x-auto pb-2 mb-6 scrollbar-hide">
-          {TABS.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => { setActiveTab(tab.key); setSelectedOrder(null); }}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap border transition-all ${
-                activeTab === tab.key
-                  ? "bg-foreground text-card border-foreground"
-                  : "bg-card text-foreground border-border hover:border-foreground"
-              }`}
-            >
-              <tab.icon size={14} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={24} /></div>
-        ) : (
-          <>
-            {activeTab === "overview" && (
-              <>
-                {needsKyc && <KycBanner kycStatus={kycStatus} needsKyc={needsKyc} isOrderBlocked={isOrderBlocked} onStartKyc={() => setActiveTab("kyc")} />}
-                <OverviewTab orders={orders} user={user} />
-              </>
-            )}
-            {activeTab === "orders" && (
-              <OrdersTab
-                orders={orders}
-                selectedOrder={selectedOrder}
-                setSelectedOrder={setSelectedOrder}
-                orderItems={orderItems}
-                statusHistory={statusHistory}
-                onCancelSuccess={loadOrders}
-              />
-            )}
-            {activeTab === "tracking" && <TrackingTab orders={orders} />}
-            {activeTab === "returns" && <ReturnsList />}
-            {activeTab === "disputes" && <DisputesList />}
-            {activeTab === "referral" && <ReferralDashboard />}
-            {activeTab === "affiliate" && <AffiliateDashboard />}
-            {activeTab === "notifications" && <NotificationsTab />}
-            {activeTab === "messages" && <MessagesRedirectTab />}
-            {activeTab === "profile" && <ProfileTab user={user} />}
-            {activeTab === "kyc" && (
-              <div className="space-y-6">
-                <KycBanner kycStatus={kycStatus} needsKyc={needsKyc} isOrderBlocked={isOrderBlocked} onStartKyc={() => setShowKycForm(true)} />
-                {kycStatus !== "not_started" && !showKycForm && (
-                  <div className="bg-card rounded-lg p-5 border border-border space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-foreground">Statut de vérification</h3>
-                      <KycStatusBadge status={kycStatus} />
-                    </div>
-                    {kycVerification?.rejection_reason && (
-                      <p className="text-sm text-destructive">Raison : {kycVerification.rejection_reason}</p>
-                    )}
-                    {canResubmit && (
-                      <Button size="sm" onClick={() => setShowKycForm(true)}>Resoumettre les documents</Button>
-                    )}
-                  </div>
-                )}
-                {(showKycForm || kycStatus === "not_started") && kycStatus !== "pending" && kycStatus !== "approved" && (
-                  <div className="bg-card rounded-lg p-6 border border-border">
-                    <h3 className="font-bold text-foreground mb-4">Vérification d'identité</h3>
-                    <KycSubmissionForm existingKyc={canResubmit ? kycVerification : null} onSuccess={() => { setShowKycForm(false); refetchKyc(); }} />
-                  </div>
-                )}
-                {kycStatus === "approved" && (
-                  <div className="bg-card rounded-lg p-6 border border-border text-center space-y-2">
-                    <ShieldCheck size={32} className="mx-auto text-primary" />
-                    <h3 className="font-bold text-foreground">Identité vérifiée</h3>
-                    <p className="text-sm text-muted-foreground">Vous avez accès à toutes les options de paiement et livraison avancées.</p>
-                  </div>
-                )}
-              </div>
-            )}
-            {activeTab === "addresses" && <AddressesTab userId={user.id} />}
-          </>
-        )}
-      </main>
-      <Footer />
-    </div>
-  );
-}
-
-function OverviewTab({ orders, user }: { orders: OrderRow[]; user: any }) {
+  // KPI data (always visible)
   const validOrders = orders.filter((o) => !NON_REVENUE_ORDER_STATUSES.includes(o.status as never));
   const activeOrders = orders.filter((o) => ACTIVE_ORDER_STATUSES.includes(o.status as never)).length;
   const totalSpent = validOrders.reduce((sum, order) => {
@@ -303,38 +220,228 @@ function OverviewTab({ orders, user }: { orders: OrderRow[]; user: any }) {
   }, 0);
   const cancelledCount = orders.filter(o => o.status === "cancelled").length;
   const returnedCount = orders.filter(o => o.status === "returned").length;
+
+  const handleTabChange = (key: string) => {
+    setActiveTab(key);
+    setSelectedOrder(null);
+  };
+
+  const renderTabContent = () => {
+    if (loading) {
+      return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={24} /></div>;
+    }
+    return (
+      <>
+        {activeTab === "overview" && (
+          <>
+            {needsKyc && <KycBanner kycStatus={kycStatus} needsKyc={needsKyc} isOrderBlocked={isOrderBlocked} onStartKyc={() => setActiveTab("kyc")} />}
+            <LoyaltyProgress />
+          </>
+        )}
+        {activeTab === "orders" && (
+          <OrdersTab
+            orders={orders}
+            selectedOrder={selectedOrder}
+            setSelectedOrder={setSelectedOrder}
+            orderItems={orderItems}
+            statusHistory={statusHistory}
+            onCancelSuccess={loadOrders}
+          />
+        )}
+        {activeTab === "tracking" && <TrackingTab orders={orders} />}
+        {activeTab === "returns" && <ReturnsList />}
+        {activeTab === "disputes" && <DisputesList />}
+        {activeTab === "referral" && <ReferralDashboard />}
+        {activeTab === "affiliate" && <AffiliateDashboard />}
+        {activeTab === "notifications" && <NotificationsTab />}
+        {activeTab === "messages" && <MessagesRedirectTab />}
+        {activeTab === "profile" && <ProfileTab user={user} />}
+        {activeTab === "kyc" && (
+          <div className="space-y-6">
+            <KycBanner kycStatus={kycStatus} needsKyc={needsKyc} isOrderBlocked={isOrderBlocked} onStartKyc={() => setShowKycForm(true)} />
+            {kycStatus !== "not_started" && !showKycForm && (
+              <div className="bg-card rounded-lg p-5 border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-foreground">Statut de vérification</h3>
+                  <KycStatusBadge status={kycStatus} />
+                </div>
+                {kycVerification?.rejection_reason && (
+                  <p className="text-sm text-destructive">Raison : {kycVerification.rejection_reason}</p>
+                )}
+                {canResubmit && (
+                  <Button size="sm" onClick={() => setShowKycForm(true)}>Resoumettre les documents</Button>
+                )}
+              </div>
+            )}
+            {(showKycForm || kycStatus === "not_started") && kycStatus !== "pending" && kycStatus !== "approved" && (
+              <div className="bg-card rounded-lg p-6 border border-border">
+                <h3 className="font-bold text-foreground mb-4">Vérification d'identité</h3>
+                <KycSubmissionForm existingKyc={canResubmit ? kycVerification : null} onSuccess={() => { setShowKycForm(false); refetchKyc(); }} />
+              </div>
+            )}
+            {kycStatus === "approved" && (
+              <div className="bg-card rounded-lg p-6 border border-border text-center space-y-2">
+                <ShieldCheck size={32} className="mx-auto text-primary" />
+                <h3 className="font-bold text-foreground">Identité vérifiée</h3>
+                <p className="text-sm text-muted-foreground">Vous avez accès à toutes les options de paiement et livraison avancées.</p>
+              </div>
+            )}
+          </div>
+        )}
+        {activeTab === "addresses" && <AddressesTab userId={user.id} />}
+      </>
+    );
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">Bienvenue</p>
-          <p className="text-sm font-bold text-foreground mt-1 truncate">{user.email}</p>
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="container py-6">
+        {/* ═══ DESKTOP LAYOUT: Sidebar + Content ═══ */}
+        <div className="hidden lg:flex gap-6">
+          {/* Sidebar */}
+          <nav className="w-56 shrink-0">
+            <div className="sticky top-20 space-y-4">
+              {/* Profile header */}
+              <div className="bg-card border border-border rounded-lg p-4 text-center">
+                <div className="w-14 h-14 rounded-full bg-muted mx-auto mb-2 overflow-hidden border-2 border-border">
+                  {profileName.avatar_url ? (
+                    <img src={profileName.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <UserIcon size={22} className="text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm font-bold text-foreground truncate">Bienvenue, {profileName.first_name || "Client"}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+              </div>
+
+              {/* Navigation items */}
+              <div className="bg-card border border-border rounded-lg py-1">
+                {TABS.map(tab => {
+                  const isActive = activeTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => handleTabChange(tab.key)}
+                      className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${
+                        isActive
+                          ? "bg-primary/10 text-primary font-semibold border-r-2 border-primary"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      }`}
+                    >
+                      <tab.icon size={16} />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </nav>
+
+          {/* Main content */}
+          <div className="flex-1 min-w-0 space-y-4">
+            {/* KPI Cards — always visible */}
+            {!loading && (
+              <div className="grid grid-cols-3 xl:grid-cols-6 gap-3">
+                <div className="bg-card border border-border rounded-lg p-3">
+                  <p className="text-[11px] text-muted-foreground">Bienvenue</p>
+                  <p className="text-sm font-bold text-foreground mt-1 truncate">{displayName}</p>
+                </div>
+                <div className="bg-card border border-border rounded-lg p-3">
+                  <p className="text-[11px] text-muted-foreground">En cours</p>
+                  <p className="text-xl font-bold text-primary mt-1">{activeOrders}</p>
+                </div>
+                <div className="bg-card border border-border rounded-lg p-3">
+                  <p className="text-[11px] text-muted-foreground">Total commandes</p>
+                  <p className="text-xl font-bold text-foreground mt-1">{validOrders.length}</p>
+                </div>
+                <div className="bg-card border border-border rounded-lg p-3">
+                  <p className="text-[11px] text-muted-foreground">Total dépensé</p>
+                  <p className="text-xl font-bold text-foreground mt-1">${totalSpent.toFixed(2)}</p>
+                </div>
+                <div className="bg-card border border-border rounded-lg p-3">
+                  <p className="text-[11px] text-muted-foreground">Annulées</p>
+                  <p className="text-xl font-bold text-destructive mt-1">{cancelledCount}</p>
+                </div>
+                <div className="bg-card border border-border rounded-lg p-3">
+                  <p className="text-[11px] text-muted-foreground">Retournées</p>
+                  <p className="text-xl font-bold text-orange-500 mt-1">{returnedCount}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Tab content */}
+            {renderTabContent()}
+          </div>
         </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">En cours</p>
-          <p className="text-2xl font-bold text-primary mt-1">{activeOrders}</p>
+
+        {/* ═══ MOBILE LAYOUT: Classic pills ═══ */}
+        <div className="lg:hidden space-y-4">
+          {/* Mobile greeting */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-muted overflow-hidden border border-border shrink-0">
+              {profileName.avatar_url ? (
+                <img src={profileName.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center"><UserIcon size={16} className="text-muted-foreground" /></div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-foreground truncate">Bienvenue, {profileName.first_name || "Client"}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+            </div>
+          </div>
+
+          {/* Mobile KPIs */}
+          {!loading && (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-card border border-border rounded-lg p-2.5">
+                <p className="text-[10px] text-muted-foreground">En cours</p>
+                <p className="text-lg font-bold text-primary">{activeOrders}</p>
+              </div>
+              <div className="bg-card border border-border rounded-lg p-2.5">
+                <p className="text-[10px] text-muted-foreground">Commandes</p>
+                <p className="text-lg font-bold text-foreground">{validOrders.length}</p>
+              </div>
+              <div className="bg-card border border-border rounded-lg p-2.5">
+                <p className="text-[10px] text-muted-foreground">Dépensé</p>
+                <p className="text-lg font-bold text-foreground">${totalSpent.toFixed(2)}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Mobile horizontal scrollable tabs */}
+          <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide">
+            {TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => handleTabChange(tab.key)}
+                className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap border transition-all ${
+                  activeTab === tab.key
+                    ? "bg-foreground text-card border-foreground"
+                    : "bg-card text-foreground border-border hover:border-foreground"
+                }`}
+              >
+                <tab.icon size={14} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          {renderTabContent()}
         </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">Total commandes</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{validOrders.length}</p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">Total dépensé</p>
-          <p className="text-2xl font-bold text-foreground mt-1">${totalSpent.toFixed(2)}</p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">Annulées</p>
-          <p className="text-2xl font-bold text-destructive mt-1">{cancelledCount}</p>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <p className="text-xs text-muted-foreground">Retournées</p>
-          <p className="text-2xl font-bold text-orange-500 mt-1">{returnedCount}</p>
-        </div>
-      </div>
-      <LoyaltyProgress />
+      </main>
+      <Footer />
     </div>
   );
 }
+
+// OverviewTab removed — KPIs are now always visible above the tab content.
+// The "overview" tab now only shows LoyaltyProgress (rendered inline in renderTabContent).
+
 
 function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, statusHistory, onCancelSuccess }: {
   orders: OrderRow[];
