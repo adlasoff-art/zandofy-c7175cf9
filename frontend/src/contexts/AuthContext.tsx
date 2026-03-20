@@ -59,12 +59,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Update last_login_at and login_count on login
+  // Update last_login_at and login_count on login (atomic increment via RPC-style)
   const trackLogin = useCallback(async (userId: string) => {
     try {
       logLoginEvent(userId);
+      // First read current count, then update — two separate calls to avoid race
+      const { data: profile } = await fromTable("profiles")
+        .select("login_count")
+        .eq("id", userId)
+        .single();
+      const currentCount = profile?.login_count ?? 0;
       await fromTable("profiles")
-        .update({ last_login_at: new Date().toISOString(), login_count: (await fromTable("profiles").select("login_count").eq("id", userId).single()).data?.login_count + 1 || 1 })
+        .update({ last_login_at: new Date().toISOString(), login_count: currentCount + 1 })
         .eq("id", userId);
     } catch { /* silent */ }
   }, []);
