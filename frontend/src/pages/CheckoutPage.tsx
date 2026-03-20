@@ -189,7 +189,7 @@ export default function CheckoutPage() {
 
   const loyaltyDiscount = loyaltyPct > 0 ? (subtotal * loyaltyPct) / 100 : 0;
   const discountAmount = couponDiscount + loyaltyDiscount;
-  const pointsDiscount = usePoints ? Math.min(pointsToUse, pointsBalance) : 0;
+  const pointsDiscount = usePoints ? Math.min(pointsToUse, pointsBalance) / pointsPerDollar : 0;
 
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
