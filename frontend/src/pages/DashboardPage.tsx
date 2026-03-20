@@ -1080,7 +1080,7 @@ function ProfileTab({ user }: { user: any }) {
   const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
-    supabase.from("profiles").select("first_name, last_name, phone, avatar_url, gender, date_of_birth").eq("id", user.id).maybeSingle().then(({ data }) => {
+    supabase.from("profiles").select("first_name, last_name, phone, avatar_url, gender, date_of_birth, nationality, residence_address, residence_city, preferred_language, preferred_contact_channel").eq("id", user.id).maybeSingle().then(({ data }) => {
       if (data) {
         setProfile({
           first_name: data.first_name || "",
@@ -1089,6 +1089,11 @@ function ProfileTab({ user }: { user: any }) {
           avatar_url: data.avatar_url || "",
           gender: (data as any).gender || "",
           date_of_birth: (data as any).date_of_birth || "",
+          nationality: (data as any).nationality || "",
+          residence_address: (data as any).residence_address || "",
+          residence_city: (data as any).residence_city || "",
+          preferred_language: (data as any).preferred_language || "fr",
+          preferred_contact_channel: (data as any).preferred_contact_channel || "chat",
         });
       }
       setLoading(false);
