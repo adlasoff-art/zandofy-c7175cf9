@@ -1247,24 +1247,25 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
+      const updated = data as any;
       setProfile({
-        first_name: data.first_name || "",
-        last_name: data.last_name || "",
-        phone: data.phone || "",
-        avatar_url: data.avatar_url || "",
-        gender: data.gender || "",
-        date_of_birth: data.date_of_birth || "",
-        nationality: data.nationality || "",
-        residence_address: data.residence_address || "",
-        residence_city: data.residence_city || "",
-        preferred_language: data.preferred_language || "fr",
-        preferred_contact_channel: data.preferred_contact_channel || "chat",
+        first_name: updated.first_name || "",
+        last_name: updated.last_name || "",
+        phone: updated.phone || "",
+        avatar_url: updated.avatar_url || "",
+        gender: updated.gender || "",
+        date_of_birth: updated.date_of_birth || "",
+        nationality: updated.nationality || "",
+        residence_address: updated.residence_address || "",
+        residence_city: updated.residence_city || "",
+        preferred_language: updated.preferred_language || "fr",
+        preferred_contact_channel: updated.preferred_contact_channel || "chat",
       });
       await supabase.auth.updateUser({
         data: {
-          first_name: data.first_name || null,
-          last_name: data.last_name || null,
-          full_name: [data.first_name, data.last_name].filter(Boolean).join(" ") || null,
+          first_name: updated.first_name || null,
+          last_name: updated.last_name || null,
+          full_name: [updated.first_name, updated.last_name].filter(Boolean).join(" ") || null,
         },
       });
       await onProfileUpdated?.();
