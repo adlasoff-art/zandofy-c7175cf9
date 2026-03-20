@@ -29,14 +29,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isBanned, setIsBanned] = useState(false);
 
   const ensureProfile = useCallback(async (authUser: User) => {
-    // Only INSERT if profile doesn't exist yet — never overwrite existing data
     const { data: existing } = await supabase
       .from("profiles")
-      .select("id")
+      .select("id, email, first_name, last_name")
       .eq("id", authUser.id)
       .maybeSingle();
-
-    if (existing) return; // Profile already exists, don't overwrite
 
     const metadata = (authUser.user_metadata ?? {}) as Record<string, unknown>;
     const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
@@ -45,6 +42,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const firstName = firstNameMeta || (fullName ? fullName.split(" ")[0] : null);
     const lastName = lastNameMeta || (fullName.includes(" ") ? fullName.split(" ").slice(1).join(" ") : null);
+
+    if (existing) {
+      const patch: Record<string, string | null> = {};
+
+      if (!existing.email && authUser.email) patch.email = authUser.email;
+      if (!existing.first_name && firstName) patch.first_name = firstName;
+      if (!existing.last_name && lastName) patch.last_name = lastName;
+
+      if (Object.keys(patch).length > 0) {
+        const { error } = await supabase
+          .from("profiles")
+          .update(patch)
+          .eq("id", authUser.id)
+          .select("id")
+          .maybeSingle();
+
+        if (error) {
+          console.warn("ensureProfile backfill failed", error.message);
+        }
+      }
+
+      return;
+    }
 
     const { error } = await supabase.from("profiles").insert({
       id: authUser.id,

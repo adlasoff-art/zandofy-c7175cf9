@@ -70,9 +70,10 @@ export function AdminSidebar() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const displayName = profile?.first_name
-    ? `${profile.first_name} ${profile.last_name || ""}`.trim()
-    : user?.email?.split("@")[0] || "";
+  const displayName = [profile?.first_name, profile?.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim() || "Administrateur";
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
