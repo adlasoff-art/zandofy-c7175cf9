@@ -373,10 +373,10 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     let productId = editing?.id;
 
     if (editing) {
-      const { error } = await supabase.from("products").update(payload).eq("id", editing.id);
+      const { error } = await (supabase.from("products").update(payload as any) as any).eq("id", editing.id);
       if (error) { toast.error("Erreur lors de la mise à jour"); setSaving(false); return; }
     } else {
-      const { data, error } = await supabase.from("products").insert(payload).select("id").single();
+      const { data, error } = await (supabase.from("products").insert(payload as any) as any).select("id").single();
       if (error || !data) { console.error("Product insert error:", error); toast.error("Erreur lors de la création : " + (error?.message || "inconnue")); setSaving(false); return; }
       productId = data.id;
     }
