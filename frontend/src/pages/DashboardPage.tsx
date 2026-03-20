@@ -1386,6 +1386,9 @@ function AddressesTab({ userId }: { userId: string }) {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ label: "Domicile", first_name: "", last_name: "", phone: "", address: "", city: "", country: "Sénégal", postal_code: "" });
   const [saving, setSaving] = useState(false);
+  const [isKycVerified, setIsKycVerified] = useState(false);
+
+  const maxAddresses = isKycVerified ? 5 : 2;
 
   const fetchAddresses = useCallback(async () => {
     setLoading(true);
@@ -1395,6 +1398,13 @@ function AddressesTab({ userId }: { userId: string }) {
   }, [userId]);
 
   useEffect(() => { fetchAddresses(); }, [fetchAddresses]);
+
+  // Check KYC status
+  useEffect(() => {
+    supabase.rpc("is_kyc_verified", { p_user_id: userId }).then(({ data }) => {
+      setIsKycVerified(data === true);
+    });
+  }, [userId]);
 
   const resetForm = () => {
     setForm({ label: "Domicile", first_name: "", last_name: "", phone: "", address: "", city: "", country: "Sénégal", postal_code: "" });
