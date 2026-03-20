@@ -89,6 +89,7 @@ export function ReferralDashboard() {
       if (row.key === "referral_settings") {
         setGiftCardEnabled(!!v.gift_card_enabled);
         setPointsExpiryMonths(Number(v.points_expiry_months) || 12);
+        setPointsPerDollar(Number(v.points_per_dollar) || 50);
       }
     });
 
