@@ -1275,6 +1275,7 @@ function ProfileTab({ user }: { user: any }) {
               <option value="sms">SMS</option>
               <option value="email">Email</option>
             </select>
+          </div>
           <Button onClick={handleSave} disabled={saving} className="mt-2">
             {saving ? <Loader2 className="animate-spin mr-2" size={14} /> : <Save size={14} className="mr-2" />}
             Sauvegarder
