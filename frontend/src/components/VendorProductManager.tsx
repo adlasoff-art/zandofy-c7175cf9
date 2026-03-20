@@ -286,6 +286,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       material: product.material || "",
       origin_country: product.origin_country || "",
       category_id: product.category_id || "",
+      trend_tag_id: (product as any).trend_tag_id || "",
       flash_timer_enabled: product.flash_timer_enabled || false,
       promo_start_date: toLocalDatetime(product.promo_start_date),
       promo_end_date: toLocalDatetime(product.promo_end_date),
