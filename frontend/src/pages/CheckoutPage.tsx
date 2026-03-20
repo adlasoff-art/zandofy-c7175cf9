@@ -154,6 +154,13 @@ export default function CheckoutPage() {
     supabase.from("zando_points").select("balance").eq("user_id", user.id).maybeSingle().then(({ data }) => {
       if (data) setPointsBalance(Number(data.balance));
     });
+    // Fetch points_per_dollar rate
+    supabase.from("platform_settings").select("value").eq("key", "referral_settings").maybeSingle().then(({ data }) => {
+      if (data?.value) {
+        const v = data.value as any;
+        setPointsPerDollar(Number(v.points_per_dollar) || 50);
+      }
+    });
   }, [user]);
 
   // Cleanup realtime subscription on unmount
