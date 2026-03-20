@@ -1109,6 +1109,11 @@ function ProfileTab({ user }: { user: any }) {
       avatar_url: profile.avatar_url || null,
       gender: profile.gender || null,
       date_of_birth: profile.date_of_birth || null,
+      nationality: profile.nationality || null,
+      residence_address: profile.residence_address || null,
+      residence_city: profile.residence_city || null,
+      preferred_language: profile.preferred_language || 'fr',
+      preferred_contact_channel: profile.preferred_contact_channel || 'chat',
     }).eq("id", user.id);
     setSaving(false);
     if (error) {
