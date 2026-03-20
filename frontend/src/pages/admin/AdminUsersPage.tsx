@@ -200,13 +200,14 @@ export default function AdminUsersPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-muted-foreground border-b border-border bg-muted/30">
-                  <th className="text-left p-3 font-medium">Utilisateur</th>
-                  <th className="text-left p-3 font-medium">Rôle(s)</th>
-                  <th className="text-left p-3 font-medium hidden sm:table-cell">Statut</th>
-                  <th className="text-left p-3 font-medium hidden md:table-cell">Inscrit le</th>
-                  <th className="text-right p-3 font-medium">Détails</th>
-                </tr>
+                 <tr className="text-xs text-muted-foreground border-b border-border bg-muted/30">
+                   <th className="text-left p-3 font-medium w-16">ID</th>
+                   <th className="text-left p-3 font-medium">Utilisateur</th>
+                   <th className="text-left p-3 font-medium">Rôle(s)</th>
+                   <th className="text-left p-3 font-medium hidden sm:table-cell">Statut</th>
+                   <th className="text-left p-3 font-medium hidden md:table-cell">Inscrit le</th>
+                   <th className="text-right p-3 font-medium">Détails</th>
+                 </tr>
               </thead>
               <tbody>
                 {paginated.map((u) => (
