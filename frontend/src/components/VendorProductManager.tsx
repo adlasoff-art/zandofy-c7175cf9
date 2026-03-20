@@ -555,6 +555,19 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
               ))}
             </select>
           </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Tag Tendance</label>
+            <select
+              className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md"
+              value={form.trend_tag_id}
+              onChange={(e) => setForm({ ...form, trend_tag_id: e.target.value })}
+            >
+              <option value="">— Aucun —</option>
+              {trendTags.map((t) => (
+                <option key={t.id} value={t.id}>{t.name_fr}</option>
+              ))}
+            </select>
+          </div>
           <div className="flex gap-4">
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.is_new || false} onChange={(e) => setForm({ ...form, is_new: e.target.checked })} />
