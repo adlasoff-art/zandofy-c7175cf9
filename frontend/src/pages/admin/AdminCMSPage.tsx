@@ -75,6 +75,7 @@ const AdminCMSPage: React.FC = () => {
         {tab === "menus" && <MenusTab />}
         {tab === "pages" && <PagesTab />}
         {tab === "sections" && <SectionsTab />}
+        {tab === "trends" && <TrendTagsTab />}
         {tab === "footer" && <FooterTab />}
         {tab === "texts" && <TextsTab />}
         {tab === "legal" && <LegalPagesTab />}
