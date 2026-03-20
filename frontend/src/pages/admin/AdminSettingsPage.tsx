@@ -420,6 +420,13 @@ export default function AdminSettingsPage() {
                   </div>
                   <Switch checked={referral.gift_card_enabled} onCheckedChange={(checked) => setReferral(prev => ({ ...prev, gift_card_enabled: checked }))} />
                 </div>
+                <div className="mt-3">
+                  <label className="text-xs text-muted-foreground block mb-1">Taux de conversion (points pour 1$)</label>
+                  <input type="number" min={1} max={500} step={1} value={referral.points_per_dollar} onChange={(e) => setReferral(prev => ({ ...prev, points_per_dollar: Math.max(1, Number(e.target.value)) }))} className={inputClass} />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {referral.points_per_dollar} ZandoPoints = $1 USD · Exemple : 500 pts = ${(500 / referral.points_per_dollar).toFixed(2)}
+                  </p>
+                </div>
               </>
             )}
           </div>
