@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fromTable } from "@/lib/supabase-helpers";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Loader2, AlertTriangle, Ban, ShieldCheck, Mail, ChevronRight, X, ClipboardList } from "lucide-react";
+import {
+  Loader2, AlertTriangle, Ban, ShieldCheck, Mail, ChevronRight, X,
+  ClipboardList, Activity, Brain, UserCheck, Eye
+} from "lucide-react";
 import type { AppRole } from "@/hooks/use-roles";
 
 const ALL_ROLES: AppRole[] = ["admin", "manager", "vendor", "shipper", "rider"];
@@ -33,6 +37,26 @@ const auditActionLabels: Record<string, string> = {
   remove_role: "Rôle retiré",
   warning: "Avertissement",
   reset_password: "Réinit. mot de passe",
+  impersonation_start: "Impersonation démarrée",
+  impersonation_end: "Impersonation terminée",
+};
+
+const activityActionLabels: Record<string, string> = {
+  login: "Connexion",
+  logout: "Déconnexion",
+  profile_update: "Mise à jour profil",
+  search: "Recherche",
+  page_view: "Vue page",
+  address_add: "Adresse ajoutée",
+  address_delete: "Adresse supprimée",
+  payment_method_add: "Méthode paiement ajoutée",
+  payment_method_delete: "Méthode paiement supprimée",
+  order_placed: "Commande passée",
+  order_cancelled: "Commande annulée",
+  kyc_submitted: "KYC soumis",
+  password_changed: "Mot de passe changé",
+  settings_changed: "Paramètres modifiés",
+  impersonated: "Impersonation par admin",
 };
 
 interface UserProfile {
@@ -83,6 +107,8 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
   const [showBanConfirm, setShowBanConfirm] = useState(false);
   const [showAddRole, setShowAddRole] = useState(false);
   const [showAuditLog, setShowAuditLog] = useState(false);
+  const [showActivityLogs, setShowActivityLogs] = useState(false);
+  const [showAiAnalysis, setShowAiAnalysis] = useState(false);
 
   // Fetch warnings
   const { data: warnings = [] } = useQuery({
@@ -101,11 +127,16 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
   const { data: orderStats } = useQuery({
     queryKey: ["user-order-stats", user.id],
     queryFn: async () => {
-      const { count } = await supabase
+      const { count: total } = await supabase
         .from("orders")
         .select("id", { count: "exact", head: true })
         .eq("user_id", user.id);
-      return { total: count || 0 };
+      const { count: cancelled } = await supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("status", "cancelled");
+      return { total: total || 0, cancelled: cancelled || 0 };
     },
   });
 
@@ -147,6 +178,67 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
       return map;
     },
     enabled: auditLogs.length > 0,
+  });
+
+  // Fetch activity logs
+  const { data: activityLogs = [], isLoading: activityLoading } = useQuery({
+    queryKey: ["user-activity-logs", user.id],
+    queryFn: async () => {
+      const { data } = await fromTable("user_activity_logs")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      return data ?? [];
+    },
+    enabled: showActivityLogs,
+  });
+
+  // Fetch vendor→customer ratings
+  const { data: customerRatings } = useQuery({
+    queryKey: ["customer-ratings", user.id],
+    queryFn: async () => {
+      const { data } = await fromTable("customer_ratings")
+        .select("rating")
+        .eq("customer_id", user.id);
+      if (!data || data.length === 0) return null;
+      const avg = data.reduce((s: number, r: any) => s + r.rating, 0) / data.length;
+      return { avg: Math.round(avg * 10) / 10, count: data.length };
+    },
+  });
+
+  // AI analysis
+  const aiAnalysisMutation = useMutation({
+    mutationFn: async (analysisType: "risk" | "segmentation") => {
+      const res = await supabase.functions.invoke("ai-user-analysis", {
+        body: { targetUserId: user.id, analysisType },
+      });
+      if (res.error) throw new Error(res.error.message);
+      return res.data;
+    },
+    onError: (e: any) => toast.error(`Analyse IA échouée: ${e.message}`),
+  });
+
+  // Impersonation
+  const impersonateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await supabase.functions.invoke("impersonate-user", {
+        body: { action: "start_impersonation", targetUserId: user.id },
+      });
+      if (res.error) throw new Error(res.error.message);
+      if (res.data?.error) throw new Error(res.data.error);
+      return res.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["user-audit-logs", user.id] });
+      toast.success(`Impersonation démarrée pour ${data.target?.first_name || data.target?.email}`);
+      // Open user's dashboard in new tab
+      const url = new URL(window.location.origin);
+      url.pathname = "/dashboard";
+      url.searchParams.set("impersonate", user.id);
+      window.open(url.toString(), "_blank");
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   // Send warning
@@ -241,6 +333,9 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
   });
 
   const availableRoles = ALL_ROLES.filter(r => !user.roles.includes(r));
+  const cancellationRate = orderStats && orderStats.total > 0
+    ? Math.round((orderStats.cancelled / orderStats.total) * 100)
+    : 0;
 
   return (
     <>
@@ -277,18 +372,22 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
           </div>
 
           {/* Quick stats */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-2">
             <div className="bg-muted/30 rounded-xl p-3 text-center">
               <p className="text-lg font-bold text-foreground">{orderStats?.total ?? "—"}</p>
               <p className="text-[10px] text-muted-foreground">Commandes</p>
             </div>
             <div className="bg-muted/30 rounded-xl p-3 text-center">
-              <p className="text-lg font-bold text-foreground">{warnings.length}</p>
-              <p className="text-[10px] text-muted-foreground">Avertissements</p>
+              <p className="text-lg font-bold text-foreground">{cancellationRate}%</p>
+              <p className="text-[10px] text-muted-foreground">Annulations</p>
             </div>
             <div className="bg-muted/30 rounded-xl p-3 text-center">
-              <p className="text-lg font-bold text-foreground">{user.roles.length || 0}</p>
-              <p className="text-[10px] text-muted-foreground">Rôles</p>
+              <p className="text-lg font-bold text-foreground">{customerRatings ? `${customerRatings.avg}★` : "—"}</p>
+              <p className="text-[10px] text-muted-foreground">Note vendeur</p>
+            </div>
+            <div className="bg-muted/30 rounded-xl p-3 text-center">
+              <p className="text-lg font-bold text-foreground">{warnings.length}</p>
+              <p className="text-[10px] text-muted-foreground">Alertes</p>
             </div>
           </div>
 
@@ -386,6 +485,18 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
           {/* Actions */}
           <div className="space-y-2">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</h4>
+
+            {/* Impersonation */}
+            <button
+              onClick={() => impersonateMutation.mutate()}
+              disabled={impersonateMutation.isPending}
+              className="w-full flex items-center gap-3 px-4 py-3 bg-blue-500/5 rounded-xl hover:bg-blue-500/10 transition-colors text-sm text-blue-600 dark:text-blue-400"
+            >
+              <Eye size={16} />
+              <span className="flex-1 text-left">Voir comme cet utilisateur</span>
+              {impersonateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <ChevronRight size={14} className="text-muted-foreground" />}
+            </button>
+
             <button
               onClick={() => resetPasswordMutation.mutate()}
               disabled={resetPasswordMutation.isPending}
@@ -498,6 +609,143 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
               ))}
               {warnings.length === 0 && <p className="text-xs text-muted-foreground italic text-center py-2">Aucun avertissement</p>}
             </div>
+          </div>
+
+          {/* AI Analysis */}
+          <div className="space-y-3">
+            <button
+              onClick={() => setShowAiAnalysis(!showAiAnalysis)}
+              className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+            >
+              <Brain size={14} />
+              Analyse IA {showAiAnalysis ? "▲" : "▼"}
+            </button>
+            {showAiAnalysis && (
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => aiAnalysisMutation.mutate("segmentation")}
+                    disabled={aiAnalysisMutation.isPending}
+                    className="flex-1 py-2 text-xs rounded-lg border border-border hover:bg-primary/5 hover:border-primary/30 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <UserCheck size={12} />
+                    {aiAnalysisMutation.isPending && aiAnalysisMutation.variables === "segmentation" ? <Loader2 size={12} className="animate-spin" /> : "Segmentation"}
+                  </button>
+                  <button
+                    onClick={() => aiAnalysisMutation.mutate("risk")}
+                    disabled={aiAnalysisMutation.isPending}
+                    className="flex-1 py-2 text-xs rounded-lg border border-border hover:bg-destructive/5 hover:border-destructive/30 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <AlertTriangle size={12} />
+                    {aiAnalysisMutation.isPending && aiAnalysisMutation.variables === "risk" ? <Loader2 size={12} className="animate-spin" /> : "Score risque"}
+                  </button>
+                </div>
+
+                {aiAnalysisMutation.data && (
+                  <div className="p-4 bg-muted/20 rounded-xl space-y-3">
+                    {aiAnalysisMutation.data.stats && (
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="text-center">
+                          <p className="font-bold text-foreground">${aiAnalysisMutation.data.stats.total_spent}</p>
+                          <p className="text-[10px] text-muted-foreground">Dépensé</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="font-bold text-foreground">${aiAnalysisMutation.data.stats.avg_basket}</p>
+                          <p className="text-[10px] text-muted-foreground">Panier moyen</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="font-bold text-foreground">{aiAnalysisMutation.data.stats.cancellation_rate}%</p>
+                          <p className="text-[10px] text-muted-foreground">Taux annulation</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {aiAnalysisMutation.data.analysis && (
+                      <div className="space-y-2">
+                        {aiAnalysisMutation.data.analysis.segment && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium capitalize">
+                              {aiAnalysisMutation.data.analysis.segment}
+                            </span>
+                            {aiAnalysisMutation.data.analysis.risk_score != null && (
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                                aiAnalysisMutation.data.analysis.risk_score > 70 ? "bg-destructive/10 text-destructive" :
+                                aiAnalysisMutation.data.analysis.risk_score > 40 ? "bg-amber-100 text-amber-700" :
+                                "bg-emerald-100 text-emerald-700"
+                              }`}>
+                                Risque: {aiAnalysisMutation.data.analysis.risk_score}/100
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {aiAnalysisMutation.data.analysis.summary && (
+                          <p className="text-xs text-foreground">{aiAnalysisMutation.data.analysis.summary}</p>
+                        )}
+                        {aiAnalysisMutation.data.analysis.flags?.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-semibold text-muted-foreground uppercase">Signalements</p>
+                            {aiAnalysisMutation.data.analysis.flags.map((f: string, i: number) => (
+                              <p key={i} className="text-xs text-amber-600 dark:text-amber-400">⚠ {f}</p>
+                            ))}
+                          </div>
+                        )}
+                        {aiAnalysisMutation.data.analysis.recommendations?.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-semibold text-muted-foreground uppercase">Recommandations</p>
+                            {aiAnalysisMutation.data.analysis.recommendations.map((r: string, i: number) => (
+                              <p key={i} className="text-xs text-foreground">• {r}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Activity Logs */}
+          <div className="space-y-3">
+            <button
+              onClick={() => setShowActivityLogs(!showActivityLogs)}
+              className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+            >
+              <Activity size={14} />
+              Logs d'activité {showActivityLogs ? "▲" : "▼"}
+            </button>
+            {showActivityLogs && (
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {activityLoading && <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-muted-foreground" /></div>}
+                {!activityLoading && activityLogs.length === 0 && (
+                  <p className="text-xs text-muted-foreground italic text-center py-2">Aucun log d'activité</p>
+                )}
+                {activityLogs.map((log: any) => (
+                  <div key={log.id} className="flex items-start gap-2 p-2.5 bg-muted/10 rounded-lg border border-border/50">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
+                          {activityActionLabels[log.action] || log.action}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {format(new Date(log.created_at), "d MMM yyyy HH:mm:ss", { locale: fr })}
+                        </span>
+                      </div>
+                      {log.metadata && (
+                        <div className="text-[10px] text-foreground/70 mt-0.5 space-x-2">
+                          {log.metadata.page_path && <span>📄 {log.metadata.page_path}</span>}
+                          {log.metadata.browser && <span>🌐 {log.metadata.browser}</span>}
+                          {log.metadata.device && <span>📱 {log.metadata.device}</span>}
+                          {log.metadata.os && <span>💻 {log.metadata.os}</span>}
+                          {log.metadata.impersonated_by && <span className="text-amber-600">👁 par admin</span>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Audit Log */}
