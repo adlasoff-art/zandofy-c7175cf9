@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
+import { logLoginEvent, logLogoutEvent } from "@/hooks/use-activity-logger";
+import { fromTable } from "@/lib/supabase-helpers";
 
 interface AuthContextType {
   user: User | null;
@@ -57,13 +59,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Update last_login_at and login_count on login
+  const trackLogin = useCallback(async (userId: string) => {
+    try {
+      logLoginEvent(userId);
+      await fromTable("profiles")
+        .update({ last_login_at: new Date().toISOString(), login_count: (await fromTable("profiles").select("login_count").eq("id", userId).single()).data?.login_count + 1 || 1 })
+        .eq("id", userId);
+    } catch { /* silent */ }
+  }, []);
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
           void ensureProfile(session.user);
+          if (event === "SIGNED_IN") {
+            void trackLogin(session.user.id);
+          }
         }
         setLoading(false);
       }
@@ -77,12 +92,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setLoading(false);
     }).catch(() => {
-      // Handle LockManager timeout gracefully
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, [ensureProfile]);
+  }, [ensureProfile, trackLogin]);
 
   // Check ban status when user changes
   useEffect(() => {
@@ -101,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const signOut = async () => {
+    if (user?.id) logLogoutEvent(user.id);
     await supabase.auth.signOut();
   };
 
