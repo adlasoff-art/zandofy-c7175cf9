@@ -2320,6 +2320,7 @@ export type Database = {
           stock_quantity: number | null
           store_id: string | null
           style: string | null
+          trend_tag_id: string | null
           updated_at: string
           vendor_extra_margin: number | null
           verified_years: number | null
@@ -2370,6 +2371,7 @@ export type Database = {
           stock_quantity?: number | null
           store_id?: string | null
           style?: string | null
+          trend_tag_id?: string | null
           updated_at?: string
           vendor_extra_margin?: number | null
           verified_years?: number | null
@@ -2420,6 +2422,7 @@ export type Database = {
           stock_quantity?: number | null
           store_id?: string | null
           style?: string | null
+          trend_tag_id?: string | null
           updated_at?: string
           vendor_extra_margin?: number | null
           verified_years?: number | null
@@ -2440,6 +2443,13 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_trend_tag_id_fkey"
+            columns: ["trend_tag_id"]
+            isOneToOne: false
+            referencedRelation: "trend_tags"
             referencedColumns: ["id"]
           },
         ]
@@ -3382,6 +3392,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      trend_tags: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          name_fr: string
+          slug: string
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          name_fr: string
+          slug: string
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          name_fr?: string
+          slug?: string
+          sort_order?: number | null
+        }
+        Relationships: []
       }
       user_activity_logs: {
         Row: {

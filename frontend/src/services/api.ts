@@ -32,6 +32,15 @@ export interface Product {
   lengthCm?: number;
   widthCm?: number;
   heightCm?: number;
+  trendTagId?: string;
+}
+
+export interface TrendTag {
+  id: string;
+  name: string;
+  nameFr: string;
+  slug: string;
+  sortOrder: number;
 }
 
 export interface PricingTierRow {
@@ -52,15 +61,12 @@ export interface Category {
 
 // Map Supabase row to Product interface
 function mapProduct(row: any): Product {
-  // Determine verification from the store (not product's own verified_years)
   const storeData = row.stores;
   const storeIsVerified = storeData?.is_verified ?? false;
   const storeVerifiedYears = storeData?.verified_years_override ?? storeData?.verified_years ?? 0;
 
-  // Use admin overrides for review_count and rating if set, otherwise use real DB values
   const realReviewCount = row.review_count_override ?? row.review_count ?? 0;
   const realRating = Number(row.rating) || 0;
-  const realSalesCount = row.sales_count_override ?? 0;
 
   const p: Product = {
     id: row.id,
@@ -81,7 +87,6 @@ function mapProduct(row: any): Product {
     colors: row.product_colors?.map((c: any) => c.color_hex) || [],
     sizes: row.product_sizes?.map((s: any) => s.size_label) || [],
     moq: row.moq || 1,
-    // Verification comes from the STORE, not the product
     verifiedYears: storeIsVerified ? storeVerifiedYears : 0,
     originCountry: row.origin_country || "",
     sku: row.sku || "",
@@ -94,15 +99,12 @@ function mapProduct(row: any): Product {
     lengthCm: row.length_cm ? Number(row.length_cm) : undefined,
     widthCm: row.width_cm ? Number(row.width_cm) : undefined,
     heightCm: row.height_cm ? Number(row.height_cm) : undefined,
+    trendTagId: row.trend_tag_id || undefined,
   };
-  // Attach store verification status
   (p as any).storeIsVerified = storeIsVerified;
-  // Attach all gallery images for the product page
   (p as any).galleryImages = row.product_images || [];
-  // Attach promo dates for flash sales
   (p as any).promoEndDate = row.promo_end_date || null;
   (p as any).promoStartDate = row.promo_start_date || null;
-  // Attach full color details for variant drawer
   (p as any).productColors = (row.product_colors || []).map((c: any) => ({
     hex: c.color_hex,
     name: c.color_name || "",
@@ -123,22 +125,39 @@ const PRODUCT_SELECT = `
 export async function fetchProducts(params?: {
   category?: string;
   limit?: number;
+  offset?: number;
   sale?: boolean;
+  trendTagId?: string;
+  categoryId?: string;
+  orderBy?: "popular" | "newest" | "default";
 }): Promise<Product[]> {
   let query = supabase
     .from("products")
     .select(PRODUCT_SELECT)
-    .eq("publish_status", "published")
-    .order("created_at", { ascending: false });
+    .eq("publish_status", "published");
+
+  // Order
+  if (params?.orderBy === "popular") {
+    query = query.order("review_count", { ascending: false });
+  } else {
+    query = query.order("created_at", { ascending: false });
+  }
 
   if (params?.category) {
-    // Filter by category name (subcategory)
     query = query.eq("categories.name", params.category);
+  }
+  if (params?.categoryId) {
+    query = query.eq("category_id", params.categoryId);
+  }
+  if (params?.trendTagId) {
+    query = (query as any).eq("trend_tag_id", params.trendTagId);
   }
   if (params?.sale) {
     query = query.eq("is_sale", true);
   }
-  if (params?.limit) {
+  if (params?.offset) {
+    query = query.range(params.offset, params.offset + (params?.limit || 24) - 1);
+  } else if (params?.limit) {
     query = query.limit(params.limit);
   }
 
@@ -150,12 +169,32 @@ export async function fetchProducts(params?: {
 
   let results = (data || []).map(mapProduct);
 
-  // Filter out products that didn't match category join
   if (params?.category) {
     results = results.filter((p) => p.category === params.category);
   }
 
   return results;
+}
+
+export async function fetchTrendTags(): Promise<TrendTag[]> {
+  const { data, error } = await supabase
+    .from("trend_tags" as any)
+    .select("id, name, name_fr, slug, sort_order")
+    .eq("is_active", true)
+    .order("sort_order");
+
+  if (error) {
+    console.error("Error fetching trend tags:", error);
+    return [];
+  }
+
+  return (data || []).map((t: any) => ({
+    id: t.id,
+    name: t.name,
+    nameFr: t.name_fr,
+    slug: t.slug,
+    sortOrder: t.sort_order,
+  }));
 }
 
 export async function fetchFlashSaleProducts(): Promise<Product[]> {
@@ -175,7 +214,6 @@ export async function fetchFlashSaleProducts(): Promise<Product[]> {
 }
 
 export async function fetchCategories(): Promise<Category[]> {
-  // Get parent categories
   const { data: parents, error: pErr } = await supabase
     .from("categories")
     .select("id, name, name_fr, icon")
@@ -187,7 +225,6 @@ export async function fetchCategories(): Promise<Category[]> {
     return [];
   }
 
-  // Get subcategories
   const { data: subs, error: sErr } = await supabase
     .from("categories")
     .select("name, name_fr, parent_id")
@@ -220,7 +257,6 @@ export async function fetchProductBySlug(
     stores!products_store_id_fkey(id, name, logo_url, is_verified, verified_years, verified_years_override, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, whatsapp_number, rating, response_rate, response_time)
   `;
 
-  // Try slug first, fall back to UUID for backward compatibility
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
 
   const { data, error } = await (supabase
@@ -236,10 +272,8 @@ export async function fetchProductBySlug(
   }
 
   const product = mapProduct(data);
-  // Attach store data for PDP
   (product as any).store = (data as any).stores;
   
-  // Fetch seller rank for this product's category
   if (data.category_id && data.store_id) {
     try {
       const { data: rankings } = await supabase.rpc("get_category_top_sellers", {

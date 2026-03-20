@@ -68,6 +68,7 @@ const EMPTY_FORM = {
   material: "",
   origin_country: "",
   category_id: "" as string,
+  trend_tag_id: "" as string,
   flash_timer_enabled: false,
   promo_start_date: "",
   promo_end_date: "",
@@ -102,6 +103,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
   const { subscription, tierConfig, canAddProduct } = useVendorSubscription(storeId);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [trendTags, setTrendTags] = useState<{ id: string; name_fr: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Product | null>(null);
   const [creating, setCreating] = useState(false);
@@ -128,9 +130,9 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await (supabase
       .from("products")
-      .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, origin_country, category_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status")
+      .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, origin_country, category_id, trend_tag_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status") as any)
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
 
@@ -165,6 +167,9 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     loadProducts();
     supabase.from("categories").select("id, name_fr").then(({ data }) => {
       if (data) setCategories(data);
+    });
+    (supabase as any).from("trend_tags").select("id, name_fr").eq("is_active", true).order("sort_order").then(({ data }: any) => {
+      if (data) setTrendTags(data);
     });
   }, [loadProducts]);
 
@@ -285,6 +290,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       material: product.material || "",
       origin_country: product.origin_country || "",
       category_id: product.category_id || "",
+      trend_tag_id: (product as any).trend_tag_id || "",
       flash_timer_enabled: product.flash_timer_enabled || false,
       promo_start_date: toLocalDatetime(product.promo_start_date),
       promo_end_date: toLocalDatetime(product.promo_end_date),
@@ -349,6 +355,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       material: form.material || null,
       origin_country: form.origin_country || null,
       category_id: form.category_id || null,
+      trend_tag_id: form.trend_tag_id || null,
       store_id: storeId,
       flash_timer_enabled: form.flash_timer_enabled,
       promo_start_date: form.promo_start_date ? new Date(form.promo_start_date).toISOString() : null,
@@ -366,10 +373,10 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     let productId = editing?.id;
 
     if (editing) {
-      const { error } = await supabase.from("products").update(payload).eq("id", editing.id);
+      const { error } = await (supabase.from("products").update(payload as any) as any).eq("id", editing.id);
       if (error) { toast.error("Erreur lors de la mise à jour"); setSaving(false); return; }
     } else {
-      const { data, error } = await supabase.from("products").insert(payload).select("id").single();
+      const { data, error } = await (supabase.from("products").insert(payload as any) as any).select("id").single();
       if (error || !data) { console.error("Product insert error:", error); toast.error("Erreur lors de la création : " + (error?.message || "inconnue")); setSaving(false); return; }
       productId = data.id;
     }
@@ -545,6 +552,19 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
               <option value="">— Aucune —</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>{c.name_fr}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Tag Tendance</label>
+            <select
+              className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md"
+              value={form.trend_tag_id}
+              onChange={(e) => setForm({ ...form, trend_tag_id: e.target.value })}
+            >
+              <option value="">— Aucun —</option>
+              {trendTags.map((t) => (
+                <option key={t.id} value={t.id}>{t.name_fr}</option>
               ))}
             </select>
           </div>
