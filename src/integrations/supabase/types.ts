@@ -2320,6 +2320,7 @@ export type Database = {
           stock_quantity: number | null
           store_id: string | null
           style: string | null
+          transaction_fee_pct: number | null
           trend_tag_id: string | null
           updated_at: string
           vendor_extra_margin: number | null
@@ -2371,6 +2372,7 @@ export type Database = {
           stock_quantity?: number | null
           store_id?: string | null
           style?: string | null
+          transaction_fee_pct?: number | null
           trend_tag_id?: string | null
           updated_at?: string
           vendor_extra_margin?: number | null
@@ -2422,6 +2424,7 @@ export type Database = {
           stock_quantity?: number | null
           store_id?: string | null
           style?: string | null
+          transaction_fee_pct?: number | null
           trend_tag_id?: string | null
           updated_at?: string
           vendor_extra_margin?: number | null
