@@ -223,10 +223,13 @@ export default function AdminVendorPricingPage() {
   return (
     <AdminLayout title="Tarification par boutique">
       <div className="space-y-4 max-w-4xl">
+        {/* Global defaults section */}
+        <GlobalPricingDefaults defaults={globalDefaults} />
+
         <p className="text-sm text-muted-foreground">
           Configurez la marge (%), le multiplicateur et l'accès à la marge vendeur pour chaque boutique.
           Les champs vides utilisent les valeurs globales par défaut
-          {globalDefaults && ` (${globalDefaults.margin_pct}% / ×${globalDefaults.multiplier})`}.
+          {globalDefaults && ` (${globalDefaults.margin_pct}% / ×${globalDefaults.multiplier} / frais ${globalDefaults.transaction_fee_pct ?? 5}%)`}.
         </p>
 
         <div className="relative">
