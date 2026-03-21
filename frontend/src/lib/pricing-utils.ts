@@ -8,6 +8,7 @@ export interface PricingDefaults {
   multiplier: number;       // default 3
   max_extra_margin_under_50: number;  // default 0.50
   max_extra_margin_over_100: number;  // default 1.00
+  transaction_fee_pct: number; // default 5
 }
 
 export const DEFAULT_PRICING: PricingDefaults = {
@@ -15,6 +16,7 @@ export const DEFAULT_PRICING: PricingDefaults = {
   multiplier: 3,
   max_extra_margin_under_50: 0.50,
   max_extra_margin_over_100: 1.00,
+  transaction_fee_pct: 5,
 };
 
 /**
@@ -28,17 +30,20 @@ export function strategicRound(price: number): number {
 
 /**
  * Calculate sale price from cost_calc using the formula:
- * sale_price = cost_calc + (cost_calc × margin_pct / 100) × multiplier + vendorExtra
+ * effectiveCost = costCalc + (costCalc × transactionFeePct / 100)
+ * sale_price = effectiveCost + (effectiveCost × margin_pct / 100) × multiplier + vendorExtra
  */
 export function calculateSalePrice(
   costCalc: number,
   marginPct: number = DEFAULT_PRICING.margin_pct,
   multiplier: number = DEFAULT_PRICING.multiplier,
   vendorExtra: number = 0,
+  transactionFeePct: number = DEFAULT_PRICING.transaction_fee_pct,
 ): number {
   if (costCalc <= 0) return 0;
-  const marginAmount = (costCalc * marginPct / 100) * multiplier;
-  const raw = costCalc + marginAmount + vendorExtra;
+  const effectiveCost = costCalc + (costCalc * transactionFeePct / 100);
+  const marginAmount = (effectiveCost * marginPct / 100) * multiplier;
+  const raw = effectiveCost + marginAmount + vendorExtra;
   return strategicRound(raw);
 }
 

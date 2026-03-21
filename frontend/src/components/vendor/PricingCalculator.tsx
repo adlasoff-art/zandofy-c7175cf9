@@ -57,6 +57,7 @@ export function PricingCalculator({
             multiplier: Number(v.multiplier) || 3,
             max_extra_margin_under_50: Number(v.max_extra_margin_under_50) || 0.50,
             max_extra_margin_over_100: Number(v.max_extra_margin_over_100) || 1.00,
+            transaction_fee_pct: Number(v.transaction_fee_pct) || 5,
           });
         }
       });
@@ -75,17 +76,18 @@ export function PricingCalculator({
   // Per-store overrides take priority, then global defaults
   const effectiveMarginPct = overrides?.margin_pct ?? settings.margin_pct;
   const effectiveMultiplier = overrides?.multiplier ?? settings.multiplier;
+  const effectiveTransactionFee = settings.transaction_fee_pct;
   const vendorExtraMarginAllowed = overrides?.vendor_extra_margin_enabled ?? false;
 
   // Recalculate when inputs change
   const recalculate = useCallback(() => {
     if (!autoPricingEnabled || costCalc <= 0) return;
     const extraMargin = vendorExtraMarginAllowed ? vendorExtraMargin : 0;
-    const sp = calculateSalePrice(costCalc, effectiveMarginPct, effectiveMultiplier, extraMargin);
+    const sp = calculateSalePrice(costCalc, effectiveMarginPct, effectiveMultiplier, extraMargin, effectiveTransactionFee);
     const op = calculateOldPrice(sp);
     onPriceChange(sp);
     onOriginalPriceChange(op);
-  }, [costCalc, effectiveMarginPct, effectiveMultiplier, vendorExtraMargin, vendorExtraMarginAllowed, autoPricingEnabled, onPriceChange, onOriginalPriceChange]);
+  }, [costCalc, effectiveMarginPct, effectiveMultiplier, effectiveTransactionFee, vendorExtraMargin, vendorExtraMarginAllowed, autoPricingEnabled, onPriceChange, onOriginalPriceChange]);
 
   useEffect(() => {
     recalculate();
@@ -97,6 +99,7 @@ export function PricingCalculator({
     : maxExtra;
 
   const marginPct = calculateMarginPercent(costReal, price);
+  const effectiveCost = costCalc > 0 ? costCalc + (costCalc * effectiveTransactionFee / 100) : 0;
 
   const inputClass = "w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20";
 
@@ -126,7 +129,6 @@ export function PricingCalculator({
                 onChange={(e) => {
                   const v = Number(e.target.value) || 0;
                   onCostRealChange(v);
-                  // Auto-fill cost_calc if empty
                   if (costCalc <= 0 && v > 0) onCostCalcChange(v);
                 }}
                 className={inputClass}
@@ -149,7 +151,12 @@ export function PricingCalculator({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Frais transaction (%)</label>
+              <input type="number" value={effectiveTransactionFee} readOnly className={inputClass + " bg-muted/50 cursor-not-allowed"} />
+              <p className="text-[10px] text-muted-foreground mt-1">Alibaba, etc.</p>
+            </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Marge (%)</label>
               <input type="number" value={effectiveMarginPct} readOnly className={inputClass + " bg-muted/50 cursor-not-allowed"} />
@@ -188,6 +195,14 @@ export function PricingCalculator({
               <div className="flex items-center gap-1 mb-1">
                 <TrendingUp size={14} className="text-primary" />
                 <span className="text-xs font-semibold text-foreground">Aperçu des prix</span>
+              </div>
+              {/* Effective cost display */}
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-1">
+                <span>Coût calcul: ${costCalc.toFixed(2)}</span>
+                <span>+</span>
+                <span>Frais {effectiveTransactionFee}%: ${(costCalc * effectiveTransactionFee / 100).toFixed(2)}</span>
+                <span>=</span>
+                <span className="font-semibold text-foreground">Coût effectif: ${effectiveCost.toFixed(2)}</span>
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div>
