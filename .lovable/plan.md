@@ -1,101 +1,77 @@
 
-# Refonte Layout : Sidebar verticale pour les dashboards Client & Vendeur (Desktop)
 
-## Résumé
+## Plan: Transaction Fee %, CMS Topbar Sync, Trend Tags Confirmation
 
-Transformer les onglets horizontaux (pills/boutons) des espaces Client (`/dashboard`) et Vendeur (`/vendor`) en un **menu latéral gauche vertical** sur desktop, tout en gardant les **onglets horizontaux scrollables** sur mobile. Les KPI cards restent **figés en haut** de la zone de contenu, indépendamment de l'onglet actif.
+### Summary
 
-## Changements structurels
+Three changes:
+1. **Add a transaction fee % field** (default 5%) to the pricing calculator. The new formula becomes: `effective_cost = cost_calc + (cost_calc * transaction_fee_pct / 100)`, then apply the existing margin/multiplier on `effective_cost` instead of raw `cost_calc`.
+2. **Sync CMS topbar texts** with the Header. Currently, `TextsTab` saves to `platform_settings.cms_texts` but `I18nContext` never reads from it -- it uses hardcoded translations. Fix: load `cms_texts` from DB in `I18nProvider` and override the static translations.
+3. **Trend tags admin/vendor** -- already implemented in previous work (TrendTagsTab in CMS + vendor dropdown). Confirm functional.
 
-### Architecture Desktop (≥ 1024px)
+---
 
-```text
-┌──────────────────────────────────────────────────┐
-│  Header (inchangé)                               │
-├──────────┬───────────────────────────────────────┤
-│          │  Photo + Nom + Bienvenue              │
-│  Menu    ├───────────────────────────────────────┤
-│ vertical │  KPI Cards (figés, toujours visibles) │
-│  gauche  ├───────────────────────────────────────┤
-│          │  Contenu de l'onglet actif            │
-│  (icons  │                                       │
-│  + label)│                                       │
-├──────────┴───────────────────────────────────────┤
-│  Footer (inchangé)                               │
-└──────────────────────────────────────────────────┘
+### 1. Transaction Fee % in Pricing
+
+**SQL Migration** (manual copy for production):
+```sql
+-- Add transaction_fee_pct to platform_settings pricing_defaults
+-- No schema change needed -- it's a JSON field in platform_settings.
+-- Just ensure the pricing_defaults row includes transaction_fee_pct: 5
+
+-- Add column to products for per-product override tracking (optional but useful)
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS transaction_fee_pct numeric(5,2);
 ```
 
-### Architecture Mobile (< 1024px)
+**Files to modify:**
 
-```text
-┌──────────────────────────┐
-│  Header                  │
-├──────────────────────────┤
-│  Photo + Nom             │
-├──────────────────────────┤
-│  KPI Cards               │
-├──────────────────────────┤
-│  [Onglets scrollables ►] │
-├──────────────────────────┤
-│  Contenu onglet actif    │
-├──────────────────────────┤
-│  Footer                  │
-└──────────────────────────┘
+- **`frontend/src/lib/pricing-utils.ts`**: Update `calculateSalePrice` to accept `transactionFeePct` param. New formula:
+  ```
+  effectiveCost = costCalc + (costCalc * transactionFeePct / 100)
+  salePrice = effectiveCost + (effectiveCost * marginPct / 100) * multiplier + vendorExtra
+  ```
+
+- **`frontend/src/components/vendor/PricingCalculator.tsx`**:
+  - Load `transaction_fee_pct` from `platform_settings.pricing_defaults` (default 5).
+  - Display it as a read-only field (admin-only, vendor cannot change).
+  - Show the effective cost (cost_calc + fee) in the preview.
+  - Pass the fee to `calculateSalePrice`.
+
+- **`frontend/src/pages/admin/AdminVendorPricingPage.tsx`**: Add editable `transaction_fee_pct` field in global pricing defaults section so admin can change from 5% to any value.
+
+### 2. CMS Topbar Texts Sync
+
+**File to modify:**
+
+- **`frontend/src/contexts/I18nContext.tsx`**:
+  - In `I18nProvider`, fetch `platform_settings` where `key = 'cms_texts'`.
+  - Override the static `translations` map with DB values for matching keys (by locale).
+  - Store overrides in state so `t()` function checks DB values first.
+
+No migration needed -- `platform_settings` table and `cms_texts` key already exist.
+
+### 3. Trend Tags -- Already Done
+
+The `TrendTagsTab` component exists in CMS, and `VendorProductManager` has the trend tag dropdown. No additional work needed.
+
+---
+
+### SQL Migration to Copy Manually
+
+```sql
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS transaction_fee_pct numeric(5,2);
 ```
 
-## Fichiers modifiés
+That's the only schema change. The `transaction_fee_pct` default value (5%) lives in `platform_settings.pricing_defaults` JSON.
 
-| Fichier | Action |
-|---------|--------|
-| `frontend/src/pages/DashboardPage.tsx` | Extraire les KPI (OverviewTab) vers le haut permanent, ajouter sidebar verticale desktop, garder pills mobiles |
-| `frontend/src/pages/VendorDashboardPage.tsx` | Même refonte : sidebar verticale desktop avec VendorSummaryWidgets toujours visibles, pills mobiles |
+---
 
-## Détail technique
+### Files Changed (4 files)
 
-### 1. DashboardPage (Client)
+| File | Change |
+|------|--------|
+| `frontend/src/lib/pricing-utils.ts` | Add `transactionFeePct` param to `calculateSalePrice` |
+| `frontend/src/components/vendor/PricingCalculator.tsx` | Load and display transaction fee %, pass to formula |
+| `frontend/src/pages/admin/AdminVendorPricingPage.tsx` | Add transaction fee % field in global settings |
+| `frontend/src/contexts/I18nContext.tsx` | Load CMS texts from DB and override static translations |
 
-**Sidebar gauche (desktop)** :
-- Largeur fixe ~220px, fond `bg-card`, bordure droite
-- En haut : avatar + prénom/nom (au lieu de l'email) + "Bienvenue"
-- Liste des onglets TABS avec icône + label, style actif en `bg-primary/10 text-primary`
-- Visuellement proche du style AdminSidebar mais plus léger
-
-**Zone principale** :
-- **Toujours visible en haut** : les 6 KPI cards (Bienvenue/nom, En cours, Total commandes, Total dépensé, Annulées, Retournées) — extraits de `OverviewTab` et affichés indépendamment de l'onglet actif
-- **En dessous** : le contenu de l'onglet sélectionné (sauf "overview" qui n'affichera que le LoyaltyProgress puisque les KPIs sont déjà visibles)
-
-**Mobile (< lg)** :
-- Pas de sidebar, les onglets restent en `flex overflow-x-auto` horizontal scrollable (comportement actuel)
-- KPI cards au-dessus des onglets
-
-### 2. VendorDashboardPage (Vendeur)
-
-**Sidebar gauche (desktop)** :
-- Avatar/logo de la boutique + nom de la boutique + badge tier
-- Liste des onglets (Catalogue, Commandes, Livraisons, Promos, etc.) avec icônes
-- Badge "non lu" sur Messages
-
-**Zone principale** :
-- **Toujours visible en haut** : VendorSummaryWidgets (Boutique, Produits, Commandes, Messages) — déjà existant, reste figé
-- **En dessous** : contenu de l'onglet actif
-
-**Mobile** : même logique — pills horizontales scrollables, widgets au-dessus
-
-### 3. Implémentation CSS
-
-- Utilisation de classes Tailwind responsive : `hidden lg:flex` pour la sidebar, `flex lg:hidden` pour les pills mobiles
-- Layout principal : `flex` horizontal sur desktop, `flex-col` sur mobile
-- Sidebar : `w-56 shrink-0 border-r border-border bg-card` sticky avec `sticky top-0 h-[calc(100vh-4rem)] overflow-y-auto`
-- Pas de composant Shadcn Sidebar (trop lourd pour ce cas) — simple `nav` avec des `button` stylisés
-
-### 4. Affichage du nom au lieu de l'email
-
-- Côté client : charger `first_name`/`last_name` depuis le profil, afficher "Bienvenue, {prénom}" au lieu de l'email brut
-- Côté vendeur : déjà affiché via le nom de la boutique
-
-## Ce qui ne change PAS
-
-- Header et Footer restent identiques
-- Toute la logique métier (chargement commandes, realtime, etc.) reste inchangée
-- Les composants enfants (VendorProductManager, OrdersTab, etc.) ne sont pas modifiés
-- Le design mobile reste quasiment identique (juste ajout des KPI permanents au-dessus des pills)
