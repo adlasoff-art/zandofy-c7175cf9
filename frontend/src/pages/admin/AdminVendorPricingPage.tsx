@@ -1,10 +1,80 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Search, Store, Save, Loader2, ShieldAlert } from "lucide-react";
+import { Search, Store, Save, Loader2, ShieldAlert, Settings } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
+
+function GlobalPricingDefaults({ defaults }: { defaults: any }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [txFee, setTxFee] = useState<string>("");
+
+  const currentFee = txFee || String(defaults?.transaction_fee_pct ?? 5);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const newValue = {
+      ...defaults,
+      transaction_fee_pct: Number(currentFee) || 5,
+    };
+    const { error } = await supabase
+      .from("platform_settings")
+      .update({ value: newValue as any, updated_at: new Date().toISOString() })
+      .eq("key", "pricing_defaults");
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Enregistré", description: "Paramètres globaux mis à jour." });
+      queryClient.invalidateQueries({ queryKey: ["pricing-defaults"] });
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Settings size={16} className="text-primary" />
+        <span className="text-sm font-semibold text-foreground">Paramètres globaux de tarification</span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Marge (%)</label>
+          <input type="number" value={defaults?.margin_pct ?? 15} readOnly className="w-full px-2 py-1.5 text-sm bg-muted/50 border border-border rounded-md cursor-not-allowed" />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Multiplicateur</label>
+          <input type="number" value={defaults?.multiplier ?? 3} readOnly className="w-full px-2 py-1.5 text-sm bg-muted/50 border border-border rounded-md cursor-not-allowed" />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Frais transaction (%)</label>
+          <input
+            type="number"
+            min={0}
+            max={50}
+            step={0.5}
+            value={currentFee}
+            onChange={(e) => setTxFee(e.target.value)}
+            className="w-full px-2 py-1.5 text-sm bg-muted border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+          <p className="text-[10px] text-muted-foreground mt-1">Alibaba, plateformes, etc.</p>
+        </div>
+        <div className="flex items-end">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+            Sauvegarder
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface StoreWithOverride {
   id: string;
