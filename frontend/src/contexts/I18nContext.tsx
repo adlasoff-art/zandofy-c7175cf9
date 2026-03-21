@@ -761,6 +761,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     return (valid.includes(saved as CurrencyCode) ? saved : "USD") as CurrencyCode;
   });
   const [rates, setRates] = useState<Record<CurrencyCode, CurrencyInfo>>({ ...DEFAULT_CURRENCIES });
+  const [cmsOverrides, setCmsOverrides] = useState<Record<string, Record<string, string>>>({});
 
   // Fetch dynamic exchange rates from DB
   useEffect(() => {
@@ -783,6 +784,28 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
+  // Fetch CMS text overrides from platform_settings
+  useEffect(() => {
+    supabase
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "cms_texts")
+      .single()
+      .then(({ data }) => {
+        if (data?.value && typeof data.value === "object") {
+          const val = data.value as any;
+          // Expected format: { fr: { "topbar.freeShipping": "...", ... }, en: { ... } }
+          // or flat format: { "topbar.freeShipping": "..." } (treated as fr)
+          if (val.fr || val.en) {
+            setCmsOverrides(val);
+          } else {
+            // Flat format — treat as current locale overrides for both
+            setCmsOverrides({ fr: val, en: val });
+          }
+        }
+      });
+  }, []);
+
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
     localStorage.setItem("zandofy_locale", l);
@@ -794,8 +817,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const t = useCallback(
-    (key: string) => translations[locale]?.[key] || translations.fr[key] || key,
-    [locale]
+    (key: string) => {
+      // CMS overrides take priority
+      const cmsValue = cmsOverrides[locale]?.[key];
+      if (cmsValue) return cmsValue;
+      return translations[locale]?.[key] || translations.fr[key] || key;
+    },
+    [locale, cmsOverrides]
   );
 
   const formatPrice = useCallback(

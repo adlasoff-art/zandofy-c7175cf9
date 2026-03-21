@@ -30,17 +30,20 @@ export function strategicRound(price: number): number {
 
 /**
  * Calculate sale price from cost_calc using the formula:
- * sale_price = cost_calc + (cost_calc × margin_pct / 100) × multiplier + vendorExtra
+ * effectiveCost = costCalc + (costCalc × transactionFeePct / 100)
+ * sale_price = effectiveCost + (effectiveCost × margin_pct / 100) × multiplier + vendorExtra
  */
 export function calculateSalePrice(
   costCalc: number,
   marginPct: number = DEFAULT_PRICING.margin_pct,
   multiplier: number = DEFAULT_PRICING.multiplier,
   vendorExtra: number = 0,
+  transactionFeePct: number = DEFAULT_PRICING.transaction_fee_pct,
 ): number {
   if (costCalc <= 0) return 0;
-  const marginAmount = (costCalc * marginPct / 100) * multiplier;
-  const raw = costCalc + marginAmount + vendorExtra;
+  const effectiveCost = costCalc + (costCalc * transactionFeePct / 100);
+  const marginAmount = (effectiveCost * marginPct / 100) * multiplier;
+  const raw = effectiveCost + marginAmount + vendorExtra;
   return strategicRound(raw);
 }
 
