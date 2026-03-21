@@ -8,6 +8,7 @@ export interface PricingDefaults {
   multiplier: number;       // default 3
   max_extra_margin_under_50: number;  // default 0.50
   max_extra_margin_over_100: number;  // default 1.00
+  transaction_fee_pct: number; // default 5
 }
 
 export const DEFAULT_PRICING: PricingDefaults = {
@@ -15,6 +16,7 @@ export const DEFAULT_PRICING: PricingDefaults = {
   multiplier: 3,
   max_extra_margin_under_50: 0.50,
   max_extra_margin_over_100: 1.00,
+  transaction_fee_pct: 5,
 };
 
 /**
