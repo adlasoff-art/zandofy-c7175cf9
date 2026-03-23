@@ -124,9 +124,10 @@ const App = () => (
     <BrowserRouter>
     <TooltipProvider>
       <AuthProvider>
+        <ImpersonationProvider>
+        <ImpersonationPanel />
         <CartProvider>
           <WishlistProvider>
-          <I18nProvider>
           <ThemeProvider>
           <UIConfigProvider>
             <CmsThemeInjector />
