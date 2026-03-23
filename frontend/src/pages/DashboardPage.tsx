@@ -469,6 +469,7 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(0);
+  const [retryOrder, setRetryOrder] = useState<OrderRow | null>(null);
 
   // Filter orders
   const filtered = orders.filter(o => {
