@@ -1,77 +1,99 @@
 
 
-## Plan: Transaction Fee %, CMS Topbar Sync, Trend Tags Confirmation
+## Plan : 4 fonctionnalités restantes
 
-### Summary
+### 1. Impersonation admin fonctionnelle
 
-Three changes:
-1. **Add a transaction fee % field** (default 5%) to the pricing calculator. The new formula becomes: `effective_cost = cost_calc + (cost_calc * transaction_fee_pct / 100)`, then apply the existing margin/multiplier on `effective_cost` instead of raw `cost_calc`.
-2. **Sync CMS topbar texts** with the Header. Currently, `TextsTab` saves to `platform_settings.cms_texts` but `I18nContext` never reads from it -- it uses hardcoded translations. Fix: load `cms_texts` from DB in `I18nProvider` and override the static translations.
-3. **Trend tags admin/vendor** -- already implemented in previous work (TrendTagsTab in CMS + vendor dropdown). Confirm functional.
+**Problème** : L'edge function `impersonate-user` retourne les infos du user cible mais ne génère PAS de token de session. Le frontend attend `access_token` + `refresh_token` qui n'arrivent jamais, donc rien ne se passe.
+
+**Solution** : Utiliser `supabaseAdmin.auth.admin.generateLink({ type: 'magiclink', email })` pour obtenir un lien de login, puis extraire le token. Alternative plus fiable : utiliser `supabaseAdmin.auth.admin.createUser` n'est pas applicable ici. La meilleure approche pour Supabase est d'utiliser un **mode lecture seule en local** :
+
+- Modifier l'edge function pour qu'elle retourne les données complètes du user cible (profil, rôles, commandes récentes, stats).
+- Côté frontend, au lieu de switcher de session (risque de sécurité), ouvrir un **panneau d'impersonation** qui affiche le dashboard tel que le voit l'utilisateur cible, en chargeant ses données via l'admin (service role dans l'edge function).
+- Ajouter un bandeau jaune "Mode impersonation — Vous voyez le compte de [nom]" avec un bouton "Quitter".
+
+**Fichiers modifiés** :
+| Fichier | Changement |
+|---------|-----------|
+| `frontend/supabase/functions/impersonate-user/index.ts` | Retourner données complètes (commandes, stats, adresses, wallet) via service role |
+| `frontend/src/components/admin/UserDetailDrawer.tsx` | Stocker les données retournées et ouvrir le panneau impersonation |
+| `frontend/src/components/admin/ImpersonationPanel.tsx` | **Nouveau** — Dashboard lecture seule affichant les données du user cible |
+| `frontend/src/contexts/ImpersonationContext.tsx` | **Nouveau** — Context pour gérer l'état d'impersonation global + bandeau |
+
+### 2. Relance de paiement depuis le dashboard client
+
+**Problème** : Quand un paiement Mobile Money échoue ou reste en `awaiting_payment`, le client doit recréer une commande au lieu de relancer le paiement.
+
+**Solution** :
+- Dans `DashboardPage.tsx`, pour les commandes en statut `awaiting_payment` ou `payment_failed`, afficher un bouton "Relancer le paiement".
+- Au clic, appeler `kelpay-payment` avec l'`order_id` existant (qui crée une nouvelle `payment_transaction` liée à la même commande).
+- Réutiliser le même flux USSD/polling que le checkout.
+- Créer un composant `RetryPaymentModal` avec le formulaire numéro de téléphone + opérateur.
+
+**Fichiers modifiés** :
+| Fichier | Changement |
+|---------|-----------|
+| `frontend/src/components/payments/RetryPaymentModal.tsx` | **Nouveau** — Modal de relance paiement (numéro, opérateur, polling) |
+| `frontend/src/pages/DashboardPage.tsx` | Bouton "Relancer" sur les commandes `awaiting_payment` / `payment_failed`, ouvre le modal |
+| `frontend/supabase/functions/kelpay-payment/index.ts` | Accepter les relances (vérifier que la commande appartient au user, créer nouvelle transaction) |
+
+### 3. Expiration automatique des commandes `awaiting_payment`
+
+**Solution** : Edge function cron qui passe les commandes `awaiting_payment` datant de +30 minutes en `payment_failed`.
+
+**Fichiers** :
+| Fichier | Changement |
+|---------|-----------|
+| `frontend/supabase/functions/expire-pending-orders/index.ts` | **Nouveau** — Requête UPDATE orders SET status='payment_failed' WHERE status='awaiting_payment' AND created_at < now() - interval '30 minutes' |
+
+**SQL** (via insert tool, pas migration) : Créer le cron job `pg_cron` qui appelle cette function toutes les 5 minutes.
+
+### 4. Filtrage vendeur : masquer commandes non abouties
+
+**Problème** : `VendorOrderManager.tsx` charge toutes les commandes du store sans filtrer.
+
+**Solution** : Ajouter `.not("status", "in", "(awaiting_payment,payment_failed)")` à la requête du vendeur pour ne montrer que les commandes dont le paiement est confirmé.
+
+**Fichier modifié** :
+| Fichier | Changement |
+|---------|-----------|
+| `frontend/src/components/vendor/VendorOrderManager.tsx` | Filtrer les statuts `awaiting_payment` et `payment_failed` de la requête |
 
 ---
 
-### 1. Transaction Fee % in Pricing
+### SQL à exécuter (insert tool, pas migration)
 
-**SQL Migration** (manual copy for production):
 ```sql
--- Add transaction_fee_pct to platform_settings pricing_defaults
--- No schema change needed -- it's a JSON field in platform_settings.
--- Just ensure the pricing_defaults row includes transaction_fee_pct: 5
+-- Activer pg_cron et pg_net si pas déjà fait
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- Add column to products for per-product override tracking (optional but useful)
-ALTER TABLE public.products ADD COLUMN IF NOT EXISTS transaction_fee_pct numeric(5,2);
+-- Cron : expirer les commandes awaiting_payment > 30 min, toutes les 5 min
+SELECT cron.schedule(
+  'expire-pending-orders',
+  '*/5 * * * *',
+  $$
+  SELECT net.http_post(
+    url := 'https://uogkklwfvwoxkifpkzpu.supabase.co/functions/v1/expire-pending-orders',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvZ2trbHdmdndveGtpZnBrenB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4ODY0MzcsImV4cCI6MjA4NzQ2MjQzN30.9NhIOytfsQ7Gdufs0goV6Lk97IyMkda362jh3IGMVi4"}'::jsonb,
+    body := '{}'::jsonb
+  ) AS request_id;
+  $$
+);
 ```
 
-**Files to modify:**
-
-- **`frontend/src/lib/pricing-utils.ts`**: Update `calculateSalePrice` to accept `transactionFeePct` param. New formula:
-  ```
-  effectiveCost = costCalc + (costCalc * transactionFeePct / 100)
-  salePrice = effectiveCost + (effectiveCost * marginPct / 100) * multiplier + vendorExtra
-  ```
-
-- **`frontend/src/components/vendor/PricingCalculator.tsx`**:
-  - Load `transaction_fee_pct` from `platform_settings.pricing_defaults` (default 5).
-  - Display it as a read-only field (admin-only, vendor cannot change).
-  - Show the effective cost (cost_calc + fee) in the preview.
-  - Pass the fee to `calculateSalePrice`.
-
-- **`frontend/src/pages/admin/AdminVendorPricingPage.tsx`**: Add editable `transaction_fee_pct` field in global pricing defaults section so admin can change from 5% to any value.
-
-### 2. CMS Topbar Texts Sync
-
-**File to modify:**
-
-- **`frontend/src/contexts/I18nContext.tsx`**:
-  - In `I18nProvider`, fetch `platform_settings` where `key = 'cms_texts'`.
-  - Override the static `translations` map with DB values for matching keys (by locale).
-  - Store overrides in state so `t()` function checks DB values first.
-
-No migration needed -- `platform_settings` table and `cms_texts` key already exist.
-
-### 3. Trend Tags -- Already Done
-
-The `TrendTagsTab` component exists in CMS, and `VendorProductManager` has the trend tag dropdown. No additional work needed.
-
 ---
 
-### SQL Migration to Copy Manually
+### Résumé : 7 fichiers modifiés/créés
 
-```sql
-ALTER TABLE public.products ADD COLUMN IF NOT EXISTS transaction_fee_pct numeric(5,2);
-```
-
-That's the only schema change. The `transaction_fee_pct` default value (5%) lives in `platform_settings.pricing_defaults` JSON.
-
----
-
-### Files Changed (4 files)
-
-| File | Change |
-|------|--------|
-| `frontend/src/lib/pricing-utils.ts` | Add `transactionFeePct` param to `calculateSalePrice` |
-| `frontend/src/components/vendor/PricingCalculator.tsx` | Load and display transaction fee %, pass to formula |
-| `frontend/src/pages/admin/AdminVendorPricingPage.tsx` | Add transaction fee % field in global settings |
-| `frontend/src/contexts/I18nContext.tsx` | Load CMS texts from DB and override static translations |
+| # | Fichier | Action |
+|---|---------|--------|
+| 1 | `frontend/supabase/functions/impersonate-user/index.ts` | Modifier — retourner données complètes |
+| 2 | `frontend/src/components/admin/ImpersonationPanel.tsx` | Créer — vue lecture seule |
+| 3 | `frontend/src/contexts/ImpersonationContext.tsx` | Créer — contexte + bandeau |
+| 4 | `frontend/src/components/admin/UserDetailDrawer.tsx` | Modifier — intégrer impersonation panel |
+| 5 | `frontend/src/components/payments/RetryPaymentModal.tsx` | Créer — relance paiement |
+| 6 | `frontend/src/pages/DashboardPage.tsx` | Modifier — bouton relance |
+| 7 | `frontend/supabase/functions/expire-pending-orders/index.ts` | Créer — cron expiration |
+| 8 | `frontend/src/components/vendor/VendorOrderManager.tsx` | Modifier — filtrer commandes |
 
