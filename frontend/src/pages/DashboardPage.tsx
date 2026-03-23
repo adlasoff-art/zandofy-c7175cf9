@@ -541,6 +541,7 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
             const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
             const canCancel = order.status === "pending";
             const canRetryPayment = ["awaiting_payment", "payment_failed"].includes(order.status);
+            return (
               <div key={order.id} className="bg-card border border-border rounded-lg p-4 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
