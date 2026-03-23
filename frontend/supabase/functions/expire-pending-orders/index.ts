@@ -1,0 +1,89 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // Find orders stuck in awaiting_payment for > 30 minutes
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+    const { data: expiredOrders, error: selectError } = await supabase
+      .from("orders")
+      .select("id, order_ref, user_id")
+      .eq("status", "awaiting_payment")
+      .lt("created_at", thirtyMinutesAgo);
+
+    if (selectError) {
+      console.error("Error finding expired orders:", selectError);
+      return new Response(JSON.stringify({ error: selectError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!expiredOrders || expiredOrders.length === 0) {
+      return new Response(JSON.stringify({ expired: 0 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const ids = expiredOrders.map((o) => o.id);
+
+    // Update all expired orders to payment_failed
+    const { error: updateError } = await supabase
+      .from("orders")
+      .update({ status: "payment_failed" })
+      .in("id", ids);
+
+    if (updateError) {
+      console.error("Error updating expired orders:", updateError);
+      return new Response(JSON.stringify({ error: updateError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Notify each user
+    const notifications = expiredOrders.map((o) => ({
+      user_id: o.user_id,
+      type: "order",
+      title: "Paiement expiré",
+      message: `Le paiement de votre commande ${o.order_ref} a expiré après 30 minutes. Vous pouvez relancer le paiement depuis votre espace.`,
+      link: "/dashboard",
+    }));
+
+    await supabase.from("notifications").insert(notifications);
+
+    // Update related payment_transactions
+    await supabase
+      .from("payment_transactions")
+      .update({ status: "failed" })
+      .in("order_id", ids)
+      .eq("status", "pending");
+
+    console.log(`Expired ${ids.length} orders:`, ids);
+
+    return new Response(
+      JSON.stringify({ expired: ids.length, order_ids: ids }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (e) {
+    console.error("expire-pending-orders error:", e);
+    return new Response(
+      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});
