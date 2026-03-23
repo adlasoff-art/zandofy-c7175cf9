@@ -103,6 +103,7 @@ async function logAudit(action: string, targetUserId: string, details: Record<st
 
 export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
   const queryClient = useQueryClient();
+  const { startImpersonation } = useImpersonation();
   const [warningReason, setWarningReason] = useState("");
   const [warningSeverity, setWarningSeverity] = useState<"warning" | "final_warning">("warning");
   const [banReason, setBanReason] = useState("");
