@@ -128,6 +128,7 @@ const App = () => (
         <ImpersonationPanel />
         <CartProvider>
           <WishlistProvider>
+          <I18nProvider>
           <ThemeProvider>
           <UIConfigProvider>
             <CmsThemeInjector />
