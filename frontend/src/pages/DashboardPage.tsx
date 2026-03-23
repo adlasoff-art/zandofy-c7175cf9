@@ -560,6 +560,11 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {canRetryPayment && (
+                    <button onClick={() => setRetryOrder(order)} className="text-xs text-primary font-medium flex items-center gap-0.5">
+                      <CreditCard size={12} /> Payer
+                    </button>
+                  )}
                   {canCancel && <CancelOrderButton orderId={order.id} orderRef={order.order_ref} onSuccess={onCancelSuccess} small />}
                   <button onClick={() => setSelectedOrder(order.id)} className="text-xs text-primary font-medium flex items-center gap-0.5">
                     Détails <ChevronRight size={12} />
