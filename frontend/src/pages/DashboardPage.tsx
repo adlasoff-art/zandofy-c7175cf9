@@ -614,10 +614,12 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
   const { toast } = useToast();
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [showDisputeForm, setShowDisputeForm] = useState(false);
+  const [showRetryPayment, setShowRetryPayment] = useState(false);
   if (!order) return null;
   const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
   const canCancel = order.status === "pending";
   const canReturn = order.status === "delivered";
+  const canRetryPayment = ["awaiting_payment", "payment_failed"].includes(order.status);
   const canDispute = ["delivered", "returned"].includes(order.status);
 
   return (
