@@ -4,6 +4,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchProductBySlug, fetchProducts, fetchPricingTiers, type Product } from "@/services/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
@@ -127,17 +128,25 @@ export default function ProductPage() {
     });
   }, []);
 
-  const pricingTiers: PricingTier[] = useMemo(
-    () =>
-      (((pricingTiersRaw && pricingTiersRaw.length > 0) ? pricingTiersRaw : globalBulkTiers.map((tier: any, index: number) => ({ id: `global-${index}`, tier_label: `Palier ${index + 1}`, min_quantity: tier.min_quantity, discount_type: "percentage", discount_value: tier.discount_pct }))) || []).map((t: any) => ({
-        id: t.id,
-        tierLabel: t.tier_label,
-        minQuantity: t.min_quantity,
-        discountType: t.discount_type as "percentage" | "fixed",
-        discountValue: Number(t.discount_value),
-      }))),
-    [globalBulkTiers, pricingTiersRaw]
-  );
+  const pricingTiers: PricingTier[] = useMemo(() => {
+    const source = pricingTiersRaw && pricingTiersRaw.length > 0
+      ? pricingTiersRaw
+      : (globalBulkTiers || []).map((tier: any, index: number) => ({
+          id: `global-${index}`,
+          tier_label: `Palier ${index + 1}`,
+          min_quantity: tier.min_quantity,
+          discount_type: "percentage",
+          discount_value: tier.discount_pct,
+        }));
+
+    return source.map((t: any) => ({
+      id: t.id,
+      tierLabel: t.tier_label,
+      minQuantity: t.min_quantity,
+      discountType: t.discount_type as "percentage" | "fixed",
+      discountValue: Number(t.discount_value),
+    }));
+  }, [globalBulkTiers, pricingTiersRaw]);
 
   const moq = product?.moq || 1;
   const currentQty = quantity ?? moq;
