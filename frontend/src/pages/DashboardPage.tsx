@@ -858,6 +858,11 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
 
       {/* Actions */}
       <div className="border-t border-border pt-4 flex flex-wrap gap-2">
+        {canRetryPayment && (
+          <Button variant="default" size="sm" onClick={() => setShowRetryPayment(true)}>
+            <CreditCard size={14} className="mr-1" /> Relancer le paiement
+          </Button>
+        )}
         {canCancel && <CancelOrderButton orderId={order.id} orderRef={order.order_ref} onSuccess={onCancelSuccess} />}
         {order.status === "delivered" && (
           <Button variant="outline" size="sm" onClick={async () => {
