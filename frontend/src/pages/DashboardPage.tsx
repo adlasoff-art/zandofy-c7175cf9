@@ -919,6 +919,17 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           onCancel={() => setShowDisputeForm(false)}
         />
       )}
+
+      {/* Retry Payment Modal */}
+      {showRetryPayment && (
+        <RetryPaymentModal
+          orderId={order.id}
+          orderRef={order.order_ref}
+          amount={Number(order.total)}
+          onClose={() => setShowRetryPayment(false)}
+          onSuccess={() => { setShowRetryPayment(false); onCancelSuccess(); }}
+        />
+      )}
     </div>
   );
 }

@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.ai-user-analysis]
 verify_jwt = false
+
+[functions.expire-pending-orders]
+verify_jwt = false
