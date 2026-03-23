@@ -10,6 +10,8 @@ import {
   ClipboardList, Activity, Brain, UserCheck, Eye
 } from "lucide-react";
 import type { AppRole } from "@/hooks/use-roles";
+import { useImpersonation } from "@/contexts/ImpersonationContext";
+import { ImpersonationPanel } from "@/components/admin/ImpersonationPanel";
 
 const ALL_ROLES: AppRole[] = ["admin", "manager", "vendor", "shipper", "rider"];
 
