@@ -14,8 +14,9 @@ import {
   Package, MapPin, User as UserIcon, ChevronRight, ChevronLeft,
   Truck, CheckCircle2, Clock, Box, Gift, MessageCircle, Loader2,
   Plus, Trash2, Home, Briefcase, Star, Edit2, X, Save, Camera, Bell, XCircle,
-  Search, Filter, AlertTriangle, History, RotateCcw, FileText,
+  Search, Filter, AlertTriangle, History, RotateCcw, FileText, CreditCard,
 } from "lucide-react";
+import { RetryPaymentModal } from "@/components/payments/RetryPaymentModal";
 import { useNotifications } from "@/hooks/use-notifications";
 import { LoyaltyProgress } from "@/components/LoyaltyProgress";
 import { ReferralDashboard } from "@/components/ReferralDashboard";
@@ -468,6 +469,7 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(0);
+  const [retryOrder, setRetryOrder] = useState<OrderRow | null>(null);
 
   // Filter orders
   const filtered = orders.filter(o => {
@@ -500,6 +502,7 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
   }
 
   return (
+    <>
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -539,6 +542,7 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
           {paginated.map(order => {
             const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
             const canCancel = order.status === "pending";
+            const canRetryPayment = ["awaiting_payment", "payment_failed"].includes(order.status);
             return (
               <div key={order.id} className="bg-card border border-border rounded-lg p-4 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
@@ -557,6 +561,11 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {canRetryPayment && (
+                    <button onClick={() => setRetryOrder(order)} className="text-xs text-primary font-medium flex items-center gap-0.5">
+                      <CreditCard size={12} /> Payer
+                    </button>
+                  )}
                   {canCancel && <CancelOrderButton orderId={order.id} orderRef={order.order_ref} onSuccess={onCancelSuccess} small />}
                   <button onClick={() => setSelectedOrder(order.id)} className="text-xs text-primary font-medium flex items-center gap-0.5">
                     Détails <ChevronRight size={12} />
@@ -581,6 +590,17 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
         </div>
       )}
     </div>
+
+      {retryOrder && (
+        <RetryPaymentModal
+          orderId={retryOrder.id}
+          orderRef={retryOrder.order_ref}
+          amount={Number(retryOrder.total)}
+          onClose={() => setRetryOrder(null)}
+          onSuccess={() => { setRetryOrder(null); onCancelSuccess(); }}
+        />
+      )}
+    </>
   );
 }
 
@@ -594,10 +614,12 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
   const { toast } = useToast();
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [showDisputeForm, setShowDisputeForm] = useState(false);
+  const [showRetryPayment, setShowRetryPayment] = useState(false);
   if (!order) return null;
   const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
   const canCancel = order.status === "pending";
   const canReturn = order.status === "delivered";
+  const canRetryPayment = ["awaiting_payment", "payment_failed"].includes(order.status);
   const canDispute = ["delivered", "returned"].includes(order.status);
 
   return (
@@ -836,6 +858,11 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
 
       {/* Actions */}
       <div className="border-t border-border pt-4 flex flex-wrap gap-2">
+        {canRetryPayment && (
+          <Button variant="default" size="sm" onClick={() => setShowRetryPayment(true)}>
+            <CreditCard size={14} className="mr-1" /> Relancer le paiement
+          </Button>
+        )}
         {canCancel && <CancelOrderButton orderId={order.id} orderRef={order.order_ref} onSuccess={onCancelSuccess} />}
         {order.status === "delivered" && (
           <Button variant="outline" size="sm" onClick={async () => {
@@ -890,6 +917,17 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           storeId={null}
           onSuccess={() => { setShowDisputeForm(false); onCancelSuccess(); }}
           onCancel={() => setShowDisputeForm(false)}
+        />
+      )}
+
+      {/* Retry Payment Modal */}
+      {showRetryPayment && (
+        <RetryPaymentModal
+          orderId={order.id}
+          orderRef={order.order_ref}
+          amount={Number(order.total)}
+          onClose={() => setShowRetryPayment(false)}
+          onSuccess={() => { setShowRetryPayment(false); onCancelSuccess(); }}
         />
       )}
     </div>

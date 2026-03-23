@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
+import { ImpersonationPanel } from "@/components/admin/ImpersonationPanel";
 import { CartProvider } from "@/contexts/CartContext";
 import { WishlistProvider } from "@/contexts/WishlistContext";
 import { CartDrawer } from "@/components/CartDrawer";
@@ -122,6 +124,8 @@ const App = () => (
     <BrowserRouter>
     <TooltipProvider>
       <AuthProvider>
+        <ImpersonationProvider>
+        <ImpersonationPanel />
         <CartProvider>
           <WishlistProvider>
           <I18nProvider>
@@ -224,6 +228,7 @@ const App = () => (
           </I18nProvider>
           </WishlistProvider>
         </CartProvider>
+        </ImpersonationProvider>
       </AuthProvider>
     </TooltipProvider>
     </BrowserRouter>
