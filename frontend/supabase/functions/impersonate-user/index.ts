@@ -69,6 +69,53 @@ serve(async (req) => {
         .select("role")
         .eq("user_id", targetUserId);
 
+      // Fetch recent orders (last 20)
+      const { data: orders } = await supabaseAdmin
+        .from("orders")
+        .select("id, order_ref, status, total, subtotal, created_at, shipping_city, payment_method")
+        .eq("user_id", targetUserId)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      // Compute stats
+      const allOrders = orders || [];
+      const totalOrders = allOrders.length;
+      const totalSpent = allOrders
+        .filter((o: any) => !["cancelled", "returned", "payment_failed", "awaiting_payment"].includes(o.status))
+        .reduce((s: number, o: any) => s + Number(o.subtotal || 0), 0);
+      const totalDelivered = allOrders.filter((o: any) => o.status === "delivered").length;
+
+      // Fetch addresses
+      const { data: addresses } = await supabaseAdmin
+        .from("saved_addresses")
+        .select("id, label, address, city, country, is_default")
+        .eq("user_id", targetUserId);
+
+      // Fetch vendor wallet if vendor
+      const isVendor = targetRoles?.some((r: any) => r.role === "vendor");
+      let wallet = null;
+      if (isVendor) {
+        const { data: stores } = await supabaseAdmin
+          .from("stores")
+          .select("id")
+          .eq("owner_id", targetUserId)
+          .limit(1);
+        if (stores && stores.length > 0) {
+          const { data: w } = await supabaseAdmin
+            .from("vendor_wallets")
+            .select("available_balance, pending_balance, total_earned")
+            .eq("store_id", stores[0].id)
+            .maybeSingle();
+          wallet = w;
+        }
+      }
+
+      // Fetch payment methods
+      const { data: paymentMethods } = await supabaseAdmin
+        .from("payment_methods")
+        .select("id, provider, phone_number, is_default, label")
+        .eq("user_id", targetUserId);
+
       // Log impersonation in audit
       await supabaseAdmin.from("admin_audit_logs").insert({
         admin_id: adminId,
@@ -90,7 +137,6 @@ serve(async (req) => {
         },
       });
 
-      // Return target user info (admin will use this to view as the user)
       return new Response(
         JSON.stringify({
           success: true,
@@ -101,15 +147,22 @@ serve(async (req) => {
             last_name: targetProfile.last_name,
             roles: targetRoles?.map((r: any) => r.role) || [],
           },
+          orders: allOrders,
+          stats: {
+            total_orders: totalOrders,
+            total_spent: Math.round(totalSpent * 100) / 100,
+            total_delivered: totalDelivered,
+          },
+          addresses: addresses || [],
+          wallet,
+          payment_methods: paymentMethods || [],
           impersonated_by: adminId,
-          note: "Impersonation is read-only. Use the admin panel to view user data.",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     if (action === "end_impersonation") {
-      // Log end of impersonation
       await supabaseAdmin.from("admin_audit_logs").insert({
         admin_id: adminId,
         action: "impersonation_end",

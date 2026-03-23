@@ -234,13 +234,20 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["user-audit-logs", user.id] });
-      toast.success(`Impersonation démarrée pour ${data.target?.first_name || data.target?.email}`);
-      if (data?.access_token && data?.refresh_token) {
-        supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token }).then(() => {
-          const targetRoles = Array.isArray(data?.target?.roles) ? data.target.roles : [];
-          window.location.href = targetRoles.includes("vendor") ? "/vendor" : "/dashboard";
-        });
-      }
+      // Open impersonation panel with full data
+      startImpersonation({
+        id: data.target.id,
+        email: data.target.email,
+        first_name: data.target.first_name,
+        last_name: data.target.last_name,
+        roles: data.target.roles || [],
+        orders: data.orders || [],
+        stats: data.stats || { total_orders: 0, total_spent: 0, total_delivered: 0 },
+        addresses: data.addresses || [],
+        wallet: data.wallet || null,
+        payment_methods: data.payment_methods || [],
+      });
+      toast.success(`Mode impersonation activé pour ${data.target?.first_name || data.target?.email}`);
     },
     onError: (e: any) => toast.error(e.message),
   });
