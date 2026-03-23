@@ -589,6 +589,16 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
         </div>
       )}
     </div>
+
+      {retryOrder && (
+        <RetryPaymentModal
+          orderId={retryOrder.id}
+          orderRef={retryOrder.order_ref}
+          amount={Number(retryOrder.total)}
+          onClose={() => setRetryOrder(null)}
+          onSuccess={() => { setRetryOrder(null); onCancelSuccess(); }}
+        />
+      )}
   );
 }
 
