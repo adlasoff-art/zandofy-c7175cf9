@@ -227,6 +227,7 @@ const App = () => (
           </I18nProvider>
           </WishlistProvider>
         </CartProvider>
+        </ImpersonationProvider>
       </AuthProvider>
     </TooltipProvider>
     </BrowserRouter>
