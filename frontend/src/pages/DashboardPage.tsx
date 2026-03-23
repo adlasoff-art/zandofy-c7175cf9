@@ -599,6 +599,7 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
           onSuccess={() => { setRetryOrder(null); onCancelSuccess(); }}
         />
       )}
+    </>
   );
 }
 
