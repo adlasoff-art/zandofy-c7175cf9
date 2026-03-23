@@ -14,8 +14,9 @@ import {
   Package, MapPin, User as UserIcon, ChevronRight, ChevronLeft,
   Truck, CheckCircle2, Clock, Box, Gift, MessageCircle, Loader2,
   Plus, Trash2, Home, Briefcase, Star, Edit2, X, Save, Camera, Bell, XCircle,
-  Search, Filter, AlertTriangle, History, RotateCcw, FileText,
+  Search, Filter, AlertTriangle, History, RotateCcw, FileText, CreditCard,
 } from "lucide-react";
+import { RetryPaymentModal } from "@/components/payments/RetryPaymentModal";
 import { useNotifications } from "@/hooks/use-notifications";
 import { LoyaltyProgress } from "@/components/LoyaltyProgress";
 import { ReferralDashboard } from "@/components/ReferralDashboard";
