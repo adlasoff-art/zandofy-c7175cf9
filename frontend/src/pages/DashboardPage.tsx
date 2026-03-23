@@ -502,6 +502,7 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
   }
 
   return (
+    <>
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
