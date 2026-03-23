@@ -35,7 +35,7 @@ export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF",
     async function loadDefault() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("payment_methods")
         .select("phone_number, provider")
         .eq("user_id", user.id)
