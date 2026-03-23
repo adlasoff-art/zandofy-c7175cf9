@@ -540,7 +540,7 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
           {paginated.map(order => {
             const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
             const canCancel = order.status === "pending";
-            return (
+            const canRetryPayment = ["awaiting_payment", "payment_failed"].includes(order.status);
               <div key={order.id} className="bg-card border border-border rounded-lg p-4 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
