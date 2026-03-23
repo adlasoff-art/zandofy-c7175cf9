@@ -520,6 +520,7 @@ export default function CheckoutPage() {
     setProcessing(true);
 
     if (paymentMethod === "mobile_money") {
+      let createdOrderIds: string[] = [];
       // Validate phone
       const cleanPhone = mobileMoneyPhone.replace(/[\s\-\+]/g, "");
       if (!cleanPhone || cleanPhone.length < 9) {
@@ -531,6 +532,7 @@ export default function CheckoutPage() {
       try {
         // Create order first
         const { orderRef, orderIds } = await createOrderForPayment();
+        createdOrderIds = orderIds;
         if (orderIds.length === 0) {
           toast({ title: "Erreur", description: "Impossible de créer la commande.", variant: "destructive" });
           setProcessing(false);
@@ -577,7 +579,7 @@ export default function CheckoutPage() {
               table: "payment_transactions",
               filter: `reference=eq.${data.reference}`,
             },
-            (payload: any) => {
+            async (payload: any) => {
               const newStatus = payload.new?.status;
               if (newStatus === "success") {
                 await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
@@ -617,8 +619,8 @@ export default function CheckoutPage() {
 
       } catch (err: any) {
         toast({ title: "Erreur", description: err.message || "Erreur inattendue.", variant: "destructive" });
-        if (orderIds.length > 0) {
-          await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", orderIds);
+        if (createdOrderIds.length > 0) {
+          await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", createdOrderIds);
         }
         setProcessing(false);
       }
