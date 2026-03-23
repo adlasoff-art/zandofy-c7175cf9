@@ -101,6 +101,7 @@ export default function AdminVendorPricingPage() {
     vendor_extra_margin_enabled: boolean;
     commission_rate: string;
     is_platform_owned: boolean;
+    vendor_cod_enabled: boolean;
   }>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -192,6 +193,7 @@ export default function AdminVendorPricingPage() {
       vendor_extra_margin_enabled: o?.vendor_extra_margin_enabled ?? false,
       commission_rate: o?.commission_rate != null ? String(o.commission_rate) : "",
       is_platform_owned: store.is_platform_owned ?? false,
+      vendor_cod_enabled: (o as any)?.vendor_cod_enabled ?? false,
     };
   };
 
@@ -204,7 +206,7 @@ export default function AdminVendorPricingPage() {
 
   const getEditForId = (storeId: string) => {
     const store = stores?.find((s) => s.id === storeId);
-    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false };
+    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false };
     return getEdit(store);
   };
 
@@ -254,6 +256,7 @@ export default function AdminVendorPricingPage() {
       max_extra_margin: edit.max_extra_margin ? Number(edit.max_extra_margin) : null,
       vendor_extra_margin_enabled: edit.vendor_extra_margin_enabled,
       commission_rate: edit.commission_rate ? Number(edit.commission_rate) : null,
+      vendor_cod_enabled: edit.vendor_cod_enabled,
       updated_at: new Date().toISOString(),
     };
 
@@ -392,6 +395,17 @@ export default function AdminVendorPricingPage() {
                   <Switch
                     checked={edit.is_platform_owned}
                     onCheckedChange={(v) => updateEdit(store.id, "is_platform_owned", v)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Paiement à la livraison vendeur</p>
+                    <p className="text-[10px] text-muted-foreground">Autorise cette boutique à accepter le paiement du produit à la livraison.</p>
+                  </div>
+                  <Switch
+                    checked={edit.vendor_cod_enabled}
+                    onCheckedChange={(v) => updateEdit(store.id, "vendor_cod_enabled", v)}
                   />
                 </div>
 

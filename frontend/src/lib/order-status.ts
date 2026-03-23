@@ -3,6 +3,7 @@ import {
 } from "lucide-react";
 
 export const ORDER_STATUSES = [
+  "awaiting_payment",
   "pending",
   "confirmed",
   "preparing",
@@ -29,12 +30,15 @@ export const ACTIVE_ORDER_STATUSES = [
   "out_for_delivery",
 ] as const;
 
-export const NON_REVENUE_ORDER_STATUSES = ["cancelled", "returned", "refunded", "payment_failed"] as const;
+export const NON_REVENUE_ORDER_STATUSES = ["awaiting_payment", "cancelled", "returned", "refunded", "payment_failed"] as const;
+
+export const REAL_REVENUE_ORDER_STATUSES = ["delivered"] as const;
 
 export const STATUS_CONFIG: Record<
   string,
   { label: string; icon: typeof Clock; color: string; badgeClass: string }
 > = {
+  awaiting_payment:  { label: "Paiement en attente",    icon: Clock,        color: "text-amber-500",    badgeClass: "bg-amber-100 text-amber-700" },
   pending:           { label: "Reçue",                icon: Clock,        color: "text-amber-500",    badgeClass: "bg-amber-100 text-amber-700" },
   confirmed:         { label: "Confirmée",            icon: CheckCircle2, color: "text-blue-500",     badgeClass: "bg-blue-100 text-blue-700" },
   preparing:         { label: "En préparation",       icon: Box,          color: "text-yellow-600",   badgeClass: "bg-yellow-100 text-yellow-700" },

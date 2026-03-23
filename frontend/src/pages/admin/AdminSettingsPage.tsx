@@ -37,6 +37,11 @@ interface PricingConfig {
   platform_commission_default: number;
 }
 
+interface BulkTierConfig {
+  min_quantity: number;
+  discount_pct: number;
+}
+
 export default function AdminSettingsPage() {
   const [trackingProvider, setTrackingProvider] = useState("17track");
   const [freeShipping, setFreeShipping] = useState<FreeShippingConfig>({ enabled: true, amount: 49, currency: "USD" });
@@ -49,8 +54,14 @@ export default function AdminSettingsPage() {
     duration_minutes: 60,
   });
   const [newnessDays, setNewnessDays] = useState(14);
-  const [paymentMethods, setPaymentMethods] = useState({ mobile_money: true, stripe: true, cod: true });
+  const [paymentMethods, setPaymentMethods] = useState({ mobile_money: true, stripe: true, cod: true, stripe_notice_enabled: false, stripe_notice_text: "Pour l'instant, ce moyen de paiement n'est pas actif." });
   const [pricing, setPricing] = useState<PricingConfig>({ margin_pct: 15, multiplier: 3, max_extra_margin_under_50: 0.50, max_extra_margin_over_100: 1.00, platform_commission_default: 10 });
+  const [bulkTiers, setBulkTiers] = useState<BulkTierConfig[]>([
+    { min_quantity: 1, discount_pct: 0 },
+    { min_quantity: 100, discount_pct: 5 },
+    { min_quantity: 500, discount_pct: 12 },
+    { min_quantity: 1000, discount_pct: 15 },
+  ]);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
@@ -58,7 +69,7 @@ export default function AdminSettingsPage() {
     supabase
       .from("platform_settings")
       .select("key, value")
-      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults"])
+      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers"])
       .then(({ data }) => {
         data?.forEach((row) => {
           const v = row.value as any;
@@ -85,7 +96,7 @@ export default function AdminSettingsPage() {
           } else if (row.key === "newness_duration_days") {
             setNewnessDays(Number(v) || 14);
           } else if (row.key === "payment_methods") {
-            setPaymentMethods({ mobile_money: v.mobile_money !== false, stripe: v.stripe !== false, cod: v.cod !== false });
+            setPaymentMethods({ mobile_money: v.mobile_money !== false, stripe: v.stripe !== false, cod: v.cod !== false, stripe_notice_enabled: !!v.stripe_notice_enabled, stripe_notice_text: v.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif." });
           } else if (row.key === "pricing_defaults") {
             setPricing({
               margin_pct: Number(v.margin_pct) || 15,
@@ -94,6 +105,11 @@ export default function AdminSettingsPage() {
               max_extra_margin_over_100: Number(v.max_extra_margin_over_100) || 1.00,
               platform_commission_default: Number(v.platform_commission_default) || 10,
             });
+          } else if (row.key === "bulk_discount_tiers") {
+            const tiers = Array.isArray(v?.tiers) ? v.tiers : [];
+            if (tiers.length) {
+              setBulkTiers(tiers.map((tier: any) => ({ min_quantity: Number(tier.min_quantity) || 1, discount_pct: Number(tier.discount_pct) || 0 })));
+            }
           }
         });
       });
@@ -133,7 +149,11 @@ export default function AdminSettingsPage() {
       .from("platform_settings")
       .upsert({ key: "pricing_defaults", value: pricing as any, updated_at: now }, { onConflict: "key" });
 
-    const error = e1 || e2 || e3 || e4 || e5 || e6;
+    const { error: e7 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "bulk_discount_tiers", value: { tiers: bulkTiers } as any, updated_at: now }, { onConflict: "key" });
+
+    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7;
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
@@ -185,6 +205,32 @@ export default function AdminSettingsPage() {
               <div key={pm.key} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                 <span className="text-sm text-foreground">{pm.label}</span>
                 <Switch checked={paymentMethods[pm.key]} onCheckedChange={(v) => setPaymentMethods((prev) => ({ ...prev, [pm.key]: v }))} />
+              </div>
+            ))}
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <div>
+                <p className="text-sm text-foreground">Afficher le message d’indisponibilité carte</p>
+                <p className="text-xs text-muted-foreground">Si activé et la carte est désactivée, le client voit un message au lieu d’un choix caché.</p>
+              </div>
+              <Switch checked={paymentMethods.stripe_notice_enabled} onCheckedChange={(v) => setPaymentMethods((prev) => ({ ...prev, stripe_notice_enabled: v }))} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Message carte bancaire</label>
+              <input type="text" value={paymentMethods.stripe_notice_text} onChange={(e) => setPaymentMethods((prev) => ({ ...prev, stripe_notice_text: e.target.value }))} className={inputClass} />
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Calculator size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Paliers globaux prix dégressifs</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {bulkTiers.map((tier, index) => (
+              <div key={tier.min_quantity} className="grid grid-cols-2 gap-2">
+                <input type="number" min={1} value={tier.min_quantity} onChange={(e) => setBulkTiers((prev) => prev.map((item, i) => i === index ? { ...item, min_quantity: Number(e.target.value) || 1 } : item))} className={inputClass} />
+                <input type="number" min={0} max={100} step={1} value={tier.discount_pct} onChange={(e) => setBulkTiers((prev) => prev.map((item, i) => i === index ? { ...item, discount_pct: Number(e.target.value) || 0 } : item))} className={inputClass} />
               </div>
             ))}
           </div>

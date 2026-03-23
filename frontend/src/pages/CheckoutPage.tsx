@@ -99,6 +99,8 @@ export default function CheckoutPage() {
   const [paymentPending, setPaymentPending] = useState(false);
   const [paymentTransactionId, setPaymentTransactionId] = useState<string | null>(null);
   const [paymentReference, setPaymentReference] = useState<string | null>(null);
+  const [paymentOrderIds, setPaymentOrderIds] = useState<string[]>([]);
+  const [vendorCodAllowed, setVendorCodAllowed] = useState(false);
   const paymentChannelRef = useRef<any>(null);
 
   const [shipping, setShipping] = useState<ShippingInfo>({ ...emptyShipping, email: user?.email || "" });
@@ -162,6 +164,33 @@ export default function CheckoutPage() {
       }
     });
   }, [user]);
+
+  useEffect(() => {
+    const loadVendorCodEligibility = async () => {
+      const productIds = [...new Set(items.map((item) => item.productId).filter(Boolean))];
+      if (productIds.length === 0) {
+        setVendorCodAllowed(false);
+        return;
+      }
+
+      const { data: products } = await supabase.from("products").select("id, store_id").in("id", productIds);
+      const storeIds = [...new Set((products || []).map((product: any) => product.store_id).filter(Boolean))];
+      if (storeIds.length === 0) {
+        setVendorCodAllowed(false);
+        return;
+      }
+
+      const { data: overrides } = await (supabase as any)
+        .from("vendor_pricing_overrides")
+        .select("store_id, vendor_cod_enabled")
+        .in("store_id", storeIds);
+
+      const codMap = new Map((overrides || []).map((override: any) => [override.store_id, !!override.vendor_cod_enabled]));
+      setVendorCodAllowed(storeIds.every((storeId) => codMap.get(storeId) === true));
+    };
+
+    void loadVendorCodEligibility();
+  }, [items]);
 
   // Cleanup realtime subscription on unmount
   useEffect(() => {
@@ -440,7 +469,7 @@ export default function CheckoutPage() {
         .insert({
           user_id: user!.id,
           store_id: storeId !== "default" ? storeId : null,
-          status: "pending",
+          status: paymentMethod === "mobile_money" ? "awaiting_payment" : "pending",
           payment_method: paymentMethod,
           shipping_first_name: shipping.firstName,
           shipping_last_name: shipping.lastName,
@@ -491,6 +520,7 @@ export default function CheckoutPage() {
     setProcessing(true);
 
     if (paymentMethod === "mobile_money") {
+      let createdOrderIds: string[] = [];
       // Validate phone
       const cleanPhone = mobileMoneyPhone.replace(/[\s\-\+]/g, "");
       if (!cleanPhone || cleanPhone.length < 9) {
@@ -502,6 +532,7 @@ export default function CheckoutPage() {
       try {
         // Create order first
         const { orderRef, orderIds } = await createOrderForPayment();
+        createdOrderIds = orderIds;
         if (orderIds.length === 0) {
           toast({ title: "Erreur", description: "Impossible de créer la commande.", variant: "destructive" });
           setProcessing(false);
@@ -534,6 +565,7 @@ export default function CheckoutPage() {
         setPaymentReference(data.reference);
         setPaymentPending(true);
         setOrderId(orderRef);
+        setPaymentOrderIds(orderIds);
         setProcessing(false);
 
         // Subscribe to realtime updates on payment_transactions
@@ -547,15 +579,17 @@ export default function CheckoutPage() {
               table: "payment_transactions",
               filter: `reference=eq.${data.reference}`,
             },
-            (payload: any) => {
+            async (payload: any) => {
               const newStatus = payload.new?.status;
               if (newStatus === "success") {
+                await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
                 setPaymentPending(false);
                 clearCart();
                 setStep("confirmation");
                 toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
                 supabase.removeChannel(channel);
               } else if (newStatus === "failed") {
+                await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", orderIds);
                 setPaymentPending(false);
                 toast({
                   title: "Paiement échoué",
@@ -585,6 +619,9 @@ export default function CheckoutPage() {
 
       } catch (err: any) {
         toast({ title: "Erreur", description: err.message || "Erreur inattendue.", variant: "destructive" });
+        if (createdOrderIds.length > 0) {
+          await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", createdOrderIds);
+        }
         setProcessing(false);
       }
     } else {
@@ -606,11 +643,17 @@ export default function CheckoutPage() {
         body: { transaction_id: paymentTransactionId },
       });
       if (data?.transactionstatus === "SUCCESS") {
+        if (paymentOrderIds.length > 0) {
+          await supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
+        }
         setPaymentPending(false);
         await clearCart();
         setStep("confirmation");
         toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderId}` });
       } else if (data?.transactionstatus === "FAILED") {
+        if (paymentOrderIds.length > 0) {
+          await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds);
+        }
         setPaymentPending(false);
         toast({ title: "Paiement échoué", description: "Le paiement n'a pas abouti.", variant: "destructive" });
       } else {
@@ -907,11 +950,15 @@ export default function CheckoutPage() {
                     { id: "stripe" as const, label: t("checkout.creditCard"), sub: "Visa, Mastercard, AMEX", icon: <CreditCard size={20} />, configKey: "stripe" as const },
                     { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, Wave, MTN", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
                     { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
-                  ]).filter(m => paymentConfig?.[m.configKey] !== false).filter(m => m.id !== "cod" || isKycVerified).map(method => (
+                  ]).filter(m => (m.id === "stripe" ? (paymentConfig?.stripe !== false || paymentConfig?.stripe_notice_enabled) : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).map(method => (
                     <button
                       key={method.id}
+                      disabled={method.id === "stripe" && paymentConfig?.stripe === false}
                       onClick={() => setPaymentMethod(method.id)}
                       className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-all text-left ${
+                        method.id === "stripe" && paymentConfig?.stripe === false
+                          ? "border-border bg-muted/40 opacity-60 cursor-not-allowed"
+                          :
                         paymentMethod === method.id
                           ? "border-primary bg-secondary"
                           : "border-border hover:border-primary/50"
@@ -922,7 +969,7 @@ export default function CheckoutPage() {
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-foreground">{method.label}</p>
-                        <p className="text-xs text-muted-foreground">{method.sub}</p>
+                          <p className="text-xs text-muted-foreground">{method.id === "stripe" && paymentConfig?.stripe === false ? (paymentConfig?.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif.") : method.sub}</p>
                       </div>
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                         paymentMethod === method.id ? "border-primary" : "border-border"
@@ -1047,9 +1094,9 @@ export default function CheckoutPage() {
                               }
                               try {
                                 const cleanPhone = retryPhone.replace(/[\s\-\+]/g, "");
-                                const { data, error } = await supabase.functions.invoke("kelpay-payment", {
+                                 const { data, error } = await supabase.functions.invoke("kelpay-payment", {
                                   body: {
-                                    order_id: orderId, // reuse same order
+                                     order_id: paymentOrderIds[0],
                                     phone_number: cleanPhone,
                                     amount: total,
                                     currency: "USD",
@@ -1071,8 +1118,8 @@ export default function CheckoutPage() {
                                     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "payment_transactions", filter: `reference=eq.${data.reference}` },
                                       (payload: any) => {
                                         const ns = payload.new?.status;
-                                        if (ns === "success") { setPaymentPending(false); clearCart(); setStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel); }
-                                        else if (ns === "failed") { setPaymentPending(false); toast({ title: "Paiement échoué", variant: "destructive" }); supabase.removeChannel(channel); }
+                                        if (ns === "success") { supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment"); setPaymentPending(false); clearCart(); setStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel); }
+                                        else if (ns === "failed") { supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds); setPaymentPending(false); toast({ title: "Paiement échoué", variant: "destructive" }); supabase.removeChannel(channel); }
                                       }
                                     ).subscribe();
                                   paymentChannelRef.current = channel;

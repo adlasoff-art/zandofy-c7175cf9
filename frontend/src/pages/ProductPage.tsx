@@ -4,6 +4,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchProductBySlug, fetchProducts, fetchPricingTiers, type Product } from "@/services/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
@@ -92,6 +93,7 @@ export default function ProductPage() {
   const [sizeUnit, setSizeUnit] = useState<"CM" | "IN">("CM");
   const [quantity, setQuantity] = useState<number | null>(null);
   const [variantDrawerOpen, setVariantDrawerOpen] = useState(false);
+  const [pointsPerDollar, setPointsPerDollar] = useState(50);
 
   const { data: product, isLoading } = useQuery({
     queryKey: ["product", slug],
@@ -111,17 +113,40 @@ export default function ProductPage() {
     enabled: !!id,
   });
 
-  const pricingTiers: PricingTier[] = useMemo(
-    () =>
-      (pricingTiersRaw || []).map((t) => ({
-        id: t.id,
-        tierLabel: t.tier_label,
-        minQuantity: t.min_quantity,
-        discountType: t.discount_type as "percentage" | "fixed",
-        discountValue: Number(t.discount_value),
-      })),
-    [pricingTiersRaw]
-  );
+  const { data: globalBulkTiers } = useQuery({
+    queryKey: ["bulk-discount-tiers"],
+    queryFn: async () => {
+      const { data } = await supabase.from("platform_settings").select("value").eq("key", "bulk_discount_tiers").maybeSingle();
+      return Array.isArray((data?.value as any)?.tiers) ? (data?.value as any).tiers : [];
+    },
+  });
+
+  useEffect(() => {
+    supabase.from("platform_settings").select("value").eq("key", "referral_settings").maybeSingle().then(({ data }) => {
+      const v = data?.value as any;
+      setPointsPerDollar(Number(v?.points_per_dollar) || 50);
+    });
+  }, []);
+
+  const pricingTiers: PricingTier[] = useMemo(() => {
+    const source = pricingTiersRaw && pricingTiersRaw.length > 0
+      ? pricingTiersRaw
+      : (globalBulkTiers || []).map((tier: any, index: number) => ({
+          id: `global-${index}`,
+          tier_label: `Palier ${index + 1}`,
+          min_quantity: tier.min_quantity,
+          discount_type: "percentage",
+          discount_value: tier.discount_pct,
+        }));
+
+    return source.map((t: any) => ({
+      id: t.id,
+      tierLabel: t.tier_label,
+      minQuantity: t.min_quantity,
+      discountType: t.discount_type as "percentage" | "fixed",
+      discountValue: Number(t.discount_value),
+    }));
+  }, [globalBulkTiers, pricingTiersRaw]);
 
   const moq = product?.moq || 1;
   const currentQty = quantity ?? moq;
@@ -146,7 +171,7 @@ export default function ProductPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const loyaltyPoints = product ? Math.floor(product.price * 10) : 0;
+  const loyaltyPoints = Math.floor(totalPrice * pointsPerDollar);
 
 
   if (isLoading) {
@@ -566,7 +591,7 @@ export default function ProductPage() {
             )}
 
             {/* Loyalty info */}
-            <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-sm">🎁 Gagnez jusqu'à <span className="font-semibold text-primary">{Math.floor(currentUnitPrice * currentQty * 10)} points</span> fidélité, calculés au checkout.</p>
+            <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-sm">🎁 Gagnez jusqu'à <span className="font-semibold text-primary">{loyaltyPoints} points</span> fidélité, calculés au checkout.</p>
 
             {/* ═══ QUANTITY + TOTAL + CTA ═══ */}
             <div className="space-y-3 pt-1">

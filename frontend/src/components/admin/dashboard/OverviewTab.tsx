@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Loader2, Users, Package, ShoppingBag, DollarSign, Store as StoreIcon, CheckCircle2, Clock, XCircle, Ban, ShieldAlert, RotateCcw, CreditCard, AlertTriangle, Bike, UserCheck, Ship, Truck, TrendingUp } from "lucide-react";
 import { KpiCard, KpiCardRow, statusColor, statusLabels } from "./shared";
-import { NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
+import { NON_REVENUE_ORDER_STATUSES, REAL_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
 import type { PeriodKey } from "./DashboardPeriodSelector";
 import { getPeriodDate } from "./DashboardPeriodSelector";
 
@@ -25,17 +25,19 @@ export function OverviewTab({ period }: Props) {
     queryKey: ["admin-order-stats", period],
     queryFn: async () => {
       const { data } = await supabase.from("orders").select("total, status").gte("created_at", since);
-      if (!data) return { count: 0, revenue: 0, cancelledRevenue: 0, cancelledCount: 0, deliveredCount: 0, pendingCount: 0, byStatus: {} as Record<string, number> };
+      if (!data) return { count: 0, revenue: 0, cancelledRevenue: 0, cancelledCount: 0, deliveredCount: 0, pendingCount: 0, failedAmount: 0, failedCount: 0, byStatus: {} as Record<string, number> };
       const byStatus: Record<string, number> = {};
-      let revenue = 0, cancelledRevenue = 0, cancelledCount = 0, deliveredCount = 0, pendingCount = 0, opCount = 0;
+      let revenue = 0, cancelledRevenue = 0, cancelledCount = 0, deliveredCount = 0, pendingCount = 0, failedAmount = 0, failedCount = 0, opCount = 0;
       data.forEach((o) => {
         byStatus[o.status] = (byStatus[o.status] || 0) + 1;
         if (o.status === "cancelled" || o.status === "returned") { cancelledRevenue += Number(o.total); cancelledCount++; }
-        if (!NON_REVENUE_ORDER_STATUSES.includes(o.status as never)) { opCount++; revenue += Number(o.total); }
+        if (!NON_REVENUE_ORDER_STATUSES.includes(o.status as never)) { opCount++; }
+        if (REAL_REVENUE_ORDER_STATUSES.includes(o.status as never)) { revenue += Number(o.total); }
         if (o.status === "delivered") deliveredCount++;
         if (o.status === "pending") pendingCount++;
+        if (o.status === "payment_failed" || o.status === "awaiting_payment") { failedAmount += Number(o.total); failedCount++; }
       });
-      return { count: opCount, revenue, cancelledRevenue, cancelledCount, deliveredCount, pendingCount, byStatus };
+      return { count: opCount, revenue, cancelledRevenue, cancelledCount, deliveredCount, pendingCount, failedAmount, failedCount, byStatus };
     },
   });
 
@@ -123,7 +125,7 @@ export function OverviewTab({ period }: Props) {
         <KpiCardRow icon={CheckCircle2} label="Livrées" value={(orderStats?.deliveredCount ?? 0).toString()} />
         <KpiCardRow icon={Clock} label="En attente" value={(orderStats?.pendingCount ?? 0).toString()} color="text-amber-500" />
         <KpiCardRow icon={XCircle} label="Annulées / retournées" value={(orderStats?.cancelledCount ?? 0).toString()} color="text-destructive" />
-        <KpiCardRow icon={Ban} label="Montant perdu" value={`$${(orderStats?.cancelledRevenue ?? 0).toLocaleString()}`} color="text-destructive" />
+        <KpiCardRow icon={Ban} label="Montant cmd échouées" value={`$${(orderStats?.failedAmount ?? 0).toLocaleString()}`} color="text-destructive" />
       </div>
 
       {/* Après-vente */}
@@ -132,7 +134,7 @@ export function OverviewTab({ period }: Props) {
         <KpiCard icon={ShieldAlert} label="Litiges" value={(disputeStats?.total ?? 0).toString()} color="text-destructive" sub={`${disputeStats?.open ?? 0} ouvert(s)`} />
         <KpiCard icon={RotateCcw} label="Retours" value={(returnStats?.total ?? 0).toString()} color="text-amber-500" sub={`${returnStats?.pending ?? 0} en attente`} />
         <KpiCard icon={CreditCard} label="Paiements réussis" value={(paymentStats?.successful ?? 0).toString()} sub={`$${(paymentStats?.totalAmount ?? 0).toLocaleString()}`} />
-        <KpiCard icon={AlertTriangle} label="Paiements échoués" value={(paymentStats?.failed ?? 0).toString()} color="text-destructive" sub={`${paymentStats?.pending ?? 0} en attente`} />
+        <KpiCard icon={AlertTriangle} label="Paiements échoués" value={(orderStats?.failedCount ?? 0).toString()} color="text-destructive" sub={`${paymentStats?.pending ?? 0} transaction(s) en attente`} />
       </div>
 
       {/* Bottom: Recent orders + sidebar */}

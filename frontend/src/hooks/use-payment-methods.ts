@@ -8,12 +8,16 @@ export interface PaymentMethodsConfig {
   mobile_money: boolean;
   stripe: boolean;
   cod: boolean;
+  stripe_notice_enabled?: boolean;
+  stripe_notice_text?: string;
 }
 
 const DEFAULT_CONFIG: PaymentMethodsConfig = {
   mobile_money: true,
   stripe: true,
   cod: true,
+  stripe_notice_enabled: false,
+  stripe_notice_text: "Pour l'instant, ce moyen de paiement n'est pas actif.",
 };
 
 export function usePaymentMethods() {

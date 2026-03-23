@@ -232,11 +232,12 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["user-audit-logs", user.id] });
       toast.success(`Impersonation démarrée pour ${data.target?.first_name || data.target?.email}`);
-      // Open user's dashboard in new tab
-      const url = new URL(window.location.origin);
-      url.pathname = "/dashboard";
-      url.searchParams.set("impersonate", user.id);
-      window.open(url.toString(), "_blank");
+      if (data?.access_token && data?.refresh_token) {
+        supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token }).then(() => {
+          const targetRoles = Array.isArray(data?.target?.roles) ? data.target.roles : [];
+          window.location.href = targetRoles.includes("vendor") ? "/vendor" : "/dashboard";
+        });
+      }
     },
     onError: (e: any) => toast.error(e.message),
   });

@@ -3732,6 +3732,7 @@ export type Database = {
           notes: string | null
           store_id: string
           updated_at: string
+          vendor_cod_enabled: boolean
           vendor_extra_margin_enabled: boolean
         }
         Insert: {
@@ -3745,6 +3746,7 @@ export type Database = {
           notes?: string | null
           store_id: string
           updated_at?: string
+          vendor_cod_enabled?: boolean
           vendor_extra_margin_enabled?: boolean
         }
         Update: {
@@ -3758,6 +3760,7 @@ export type Database = {
           notes?: string | null
           store_id?: string
           updated_at?: string
+          vendor_cod_enabled?: boolean
           vendor_extra_margin_enabled?: boolean
         }
         Relationships: [
