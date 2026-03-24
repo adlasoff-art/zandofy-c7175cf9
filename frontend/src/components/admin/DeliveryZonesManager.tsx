@@ -26,13 +26,12 @@ export function DeliveryZonesManager() {
   const [country, setCountry] = useState("CD");
   const [price, setPrice] = useState(3);
 
+  const db = supabase as any;
+
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("delivery_zones")
-      .select("*")
-      .order("city", { ascending: true });
-    setZones((data as DeliveryZone[]) || []);
+    const { data } = await db.from("delivery_zones").select("*").order("city", { ascending: true });
+    setZones((data || []) as DeliveryZone[]);
     setLoading(false);
   }, []);
 
@@ -41,12 +40,8 @@ export function DeliveryZonesManager() {
   const save = async () => {
     if (!name.trim() || !city.trim()) { toast.error("Nom et ville requis"); return; }
     setSaving(true);
-    const { error } = await supabase.from("delivery_zones").insert({
-      name: name.trim(),
-      city: city.trim(),
-      country,
-      price,
-      created_by_admin: true,
+    const { error } = await db.from("delivery_zones").insert({
+      name: name.trim(), city: city.trim(), country, price, created_by_admin: true,
     });
     if (error) toast.error(error.message);
     else { toast.success("Zone créée"); setShowForm(false); setName(""); setCity(""); setPrice(3); load(); }
@@ -54,12 +49,12 @@ export function DeliveryZonesManager() {
   };
 
   const toggle = async (z: DeliveryZone) => {
-    await supabase.from("delivery_zones").update({ is_active: !z.is_active }).eq("id", z.id);
+    await db.from("delivery_zones").update({ is_active: !z.is_active }).eq("id", z.id);
     setZones(prev => prev.map(x => x.id === z.id ? { ...x, is_active: !x.is_active } : x));
   };
 
   const remove = async (id: string) => {
-    await supabase.from("delivery_zones").delete().eq("id", id);
+    await db.from("delivery_zones").delete().eq("id", id);
     setZones(prev => prev.filter(x => x.id !== id));
     toast.success("Zone supprimée");
   };
