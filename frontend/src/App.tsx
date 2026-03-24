@@ -50,6 +50,7 @@ const ShipperDashboardPage = lazy(() => import("./pages/ShipperDashboardPage"));
 const RiderDashboardPage = lazy(() => import("./pages/RiderDashboardPage"));
 const SearchPage = lazy(() => import("./pages/SearchPage"));
 const WishlistPage = lazy(() => import("./pages/WishlistPage"));
+const SharedWishlistPage = lazy(() => import("./pages/SharedWishlistPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const FAQPage = lazy(() => import("./pages/FAQPage"));
