@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
-import { Heart } from "lucide-react";
+import { Heart, Share2, Copy } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/contexts/I18nContext";
