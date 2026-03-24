@@ -1041,6 +1041,11 @@ const AdminShippingPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Last-Mile Delivery Zones */}
+      <div className="mt-8 border-t border-border pt-6">
+        <DeliveryZonesManager />
+      </div>
+
       {/* Dialogs */}
       <ZoneDialog open={zoneDialog.open} onClose={() => setZoneDialog({ open: false, zone: null })} zone={zoneDialog.zone} onSave={handleSaveZone} />
       <RouteDialog open={routeDialog.open} onClose={() => setRouteDialog({ open: false, route: null })} route={routeDialog.route} zones={zones} onSave={handleSaveRoute} />
