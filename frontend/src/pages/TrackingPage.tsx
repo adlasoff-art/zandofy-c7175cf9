@@ -439,6 +439,31 @@ export default function TrackingPage() {
   const [globalResult, setGlobalResult] = useState<TrackingResult | null>(null);
   const [orderResult, setOrderResult] = useState<OrderTrackingResult | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [tippingEnabled, setTippingEnabled] = useState(false);
+  const [maxTip, setMaxTip] = useState(20);
+
+  // Check tipping settings
+  useEffect(() => {
+    supabase.from("platform_settings").select("value").eq("key", "tipping_settings").maybeSingle()
+      .then(({ data }) => {
+        if (data?.value) {
+          const v = data.value as any;
+          setTippingEnabled(!!v.enabled);
+          setMaxTip(Number(v.max_amount) || 20);
+        }
+      });
+  }, []);
+
+  // Auto-show rating modal when order is delivered
+  useEffect(() => {
+    if (orderResult?.status === "delivered" && orderResult?.assigned_rider_id && user) {
+      fromTable("rider_ratings").select("id").eq("order_id", orderResult.id).eq("user_id", user.id).maybeSingle()
+        .then(({ data }: any) => {
+          if (!data) setShowRatingModal(true);
+        });
+    }
+  }, [orderResult?.status, orderResult?.id, orderResult?.assigned_rider_id, user]);
 
   // Fetch order + history
   const fetchOrder = useCallback(async (orderRef: string) => {
