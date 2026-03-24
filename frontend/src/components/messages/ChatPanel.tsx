@@ -546,6 +546,20 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Typing indicator */}
+      {isTyping && (
+        <div className="px-4 py-1">
+          <span className="text-[11px] text-muted-foreground italic animate-pulse">
+            {conversation.other_party_name} est en train d'écrire…
+          </span>
+        </div>
+      )}
+
+      {/* Quick replies (vendor only) */}
+      {conversation.is_store_owner && (
+        <QuickReplies onSelect={(text) => setNewMessage(text)} />
+      )}
+
       {/* Input area */}
       <div className="border-t border-border px-3 py-2 flex items-center gap-2 shrink-0">
         {mediaEnabled && (
@@ -568,7 +582,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
         )}
         <textarea
           value={newMessage}
-          onChange={e => setNewMessage(e.target.value)}
+          onChange={e => { setNewMessage(e.target.value); broadcastTyping(); }}
           onKeyDown={handleKeyDown}
           placeholder="Écrivez votre message..."
           rows={1}
