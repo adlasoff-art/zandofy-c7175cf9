@@ -84,6 +84,7 @@ export function ReviewForm({ productId, onSuccess }: ReviewFormProps) {
         rating,
         comment: comment.trim(),
         images: imageUrls,
+        is_verified_purchase: !!hasVerifiedPurchase,
       });
       if (error) {
         if (error.code === "23505")
