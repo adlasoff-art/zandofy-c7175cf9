@@ -18,14 +18,47 @@ self.addEventListener("install", (event) => {
 
 // Activate — clean old caches immediately
 self.addEventListener("activate", (event) => {
-  const keepCaches = [STATIC_CACHE, API_CACHE, IMG_CACHE];
+  const keepCaches = [STATIC_CACHE, API_CACHE, IMG_CACHE, CATALOG_CACHE];
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => !keepCaches.includes(k)).map((k) => caches.delete(k)))
-    )
+    ).then(() => cacheTopProducts())
   );
   self.clients.claim();
 });
+
+// Cache top products for offline catalog
+async function cacheTopProducts() {
+  try {
+    const supabaseUrl = self.location.origin.includes("localhost")
+      ? "https://uogkklwfvwoxkifpkzpu.supabase.co"
+      : "https://uogkklwfvwoxkifpkzpu.supabase.co";
+    const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvZ2trbHdmdndveGtpZnBrenB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4ODY0MzcsImV4cCI6MjA4NzQ2MjQzN30.9NhIOytfsQ7Gdufs0goV6Lk97IyMkda362jh3IGMVi4";
+
+    const url = `${supabaseUrl}/rest/v1/products?select=id,name,name_fr,price,rating,product_images(image_url)&publish_status=eq.published&order=rating.desc.nullslast&limit=50`;
+    const response = await fetch(url, {
+      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+    });
+
+    if (response.ok) {
+      const cache = await caches.open(CATALOG_CACHE);
+      await cache.put("offline-catalog", response.clone());
+
+      // Cache product images
+      const products = await response.json();
+      const imgCache = await caches.open(IMG_CACHE);
+      for (const p of products) {
+        const imgUrl = p.product_images?.[0]?.image_url;
+        if (imgUrl) {
+          try {
+            const imgRes = await fetch(imgUrl);
+            if (imgRes.ok) await imgCache.put(new Request(imgUrl), imgRes);
+          } catch {}
+        }
+      }
+    }
+  } catch {}
+}
 
 // Helper: limit cache size
 async function trimCache(cacheName, maxItems) {
