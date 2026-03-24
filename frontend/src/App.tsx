@@ -66,6 +66,7 @@ const CareersPage = lazy(() => import("./pages/CareersPage"));
 const SocialResponsibilityPage = lazy(() => import("./pages/SocialResponsibilityPage"));
 const BlogPage = lazy(() => import("./pages/BlogPage"));
 const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
+const ComparePage = lazy(() => import("./pages/ComparePage"));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
