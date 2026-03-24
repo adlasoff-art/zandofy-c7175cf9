@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { Bike, MapPin, CheckCircle, Clock, Phone, Navigation, User, Home, Camera, Loader2, Star, Calendar, Map as MapIcon, Hash, Package, ShoppingBag, Banknote } from "lucide-react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { Bike, MapPin, CheckCircle, Clock, Phone, Navigation, User, Home, Camera, Loader2, Star, Calendar, Map as MapIcon, Hash, Package, ShoppingBag, Banknote, Crosshair, Send } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRoles } from "@/hooks/use-roles";
 import { Navigate, NavLink } from "react-router-dom";
@@ -22,9 +22,13 @@ const statusStyles: Record<DeliveryStatus, string> = {
 
 type TabKey = "route" | "orders" | "map" | "history" | "profile";
 
-function RiderMapTabContent({ activeDelivery }: { activeDelivery: any }) {
+function RiderMapTabContent({ activeDelivery, userId }: { activeDelivery: any; userId?: string }) {
   const [customerLat, setCustomerLat] = useState<number | null>(null);
   const [customerLng, setCustomerLng] = useState<number | null>(null);
+  const [riderLat, setRiderLat] = useState<number | null>(null);
+  const [riderLng, setRiderLng] = useState<number | null>(null);
+  const [requestingSent, setRequestingSent] = useState(false);
+  const riderWatchId = useRef<number | null>(null);
 
   useCustomerLocationSubscription(
     activeDelivery?.order_id,
@@ -33,6 +37,49 @@ function RiderMapTabContent({ activeDelivery }: { activeDelivery: any }) {
       setCustomerLng(lng);
     }, [])
   );
+
+  // Track rider's own position for display on the map
+  useEffect(() => {
+    if (!activeDelivery || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setRiderLat(pos.coords.latitude); setRiderLng(pos.coords.longitude); },
+      () => {}, { enableHighAccuracy: true }
+    );
+    riderWatchId.current = navigator.geolocation.watchPosition(
+      (pos) => { setRiderLat(pos.coords.latitude); setRiderLng(pos.coords.longitude); },
+      () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    );
+    return () => {
+      if (riderWatchId.current !== null) navigator.geolocation.clearWatch(riderWatchId.current);
+    };
+  }, [activeDelivery]);
+
+  // Request customer to activate their GPS via in-app notification
+  const requestCustomerLocation = async () => {
+    if (!activeDelivery?.order_id || requestingSent) return;
+    try {
+      // Get order's user_id
+      const { data: order } = await supabase
+        .from("orders")
+        .select("user_id, order_ref")
+        .eq("id", activeDelivery.order_id)
+        .single();
+      if (!order) { toast.error("Commande introuvable"); return; }
+
+      await supabase.from("notifications").insert({
+        user_id: order.user_id,
+        type: "delivery",
+        title: "📍 Partagez votre position",
+        message: `Votre livreur pour la commande ${order.order_ref} vous demande d'activer votre localisation GPS pour faciliter la livraison.`,
+        link: "/tracking",
+      });
+      setRequestingSent(true);
+      toast.success("Demande de localisation envoyée au client !");
+      setTimeout(() => setRequestingSent(false), 30000); // re-enable after 30s
+    } catch {
+      toast.error("Erreur lors de l'envoi");
+    }
+  };
 
   if (!activeDelivery) {
     return (
@@ -44,6 +91,9 @@ function RiderMapTabContent({ activeDelivery }: { activeDelivery: any }) {
   }
 
   const markers: MapMarker[] = [];
+  if (riderLat && riderLng) {
+    markers.push({ lat: riderLat, lng: riderLng, type: "rider", label: "🚴 Ma position", id: "rider-self" });
+  }
   if (activeDelivery.delivery_lat && activeDelivery.delivery_lng) {
     markers.push({ lat: activeDelivery.delivery_lat, lng: activeDelivery.delivery_lng, type: "destination", label: "📍 Destination", id: "dest" });
   }
@@ -54,6 +104,31 @@ function RiderMapTabContent({ activeDelivery }: { activeDelivery: any }) {
   return (
     <div className="px-4 mt-4 space-y-3">
       <h2 className="text-sm font-semibold text-foreground">Carte de livraison</h2>
+
+      {/* GPS status indicators */}
+      <div className="flex gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 text-xs bg-primary/10 border border-primary/20 rounded-lg px-3 py-1.5">
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <Crosshair size={12} className="text-primary" />
+          <span className="text-foreground font-medium">Mon GPS actif</span>
+        </div>
+        {customerLat && customerLng ? (
+          <div className="flex items-center gap-1.5 text-xs bg-primary/10 border border-primary/20 rounded-lg px-3 py-1.5">
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            <span className="text-foreground font-medium">Client GPS actif</span>
+          </div>
+        ) : (
+          <button
+            onClick={requestCustomerLocation}
+            disabled={requestingSent}
+            className="flex items-center gap-1.5 text-xs bg-accent text-accent-foreground rounded-lg px-3 py-1.5 active:scale-95 touch-manipulation disabled:opacity-50"
+          >
+            <Send size={12} />
+            {requestingSent ? "Demande envoyée ✓" : "Demander position client"}
+          </button>
+        )}
+      </div>
+
       <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
         <MapPin size={16} className="text-primary shrink-0" />
         <div className="flex-1 min-w-0">
@@ -61,13 +136,8 @@ function RiderMapTabContent({ activeDelivery }: { activeDelivery: any }) {
           <p className="text-xs text-muted-foreground truncate">{activeDelivery.address}</p>
         </div>
       </div>
-      {customerLat && customerLng && (
-        <div className="flex items-center gap-2 text-xs bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
-          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          <span className="text-foreground font-medium">Client GPS actif — position en temps réel</span>
-        </div>
-      )}
-      <DeliveryMap markers={markers} showPolylines={!!customerLat} showEta={!!customerLat} className="h-[400px]" />
+
+      <DeliveryMap markers={markers} showPolylines={markers.length >= 2} showEta={!!customerLat || !!(activeDelivery.delivery_lat)} className="h-[400px]" />
       <p className="text-[10px] text-muted-foreground text-center">
         Votre position GPS est partagée en temps réel avec le client
         {activeDelivery.address && (
@@ -482,7 +552,7 @@ export default function RiderDashboardPage() {
       )}
 
       {tab === "map" && (
-        <RiderMapTabContent activeDelivery={activeDelivery} />
+        <RiderMapTabContent activeDelivery={activeDelivery} userId={user?.id} />
       )}
 
       {tab === "history" && (
