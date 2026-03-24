@@ -95,7 +95,7 @@ export function BundleSection({ productId }: { productId: string }) {
 
   const handleAddBundle = (bundle: Bundle) => {
     bundle.products.forEach((p) => {
-      addItem({ productId: p.id, name: p.name, nameFr: p.name, price: p.price, image: p.image, quantity: 1 });
+      addItem({ productId: p.id, name: p.name, nameFr: p.name, price: p.price, image: p.image, quantity: 1, color: null, size: null, moq: null });
     });
     toast({ title: "Bundle ajouté au panier", description: `${bundle.products.length} produits ajoutés` });
   };
