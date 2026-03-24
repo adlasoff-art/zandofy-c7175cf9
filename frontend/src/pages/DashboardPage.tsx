@@ -17,6 +17,7 @@ import {
   Search, Filter, AlertTriangle, History, RotateCcw, FileText, CreditCard,
 } from "lucide-react";
 import { RetryPaymentModal } from "@/components/payments/RetryPaymentModal";
+import { PushPermissionPrompt } from "@/components/PushPermissionPrompt";
 import { useNotifications } from "@/hooks/use-notifications";
 import { LoyaltyProgress } from "@/components/LoyaltyProgress";
 import { ReferralDashboard } from "@/components/ReferralDashboard";
