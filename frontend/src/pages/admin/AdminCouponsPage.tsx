@@ -77,6 +77,8 @@ export default function AdminCouponsPage() {
       min_order_amount: minOrder > 0 ? minOrder : null,
       max_uses: maxUses ? Number(maxUses) : null,
       expires_at: expiresAt || null,
+      target_city: targetCity.trim() || null,
+      target_country: targetCountry.trim() || null,
     });
     if (error) {
       if (error.code === "23505") toast.error("Ce code existe déjà");
