@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { icon: Search, labelKey: "bottomNav.search", path: "/search" },
   { icon: Heart, labelKey: "bottomNav.wishlist", path: "/wishlist" },
   { icon: ShoppingBag, labelKey: "bottomNav.cart", path: "#cart" },
-  { icon: User, labelKey: "bottomNav.account", path: "/dashboard" },
+  { icon: User, labelKey: "bottomNav.account", path: "/account" },
 ];
 
 // Custom event to toggle search bar on SearchPage
