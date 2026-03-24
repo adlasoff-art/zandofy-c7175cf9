@@ -602,33 +602,7 @@ export default function RiderDashboardPage() {
       )}
 
       {tab === "profile" && (
-        <div className="px-4 mt-4 space-y-4">
-          <div className="bg-card border border-border rounded-xl p-5">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <User size={28} className="text-primary" />
-              </div>
-              <div>
-                <p className="text-base font-bold text-foreground">Profil Livreur</p>
-                <p className="text-xs text-muted-foreground">{user?.email}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="bg-muted/50 rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-foreground">{completed.length}</p>
-                <p className="text-[10px] text-muted-foreground">Livrées</p>
-              </div>
-              <div className="bg-muted/50 rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-foreground">${totalEarnings.toFixed(0)}</p>
-                <p className="text-[10px] text-muted-foreground">Gains</p>
-              </div>
-              <div className="bg-muted/50 rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-foreground">{deliveries.length ? Math.round((completed.length / deliveries.length) * 100) : 0}%</p>
-                <p className="text-[10px] text-muted-foreground">Taux</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <RiderProfileTab userId={user?.id} email={user?.email} completed={completed} totalEarnings={totalEarnings} deliveries={deliveries} />
       )}
 
       {signatureModal && (
