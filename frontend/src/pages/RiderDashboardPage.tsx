@@ -554,7 +554,17 @@ export default function RiderDashboardPage() {
       )}
 
       {tab === "map" && (
-        <RiderMapTabContent activeDelivery={activeDelivery} userId={user?.id} />
+        <>
+          <RiderMapTabContent activeDelivery={activeDelivery} userId={user?.id} />
+          {/* Ephemeral chat during active delivery */}
+          {activeDelivery?.order_id && (
+            <DeliveryChat
+              orderId={activeDelivery.order_id}
+              deliveryId={activeDelivery.id}
+              otherPartyName={activeDelivery.customer_name || "Client"}
+            />
+          )}
+        </>
       )}
 
       {tab === "history" && (
