@@ -29,11 +29,11 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
-    const { data: claims, error: claimsErr } = await anonClient.auth.getClaims(authHeader.replace("Bearer ", ""));
-    if (claimsErr || !claims?.claims) {
+    const { data: { user }, error: userErr } = await anonClient.auth.getUser();
+    if (userErr || !user) {
       return jsonResponse({ error: "Unauthorized" }, 401);
     }
-    const callerId = claims.claims.sub as string;
+    const callerId = user.id;
 
     // Check admin role
     const { data: roleCheck } = await anonClient.rpc("has_role", { _user_id: callerId, _role: "admin" });
