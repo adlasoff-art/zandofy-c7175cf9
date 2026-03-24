@@ -1,4 +1,4 @@
-import { Heart, ShoppingCart, Plus, Star, Trophy, Check, Award } from "lucide-react";
+import { Heart, ShoppingCart, Plus, Star, Trophy, Check, Award, GitCompareArrows } from "lucide-react";
 import { useState, useCallback, useRef, memo } from "react";
 import { useLazyImage } from "@/hooks/use-lazy-image";
 import { useCart } from "@/contexts/CartContext";
