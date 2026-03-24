@@ -21,8 +21,10 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
   const { addItem } = useCart();
   const { user } = useAuth();
   const { isInWishlist, toggleWishlist } = useWishlist();
-  const { t, formatPrice, locale } = useI18n();
+  const { formatPrice, locale } = useI18n();
+  const { isInCompare, addToCompare, removeFromCompare } = useCompare();
   const wishlisted = isInWishlist(product.id);
+  const compared = isInCompare(product.id);
   const [cartSuccess, setCartSuccess] = useState(false);
   const successTimer = useRef<ReturnType<typeof setTimeout>>();
 
