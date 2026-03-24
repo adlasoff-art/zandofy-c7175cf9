@@ -122,7 +122,21 @@ export function ReviewForm({ productId, onSuccess }: ReviewFormProps) {
 
   return (
     <div className="p-4 bg-card border border-border rounded-sm space-y-4">
-      <h3 className="font-semibold text-foreground">Donner mon avis</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-foreground">Donner mon avis</h3>
+        {hasVerifiedPurchase && (
+          <span className="inline-flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded">
+            <BadgeCheck size={12} /> Achat vérifié
+          </span>
+        )}
+      </div>
+
+      {!hasVerifiedPurchase && !checkingPurchase && (
+        <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-sm text-xs text-muted-foreground">
+          <ShieldAlert size={14} className="shrink-0 mt-0.5" />
+          <span>Vous n'avez pas encore acheté ce produit. Votre avis sera publié sans le badge "Achat vérifié".</span>
+        </div>
+      )}
 
       <div>
         <label className="text-sm text-muted-foreground mb-1 block">Note</label>
