@@ -61,6 +61,31 @@ const activityActionLabels: Record<string, string> = {
   impersonated: "Impersonation par admin",
 };
 
+const getFunctionErrorMessage = async (error: unknown, fallback = "Une erreur est survenue") => {
+  if (!error || typeof error !== "object") return fallback;
+
+  const baseMessage = "message" in error && typeof error.message === "string"
+    ? error.message
+    : fallback;
+
+  const context = "context" in error ? error.context : null;
+  if (!context || typeof context !== "object" || !("json" in context) || typeof context.json !== "function") {
+    return baseMessage;
+  }
+
+  try {
+    const payload = await context.json();
+    if (payload && typeof payload === "object") {
+      if ("error" in payload && typeof payload.error === "string") return payload.error;
+      if ("message" in payload && typeof payload.message === "string") return payload.message;
+    }
+  } catch {
+    // noop
+  }
+
+  return baseMessage;
+};
+
 interface UserProfile {
   id: string;
   first_name: string | null;
@@ -279,7 +304,7 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
       const res = await supabase.functions.invoke("admin-users", {
         body: { action: "reset_password", userId: user.id },
       });
-      if (res.error) throw new Error(res.error.message);
+      if (res.error) throw new Error(await getFunctionErrorMessage(res.error, "Échec d'envoi de l'email de réinitialisation"));
       if (res.data?.error) throw new Error(res.data.error);
       await logAudit("reset_password", user.id, { email: res.data.email });
       return res.data;

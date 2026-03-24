@@ -6,6 +6,12 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const jsonResponse = (body: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -14,7 +20,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     // Verify caller is admin
@@ -25,14 +31,14 @@ Deno.serve(async (req) => {
     );
     const { data: claims, error: claimsErr } = await anonClient.auth.getClaims(authHeader.replace("Bearer ", ""));
     if (claimsErr || !claims?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
     const callerId = claims.claims.sub as string;
 
     // Check admin role
     const { data: roleCheck } = await anonClient.rpc("has_role", { _user_id: callerId, _role: "admin" });
     if (!roleCheck) {
-      return new Response(JSON.stringify({ error: "Forbidden: admin role required" }), { status: 403, headers: corsHeaders });
+      return jsonResponse({ error: "Forbidden: admin role required" }, 403);
     }
 
     // Service role client for admin operations
@@ -48,7 +54,7 @@ Deno.serve(async (req) => {
         // Get user email
         const { data: userData, error: userErr } = await adminClient.auth.admin.getUserById(userId);
         if (userErr || !userData?.user?.email) {
-          return new Response(JSON.stringify({ error: "User not found" }), { status: 404, headers: corsHeaders });
+          return jsonResponse({ error: "User not found" }, 404);
         }
         const userEmail = userData.user.email;
 
@@ -59,13 +65,13 @@ Deno.serve(async (req) => {
         });
         if (linkErr) {
           console.error("generateLink error:", linkErr.message);
-          return new Response(JSON.stringify({ error: linkErr.message }), { status: 500, headers: corsHeaders });
+          return jsonResponse({ error: linkErr.message }, 500);
         }
 
         // Build the redirect URL from the generated link
         const actionLink = linkData?.properties?.action_link;
         if (!actionLink) {
-          return new Response(JSON.stringify({ error: "Could not generate recovery link" }), { status: 500, headers: corsHeaders });
+          return jsonResponse({ error: "Could not generate recovery link" }, 500);
         }
 
         // Send the email via SMTP (same as send-email function)
@@ -76,7 +82,7 @@ Deno.serve(async (req) => {
 
         if (!smtpHost || !smtpUser || !smtpPass) {
           console.error("Missing SMTP secrets:", { hasHost: !!smtpHost, hasUser: !!smtpUser, hasPass: !!smtpPass });
-          return new Response(JSON.stringify({ error: "SMTP configuration missing. Please configure SMTP secrets." }), { status: 500, headers: corsHeaders });
+          return jsonResponse({ error: "SMTP configuration missing. Please configure SMTP secrets." }, 500);
         }
 
         const nodemailer = (await import("npm:nodemailer@6.9.16")).default;
@@ -115,7 +121,7 @@ Deno.serve(async (req) => {
           `,
         });
 
-        return new Response(JSON.stringify({ success: true, email: userEmail }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return jsonResponse({ success: true, email: userEmail });
       }
 
       case "ban_user": {
@@ -125,7 +131,7 @@ Deno.serve(async (req) => {
           ban_duration: "876600h", // ~100 years
         });
         if (banErr) {
-          return new Response(JSON.stringify({ error: banErr.message }), { status: 500, headers: corsHeaders });
+          return jsonResponse({ error: banErr.message }, 500);
         }
         // Update profile
         await adminClient.from("profiles").update({
@@ -135,7 +141,7 @@ Deno.serve(async (req) => {
           banned_by: callerId,
         }).eq("id", userId);
 
-        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return jsonResponse({ success: true });
       }
 
       case "unban_user": {
@@ -144,7 +150,7 @@ Deno.serve(async (req) => {
           ban_duration: "none",
         });
         if (unbanErr) {
-          return new Response(JSON.stringify({ error: unbanErr.message }), { status: 500, headers: corsHeaders });
+          return jsonResponse({ error: unbanErr.message }, 500);
         }
         // Update profile
         await adminClient.from("profiles").update({
@@ -154,28 +160,28 @@ Deno.serve(async (req) => {
           banned_by: null,
         }).eq("id", userId);
 
-        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return jsonResponse({ success: true });
       }
 
       case "get_user_details": {
         // Get auth user details (last sign in, created at, etc.)
         const { data: authUser, error: authErr } = await adminClient.auth.admin.getUserById(userId);
         if (authErr) {
-          return new Response(JSON.stringify({ error: authErr.message }), { status: 500, headers: corsHeaders });
+          return jsonResponse({ error: authErr.message }, 500);
         }
-        return new Response(JSON.stringify({
+        return jsonResponse({
           last_sign_in_at: authUser.user.last_sign_in_at,
           created_at: authUser.user.created_at,
           email_confirmed_at: authUser.user.email_confirmed_at,
           banned_until: authUser.user.banned_until,
           providers: authUser.user.app_metadata?.providers || [],
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        });
       }
 
       default:
-        return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400, headers: corsHeaders });
+        return jsonResponse({ error: "Unknown action" }, 400);
     }
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
+    return jsonResponse({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });
