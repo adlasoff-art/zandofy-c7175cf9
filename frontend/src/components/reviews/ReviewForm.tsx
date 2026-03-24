@@ -24,6 +24,24 @@ export function ReviewForm({ productId, onSuccess }: ReviewFormProps) {
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
 
+  // Check if user has a delivered order for this product
+  const { data: hasVerifiedPurchase, isLoading: checkingPurchase } = useQuery({
+    queryKey: ["verified-purchase", productId, user?.id],
+    queryFn: async () => {
+      if (!user) return false;
+      const { data, error } = await supabase
+        .from("order_items")
+        .select("id, orders!inner(status, user_id)")
+        .eq("product_id", productId)
+        .eq("orders.user_id", user.id)
+        .eq("orders.status", "delivered")
+        .limit(1);
+      if (error) return false;
+      return (data?.length ?? 0) > 0;
+    },
+    enabled: !!user,
+  });
+
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
     const newFiles = Array.from(files).slice(0, 5 - images.length);
