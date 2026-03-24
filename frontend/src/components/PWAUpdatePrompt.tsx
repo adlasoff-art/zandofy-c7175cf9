@@ -33,7 +33,8 @@ export function PWAUpdatePrompt() {
     if (updating) return;
 
     setUpdating(true);
-    localStorage.setItem(PWA_UPDATE_LOCK_KEY, APP_VERSION);
+    sessionStorage.setItem(PWA_UPDATE_LOCK_KEY, APP_VERSION);
+    localStorage.setItem(PWA_UPDATE_DONE_KEY, APP_VERSION);
 
     const waiting = registration?.waiting;
     let reloadTriggered = false;
