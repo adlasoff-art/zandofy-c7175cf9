@@ -64,6 +64,7 @@ const Index = () => {
         <HeroBanner />
         <CategoryBanner />
         <FlashSales />
+        <RecommendationsSection />
 
         {/* Featured sidebar + TopTrends only */}
         <div className="container">

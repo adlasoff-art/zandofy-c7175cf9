@@ -129,6 +129,14 @@ export function AffiliateDashboard() {
           })}
         </div>
       </div>
+
+      {/* Affiliate Links Manager */}
+      <div className="bg-card border border-border rounded-xl p-5">
+        <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
+          <Link2 size={16} className="text-primary" /> Mes liens d'affiliation
+        </h3>
+        <AffiliateLinksManager />
+      </div>
     </div>
   );
 }
