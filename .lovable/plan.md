@@ -1,119 +1,192 @@
 
 
-## Plan : Terminer la Phase 1 — 5 fonctionnalités incomplètes
+## Plan : Fonctionnalites strategiques 6-15
 
-Après audit du code, voici les 5 éléments commencés mais non terminés, et ce qu'il faut faire pour chacun.
-
----
-
-### 1. Emails transactionnels automatiques sur changement de statut commande
-
-**État actuel** : L'edge function `notify-order-status` existe et peut envoyer des emails + notifications in-app + push. Mais elle n'est **jamais appelée** depuis le frontend.
-
-**À faire** :
-- Dans `VendorOrderManager.tsx`, après chaque changement de statut réussi (confirmed, in_shipping, shipped, delivered), appeler `supabase.functions.invoke("notify-order-status", { body: { orderId, newStatus } })`
-- Dans les pages admin où le statut peut être changé, ajouter le même appel
-- Ajouter les statuts manquants dans la map `NOTIFY_STATUSES` de l'edge function : `delivered`, `out_for_delivery`
-
-| Fichier | Changement |
-|---------|-----------|
-| `frontend/src/components/vendor/VendorOrderManager.tsx` | Appel notify-order-status après mise à jour statut |
-| `frontend/supabase/functions/notify-order-status/index.ts` | Ajouter statuts `delivered`, `out_for_delivery` |
+Apres audit complet, voici l'etat actuel et le plan d'implementation pour chaque fonctionnalite.
 
 ---
 
-### 2. pg_cron pour expiration automatique des commandes
+### Etat des lieux rapide
 
-**État actuel** : L'edge function `expire-pending-orders` existe et fonctionne. Mais le cron job n'est peut-être pas configuré en production.
+| # | Feature | Etat actuel |
+|---|---------|-------------|
+| 6 | Wishlist | **Fait** — table `wishlists`, context, page, bouton coeur sur ProductCard |
+| 7 | Coupons | **Fait** — tables `coupons` + `store_coupons`, validation checkout, vendeur peut creer ses codes |
+| 8 | Flash Sales | **Inexistant** — aucune table ni UI |
+| 9 | Comparateur | **Inexistant** |
+| 10 | Notifications multi-canal | **Partiel** — in-app + push + email existent mais pas de routage intelligent par preference |
+| 11 | Avis verifies photos | **Partiel** — ReviewForm existe avec upload photos, mais pas de verification d'achat |
+| 12 | Chat ameliore | **Partiel** — ChatPanel existe avec media/moderation, mais pas de typing indicator ni statut en ligne |
+| 13 | Analytics vendeur avance | **Partiel** — VendorStatsTab a revenus/commandes/top produits, manque taux conversion, heures de pointe, taux retour |
+| 14 | Litiges structures | **Partiel** — DisputeForm client + AdminDisputesPage + VendorDisputesTab existent, mais pas de messagerie tripartite |
+| 15 | Export comptable | **Inexistant** |
 
-**À faire** :
-- Fournir le SQL exact pour créer le cron job via `pg_cron` + `pg_net`
-- Le configurer via l'outil SQL (pas migration, car contient des données spécifiques au projet)
+**Conclusion : les points 6 et 7 sont deja complets.** Il reste 8 fonctionnalites a implementer.
 
-**SQL à exécuter** :
+---
+
+### 8. Flash Sales / Ventes Flash
+
+**Migration SQL** :
 ```sql
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
-
-SELECT cron.schedule(
-  'expire-pending-orders',
-  '*/5 * * * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://uogkklwfvwoxkifpkzpu.supabase.co/functions/v1/expire-pending-orders',
-    headers := '{"Content-Type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvZ2trbHdmdndveGtpZnBrenB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4ODY0MzcsImV4cCI6MjA4NzQ2MjQzN30.9NhIOytfsQ7Gdufs0goV6Lk97IyMkda362jh3IGMVi4"}'::jsonb,
-    body := '{}'::jsonb
-  ) AS request_id;
-  $$
+CREATE TABLE public.flash_sales (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  flash_price numeric NOT NULL,
+  original_price numeric NOT NULL,
+  starts_at timestamptz NOT NULL,
+  ends_at timestamptz NOT NULL,
+  max_quantity int DEFAULT NULL,
+  sold_quantity int NOT NULL DEFAULT 0,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.flash_sales ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read active flash sales" ON public.flash_sales FOR SELECT USING (is_active = true);
+CREATE POLICY "Admin manage flash sales" ON public.flash_sales FOR ALL USING (has_role(auth.uid(), 'admin')) WITH CHECK (has_role(auth.uid(), 'admin'));
 ```
 
----
-
-### 3. Visual Search — connecter le frontend à l'edge function Lovable Cloud
-
-**État actuel** : `PredictiveSearch.tsx` a déjà un bouton caméra et un modal de visual search. L'edge function `visual-search` existe dans deux emplacements (`supabase/functions/` et `frontend/supabase/functions/`). Il faut vérifier que le frontend appelle bien l'edge function Lovable Cloud (pas l'ancien backend FastAPI).
-
-**À faire** :
-- Vérifier que `PredictiveSearch.tsx` utilise `supabase.functions.invoke("visual-search")` et non l'ancien `apiFetch`
-- S'assurer que la config.toml a `verify_jwt = false` pour visual-search (déjà fait)
-- Tester le flux complet
-
-| Fichier | Changement |
-|---------|-----------|
-| `frontend/src/components/PredictiveSearch.tsx` | Vérifier/corriger l'appel vers edge function |
+**Fichiers a creer/modifier** :
+| Fichier | Action |
+|---------|--------|
+| `frontend/src/components/FlashSalesSection.tsx` | Creer — carrousel page d'accueil avec countdown timer |
+| `frontend/src/pages/admin/AdminFlashSalesPage.tsx` | Creer — CRUD flash sales (admin) |
+| `frontend/src/pages/Index.tsx` | Modifier — integrer FlashSalesSection |
+| `frontend/src/pages/ProductPage.tsx` | Modifier — afficher prix flash + timer si actif |
+| `frontend/src/App.tsx` | Ajouter route admin |
 
 ---
 
-### 4. Push Notifications — abonnement frontend
+### 9. Comparateur de produits
 
-**État actuel** : L'edge function `push-notifications` existe avec les VAPID keys configurées. Mais **aucun code frontend** ne demande la permission, n'enregistre le service worker, ni ne sauvegarde l'abonnement en base.
-
-**À faire** :
-- Créer un hook `usePushNotifications` qui :
-  - Demande la permission notification
-  - Enregistre le service worker
-  - Obtient l'abonnement PushSubscription
-  - Sauvegarde endpoint/p256dh/auth dans `push_subscriptions`
-- Créer un composant `PushPermissionPrompt` qui s'affiche une fois pour les utilisateurs connectés
-- Intégrer dans `DashboardPage.tsx` ou `App.tsx`
+**Aucune migration** — tout cote client (localStorage).
 
 | Fichier | Action |
 |---------|--------|
-| `frontend/src/hooks/use-push-notifications.ts` | Créer — hook d'abonnement push |
-| `frontend/src/components/PushPermissionPrompt.tsx` | Créer — UI demande permission |
-| `frontend/src/pages/DashboardPage.tsx` | Intégrer le prompt |
-| `frontend/public/sw-push.js` | Créer — service worker pour recevoir les notifs push |
+| `frontend/src/contexts/CompareContext.tsx` | Creer — context global (max 4 produits) |
+| `frontend/src/components/CompareBar.tsx` | Creer — barre flottante en bas avec miniatures |
+| `frontend/src/components/CompareTable.tsx` | Creer — tableau comparatif (prix, rating, tailles, vendeur, origine) |
+| `frontend/src/pages/ComparePage.tsx` | Creer — page /compare |
+| `frontend/src/components/ProductCard.tsx` | Modifier — ajouter bouton "Comparer" |
 
 ---
 
-### 5. Paiement par carte — Intégration Stripe
+### 10. Notifications multi-canal intelligentes
 
-**État actuel** : Un message "Ce moyen de paiement n'est pas actif" s'affiche. Aucune intégration réelle.
-
-**À faire** :
-- Activer Stripe via l'outil Lovable Stripe
-- Créer une edge function `create-checkout-session` pour générer une session Stripe Checkout
-- Modifier `CheckoutPage.tsx` pour proposer Stripe quand la carte est activée dans `platform_settings`
-- Gérer le webhook de confirmation (marquer la commande comme `confirmed`)
+**Migration SQL** :
+```sql
+CREATE TABLE public.notification_preferences (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE UNIQUE,
+  order_updates jsonb NOT NULL DEFAULT '{"in_app":true,"email":true,"push":true}',
+  promotions jsonb NOT NULL DEFAULT '{"in_app":true,"email":false,"push":false}',
+  messages jsonb NOT NULL DEFAULT '{"in_app":true,"email":false,"push":true}',
+  system jsonb NOT NULL DEFAULT '{"in_app":true,"email":true,"push":false}',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage own prefs" ON public.notification_preferences FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+```
 
 | Fichier | Action |
 |---------|--------|
-| Edge function `create-stripe-session` | Créer — session Stripe Checkout |
-| Edge function `stripe-webhook` | Créer — callback Stripe |
-| `frontend/src/pages/CheckoutPage.tsx` | Intégrer le bouton payer par carte |
-
-**Note** : Cette étape nécessite d'abord d'activer Stripe (clé API). Je demanderai confirmation avant de procéder.
+| `frontend/src/components/NotificationPreferences.tsx` | Creer — UI toggles par categorie/canal |
+| `frontend/src/pages/DashboardPage.tsx` | Integrer dans onglet parametres |
+| `frontend/supabase/functions/notify-order-status/index.ts` | Modifier — lire les preferences avant d'envoyer |
 
 ---
 
-### Ordre d'implémentation
+### 11. Avis avec verification d'achat
 
-1. **Emails transactionnels** (rapide, juste brancher les appels)
-2. **pg_cron** (SQL à exécuter manuellement)
-3. **Visual Search** (vérification + correction si nécessaire)
-4. **Push Notifications** (nouveau code frontend)
-5. **Stripe** (nécessite activation préalable)
+**Pas de migration** — la logique utilise les tables `orders` + `order_items` existantes.
 
-### Résumé : ~10 fichiers modifiés/créés
+| Fichier | Action |
+|---------|--------|
+| `frontend/src/components/reviews/ReviewForm.tsx` | Modifier — verifier que l'utilisateur a une commande livree pour ce produit avant de permettre l'envoi ; ajouter badge "Achat verifie" ; rendre les photos encouragees (pas obligatoires) pour 4-5 etoiles |
+| `frontend/src/components/reviews/ReviewCard.tsx` | Modifier — afficher badge "Achat verifie" |
+
+---
+
+### 12. Chat temps reel ameliore
+
+**Pas de migration** — `stores.is_online` et `stores.last_seen_at` existent deja.
+
+| Fichier | Action |
+|---------|--------|
+| `frontend/src/components/messages/ChatPanel.tsx` | Modifier — ajouter indicateur "en ligne" (query last_seen_at < 5min), indicateur de frappe (presence channel Supabase), reponses rapides pre-configurees |
+| `frontend/src/components/messages/ConversationList.tsx` | Modifier — afficher pastille verte si vendeur en ligne |
+| `frontend/src/components/messages/QuickReplies.tsx` | Creer — liste de reponses rapides configurable par le vendeur |
+
+---
+
+### 13. Analytics vendeur avance
+
+**Pas de migration** — donnees dans `orders`, `order_items`, `products`, `returns`.
+
+| Fichier | Action |
+|---------|--------|
+| `frontend/src/components/vendor/VendorStatsTab.tsx` | Modifier — ajouter : (1) taux de conversion par produit (vues vs achats via `products.views_count`), (2) heures de pointe (histogramme par heure), (3) taux de retour par produit, (4) graphique comparatif vues vs ventes |
+
+---
+
+### 14. Litiges structures — workflow complet
+
+**Migration SQL** :
+```sql
+CREATE TABLE public.dispute_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  dispute_id uuid NOT NULL REFERENCES disputes(id) ON DELETE CASCADE,
+  sender_id uuid NOT NULL,
+  sender_role text NOT NULL DEFAULT 'client', -- client, vendor, admin
+  content text NOT NULL,
+  attachments text[] DEFAULT '{}',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.dispute_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Dispute participants read" ON public.dispute_messages FOR SELECT USING (
+  sender_id = auth.uid() OR
+  dispute_id IN (SELECT id FROM disputes WHERE user_id = auth.uid()) OR
+  dispute_id IN (SELECT d.id FROM disputes d JOIN stores s ON s.id = d.store_id WHERE s.owner_id = auth.uid()) OR
+  has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'manager')
+);
+CREATE POLICY "Dispute participants insert" ON public.dispute_messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+```
+
+| Fichier | Action |
+|---------|--------|
+| `frontend/src/components/disputes/DisputeChat.tsx` | Creer — messagerie tripartite (client, vendeur, admin) avec timeline |
+| `frontend/src/components/disputes/DisputesList.tsx` | Modifier — ouvrir DisputeChat au clic |
+| `frontend/src/components/vendor/VendorDisputesTab.tsx` | Modifier — integrer DisputeChat pour reponse vendeur |
+| `frontend/src/pages/admin/AdminDisputesPage.tsx` | Modifier — integrer DisputeChat pour arbitrage admin |
+
+---
+
+### 15. Export comptable CSV/PDF
+
+**Pas de migration** — lecture seule sur tables existantes.
+
+| Fichier | Action |
+|---------|--------|
+| `frontend/src/components/exports/ExportButton.tsx` | Creer — bouton generique qui genere CSV a partir de donnees |
+| `frontend/src/components/vendor/VendorWalletTab.tsx` | Modifier — ajouter bouton export CSV (transactions, commissions) |
+| `frontend/src/components/vendor/VendorStatsTab.tsx` | Modifier — ajouter export CSV ventes |
+| `frontend/src/pages/admin/AdminVendorAccountingPage.tsx` | Modifier — ajouter export CSV/PDF comptabilite globale |
+
+---
+
+### Ordre d'implementation
+
+1. **Flash Sales** (migration + UI admin + section accueil)
+2. **Comparateur** (100% frontend, pas de migration)
+3. **Avis verifies** (modification ReviewForm, pas de migration)
+4. **Chat ameliore** (presence Supabase, reponses rapides)
+5. **Analytics vendeur** (enrichir VendorStatsTab)
+6. **Notifications preferences** (migration + UI + edge function)
+7. **Litiges structures** (migration + messagerie tripartite)
+8. **Export comptable** (CSV generation)
+
+### Resume : ~20 fichiers crees/modifies, 3 migrations SQL
+
+C'est un plan consequent. Je propose de l'implementer par blocs de 2-3 fonctionnalites a la fois pour eviter les erreurs. On commence par les points 8-9-11 (Flash Sales + Comparateur + Avis verifies) ?
 
