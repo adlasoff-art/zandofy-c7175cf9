@@ -115,7 +115,7 @@ export function VendorStatsTab({ storeId }: VendorStatsTabProps) {
         const existing = productMap.get(key) || { quantity: 0, revenue: 0, views: 0, returns: 0, productId: item.product_id };
         existing.quantity += item.quantity;
         existing.revenue += Number(item.price) * item.quantity;
-        existing.views = productViewsMap.get(item.product_id) || 0;
+        existing.views = viewsByProduct.get(item.product_id) || 0;
         productMap.set(key, existing);
       }
 
