@@ -21,6 +21,8 @@ import {
   BadgeCheck,
   FileText,
   Loader2,
+  AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
