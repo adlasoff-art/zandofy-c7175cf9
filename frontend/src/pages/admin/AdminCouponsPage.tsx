@@ -246,6 +246,9 @@ export default function AdminCouponsPage() {
                             {format(new Date(coupon.expires_at), "dd MMM yyyy", { locale: fr })}
                           </span>
                         )}
+                        {(coupon.target_city || coupon.target_country) && (
+                          <span className="text-[10px] text-blue-600">📍 {[coupon.target_city, coupon.target_country].filter(Boolean).join(", ")}</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
