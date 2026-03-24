@@ -8,6 +8,8 @@ import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
 import { ImpersonationPanel } from "@/components/admin/ImpersonationPanel";
 import { CartProvider } from "@/contexts/CartContext";
 import { WishlistProvider } from "@/contexts/WishlistContext";
+import { CompareProvider } from "@/contexts/CompareContext";
+import { CompareBar } from "@/components/CompareBar";
 import { CartDrawer } from "@/components/CartDrawer";
 import { SupportDrawer } from "@/components/support/SupportDrawer";
 import { SupportDrawerProvider, useSupportDrawer } from "@/contexts/SupportDrawerContext";
@@ -64,6 +66,7 @@ const CareersPage = lazy(() => import("./pages/CareersPage"));
 const SocialResponsibilityPage = lazy(() => import("./pages/SocialResponsibilityPage"));
 const BlogPage = lazy(() => import("./pages/BlogPage"));
 const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
+const ComparePage = lazy(() => import("./pages/ComparePage"));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -99,6 +102,7 @@ const AdminEmailTemplatesPage = lazy(() => import("./pages/admin/AdminEmailTempl
 const AdminKycPage = lazy(() => import("./pages/admin/AdminKycPage"));
 const AdminFeaturedPlacementsPage = lazy(() => import("./pages/admin/AdminFeaturedPlacementsPage"));
 const AdminVendorAccountingPage = lazy(() => import("./pages/admin/AdminVendorAccountingPage"));
+const AdminFlashSalesPage = lazy(() => import("./pages/admin/AdminFlashSalesPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30 * 1000 } },
@@ -128,6 +132,7 @@ const App = () => (
         <ImpersonationPanel />
         <CartProvider>
           <WishlistProvider>
+          <CompareProvider>
           <I18nProvider>
           <ThemeProvider>
           <UIConfigProvider>
@@ -140,7 +145,8 @@ const App = () => (
             <OrderAlertListener />
             <SupportDrawerProvider>
             <ScrollRestoration />
-            <CartDrawer />
+             <CartDrawer />
+            <CompareBar />
             <SupportDrawerWrapper />
             <MobileBottomNav />
             <PWAInstallBanner />
@@ -182,6 +188,7 @@ const App = () => (
                 <Route path="/social-responsibility" element={<SocialResponsibilityPage />} />
                 <Route path="/blog" element={<BlogPage />} />
                 <Route path="/blog/:slug" element={<BlogPostPage />} />
+                <Route path="/compare" element={<ComparePage />} />
                 {/* Admin routes */}
                 <Route path="/admin" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDashboard /></RoleGuard>} />
                 <Route path="/admin/users" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminUsersPage /></RoleGuard>} />
@@ -216,6 +223,7 @@ const App = () => (
                 <Route path="/admin/kyc" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminKycPage /></RoleGuard>} />
                 <Route path="/admin/featured-placements" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminFeaturedPlacementsPage /></RoleGuard>} />
                 <Route path="/admin/vendor-accounting" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminVendorAccountingPage /></RoleGuard>} />
+                <Route path="/admin/flash-sales" element={<RoleGuard allowedRoles={["admin"]}><AdminFlashSalesPage /></RoleGuard>} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
@@ -226,6 +234,7 @@ const App = () => (
           </UIConfigProvider>
           </ThemeProvider>
           </I18nProvider>
+          </CompareProvider>
           </WishlistProvider>
         </CartProvider>
         </ImpersonationProvider>

@@ -1,12 +1,12 @@
-import { useState, useRef } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useRef, useEffect } from "react";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { StarRatingInput } from "./StarRatingInput";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ImagePlus, X, Loader2 } from "lucide-react";
+import { ImagePlus, X, Loader2, BadgeCheck, ShieldAlert } from "lucide-react";
 
 interface ReviewFormProps {
   productId: string;
@@ -23,6 +23,24 @@ export function ReviewForm({ productId, onSuccess }: ReviewFormProps) {
   const [comment, setComment] = useState("");
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+
+  // Check if user has a delivered order for this product
+  const { data: hasVerifiedPurchase, isLoading: checkingPurchase } = useQuery({
+    queryKey: ["verified-purchase", productId, user?.id],
+    queryFn: async () => {
+      if (!user) return false;
+      const { data, error } = await supabase
+        .from("order_items")
+        .select("id, orders!inner(status, user_id)")
+        .eq("product_id", productId)
+        .eq("orders.user_id", user.id)
+        .eq("orders.status", "delivered")
+        .limit(1);
+      if (error) return false;
+      return (data?.length ?? 0) > 0;
+    },
+    enabled: !!user,
+  });
 
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
@@ -66,6 +84,7 @@ export function ReviewForm({ productId, onSuccess }: ReviewFormProps) {
         rating,
         comment: comment.trim(),
         images: imageUrls,
+        is_verified_purchase: !!hasVerifiedPurchase,
       });
       if (error) {
         if (error.code === "23505")
@@ -103,7 +122,21 @@ export function ReviewForm({ productId, onSuccess }: ReviewFormProps) {
 
   return (
     <div className="p-4 bg-card border border-border rounded-sm space-y-4">
-      <h3 className="font-semibold text-foreground">Donner mon avis</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-foreground">Donner mon avis</h3>
+        {hasVerifiedPurchase && (
+          <span className="inline-flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded">
+            <BadgeCheck size={12} /> Achat vérifié
+          </span>
+        )}
+      </div>
+
+      {!hasVerifiedPurchase && !checkingPurchase && (
+        <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-sm text-xs text-muted-foreground">
+          <ShieldAlert size={14} className="shrink-0 mt-0.5" />
+          <span>Vous n'avez pas encore acheté ce produit. Votre avis sera publié sans le badge "Achat vérifié".</span>
+        </div>
+      )}
 
       <div>
         <label className="text-sm text-muted-foreground mb-1 block">Note</label>
