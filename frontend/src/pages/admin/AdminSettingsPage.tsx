@@ -1,5 +1,6 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator } from "lucide-react";
+import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator, Crown } from "lucide-react";
+import { MonetizationSettings } from "@/components/admin/MonetizationSettings";
 import { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
