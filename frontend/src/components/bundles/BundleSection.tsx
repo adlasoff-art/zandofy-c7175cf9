@@ -11,7 +11,6 @@ interface BundleProduct {
   name: string;
   price: number;
   image: string;
-  slug?: string;
 }
 
 interface Bundle {
@@ -31,7 +30,7 @@ export function BundleSection({ productId }: { productId: string }) {
   useEffect(() => {
     async function load() {
       // Find bundles that contain this product
-      const { data: bundleIds } = await supabase
+      const { data: bundleIds } = await (supabase as any)
         .from("bundle_items")
         .select("bundle_id")
         .eq("product_id", productId);
@@ -40,7 +39,7 @@ export function BundleSection({ productId }: { productId: string }) {
 
       const ids = [...new Set(bundleIds.map((b: any) => b.bundle_id))];
 
-      const { data: bundlesData } = await supabase
+      const { data: bundlesData } = await (supabase as any)
         .from("product_bundles")
         .select("*")
         .in("id", ids)
@@ -50,7 +49,7 @@ export function BundleSection({ productId }: { productId: string }) {
 
       const results: Bundle[] = [];
       for (const bundle of bundlesData) {
-        const { data: items } = await supabase
+        const { data: items } = await (supabase as any)
           .from("bundle_items")
           .select("product_id")
           .eq("bundle_id", bundle.id)
@@ -60,7 +59,7 @@ export function BundleSection({ productId }: { productId: string }) {
 
         const { data: products } = await supabase
           .from("products")
-          .select("id, name, price, image, slug")
+          .select("id, name, price, product_images(image_url, position)")
           .in("id", items.map((i: any) => i.product_id));
 
         if (products) {
@@ -70,7 +69,12 @@ export function BundleSection({ productId }: { productId: string }) {
             description: bundle.description,
             discount_type: bundle.discount_type,
             discount_value: bundle.discount_value,
-            products: products as BundleProduct[],
+            products: products.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              price: Number(p.price),
+              image: p.product_images?.[0]?.image_url || "/placeholder.svg",
+            })),
           });
         }
       }
@@ -91,7 +95,7 @@ export function BundleSection({ productId }: { productId: string }) {
 
   const handleAddBundle = (bundle: Bundle) => {
     bundle.products.forEach((p) => {
-      addItem({ id: p.id, name: p.name, price: p.price, image: p.image, quantity: 1 });
+      addItem({ productId: p.id, name: p.name, nameFr: p.name, price: p.price, image: p.image, quantity: 1 });
     });
     toast({ title: "Bundle ajouté au panier", description: `${bundle.products.length} produits ajoutés` });
   };
@@ -125,7 +129,7 @@ export function BundleSection({ productId }: { productId: string }) {
               {bundle.products.map((product, i) => (
                 <div key={product.id} className="flex items-center gap-2 shrink-0">
                   {i > 0 && <Plus size={14} className="text-muted-foreground" />}
-                  <Link to={`/product/${product.slug || product.id}`} className="flex items-center gap-2 hover:bg-muted rounded-lg p-1.5 transition-colors">
+                  <Link to={`/product/${product.id}`} className="flex items-center gap-2 hover:bg-muted rounded-lg p-1.5 transition-colors">
                     <img src={product.image} alt={product.name} className="w-12 h-12 object-cover rounded-lg border border-border" />
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-foreground truncate max-w-[100px]">{product.name}</p>
@@ -140,7 +144,7 @@ export function BundleSection({ productId }: { productId: string }) {
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground line-through">${originalTotal.toFixed(2)}</span>
                 <span className="text-lg font-bold text-primary">${bundlePrice.toFixed(2)}</span>
-                <span className="text-xs text-emerald-600 font-medium">Économisez ${savings.toFixed(2)}</span>
+                <span className="text-xs text-primary font-medium">-${savings.toFixed(2)}</span>
               </div>
               <Button size="sm" onClick={() => handleAddBundle(bundle)} className="gap-1.5">
                 <ShoppingCart size={14} />

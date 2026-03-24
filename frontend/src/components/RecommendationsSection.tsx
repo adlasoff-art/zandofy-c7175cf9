@@ -9,7 +9,6 @@ interface RecommendedProduct {
   name: string;
   price: number;
   image: string;
-  slug?: string;
   rating?: number;
 }
 
@@ -23,7 +22,6 @@ export function RecommendationsSection() {
       setLoading(true);
       try {
         if (user) {
-          // Try AI recommendations via edge function
           const { data, error } = await supabase.functions.invoke("ai-recommendations", {
             body: { userId: user.id },
           });
@@ -34,24 +32,40 @@ export function RecommendationsSection() {
           }
         }
 
-        // Fallback: popular products (most reviewed / highest rated)
+        // Fallback: popular products
         const { data: popular } = await supabase
           .from("products")
-          .select("id, name, price, image, slug, rating")
-          .eq("status", "approved")
+          .select("id, name, price, rating, product_images(image_url, position)")
+          .eq("publish_status", "published")
           .order("rating", { ascending: false })
           .limit(8);
 
-        setProducts((popular || []) as RecommendedProduct[]);
+        setProducts(
+          (popular || []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            price: Number(p.price),
+            rating: p.rating,
+            image: p.product_images?.[0]?.image_url || "/placeholder.svg",
+          }))
+        );
       } catch {
-        // Fallback silently
         const { data: popular } = await supabase
           .from("products")
-          .select("id, name, price, image, slug, rating")
-          .eq("status", "approved")
+          .select("id, name, price, rating, product_images(image_url, position)")
+          .eq("publish_status", "published")
           .order("created_at", { ascending: false })
           .limit(8);
-        setProducts((popular || []) as RecommendedProduct[]);
+
+        setProducts(
+          (popular || []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            price: Number(p.price),
+            rating: p.rating,
+            image: p.product_images?.[0]?.image_url || "/placeholder.svg",
+          }))
+        );
       }
       setLoading(false);
     }
@@ -83,7 +97,7 @@ export function RecommendationsSection() {
         {products.map((product) => (
           <Link
             key={product.id}
-            to={`/product/${product.slug || product.id}`}
+            to={`/product/${product.id}`}
             className="group bg-card border border-border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
           >
             <div className="aspect-square overflow-hidden">
@@ -98,8 +112,8 @@ export function RecommendationsSection() {
               <p className="text-xs font-medium text-foreground line-clamp-2 mb-1">{product.name}</p>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-primary">${product.price.toFixed(2)}</span>
-                {product.rating && product.rating > 0 && (
-                  <span className="text-[10px] text-amber-500">★ {product.rating}</span>
+                {product.rating != null && product.rating > 0 && (
+                  <span className="text-[10px] text-primary">★ {product.rating}</span>
                 )}
               </div>
             </div>

@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Link2, Plus, Copy, Trash2, Loader2, TrendingUp, MousePointer, ShoppingBag, DollarSign } from "lucide-react";
+import { Link2, Plus, Copy, Trash2, Loader2, MousePointer, ShoppingBag, DollarSign, TrendingUp } from "lucide-react";
 
 interface AffiliateLink {
   id: string;
@@ -31,7 +31,7 @@ export function AffiliateLinksManager() {
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from("affiliate_links")
       .select("*")
       .eq("user_id", user.id)
@@ -46,7 +46,7 @@ export function AffiliateLinksManager() {
     if (!user) return;
     setCreating(true);
     const code = `AFF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    const { error } = await supabase.from("affiliate_links").insert({
+    const { error } = await (supabase as any).from("affiliate_links").insert({
       user_id: user.id,
       code,
       label: newLabel.trim() || null,
@@ -68,7 +68,7 @@ export function AffiliateLinksManager() {
   };
 
   const deleteLink = async (id: string) => {
-    const { error } = await supabase.from("affiliate_links").delete().eq("id", id);
+    const { error } = await (supabase as any).from("affiliate_links").delete().eq("id", id);
     if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
     else { toast({ title: "Lien supprimé" }); load(); }
   };
