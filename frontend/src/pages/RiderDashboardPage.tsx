@@ -258,7 +258,7 @@ export default function RiderDashboardPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-30 bg-card border-b border-border px-4 py-3">
+      <header className="sticky top-0 z-30 bg-card border-b border-border px-4 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-base font-bold text-foreground flex items-center gap-2">

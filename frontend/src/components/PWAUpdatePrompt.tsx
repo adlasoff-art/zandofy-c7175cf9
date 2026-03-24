@@ -4,6 +4,7 @@ import { useI18n } from "@/contexts/I18nContext";
 
 const APP_VERSION = "1.8.0";
 const PWA_UPDATE_LOCK_KEY = "pwa-update-lock";
+const PWA_UPDATE_DONE_KEY = "pwa-update-done";
 
 const clearAllCaches = async () => {
   const names = await caches.keys();

@@ -64,7 +64,7 @@ export function MobileAccountMenu() {
       title: "Mon espace",
       items: [
         { to: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
-        { to: "/dashboard", icon: FileText, label: "Mes commandes", hash: "orders" },
+        { to: "/dashboard?tab=orders", icon: FileText, label: "Mes commandes" },
         { to: "/wishlist", icon: Heart, label: "Liste de souhaits" },
         { to: "/messages", icon: MessageSquare, label: "Messages" },
       ],
@@ -77,13 +77,20 @@ export function MobileAccountMenu() {
       ],
     },
     {
+      title: "Réclamations",
+      items: [
+        { to: "/dashboard?tab=disputes", icon: AlertTriangle, label: "Litiges" },
+        { to: "/dashboard?tab=returns", icon: RotateCcw, label: "Retours" },
+      ],
+    },
+    {
       title: "Paramètres du compte",
       items: [
-        { to: "/dashboard", icon: User, label: "Profil", hash: "profile" },
-        { to: "/dashboard", icon: MapPin, label: "Adresses", hash: "addresses" },
-        { to: "/dashboard", icon: Bell, label: "Notifications", hash: "notifications" },
-        { to: "/dashboard", icon: BadgeCheck, label: "Vérification KYC", hash: "verification" },
-        { to: "/dashboard", icon: KeyRound, label: "Sécurité & mot de passe", hash: "security" },
+        { to: "/dashboard?tab=profile", icon: User, label: "Profil" },
+        { to: "/dashboard?tab=addresses", icon: MapPin, label: "Adresses" },
+        { to: "/dashboard?tab=notifications", icon: Bell, label: "Notifications" },
+        { to: "/dashboard?tab=verification", icon: BadgeCheck, label: "Vérification KYC" },
+        { to: "/dashboard?tab=security", icon: KeyRound, label: "Sécurité & mot de passe" },
       ],
     },
   ];
