@@ -698,6 +698,34 @@ export default function TrackingPage() {
                 </div>
               )}
 
+              {/* Rider profile visible to customer */}
+              {orderResult.assigned_rider_id && orderResult.status === "out_for_delivery" && (
+                <RiderProfileBanner riderId={orderResult.assigned_rider_id} riderName={orderResult.assigned_rider_name || "Livreur"} />
+              )}
+
+              {/* Ephemeral chat during delivery */}
+              {user && orderResult.assigned_rider_id && ["out_for_delivery", "shipped"].includes(orderResult.status) && (
+                <DeliveryChat
+                  orderId={orderResult.id}
+                  deliveryId={orderResult.delivery_id}
+                  otherPartyName={orderResult.assigned_rider_name || "Votre livreur"}
+                />
+              )}
+
+              {/* Rating modal after delivery */}
+              {user && orderResult.status === "delivered" && orderResult.assigned_rider_id && showRatingModal && (
+                <RiderRatingModal
+                  orderId={orderResult.id}
+                  riderId={orderResult.assigned_rider_id}
+                  riderName={orderResult.assigned_rider_name || "Livreur"}
+                  userId={user.id}
+                  deliveryId={orderResult.delivery_id}
+                  tippingEnabled={tippingEnabled}
+                  maxTip={maxTip}
+                  onClose={() => setShowRatingModal(false)}
+                />
+              )}
+
               {/* Details grid */}
               <div className="grid grid-cols-2 gap-4 text-sm border-t border-border pt-4">
                 <div>
