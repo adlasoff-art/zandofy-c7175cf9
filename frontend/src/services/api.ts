@@ -197,7 +197,41 @@ export async function fetchTrendTags(): Promise<TrendTag[]> {
   }));
 }
 
-export async function fetchFlashSaleProducts(): Promise<Product[]> {
+export async function fetchFlashSaleProducts(): Promise<(Product & { flashPrice?: number; flashEndsAt?: string })[]> {
+  const now = new Date().toISOString();
+
+  // First try real flash_sales table
+  const { data: flashData } = await supabase
+    .from("flash_sales" as any)
+    .select("product_id, flash_price, ends_at")
+    .eq("is_active", true)
+    .gte("ends_at", now)
+    .lte("starts_at", now);
+
+  if (flashData && flashData.length > 0) {
+    const productIds = (flashData as any[]).map((f: any) => f.product_id);
+    const { data, error } = await supabase
+      .from("products")
+      .select(PRODUCT_SELECT)
+      .eq("publish_status", "published")
+      .in("id", productIds);
+
+    if (error || !data) return [];
+
+    const flashMap = new Map((flashData as any[]).map((f: any) => [f.product_id, f]));
+    return data.map((row: any) => {
+      const p = mapProduct(row);
+      const flash = flashMap.get(row.id);
+      if (flash) {
+        (p as any).flashPrice = Number(flash.flash_price);
+        (p as any).flashEndsAt = flash.ends_at;
+        (p as any).promoEndDate = flash.ends_at;
+      }
+      return p;
+    });
+  }
+
+  // Fallback: products with is_sale
   const { data, error } = await supabase
     .from("products")
     .select(PRODUCT_SELECT)
