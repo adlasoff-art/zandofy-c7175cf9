@@ -72,13 +72,29 @@ export default function WishlistPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container py-6">
-        <h1 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-2">
-          <Heart size={24} className="text-sale" />
-          {t("wishlist.title")}
-          {products.length > 0 && (
-            <span className="text-base font-normal text-muted-foreground">({products.length})</span>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Heart size={24} className="text-sale" />
+            {t("wishlist.title")}
+            {products.length > 0 && (
+              <span className="text-base font-normal text-muted-foreground">({products.length})</span>
+            )}
+          </h1>
+          {user && products.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const url = `${window.location.origin}/wishlist/shared/${user.id}`;
+                navigator.clipboard.writeText(url);
+                toast.success("Lien de partage copié !");
+              }}
+              className="flex items-center gap-2"
+            >
+              <Share2 size={14} /> Partager
+            </Button>
           )}
-        </h1>
+        </div>
 
         {!user ? (
           <div className="text-center py-20">

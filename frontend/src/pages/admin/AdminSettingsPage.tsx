@@ -551,6 +551,15 @@ export default function AdminSettingsPage() {
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
           Enregistrer les paramètres
         </button>
+
+        {/* Monetization Settings */}
+        <div className="border-t border-border pt-6 mt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Crown size={18} className="text-primary" />
+            <h2 className="text-lg font-bold text-foreground">Monétisation & Features optionnelles</h2>
+          </div>
+          <MonetizationSettings />
+        </div>
       </div>
     </AdminLayout>
   );
