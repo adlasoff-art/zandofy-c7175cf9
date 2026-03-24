@@ -16,7 +16,7 @@ export function CompareBar() {
         initial={{ y: 100 }}
         animate={{ y: 0 }}
         exit={{ y: 100 }}
-        className="fixed bottom-16 md:bottom-4 left-1/2 -translate-x-1/2 z-50 bg-card border border-border shadow-xl rounded-lg px-4 py-3 flex items-center gap-3"
+        className="fixed bottom-20 md:bottom-4 left-1/2 -translate-x-1/2 z-[60] bg-card border border-border shadow-2xl rounded-lg px-3 py-2.5 flex items-center gap-2 max-w-[95vw] md:max-w-none md:px-4 md:py-3 md:gap-3"
       >
         <div className="flex items-center gap-2">
           {items.map((item) => (
