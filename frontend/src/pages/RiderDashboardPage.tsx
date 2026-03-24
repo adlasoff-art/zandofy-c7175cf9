@@ -641,13 +641,16 @@ export default function RiderDashboardPage() {
               <button onClick={() => { setSignatureModal(null); setSignatureDataUrl(null); setProofPhoto(null); }} className="flex-1 px-4 py-2.5 text-sm border border-border rounded-lg hover:bg-muted">Annuler</button>
               <button 
                 onClick={() => markDelivered(signatureModal)} 
-                disabled={confirming}
+                disabled={confirming || !proofPhoto}
                 className="flex-1 px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 active:scale-95 touch-manipulation disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {confirming ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                 {confirming ? "Envoi..." : "Confirmer livré"}
               </button>
             </div>
+            {!proofPhoto && (
+              <p className="text-xs text-destructive text-center">📸 La photo de preuve est obligatoire pour confirmer la livraison</p>
+            )}
           </div>
         </div>
       )}
