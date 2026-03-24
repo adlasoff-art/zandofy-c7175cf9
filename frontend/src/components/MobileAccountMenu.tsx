@@ -89,7 +89,7 @@ export function MobileAccountMenu() {
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Profile header */}
-      <div className="bg-primary/5 px-4 py-6 flex items-center gap-4">
+      <div className="bg-primary/5 px-4 py-6 flex items-center gap-4" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 1.5rem)" }}>
         <Avatar className="h-14 w-14 border-2 border-primary">
           <AvatarFallback className="bg-primary text-primary-foreground text-lg font-bold">
             {initials}
