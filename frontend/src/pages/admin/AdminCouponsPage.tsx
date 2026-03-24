@@ -63,7 +63,7 @@ export default function AdminCouponsPage() {
 
   const resetForm = () => {
     setCode(""); setDiscountType("percentage"); setDiscountValue(10);
-    setMinOrder(0); setMaxUses(100); setExpiresAt(""); setShowForm(false);
+    setMinOrder(0); setMaxUses(100); setExpiresAt(""); setTargetCity(""); setTargetCountry(""); setShowForm(false);
   };
 
   const saveCoupon = async () => {
