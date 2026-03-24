@@ -69,14 +69,24 @@ Deno.serve(async (req) => {
         }
 
         // Send the email via SMTP (same as send-email function)
+        const smtpHost = Deno.env.get("SMTP_HOST");
+        const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "465");
+        const smtpUser = Deno.env.get("SMTP_USER");
+        const smtpPass = Deno.env.get("SMTP_PASS");
+
+        if (!smtpHost || !smtpUser || !smtpPass) {
+          console.error("Missing SMTP secrets:", { hasHost: !!smtpHost, hasUser: !!smtpUser, hasPass: !!smtpPass });
+          return new Response(JSON.stringify({ error: "SMTP configuration missing. Please configure SMTP secrets." }), { status: 500, headers: corsHeaders });
+        }
+
         const nodemailer = (await import("npm:nodemailer@6.9.16")).default;
         const transporter = nodemailer.createTransport({
-          host: Deno.env.get("SMTP_HOST"),
-          port: parseInt(Deno.env.get("SMTP_PORT") || "587"),
-          secure: false,
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
           auth: {
-            user: Deno.env.get("SMTP_USER"),
-            pass: Deno.env.get("SMTP_PASS"),
+            user: smtpUser,
+            pass: smtpPass,
           },
         });
 
