@@ -95,11 +95,14 @@ export function VendorStatsTab({ storeId }: VendorStatsTabProps) {
         orderIds.length > 0
           ? supabase.from("order_items").select("product_name, product_id, quantity, price, order_id").in("order_id", orderIds)
           : Promise.resolve({ data: [] }),
-        supabase.from("products").select("id, name_fr, views_count").eq("store_id", storeId),
+        supabase.from("analytics_events").select("product_id").eq("event_type", "product_view").eq("store_id", storeId).gte("created_at", since.toISOString()),
         supabase.from("return_requests").select("order_id, status").eq("store_id", storeId).gte("created_at", since.toISOString()),
       ]);
 
-      const productViewsMap = new Map((productsRes.data || []).map(p => [p.id, p.views_count || 0]));
+      const viewsByProduct = new Map<string, number>();
+      for (const ev of (productsRes.data || [])) {
+        if (ev.product_id) viewsByProduct.set(ev.product_id, (viewsByProduct.get(ev.product_id) || 0) + 1);
+      }
       const returnsByOrder = new Map<string, number>();
       for (const r of (returnsRes.data || [])) {
         returnsByOrder.set(r.order_id, (returnsByOrder.get(r.order_id) || 0) + 1);
