@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
@@ -23,6 +24,9 @@ import { useRiderLocationSubscription } from "@/hooks/use-rider-location";
 import { useCustomerLocationBroadcast } from "@/hooks/use-customer-location";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { DeliveryChat } from "@/components/delivery/DeliveryChat";
+import { RiderRatingModal } from "@/components/delivery/RiderRatingModal";
+import { fromTable } from "@/lib/supabase-helpers";
 
 // ── Types ──
 interface ShipmentResult {
@@ -381,6 +385,49 @@ function LiveRiderMap({ deliveryId, orderId, userId }: { deliveryId: string; ord
   );
 }
 
+// ── Rider Profile Banner (visible to customer) ──
+function RiderProfileBanner({ riderId, riderName }: { riderId: string; riderName: string }) {
+  const { data: profile } = useQuery({
+    queryKey: ["rider-profile", riderId],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("first_name, last_name, avatar_url").eq("id", riderId).single();
+      return data;
+    },
+    enabled: !!riderId,
+  });
+
+  const { data: avgRating } = useQuery({
+    queryKey: ["rider-avg-rating", riderId],
+    queryFn: async () => {
+      const { data } = await fromTable("rider_ratings").select("rating").eq("rider_id", riderId);
+      if (!data || data.length === 0) return null;
+      const avg = data.reduce((s: number, r: any) => s + r.rating, 0) / data.length;
+      return { avg: Math.round(avg * 10) / 10, count: data.length };
+    },
+    enabled: !!riderId,
+  });
+
+  const displayName = profile ? [profile.first_name, profile.last_name].filter(Boolean).join(" ") || riderName : riderName;
+
+  return (
+    <div className="flex items-center gap-3 bg-muted/50 rounded-xl px-4 py-3 border border-border">
+      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+        {profile?.avatar_url ? (
+          <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
+        ) : (
+          <UserCheck size={18} className="text-primary" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-foreground">Votre livreur : {displayName}</p>
+        {avgRating && (
+          <p className="text-xs text-muted-foreground">⭐ {avgRating.avg}/5 ({avgRating.count} avis)</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──
 export default function TrackingPage() {
   const { user } = useAuth();
@@ -393,6 +440,31 @@ export default function TrackingPage() {
   const [globalResult, setGlobalResult] = useState<TrackingResult | null>(null);
   const [orderResult, setOrderResult] = useState<OrderTrackingResult | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [tippingEnabled, setTippingEnabled] = useState(false);
+  const [maxTip, setMaxTip] = useState(20);
+
+  // Check tipping settings
+  useEffect(() => {
+    supabase.from("platform_settings").select("value").eq("key", "tipping_settings").maybeSingle()
+      .then(({ data }) => {
+        if (data?.value) {
+          const v = data.value as any;
+          setTippingEnabled(!!v.enabled);
+          setMaxTip(Number(v.max_amount) || 20);
+        }
+      });
+  }, []);
+
+  // Auto-show rating modal when order is delivered
+  useEffect(() => {
+    if (orderResult?.status === "delivered" && orderResult?.assigned_rider_id && user) {
+      fromTable("rider_ratings").select("id").eq("order_id", orderResult.id).eq("user_id", user.id).maybeSingle()
+        .then(({ data }: any) => {
+          if (!data) setShowRatingModal(true);
+        });
+    }
+  }, [orderResult?.status, orderResult?.id, orderResult?.assigned_rider_id, user]);
 
   // Fetch order + history
   const fetchOrder = useCallback(async (orderRef: string) => {
@@ -693,6 +765,34 @@ export default function TrackingPage() {
                   </h3>
                   <LiveRiderMap deliveryId={orderResult.delivery_id} orderId={orderResult.id} userId={user?.id} />
                 </div>
+              )}
+
+              {/* Rider profile visible to customer */}
+              {orderResult.assigned_rider_id && orderResult.status === "out_for_delivery" && (
+                <RiderProfileBanner riderId={orderResult.assigned_rider_id} riderName={orderResult.assigned_rider_name || "Livreur"} />
+              )}
+
+              {/* Ephemeral chat during delivery */}
+              {user && orderResult.assigned_rider_id && ["out_for_delivery", "shipped"].includes(orderResult.status) && (
+                <DeliveryChat
+                  orderId={orderResult.id}
+                  deliveryId={orderResult.delivery_id}
+                  otherPartyName={orderResult.assigned_rider_name || "Votre livreur"}
+                />
+              )}
+
+              {/* Rating modal after delivery */}
+              {user && orderResult.status === "delivered" && orderResult.assigned_rider_id && showRatingModal && (
+                <RiderRatingModal
+                  orderId={orderResult.id}
+                  riderId={orderResult.assigned_rider_id}
+                  riderName={orderResult.assigned_rider_name || "Livreur"}
+                  userId={user.id}
+                  deliveryId={orderResult.delivery_id}
+                  tippingEnabled={tippingEnabled}
+                  maxTip={maxTip}
+                  onClose={() => setShowRatingModal(false)}
+                />
               )}
 
               {/* Details grid */}
