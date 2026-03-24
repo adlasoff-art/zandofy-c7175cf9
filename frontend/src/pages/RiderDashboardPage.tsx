@@ -13,6 +13,8 @@ import { useRiderLocationBroadcast } from "@/hooks/use-rider-location";
 import { useCustomerLocationSubscription } from "@/hooks/use-customer-location";
 import { generateConfirmationCode } from "@/components/vendor/OrderTransitionModals";
 import { STATUS_CONFIG } from "@/lib/order-status";
+import { DeliveryChat } from "@/components/delivery/DeliveryChat";
+import { fromTable } from "@/lib/supabase-helpers";
 
 type DeliveryStatus = "pending" | "in_progress" | "delivered";
 const statusLabels: Record<DeliveryStatus, string> = { pending: "À livrer", in_progress: "En cours", delivered: "Livré" };
