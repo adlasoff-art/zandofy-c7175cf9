@@ -17,6 +17,7 @@ import {
   Search, Filter, AlertTriangle, History, RotateCcw, FileText, CreditCard,
 } from "lucide-react";
 import { RetryPaymentModal } from "@/components/payments/RetryPaymentModal";
+import { PushPermissionPrompt } from "@/components/PushPermissionPrompt";
 import { useNotifications } from "@/hooks/use-notifications";
 import { LoyaltyProgress } from "@/components/LoyaltyProgress";
 import { ReferralDashboard } from "@/components/ReferralDashboard";
@@ -311,6 +312,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      <PushPermissionPrompt />
       <main className="container py-6">
         {/* ═══ DESKTOP LAYOUT: Sidebar + Content ═══ */}
         <div className="hidden lg:flex gap-6">
