@@ -145,7 +145,8 @@ const App = () => (
             <OrderAlertListener />
             <SupportDrawerProvider>
             <ScrollRestoration />
-            <CartDrawer />
+             <CartDrawer />
+            <CompareBar />
             <SupportDrawerWrapper />
             <MobileBottomNav />
             <PWAInstallBanner />
