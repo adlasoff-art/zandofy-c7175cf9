@@ -20,6 +20,8 @@ interface Coupon {
   is_active: boolean;
   expires_at: string | null;
   created_at: string;
+  target_city: string | null;
+  target_country: string | null;
 }
 
 export default function AdminCouponsPage() {
