@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Loader2 } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+
+const APP_VERSION = "1.8.0";
 
 export function PWAUpdatePrompt() {
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  const [updating, setUpdating] = useState(false);
   const { locale } = useI18n();
 
   useEffect(() => {
@@ -15,16 +18,48 @@ export function PWAUpdatePrompt() {
   }, []);
 
   const handleUpdate = useCallback(() => {
-    const waiting = registration?.waiting;
-    if (!waiting) return;
+    setUpdating(true);
 
-    waiting.addEventListener("statechange", () => {
+    const waiting = registration?.waiting;
+
+    // If there's no waiting worker, force reload as fallback
+    if (!waiting) {
+      // Clear all caches then reload
+      caches.keys().then((names) => {
+        Promise.all(names.map((n) => caches.delete(n))).then(() => {
+          window.location.reload();
+        });
+      });
+      return;
+    }
+
+    // Listen for the new SW to activate
+    const onStateChange = () => {
       if (waiting.state === "activated") {
+        waiting.removeEventListener("statechange", onStateChange);
         window.location.reload();
       }
-    });
+    };
+    waiting.addEventListener("statechange", onStateChange);
 
+    // Also listen for controllerchange as a more reliable signal
+    const onControllerChange = () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+
+    // Tell the waiting SW to skip waiting
     waiting.postMessage({ type: "SKIP_WAITING" });
+
+    // Safety timeout: if nothing happens after 4s, force reload
+    setTimeout(() => {
+      waiting.removeEventListener("statechange", onStateChange);
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      caches.keys().then((names) =>
+        Promise.all(names.map((n) => caches.delete(n)))
+      ).then(() => window.location.reload());
+    }, 4000);
   }, [registration]);
 
   if (!registration) return null;
@@ -35,12 +70,20 @@ export function PWAUpdatePrompt() {
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 animate-fade-in">
       <div className="mx-4 w-full max-w-sm rounded-2xl bg-background border border-border p-6 shadow-2xl text-center space-y-4">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-          <RefreshCw className="h-7 w-7 text-primary" />
+          {updating ? (
+            <Loader2 className="h-7 w-7 text-primary animate-spin" />
+          ) : (
+            <RefreshCw className="h-7 w-7 text-primary" />
+          )}
         </div>
 
         <h2 className="text-lg font-bold text-foreground">
           {isFr ? "Nouvelle version disponible !" : "New version available!"}
         </h2>
+
+        <p className="text-xs font-medium text-primary">
+          v{APP_VERSION}
+        </p>
 
         <p className="text-sm text-muted-foreground leading-relaxed">
           {isFr
@@ -50,9 +93,12 @@ export function PWAUpdatePrompt() {
 
         <button
           onClick={handleUpdate}
-          className="w-full rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90 active:scale-[0.98] touch-manipulation"
+          disabled={updating}
+          className="w-full rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90 active:scale-[0.98] touch-manipulation disabled:opacity-60"
         >
-          {isFr ? "Mettre à jour" : "Update now"}
+          {updating
+            ? (isFr ? "Mise à jour en cours…" : "Updating…")
+            : (isFr ? "Mettre à jour" : "Update now")}
         </button>
       </div>
     </div>
