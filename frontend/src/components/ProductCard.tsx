@@ -129,10 +129,22 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
           className={`absolute top-2 right-2 w-9 h-9 bg-card/80 rounded-full flex items-center justify-center touch-manipulation active-press ${
             wishlisted ? "opacity-100 scale-110" : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
           }`}
-          aria-label={wishlisted ? t("product.removeFromWishlist") : t("product.addToWishlist")}
+          aria-label={wishlisted ? "Retirer des favoris" : "Ajouter aux favoris"}
           style={{ WebkitTapHighlightColor: "transparent", transition: "opacity 0.2s, transform 0.2s" }}
         >
           <Heart size={14} className={wishlisted ? "fill-sale text-sale" : "text-foreground"} />
+        </button>
+
+        {/* Compare button - below wishlist */}
+        <button
+          onClick={handleCompare}
+          className={`absolute top-12 right-2 w-9 h-9 bg-card/80 rounded-full flex items-center justify-center touch-manipulation active-press ${
+            compared ? "opacity-100 bg-primary/20" : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
+          }`}
+          aria-label={compared ? "Retirer du comparateur" : "Comparer"}
+          style={{ WebkitTapHighlightColor: "transparent", transition: "opacity 0.2s, transform 0.2s" }}
+        >
+          <GitCompareArrows size={14} className={compared ? "text-primary" : "text-foreground"} />
         </button>
       </div>
 
