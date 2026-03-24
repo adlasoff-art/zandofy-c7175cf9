@@ -1,74 +1,40 @@
 
 
-## Plan : 4 fonctionnalités restantes
+## Plan : Terminer la Phase 1 — 5 fonctionnalités incomplètes
 
-### 1. Impersonation admin fonctionnelle
-
-**Problème** : L'edge function `impersonate-user` retourne les infos du user cible mais ne génère PAS de token de session. Le frontend attend `access_token` + `refresh_token` qui n'arrivent jamais, donc rien ne se passe.
-
-**Solution** : Utiliser `supabaseAdmin.auth.admin.generateLink({ type: 'magiclink', email })` pour obtenir un lien de login, puis extraire le token. Alternative plus fiable : utiliser `supabaseAdmin.auth.admin.createUser` n'est pas applicable ici. La meilleure approche pour Supabase est d'utiliser un **mode lecture seule en local** :
-
-- Modifier l'edge function pour qu'elle retourne les données complètes du user cible (profil, rôles, commandes récentes, stats).
-- Côté frontend, au lieu de switcher de session (risque de sécurité), ouvrir un **panneau d'impersonation** qui affiche le dashboard tel que le voit l'utilisateur cible, en chargeant ses données via l'admin (service role dans l'edge function).
-- Ajouter un bandeau jaune "Mode impersonation — Vous voyez le compte de [nom]" avec un bouton "Quitter".
-
-**Fichiers modifiés** :
-| Fichier | Changement |
-|---------|-----------|
-| `frontend/supabase/functions/impersonate-user/index.ts` | Retourner données complètes (commandes, stats, adresses, wallet) via service role |
-| `frontend/src/components/admin/UserDetailDrawer.tsx` | Stocker les données retournées et ouvrir le panneau impersonation |
-| `frontend/src/components/admin/ImpersonationPanel.tsx` | **Nouveau** — Dashboard lecture seule affichant les données du user cible |
-| `frontend/src/contexts/ImpersonationContext.tsx` | **Nouveau** — Context pour gérer l'état d'impersonation global + bandeau |
-
-### 2. Relance de paiement depuis le dashboard client
-
-**Problème** : Quand un paiement Mobile Money échoue ou reste en `awaiting_payment`, le client doit recréer une commande au lieu de relancer le paiement.
-
-**Solution** :
-- Dans `DashboardPage.tsx`, pour les commandes en statut `awaiting_payment` ou `payment_failed`, afficher un bouton "Relancer le paiement".
-- Au clic, appeler `kelpay-payment` avec l'`order_id` existant (qui crée une nouvelle `payment_transaction` liée à la même commande).
-- Réutiliser le même flux USSD/polling que le checkout.
-- Créer un composant `RetryPaymentModal` avec le formulaire numéro de téléphone + opérateur.
-
-**Fichiers modifiés** :
-| Fichier | Changement |
-|---------|-----------|
-| `frontend/src/components/payments/RetryPaymentModal.tsx` | **Nouveau** — Modal de relance paiement (numéro, opérateur, polling) |
-| `frontend/src/pages/DashboardPage.tsx` | Bouton "Relancer" sur les commandes `awaiting_payment` / `payment_failed`, ouvre le modal |
-| `frontend/supabase/functions/kelpay-payment/index.ts` | Accepter les relances (vérifier que la commande appartient au user, créer nouvelle transaction) |
-
-### 3. Expiration automatique des commandes `awaiting_payment`
-
-**Solution** : Edge function cron qui passe les commandes `awaiting_payment` datant de +30 minutes en `payment_failed`.
-
-**Fichiers** :
-| Fichier | Changement |
-|---------|-----------|
-| `frontend/supabase/functions/expire-pending-orders/index.ts` | **Nouveau** — Requête UPDATE orders SET status='payment_failed' WHERE status='awaiting_payment' AND created_at < now() - interval '30 minutes' |
-
-**SQL** (via insert tool, pas migration) : Créer le cron job `pg_cron` qui appelle cette function toutes les 5 minutes.
-
-### 4. Filtrage vendeur : masquer commandes non abouties
-
-**Problème** : `VendorOrderManager.tsx` charge toutes les commandes du store sans filtrer.
-
-**Solution** : Ajouter `.not("status", "in", "(awaiting_payment,payment_failed)")` à la requête du vendeur pour ne montrer que les commandes dont le paiement est confirmé.
-
-**Fichier modifié** :
-| Fichier | Changement |
-|---------|-----------|
-| `frontend/src/components/vendor/VendorOrderManager.tsx` | Filtrer les statuts `awaiting_payment` et `payment_failed` de la requête |
+Après audit du code, voici les 5 éléments commencés mais non terminés, et ce qu'il faut faire pour chacun.
 
 ---
 
-### SQL à exécuter (insert tool, pas migration)
+### 1. Emails transactionnels automatiques sur changement de statut commande
 
+**État actuel** : L'edge function `notify-order-status` existe et peut envoyer des emails + notifications in-app + push. Mais elle n'est **jamais appelée** depuis le frontend.
+
+**À faire** :
+- Dans `VendorOrderManager.tsx`, après chaque changement de statut réussi (confirmed, in_shipping, shipped, delivered), appeler `supabase.functions.invoke("notify-order-status", { body: { orderId, newStatus } })`
+- Dans les pages admin où le statut peut être changé, ajouter le même appel
+- Ajouter les statuts manquants dans la map `NOTIFY_STATUSES` de l'edge function : `delivered`, `out_for_delivery`
+
+| Fichier | Changement |
+|---------|-----------|
+| `frontend/src/components/vendor/VendorOrderManager.tsx` | Appel notify-order-status après mise à jour statut |
+| `frontend/supabase/functions/notify-order-status/index.ts` | Ajouter statuts `delivered`, `out_for_delivery` |
+
+---
+
+### 2. pg_cron pour expiration automatique des commandes
+
+**État actuel** : L'edge function `expire-pending-orders` existe et fonctionne. Mais le cron job n'est peut-être pas configuré en production.
+
+**À faire** :
+- Fournir le SQL exact pour créer le cron job via `pg_cron` + `pg_net`
+- Le configurer via l'outil SQL (pas migration, car contient des données spécifiques au projet)
+
+**SQL à exécuter** :
 ```sql
--- Activer pg_cron et pg_net si pas déjà fait
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- Cron : expirer les commandes awaiting_payment > 30 min, toutes les 5 min
 SELECT cron.schedule(
   'expire-pending-orders',
   '*/5 * * * *',
@@ -84,16 +50,70 @@ SELECT cron.schedule(
 
 ---
 
-### Résumé : 7 fichiers modifiés/créés
+### 3. Visual Search — connecter le frontend à l'edge function Lovable Cloud
 
-| # | Fichier | Action |
-|---|---------|--------|
-| 1 | `frontend/supabase/functions/impersonate-user/index.ts` | Modifier — retourner données complètes |
-| 2 | `frontend/src/components/admin/ImpersonationPanel.tsx` | Créer — vue lecture seule |
-| 3 | `frontend/src/contexts/ImpersonationContext.tsx` | Créer — contexte + bandeau |
-| 4 | `frontend/src/components/admin/UserDetailDrawer.tsx` | Modifier — intégrer impersonation panel |
-| 5 | `frontend/src/components/payments/RetryPaymentModal.tsx` | Créer — relance paiement |
-| 6 | `frontend/src/pages/DashboardPage.tsx` | Modifier — bouton relance |
-| 7 | `frontend/supabase/functions/expire-pending-orders/index.ts` | Créer — cron expiration |
-| 8 | `frontend/src/components/vendor/VendorOrderManager.tsx` | Modifier — filtrer commandes |
+**État actuel** : `PredictiveSearch.tsx` a déjà un bouton caméra et un modal de visual search. L'edge function `visual-search` existe dans deux emplacements (`supabase/functions/` et `frontend/supabase/functions/`). Il faut vérifier que le frontend appelle bien l'edge function Lovable Cloud (pas l'ancien backend FastAPI).
+
+**À faire** :
+- Vérifier que `PredictiveSearch.tsx` utilise `supabase.functions.invoke("visual-search")` et non l'ancien `apiFetch`
+- S'assurer que la config.toml a `verify_jwt = false` pour visual-search (déjà fait)
+- Tester le flux complet
+
+| Fichier | Changement |
+|---------|-----------|
+| `frontend/src/components/PredictiveSearch.tsx` | Vérifier/corriger l'appel vers edge function |
+
+---
+
+### 4. Push Notifications — abonnement frontend
+
+**État actuel** : L'edge function `push-notifications` existe avec les VAPID keys configurées. Mais **aucun code frontend** ne demande la permission, n'enregistre le service worker, ni ne sauvegarde l'abonnement en base.
+
+**À faire** :
+- Créer un hook `usePushNotifications` qui :
+  - Demande la permission notification
+  - Enregistre le service worker
+  - Obtient l'abonnement PushSubscription
+  - Sauvegarde endpoint/p256dh/auth dans `push_subscriptions`
+- Créer un composant `PushPermissionPrompt` qui s'affiche une fois pour les utilisateurs connectés
+- Intégrer dans `DashboardPage.tsx` ou `App.tsx`
+
+| Fichier | Action |
+|---------|--------|
+| `frontend/src/hooks/use-push-notifications.ts` | Créer — hook d'abonnement push |
+| `frontend/src/components/PushPermissionPrompt.tsx` | Créer — UI demande permission |
+| `frontend/src/pages/DashboardPage.tsx` | Intégrer le prompt |
+| `frontend/public/sw-push.js` | Créer — service worker pour recevoir les notifs push |
+
+---
+
+### 5. Paiement par carte — Intégration Stripe
+
+**État actuel** : Un message "Ce moyen de paiement n'est pas actif" s'affiche. Aucune intégration réelle.
+
+**À faire** :
+- Activer Stripe via l'outil Lovable Stripe
+- Créer une edge function `create-checkout-session` pour générer une session Stripe Checkout
+- Modifier `CheckoutPage.tsx` pour proposer Stripe quand la carte est activée dans `platform_settings`
+- Gérer le webhook de confirmation (marquer la commande comme `confirmed`)
+
+| Fichier | Action |
+|---------|--------|
+| Edge function `create-stripe-session` | Créer — session Stripe Checkout |
+| Edge function `stripe-webhook` | Créer — callback Stripe |
+| `frontend/src/pages/CheckoutPage.tsx` | Intégrer le bouton payer par carte |
+
+**Note** : Cette étape nécessite d'abord d'activer Stripe (clé API). Je demanderai confirmation avant de procéder.
+
+---
+
+### Ordre d'implémentation
+
+1. **Emails transactionnels** (rapide, juste brancher les appels)
+2. **pg_cron** (SQL à exécuter manuellement)
+3. **Visual Search** (vérification + correction si nécessaire)
+4. **Push Notifications** (nouveau code frontend)
+5. **Stripe** (nécessite activation préalable)
+
+### Résumé : ~10 fichiers modifiés/créés
 
