@@ -234,6 +234,7 @@ const App = () => (
           </UIConfigProvider>
           </ThemeProvider>
           </I18nProvider>
+          </CompareProvider>
           </WishlistProvider>
         </CartProvider>
         </ImpersonationProvider>
