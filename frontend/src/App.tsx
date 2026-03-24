@@ -8,6 +8,8 @@ import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
 import { ImpersonationPanel } from "@/components/admin/ImpersonationPanel";
 import { CartProvider } from "@/contexts/CartContext";
 import { WishlistProvider } from "@/contexts/WishlistContext";
+import { CompareProvider } from "@/contexts/CompareContext";
+import { CompareBar } from "@/components/CompareBar";
 import { CartDrawer } from "@/components/CartDrawer";
 import { SupportDrawer } from "@/components/support/SupportDrawer";
 import { SupportDrawerProvider, useSupportDrawer } from "@/contexts/SupportDrawerContext";
