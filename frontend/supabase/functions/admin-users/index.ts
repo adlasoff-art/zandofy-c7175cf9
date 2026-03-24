@@ -50,15 +50,62 @@ Deno.serve(async (req) => {
         if (userErr || !userData?.user?.email) {
           return new Response(JSON.stringify({ error: "User not found" }), { status: 404, headers: corsHeaders });
         }
-        // Send password reset email
-        const { error: resetErr } = await adminClient.auth.admin.generateLink({
+        const userEmail = userData.user.email;
+
+        // Generate recovery link
+        const { data: linkData, error: linkErr } = await adminClient.auth.admin.generateLink({
           type: "recovery",
-          email: userData.user.email,
+          email: userEmail,
         });
-        if (resetErr) {
-          return new Response(JSON.stringify({ error: resetErr.message }), { status: 500, headers: corsHeaders });
+        if (linkErr) {
+          console.error("generateLink error:", linkErr.message);
+          return new Response(JSON.stringify({ error: linkErr.message }), { status: 500, headers: corsHeaders });
         }
-        return new Response(JSON.stringify({ success: true, email: userData.user.email }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+        // Build the redirect URL from the generated link
+        const actionLink = linkData?.properties?.action_link;
+        if (!actionLink) {
+          return new Response(JSON.stringify({ error: "Could not generate recovery link" }), { status: 500, headers: corsHeaders });
+        }
+
+        // Send the email via SMTP (same as send-email function)
+        const nodemailer = (await import("npm:nodemailer@6.9.16")).default;
+        const transporter = nodemailer.createTransport({
+          host: Deno.env.get("SMTP_HOST"),
+          port: parseInt(Deno.env.get("SMTP_PORT") || "587"),
+          secure: false,
+          auth: {
+            user: Deno.env.get("SMTP_USER"),
+            pass: Deno.env.get("SMTP_PASS"),
+          },
+        });
+
+        const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "noreply@zandofy.com";
+
+        await transporter.sendMail({
+          from: `"Zandofy" <${fromEmail}>`,
+          to: userEmail,
+          subject: "Réinitialisation de votre mot de passe - Zandofy",
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+              <h2 style="color:#008000;">Zandofy</h2>
+              <p>Bonjour,</p>
+              <p>Un administrateur a demandé la réinitialisation de votre mot de passe.</p>
+              <p>Cliquez sur le bouton ci-dessous pour définir un nouveau mot de passe :</p>
+              <div style="text-align:center;margin:30px 0;">
+                <a href="${actionLink}" style="background-color:#008000;color:#fff;padding:14px 28px;text-decoration:none;border-radius:8px;font-size:16px;display:inline-block;">
+                  Réinitialiser mon mot de passe
+                </a>
+              </div>
+              <p style="color:#666;font-size:13px;">Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</p>
+              <p style="color:#666;font-size:13px;">Ce lien expire dans 24 heures.</p>
+              <hr style="border:none;border-top:1px solid #eee;margin:20px 0;">
+              <p style="color:#999;font-size:12px;">© Zandofy - Marketplace Mode Africaine</p>
+            </div>
+          `,
+        });
+
+        return new Response(JSON.stringify({ success: true, email: userEmail }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       case "ban_user": {
