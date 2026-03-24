@@ -3,6 +3,12 @@ import { RefreshCw, Loader2 } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 
 const APP_VERSION = "1.8.0";
+const PWA_UPDATE_LOCK_KEY = "pwa-update-lock";
+
+const clearAllCaches = async () => {
+  const names = await caches.keys();
+  await Promise.all(names.map((name) => caches.delete(name)));
+};
 
 export function PWAUpdatePrompt() {
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
@@ -11,6 +17,7 @@ export function PWAUpdatePrompt() {
 
   useEffect(() => {
     const handler = (e: Event) => {
+      if (localStorage.getItem(PWA_UPDATE_LOCK_KEY) === APP_VERSION) return;
       setRegistration((e as CustomEvent).detail.registration);
     };
     window.addEventListener("sw-update-available", handler);
@@ -18,18 +25,35 @@ export function PWAUpdatePrompt() {
   }, []);
 
   const handleUpdate = useCallback(() => {
+    if (updating) return;
+
     setUpdating(true);
+    localStorage.setItem(PWA_UPDATE_LOCK_KEY, APP_VERSION);
 
     const waiting = registration?.waiting;
+    let reloadTriggered = false;
+
+    const finalizeReload = () => {
+      if (reloadTriggered) return;
+      reloadTriggered = true;
+      setRegistration(null);
+      window.location.reload();
+    };
+
+    const cleanupAndReload = async () => {
+      try {
+        registration?.active?.postMessage({ type: "CLEAR_CACHES" });
+        waiting?.postMessage({ type: "CLEAR_CACHES" });
+        await clearAllCaches();
+        await registration?.unregister();
+      } finally {
+        finalizeReload();
+      }
+    };
 
     // If there's no waiting worker, force reload as fallback
     if (!waiting) {
-      // Clear all caches then reload
-      caches.keys().then((names) => {
-        Promise.all(names.map((n) => caches.delete(n))).then(() => {
-          window.location.reload();
-        });
-      });
+      cleanupAndReload();
       return;
     }
 
@@ -37,7 +61,7 @@ export function PWAUpdatePrompt() {
     const onStateChange = () => {
       if (waiting.state === "activated") {
         waiting.removeEventListener("statechange", onStateChange);
-        window.location.reload();
+        finalizeReload();
       }
     };
     waiting.addEventListener("statechange", onStateChange);
@@ -45,9 +69,11 @@ export function PWAUpdatePrompt() {
     // Also listen for controllerchange as a more reliable signal
     const onControllerChange = () => {
       navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
-      window.location.reload();
+      finalizeReload();
     };
     navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+
+    registration.active?.postMessage({ type: "CLEAR_CACHES" });
 
     // Tell the waiting SW to skip waiting
     waiting.postMessage({ type: "SKIP_WAITING" });
@@ -56,11 +82,18 @@ export function PWAUpdatePrompt() {
     setTimeout(() => {
       waiting.removeEventListener("statechange", onStateChange);
       navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
-      caches.keys().then((names) =>
-        Promise.all(names.map((n) => caches.delete(n)))
-      ).then(() => window.location.reload());
+      cleanupAndReload();
     }, 4000);
-  }, [registration]);
+  }, [registration, updating]);
+
+  useEffect(() => {
+    if (!registration?.waiting) {
+      localStorage.removeItem(PWA_UPDATE_LOCK_KEY);
+      if (!updating) {
+        setRegistration(null);
+      }
+    }
+  }, [registration, updating]);
 
   if (!registration) return null;
 
