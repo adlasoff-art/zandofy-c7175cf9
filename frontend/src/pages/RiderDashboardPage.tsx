@@ -255,6 +255,7 @@ function RiderProfileTab({ userId, email, completed, totalEarnings, deliveries }
   );
 }
 
+export default function RiderDashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const { isRider, isAdmin, loading: rolesLoading } = useRoles();
   const [tab, setTab] = useState<TabKey>("route");
