@@ -64,6 +64,13 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
 
   const handleImgError = useCallback(() => setImgError(true), []);
 
+  const handleCompare = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (compared) removeFromCompare(product.id);
+    else addToCompare(product);
+  }, [compared, product, addToCompare, removeFromCompare]);
+
   return (
     <div
       ref={ref}
