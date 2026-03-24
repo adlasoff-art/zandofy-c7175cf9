@@ -39,6 +39,8 @@ export default function AdminCouponsPage() {
   const [minOrder, setMinOrder] = useState(0);
   const [maxUses, setMaxUses] = useState<number | "">(100);
   const [expiresAt, setExpiresAt] = useState("");
+  const [targetCity, setTargetCity] = useState("");
+  const [targetCountry, setTargetCountry] = useState("");
 
   const loadCoupons = useCallback(async () => {
     setLoading(true);
