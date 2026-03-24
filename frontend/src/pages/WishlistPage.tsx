@@ -8,6 +8,7 @@ import { Heart, Share2, Copy } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/contexts/I18nContext";
+import { toast } from "sonner";
 import type { Product } from "@/services/api";
 
 function mapWishlistProduct(row: any): Product {
