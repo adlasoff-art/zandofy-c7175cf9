@@ -49,6 +49,8 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
