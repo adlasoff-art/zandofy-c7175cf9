@@ -248,4 +248,18 @@ self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "CLEAR_CACHES") {
     caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
   }
+  if (event.data && event.data.type === "GET_OFFLINE_CATALOG") {
+    caches.open("zandofy-catalog-v1").then((cache) =>
+      cache.match("offline-catalog").then((response) => {
+        if (response) {
+          response.json().then((data) => {
+            event.source.postMessage({ type: "OFFLINE_CATALOG", products: data });
+          });
+        }
+      })
+    );
+  }
+  if (event.data && event.data.type === "REFRESH_CATALOG") {
+    cacheTopProducts();
+  }
 });
