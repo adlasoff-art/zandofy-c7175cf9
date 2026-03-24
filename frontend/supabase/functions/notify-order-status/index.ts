@@ -27,6 +27,18 @@ const NOTIFY_STATUSES: Record<string, { subject: string; heading: string; body: 
     body: "Votre commande est arrivée au hub local et sera bientôt assignée à un livreur.",
     emoji: "📦",
   },
+  out_for_delivery: {
+    subject: "🛵 Livraison en cours",
+    heading: "Votre colis est en cours de livraison !",
+    body: "Le livreur est en route vers votre adresse. Préparez-vous à recevoir votre commande.",
+    emoji: "🛵",
+  },
+  delivered: {
+    subject: "🎉 Commande livrée",
+    heading: "Votre commande a été livrée !",
+    body: "Votre colis a été livré avec succès. Merci pour votre confiance !",
+    emoji: "🎉",
+  },
 };
 
 function buildEmailHtml(heading: string, body: string, orderRef: string, emoji: string) {

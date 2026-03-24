@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
  * Statuses that trigger: confirmed, in_shipping, shipped (arrived at hub)
  */
 export async function triggerOrderStatusNotification(orderId: string, newStatus: string) {
-  const NOTIFIABLE_STATUSES = ["confirmed", "in_shipping", "shipped"];
+  const NOTIFIABLE_STATUSES = ["confirmed", "in_shipping", "shipped", "out_for_delivery", "delivered"];
   if (!NOTIFIABLE_STATUSES.includes(newStatus)) return;
 
   try {
