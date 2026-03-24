@@ -8,6 +8,7 @@ import {
   Send, Loader2, MessageCircle, Paperclip, FileText, Search, X,
   Check, CheckCheck, ChevronDown, Trash2, ArrowLeft,
 } from "lucide-react";
+import { QuickReplies } from "./QuickReplies";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -48,6 +49,8 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -164,6 +167,37 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
       supabase.removeChannel(channel);
     };
   }, [conversation.id, user, scrollToBottom]);
+
+  // Typing indicator via Supabase Presence
+  useEffect(() => {
+    if (!user || !conversation.id) return;
+
+    const presenceChannel = supabase.channel(`typing-${conversation.id}`, {
+      config: { presence: { key: user.id } },
+    });
+
+    presenceChannel
+      .on("presence", { event: "sync" }, () => {
+        const state = presenceChannel.presenceState();
+        const otherTyping = Object.entries(state).some(
+          ([key, vals]) => key !== user.id && (vals as any[]).some(v => v.typing)
+        );
+        setIsTyping(otherTyping);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(presenceChannel); };
+  }, [conversation.id, user]);
+
+  const broadcastTyping = useCallback(() => {
+    if (!user || !conversation.id) return;
+    const channel = supabase.channel(`typing-${conversation.id}`);
+    channel.track({ typing: true });
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      channel.track({ typing: false });
+    }, 2000);
+  }, [user, conversation.id]);
 
   const handleSend = async () => {
     if (!newMessage.trim() || !user || sending) return;
@@ -512,6 +546,20 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Typing indicator */}
+      {isTyping && (
+        <div className="px-4 py-1">
+          <span className="text-[11px] text-muted-foreground italic animate-pulse">
+            {conversation.other_party_name} est en train d'écrire…
+          </span>
+        </div>
+      )}
+
+      {/* Quick replies (vendor only) */}
+      {conversation.is_store_owner && (
+        <QuickReplies onSelect={(text) => setNewMessage(text)} />
+      )}
+
       {/* Input area */}
       <div className="border-t border-border px-3 py-2 flex items-center gap-2 shrink-0">
         {mediaEnabled && (
@@ -534,7 +582,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
         )}
         <textarea
           value={newMessage}
-          onChange={e => setNewMessage(e.target.value)}
+          onChange={e => { setNewMessage(e.target.value); broadcastTyping(); }}
           onKeyDown={handleKeyDown}
           placeholder="Écrivez votre message..."
           rows={1}

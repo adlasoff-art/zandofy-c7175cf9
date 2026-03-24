@@ -2,10 +2,11 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Loader2, Store, ChevronDown, ChevronRight, Building2, User2, TrendingUp, DollarSign, BarChart3 } from "lucide-react";
+import { Search, Loader2, Store, ChevronDown, ChevronRight, Building2, User2, TrendingUp, DollarSign, BarChart3, Download } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ExportButton } from "@/components/exports/ExportButton";
 
 type Period = "7d" | "14d" | "30d" | "3m" | "6m" | "1y" | "all";
 
@@ -228,6 +229,22 @@ export default function AdminVendorAccountingPage() {
     );
   }, [storeAccounting]);
 
+  // Export data
+  const exportRows = useMemo(() => {
+    return storeAccounting.map(s => ({
+      boutique: s.name,
+      type: s.isPlatform ? "Plateforme" : "Indépendant",
+      commission_pct: s.commissionRate,
+      ca_livre: s.totalRevenue.toFixed(2),
+      cout_achat: s.totalCost.toFixed(2),
+      bonus_vendeur: s.totalVendorMargin.toFixed(2),
+      commission: s.platformCommission.toFixed(2),
+      net_du: s.netDueVendor.toFixed(2),
+      wallet_dispo: s.walletAvailable.toFixed(2),
+      wallet_en_attente: s.walletPending.toFixed(2),
+    }));
+  }, [storeAccounting]);
+
   return (
     <AdminLayout title="Comptabilité vendeurs">
       <div className="space-y-6">
@@ -252,6 +269,23 @@ export default function AdminVendorAccountingPage() {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
+          <ExportButton
+            data={exportRows}
+            columns={[
+              { key: "boutique", label: "Boutique" },
+              { key: "type", label: "Type" },
+              { key: "commission_pct", label: "Commission %" },
+              { key: "ca_livre", label: "CA livré ($)" },
+              { key: "cout_achat", label: "Coût achat ($)" },
+              { key: "bonus_vendeur", label: "Bonus vendeur ($)" },
+              { key: "commission", label: "Commission ($)" },
+              { key: "net_du", label: "Net dû ($)" },
+              { key: "wallet_dispo", label: "Wallet dispo ($)" },
+              { key: "wallet_en_attente", label: "Wallet en attente ($)" },
+            ]}
+            filename="comptabilite-vendeurs"
+            label="Export CSV"
+          />
         </div>
 
         {/* KPI Cards */}

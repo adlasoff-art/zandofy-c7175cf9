@@ -9,6 +9,7 @@ import { Loader2, AlertTriangle, Search, CheckCircle2, MessageCircle } from "luc
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DisputeChat } from "@/components/disputes/DisputeChat";
 
 const STATUS_TABS = [
   { key: "all", label: "Tous" },
@@ -144,6 +145,11 @@ export default function AdminDisputesPage() {
                     <div className="text-xs space-y-1">
                       <p><strong>Commande :</strong> {d.order_id}</p>
                       {d.return_request_id && <p><strong>Retour lié :</strong> {d.return_request_id}</p>}
+                    </div>
+
+                    {/* Dispute Chat */}
+                    <div className="border border-border rounded-lg p-3 bg-background">
+                      <DisputeChat disputeId={d.id} disputeStatus={d.status} viewerRole="admin" />
                     </div>
 
                     {d.resolution && (

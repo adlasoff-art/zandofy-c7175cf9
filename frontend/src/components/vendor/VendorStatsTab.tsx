@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, TrendingUp, DollarSign, ShoppingBag, Package, BarChart3, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, Repeat } from "lucide-react";
+import { Loader2, TrendingUp, DollarSign, ShoppingBag, Package, BarChart3, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, Repeat, Eye, Clock, Undo2 } from "lucide-react";
 import {
   ChartContainer,
   ChartTooltip,
@@ -11,6 +11,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line,
   PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area,
 } from "recharts";
+import { ExportButton } from "@/components/exports/ExportButton";
 
 interface VendorStatsTabProps {
   storeId: string;
@@ -51,11 +52,13 @@ const STATUS_LABELS: Record<string, string> = {
   returned: "Retournées",
 };
 
+const HOUR_LABELS = Array.from({ length: 24 }, (_, i) => `${i}h`);
+
 export function VendorStatsTab({ storeId }: VendorStatsTabProps) {
   const [period, setPeriod] = useState<Period>("30d");
   const [orders, setOrders] = useState<any[]>([]);
   const [prevOrders, setPrevOrders] = useState<any[]>([]);
-  const [topProducts, setTopProducts] = useState<{ name: string; quantity: number; revenue: number }[]>([]);
+  const [topProducts, setTopProducts] = useState<{ name: string; quantity: number; revenue: number; views: number; returns: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -67,7 +70,7 @@ export function VendorStatsTab({ storeId }: VendorStatsTabProps) {
       const prevSince = new Date();
       prevSince.setDate(prevSince.getDate() - daysAgo * 2);
 
-      const [currentRes, prevRes, itemsRes] = await Promise.all([
+      const [currentRes, prevRes] = await Promise.all([
         supabase
           .from("orders")
           .select("id, created_at, total, status, subtotal")
@@ -80,35 +83,53 @@ export function VendorStatsTab({ storeId }: VendorStatsTabProps) {
           .eq("store_id", storeId)
           .gte("created_at", prevSince.toISOString())
           .lt("created_at", since.toISOString()),
-        supabase
-          .from("order_items")
-          .select("product_name, quantity, price, order_id")
-          .in(
-            "order_id",
-            (await supabase
-              .from("orders")
-              .select("id")
-              .eq("store_id", storeId)
-              .gte("created_at", since.toISOString())
-            ).data?.map(o => o.id) || []
-          ),
       ]);
 
-      setOrders(currentRes.data || []);
+      const currentOrders = currentRes.data || [];
+      setOrders(currentOrders);
       setPrevOrders(prevRes.data || []);
 
+      // Get order items for top products
+      const orderIds = currentOrders.map(o => o.id);
+      const [itemsRes, productsRes, returnsRes] = await Promise.all([
+        orderIds.length > 0
+          ? supabase.from("order_items").select("product_name, product_id, quantity, price, order_id").in("order_id", orderIds)
+          : Promise.resolve({ data: [] }),
+        (supabase as any).from("analytics_events").select("product_id").eq("event_type", "product_view").eq("store_id", storeId).gte("created_at", since.toISOString()),
+        supabase.from("return_requests").select("order_id, status").eq("store_id", storeId).gte("created_at", since.toISOString()),
+      ]);
+
+      const viewsByProduct = new Map<string, number>();
+      for (const ev of (productsRes.data || []) as any[]) {
+        if (ev.product_id) viewsByProduct.set(ev.product_id, (viewsByProduct.get(ev.product_id) || 0) + 1);
+      }
+      const returnsByOrder = new Map<string, number>();
+      for (const r of (returnsRes.data || [])) {
+        returnsByOrder.set(r.order_id, (returnsByOrder.get(r.order_id) || 0) + 1);
+      }
+
       // Aggregate top products
-      const productMap = new Map<string, { quantity: number; revenue: number }>();
+      const productMap = new Map<string, { quantity: number; revenue: number; views: number; returns: number; productId: string }>();
       for (const item of (itemsRes.data || [])) {
         const key = item.product_name;
-        const existing = productMap.get(key) || { quantity: 0, revenue: 0 };
+        const existing = productMap.get(key) || { quantity: 0, revenue: 0, views: 0, returns: 0, productId: item.product_id };
         existing.quantity += item.quantity;
         existing.revenue += Number(item.price) * item.quantity;
+        existing.views = viewsByProduct.get(item.product_id) || 0;
         productMap.set(key, existing);
       }
+
+      // Count returns per product (via order_items)
+      for (const [orderId, count] of returnsByOrder) {
+        for (const item of (itemsRes.data || []).filter(i => i.order_id === orderId)) {
+          const entry = productMap.get(item.product_name);
+          if (entry) entry.returns += count;
+        }
+      }
+
       const sorted = Array.from(productMap, ([name, v]) => ({ name, ...v }))
         .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5);
+        .slice(0, 10);
       setTopProducts(sorted);
 
       setLoading(false);
@@ -117,7 +138,6 @@ export function VendorStatsTab({ storeId }: VendorStatsTabProps) {
   }, [storeId, period]);
 
   const stats = useMemo(() => {
-    // Current period
     const totalRevenue = orders.reduce((s, o) => s + (Number(o.total) || 0), 0);
     const totalOrders = orders.length;
     const avgOrder = totalOrders > 0 ? totalRevenue / totalOrders : 0;
@@ -125,7 +145,6 @@ export function VendorStatsTab({ storeId }: VendorStatsTabProps) {
     const cancelledCount = orders.filter(o => o.status === "cancelled" || o.status === "returned").length;
     const fulfillmentRate = totalOrders > 0 ? Math.round((deliveredCount / totalOrders) * 100) : 0;
 
-    // Previous period for comparison
     const prevRevenue = prevOrders.reduce((s, o) => s + (Number(o.total) || 0), 0);
     const prevCount = prevOrders.length;
     const revenueChange = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : 0;
@@ -153,11 +172,32 @@ export function VendorStatsTab({ storeId }: VendorStatsTabProps) {
       color: STATUS_COLORS[status] || "hsl(var(--muted))",
     }));
 
+    // Peak hours
+    const hourMap = new Map<number, number>();
+    for (const o of orders) {
+      const hour = new Date(o.created_at).getHours();
+      hourMap.set(hour, (hourMap.get(hour) || 0) + 1);
+    }
+    const peakHoursData = Array.from({ length: 24 }, (_, h) => ({
+      hour: HOUR_LABELS[h],
+      commandes: hourMap.get(h) || 0,
+    }));
+
     return {
       totalRevenue, totalOrders, avgOrder, deliveredCount, cancelledCount,
-      fulfillmentRate, revenueChange, ordersChange, chartData, statusData,
+      fulfillmentRate, revenueChange, ordersChange, chartData, statusData, peakHoursData,
     };
   }, [orders, prevOrders]);
+
+  // Export data
+  const exportData = useMemo(() => {
+    return orders.map(o => ({
+      date: new Date(o.created_at).toLocaleDateString("fr-FR"),
+      ref: o.id.slice(0, 8),
+      statut: STATUS_LABELS[o.status] || o.status,
+      total: Number(o.total).toFixed(2),
+    }));
+  }, [orders]);
 
   if (loading) {
     return (
@@ -169,21 +209,34 @@ export function VendorStatsTab({ storeId }: VendorStatsTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* Period selector */}
-      <div className="flex gap-1">
-        {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
-          <button
-            key={p}
-            onClick={() => setPeriod(p)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all ${
-              period === p
-                ? "bg-foreground text-card border-foreground"
-                : "bg-card text-foreground border-border hover:border-foreground"
-            }`}
-          >
-            {PERIOD_LABELS[p]}
-          </button>
-        ))}
+      {/* Period selector + Export */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1">
+          {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all ${
+                period === p
+                  ? "bg-foreground text-card border-foreground"
+                  : "bg-card text-foreground border-border hover:border-foreground"
+              }`}
+            >
+              {PERIOD_LABELS[p]}
+            </button>
+          ))}
+        </div>
+        <ExportButton
+          data={exportData}
+          columns={[
+            { key: "date", label: "Date" },
+            { key: "ref", label: "Réf" },
+            { key: "statut", label: "Statut" },
+            { key: "total", label: "Total ($)" },
+          ]}
+          filename="ventes-vendeur"
+          label="Export CSV"
+        />
       </div>
 
       {/* KPI cards */}
@@ -261,6 +314,22 @@ export function VendorStatsTab({ storeId }: VendorStatsTabProps) {
             </ChartContainer>
           </div>
 
+          {/* Peak hours histogram */}
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+              <Clock size={14} /> Heures de pointe
+            </h3>
+            <ChartContainer config={{ commandes: { label: "Commandes", color: "hsl(var(--primary))" } }} className="h-[180px] w-full">
+              <BarChart data={stats.peakHoursData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="hour" fontSize={9} tickLine={false} axisLine={false} interval={1} />
+                <YAxis fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="commandes" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Status distribution */}
             {stats.statusData.length > 0 && (
@@ -309,33 +378,44 @@ export function VendorStatsTab({ storeId }: VendorStatsTabProps) {
               </div>
             )}
 
-            {/* Top Products */}
+            {/* Top Products with conversion & return rates */}
             <div className="bg-card border border-border rounded-lg p-4">
               <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-                <Package size={14} /> Top produits vendus
+                <Package size={14} /> Performance produits
               </h3>
               {topProducts.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-6">Aucune vente sur cette période.</p>
               ) : (
                 <div className="space-y-2">
-                  {topProducts.map((p, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-muted-foreground w-5 text-right">{i + 1}.</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-foreground truncate">{p.name}</p>
-                        <div className="w-full bg-muted rounded-full h-1.5 mt-1">
-                          <div
-                            className="bg-primary h-1.5 rounded-full transition-all"
-                            style={{ width: `${topProducts[0].revenue > 0 ? (p.revenue / topProducts[0].revenue) * 100 : 0}%` }}
-                          />
+                  {topProducts.slice(0, 5).map((p, i) => {
+                    const convRate = p.views > 0 ? ((p.quantity / p.views) * 100).toFixed(1) : "—";
+                    const returnRate = p.quantity > 0 ? ((p.returns / p.quantity) * 100).toFixed(1) : "0";
+                    return (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-muted-foreground w-5 text-right">{i + 1}.</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-foreground truncate">{p.name}</p>
+                          <div className="flex gap-3 mt-0.5">
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                              <Eye size={9} /> {p.views} vues
+                            </span>
+                            <span className="text-[10px] text-emerald-600 flex items-center gap-0.5">
+                              <TrendingUp size={9} /> {convRate}% conv.
+                            </span>
+                            {Number(returnRate) > 0 && (
+                              <span className="text-[10px] text-destructive flex items-center gap-0.5">
+                                <Undo2 size={9} /> {returnRate}% retour
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs font-bold text-foreground">${p.revenue.toFixed(0)}</p>
+                          <p className="text-[10px] text-muted-foreground">{p.quantity} vendus</p>
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs font-bold text-foreground">${p.revenue.toFixed(0)}</p>
-                        <p className="text-[10px] text-muted-foreground">{p.quantity} vendus</p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
