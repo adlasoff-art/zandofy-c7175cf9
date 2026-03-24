@@ -72,8 +72,8 @@ export function MobileAccountMenu() {
     {
       title: "Fidélité & Parrainage",
       items: [
-        { to: "/loyalty-program", icon: Award, label: "Programme de fidélité" },
-        { to: "/affiliate-program", icon: Users, label: "Parrainage & Affiliation" },
+        { to: "/dashboard?tab=overview", icon: Award, label: "Programme de fidélité" },
+        { to: "/dashboard?tab=referral", icon: Users, label: "Parrainage & Affiliation" },
       ],
     },
     {
