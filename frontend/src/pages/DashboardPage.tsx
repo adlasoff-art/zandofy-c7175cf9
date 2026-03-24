@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useI18n } from "@/contexts/I18nContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
