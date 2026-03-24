@@ -132,6 +132,7 @@ const App = () => (
         <ImpersonationPanel />
         <CartProvider>
           <WishlistProvider>
+          <CompareProvider>
           <I18nProvider>
           <ThemeProvider>
           <UIConfigProvider>
