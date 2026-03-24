@@ -6,6 +6,7 @@ import { FlashSales } from "@/components/FlashSales";
 import { TopTrends } from "@/components/TopTrends";
 import { ProductGrid } from "@/components/ProductGrid";
 import { FeaturedSidebar } from "@/components/FeaturedSidebar";
+import { RecommendationsSection } from "@/components/RecommendationsSection";
 import { Footer } from "@/components/Footer";
 import { FloatingActions } from "@/components/FloatingActions";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
@@ -63,6 +64,7 @@ const Index = () => {
         <HeroBanner />
         <CategoryBanner />
         <FlashSales />
+        <RecommendationsSection />
 
         {/* Featured sidebar + TopTrends only */}
         <div className="container">
