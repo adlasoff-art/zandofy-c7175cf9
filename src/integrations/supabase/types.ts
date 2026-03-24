@@ -989,6 +989,8 @@ export type Database = {
           is_active: boolean
           max_uses: number | null
           min_order_amount: number | null
+          target_city: string | null
+          target_country: string | null
         }
         Insert: {
           code: string
@@ -1001,6 +1003,8 @@ export type Database = {
           is_active?: boolean
           max_uses?: number | null
           min_order_amount?: number | null
+          target_city?: string | null
+          target_country?: string | null
         }
         Update: {
           code?: string
@@ -1013,6 +1017,8 @@ export type Database = {
           is_active?: boolean
           max_uses?: number | null
           min_order_amount?: number | null
+          target_city?: string | null
+          target_country?: string | null
         }
         Relationships: []
       }
@@ -1208,6 +1214,84 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      delivery_chats: {
+        Row: {
+          created_at: string
+          delivery_id: string | null
+          id: string
+          message: string
+          order_id: string | null
+          sender_id: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_id?: string | null
+          id?: string
+          message?: string
+          order_id?: string | null
+          sender_id: string
+        }
+        Update: {
+          created_at?: string
+          delivery_id?: string | null
+          id?: string
+          message?: string
+          order_id?: string | null
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_chats_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_chats_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_zones: {
+        Row: {
+          city: string
+          country: string
+          created_at: string
+          created_by_admin: boolean
+          id: string
+          is_active: boolean
+          name: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          city: string
+          country?: string
+          created_at?: string
+          created_by_admin?: boolean
+          id?: string
+          is_active?: boolean
+          name: string
+          price?: number
+          updated_at?: string
+        }
+        Update: {
+          city?: string
+          country?: string
+          created_at?: string
+          created_by_admin?: boolean
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       dispute_messages: {
         Row: {
@@ -1965,6 +2049,7 @@ export type Database = {
           store_id: string | null
           subtotal: number
           supplier_order_number: string | null
+          tip_amount: number | null
           total: number
           tracking_number: string | null
           updated_at: string
@@ -2004,6 +2089,7 @@ export type Database = {
           store_id?: string | null
           subtotal?: number
           supplier_order_number?: string | null
+          tip_amount?: number | null
           total?: number
           tracking_number?: string | null
           updated_at?: string
@@ -2043,6 +2129,7 @@ export type Database = {
           store_id?: string | null
           subtotal?: number
           supplier_order_number?: string | null
+          tip_amount?: number | null
           total?: number
           tracking_number?: string | null
           updated_at?: string
@@ -2235,6 +2322,39 @@ export type Database = {
           order_id?: string | null
           referral_id?: string | null
           type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      premium_subscriptions: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          is_active: boolean
+          plan_name: string
+          price: number
+          start_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          is_active?: boolean
+          plan_name?: string
+          price?: number
+          start_date?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          is_active?: boolean
+          plan_name?: string
+          price?: number
+          start_date?: string
           user_id?: string
         }
         Relationships: []
@@ -2966,6 +3086,54 @@ export type Database = {
             columns: ["delivery_id"]
             isOneToOne: false
             referencedRelation: "deliveries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rider_ratings: {
+        Row: {
+          comment: string | null
+          created_at: string
+          delivery_id: string | null
+          id: string
+          order_id: string | null
+          rating: number
+          rider_id: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          delivery_id?: string | null
+          id?: string
+          order_id?: string | null
+          rating: number
+          rider_id: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          delivery_id?: string | null
+          id?: string
+          order_id?: string | null
+          rating?: number
+          rider_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rider_ratings_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rider_ratings_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -3824,6 +3992,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      vendor_boosts: {
+        Row: {
+          amount_paid: number
+          created_at: string
+          end_date: string
+          id: string
+          is_active: boolean
+          start_date: string
+          store_id: string
+        }
+        Insert: {
+          amount_paid?: number
+          created_at?: string
+          end_date: string
+          id?: string
+          is_active?: boolean
+          start_date?: string
+          store_id: string
+        }
+        Update: {
+          amount_paid?: number
+          created_at?: string
+          end_date?: string
+          id?: string
+          is_active?: boolean
+          start_date?: string
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_boosts_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vendor_delivery_zones: {
         Row: {
