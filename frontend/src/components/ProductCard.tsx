@@ -4,6 +4,7 @@ import { useLazyImage } from "@/hooks/use-lazy-image";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWishlist } from "@/contexts/WishlistContext";
+import { useCompare } from "@/contexts/CompareContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import type { Product } from "@/services/api";
