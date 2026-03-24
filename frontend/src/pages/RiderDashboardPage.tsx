@@ -155,7 +155,106 @@ function RiderMapTabContent({ activeDelivery, userId }: { activeDelivery: any; u
   );
 }
 
-export default function RiderDashboardPage() {
+function RiderProfileTab({ userId, email, completed, totalEarnings, deliveries }: { userId?: string; email?: string; completed: any[]; totalEarnings: number; deliveries: any[] }) {
+  const { data: avgRating } = useQuery({
+    queryKey: ["rider-self-rating", userId],
+    queryFn: async () => {
+      const { data } = await fromTable("rider_ratings").select("rating, comment, created_at").eq("rider_id", userId);
+      if (!data || data.length === 0) return { avg: 0, count: 0, ratings: [] };
+      const avg = data.reduce((s: number, r: any) => s + r.rating, 0) / data.length;
+      return { avg: Math.round(avg * 10) / 10, count: data.length, ratings: data.slice(0, 5) };
+    },
+    enabled: !!userId,
+  });
+
+  // Weekly earnings (last 4 weeks)
+  const weeklyEarnings = (() => {
+    const weeks: { label: string; amount: number }[] = [];
+    for (let w = 3; w >= 0; w--) {
+      const start = new Date(); start.setDate(start.getDate() - (w + 1) * 7);
+      const end = new Date(); end.setDate(end.getDate() - w * 7);
+      const amount = completed
+        .filter((d: any) => { const dt = new Date(d.delivered_at || d.delivery_date); return dt >= start && dt < end; })
+        .reduce((s: number, d: any) => s + Number(d.amount), 0);
+      weeks.push({ label: `S-${w}`, amount });
+    }
+    return weeks;
+  })();
+  const maxWeekly = Math.max(...weeklyEarnings.map(w => w.amount), 1);
+
+  return (
+    <div className="px-4 mt-4 space-y-4">
+      <div className="bg-card border border-border rounded-xl p-5">
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+            <User size={28} className="text-primary" />
+          </div>
+          <div>
+            <p className="text-base font-bold text-foreground">Profil Livreur</p>
+            <p className="text-xs text-muted-foreground">{email}</p>
+            {avgRating && avgRating.count > 0 && (
+              <p className="text-xs text-foreground mt-0.5">⭐ {avgRating.avg}/5 ({avgRating.count} avis)</p>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="bg-muted/50 rounded-lg p-3 text-center">
+            <p className="text-lg font-bold text-foreground">{completed.length}</p>
+            <p className="text-[10px] text-muted-foreground">Livrées</p>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-3 text-center">
+            <p className="text-lg font-bold text-foreground">${totalEarnings.toFixed(0)}</p>
+            <p className="text-[10px] text-muted-foreground">Gains</p>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-3 text-center">
+            <p className="text-lg font-bold text-foreground">{deliveries.length ? Math.round((completed.length / deliveries.length) * 100) : 0}%</p>
+            <p className="text-[10px] text-muted-foreground">Taux</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Weekly earnings chart */}
+      <div className="bg-card border border-border rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+          <BarChart3 size={16} className="text-primary" /> Revenus hebdomadaires
+        </h3>
+        <div className="flex items-end gap-2 h-24">
+          {weeklyEarnings.map((w, i) => (
+            <div key={i} className="flex-1 flex flex-col items-center gap-1">
+              <span className="text-[10px] text-muted-foreground">${w.amount.toFixed(0)}</span>
+              <div className="w-full bg-primary/20 rounded-t" style={{ height: `${Math.max((w.amount / maxWeekly) * 100, 4)}%` }}>
+                <div className="w-full h-full bg-primary rounded-t" />
+              </div>
+              <span className="text-[10px] text-muted-foreground">{w.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Recent ratings */}
+      {avgRating && avgRating.ratings && avgRating.ratings.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+            <Star size={16} className="text-primary" /> Derniers avis
+          </h3>
+          <div className="space-y-2">
+            {avgRating.ratings.map((r: any, i: number) => (
+              <div key={i} className="flex items-start gap-2 text-sm">
+                <div className="flex gap-0.5">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <Star key={n} size={12} className={n <= r.rating ? "text-amber-400 fill-amber-400" : "text-muted-foreground/20"} />
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground flex-1">{r.comment || "—"}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
   const { user, loading: authLoading } = useAuth();
   const { isRider, isAdmin, loading: rolesLoading } = useRoles();
   const [tab, setTab] = useState<TabKey>("route");
