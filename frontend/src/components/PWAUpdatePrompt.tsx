@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Loader2 } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 
-const APP_VERSION = "1.8.0";
+const APP_VERSION = "1.8.1";
 const PWA_UPDATE_LOCK_KEY = "pwa-update-lock";
 const PWA_UPDATE_DONE_KEY = "pwa-update-done";
 
@@ -117,9 +117,7 @@ export function PWAUpdatePrompt() {
           {isFr ? "Nouvelle version disponible !" : "New version available!"}
         </h2>
 
-        <p className="text-xs font-medium text-primary">
-          v{APP_VERSION}
-        </p>
+        <p className="text-xs font-medium text-primary">v{APP_VERSION}</p>
 
         <p className="text-sm text-muted-foreground leading-relaxed">
           {isFr
@@ -132,9 +130,7 @@ export function PWAUpdatePrompt() {
           disabled={updating}
           className="w-full rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90 active:scale-[0.98] touch-manipulation disabled:opacity-60"
         >
-          {updating
-            ? (isFr ? "Mise à jour en cours…" : "Updating…")
-            : (isFr ? "Mettre à jour" : "Update now")}
+          {updating ? (isFr ? "Mise à jour en cours…" : "Updating…") : isFr ? "Mettre à jour" : "Update now"}
         </button>
       </div>
     </div>
