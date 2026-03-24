@@ -90,7 +90,7 @@ export function MobileAccountMenu() {
         { to: "/dashboard?tab=addresses", icon: MapPin, label: "Adresses" },
         { to: "/dashboard?tab=notifications", icon: Bell, label: "Notifications" },
         { to: "/dashboard?tab=kyc", icon: BadgeCheck, label: "Vérification KYC" },
-        { to: "/dashboard?tab=security", icon: KeyRound, label: "Sécurité & mot de passe" },
+        { to: "/dashboard?tab=profile", icon: KeyRound, label: "Sécurité & mot de passe" },
       ],
     },
   ];
