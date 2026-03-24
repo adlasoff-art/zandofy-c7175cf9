@@ -9,6 +9,7 @@ import { Loader2, AlertTriangle, Search, CheckCircle2, MessageCircle } from "luc
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DisputeChat } from "@/components/disputes/DisputeChat";
 
 const STATUS_TABS = [
   { key: "all", label: "Tous" },
