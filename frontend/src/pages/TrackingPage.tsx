@@ -384,6 +384,49 @@ function LiveRiderMap({ deliveryId, orderId, userId }: { deliveryId: string; ord
   );
 }
 
+// ── Rider Profile Banner (visible to customer) ──
+function RiderProfileBanner({ riderId, riderName }: { riderId: string; riderName: string }) {
+  const { data: profile } = useQuery({
+    queryKey: ["rider-profile", riderId],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("first_name, last_name, avatar_url").eq("id", riderId).single();
+      return data;
+    },
+    enabled: !!riderId,
+  });
+
+  const { data: avgRating } = useQuery({
+    queryKey: ["rider-avg-rating", riderId],
+    queryFn: async () => {
+      const { data } = await fromTable("rider_ratings").select("rating").eq("rider_id", riderId);
+      if (!data || data.length === 0) return null;
+      const avg = data.reduce((s: number, r: any) => s + r.rating, 0) / data.length;
+      return { avg: Math.round(avg * 10) / 10, count: data.length };
+    },
+    enabled: !!riderId,
+  });
+
+  const displayName = profile ? [profile.first_name, profile.last_name].filter(Boolean).join(" ") || riderName : riderName;
+
+  return (
+    <div className="flex items-center gap-3 bg-muted/50 rounded-xl px-4 py-3 border border-border">
+      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+        {profile?.avatar_url ? (
+          <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
+        ) : (
+          <UserCheck size={18} className="text-primary" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-foreground">Votre livreur : {displayName}</p>
+        {avgRating && (
+          <p className="text-xs text-muted-foreground">⭐ {avgRating.avg}/5 ({avgRating.count} avis)</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──
 export default function TrackingPage() {
   const { user } = useAuth();
