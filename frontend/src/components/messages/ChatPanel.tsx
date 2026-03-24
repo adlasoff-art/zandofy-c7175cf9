@@ -168,6 +168,37 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
     };
   }, [conversation.id, user, scrollToBottom]);
 
+  // Typing indicator via Supabase Presence
+  useEffect(() => {
+    if (!user || !conversation.id) return;
+
+    const presenceChannel = supabase.channel(`typing-${conversation.id}`, {
+      config: { presence: { key: user.id } },
+    });
+
+    presenceChannel
+      .on("presence", { event: "sync" }, () => {
+        const state = presenceChannel.presenceState();
+        const otherTyping = Object.entries(state).some(
+          ([key, vals]) => key !== user.id && (vals as any[]).some(v => v.typing)
+        );
+        setIsTyping(otherTyping);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(presenceChannel); };
+  }, [conversation.id, user]);
+
+  const broadcastTyping = useCallback(() => {
+    if (!user || !conversation.id) return;
+    const channel = supabase.channel(`typing-${conversation.id}`);
+    channel.track({ typing: true });
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      channel.track({ typing: false });
+    }, 2000);
+  }, [user, conversation.id]);
+
   const handleSend = async () => {
     if (!newMessage.trim() || !user || sending) return;
 
