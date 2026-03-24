@@ -2,10 +2,11 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Loader2, Store, ChevronDown, ChevronRight, Building2, User2, TrendingUp, DollarSign, BarChart3 } from "lucide-react";
+import { Search, Loader2, Store, ChevronDown, ChevronRight, Building2, User2, TrendingUp, DollarSign, BarChart3, Download } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ExportButton } from "@/components/exports/ExportButton";
 
 type Period = "7d" | "14d" | "30d" | "3m" | "6m" | "1y" | "all";
 
