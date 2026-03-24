@@ -8,6 +8,7 @@ import {
   Send, Loader2, MessageCircle, Paperclip, FileText, Search, X,
   Check, CheckCheck, ChevronDown, Trash2, ArrowLeft,
 } from "lucide-react";
+import { QuickReplies } from "./QuickReplies";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
