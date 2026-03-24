@@ -45,7 +45,6 @@ export function PWAUpdatePrompt() {
         registration?.active?.postMessage({ type: "CLEAR_CACHES" });
         waiting?.postMessage({ type: "CLEAR_CACHES" });
         await clearAllCaches();
-        await registration?.unregister();
       } finally {
         finalizeReload();
       }
@@ -88,10 +87,8 @@ export function PWAUpdatePrompt() {
 
   useEffect(() => {
     if (!registration?.waiting) {
-      localStorage.removeItem(PWA_UPDATE_LOCK_KEY);
-      if (!updating) {
-        setRegistration(null);
-      }
+      setRegistration(null);
+      if (!updating) setUpdating(false);
     }
   }, [registration, updating]);
 
