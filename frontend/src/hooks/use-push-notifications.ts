@@ -25,6 +25,14 @@ export function usePushNotifications() {
   const [loading, setLoading] = useState(false);
   const [supported, setSupported] = useState(false);
 
+  // Register service worker
+  useEffect(() => {
+    if (!supported) return;
+    navigator.serviceWorker.register("/sw-push.js").catch((err) => {
+      console.warn("SW registration failed:", err);
+    });
+  }, [supported]);
+
   useEffect(() => {
     setSupported("serviceWorker" in navigator && "PushManager" in window && "Notification" in window);
   }, []);
