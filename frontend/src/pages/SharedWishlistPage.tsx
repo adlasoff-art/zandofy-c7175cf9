@@ -1,17 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
+import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
-import { Heart, Share2, Copy } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Heart, Gift, Share2, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
 import type { Product } from "@/services/api";
 
-function mapWishlistProduct(row: any): Product {
+function mapProduct(row: any): Product {
   return {
     id: row.id,
     name: row.name,
@@ -36,14 +34,27 @@ function mapWishlistProduct(row: any): Product {
   };
 }
 
-export default function WishlistPage() {
-  const { user } = useAuth();
-  const { t } = useI18n();
+export default function SharedWishlistPage() {
+  const { userId } = useParams<{ userId: string }>();
+
+  const { data: profile } = useQuery({
+    queryKey: ["shared-wishlist-profile", userId],
+    queryFn: async () => {
+      if (!userId) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, avatar_url")
+        .eq("id", userId)
+        .single();
+      return data;
+    },
+    enabled: !!userId,
+  });
 
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ["wishlist-products", user?.id],
+    queryKey: ["shared-wishlist-products", userId],
     queryFn: async () => {
-      if (!user) return [];
+      if (!userId) return [];
       const { data, error } = await supabase
         .from("wishlists")
         .select(`
@@ -56,70 +67,54 @@ export default function WishlistPage() {
             product_sizes(size_label)
           )
         `)
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false });
-
       if (error) throw error;
-      return (data || [])
-        .map((r: any) => r.products)
-        .filter(Boolean)
-        .map(mapWishlistProduct);
+      return (data || []).map((r: any) => r.products).filter(Boolean).map(mapProduct);
     },
-    enabled: !!user,
+    enabled: !!userId,
   });
+
+  const ownerName = profile ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Un utilisateur" : "...";
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    toast.success("Lien copié !");
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container py-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Heart size={24} className="text-sale" />
-            {t("wishlist.title")}
-            {products.length > 0 && (
-              <span className="text-base font-normal text-muted-foreground">({products.length})</span>
-            )}
-          </h1>
-          {user && products.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const url = `${window.location.origin}/wishlist/shared/${user.id}`;
-                navigator.clipboard.writeText(url);
-                toast.success("Lien de partage copié !");
-              }}
-              className="flex items-center gap-2"
-            >
-              <Share2 size={14} /> Partager
-            </Button>
-          )}
+          <div>
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              <Gift size={24} className="text-primary" />
+              Liste de souhaits de {ownerName}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {products.length} article{products.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={copyLink} className="flex items-center gap-2">
+            <Copy size={14} /> Copier le lien
+          </Button>
         </div>
 
-        {!user ? (
-          <div className="text-center py-20">
-            <Heart size={48} className="mx-auto text-muted-foreground/30 mb-4" />
-            <p className="text-muted-foreground mb-4">{t("wishlist.loginRequired")}</p>
-            <Button asChild><Link to="/auth">{t("general.loginButton")}</Link></Button>
-          </div>
-        ) : isLoading ? (
+        {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <ProductCardSkeleton key={i} />
-            ))}
+            {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
           </div>
         ) : products.length === 0 ? (
           <div className="text-center py-20">
             <Heart size={48} className="mx-auto text-muted-foreground/30 mb-4" />
-            <h2 className="text-lg font-semibold text-foreground mb-2">{t("wishlist.empty")}</h2>
-            <p className="text-muted-foreground mb-6">{t("wishlist.emptySub")}</p>
-            <Button asChild><Link to="/">{t("wishlist.discover")}</Link></Button>
+            <h2 className="text-lg font-semibold text-foreground mb-2">Liste vide</h2>
+            <p className="text-muted-foreground mb-6">Cette liste de souhaits ne contient aucun article.</p>
+            <Button asChild><Link to="/">Découvrir les produits</Link></Button>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {products.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
+            {products.map(p => <ProductCard key={p.id} product={p} />)}
           </div>
         )}
       </main>

@@ -6,6 +6,7 @@ import {
   Save, X, AlertTriangle, Package, ChevronDown, ChevronUp, Download, Upload, Globe, TrainFront, Loader2,
 } from "lucide-react";
 import { DynamicShippingCalculator } from "@/components/DynamicShippingCalculator";
+import { DeliveryZonesManager } from "@/components/admin/DeliveryZonesManager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1039,6 +1040,11 @@ const AdminShippingPage: React.FC = () => {
         <div className="w-full lg:w-80 shrink-0">
           <QuoteCalculator zones={zones} routes={routes} defaults={defaults} />
         </div>
+      </div>
+
+      {/* Last-Mile Delivery Zones */}
+      <div className="mt-8 border-t border-border pt-6">
+        <DeliveryZonesManager />
       </div>
 
       {/* Dialogs */}

@@ -1,5 +1,6 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator } from "lucide-react";
+import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator, Crown } from "lucide-react";
+import { MonetizationSettings } from "@/components/admin/MonetizationSettings";
 import { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
@@ -550,6 +551,15 @@ export default function AdminSettingsPage() {
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
           Enregistrer les paramètres
         </button>
+
+        {/* Monetization Settings */}
+        <div className="border-t border-border pt-6 mt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Crown size={18} className="text-primary" />
+            <h2 className="text-lg font-bold text-foreground">Monétisation & Features optionnelles</h2>
+          </div>
+          <MonetizationSettings />
+        </div>
       </div>
     </AdminLayout>
   );

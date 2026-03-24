@@ -20,6 +20,8 @@ interface Coupon {
   is_active: boolean;
   expires_at: string | null;
   created_at: string;
+  target_city: string | null;
+  target_country: string | null;
 }
 
 export default function AdminCouponsPage() {
@@ -37,6 +39,8 @@ export default function AdminCouponsPage() {
   const [minOrder, setMinOrder] = useState(0);
   const [maxUses, setMaxUses] = useState<number | "">(100);
   const [expiresAt, setExpiresAt] = useState("");
+  const [targetCity, setTargetCity] = useState("");
+  const [targetCountry, setTargetCountry] = useState("");
 
   const loadCoupons = useCallback(async () => {
     setLoading(true);
@@ -59,7 +63,7 @@ export default function AdminCouponsPage() {
 
   const resetForm = () => {
     setCode(""); setDiscountType("percentage"); setDiscountValue(10);
-    setMinOrder(0); setMaxUses(100); setExpiresAt(""); setShowForm(false);
+    setMinOrder(0); setMaxUses(100); setExpiresAt(""); setTargetCity(""); setTargetCountry(""); setShowForm(false);
   };
 
   const saveCoupon = async () => {
@@ -73,6 +77,8 @@ export default function AdminCouponsPage() {
       min_order_amount: minOrder > 0 ? minOrder : null,
       max_uses: maxUses ? Number(maxUses) : null,
       expires_at: expiresAt || null,
+      target_city: targetCity.trim() || null,
+      target_country: targetCountry.trim() || null,
     });
     if (error) {
       if (error.code === "23505") toast.error("Ce code existe déjà");
@@ -161,6 +167,16 @@ export default function AdminCouponsPage() {
               <label className="text-xs text-muted-foreground">Date d'expiration (optionnel)</label>
               <input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className={inputClass} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground">Ville ciblée (optionnel)</label>
+                <input value={targetCity} onChange={(e) => setTargetCity(e.target.value)} placeholder="Ex: Kinshasa" className={inputClass} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Pays ciblé (optionnel)</label>
+                <input value={targetCountry} onChange={(e) => setTargetCountry(e.target.value)} placeholder="Ex: CD" className={inputClass} />
+              </div>
+            </div>
             <div className="flex justify-end gap-2">
               <button onClick={resetForm} className="px-4 py-2 text-xs text-muted-foreground hover:text-foreground">Annuler</button>
               <button onClick={saveCoupon} disabled={saving} className="px-4 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1">
@@ -229,6 +245,9 @@ export default function AdminCouponsPage() {
                             <Clock size={9} />
                             {format(new Date(coupon.expires_at), "dd MMM yyyy", { locale: fr })}
                           </span>
+                        )}
+                        {(coupon.target_city || coupon.target_country) && (
+                          <span className="text-[10px] text-blue-600">📍 {[coupon.target_city, coupon.target_country].filter(Boolean).join(", ")}</span>
                         )}
                       </div>
                     </div>
