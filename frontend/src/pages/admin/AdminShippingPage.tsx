@@ -6,6 +6,7 @@ import {
   Save, X, AlertTriangle, Package, ChevronDown, ChevronUp, Download, Upload, Globe, TrainFront, Loader2,
 } from "lucide-react";
 import { DynamicShippingCalculator } from "@/components/DynamicShippingCalculator";
+import { DeliveryZonesManager } from "@/components/admin/DeliveryZonesManager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

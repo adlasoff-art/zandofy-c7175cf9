@@ -177,6 +177,7 @@ const App = () => (
                 <Route path="/rider" element={<RiderDashboardPage />} />
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/wishlist" element={<WishlistPage />} />
+                <Route path="/wishlist/shared/:userId" element={<SharedWishlistPage />} />
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/faq" element={<FAQPage />} />
                 <Route path="/help-center" element={<HelpCenterPage />} />
