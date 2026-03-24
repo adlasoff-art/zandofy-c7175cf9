@@ -17,8 +17,12 @@ export function PWAUpdatePrompt() {
   const { locale } = useI18n();
 
   useEffect(() => {
+    // If we already completed an update for this version, never show again
+    if (localStorage.getItem(PWA_UPDATE_DONE_KEY) === APP_VERSION) return;
+
     const handler = (e: Event) => {
-      if (localStorage.getItem(PWA_UPDATE_LOCK_KEY) === APP_VERSION) return;
+      if (localStorage.getItem(PWA_UPDATE_DONE_KEY) === APP_VERSION) return;
+      if (sessionStorage.getItem(PWA_UPDATE_LOCK_KEY) === APP_VERSION) return;
       setRegistration((e as CustomEvent).detail.registration);
     };
     window.addEventListener("sw-update-available", handler);
