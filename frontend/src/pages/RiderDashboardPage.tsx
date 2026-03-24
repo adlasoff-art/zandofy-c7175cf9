@@ -552,7 +552,7 @@ export default function RiderDashboardPage() {
       )}
 
       {tab === "map" && (
-        <RiderMapTabContent activeDelivery={activeDelivery} />
+        <RiderMapTabContent activeDelivery={activeDelivery} userId={user?.id} />
       )}
 
       {tab === "history" && (
