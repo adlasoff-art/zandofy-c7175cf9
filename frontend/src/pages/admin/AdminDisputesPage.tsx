@@ -147,6 +147,11 @@ export default function AdminDisputesPage() {
                       {d.return_request_id && <p><strong>Retour lié :</strong> {d.return_request_id}</p>}
                     </div>
 
+                    {/* Dispute Chat */}
+                    <div className="border border-border rounded-lg p-3 bg-background">
+                      <DisputeChat disputeId={d.id} disputeStatus={d.status} viewerRole="admin" />
+                    </div>
+
                     {d.resolution && (
                       <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded p-2 text-xs text-emerald-700">
                         <strong>Résolution :</strong> {d.resolution}
