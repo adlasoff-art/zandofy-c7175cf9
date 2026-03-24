@@ -167,6 +167,16 @@ export default function AdminCouponsPage() {
               <label className="text-xs text-muted-foreground">Date d'expiration (optionnel)</label>
               <input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className={inputClass} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground">Ville ciblée (optionnel)</label>
+                <input value={targetCity} onChange={(e) => setTargetCity(e.target.value)} placeholder="Ex: Kinshasa" className={inputClass} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Pays ciblé (optionnel)</label>
+                <input value={targetCountry} onChange={(e) => setTargetCountry(e.target.value)} placeholder="Ex: CD" className={inputClass} />
+              </div>
+            </div>
             <div className="flex justify-end gap-2">
               <button onClick={resetForm} className="px-4 py-2 text-xs text-muted-foreground hover:text-foreground">Annuler</button>
               <button onClick={saveCoupon} disabled={saving} className="px-4 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1">
