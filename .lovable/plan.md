@@ -1,34 +1,116 @@
 
 
-# Plan — Compression d'images à l'upload + optimisation d'affichage
+# Plan — Corrections multiples (Buckets, Featured, Promos, Claims, Multi-boutique)
 
-## Objectif
-Compresser automatiquement les images côté client avant upload (Canvas API → WebP 85%, max 1600px) pour garantir des images nettes et légères. Aucune cassure sur l'existant.
+## 1. Documents KYB — Bucket 404 (Critique)
 
-## Fichiers à créer
+**Problème** : Le bucket `vendor-documents` est **privé** (`public: false`), mais le code utilise `getPublicUrl()` qui ne fonctionne que pour les buckets publics. Les URLs générées retournent 404.
 
-| Fichier | Rôle |
+**Solution** :
+- Dans `BecomeVendorPage.tsx` : remplacer `getPublicUrl()` par `createSignedUrl()` avec une longue durée (ex: 10 ans = 315360000 secondes) pour stocker l'URL signée dans `vendor_documents.document_url`
+- Dans `AdminVendorApplicationsPage.tsx` : utiliser `createSignedUrl()` au moment de l'affichage pour générer des URLs temporaires à la volée (1h de validité) au lieu d'utiliser les URLs stockées directement
+- Vérifier tous les autres buckets privés (`kyc-documents`) — même correctif si applicable
+
+**Fichiers modifiés** :
+- `frontend/src/pages/BecomeVendorPage.tsx` — stocker le path relatif au lieu de l'URL publique
+- `frontend/src/pages/admin/AdminVendorApplicationsPage.tsx` — générer des signed URLs à l'affichage
+
+---
+
+## 2. Mise en avant — "Aucun produit approuvé disponible"
+
+**Problème** : Le filtre utilise `publish_status = "approved"` mais le statut des produits publiés est `"published"` (pas `"approved"`).
+
+**Solution** :
+- Corriger le filtre dans `VendorFeaturedRequestTab.tsx` : `.eq("publish_status", "published")`
+- Ajouter un **sélecteur de type** : "Produit approuvé" ou "Autre (annonce libre)"
+  - Si "Produit" → afficher la liste des produits publiés avec sélection
+  - Si "Autre" → masquer la liste produits, afficher un champ **lien interne** (autocomplete routes internes : `/store/...`, `/category/...`, etc.) + image + message
+- La validation du formulaire accepte l'un ou l'autre mode
+- Ajouter un champ `request_type` (`product` | `custom`) et `internal_link` au submit
+
+**Fichiers modifiés** :
+- `frontend/src/components/vendor/VendorFeaturedRequestTab.tsx`
+
+**Migration SQL** : Ajouter les colonnes `request_type` et `internal_link` à `featured_placement_requests`
+
+---
+
+## 3. Promotions — Édition des dates et limites par badge
+
+**Problème** : Pas de possibilité de modifier les dates de promo d'un produit déjà en promotion. Pas de limite de produits en promo selon le badge vendeur.
+
+**Solution** :
+- Ajouter dans `VendorPromotionsTab.tsx` un **bouton d'édition** sur chaque produit en promo (actif/planifié) ouvrant un mini-dialogue pour modifier :
+  - Date de début
+  - Date de fin
+  - Pourcentage de réduction
+- Ajouter les **limites de promo simultanées par badge** dans `vendor-tiers.ts` :
+  - Beginner : 3 promos simultanées max
+  - Pro : 25 promos simultanées max
+  - Grand Supplier : 50 promos simultanées max
+- Vérifier la limite avant d'activer une promo (toggle ou bulk)
+
+**Fichiers modifiés** :
+- `frontend/src/components/vendor/VendorPromotionsTab.tsx` — dialogue édition + vérification limite
+- `frontend/src/lib/vendor-tiers.ts` — ajouter `maxPromos` par tier
+
+---
+
+## 4. Claims 72h — Auto-expiration et bouton ticket support
+
+**Problème** : Les messages de revendication restent affichés au-delà de 72h. Pas de bouton pour ouvrir un ticket de réclamation.
+
+**Solution** :
+- Dans `VendorPlatformClaimBanner.tsx`, quand le claim est expiré, ajouter un **bouton "Ouvrir un ticket de réclamation"** qui redirige vers `/help-center` avec des paramètres pré-remplis (sujet = nom de la boutique, catégorie = "account")
+- Le banner doit disparaître (ou se réduire) si le claim est expiré ET résolu/contesté
+
+**Fichiers modifiés** :
+- `frontend/src/components/vendor/VendorPlatformClaimBanner.tsx`
+
+---
+
+## 5. Multi-boutique — Demande d'ajout d'une nouvelle boutique
+
+**Solution** :
+- Ajouter dans le dashboard vendeur un bouton **"Ajouter une boutique"** qui redirige vers `/become-vendor` (le formulaire existant)
+- Adapter `BecomeVendorPage.tsx` pour détecter qu'un utilisateur est déjà vendeur et permettre de soumettre une nouvelle demande de boutique (au lieu de bloquer)
+- Côté admin (`AdminVendorApplicationsPage.tsx`), le flux d'approbation crée déjà une nouvelle boutique — il n'y a pas de contrainte d'unicité à lever
+
+**Fichiers modifiés** :
+- `frontend/src/pages/VendorDashboardPage.tsx` — bouton "Ajouter une boutique"
+- `frontend/src/pages/BecomeVendorPage.tsx` — permettre les demandes multiples
+
+---
+
+## 6. Wallet — Vérification opérationnelle
+
+Vérifier que les composants wallet (solde, historique transactions, demande de retrait) fonctionnent correctement avec les données existantes et ne crashent pas à vide.
+
+**Fichiers vérifiés** (lecture seule, corrections si nécessaire) :
+- Composants wallet vendeur existants
+
+---
+
+## Migration SQL requise
+
+```sql
+-- Colonnes pour featured_placement_requests
+ALTER TABLE featured_placement_requests 
+  ADD COLUMN IF NOT EXISTS request_type text DEFAULT 'product',
+  ADD COLUMN IF NOT EXISTS internal_link text;
+```
+
+## Résumé des fichiers
+
+| Fichier | Action |
 |---|---|
-| `frontend/src/utils/image-compress.ts` | Fonction `compressImage(file, maxSize=1600, quality=0.85)` → retourne un `File` WebP (fallback JPEG) via Canvas API |
-
-## Fichiers à modifier
-
-| Fichier | Modification |
-|---|---|
-| `frontend/src/components/vendor/MediaUploader.tsx` | Appeler `compressImage()` avant chaque `supabase.storage.upload()` pour les fichiers image |
-| `frontend/src/components/PaymentProofUpload.tsx` | Appeler `compressImage()` avant upload des preuves de paiement |
-| `frontend/src/pages/VendorDashboardPage.tsx` | Compression logo/bannière boutique avant upload |
-| `frontend/src/pages/DashboardPage.tsx` | Compression avatar utilisateur avant upload |
-| `frontend/src/components/ProductCard.tsx` | Ajouter `decoding="async"` sur les `<img>` |
-
-## Logique de compression (image-compress.ts)
-
-1. Créer un `Image()` à partir du fichier
-2. Calculer les dimensions finales (max 1600px, ratio conservé)
-3. Dessiner sur un `<canvas>` aux dimensions calculées
-4. Exporter en `image/webp` qualité 0.85 (fallback `image/jpeg` si WebP non supporté)
-5. Retourner un nouveau `File` avec extension `.webp`
-6. Ne pas toucher aux fichiers vidéo — compression images uniquement
-
-## Aucune migration SQL nécessaire
+| `BecomeVendorPage.tsx` | Fix signed URL + multi-boutique |
+| `AdminVendorApplicationsPage.tsx` | Fix signed URL affichage docs |
+| `VendorFeaturedRequestTab.tsx` | Fix filtre `published` + type annonce |
+| `VendorPromotionsTab.tsx` | Édition dates promo + limites badge |
+| `vendor-tiers.ts` | Ajouter `maxPromos` |
+| `VendorPlatformClaimBanner.tsx` | Bouton ticket réclamation |
+| `VendorDashboardPage.tsx` | Bouton multi-boutique |
+| Migration SQL | `request_type` + `internal_link` |
 
