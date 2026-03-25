@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { compressImage } from "@/utils/image-compress";
 import { ImageIcon, Plus, X, Loader2, Video, Play } from "lucide-react";
 import { toast } from "sonner";
 
