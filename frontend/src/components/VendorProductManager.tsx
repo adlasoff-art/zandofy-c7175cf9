@@ -371,9 +371,14 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     };
 
     let productId = editing?.id;
+    const wasPublished = editing?.publish_status === "published";
 
     if (editing) {
-      const { error } = await (supabase.from("products").update(payload as any) as any).eq("id", editing.id);
+      // If the product was published, any edit forces re-approval
+      const updatePayload = wasPublished
+        ? { ...payload, publish_status: "pending_approval" }
+        : payload;
+      const { error } = await (supabase.from("products").update(updatePayload as any) as any).eq("id", editing.id);
       if (error) { toast.error("Erreur lors de la mise à jour"); setSaving(false); return; }
     } else {
       const { data, error } = await (supabase.from("products").insert(payload as any) as any).select("id").single();
