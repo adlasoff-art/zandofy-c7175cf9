@@ -24,12 +24,12 @@ export function QuickReplies({ onSelect, storeId, onManage }: QuickRepliesProps)
 
   useEffect(() => {
     if (!storeId) return;
-    supabase
-      .from("store_quick_replies")
+    (supabase
+      .from("store_quick_replies" as any)
       .select("content")
       .eq("store_id", storeId)
-      .order("sort_order", { ascending: true })
-      .then(({ data }) => {
+      .order("sort_order", { ascending: true }) as any)
+      .then(({ data }: any) => {
         if (data) setCustomReplies(data.map((r: any) => r.content));
       });
   }, [storeId]);

@@ -74,7 +74,7 @@ export function QuickRepliesManager({ storeId, onClose }: QuickRepliesManagerPro
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("store_quick_replies").delete().eq("id", id);
+    const { error } = await (supabase.from("store_quick_replies" as any) as any).delete().eq("id", id);
     if (error) {
       toast.error("Erreur lors de la suppression");
     } else {
