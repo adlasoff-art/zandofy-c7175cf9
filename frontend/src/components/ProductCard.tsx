@@ -34,7 +34,11 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
   const secondImage = galleryImages && galleryImages.length > 1
     ? galleryImages.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))[1]?.image_url
     : null;
-  const displayImage = hovered && secondImage ? secondImage : (imgError ? "/placeholder.svg" : product.image);
+
+  // Optimized image URLs for card display
+  const optimizedMainImage = useMemo(() => IMAGE_PRESETS.cardThumbnail(product.image), [product.image]);
+  const optimizedSecondImage = useMemo(() => secondImage ? IMAGE_PRESETS.cardThumbnail(secondImage) : null, [secondImage]);
+  const displayImage = hovered && optimizedSecondImage ? optimizedSecondImage : (imgError ? "/placeholder.svg" : optimizedMainImage);
 
   const handleAddToCart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
