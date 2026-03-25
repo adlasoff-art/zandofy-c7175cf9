@@ -77,7 +77,7 @@ export default function AdminSettingsPage() {
     supabase
       .from("platform_settings")
       .select("key, value")
-      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers"])
+      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings"])
       .then(({ data }) => {
         data?.forEach((row) => {
           const v = row.value as any;
@@ -92,6 +92,12 @@ export default function AdminSettingsPage() {
               gift_card_enabled: !!v.gift_card_enabled,
               points_expiry_months: Number(v.points_expiry_months) || 12,
               points_per_dollar: Number(v.points_per_dollar) || 50,
+              affiliate_bonus_enabled: !!v.affiliate_bonus_enabled,
+            });
+          } else if (row.key === "max_discount_settings") {
+            setDiscountCap({
+              max_total_discount_pct: Number(v.max_total_discount_pct) || 20,
+              max_points_discount_pct: Number(v.max_points_discount_pct) || 10,
             });
           } else if (row.key === "maintenance_mode") {
             setMaintenance({
