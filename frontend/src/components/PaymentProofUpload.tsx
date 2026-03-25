@@ -38,7 +38,8 @@ export function PaymentProofUpload({ orderId, field, label = "Preuve de paiement
     setUploading(true);
 
     try {
-      const ext = file.name.split(".").pop() || "jpg";
+      const compressed = await compressImage(file);
+      const ext = compressed.name.split(".").pop() || "jpg";
       const path = `payment-proofs/${orderId}/${field}-${Date.now()}.${ext}`;
 
       const { error: uploadError } = await supabase.storage
