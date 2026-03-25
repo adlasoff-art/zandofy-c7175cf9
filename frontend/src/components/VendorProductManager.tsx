@@ -723,13 +723,22 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {product.publish_status === "draft" && (
+                {(product.publish_status === "draft" || product.publish_status === "revision_requested") && (
                   <button
                     onClick={() => handlePublish(product.id)}
                     className="p-2 text-muted-foreground hover:text-emerald-500 transition-colors"
-                    title="Publier"
+                    title="Soumettre pour approbation"
                   >
                     <Send size={14} />
+                  </button>
+                )}
+                {product.publish_status === "published" && (
+                  <button
+                    onClick={() => handleUnpublish(product.id)}
+                    className="p-2 text-muted-foreground hover:text-amber-500 transition-colors"
+                    title="Dépublier"
+                  >
+                    <EyeOff size={14} />
                   </button>
                 )}
                 <button onClick={() => startEdit(product)} className="p-2 text-muted-foreground hover:text-primary transition-colors">
