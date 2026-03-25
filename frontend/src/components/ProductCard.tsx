@@ -91,11 +91,11 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
         {inView && (
           <>
             <img
-              src={imgError ? "/placeholder.svg" : product.image}
+              src={imgError ? "/placeholder.svg" : optimizedMainImage}
               alt={product.nameFr}
               className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
                 loaded ? "opacity-100" : "opacity-0"
-              } ${hovered && secondImage ? "opacity-0 scale-105" : ""}`}
+              } ${hovered && optimizedSecondImage ? "opacity-0 scale-105" : ""}`}
               loading="lazy"
               onLoad={onLoad}
               onError={handleImgError}
