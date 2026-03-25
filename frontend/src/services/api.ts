@@ -70,7 +70,7 @@ export interface Category {
 }
 
 // Map Supabase row to Product interface
-function mapProduct(row: any): Product {
+export function mapProduct(row: any): Product {
   const storeData = row.stores;
   const storeIsVerified = storeData?.is_verified ?? false;
   const storeVerifiedYears = storeData?.verified_years_override ?? storeData?.verified_years ?? 0;
@@ -78,7 +78,7 @@ function mapProduct(row: any): Product {
   const realReviewCount = row.review_count_override ?? row.review_count ?? 0;
   const realRating = Number(row.rating) || 0;
 
-  const p: Product = {
+  return {
     id: row.id,
     slug: row.slug || row.id,
     name: row.name,
@@ -110,17 +110,16 @@ function mapProduct(row: any): Product {
     widthCm: row.width_cm ? Number(row.width_cm) : undefined,
     heightCm: row.height_cm ? Number(row.height_cm) : undefined,
     trendTagId: row.trend_tag_id || undefined,
+    storeIsVerified,
+    galleryImages: row.product_images || [],
+    promoEndDate: row.promo_end_date || null,
+    promoStartDate: row.promo_start_date || null,
+    productColors: (row.product_colors || []).map((c: any) => ({
+      hex: c.color_hex,
+      name: c.color_name || "",
+      imageUrl: c.image_url || null,
+    })),
   };
-  (p as any).storeIsVerified = storeIsVerified;
-  (p as any).galleryImages = row.product_images || [];
-  (p as any).promoEndDate = row.promo_end_date || null;
-  (p as any).promoStartDate = row.promo_start_date || null;
-  (p as any).productColors = (row.product_colors || []).map((c: any) => ({
-    hex: c.color_hex,
-    name: c.color_name || "",
-    imageUrl: c.image_url || null,
-  }));
-  return p;
 }
 
 const PRODUCT_SELECT = `

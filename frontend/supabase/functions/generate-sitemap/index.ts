@@ -51,7 +51,8 @@ Deno.serve(async () => {
     // Products
     for (const p of products || []) {
       const lastmod = p.updated_at ? p.updated_at.split("T")[0] : "";
-      xml += `  <url><loc>${SITE_URL}/product/${p.id}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}<changefreq>weekly</changefreq><priority>0.8</priority></url>\n`;
+      const productPath = p.slug || p.id;
+      xml += `  <url><loc>${SITE_URL}/product/${productPath}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}<changefreq>weekly</changefreq><priority>0.8</priority></url>\n`;
     }
 
     // Categories
