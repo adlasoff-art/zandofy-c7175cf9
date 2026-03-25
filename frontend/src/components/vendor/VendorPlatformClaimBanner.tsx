@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { AlertTriangle, ShieldCheck, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { AlertTriangle, ShieldCheck, Clock, LifeBuoy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function VendorPlatformClaimBanner({ storeId, userId, storeName }: Props) {
+  const navigate = useNavigate();
   const [claim, setClaim] = useState<Claim | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -35,7 +37,6 @@ export function VendorPlatformClaimBanner({ storeId, userId, storeName }: Props)
           .select("*")
           .eq("store_id", storeId)
           .eq("vendor_id", userId)
-          .eq("status", "pending")
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
@@ -52,11 +53,13 @@ export function VendorPlatformClaimBanner({ storeId, userId, storeName }: Props)
 
   const isExpired = claim ? new Date(claim.expires_at) < new Date() : true;
 
+  // If claim is expired AND already resolved (accepted/rejected), hide the banner entirely
+  if (claim && isExpired && claim.status !== "pending") return null;
+
   const handleContest = async () => {
     if (!claim || isExpired) return;
     setSubmitting(true);
 
-    // Mark claim as "accepted" = vendor has contested
     const { error } = await (supabase as any)
       .from("platform_ownership_claims")
       .update({ status: "accepted", resolved_at: new Date().toISOString() })
@@ -70,6 +73,12 @@ export function VendorPlatformClaimBanner({ storeId, userId, storeName }: Props)
       setClaim({ ...claim, status: "accepted" });
     }
     setSubmitting(false);
+  };
+
+  const handleOpenTicket = () => {
+    const subject = encodeURIComponent(`Réclamation boutique : ${storeName}`);
+    const category = "account";
+    navigate(`/help-center?subject=${subject}&category=${category}`);
   };
 
   return (
@@ -108,9 +117,18 @@ export function VendorPlatformClaimBanner({ storeId, userId, storeName }: Props)
               ✓ Votre contestation a été enregistrée. L'administrateur la traitera prochainement.
             </p>
           ) : (
-            <p className="text-xs text-muted-foreground/70 italic">
-              Le délai de contestation de 72h est expiré. Seul l'administrateur peut modifier ce statut.
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground/70 italic">
+                Le délai de contestation de 72h est expiré.
+              </p>
+              <button
+                onClick={handleOpenTicket}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-colors"
+              >
+                <LifeBuoy size={14} />
+                Ouvrir un ticket de réclamation
+              </button>
+            </div>
           )}
         </div>
       </div>

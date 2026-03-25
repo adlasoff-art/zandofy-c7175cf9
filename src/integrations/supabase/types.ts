@@ -1431,9 +1431,11 @@ export type Database = {
           desired_start_date: string | null
           id: string
           image_url: string | null
+          internal_link: string | null
           message: string | null
           price_quoted: number | null
           product_ids: string[]
+          request_type: string | null
           requested_by: string
           reviewed_at: string | null
           reviewed_by: string | null
@@ -1449,9 +1451,11 @@ export type Database = {
           desired_start_date?: string | null
           id?: string
           image_url?: string | null
+          internal_link?: string | null
           message?: string | null
           price_quoted?: number | null
           product_ids?: string[]
+          request_type?: string | null
           requested_by: string
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -1467,9 +1471,11 @@ export type Database = {
           desired_start_date?: string | null
           id?: string
           image_url?: string | null
+          internal_link?: string | null
           message?: string | null
           price_quoted?: number | null
           product_ids?: string[]
+          request_type?: string | null
           requested_by?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
