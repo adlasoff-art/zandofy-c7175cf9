@@ -4,6 +4,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { compressImage } from "@/utils/image-compress";
 import { InternalChat } from "@/components/InternalChat";
 import { VendorPlatformClaimBanner } from "@/components/vendor/VendorPlatformClaimBanner";
 import { VendorProductManager } from "@/components/VendorProductManager";
