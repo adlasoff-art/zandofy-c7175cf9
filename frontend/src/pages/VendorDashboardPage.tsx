@@ -4,6 +4,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { compressImage } from "@/utils/image-compress";
 import { InternalChat } from "@/components/InternalChat";
 import { VendorPlatformClaimBanner } from "@/components/vendor/VendorPlatformClaimBanner";
 import { VendorProductManager } from "@/components/VendorProductManager";
@@ -692,9 +693,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
     }
     setUploadingLogo(true);
     try {
-      const ext = file.name.split(".").pop();
+      const compressed = await compressImage(file);
+      const ext = compressed.name.split(".").pop();
       const path = `${store.id}/logo-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("product-media").upload(path, file, { upsert: true });
+      const { error: upErr } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true });
       if (upErr) { toast.error("Erreur upload logo"); return; }
       const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
       const url = urlData.publicUrl;
@@ -720,9 +722,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
     }
     setUploadingBanner(true);
     try {
-      const ext = file.name.split(".").pop();
+      const compressed = await compressImage(file);
+      const ext = compressed.name.split(".").pop();
       const path = `${store.id}/banner-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("product-media").upload(path, file, { upsert: true });
+      const { error: upErr } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true });
       if (upErr) { toast.error("Erreur upload bannière"); return; }
       const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
       const url = urlData.publicUrl;

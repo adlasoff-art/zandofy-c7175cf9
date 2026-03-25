@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { compressImage } from "@/utils/image-compress";
 import { ImageIcon, Plus, X, Loader2, Video, Play } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,8 +32,9 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
 
     const newItems: MediaItem[] = [];
     for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const isVideo = file.type.startsWith("video/");
+      const raw = files[i];
+      const isVideo = raw.type.startsWith("video/");
+      const file = isVideo ? raw : await compressImage(raw);
       const ext = file.name.split(".").pop();
       const path = `${storeId}/${Date.now()}-${i}.${ext}`;
 

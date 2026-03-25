@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { compressImage } from "@/utils/image-compress";
 import { Camera, Upload, Loader2, CheckCircle, X, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -37,12 +38,13 @@ export function PaymentProofUpload({ orderId, field, label = "Preuve de paiement
     setUploading(true);
 
     try {
-      const ext = file.name.split(".").pop() || "jpg";
+      const compressed = await compressImage(file);
+      const ext = compressed.name.split(".").pop() || "jpg";
       const path = `payment-proofs/${orderId}/${field}-${Date.now()}.${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from("delivery-proofs")
-        .upload(path, file, { upsert: true });
+        .upload(path, compressed, { upsert: true });
 
       if (uploadError) throw uploadError;
 

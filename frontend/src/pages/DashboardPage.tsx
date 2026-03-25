@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { compressImage } from "@/utils/image-compress";
 import { useI18n } from "@/contexts/I18nContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/Header";
@@ -1349,9 +1350,10 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const ext = file.name.split(".").pop();
+    const compressed = await compressImage(file);
+    const ext = compressed.name.split(".").pop();
     const path = `${user.id}/avatar.${ext}`;
-    const { error } = await supabase.storage.from("product-media").upload(path, file, { upsert: true });
+    const { error } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true });
     if (error) {
       toast({ title: "Erreur upload", description: error.message, variant: "destructive" });
       return;
