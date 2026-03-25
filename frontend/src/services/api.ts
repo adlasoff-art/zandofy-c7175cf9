@@ -33,6 +33,16 @@ export interface Product {
   widthCm?: number;
   heightCm?: number;
   trendTagId?: string;
+  // Extended properties set by mapProduct
+  storeIsVerified?: boolean;
+  galleryImages?: Array<{ image_url: string; position: number }>;
+  promoEndDate?: string | null;
+  promoStartDate?: string | null;
+  productColors?: Array<{ hex: string; name: string; imageUrl: string | null }>;
+  flashPrice?: number;
+  flashEndsAt?: string;
+  store?: any;
+  sellerRank?: number;
 }
 
 export interface TrendTag {
