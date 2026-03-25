@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const SITE_URL = "https://zandofy.lovable.app";
+const SITE_URL = (Deno.env.get("SITE_BASE_URL") || "https://zandofy.com").replace(/\/$/, "");
 
 Deno.serve(async () => {
   try {
