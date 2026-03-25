@@ -9,6 +9,7 @@ import {
   Check, CheckCheck, ChevronDown, Trash2, ArrowLeft,
 } from "lucide-react";
 import { QuickReplies } from "./QuickReplies";
+import { QuickRepliesManager } from "./QuickRepliesManager";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -50,6 +51,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [showQrManager, setShowQrManager] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -556,8 +558,19 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
       )}
 
       {/* Quick replies (vendor only) */}
-      {conversation.is_store_owner && (
-        <QuickReplies onSelect={(text) => setNewMessage(text)} />
+      {conversation.is_store_owner && !showQrManager && (
+        <QuickReplies
+          onSelect={(text) => setNewMessage(text)}
+          storeId={conversation.store_id}
+          onManage={() => setShowQrManager(true)}
+        />
+      )}
+
+      {/* Quick replies manager */}
+      {conversation.is_store_owner && showQrManager && (
+        <div className="border-t border-border max-h-[50%] overflow-hidden flex flex-col">
+          <QuickRepliesManager storeId={conversation.store_id} onClose={() => setShowQrManager(false)} />
+        </div>
       )}
 
       {/* Input area */}
