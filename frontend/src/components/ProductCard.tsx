@@ -100,9 +100,9 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
               onLoad={onLoad}
               onError={handleImgError}
             />
-            {secondImage && (
+            {optimizedSecondImage && (
               <img
-                src={secondImage}
+                src={optimizedSecondImage}
                 alt={product.nameFr}
                 className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
                   hovered ? "opacity-100 scale-100" : "opacity-0 scale-95"
