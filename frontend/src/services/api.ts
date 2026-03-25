@@ -1,5 +1,6 @@
 // Supabase-powered API service layer
 import { supabase } from "@/integrations/supabase/client";
+import { fromTable } from "@/lib/supabase-helpers";
 
 export interface Product {
   id: string;
