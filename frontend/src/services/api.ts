@@ -210,8 +210,7 @@ export async function fetchFlashSaleProducts(): Promise<(Product & { flashPrice?
   const now = new Date().toISOString();
 
   // First try real flash_sales table
-  const { data: flashData } = await supabase
-    .from("flash_sales" as any)
+  const { data: flashData } = await fromTable("flash_sales")
     .select("product_id, flash_price, ends_at")
     .eq("is_active", true)
     .gte("ends_at", now)
