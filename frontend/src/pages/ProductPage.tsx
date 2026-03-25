@@ -296,7 +296,8 @@ export default function ProductPage() {
                   />
                 ) : (
                   <ImageZoomLens
-                    src={gallery[selectedImage]?.url || ""}
+                    src={IMAGE_PRESETS.detailMain(gallery[selectedImage]?.url || "")}
+                    zoomSrc={IMAGE_PRESETS.detailZoom(gallery[selectedImage]?.url || "")}
                     alt={product.nameFr}
                     className="w-full h-full"
                     zoomFactor={2.5}
