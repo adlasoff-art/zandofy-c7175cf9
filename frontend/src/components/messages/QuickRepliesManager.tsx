@@ -58,7 +58,7 @@ export function QuickRepliesManager({ storeId, onClose }: QuickRepliesManagerPro
       return;
     }
     setSaving(true);
-    const { error } = await supabase.from("store_quick_replies").insert({
+    const { error } = await (supabase.from("store_quick_replies" as any) as any).insert({
       store_id: storeId,
       content: text,
       sort_order: replies.length,
