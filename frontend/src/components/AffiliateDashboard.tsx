@@ -123,7 +123,7 @@ export function AffiliateDashboard() {
                       <p className="text-sm font-bold text-foreground">{tier.badge_label}</p>
                       <p className="text-[10px] text-muted-foreground">
                         {tier.min_referrals} filleuls min · {tier.commission_pct}% commission
-                        {tier.bonus_points > 0 && ` · +${tier.bonus_points} bonus pts`}
+                        {bonusEnabled && tier.bonus_points > 0 && ` · +${tier.bonus_points} bonus pts`}
                       </p>
                     </div>
                   </div>
