@@ -218,15 +218,33 @@ export default function CheckoutPage() {
     ? dynamicShippingCost
     : (freeShippingEnabled && subtotal >= freeShippingThreshold ? 0 : FALLBACK_SHIPPING_COST);
 
-  const couponDiscount = appliedCoupon
+  // Raw discount calculations
+  const rawCouponPct = appliedCoupon
     ? appliedCoupon.discount_type === "percentage"
-      ? (subtotal * appliedCoupon.discount_value) / 100
-      : Math.min(appliedCoupon.discount_value, subtotal)
+      ? appliedCoupon.discount_value
+      : subtotal > 0 ? (Math.min(appliedCoupon.discount_value, subtotal) / subtotal) * 100 : 0
     : 0;
+  const rawLoyaltyPct = loyaltyPct;
+  const rawTotalDiscountPct = rawCouponPct + rawLoyaltyPct;
 
-  const loyaltyDiscount = loyaltyPct > 0 ? (subtotal * loyaltyPct) / 100 : 0;
+  // Apply global discount cap (proportional reduction if over cap)
+  let effectiveCouponPct = rawCouponPct;
+  let effectiveLoyaltyPct = rawLoyaltyPct;
+  const discountCapped = rawTotalDiscountPct > maxTotalDiscountPct;
+  if (discountCapped && rawTotalDiscountPct > 0) {
+    const ratio = maxTotalDiscountPct / rawTotalDiscountPct;
+    effectiveCouponPct = rawCouponPct * ratio;
+    effectiveLoyaltyPct = rawLoyaltyPct * ratio;
+  }
+
+  const couponDiscount = subtotal * effectiveCouponPct / 100;
+  const loyaltyDiscount = subtotal * effectiveLoyaltyPct / 100;
   const discountAmount = couponDiscount + loyaltyDiscount;
-  const pointsDiscount = usePoints ? Math.min(pointsToUse, pointsBalance) / pointsPerDollar : 0;
+
+  // Points discount capped separately
+  const maxPointsValue = subtotal * maxPointsDiscountPct / 100;
+  const rawPointsDiscount = usePoints ? Math.min(pointsToUse, pointsBalance) / pointsPerDollar : 0;
+  const pointsDiscount = Math.min(rawPointsDiscount, maxPointsValue);
 
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
