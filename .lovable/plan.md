@@ -1,116 +1,136 @@
 
 
-# Plan — Corrections multiples (Buckets, Featured, Promos, Claims, Multi-boutique)
+# Plan — Protection financiere anti-perte + reduction commissions affiliation
 
-## 1. Documents KYB — Bucket 404 (Critique)
+## Etat actuel de la base de donnees
 
-**Problème** : Le bucket `vendor-documents` est **privé** (`public: false`), mais le code utilise `getPublicUrl()` qui ne fonctionne que pour les buckets publics. Les URLs générées retournent 404.
+| Systeme | Valeurs actuelles |
+|---|---|
+| **Fidelite** | Client 0% → Junior 1% → Senior 2% → Pro 3% → Business 5% → Elite 7% → Angel 10% |
+| **Affiliation** | Starter 3% → Bronze 4% → Silver 5% → Gold 6% → Platinum 7% |
+| **Parrainage** | 3% commission, 3 commandes max |
+| **Bulk discount** | 0% / 5% / 12% / 15% (par quantite) |
+| **Plafond global** | AUCUN — pas de cap dans le code ni en DB |
 
-**Solution** :
-- Dans `BecomeVendorPage.tsx` : remplacer `getPublicUrl()` par `createSignedUrl()` avec une longue durée (ex: 10 ans = 315360000 secondes) pour stocker l'URL signée dans `vendor_documents.document_url`
-- Dans `AdminVendorApplicationsPage.tsx` : utiliser `createSignedUrl()` au moment de l'affichage pour générer des URLs temporaires à la volée (1h de validité) au lieu d'utiliser les URLs stockées directement
-- Vérifier tous les autres buckets privés (`kyc-documents`) — même correctif si applicable
+## Analyse du risque avec la marge de 30%
 
-**Fichiers modifiés** :
-- `frontend/src/pages/BecomeVendorPage.tsx` — stocker le path relatif au lieu de l'URL publique
-- `frontend/src/pages/admin/AdminVendorApplicationsPage.tsx` — générer des signed URLs à l'affichage
+La marge exploitable est de 30% (sur les 45% de markup). Voici le pire cas actuel :
+- Fidelite Angel : **10%**
+- Bulk 1000+ : **15%**
+- Coupon : **variable**
+- Total possible : **25%+** → ne reste que 5% pour couvrir parrainage/affiliation → **PERTE**
 
----
+## 1. Reduire les commissions d'affiliation
 
-## 2. Mise en avant — "Aucun produit approuvé disponible"
+Les affilies (influenceurs) generent des ventes via un lien. La commission doit etre attractive mais pas destructrice.
 
-**Problème** : Le filtre utilise `publish_status = "approved"` mais le statut des produits publiés est `"published"` (pas `"approved"`).
+**Nouvelles valeurs proposees** :
 
-**Solution** :
-- Corriger le filtre dans `VendorFeaturedRequestTab.tsx` : `.eq("publish_status", "published")`
-- Ajouter un **sélecteur de type** : "Produit approuvé" ou "Autre (annonce libre)"
-  - Si "Produit" → afficher la liste des produits publiés avec sélection
-  - Si "Autre" → masquer la liste produits, afficher un champ **lien interne** (autocomplete routes internes : `/store/...`, `/category/...`, etc.) + image + message
-- La validation du formulaire accepte l'un ou l'autre mode
-- Ajouter un champ `request_type` (`product` | `custom`) et `internal_link` au submit
+| Palier | Filleuls min | Commission actuelle | Commission proposee | Bonus pts |
+|---|---|---|---|---|
+| Starter | 0 | 3% | **1.5%** | 0 |
+| Bronze | 10 | 4% | **2%** | 25 |
+| Silver | 30 | 5% | **2.5%** | 75 |
+| Gold | 75 | 6% | **3%** | 150 |
+| Platinum | 200 | 7% | **3.5%** | 300 |
 
-**Fichiers modifiés** :
-- `frontend/src/components/vendor/VendorFeaturedRequestTab.tsx`
+**Justification** : Meme au palier Platinum (3.5%), combine avec Angel (10%) et bulk (15%), le plafond global (voir point 2) garantit que la somme ne depasse jamais 20%.
 
-**Migration SQL** : Ajouter les colonnes `request_type` et `internal_link` à `featured_placement_requests`
+## 2. Plafond global de reductions au checkout
 
----
+Ajouter dans `CheckoutPage.tsx` un cap dur sur le cumul de toutes les reductions :
 
-## 3. Promotions — Édition des dates et limites par badge
+```text
+totalDiscountPct = loyaltyPct + couponPct + bulkPct
+Si totalDiscountPct > max_total_discount_pct (defaut 20%) :
+  → Reduire proportionnellement chaque composante
+  → Afficher message au client
 
-**Problème** : Pas de possibilité de modifier les dates de promo d'un produit déjà en promotion. Pas de limite de produits en promo selon le badge vendeur.
-
-**Solution** :
-- Ajouter dans `VendorPromotionsTab.tsx` un **bouton d'édition** sur chaque produit en promo (actif/planifié) ouvrant un mini-dialogue pour modifier :
-  - Date de début
-  - Date de fin
-  - Pourcentage de réduction
-- Ajouter les **limites de promo simultanées par badge** dans `vendor-tiers.ts` :
-  - Beginner : 3 promos simultanées max
-  - Pro : 25 promos simultanées max
-  - Grand Supplier : 50 promos simultanées max
-- Vérifier la limite avant d'activer une promo (toggle ou bulk)
-
-**Fichiers modifiés** :
-- `frontend/src/components/vendor/VendorPromotionsTab.tsx` — dialogue édition + vérification limite
-- `frontend/src/lib/vendor-tiers.ts` — ajouter `maxPromos` par tier
-
----
-
-## 4. Claims 72h — Auto-expiration et bouton ticket support
-
-**Problème** : Les messages de revendication restent affichés au-delà de 72h. Pas de bouton pour ouvrir un ticket de réclamation.
-
-**Solution** :
-- Dans `VendorPlatformClaimBanner.tsx`, quand le claim est expiré, ajouter un **bouton "Ouvrir un ticket de réclamation"** qui redirige vers `/help-center` avec des paramètres pré-remplis (sujet = nom de la boutique, catégorie = "account")
-- Le banner doit disparaître (ou se réduire) si le claim est expiré ET résolu/contesté
-
-**Fichiers modifiés** :
-- `frontend/src/components/vendor/VendorPlatformClaimBanner.tsx`
-
----
-
-## 5. Multi-boutique — Demande d'ajout d'une nouvelle boutique
-
-**Solution** :
-- Ajouter dans le dashboard vendeur un bouton **"Ajouter une boutique"** qui redirige vers `/become-vendor` (le formulaire existant)
-- Adapter `BecomeVendorPage.tsx` pour détecter qu'un utilisateur est déjà vendeur et permettre de soumettre une nouvelle demande de boutique (au lieu de bloquer)
-- Côté admin (`AdminVendorApplicationsPage.tsx`), le flux d'approbation crée déjà une nouvelle boutique — il n'y a pas de contrainte d'unicité à lever
-
-**Fichiers modifiés** :
-- `frontend/src/pages/VendorDashboardPage.tsx` — bouton "Ajouter une boutique"
-- `frontend/src/pages/BecomeVendorPage.tsx` — permettre les demandes multiples
-
----
-
-## 6. Wallet — Vérification opérationnelle
-
-Vérifier que les composants wallet (solde, historique transactions, demande de retrait) fonctionnent correctement avec les données existantes et ne crashent pas à vide.
-
-**Fichiers vérifiés** (lecture seule, corrections si nécessaire) :
-- Composants wallet vendeur existants
-
----
-
-## Migration SQL requise
-
-```sql
--- Colonnes pour featured_placement_requests
-ALTER TABLE featured_placement_requests 
-  ADD COLUMN IF NOT EXISTS request_type text DEFAULT 'product',
-  ADD COLUMN IF NOT EXISTS internal_link text;
+pointsDiscount plafonné séparément à max_points_discount_pct (defaut 10%) du subtotal
 ```
 
-## Résumé des fichiers
+**Valeur recommandee : 20%** → Sur les 30% exploitables, il reste toujours 10% minimum pour l'entreprise.
+
+**Impact pire cas** :
+```text
+Produit coût $4.99
+Prix de vente ≈ $7.60 (formule ×1.5225)
+Reduction max 20% : -$1.52
+Points max 10% : -$0.76
+Revenu net : $5.32
+Coût reel : $5.24 (avec 5% transaction)
+Marge nette : $0.08 minimum → JAMAIS EN PERTE ✓
+
+Cas typique (Senior 2% + pas de bulk + pas de coupon) :
+Reduction : 2% = -$0.15
+Revenu net : $7.45
+Marge nette : $2.21 → CONFORTABLE ✓
+```
+
+## 3. Section admin "Plafond de reductions"
+
+**Fichier** : `AdminSettingsPage.tsx`
+
+Ajouter une nouvelle section avec :
+- **Plafond global reductions** : input (defaut 20%)
+- **Plafond points** : input (defaut 10%)
+- **Toggle bonus points affiliation** : desactive par defaut — controle si les bonus points des paliers d'affiliation sont credites automatiquement
+
+## 4. Logique affiliation vs parrainage
+
+Le systeme actuel distingue deja les deux :
+- **Parrainage** = table `referrals` (referrer_id → referee_id), commission sur 3 premieres commandes livrees
+- **Affiliation** = table `affiliate_links` (liens partageables), tracking clics/conversions
+
+**Clarification** : Quand un achat vient d'un lien d'affiliation, c'est la commission d'affiliation qui s'applique (palier de l'affilie). Le parrainage ne s'applique PAS en plus. Le code actuel gere deja cette separation.
+
+## 5. Donnees a inserer en DB
+
+```sql
+-- Plafond de reductions (nouvelle cle platform_settings)
+INSERT INTO platform_settings (key, value) VALUES (
+  'max_discount_settings',
+  '{"max_total_discount_pct": 20, "max_points_discount_pct": 10}'::jsonb
+) ON CONFLICT (key) DO NOTHING;
+
+-- Toggle bonus affiliation dans referral_settings
+UPDATE platform_settings
+SET value = value || '{"affiliate_bonus_enabled": false}'::jsonb
+WHERE key = 'referral_settings';
+
+-- Reduire les commissions d'affiliation
+UPDATE affiliate_tiers SET commission_pct = 1.5 WHERE tier_name = 'Starter';
+UPDATE affiliate_tiers SET commission_pct = 2 WHERE tier_name = 'Bronze';
+UPDATE affiliate_tiers SET commission_pct = 2.5 WHERE tier_name = 'Silver';
+UPDATE affiliate_tiers SET commission_pct = 3 WHERE tier_name = 'Gold';
+UPDATE affiliate_tiers SET commission_pct = 3.5 WHERE tier_name = 'Platinum';
+```
+
+**Aucune migration de schema requise** — ce sont uniquement des mises a jour de donnees existantes.
+
+## Fichiers modifies
 
 | Fichier | Action |
 |---|---|
-| `BecomeVendorPage.tsx` | Fix signed URL + multi-boutique |
-| `AdminVendorApplicationsPage.tsx` | Fix signed URL affichage docs |
-| `VendorFeaturedRequestTab.tsx` | Fix filtre `published` + type annonce |
-| `VendorPromotionsTab.tsx` | Édition dates promo + limites badge |
-| `vendor-tiers.ts` | Ajouter `maxPromos` |
-| `VendorPlatformClaimBanner.tsx` | Bouton ticket réclamation |
-| `VendorDashboardPage.tsx` | Bouton multi-boutique |
-| Migration SQL | `request_type` + `internal_link` |
+| `CheckoutPage.tsx` | Charger `max_discount_settings`, appliquer le cap sur cumul reductions + points |
+| `AdminSettingsPage.tsx` | Ajouter section plafond + toggle bonus affiliation |
+| `AffiliateDashboard.tsx` | Conditionner affichage bonus points sur `affiliate_bonus_enabled` |
+
+## Resume de la protection
+
+```text
+┌─────────────────────────────────────────────────┐
+│           MARGE TOTALE : 45% du coût            │
+├─────────────────────────────────────────────────┤
+│ 15% → Marge incompressible entreprise     🔒    │
+│ 30% → Marge exploitable                        │
+│   ├─ Fidelite : 0-10% (plafonné à 20% cumul)   │
+│   ├─ Coupon : 0-10% (plafonné à 20% cumul)     │
+│   ├─ Bulk : 0-15% (plafonné à 20% cumul)       │
+│   ├─ Points : 0-10% du subtotal (cap séparé)   │
+│   ├─ Parrainage : 3% × 3 commandes seulement   │
+│   ├─ Affiliation : 1.5-3.5% (réduit)           │
+│   └─ Reste minimum garanti : ≥ 6.5%      ✓     │
+└─────────────────────────────────────────────────┘
+```
 
