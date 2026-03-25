@@ -443,6 +443,48 @@ export default function AdminSettingsPage() {
           </div>
         </section>
 
+        {/* Discount Caps - Financial Protection */}
+        <section className="bg-card border-2 border-primary/30 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Shield size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Plafond de réductions (protection marge)</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Limite le cumul des réductions (fidélité + coupon + volume) pour protéger la marge de l'entreprise. Le plafond s'applique au checkout.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Plafond global réductions (%)</label>
+              <input
+                type="number"
+                min={5}
+                max={50}
+                step={1}
+                value={discountCap.max_total_discount_pct}
+                onChange={(e) => setDiscountCap(prev => ({ ...prev, max_total_discount_pct: Number(e.target.value) || 20 }))}
+                className={inputClass}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Cumul max fidélité + coupon + volume</p>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Plafond points (%)</label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                step={1}
+                value={discountCap.max_points_discount_pct}
+                onChange={(e) => setDiscountCap(prev => ({ ...prev, max_points_discount_pct: Number(e.target.value) || 10 }))}
+                className={inputClass}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">% max du sous-total payable en points</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-3 bg-muted/50 p-2 rounded">
+            💡 Avec un plafond à {discountCap.max_total_discount_pct}% et des points à {discountCap.max_points_discount_pct}%, la marge nette minimum est d'environ {Math.max(0, 34.3 - discountCap.max_total_discount_pct - discountCap.max_points_discount_pct).toFixed(1)}% du prix de vente.
+          </p>
+        </section>
+
         {/* Referral Settings */}
         <section className="bg-card border border-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
