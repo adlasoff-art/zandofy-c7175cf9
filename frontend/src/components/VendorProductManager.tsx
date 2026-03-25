@@ -447,7 +447,11 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     }
 
     clearDraft();
-    toast.success(editing ? "Produit mis à jour" : "Produit sauvegardé en brouillon");
+    toast.success(editing
+      ? wasPublished
+        ? "Produit modifié — soumis à nouveau pour approbation"
+        : "Produit mis à jour"
+      : "Produit sauvegardé en brouillon");
     cancelForm();
     loadProducts();
     setSaving(false);
