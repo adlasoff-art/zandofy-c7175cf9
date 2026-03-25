@@ -229,7 +229,7 @@ export async function fetchFlashSaleProducts(): Promise<(Product & { flashPrice?
     const flashMap = new Map(flashData.map((f: any) => [f.product_id, f]));
     return data.map((row: any) => {
       const p = mapProduct(row);
-      const flash = flashMap.get(row.id);
+      const flash: any = flashMap.get(row.id);
       if (flash) {
         p.flashPrice = Number(flash.flash_price);
         p.flashEndsAt = flash.ends_at;
