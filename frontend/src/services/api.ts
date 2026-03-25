@@ -217,7 +217,7 @@ export async function fetchFlashSaleProducts(): Promise<(Product & { flashPrice?
     .lte("starts_at", now);
 
   if (flashData && flashData.length > 0) {
-    const productIds = (flashData as any[]).map((f: any) => f.product_id);
+    const productIds = flashData.map((f: any) => f.product_id);
     const { data, error } = await supabase
       .from("products")
       .select(PRODUCT_SELECT)
@@ -226,14 +226,14 @@ export async function fetchFlashSaleProducts(): Promise<(Product & { flashPrice?
 
     if (error || !data) return [];
 
-    const flashMap = new Map((flashData as any[]).map((f: any) => [f.product_id, f]));
+    const flashMap = new Map(flashData.map((f: any) => [f.product_id, f]));
     return data.map((row: any) => {
       const p = mapProduct(row);
       const flash = flashMap.get(row.id);
       if (flash) {
-        (p as any).flashPrice = Number(flash.flash_price);
-        (p as any).flashEndsAt = flash.ends_at;
-        (p as any).promoEndDate = flash.ends_at;
+        p.flashPrice = Number(flash.flash_price);
+        p.flashEndsAt = flash.ends_at;
+        p.promoEndDate = flash.ends_at;
       }
       return p;
     });
