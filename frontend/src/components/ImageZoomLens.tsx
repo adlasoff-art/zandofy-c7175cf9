@@ -15,10 +15,12 @@ interface ImageZoomLensProps {
  */
 export const ImageZoomLens = memo(function ImageZoomLens({
   src,
+  zoomSrc,
   alt,
   className = "",
   zoomFactor = 2.5,
 }: ImageZoomLensProps) {
+  const zoomImageUrl = zoomSrc || src;
   const containerRef = useRef<HTMLDivElement>(null);
   const [lens, setLens] = useState<{ x: number; y: number; active: boolean }>({
     x: 0,
