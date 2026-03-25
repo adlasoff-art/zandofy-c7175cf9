@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { compressImage } from "@/utils/image-compress";
 import { Camera, Upload, Loader2, CheckCircle, X, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
