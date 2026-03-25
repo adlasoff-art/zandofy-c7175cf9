@@ -223,7 +223,7 @@ export default function BecomeVendorPage() {
     );
   }
 
-  // Already submitted
+  // Already submitted — but allow creating a NEW application if approved/rejected (multi-store)
   const isTerminalStatus = ["submitted", "approved", "rejected", "revision_requested"].includes(form.status);
   if (isTerminalStatus && form.status !== "revision_requested") {
     return (
@@ -243,6 +243,17 @@ export default function BecomeVendorPage() {
               <h1 className="text-2xl font-bold">{t("vendor.approved")}</h1>
               <p className="text-muted-foreground">{t("vendor.approvedDesc")}</p>
               <Button onClick={() => navigate("/vendor")}>{t("vendor.goToVendor")}</Button>
+              <div className="pt-4 border-t border-border">
+                <p className="text-xs text-muted-foreground mb-2">Vous souhaitez ouvrir une nouvelle boutique ?</p>
+                <Button variant="outline" onClick={() => {
+                  setForm(initialData);
+                  setDocs([]);
+                  setStep(1);
+                  setExistingApp(false);
+                }}>
+                  <Store size={14} className="mr-2" /> Nouvelle demande de boutique
+                </Button>
+              </div>
             </>
           )}
           {form.status === "rejected" && (
@@ -250,6 +261,14 @@ export default function BecomeVendorPage() {
               <AlertCircle size={48} className="mx-auto text-destructive" />
               <h1 className="text-2xl font-bold">{t("vendor.rejected")}</h1>
               <p className="text-muted-foreground">{t("vendor.rejectedDesc")}</p>
+              <Button variant="outline" onClick={() => {
+                setForm(initialData);
+                setDocs([]);
+                setStep(1);
+                setExistingApp(false);
+              }}>
+                Soumettre une nouvelle demande
+              </Button>
             </>
           )}
         </div>

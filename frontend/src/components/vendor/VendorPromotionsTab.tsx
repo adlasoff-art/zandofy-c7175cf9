@@ -2,11 +2,14 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Flame, Clock, Tag, Loader2, ToggleLeft, ToggleRight,
-  Calendar, TrendingUp, AlertCircle, CheckCircle2, Zap,
+  Calendar, TrendingUp, AlertCircle, CheckCircle2, Zap, Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { VENDOR_TIERS, VendorTier } from "@/lib/vendor-tiers";
 
 interface PromoProduct {
   id: string;
@@ -48,6 +51,14 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
   const [bulkDiscount, setBulkDiscount] = useState(10);
   const [bulkDuration, setBulkDuration] = useState(24);
   const [applyingBulk, setApplyingBulk] = useState(false);
+  // Edit dialog state
+  const [editProduct, setEditProduct] = useState<PromoProduct | null>(null);
+  const [editDiscount, setEditDiscount] = useState("");
+  const [editStartDate, setEditStartDate] = useState("");
+  const [editEndDate, setEditEndDate] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  // Vendor tier for promo limits
+  const [vendorTier, setVendorTier] = useState<VendorTier>("beginner");
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -58,7 +69,6 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
       .order("created_at", { ascending: false });
 
     if (data) {
-      // Get first image for each product
       const ids = data.map((p) => p.id);
       const { data: imgs } = ids.length > 0
         ? await supabase
@@ -86,11 +96,42 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
     setLoading(false);
   }, [storeId]);
 
+  // Load vendor tier
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("stores")
+        .select("vendor_tier")
+        .eq("id", storeId)
+        .single();
+      if (data?.vendor_tier && data.vendor_tier in VENDOR_TIERS) {
+        setVendorTier(data.vendor_tier as VendorTier);
+      }
+    })();
+  }, [storeId]);
+
   useEffect(() => { loadProducts(); }, [loadProducts]);
 
+  const activePromoCount = products.filter((p) => {
+    const s = getPromoStatus(p);
+    return s === "active" || s === "scheduled";
+  }).length;
+
+  const maxPromos = VENDOR_TIERS[vendorTier].maxPromos;
+
+  const checkPromoLimit = (additionalCount = 1): boolean => {
+    if (activePromoCount + additionalCount > maxPromos) {
+      toast.error(`Limite atteinte : ${maxPromos} promotions simultanées max (badge ${VENDOR_TIERS[vendorTier].label})`);
+      return false;
+    }
+    return true;
+  };
+
   const togglePromo = async (product: PromoProduct) => {
-    setToggling(product.id);
     const newIsSale = !product.is_sale;
+    if (newIsSale && !checkPromoLimit()) return;
+
+    setToggling(product.id);
     const update: Record<string, any> = { is_sale: newIsSale };
 
     if (newIsSale && !product.original_price) {
@@ -126,8 +167,14 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
 
   const applyBulkPromo = async () => {
     if (selected.size === 0) { toast.error("Sélectionnez des produits"); return; }
-    setApplyingBulk(true);
+    // Check how many new promos this would add
+    const newPromoCount = [...selected].filter((id) => {
+      const p = products.find((pr) => pr.id === id);
+      return p && getPromoStatus(p) !== "active" && getPromoStatus(p) !== "scheduled";
+    }).length;
+    if (!checkPromoLimit(newPromoCount)) return;
 
+    setApplyingBulk(true);
     const now = new Date();
     const end = new Date(now.getTime() + bulkDuration * 3600 * 1000);
 
@@ -150,6 +197,32 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
     setBulkMode(false);
     loadProducts();
     setApplyingBulk(false);
+  };
+
+  const openEdit = (product: PromoProduct) => {
+    setEditProduct(product);
+    setEditDiscount(String(product.discount || 0));
+    setEditStartDate(product.promo_start_date ? product.promo_start_date.slice(0, 16) : "");
+    setEditEndDate(product.promo_end_date ? product.promo_end_date.slice(0, 16) : "");
+  };
+
+  const saveEdit = async () => {
+    if (!editProduct) return;
+    setEditSaving(true);
+    const update: Record<string, any> = {
+      discount: parseInt(editDiscount) || 0,
+      promo_start_date: editStartDate ? new Date(editStartDate).toISOString() : null,
+      promo_end_date: editEndDate ? new Date(editEndDate).toISOString() : null,
+    };
+    const { error } = await supabase.from("products").update(update).eq("id", editProduct.id);
+    if (error) {
+      toast.error("Erreur lors de la sauvegarde");
+    } else {
+      toast.success("Promotion mise à jour");
+      setEditProduct(null);
+      loadProducts();
+    }
+    setEditSaving(false);
   };
 
   const filtered = products.filter((p) => {
@@ -190,6 +263,12 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
         >
           <Zap size={12} /> {bulkMode ? "Annuler" : "Promo en lot"}
         </button>
+      </div>
+
+      {/* Promo limit indicator */}
+      <div className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2 flex items-center justify-between">
+        <span>Promotions actives : <strong className="text-foreground">{activePromoCount}</strong> / {maxPromos}</span>
+        <span className="text-[10px]">Badge {VENDOR_TIERS[vendorTier].label}</span>
       </div>
 
       {/* KPI summary */}
@@ -291,7 +370,6 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
                   isSelected ? "border-sale bg-sale/5" : "border-border"
                 }`}
               >
-                {/* Bulk select checkbox */}
                 {bulkMode && (
                   <input
                     type="checkbox"
@@ -305,7 +383,6 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
                   />
                 )}
 
-                {/* Image */}
                 {product.image_url ? (
                   <img src={product.image_url} alt="" className="w-11 h-11 rounded-md object-cover shrink-0" />
                 ) : (
@@ -314,7 +391,6 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
                   </div>
                 )}
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{product.name_fr}</p>
                   <div className="flex items-center gap-2 mt-0.5">
@@ -341,6 +417,16 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 shrink-0">
+                  {/* Edit button (only for active/scheduled promos) */}
+                  {product.is_sale && (status === "active" || status === "scheduled" || status === "expired") && (
+                    <button
+                      onClick={() => openEdit(product)}
+                      className="p-1.5 rounded-md transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+                      title="Modifier la promotion"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  )}
                   {product.is_sale && (
                     <button
                       onClick={() => toggleFlashTimer(product)}
@@ -375,6 +461,58 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
           })}
         </div>
       )}
+
+      {/* Edit Promotion Dialog */}
+      <Dialog open={!!editProduct} onOpenChange={(o) => { if (!o) setEditProduct(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Modifier la promotion</DialogTitle>
+          </DialogHeader>
+          {editProduct && (
+            <div className="space-y-4">
+              <p className="text-sm font-medium text-foreground truncate">{editProduct.name_fr}</p>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Réduction (%)</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={90}
+                  value={editDiscount}
+                  onChange={(e) => setEditDiscount(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Date de début</label>
+                <Input
+                  type="datetime-local"
+                  value={editStartDate}
+                  onChange={(e) => setEditStartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Date de fin</label>
+                <Input
+                  type="datetime-local"
+                  value={editEndDate}
+                  onChange={(e) => setEditEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <button onClick={() => setEditProduct(null)} className="px-4 py-2 text-sm border border-border rounded-lg">
+              Annuler
+            </button>
+            <button
+              onClick={saveEdit}
+              disabled={editSaving}
+              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg disabled:opacity-50"
+            >
+              {editSaving ? "Sauvegarde..." : "Enregistrer"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

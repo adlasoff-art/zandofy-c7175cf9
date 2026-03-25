@@ -46,7 +46,32 @@ export default function AdminVendorApplicationsPage() {
         .from("vendor_documents")
         .select("*")
         .eq("application_id", selected.id);
-      return data || [];
+      if (!data) return [];
+      // Generate signed URLs for private bucket documents
+      const docsWithUrls = await Promise.all(
+        data.map(async (doc: any) => {
+          const storedUrl = doc.document_url || "";
+          // If it looks like a relative path (no http), generate a signed URL
+          if (storedUrl && !storedUrl.startsWith("http")) {
+            const { data: signedData } = await supabase.storage
+              .from("vendor-documents")
+              .createSignedUrl(storedUrl, 3600); // 1h validity
+            return { ...doc, document_url: signedData?.signedUrl || storedUrl };
+          }
+          // Legacy full URLs — try to extract path and sign
+          if (storedUrl.includes("/vendor-documents/")) {
+            const path = storedUrl.split("/vendor-documents/").pop();
+            if (path) {
+              const { data: signedData } = await supabase.storage
+                .from("vendor-documents")
+                .createSignedUrl(decodeURIComponent(path), 3600);
+              return { ...doc, document_url: signedData?.signedUrl || storedUrl };
+            }
+          }
+          return doc;
+        })
+      );
+      return docsWithUrls;
     },
     enabled: !!selected,
   });

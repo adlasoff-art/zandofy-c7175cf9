@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Sparkles, Plus, Clock, Loader2, ImagePlus, X } from "lucide-react";
+import { Sparkles, Plus, Clock, Loader2, ImagePlus, X, Link as LinkIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,18 +13,29 @@ interface Props {
   storeId: string;
 }
 
+type RequestType = "product" | "custom";
+
+const INTERNAL_LINK_SUGGESTIONS = [
+  { label: "Page boutique", prefix: "/store/" },
+  { label: "Catégorie", prefix: "/category/" },
+  { label: "Produit", prefix: "/product/" },
+  { label: "Promotions", prefix: "/deals" },
+];
+
 export function VendorFeaturedRequestTab({ storeId }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [requestType, setRequestType] = useState<RequestType>("product");
   const [message, setMessage] = useState("");
   const [durationDays, setDurationDays] = useState("7");
+  const [internalLink, setInternalLink] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Load vendor's products for selection
+  // Load vendor's PUBLISHED products
   const { data: products = [] } = useQuery({
     queryKey: ["vendor-products-for-featured", storeId],
     queryFn: async () => {
@@ -32,7 +43,7 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
         .from("products")
         .select("id, name_fr, price")
         .eq("store_id", storeId)
-        .eq("publish_status", "approved")
+        .eq("publish_status", "published")
         .order("name_fr");
       return data || [];
     },
@@ -74,7 +85,16 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (selectedProductIds.length === 0) throw new Error("Sélectionnez au moins un produit");
+      if (requestType === "product" && selectedProductIds.length === 0) {
+        throw new Error("Sélectionnez au moins un produit");
+      }
+      if (requestType === "custom" && !internalLink.trim()) {
+        throw new Error("Veuillez renseigner un lien interne");
+      }
+      // Validate internal link starts with /
+      if (requestType === "custom" && !internalLink.startsWith("/")) {
+        throw new Error("Le lien doit être un lien interne (commençant par /)");
+      }
       setUploading(true);
       let imageUrl: string | null = null;
       if (imageFile) {
@@ -83,10 +103,12 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
       const { error } = await (supabase.from("featured_placement_requests" as any) as any).insert({
         store_id: storeId,
         requested_by: user?.id,
-        product_ids: selectedProductIds,
+        product_ids: requestType === "product" ? selectedProductIds : [],
         message: message || null,
         desired_duration_days: parseInt(durationDays) || 7,
         image_url: imageUrl,
+        request_type: requestType,
+        internal_link: requestType === "custom" ? internalLink : null,
       });
       if (error) throw error;
     },
@@ -101,8 +123,10 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
 
   const resetForm = () => {
     setShowForm(false);
+    setRequestType("product");
     setMessage("");
     setDurationDays("7");
+    setInternalLink("");
     setSelectedProductIds([]);
     setImageFile(null);
     setImagePreview(null);
@@ -142,7 +166,7 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Demandez la mise en avant de vos produits sur la page d'accueil. L'administration examinera votre demande et fixera un tarif.
+        Demandez la mise en avant de vos produits ou d'une annonce sur la page d'accueil. L'administration examinera votre demande et fixera un tarif.
       </p>
 
       {isLoading ? (
@@ -160,7 +184,7 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
             <div key={r.id} className="bg-card border border-border rounded-xl p-4 space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-foreground">
-                  {r.product_ids?.length || 0} produit(s) • {r.desired_duration_days || 7}j
+                  {r.request_type === "custom" ? "Annonce libre" : `${r.product_ids?.length || 0} produit(s)`} • {r.desired_duration_days || 7}j
                 </p>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColors[r.status] || ""}`}>
                   {statusLabels[r.status] || r.status}
@@ -168,6 +192,9 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
               </div>
               {r.image_url && (
                 <img src={r.image_url} alt="" className="w-20 h-10 object-cover rounded-md" />
+              )}
+              {r.internal_link && (
+                <p className="text-[10px] text-primary flex items-center gap-1"><LinkIcon size={10} /> {r.internal_link}</p>
               )}
               {r.message && <p className="text-xs text-muted-foreground line-clamp-2">{r.message}</p>}
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
@@ -194,31 +221,85 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
             <DialogTitle>Demande de mise en avant</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Product selection */}
+            {/* Request type selector */}
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Sélectionnez les produits à mettre en avant</label>
-              {products.length === 0 ? (
-                <p className="text-xs text-muted-foreground mt-1">Aucun produit approuvé disponible.</p>
-              ) : (
-                <div className="mt-1.5 max-h-40 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
-                  {products.map((p) => (
-                    <label key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedProductIds.includes(p.id)}
-                        onChange={() => toggleProduct(p.id)}
-                        className="rounded border-border text-primary focus:ring-primary"
-                      />
-                      <span className="text-sm text-foreground truncate flex-1">{p.name_fr}</span>
-                      <span className="text-xs text-muted-foreground">${p.price}</span>
-                    </label>
+              <label className="text-xs font-medium text-muted-foreground">Type de demande</label>
+              <div className="flex gap-2 mt-1.5">
+                <button
+                  onClick={() => setRequestType("product")}
+                  className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-colors ${
+                    requestType === "product"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  Produits approuvés
+                </button>
+                <button
+                  onClick={() => setRequestType("custom")}
+                  className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-colors ${
+                    requestType === "custom"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  Annonce libre
+                </button>
+              </div>
+            </div>
+
+            {/* Product selection (only for product type) */}
+            {requestType === "product" && (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Sélectionnez les produits à mettre en avant</label>
+                {products.length === 0 ? (
+                  <p className="text-xs text-muted-foreground mt-1">Aucun produit publié disponible.</p>
+                ) : (
+                  <div className="mt-1.5 max-h-40 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
+                    {products.map((p) => (
+                      <label key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedProductIds.includes(p.id)}
+                          onChange={() => toggleProduct(p.id)}
+                          className="rounded border-border text-primary focus:ring-primary"
+                        />
+                        <span className="text-sm text-foreground truncate flex-1">{p.name_fr}</span>
+                        <span className="text-xs text-muted-foreground">${p.price}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {selectedProductIds.length > 0 && (
+                  <p className="text-[10px] text-primary mt-1">{selectedProductIds.length} produit(s) sélectionné(s)</p>
+                )}
+              </div>
+            )}
+
+            {/* Internal link (only for custom type) */}
+            {requestType === "custom" && (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Lien interne *</label>
+                <Input
+                  value={internalLink}
+                  onChange={(e) => setInternalLink(e.target.value)}
+                  placeholder="/store/ma-boutique ou /category/vetements"
+                  className="mt-1"
+                />
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {INTERNAL_LINK_SUGGESTIONS.map((s) => (
+                    <button
+                      key={s.prefix}
+                      type="button"
+                      onClick={() => setInternalLink(s.prefix)}
+                      className="text-[10px] px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
+                    >
+                      {s.label}
+                    </button>
                   ))}
                 </div>
-              )}
-              {selectedProductIds.length > 0 && (
-                <p className="text-[10px] text-primary mt-1">{selectedProductIds.length} produit(s) sélectionné(s)</p>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Image upload */}
             <div>
@@ -270,7 +351,11 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
             </button>
             <button
               onClick={() => submitMutation.mutate()}
-              disabled={selectedProductIds.length === 0 || submitMutation.isPending || uploading}
+              disabled={
+                (requestType === "product" && selectedProductIds.length === 0) ||
+                (requestType === "custom" && !internalLink.trim()) ||
+                submitMutation.isPending || uploading
+              }
               className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg disabled:opacity-50"
             >
               {submitMutation.isPending || uploading ? "Envoi..." : "Envoyer la demande"}
