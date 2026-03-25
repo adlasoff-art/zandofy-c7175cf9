@@ -1,136 +1,165 @@
 
 
-# Plan — Protection financiere anti-perte + reduction commissions affiliation
+# Plan d'Audit et de Solidification — Zandofy (Stack Production)
 
-## Etat actuel de la base de donnees
+## Contexte
 
-| Systeme | Valeurs actuelles |
-|---|---|
-| **Fidelite** | Client 0% → Junior 1% → Senior 2% → Pro 3% → Business 5% → Elite 7% → Angel 10% |
-| **Affiliation** | Starter 3% → Bronze 4% → Silver 5% → Gold 6% → Platinum 7% |
-| **Parrainage** | 3% commission, 3 commandes max |
-| **Bulk discount** | 0% / 5% / 12% / 15% (par quantite) |
-| **Plafond global** | AUCUN — pas de cap dans le code ni en DB |
+Préparer la base de code pour une mise en production propre avec deux environnements :
+- **Staging** : `studio.zandofy.com` (stack actuelle)
+- **Production** : `zandofy.com` (nouveau déploiement Vercel + Supabase dupliqué)
 
-## Analyse du risque avec la marge de 30%
+---
 
-La marge exploitable est de 30% (sur les 45% de markup). Voici le pire cas actuel :
-- Fidelite Angel : **10%**
-- Bulk 1000+ : **15%**
-- Coupon : **variable**
-- Total possible : **25%+** → ne reste que 5% pour couvrir parrainage/affiliation → **PERTE**
+## Phase 1 — Corrections critiques (bugs, deprecated, incohérences)
 
-## 1. Reduire les commissions d'affiliation
+### 1.1 Edge Functions : `getClaims()` deprecated → `getUser()`
 
-Les affilies (influenceurs) generent des ventes via un lien. La commission doit etre attractive mais pas destructrice.
+**Fichiers** : `send-email/index.ts`, `generate-invoice/index.ts`
 
-**Nouvelles valeurs proposees** :
+Ces deux fonctions utilisent `supabase.auth.getClaims(token)` qui n'existe pas dans le SDK Supabase JS v2. Cela provoque des erreurs silencieuses en production.
 
-| Palier | Filleuls min | Commission actuelle | Commission proposee | Bonus pts |
-|---|---|---|---|---|
-| Starter | 0 | 3% | **1.5%** | 0 |
-| Bronze | 10 | 4% | **2%** | 25 |
-| Silver | 30 | 5% | **2.5%** | 75 |
-| Gold | 75 | 6% | **3%** | 150 |
-| Platinum | 200 | 7% | **3.5%** | 300 |
+**Action** : Remplacer par `supabase.auth.getUser(token)` conformément au pattern déjà utilisé dans `admin-users`, `kelpay-check`, etc.
 
-**Justification** : Meme au palier Platinum (3.5%), combine avec Angel (10%) et bulk (15%), le plafond global (voir point 2) garantit que la somme ne depasse jamais 20%.
+### 1.2 Edge Functions : `serve()` deprecated → `Deno.serve()`
 
-## 2. Plafond global de reductions au checkout
+**Fichiers** : `send-email`, `ai-user-analysis`, `ai-recommendations`, `impersonate-user`, `visual-search`
 
-Ajouter dans `CheckoutPage.tsx` un cap dur sur le cumul de toutes les reductions :
+Ces 5 fonctions utilisent `import { serve } from "https://deno.land/std@0.168.0/http/server.ts"` qui est deprecated depuis Deno 1.35+. Les 11 autres fonctions utilisent déjà correctement `Deno.serve()`.
 
-```text
-totalDiscountPct = loyaltyPct + couponPct + bulkPct
-Si totalDiscountPct > max_total_discount_pct (defaut 20%) :
-  → Reduire proportionnellement chaque composante
-  → Afficher message au client
+**Action** : Migrer vers `Deno.serve()` (supprimer l'import `serve`).
 
-pointsDiscount plafonné séparément à max_points_discount_pct (defaut 10%) du subtotal
+### 1.3 Sitemap : URL en dur `zandofy.lovable.app`
+
+**Fichier** : `generate-sitemap/index.ts` (ligne 3)
+
+```typescript
+const SITE_URL = "https://zandofy.lovable.app"; // ← FAUX en production
 ```
 
-**Valeur recommandee : 20%** → Sur les 30% exploitables, il reste toujours 10% minimum pour l'entreprise.
+**Action** : Lire depuis une variable d'environnement `Deno.env.get("SITE_BASE_URL") || "https://zandofy.com"`. Ajouter le secret `SITE_BASE_URL`.
 
-**Impact pire cas** :
-```text
-Produit coût $4.99
-Prix de vente ≈ $7.60 (formule ×1.5225)
-Reduction max 20% : -$1.52
-Points max 10% : -$0.76
-Revenu net : $5.32
-Coût reel : $5.24 (avec 5% transaction)
-Marge nette : $0.08 minimum → JAMAIS EN PERTE ✓
+### 1.4 Sitemap : produits référencés par `id` au lieu de `slug`
 
-Cas typique (Senior 2% + pas de bulk + pas de coupon) :
-Reduction : 2% = -$0.15
-Revenu net : $7.45
-Marge nette : $2.21 → CONFORTABLE ✓
+Ligne 54 : `/product/${p.id}` alors que le routeur utilise `/product/:slug`. Google indexera des UUIDs au lieu des slugs SEO-friendly.
+
+**Action** : Requêter aussi `slug` et préférer `p.slug || p.id`.
+
+### 1.5 `api-client.ts` : fallback `localStorage.getItem("access_token")`
+
+Ligne 20 : Ce fallback legacy est inutile et potentiellement dangereux (token périmé stocké manuellement).
+
+**Action** : Supprimer le bloc fallback. Le token Supabase via `getSession()` est la seule source fiable.
+
+---
+
+## Phase 2 — Qualité de code (nettoyage `as any`, typage, DRY)
+
+### 2.1 `api.ts` : propriétés hors interface via `(p as any).xxx`
+
+Le `mapProduct()` ajoute 6 propriétés (`storeIsVerified`, `galleryImages`, `promoEndDate`, etc.) par casting `as any` au lieu de les déclarer dans l'interface `Product`.
+
+**Action** : Étendre l'interface `Product` avec les propriétés manquantes (optionnelles). Supprimer tous les `as any` du mapper.
+
+### 2.2 `api.ts` : tables `trend_tags` et `flash_sales` castées `as any`
+
+```typescript
+.from("trend_tags" as any)
+.from("flash_sales" as any)
 ```
 
-## 3. Section admin "Plafond de reductions"
+Cela indique que ces tables ne sont pas dans le fichier `types.ts` auto-généré. Comme ce fichier est auto-généré, on ne peut pas le modifier. Cependant, on peut centraliser un helper typé plutôt que des casts éparpillés.
 
-**Fichier** : `AdminSettingsPage.tsx`
+**Action** : Utiliser `fromTable()` de `supabase-helpers.ts` de manière cohérente au lieu de `as any` directement dans les appels.
 
-Ajouter une nouvelle section avec :
-- **Plafond global reductions** : input (defaut 20%)
-- **Plafond points** : input (defaut 10%)
-- **Toggle bonus points affiliation** : desactive par defaut — controle si les bonus points des paliers d'affiliation sont credites automatiquement
+### 2.3 `search.ts` : `mapProduct()` dupliqué
 
-## 4. Logique affiliation vs parrainage
+Le fichier `search.ts` contient une copie simplifiée de `mapProduct()` d'`api.ts`.
 
-Le systeme actuel distingue deja les deux :
-- **Parrainage** = table `referrals` (referrer_id → referee_id), commission sur 3 premieres commandes livrees
-- **Affiliation** = table `affiliate_links` (liens partageables), tracking clics/conversions
+**Action** : Exporter `mapProduct` depuis `api.ts` et le réutiliser dans `search.ts`.
 
-**Clarification** : Quand un achat vient d'un lien d'affiliation, c'est la commission d'affiliation qui s'applique (palier de l'affilie). Le parrainage ne s'applique PAS en plus. Le code actuel gere deja cette separation.
+### 2.4 `search.ts` : injection ilike non sanitisée
 
-## 5. Donnees a inserer en DB
+Ligne 59 : `name.ilike.%${filters.query}%` — si `query` contient `%` ou `_` (wildcards PostgREST), cela casse la recherche.
 
-```sql
--- Plafond de reductions (nouvelle cle platform_settings)
-INSERT INTO platform_settings (key, value) VALUES (
-  'max_discount_settings',
-  '{"max_total_discount_pct": 20, "max_points_discount_pct": 10}'::jsonb
-) ON CONFLICT (key) DO NOTHING;
+**Action** : Échapper les caractères spéciaux PostgREST avant interpolation.
 
--- Toggle bonus affiliation dans referral_settings
-UPDATE platform_settings
-SET value = value || '{"affiliate_bonus_enabled": false}'::jsonb
-WHERE key = 'referral_settings';
+---
 
--- Reduire les commissions d'affiliation
-UPDATE affiliate_tiers SET commission_pct = 1.5 WHERE tier_name = 'Starter';
-UPDATE affiliate_tiers SET commission_pct = 2 WHERE tier_name = 'Bronze';
-UPDATE affiliate_tiers SET commission_pct = 2.5 WHERE tier_name = 'Silver';
-UPDATE affiliate_tiers SET commission_pct = 3 WHERE tier_name = 'Gold';
-UPDATE affiliate_tiers SET commission_pct = 3.5 WHERE tier_name = 'Platinum';
-```
+## Phase 3 — Sécurité
 
-**Aucune migration de schema requise** — ce sont uniquement des mises a jour de donnees existantes.
+### 3.1 `auth-helpers.ts` : rate-limiting côté client uniquement
 
-## Fichiers modifies
+Le verrouillage de session via `sessionStorage` est contournable en ouvrant un nouvel onglet ou en vidant le storage. C'est une mesure cosmétique, pas une protection réelle.
+
+**Action** : Documenter la limitation, mais conserver le mécanisme comme couche UX. La protection réelle doit être côté Supabase Auth (qui a un rate-limit natif).
+
+### 3.2 CORS `Access-Control-Allow-Origin: *` dans les Edge Functions
+
+Toutes les Edge Functions utilisent `"Access-Control-Allow-Origin": "*"`. Pour la production, cela devrait être restreint au domaine `zandofy.com`.
+
+**Action** : Lire `SITE_BASE_URL` depuis l'environnement et l'utiliser comme origin autorisé. Garder `*` en fallback pour le dev.
+
+---
+
+## Phase 4 — Portabilité multi-environnement (Staging vs Production)
+
+### 4.1 Variable `VITE_SITE_URL` déjà en place — vérifier sa propagation
+
+Le code utilise `import.meta.env.VITE_SITE_URL || "https://zandofy.com"` dans SEOHead, Index, ReferralDashboard, AdminVendorApplications. C'est correct.
+
+**Action** : S'assurer que la variable est configurée dans Vercel pour chaque environnement :
+- Staging : `VITE_SITE_URL=https://studio.zandofy.com`
+- Production : `VITE_SITE_URL=https://zandofy.com`
+
+### 4.2 `VITE_API_URL` — Backend FastAPI
+
+Le `api-client.ts` utilise `VITE_API_URL` pour appeler le backend FastAPI. Ce backend n'est pas déployé sur Vercel (comme prévu). Pour la stack Vercel + Supabase.com sans backend FastAPI custom, **ce client est inutilisé sauf si le backend Coolify est actif**.
+
+**Action** : Aucun changement de code, mais documenter que `VITE_API_URL` est optionnel et ne doit être défini que si le backend FastAPI est déployé séparément.
+
+### 4.3 Ajout d'un secret `SITE_BASE_URL` dans Supabase
+
+Pour les Edge Functions (sitemap, CORS dynamique).
+
+**Action** : Ajouter le secret via l'outil `add_secret`.
+
+---
+
+## Phase 5 — Guide de duplication pour la Production
+
+### Étapes pour créer l'environnement Production
+
+1. **Supabase** : Créer un nouveau projet Supabase.com dédié à la production
+2. **Migrer le schema** : Exécuter toutes les migrations SQL depuis `frontend/supabase/migrations/` dans le nouveau projet
+3. **Secrets** : Configurer tous les secrets (SMTP, Kelpay, VAPID, OpenAI, etc.) dans le nouveau projet
+4. **Edge Functions** : Déployer via `supabase functions deploy` pointant vers le nouveau projet
+5. **Vercel** :
+   - Créer un nouveau déploiement Vercel (ou un nouvel environnement "Production" sur le même projet)
+   - Variables d'environnement :
+     - `VITE_SUPABASE_URL` → URL du nouveau projet Supabase
+     - `VITE_SUPABASE_PUBLISHABLE_KEY` → Anon key du nouveau projet
+     - `VITE_SUPABASE_PROJECT_ID` → Ref du nouveau projet
+     - `VITE_SITE_URL=https://zandofy.com`
+   - Domaine : `zandofy.com`
+6. **Staging** (existant) : Mettre à jour `VITE_SITE_URL=https://studio.zandofy.com`
+
+---
+
+## Résumé des fichiers à modifier
 
 | Fichier | Action |
 |---|---|
-| `CheckoutPage.tsx` | Charger `max_discount_settings`, appliquer le cap sur cumul reductions + points |
-| `AdminSettingsPage.tsx` | Ajouter section plafond + toggle bonus affiliation |
-| `AffiliateDashboard.tsx` | Conditionner affichage bonus points sur `affiliate_bonus_enabled` |
+| `frontend/supabase/functions/send-email/index.ts` | `getClaims` → `getUser`, `serve` → `Deno.serve` |
+| `frontend/supabase/functions/generate-invoice/index.ts` | `getClaims` → `getUser` |
+| `frontend/supabase/functions/ai-user-analysis/index.ts` | `serve` → `Deno.serve` |
+| `frontend/supabase/functions/ai-recommendations/index.ts` | `serve` → `Deno.serve` |
+| `frontend/supabase/functions/impersonate-user/index.ts` | `serve` → `Deno.serve` |
+| `frontend/supabase/functions/visual-search/index.ts` | `serve` → `Deno.serve` |
+| `frontend/supabase/functions/generate-sitemap/index.ts` | URL dynamique + slug |
+| `frontend/src/services/api-client.ts` | Supprimer fallback localStorage |
+| `frontend/src/services/api.ts` | Étendre interface Product, nettoyer `as any`, exporter `mapProduct` |
+| `frontend/src/services/search.ts` | Réutiliser `mapProduct`, sanitiser ilike |
+| Ajout secret `SITE_BASE_URL` | Via outil secrets |
 
-## Resume de la protection
-
-```text
-┌─────────────────────────────────────────────────┐
-│           MARGE TOTALE : 45% du coût            │
-├─────────────────────────────────────────────────┤
-│ 15% → Marge incompressible entreprise     🔒    │
-│ 30% → Marge exploitable                        │
-│   ├─ Fidelite : 0-10% (plafonné à 20% cumul)   │
-│   ├─ Coupon : 0-10% (plafonné à 20% cumul)     │
-│   ├─ Bulk : 0-15% (plafonné à 20% cumul)       │
-│   ├─ Points : 0-10% du subtotal (cap séparé)   │
-│   ├─ Parrainage : 3% × 3 commandes seulement   │
-│   ├─ Affiliation : 1.5-3.5% (réduit)           │
-│   └─ Reste minimum garanti : ≥ 6.5%      ✓     │
-└─────────────────────────────────────────────────┘
-```
+**Estimation** : ~15 modifications ciblées, aucun changement structurel ni breaking change. Toutes les fonctionnalités existantes restent intactes.
 
