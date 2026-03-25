@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { compressImage } from "@/utils/image-compress";
 import { useI18n } from "@/contexts/I18nContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/Header";
