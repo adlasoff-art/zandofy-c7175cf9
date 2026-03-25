@@ -278,7 +278,7 @@ export default function ProductPage() {
                         <Camera size={14} className="text-muted-foreground" />
                       </div>
                     ) : (
-                      <img src={item.url} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={IMAGE_PRESETS.galleryThumb(item.url)} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" />
                     )}
                   </button>
                 ))}
