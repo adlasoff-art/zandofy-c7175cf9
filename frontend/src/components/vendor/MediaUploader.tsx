@@ -32,8 +32,9 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
 
     const newItems: MediaItem[] = [];
     for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const isVideo = file.type.startsWith("video/");
+      const raw = files[i];
+      const isVideo = raw.type.startsWith("video/");
+      const file = isVideo ? raw : await compressImage(raw);
       const ext = file.name.split(".").pop();
       const path = `${storeId}/${Date.now()}-${i}.${ext}`;
 

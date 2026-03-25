@@ -44,7 +44,7 @@ export function PaymentProofUpload({ orderId, field, label = "Preuve de paiement
 
       const { error: uploadError } = await supabase.storage
         .from("delivery-proofs")
-        .upload(path, file, { upsert: true });
+        .upload(path, compressed, { upsert: true });
 
       if (uploadError) throw uploadError;
 

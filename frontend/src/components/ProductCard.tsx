@@ -88,6 +88,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
             <img
               src={imgError ? "/placeholder.svg" : product.image}
               alt={product.nameFr}
+              decoding="async"
               className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
                 loaded ? "opacity-100" : "opacity-0"
               } ${hovered && secondImage ? "opacity-0 scale-105" : ""}`}
@@ -99,6 +100,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
               <img
                 src={secondImage}
                 alt={product.nameFr}
+                decoding="async"
                 className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
                   hovered ? "opacity-100 scale-100" : "opacity-0 scale-95"
                 }`}
