@@ -163,6 +163,14 @@ export default function CheckoutPage() {
         setPointsPerDollar(Number(v.points_per_dollar) || 50);
       }
     });
+    // Fetch discount caps
+    supabase.from("platform_settings").select("value").eq("key", "max_discount_settings").maybeSingle().then(({ data }) => {
+      if (data?.value) {
+        const v = data.value as any;
+        setMaxTotalDiscountPct(Number(v.max_total_discount_pct) || 20);
+        setMaxPointsDiscountPct(Number(v.max_points_discount_pct) || 10);
+      }
+    });
   }, [user]);
 
   useEffect(() => {
