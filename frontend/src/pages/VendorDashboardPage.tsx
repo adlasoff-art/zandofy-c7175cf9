@@ -410,6 +410,12 @@ export default function VendorDashboardPage() {
             <p className="text-xs text-muted-foreground">
               Contactez l'administration pour créer votre espace vendeur.
             </p>
+            <button
+              onClick={() => navigate("/become-vendor")}
+              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90"
+            >
+              Demander une boutique
+            </button>
           </div>
         ) : (
           <>
