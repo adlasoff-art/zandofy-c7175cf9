@@ -20,6 +20,12 @@ interface ReferralConfig {
   gift_card_enabled: boolean;
   points_expiry_months: number;
   points_per_dollar: number;
+  affiliate_bonus_enabled: boolean;
+}
+
+interface DiscountCapConfig {
+  max_total_discount_pct: number;
+  max_points_discount_pct: number;
 }
 
 interface MaintenanceConfig {
