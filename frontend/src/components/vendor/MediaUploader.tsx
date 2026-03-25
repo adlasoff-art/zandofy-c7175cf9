@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ImageIcon, Plus, X, Loader2, Video, Play } from "lucide-react";
 import { toast } from "sonner";
+import { compressImageForUpload } from "@/utils/imageOptimizer";
 
 interface MediaItem {
   id?: string;
