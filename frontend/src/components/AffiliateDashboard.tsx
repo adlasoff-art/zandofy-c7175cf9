@@ -19,19 +19,25 @@ export function AffiliateDashboard() {
   const [currentTier, setCurrentTier] = useState<string | null>(null);
   const [referralCount, setReferralCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [bonusEnabled, setBonusEnabled] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     async function load() {
       setLoading(true);
-      const [tiersRes, profileRes, referralsRes] = await Promise.all([
+      const [tiersRes, profileRes, referralsRes, settingsRes] = await Promise.all([
         supabase.from("affiliate_tiers").select("*").order("min_referrals"),
         supabase.from("profiles").select("affiliate_tier").eq("id", user!.id).single(),
         supabase.from("referrals").select("id", { count: "exact", head: true }).eq("referrer_id", user!.id),
+        supabase.from("platform_settings").select("value").eq("key", "referral_settings").maybeSingle(),
       ]);
       setTiers((tiersRes.data || []) as AffiliateTier[]);
       setCurrentTier(profileRes.data?.affiliate_tier || null);
       setReferralCount(referralsRes.count || 0);
+      if (settingsRes.data?.value) {
+        const v = settingsRes.data.value as any;
+        setBonusEnabled(!!v.affiliate_bonus_enabled);
+      }
       setLoading(false);
     }
     load();
