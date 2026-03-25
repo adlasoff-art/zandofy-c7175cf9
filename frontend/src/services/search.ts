@@ -32,7 +32,8 @@ export async function searchProducts(filters: SearchFilters): Promise<Product[]>
 
   // Text search on name / name_fr
   if (filters.query) {
-    query = query.or(`name.ilike.%${filters.query}%,name_fr.ilike.%${filters.query}%`);
+    const q = sanitizeLike(filters.query);
+    query = query.or(`name.ilike.%${q}%,name_fr.ilike.%${q}%`);
   }
 
   // Price range
