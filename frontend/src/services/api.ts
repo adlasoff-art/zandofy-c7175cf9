@@ -314,7 +314,7 @@ export async function fetchProductBySlug(
   }
 
   const product = mapProduct(data);
-  (product as any).store = (data as any).stores;
+  product.store = data.stores;
   
   if (data.category_id && data.store_id) {
     try {
@@ -325,7 +325,7 @@ export async function fetchProductBySlug(
       if (rankings) {
         const storeRank = rankings.find((r: any) => r.store_id === data.store_id);
         if (storeRank) {
-          (product as any).sellerRank = Number(storeRank.rank);
+          product.sellerRank = Number(storeRank.rank);
         }
       }
     } catch (e) {
