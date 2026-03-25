@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Product } from "@/services/api";
+import { mapProduct, type Product } from "@/services/api";
 
 const SEARCH_SELECT = `
   *,
@@ -9,33 +9,9 @@ const SEARCH_SELECT = `
   product_sizes(size_label, region, bust_cm, waist_cm, hips_cm)
 `;
 
-function mapProduct(row: any): Product {
-  return {
-    id: row.id,
-    name: row.name,
-    nameFr: row.name_fr,
-    price: Number(row.price),
-    originalPrice: row.original_price ? Number(row.original_price) : undefined,
-    currency: row.currency,
-    image: row.product_images?.[0]?.image_url || "/placeholder.svg",
-    category: row.categories?.name || "",
-    categoryFr: row.categories?.name_fr || "",
-    rating: Number(row.rating) || 0,
-    reviewCount: row.review_count || 0,
-    isNew: row.is_new || false,
-    isSale: row.is_sale || false,
-    discount: row.discount || 0,
-    colors: row.product_colors?.map((c: any) => c.color_hex) || [],
-    sizes: row.product_sizes?.map((s: any) => s.size_label) || [],
-    moq: row.moq || 1,
-    verifiedYears: row.verified_years || 0,
-    originCountry: row.origin_country || "",
-    sku: row.sku || "",
-    material: row.material || "",
-    style: row.style || "",
-    storeId: row.store_id || "",
-    shortDescription: row.short_description || undefined,
-  };
+/** Escape PostgREST ilike wildcards (% and _) */
+function sanitizeLike(value: string): string {
+  return value.replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
 export interface SearchFilters {
@@ -56,7 +32,8 @@ export async function searchProducts(filters: SearchFilters): Promise<Product[]>
 
   // Text search on name / name_fr
   if (filters.query) {
-    query = query.or(`name.ilike.%${filters.query}%,name_fr.ilike.%${filters.query}%`);
+    const q = sanitizeLike(filters.query);
+    query = query.or(`name.ilike.%${q}%,name_fr.ilike.%${q}%`);
   }
 
   // Price range

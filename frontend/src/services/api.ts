@@ -1,5 +1,6 @@
 // Supabase-powered API service layer
 import { supabase } from "@/integrations/supabase/client";
+import { fromTable } from "@/lib/supabase-helpers";
 
 export interface Product {
   id: string;
@@ -33,6 +34,16 @@ export interface Product {
   widthCm?: number;
   heightCm?: number;
   trendTagId?: string;
+  // Extended properties set by mapProduct
+  storeIsVerified?: boolean;
+  galleryImages?: Array<{ image_url: string; position: number }>;
+  promoEndDate?: string | null;
+  promoStartDate?: string | null;
+  productColors?: Array<{ hex: string; name: string; imageUrl: string | null }>;
+  flashPrice?: number;
+  flashEndsAt?: string;
+  store?: any;
+  sellerRank?: number;
 }
 
 export interface TrendTag {
@@ -60,7 +71,7 @@ export interface Category {
 }
 
 // Map Supabase row to Product interface
-function mapProduct(row: any): Product {
+export function mapProduct(row: any): Product {
   const storeData = row.stores;
   const storeIsVerified = storeData?.is_verified ?? false;
   const storeVerifiedYears = storeData?.verified_years_override ?? storeData?.verified_years ?? 0;
@@ -68,7 +79,7 @@ function mapProduct(row: any): Product {
   const realReviewCount = row.review_count_override ?? row.review_count ?? 0;
   const realRating = Number(row.rating) || 0;
 
-  const p: Product = {
+  return {
     id: row.id,
     slug: row.slug || row.id,
     name: row.name,
@@ -100,17 +111,16 @@ function mapProduct(row: any): Product {
     widthCm: row.width_cm ? Number(row.width_cm) : undefined,
     heightCm: row.height_cm ? Number(row.height_cm) : undefined,
     trendTagId: row.trend_tag_id || undefined,
+    storeIsVerified,
+    galleryImages: row.product_images || [],
+    promoEndDate: row.promo_end_date || null,
+    promoStartDate: row.promo_start_date || null,
+    productColors: (row.product_colors || []).map((c: any) => ({
+      hex: c.color_hex,
+      name: c.color_name || "",
+      imageUrl: c.image_url || null,
+    })),
   };
-  (p as any).storeIsVerified = storeIsVerified;
-  (p as any).galleryImages = row.product_images || [];
-  (p as any).promoEndDate = row.promo_end_date || null;
-  (p as any).promoStartDate = row.promo_start_date || null;
-  (p as any).productColors = (row.product_colors || []).map((c: any) => ({
-    hex: c.color_hex,
-    name: c.color_name || "",
-    imageUrl: c.image_url || null,
-  }));
-  return p;
 }
 
 const PRODUCT_SELECT = `
@@ -177,8 +187,7 @@ export async function fetchProducts(params?: {
 }
 
 export async function fetchTrendTags(): Promise<TrendTag[]> {
-  const { data, error } = await supabase
-    .from("trend_tags" as any)
+  const { data, error } = await fromTable("trend_tags")
     .select("id, name, name_fr, slug, sort_order")
     .eq("is_active", true)
     .order("sort_order");
@@ -201,15 +210,14 @@ export async function fetchFlashSaleProducts(): Promise<(Product & { flashPrice?
   const now = new Date().toISOString();
 
   // First try real flash_sales table
-  const { data: flashData } = await supabase
-    .from("flash_sales" as any)
+  const { data: flashData } = await fromTable("flash_sales")
     .select("product_id, flash_price, ends_at")
     .eq("is_active", true)
     .gte("ends_at", now)
     .lte("starts_at", now);
 
   if (flashData && flashData.length > 0) {
-    const productIds = (flashData as any[]).map((f: any) => f.product_id);
+    const productIds = flashData.map((f: any) => f.product_id);
     const { data, error } = await supabase
       .from("products")
       .select(PRODUCT_SELECT)
@@ -218,14 +226,14 @@ export async function fetchFlashSaleProducts(): Promise<(Product & { flashPrice?
 
     if (error || !data) return [];
 
-    const flashMap = new Map((flashData as any[]).map((f: any) => [f.product_id, f]));
+    const flashMap = new Map(flashData.map((f: any) => [f.product_id, f]));
     return data.map((row: any) => {
       const p = mapProduct(row);
-      const flash = flashMap.get(row.id);
+      const flash: any = flashMap.get(row.id);
       if (flash) {
-        (p as any).flashPrice = Number(flash.flash_price);
-        (p as any).flashEndsAt = flash.ends_at;
-        (p as any).promoEndDate = flash.ends_at;
+        p.flashPrice = Number(flash.flash_price);
+        p.flashEndsAt = flash.ends_at;
+        p.promoEndDate = flash.ends_at;
       }
       return p;
     });
@@ -306,7 +314,7 @@ export async function fetchProductBySlug(
   }
 
   const product = mapProduct(data);
-  (product as any).store = (data as any).stores;
+  product.store = data.stores;
   
   if (data.category_id && data.store_id) {
     try {
@@ -317,7 +325,7 @@ export async function fetchProductBySlug(
       if (rankings) {
         const storeRank = rankings.find((r: any) => r.store_id === data.store_id);
         if (storeRank) {
-          (product as any).sellerRank = Number(storeRank.rank);
+          product.sellerRank = Number(storeRank.rank);
         }
       }
     } catch (e) {

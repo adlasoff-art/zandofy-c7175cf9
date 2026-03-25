@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const SITE_URL = "https://zandofy.lovable.app";
+const SITE_URL = (Deno.env.get("SITE_BASE_URL") || "https://zandofy.com").replace(/\/$/, "");
 
 Deno.serve(async () => {
   try {
@@ -22,7 +22,7 @@ Deno.serve(async () => {
     // Fetch published products
     const { data: products } = await supabase
       .from("products")
-      .select("id, updated_at")
+      .select("id, slug, updated_at")
       .eq("publish_status", "published")
       .order("updated_at", { ascending: false })
       .limit(5000);
@@ -51,7 +51,8 @@ Deno.serve(async () => {
     // Products
     for (const p of products || []) {
       const lastmod = p.updated_at ? p.updated_at.split("T")[0] : "";
-      xml += `  <url><loc>${SITE_URL}/product/${p.id}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}<changefreq>weekly</changefreq><priority>0.8</priority></url>\n`;
+      const productPath = p.slug || p.id;
+      xml += `  <url><loc>${SITE_URL}/product/${productPath}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}<changefreq>weekly</changefreq><priority>0.8</priority></url>\n`;
     }
 
     // Categories

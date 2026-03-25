@@ -13,11 +13,7 @@ async function resolveAuthToken(explicitToken?: string): Promise<string | null> 
     const { data } = await supabase.auth.getSession();
     if (data.session?.access_token) return data.session.access_token;
   } catch {
-    // fallback legacy only
-  }
-
-  if (typeof localStorage !== "undefined") {
-    return localStorage.getItem("access_token");
+    // session unavailable
   }
 
   return null;
