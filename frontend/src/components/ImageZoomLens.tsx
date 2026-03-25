@@ -63,7 +63,7 @@ export const ImageZoomLens = memo(function ImageZoomLens({
         <div
           className="absolute inset-0 pointer-events-none z-10"
           style={{
-            backgroundImage: `url(${src})`,
+            backgroundImage: `url(${zoomImageUrl})`,
             backgroundSize: `${zoomFactor * 100}%`,
             backgroundPosition: `${lens.x}% ${lens.y}%`,
             backgroundRepeat: "no-repeat",
