@@ -339,8 +339,8 @@ export default function BecomeVendorPage() {
       return;
     }
 
-    const { data: urlData } = supabase.storage.from("vendor-documents").getPublicUrl(path);
-    const docUrl = urlData.publicUrl;
+    // Store the relative path (bucket is private, signed URLs generated on demand)
+    const docUrl = path;
 
     const { data: docRow } = await supabase
       .from("vendor_documents")
