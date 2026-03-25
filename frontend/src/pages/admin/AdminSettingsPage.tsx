@@ -52,7 +52,8 @@ interface BulkTierConfig {
 export default function AdminSettingsPage() {
   const [trackingProvider, setTrackingProvider] = useState("17track");
   const [freeShipping, setFreeShipping] = useState<FreeShippingConfig>({ enabled: true, amount: 49, currency: "USD" });
-  const [referral, setReferral] = useState<ReferralConfig>({ enabled: true, commission_pct: 3, max_rewarded_orders: 3, welcome_discount_pct: 5, gift_card_enabled: true, points_expiry_months: 6, points_per_dollar: 100 });
+  const [referral, setReferral] = useState<ReferralConfig>({ enabled: true, commission_pct: 3, max_rewarded_orders: 3, welcome_discount_pct: 5, gift_card_enabled: true, points_expiry_months: 6, points_per_dollar: 100, affiliate_bonus_enabled: false });
+  const [discountCap, setDiscountCap] = useState<DiscountCapConfig>({ max_total_discount_pct: 20, max_points_discount_pct: 10 });
   const [maintenance, setMaintenance] = useState<MaintenanceConfig>({
     enabled: false,
     title: "Maintenance en cours",
