@@ -1318,6 +1318,15 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                {/* Discount cap notice */}
+                {discountCapped && (
+                  <div className="border-t border-border pt-3">
+                    <p className="text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1.5 rounded">
+                      ⚠️ Le cumul des réductions a été plafonné à {maxTotalDiscountPct}% du sous-total.
+                    </p>
+                  </div>
+                )}
+
                 <div className="border-t border-border pt-3 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">{t("cart.subtotal")}</span>
