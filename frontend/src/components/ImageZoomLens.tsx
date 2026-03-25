@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, memo } from "react";
 
 interface ImageZoomLensProps {
   src: string;
+  zoomSrc?: string;
   alt: string;
   className?: string;
   zoomFactor?: number;
@@ -14,10 +15,12 @@ interface ImageZoomLensProps {
  */
 export const ImageZoomLens = memo(function ImageZoomLens({
   src,
+  zoomSrc,
   alt,
   className = "",
   zoomFactor = 2.5,
 }: ImageZoomLensProps) {
+  const zoomImageUrl = zoomSrc || src;
   const containerRef = useRef<HTMLDivElement>(null);
   const [lens, setLens] = useState<{ x: number; y: number; active: boolean }>({
     x: 0,
@@ -60,7 +63,7 @@ export const ImageZoomLens = memo(function ImageZoomLens({
         <div
           className="absolute inset-0 pointer-events-none z-10"
           style={{
-            backgroundImage: `url(${src})`,
+            backgroundImage: `url(${zoomImageUrl})`,
             backgroundSize: `${zoomFactor * 100}%`,
             backgroundPosition: `${lens.x}% ${lens.y}%`,
             backgroundRepeat: "no-repeat",
