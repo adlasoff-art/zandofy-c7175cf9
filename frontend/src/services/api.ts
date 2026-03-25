@@ -187,8 +187,7 @@ export async function fetchProducts(params?: {
 }
 
 export async function fetchTrendTags(): Promise<TrendTag[]> {
-  const { data, error } = await supabase
-    .from("trend_tags" as any)
+  const { data, error } = await fromTable("trend_tags")
     .select("id, name, name_fr, slug, sort_order")
     .eq("is_active", true)
     .order("sort_order");
