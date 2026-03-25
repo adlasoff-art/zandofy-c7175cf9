@@ -36,11 +36,11 @@ export function QuickRepliesManager({ storeId, onClose }: QuickRepliesManagerPro
 
   const fetchReplies = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("store_quick_replies")
+    const { data } = await (supabase
+      .from("store_quick_replies" as any)
       .select("id, content, sort_order")
       .eq("store_id", storeId)
-      .order("sort_order", { ascending: true });
+      .order("sort_order", { ascending: true }) as any);
     if (data) setReplies(data as QuickReply[]);
     setLoading(false);
   };
