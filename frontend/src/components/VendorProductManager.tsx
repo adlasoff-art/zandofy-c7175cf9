@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Plus, Pencil, Trash2, Loader2, X, Save, Package,
-  ImageIcon, ChevronLeft, Eye, EyeOff, Send, Crown,
+  ImageIcon, ChevronLeft, Eye, EyeOff, Send, Crown, EyeOff as EyeOffIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
@@ -371,9 +371,14 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     };
 
     let productId = editing?.id;
+    const wasPublished = editing?.publish_status === "published";
 
     if (editing) {
-      const { error } = await (supabase.from("products").update(payload as any) as any).eq("id", editing.id);
+      // If the product was published, any edit forces re-approval
+      const updatePayload = wasPublished
+        ? { ...payload, publish_status: "pending_approval" }
+        : payload;
+      const { error } = await (supabase.from("products").update(updatePayload as any) as any).eq("id", editing.id);
       if (error) { toast.error("Erreur lors de la mise à jour"); setSaving(false); return; }
     } else {
       const { data, error } = await (supabase.from("products").insert(payload as any) as any).select("id").single();
@@ -442,7 +447,11 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     }
 
     clearDraft();
-    toast.success(editing ? "Produit mis à jour" : "Produit sauvegardé en brouillon");
+    toast.success(editing
+      ? wasPublished
+        ? "Produit modifié — soumis à nouveau pour approbation"
+        : "Produit mis à jour"
+      : "Produit sauvegardé en brouillon");
     cancelForm();
     loadProducts();
     setSaving(false);
@@ -470,7 +479,20 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     setDeleting(null);
   };
 
-  
+  const handleUnpublish = async (productId: string) => {
+    const { error } = await supabase
+      .from("products")
+      .update({ publish_status: "draft" } as any)
+      .eq("id", productId);
+    if (error) {
+      toast.error("Erreur lors de la dépublication");
+    } else {
+      toast.success("Produit dépublié");
+      loadProducts();
+    }
+  };
+
+
 
   if (showForm) {
     return (
@@ -701,13 +723,22 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {product.publish_status === "draft" && (
+                {(product.publish_status === "draft" || product.publish_status === "revision_requested") && (
                   <button
                     onClick={() => handlePublish(product.id)}
                     className="p-2 text-muted-foreground hover:text-emerald-500 transition-colors"
-                    title="Publier"
+                    title="Soumettre pour approbation"
                   >
                     <Send size={14} />
+                  </button>
+                )}
+                {product.publish_status === "published" && (
+                  <button
+                    onClick={() => handleUnpublish(product.id)}
+                    className="p-2 text-muted-foreground hover:text-amber-500 transition-colors"
+                    title="Dépublier"
+                  >
+                    <EyeOff size={14} />
                   </button>
                 )}
                 <button onClick={() => startEdit(product)} className="p-2 text-muted-foreground hover:text-primary transition-colors">
