@@ -134,6 +134,10 @@ export default function CheckoutPage() {
   const [pointsToUse, setPointsToUse] = useState(0);
   const [pointsPerDollar, setPointsPerDollar] = useState(50);
 
+  // Discount caps
+  const [maxTotalDiscountPct, setMaxTotalDiscountPct] = useState(20);
+  const [maxPointsDiscountPct, setMaxPointsDiscountPct] = useState(10);
+
   useEffect(() => {
     if (!user) return;
     // Fetch loyalty tier
@@ -161,6 +165,14 @@ export default function CheckoutPage() {
       if (data?.value) {
         const v = data.value as any;
         setPointsPerDollar(Number(v.points_per_dollar) || 50);
+      }
+    });
+    // Fetch discount caps
+    supabase.from("platform_settings").select("value").eq("key", "max_discount_settings").maybeSingle().then(({ data }) => {
+      if (data?.value) {
+        const v = data.value as any;
+        setMaxTotalDiscountPct(Number(v.max_total_discount_pct) || 20);
+        setMaxPointsDiscountPct(Number(v.max_points_discount_pct) || 10);
       }
     });
   }, [user]);
@@ -210,15 +222,33 @@ export default function CheckoutPage() {
     ? dynamicShippingCost
     : (freeShippingEnabled && subtotal >= freeShippingThreshold ? 0 : FALLBACK_SHIPPING_COST);
 
-  const couponDiscount = appliedCoupon
+  // Raw discount calculations
+  const rawCouponPct = appliedCoupon
     ? appliedCoupon.discount_type === "percentage"
-      ? (subtotal * appliedCoupon.discount_value) / 100
-      : Math.min(appliedCoupon.discount_value, subtotal)
+      ? appliedCoupon.discount_value
+      : subtotal > 0 ? (Math.min(appliedCoupon.discount_value, subtotal) / subtotal) * 100 : 0
     : 0;
+  const rawLoyaltyPct = loyaltyPct;
+  const rawTotalDiscountPct = rawCouponPct + rawLoyaltyPct;
 
-  const loyaltyDiscount = loyaltyPct > 0 ? (subtotal * loyaltyPct) / 100 : 0;
+  // Apply global discount cap (proportional reduction if over cap)
+  let effectiveCouponPct = rawCouponPct;
+  let effectiveLoyaltyPct = rawLoyaltyPct;
+  const discountCapped = rawTotalDiscountPct > maxTotalDiscountPct;
+  if (discountCapped && rawTotalDiscountPct > 0) {
+    const ratio = maxTotalDiscountPct / rawTotalDiscountPct;
+    effectiveCouponPct = rawCouponPct * ratio;
+    effectiveLoyaltyPct = rawLoyaltyPct * ratio;
+  }
+
+  const couponDiscount = subtotal * effectiveCouponPct / 100;
+  const loyaltyDiscount = subtotal * effectiveLoyaltyPct / 100;
   const discountAmount = couponDiscount + loyaltyDiscount;
-  const pointsDiscount = usePoints ? Math.min(pointsToUse, pointsBalance) / pointsPerDollar : 0;
+
+  // Points discount capped separately
+  const maxPointsValue = subtotal * maxPointsDiscountPct / 100;
+  const rawPointsDiscount = usePoints ? Math.min(pointsToUse, pointsBalance) / pointsPerDollar : 0;
+  const pointsDiscount = Math.min(rawPointsDiscount, maxPointsValue);
 
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
@@ -1289,6 +1319,15 @@ export default function CheckoutPage() {
                         <span className="text-sm font-bold text-primary w-24 text-right">{pointsToUse} pts (${(pointsToUse / pointsPerDollar).toFixed(2)})</span>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Discount cap notice */}
+                {discountCapped && (
+                  <div className="border-t border-border pt-3">
+                    <p className="text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1.5 rounded">
+                      ⚠️ Le cumul des réductions a été plafonné à {maxTotalDiscountPct}% du sous-total.
+                    </p>
                   </div>
                 )}
 

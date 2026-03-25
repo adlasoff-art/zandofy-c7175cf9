@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator, Crown } from "lucide-react";
+import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator, Crown, Shield } from "lucide-react";
 import { MonetizationSettings } from "@/components/admin/MonetizationSettings";
 import { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
@@ -20,6 +20,12 @@ interface ReferralConfig {
   gift_card_enabled: boolean;
   points_expiry_months: number;
   points_per_dollar: number;
+  affiliate_bonus_enabled: boolean;
+}
+
+interface DiscountCapConfig {
+  max_total_discount_pct: number;
+  max_points_discount_pct: number;
 }
 
 interface MaintenanceConfig {
@@ -46,7 +52,8 @@ interface BulkTierConfig {
 export default function AdminSettingsPage() {
   const [trackingProvider, setTrackingProvider] = useState("17track");
   const [freeShipping, setFreeShipping] = useState<FreeShippingConfig>({ enabled: true, amount: 49, currency: "USD" });
-  const [referral, setReferral] = useState<ReferralConfig>({ enabled: true, commission_pct: 3, max_rewarded_orders: 3, welcome_discount_pct: 5, gift_card_enabled: true, points_expiry_months: 6, points_per_dollar: 100 });
+  const [referral, setReferral] = useState<ReferralConfig>({ enabled: true, commission_pct: 3, max_rewarded_orders: 3, welcome_discount_pct: 5, gift_card_enabled: true, points_expiry_months: 6, points_per_dollar: 100, affiliate_bonus_enabled: false });
+  const [discountCap, setDiscountCap] = useState<DiscountCapConfig>({ max_total_discount_pct: 20, max_points_discount_pct: 10 });
   const [maintenance, setMaintenance] = useState<MaintenanceConfig>({
     enabled: false,
     title: "Maintenance en cours",
@@ -70,7 +77,7 @@ export default function AdminSettingsPage() {
     supabase
       .from("platform_settings")
       .select("key, value")
-      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers"])
+      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings"])
       .then(({ data }) => {
         data?.forEach((row) => {
           const v = row.value as any;
@@ -85,6 +92,12 @@ export default function AdminSettingsPage() {
               gift_card_enabled: !!v.gift_card_enabled,
               points_expiry_months: Number(v.points_expiry_months) || 12,
               points_per_dollar: Number(v.points_per_dollar) || 50,
+              affiliate_bonus_enabled: !!v.affiliate_bonus_enabled,
+            });
+          } else if (row.key === "max_discount_settings") {
+            setDiscountCap({
+              max_total_discount_pct: Number(v.max_total_discount_pct) || 20,
+              max_points_discount_pct: Number(v.max_points_discount_pct) || 10,
             });
           } else if (row.key === "maintenance_mode") {
             setMaintenance({
@@ -154,7 +167,11 @@ export default function AdminSettingsPage() {
       .from("platform_settings")
       .upsert({ key: "bulk_discount_tiers", value: { tiers: bulkTiers } as any, updated_at: now }, { onConflict: "key" });
 
-    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7;
+    const { error: e8 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "max_discount_settings", value: discountCap as any, updated_at: now }, { onConflict: "key" });
+
+    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8;
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
@@ -426,6 +443,48 @@ export default function AdminSettingsPage() {
           </div>
         </section>
 
+        {/* Discount Caps - Financial Protection */}
+        <section className="bg-card border-2 border-primary/30 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Shield size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Plafond de réductions (protection marge)</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Limite le cumul des réductions (fidélité + coupon + volume) pour protéger la marge de l'entreprise. Le plafond s'applique au checkout.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Plafond global réductions (%)</label>
+              <input
+                type="number"
+                min={5}
+                max={50}
+                step={1}
+                value={discountCap.max_total_discount_pct}
+                onChange={(e) => setDiscountCap(prev => ({ ...prev, max_total_discount_pct: Number(e.target.value) || 20 }))}
+                className={inputClass}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Cumul max fidélité + coupon + volume</p>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Plafond points (%)</label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                step={1}
+                value={discountCap.max_points_discount_pct}
+                onChange={(e) => setDiscountCap(prev => ({ ...prev, max_points_discount_pct: Number(e.target.value) || 10 }))}
+                className={inputClass}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">% max du sous-total payable en points</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-3 bg-muted/50 p-2 rounded">
+            💡 Avec un plafond à {discountCap.max_total_discount_pct}% et des points à {discountCap.max_points_discount_pct}%, la marge nette minimum est d'environ {Math.max(0, 34.3 - discountCap.max_total_discount_pct - discountCap.max_points_discount_pct).toFixed(1)}% du prix de vente.
+          </p>
+        </section>
+
         {/* Referral Settings */}
         <section className="bg-card border border-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
@@ -473,6 +532,13 @@ export default function AdminSettingsPage() {
                   <p className="text-[10px] text-muted-foreground mt-1">
                     {referral.points_per_dollar} ZandoPoints = $1 USD · Exemple : 500 pts = ${(500 / referral.points_per_dollar).toFixed(2)}
                   </p>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg mt-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Bonus points paliers d'affiliation</p>
+                    <p className="text-xs text-muted-foreground">Créditer automatiquement les bonus quand un affilié atteint un nouveau palier</p>
+                  </div>
+                  <Switch checked={referral.affiliate_bonus_enabled} onCheckedChange={(checked) => setReferral(prev => ({ ...prev, affiliate_bonus_enabled: checked }))} />
                 </div>
               </>
             )}

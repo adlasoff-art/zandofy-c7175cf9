@@ -19,19 +19,25 @@ export function AffiliateDashboard() {
   const [currentTier, setCurrentTier] = useState<string | null>(null);
   const [referralCount, setReferralCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [bonusEnabled, setBonusEnabled] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     async function load() {
       setLoading(true);
-      const [tiersRes, profileRes, referralsRes] = await Promise.all([
+      const [tiersRes, profileRes, referralsRes, settingsRes] = await Promise.all([
         supabase.from("affiliate_tiers").select("*").order("min_referrals"),
         supabase.from("profiles").select("affiliate_tier").eq("id", user!.id).single(),
         supabase.from("referrals").select("id", { count: "exact", head: true }).eq("referrer_id", user!.id),
+        supabase.from("platform_settings").select("value").eq("key", "referral_settings").maybeSingle(),
       ]);
       setTiers((tiersRes.data || []) as AffiliateTier[]);
       setCurrentTier(profileRes.data?.affiliate_tier || null);
       setReferralCount(referralsRes.count || 0);
+      if (settingsRes.data?.value) {
+        const v = settingsRes.data.value as any;
+        setBonusEnabled(!!v.affiliate_bonus_enabled);
+      }
       setLoading(false);
     }
     load();
@@ -117,7 +123,7 @@ export function AffiliateDashboard() {
                       <p className="text-sm font-bold text-foreground">{tier.badge_label}</p>
                       <p className="text-[10px] text-muted-foreground">
                         {tier.min_referrals} filleuls min · {tier.commission_pct}% commission
-                        {tier.bonus_points > 0 && ` · +${tier.bonus_points} bonus pts`}
+                        {bonusEnabled && tier.bonus_points > 0 && ` · +${tier.bonus_points} bonus pts`}
                       </p>
                     </div>
                   </div>
