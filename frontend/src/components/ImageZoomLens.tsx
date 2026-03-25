@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, memo } from "react";
 
 interface ImageZoomLensProps {
   src: string;
+  zoomSrc?: string;
   alt: string;
   className?: string;
   zoomFactor?: number;
