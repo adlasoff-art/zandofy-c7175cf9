@@ -30,6 +30,9 @@ export function BrandLogo({ variant = "header", className = "" }: BrandLogoProps
     return (
       <Link to="/" className={`flex items-center gap-2 shrink-0 ${className}`}>
         <img src={logoUrl} alt="Zandofy" className={imgClass} />
+        <span className={textStyle} style={{ fontFamily: "'Outfit', sans-serif", fontWeight: variant === "header" ? 700 : 400 }}>
+          Zandofy
+        </span>
       </Link>
     );
   }
