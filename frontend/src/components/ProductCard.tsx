@@ -1,5 +1,5 @@
 import { Heart, ShoppingCart, Plus, Star, Trophy, Check, Award, GitCompareArrows } from "lucide-react";
-import { useState, useCallback, useRef, memo } from "react";
+import { useState, useCallback, useRef, memo, useMemo } from "react";
 import { useLazyImage } from "@/hooks/use-lazy-image";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,6 +7,7 @@ import { useWishlist } from "@/contexts/WishlistContext";
 import { useCompare } from "@/contexts/CompareContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { IMAGE_PRESETS } from "@/utils/imageOptimizer";
 import type { Product } from "@/services/api";
 
 interface ProductCardProps {
