@@ -479,7 +479,20 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     setDeleting(null);
   };
 
-  
+  const handleUnpublish = async (productId: string) => {
+    const { error } = await supabase
+      .from("products")
+      .update({ publish_status: "draft" } as any)
+      .eq("id", productId);
+    if (error) {
+      toast.error("Erreur lors de la dépublication");
+    } else {
+      toast.success("Produit dépublié");
+      loadProducts();
+    }
+  };
+
+
 
   if (showForm) {
     return (
