@@ -533,6 +533,13 @@ export default function AdminSettingsPage() {
                     {referral.points_per_dollar} ZandoPoints = $1 USD · Exemple : 500 pts = ${(500 / referral.points_per_dollar).toFixed(2)}
                   </p>
                 </div>
+                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg mt-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Bonus points paliers d'affiliation</p>
+                    <p className="text-xs text-muted-foreground">Créditer automatiquement les bonus quand un affilié atteint un nouveau palier</p>
+                  </div>
+                  <Switch checked={referral.affiliate_bonus_enabled} onCheckedChange={(checked) => setReferral(prev => ({ ...prev, affiliate_bonus_enabled: checked }))} />
+                </div>
               </>
             )}
           </div>
