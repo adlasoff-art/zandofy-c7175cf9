@@ -22,7 +22,7 @@ Deno.serve(async () => {
     // Fetch published products
     const { data: products } = await supabase
       .from("products")
-      .select("id, updated_at")
+      .select("id, slug, updated_at")
       .eq("publish_status", "published")
       .order("updated_at", { ascending: false })
       .limit(5000);
