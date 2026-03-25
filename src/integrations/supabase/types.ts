@@ -3483,6 +3483,41 @@ export type Database = {
           },
         ]
       }
+      store_quick_replies: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          sort_order: number
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_quick_replies_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_reviews: {
         Row: {
           comment: string | null
