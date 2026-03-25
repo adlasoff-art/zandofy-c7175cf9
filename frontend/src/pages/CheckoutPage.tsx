@@ -134,6 +134,10 @@ export default function CheckoutPage() {
   const [pointsToUse, setPointsToUse] = useState(0);
   const [pointsPerDollar, setPointsPerDollar] = useState(50);
 
+  // Discount caps
+  const [maxTotalDiscountPct, setMaxTotalDiscountPct] = useState(20);
+  const [maxPointsDiscountPct, setMaxPointsDiscountPct] = useState(10);
+
   useEffect(() => {
     if (!user) return;
     // Fetch loyalty tier
