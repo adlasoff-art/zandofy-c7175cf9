@@ -5,12 +5,17 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { KycStatusBadge } from "@/components/kyc/KycStatusBadge";
 import type { KycStatus } from "@/hooks/use-kyc";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
   ShieldCheck, Search, Eye, CheckCircle, XCircle, RotateCcw,
   Loader2, ChevronLeft, FileImage, User, MapPin, Clock, Save,
+  AlertTriangle, Link as LinkIcon,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -34,7 +39,8 @@ interface KycRow {
   reviewed_at: string | null;
   created_at: string;
   updated_at: string;
-  profiles?: { first_name: string | null; last_name: string | null; email: string | null } | null;
+  // Fetched separately
+  profile?: { first_name: string | null; last_name: string | null; email: string | null } | null;
 }
 
 interface AuditLog {
@@ -55,6 +61,19 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 
 const STATUS_FILTERS = ["all", "pending", "approved", "rejected", "resubmission_required"] as const;
 
+const KYC_REJECTION_REASONS = [
+  { id: "blurry_doc", label: "Document illisible", description: "Le document est flou, coupé ou de mauvaise qualité." },
+  { id: "blurry_selfie", label: "Selfie non conforme", description: "Le selfie est flou, le visage ou le document n'est pas clairement visible." },
+  { id: "mismatch", label: "Informations incohérentes", description: "Les informations du document ne correspondent pas au profil." },
+  { id: "expired_doc", label: "Document expiré", description: "Le document d'identité présenté est expiré." },
+  { id: "wrong_doc_type", label: "Type de document non accepté", description: "Le type de document fourni n'est pas accepté pour la vérification." },
+  { id: "incomplete", label: "Dossier incomplet", description: "Des éléments requis sont manquants (verso, selfie, adresse)." },
+  { id: "fraud_suspicion", label: "Suspicion de fraude", description: "Le document semble altéré ou ne pas être authentique." },
+  { id: "other", label: "Autre raison", description: "Raison personnalisée à préciser ci-dessous." },
+] as const;
+
+type KycReasonId = typeof KYC_REJECTION_REASONS[number]["id"];
+
 export default function AdminKycPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -65,8 +84,6 @@ export default function AdminKycPage() {
   const [selected, setSelected] = useState<KycRow | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [adminNotes, setAdminNotes] = useState("");
 
   const [kycActivationOrders, setKycActivationOrders] = useState(2);
   const [kycOrderLimit, setKycOrderLimit] = useState(10);
@@ -78,17 +95,50 @@ export default function AdminKycPage() {
   const [backUrl, setBackUrl] = useState("");
   const [selfieUrl, setSelfieUrl] = useState("");
 
+  // Rejection/revision dialog state
+  const [actionDialogOpen, setActionDialogOpen] = useState(false);
+  const [actionType, setActionType] = useState<"rejected" | "resubmission_required">("rejected");
+  const [selectedReason, setSelectedReason] = useState<KycReasonId | null>(null);
+  const [customReason, setCustomReason] = useState("");
+  const [policyLink, setPolicyLink] = useState("");
+  const [adminNotes, setAdminNotes] = useState("");
+
   const fetchRows = useCallback(async () => {
     setLoading(true);
     let query = (supabase as any)
       .from("kyc_verifications")
-      .select("*, profiles(first_name, last_name, email)")
+      .select("*")
       .order("created_at", { ascending: false });
     if (filter !== "all") {
       query = query.eq("status", filter);
     }
-    const { data } = await query;
-    setRows((data as KycRow[]) || []);
+    const { data, error } = await query;
+    if (error) {
+      console.error("KYC fetch error:", error);
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+    const kycRows = (data as KycRow[]) || [];
+
+    // Fetch profiles separately for all user_ids
+    if (kycRows.length > 0) {
+      const userIds = [...new Set(kycRows.map(r => r.user_id))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email")
+        .in("id", userIds);
+      
+      const profileMap = new Map(
+        (profiles || []).map(p => [p.id, { first_name: p.first_name, last_name: p.last_name, email: p.email }])
+      );
+      
+      kycRows.forEach(r => {
+        r.profile = profileMap.get(r.user_id) || null;
+      });
+    }
+
+    setRows(kycRows);
     setLoading(false);
   }, [filter]);
 
@@ -127,7 +177,6 @@ export default function AdminKycPage() {
 
   const openDetail = async (row: KycRow) => {
     setSelected(row);
-    setRejectionReason(row.rejection_reason || "");
     setAdminNotes(row.admin_notes || "");
 
     const { data } = await (supabase as any)
@@ -139,7 +188,8 @@ export default function AdminKycPage() {
   };
 
   const getSignedUrl = async (path: string) => {
-    const { data } = await supabase.storage.from("kyc-documents").createSignedUrl(path, 300);
+    if (!path) return "";
+    const { data } = await supabase.storage.from("kyc-documents").createSignedUrl(path, 3600);
     return data?.signedUrl || "";
   };
 
@@ -153,21 +203,41 @@ export default function AdminKycPage() {
     })();
   }, [selected]);
 
+  const openActionDialog = (type: "rejected" | "resubmission_required") => {
+    setActionType(type);
+    setSelectedReason(null);
+    setCustomReason("");
+    setPolicyLink("");
+    setActionDialogOpen(true);
+  };
+
+  const buildReasonText = () => {
+    if (!selectedReason) return "";
+    if (selectedReason === "other") return customReason.trim();
+    const reasonObj = KYC_REJECTION_REASONS.find(r => r.id === selectedReason);
+    const base = reasonObj ? `${reasonObj.label} — ${reasonObj.description}` : "";
+    return customReason.trim() ? `${base}\n\n${customReason.trim()}` : base;
+  };
+
   const handleAction = async (newStatus: KycStatus) => {
     if (!selected || !user) return;
-    if ((newStatus === "rejected" || newStatus === "resubmission_required") && !rejectionReason.trim()) {
-      toast({ title: "Raison requise", description: "Veuillez indiquer la raison du rejet.", variant: "destructive" });
-      return;
-    }
     setActionLoading(true);
     try {
+      const rejectionReason = (newStatus === "rejected" || newStatus === "resubmission_required")
+        ? buildReasonText()
+        : null;
+
+      const fullReason = rejectionReason && policyLink.trim()
+        ? `${rejectionReason}\n\n📎 Règlement : ${policyLink.trim()}`
+        : rejectionReason;
+
       const { error } = await (supabase as any)
         .from("kyc_verifications")
         .update({
           status: newStatus,
           reviewed_by: user.id,
           reviewed_at: new Date().toISOString(),
-          rejection_reason: newStatus === "rejected" || newStatus === "resubmission_required" ? rejectionReason : null,
+          rejection_reason: fullReason || null,
           admin_notes: adminNotes || null,
         })
         .eq("id", selected.id);
@@ -179,11 +249,12 @@ export default function AdminKycPage() {
         performed_by: user.id,
         old_status: selected.status,
         new_status: newStatus,
-        notes: adminNotes || rejectionReason || null,
+        notes: adminNotes || fullReason || null,
       });
 
-      toast({ title: "Statut mis à jour", description: `KYC → ${newStatus}` });
+      toast({ title: "Statut mis à jour", description: `KYC → ${newStatus === "approved" ? "Approuvé" : newStatus === "rejected" ? "Refusé" : "Révision demandée"}` });
       setSelected(null);
+      setActionDialogOpen(false);
       fetchRows();
     } catch (err: any) {
       toast({ title: "Erreur", description: err.message, variant: "destructive" });
@@ -195,11 +266,14 @@ export default function AdminKycPage() {
   const filtered = rows.filter(r => {
     if (!search) return true;
     const s = search.toLowerCase();
-    const name = `${r.profiles?.first_name || ""} ${r.profiles?.last_name || ""}`.toLowerCase();
-    const email = (r.profiles?.email || "").toLowerCase();
+    const name = `${r.profile?.first_name || ""} ${r.profile?.last_name || ""}`.toLowerCase();
+    const email = (r.profile?.email || "").toLowerCase();
     return name.includes(s) || email.includes(s) || r.id.includes(s);
   });
 
+  const canSubmitAction = selectedReason && (selectedReason === "other" ? customReason.trim().length > 0 : true);
+
+  // ── Detail view ──
   if (selected) {
     return (
       <AdminLayout title="Détail KYC">
@@ -209,19 +283,21 @@ export default function AdminKycPage() {
 
         <div className="grid lg:grid-cols-2 gap-6">
           <div className="space-y-6">
+            {/* User info */}
             <div className="bg-card rounded-lg p-5 border border-border space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-foreground flex items-center gap-2"><User size={16} /> Utilisateur</h3>
                 <KycStatusBadge status={selected.status} />
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><span className="text-muted-foreground">Nom</span><p className="font-medium text-foreground">{selected.profiles?.first_name} {selected.profiles?.last_name}</p></div>
-                <div><span className="text-muted-foreground">Email</span><p className="font-medium text-foreground">{selected.profiles?.email}</p></div>
+                <div><span className="text-muted-foreground">Nom</span><p className="font-medium text-foreground">{selected.profile?.first_name} {selected.profile?.last_name}</p></div>
+                <div><span className="text-muted-foreground">Email</span><p className="font-medium text-foreground">{selected.profile?.email}</p></div>
                 <div><span className="text-muted-foreground">Document</span><p className="font-medium text-foreground">{DOC_TYPE_LABELS[selected.document_type] || selected.document_type}</p></div>
                 <div><span className="text-muted-foreground">Soumis le</span><p className="font-medium text-foreground">{format(new Date(selected.created_at), "dd MMM yyyy HH:mm", { locale: fr })}</p></div>
               </div>
             </div>
 
+            {/* Address */}
             <div className="bg-card rounded-lg p-5 border border-border space-y-3">
               <h3 className="font-bold text-foreground flex items-center gap-2"><MapPin size={16} /> Adresse déclarée</h3>
               <div className="text-sm space-y-1 text-foreground">
@@ -232,51 +308,66 @@ export default function AdminKycPage() {
               </div>
             </div>
 
+            {/* Documents */}
             <div className="bg-card rounded-lg p-5 border border-border space-y-4">
               <h3 className="font-bold text-foreground flex items-center gap-2"><FileImage size={16} /> Documents</h3>
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Recto</p>
-                  {frontUrl && <img src={frontUrl} alt="Recto" className="w-full max-h-64 object-contain rounded-lg border border-border bg-muted" />}
+                  {frontUrl ? (
+                    <a href={frontUrl} target="_blank" rel="noopener noreferrer">
+                      <img src={frontUrl} alt="Recto" className="w-full max-h-64 object-contain rounded-lg border border-border bg-muted cursor-pointer hover:opacity-90 transition-opacity" />
+                    </a>
+                  ) : (
+                    <div className="h-32 flex items-center justify-center bg-muted rounded-lg border border-border">
+                      <Loader2 size={20} className="animate-spin text-muted-foreground" />
+                    </div>
+                  )}
                 </div>
-                {backUrl && (
+                {selected.document_back_url && (
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Verso</p>
-                    <img src={backUrl} alt="Verso" className="w-full max-h-64 object-contain rounded-lg border border-border bg-muted" />
+                    {backUrl ? (
+                      <a href={backUrl} target="_blank" rel="noopener noreferrer">
+                        <img src={backUrl} alt="Verso" className="w-full max-h-64 object-contain rounded-lg border border-border bg-muted cursor-pointer hover:opacity-90 transition-opacity" />
+                      </a>
+                    ) : (
+                      <div className="h-32 flex items-center justify-center bg-muted rounded-lg border border-border">
+                        <Loader2 size={20} className="animate-spin text-muted-foreground" />
+                      </div>
+                    )}
                   </div>
                 )}
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Selfie avec document</p>
-                  {selfieUrl && <img src={selfieUrl} alt="Selfie" className="w-full max-h-64 object-contain rounded-lg border border-border bg-muted" />}
+                  {selfieUrl ? (
+                    <a href={selfieUrl} target="_blank" rel="noopener noreferrer">
+                      <img src={selfieUrl} alt="Selfie" className="w-full max-h-64 object-contain rounded-lg border border-border bg-muted cursor-pointer hover:opacity-90 transition-opacity" />
+                    </a>
+                  ) : (
+                    <div className="h-32 flex items-center justify-center bg-muted rounded-lg border border-border">
+                      <Loader2 size={20} className="animate-spin text-muted-foreground" />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
           <div className="space-y-6">
+            {/* Actions */}
             {selected.status === "pending" || selected.status === "resubmission_required" ? (
               <div className="bg-card rounded-lg p-5 border border-border space-y-4">
-                <h3 className="font-bold text-foreground">Actions</h3>
+                <h3 className="font-bold text-foreground">Actions de vérification</h3>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Notes admin</Label>
-                  <textarea
+                  <Label className="text-xs">Notes admin (internes)</Label>
+                  <Textarea
                     value={adminNotes}
                     onChange={e => setAdminNotes(e.target.value)}
                     rows={2}
-                    className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md text-foreground resize-none"
-                    placeholder="Notes internes..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs">Raison du rejet (si applicable)</Label>
-                  <textarea
-                    value={rejectionReason}
-                    onChange={e => setRejectionReason(e.target.value)}
-                    rows={2}
-                    className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md text-foreground resize-none"
-                    placeholder="Document illisible, selfie flou..."
+                    placeholder="Notes internes visibles uniquement par l'équipe..."
+                    className="text-sm"
                   />
                 </div>
 
@@ -284,11 +375,11 @@ export default function AdminKycPage() {
                   <Button className="flex-1" onClick={() => handleAction("approved")} disabled={actionLoading}>
                     <CheckCircle size={16} className="mr-1" /> Approuver
                   </Button>
-                  <Button variant="destructive" className="flex-1" onClick={() => handleAction("rejected")} disabled={actionLoading}>
+                  <Button variant="destructive" className="flex-1" onClick={() => openActionDialog("rejected")} disabled={actionLoading}>
                     <XCircle size={16} className="mr-1" /> Refuser
                   </Button>
-                  <Button variant="outline" className="flex-1" onClick={() => handleAction("resubmission_required")} disabled={actionLoading}>
-                    <RotateCcw size={16} className="mr-1" /> Resoumettre
+                  <Button variant="outline" className="flex-1 text-orange-600 border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20" onClick={() => openActionDialog("resubmission_required")} disabled={actionLoading}>
+                    <RotateCcw size={16} className="mr-1" /> Révision
                   </Button>
                 </div>
               </div>
@@ -297,7 +388,16 @@ export default function AdminKycPage() {
                 <h3 className="font-bold text-foreground">Statut actuel</h3>
                 <KycStatusBadge status={selected.status} />
                 {selected.rejection_reason && (
-                  <div className="text-sm"><span className="text-muted-foreground">Raison : </span><span className="text-foreground">{selected.rejection_reason}</span></div>
+                  <div className="text-sm space-y-1">
+                    <span className="text-muted-foreground">Raison :</span>
+                    <p className="text-foreground whitespace-pre-wrap">{selected.rejection_reason}</p>
+                  </div>
+                )}
+                {selected.admin_notes && (
+                  <div className="text-sm space-y-1">
+                    <span className="text-muted-foreground">Notes admin :</span>
+                    <p className="text-foreground">{selected.admin_notes}</p>
+                  </div>
                 )}
                 {selected.reviewed_at && (
                   <div className="text-sm text-muted-foreground">
@@ -307,6 +407,7 @@ export default function AdminKycPage() {
               </div>
             )}
 
+            {/* Audit logs */}
             <div className="bg-card rounded-lg p-5 border border-border space-y-3">
               <h3 className="font-bold text-foreground flex items-center gap-2"><Clock size={16} /> Historique</h3>
               {auditLogs.length === 0 ? (
@@ -327,10 +428,109 @@ export default function AdminKycPage() {
             </div>
           </div>
         </div>
+
+        {/* Rejection / Revision Dialog */}
+        <Dialog open={actionDialogOpen} onOpenChange={setActionDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {actionType === "rejected" ? (
+                  <><XCircle size={16} className="text-destructive" /> Refuser la vérification KYC</>
+                ) : (
+                  <><RotateCcw size={16} className="text-orange-500" /> Renvoyer pour révision</>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Client : <strong className="text-foreground">{selected?.profile?.first_name} {selected?.profile?.last_name}</strong>
+              </p>
+
+              {/* Predefined reasons */}
+              <div>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground mb-2 block">
+                  Raison {actionType === "rejected" ? "du refus" : "de la révision"}
+                </Label>
+                <div className="grid gap-1.5 max-h-48 overflow-y-auto">
+                  {KYC_REJECTION_REASONS.map((reason) => (
+                    <button
+                      key={reason.id}
+                      onClick={() => setSelectedReason(reason.id)}
+                      className={`text-left px-3 py-2 rounded-md border text-sm transition-colors ${
+                        selectedReason === reason.id
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "border-border hover:bg-muted/50"
+                      }`}
+                    >
+                      <span className="font-medium text-foreground">{reason.label}</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">{reason.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom details */}
+              <div>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground mb-1.5 block">
+                  {selectedReason === "other" ? "Raison personnalisée *" : "Détails supplémentaires (optionnel)"}
+                </Label>
+                <Textarea
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  placeholder={selectedReason === "other" ? "Décrivez la raison..." : "Ajoutez des précisions pour le client..."}
+                  rows={3}
+                  className="text-sm"
+                />
+              </div>
+
+              {/* Policy link */}
+              <div>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-1">
+                  <LinkIcon size={12} />
+                  Lien vers le règlement KYC (optionnel)
+                </Label>
+                <Input
+                  type="url"
+                  value={policyLink}
+                  onChange={(e) => setPolicyLink(e.target.value)}
+                  placeholder="https://zandofy.com/reglements/kyc"
+                  className="text-sm"
+                />
+              </div>
+
+              {/* Warning */}
+              <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-2.5">
+                <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  {actionType === "rejected"
+                    ? "Le client sera notifié du refus avec la raison indiquée. Il devra resoumettre une nouvelle vérification."
+                    : "Le client sera invité à corriger sa soumission et à la resoumettre pour vérification."
+                  }
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setActionDialogOpen(false)} disabled={actionLoading}>
+                Annuler
+              </Button>
+              <Button
+                variant={actionType === "rejected" ? "destructive" : "default"}
+                onClick={() => handleAction(actionType)}
+                disabled={!canSubmitAction || actionLoading}
+                className={actionType !== "rejected" ? "bg-orange-500 hover:bg-orange-600 text-white" : ""}
+              >
+                {actionLoading ? "..." : actionType === "rejected" ? "Confirmer le refus" : "Renvoyer pour révision"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </AdminLayout>
     );
   }
 
+  // ── List view ──
   return (
     <AdminLayout title="Vérification KYC">
       <div className="space-y-6">
@@ -418,8 +618,8 @@ export default function AdminKycPage() {
                     <tr key={row.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3">
                         <div>
-                          <p className="font-medium text-foreground">{row.profiles?.first_name} {row.profiles?.last_name}</p>
-                          <p className="text-xs text-muted-foreground">{row.profiles?.email}</p>
+                          <p className="font-medium text-foreground">{row.profile?.first_name} {row.profile?.last_name}</p>
+                          <p className="text-xs text-muted-foreground">{row.profile?.email}</p>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-foreground">{DOC_TYPE_LABELS[row.document_type] || row.document_type}</td>
