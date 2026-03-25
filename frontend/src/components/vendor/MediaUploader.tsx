@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ImageIcon, Plus, X, Loader2, Video, Play } from "lucide-react";
 import { toast } from "sonner";
-import { compressImageForUpload } from "@/utils/imageOptimizer";
 
 interface MediaItem {
   id?: string;
@@ -32,19 +31,9 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
 
     const newItems: MediaItem[] = [];
     for (let i = 0; i < files.length; i++) {
-      let file = files[i];
+      const file = files[i];
       const isVideo = file.type.startsWith("video/");
-
-      // Compress images before upload for better quality/size ratio
-      if (!isVideo) {
-        try {
-          file = await compressImageForUpload(file, { maxWidth: 1600, maxHeight: 2000, quality: 0.88 });
-        } catch {
-          // If compression fails, upload original
-        }
-      }
-
-      const ext = file.name.split(".").pop() || (isVideo ? "mp4" : "webp");
+      const ext = file.name.split(".").pop();
       const path = `${storeId}/${Date.now()}-${i}.${ext}`;
 
       const { error } = await supabase.storage.from("product-media").upload(path, file);

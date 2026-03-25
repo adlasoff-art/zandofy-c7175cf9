@@ -1,5 +1,5 @@
 import { Heart, ShoppingCart, Plus, Star, Trophy, Check, Award, GitCompareArrows } from "lucide-react";
-import { useState, useCallback, useRef, memo, useMemo } from "react";
+import { useState, useCallback, useRef, memo } from "react";
 import { useLazyImage } from "@/hooks/use-lazy-image";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,7 +7,6 @@ import { useWishlist } from "@/contexts/WishlistContext";
 import { useCompare } from "@/contexts/CompareContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { VerificationBadge } from "@/components/VerificationBadge";
-import { IMAGE_PRESETS } from "@/utils/imageOptimizer";
 import type { Product } from "@/services/api";
 
 interface ProductCardProps {
@@ -34,11 +33,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
   const secondImage = galleryImages && galleryImages.length > 1
     ? galleryImages.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))[1]?.image_url
     : null;
-
-  // Optimized image URLs for card display
-  const optimizedMainImage = useMemo(() => IMAGE_PRESETS.cardThumbnail(product.image), [product.image]);
-  const optimizedSecondImage = useMemo(() => secondImage ? IMAGE_PRESETS.cardThumbnail(secondImage) : null, [secondImage]);
-  const displayImage = hovered && optimizedSecondImage ? optimizedSecondImage : (imgError ? "/placeholder.svg" : optimizedMainImage);
+  const displayImage = hovered && secondImage ? secondImage : (imgError ? "/placeholder.svg" : product.image);
 
   const handleAddToCart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -91,18 +86,18 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
         {inView && (
           <>
             <img
-              src={imgError ? "/placeholder.svg" : optimizedMainImage}
+              src={imgError ? "/placeholder.svg" : product.image}
               alt={product.nameFr}
               className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
                 loaded ? "opacity-100" : "opacity-0"
-              } ${hovered && optimizedSecondImage ? "opacity-0 scale-105" : ""}`}
+              } ${hovered && secondImage ? "opacity-0 scale-105" : ""}`}
               loading="lazy"
               onLoad={onLoad}
               onError={handleImgError}
             />
-            {optimizedSecondImage && (
+            {secondImage && (
               <img
-                src={optimizedSecondImage}
+                src={secondImage}
                 alt={product.nameFr}
                 className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
                   hovered ? "opacity-100 scale-100" : "opacity-0 scale-95"

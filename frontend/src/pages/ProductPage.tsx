@@ -1,6 +1,5 @@
 import { useState, useMemo, useRef, useEffect, lazy, Suspense } from "react";
 import { ImageZoomLens } from "@/components/ImageZoomLens";
-import { IMAGE_PRESETS } from "@/utils/imageOptimizer";
 import { useI18n } from "@/contexts/I18nContext";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -278,7 +277,7 @@ export default function ProductPage() {
                         <Camera size={14} className="text-muted-foreground" />
                       </div>
                     ) : (
-                      <img src={IMAGE_PRESETS.galleryThumb(item.url)} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={item.url} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" />
                     )}
                   </button>
                 ))}
@@ -296,8 +295,7 @@ export default function ProductPage() {
                   />
                 ) : (
                   <ImageZoomLens
-                    src={IMAGE_PRESETS.detailMain(gallery[selectedImage]?.url || "")}
-                    zoomSrc={IMAGE_PRESETS.detailZoom(gallery[selectedImage]?.url || "")}
+                    src={gallery[selectedImage]?.url || ""}
                     alt={product.nameFr}
                     className="w-full h-full"
                     zoomFactor={2.5}
@@ -342,7 +340,7 @@ export default function ProductPage() {
                             <Camera size={12} className="text-muted-foreground" />
                           </div>
                         ) : (
-                          <img src={IMAGE_PRESETS.galleryThumb(item.url)} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" />
+                          <img src={item.url} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" />
                         )}
                       </button>
                     ))}
