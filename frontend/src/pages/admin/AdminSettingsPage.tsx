@@ -167,7 +167,11 @@ export default function AdminSettingsPage() {
       .from("platform_settings")
       .upsert({ key: "bulk_discount_tiers", value: { tiers: bulkTiers } as any, updated_at: now }, { onConflict: "key" });
 
-    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7;
+    const { error: e8 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "max_discount_settings", value: discountCap as any, updated_at: now }, { onConflict: "key" });
+
+    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8;
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
