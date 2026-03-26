@@ -568,7 +568,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
             <CountryCombobox value={form.origin_country} onChange={(v) => setForm({ ...form, origin_country: v })} />
           </div>
           <div>
-            <Field label="Taille du mannequin (ex: M, XL, 42)" value={form.model_size} onChange={(v) => setForm({ ...form, model_size: v })} placeholder="M" />
+            <Field label="Taille du mannequin (ex: M, XL, 42)" value={form.model_size} onChange={(v) => setForm({ ...form, model_size: v })} />
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Catégorie</label>
