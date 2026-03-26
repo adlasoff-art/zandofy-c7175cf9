@@ -316,6 +316,44 @@ export async function fetchProductBySlug(
 
   const product = mapProduct(data);
   product.store = data.stores;
+
+  // Load dynamic variant selections with type info
+  try {
+    const { data: selections } = await (supabase as any)
+      .from("product_variant_selections")
+      .select("variant_type_id, variant_option_id")
+      .eq("product_id", data.id);
+
+    if (selections && selections.length > 0) {
+      const typeIds = [...new Set(selections.map((s: any) => s.variant_type_id))];
+      const optionIds = selections.map((s: any) => s.variant_option_id);
+
+      const [typesRes, optionsRes] = await Promise.all([
+        (supabase as any).from("variant_types").select("id, name, unit, icon").in("id", typeIds),
+        (supabase as any).from("variant_type_options").select("id, variant_type_id, label, sort_order").in("id", optionIds).order("sort_order"),
+      ]);
+
+      const typesMap = new Map((typesRes.data || []).map((t: any) => [t.id, t]));
+      const dynamicVariants: any[] = [];
+
+      for (const typeId of typeIds) {
+        const type = typesMap.get(typeId);
+        if (!type) continue;
+        const typeOptions = (optionsRes.data || []).filter((o: any) => o.variant_type_id === typeId);
+        dynamicVariants.push({
+          typeId: type.id,
+          typeName: type.name,
+          unit: type.unit,
+          icon: type.icon,
+          options: typeOptions.map((o: any) => ({ id: o.id, label: o.label })),
+        });
+      }
+
+      (product as any).dynamicVariants = dynamicVariants;
+    }
+  } catch (e) {
+    // Silently fail - variants are optional
+  }
   
   if (data.category_id && data.store_id) {
     try {
