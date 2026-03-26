@@ -112,8 +112,30 @@ export default function AdminCategoriesPage() {
   });
 
   const openEdit = (cat: Category) => {
-    setForm({ mode: "edit", id: cat.id, name: cat.name, name_fr: cat.name_fr, icon: cat.icon || "", image_url: cat.image_url || "", display_mode: (cat as any).display_mode || "icon", parent_id: cat.parent_id || "" });
+    setForm({ mode: "edit", id: cat.id, name: cat.name, name_fr: cat.name_fr, icon: cat.icon || "", image_url: cat.image_url || "", display_mode: (cat as any).display_mode || "icon", parent_id: cat.parent_id || "", sort_order: cat.sort_order ?? 0 });
     setShowForm(true);
+  };
+
+  const moveMutation = useMutation({
+    mutationFn: async ({ id, newOrder }: { id: string; newOrder: number }) => {
+      const { error } = await supabase.from("categories").update({ sort_order: newOrder }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-categories"] }),
+  });
+
+  const moveCategory = (catId: string, siblings: Category[], direction: "up" | "down") => {
+    const idx = siblings.findIndex(c => c.id === catId);
+    if (idx < 0) return;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= siblings.length) return;
+    const currentOrder = siblings[idx].sort_order;
+    const swapOrder = siblings[swapIdx].sort_order;
+    // If they have the same sort_order, use index-based values
+    const newCurrent = swapOrder === currentOrder ? (direction === "up" ? currentOrder - 1 : currentOrder + 1) : swapOrder;
+    const newSwap = swapOrder === currentOrder ? currentOrder : currentOrder;
+    moveMutation.mutate({ id: siblings[idx].id, newOrder: newCurrent });
+    moveMutation.mutate({ id: siblings[swapIdx].id, newOrder: newSwap });
   };
 
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
