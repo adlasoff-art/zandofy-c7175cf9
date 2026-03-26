@@ -105,6 +105,7 @@ export function VariantOrderDrawer({
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
   const [variantQtys, setVariantQtys] = useState<Record<string, number>>({});
   const [subtotalExpanded, setSubtotalExpanded] = useState(false);
+  const [selectedDynamicOptions, setSelectedDynamicOptions] = useState<Record<string, string>>({});
 
   // Reset when drawer opens
   useEffect(() => {
