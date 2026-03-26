@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Plus, Edit2, Trash2, ChevronRight, Loader2, X, Save, Upload, Image } from "lucide-react";
+import { Plus, Edit2, Trash2, ChevronRight, ChevronUp, ChevronDown, Loader2, X, Save, Upload, Image, GripVertical } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ interface Category {
   icon: string | null;
   image_url: string | null;
   parent_id: string | null;
+  sort_order: number;
 }
 
 interface TreeNode extends Category {
@@ -29,6 +30,9 @@ function buildTree(cats: Category[]): TreeNode[] {
       roots.push(map[c.id]);
     }
   });
+  // Sort by sort_order
+  roots.sort((a, b) => a.sort_order - b.sort_order);
+  roots.forEach(r => r.children.sort((a, b) => a.sort_order - b.sort_order));
   return roots;
 }
 
