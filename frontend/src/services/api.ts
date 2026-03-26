@@ -337,7 +337,7 @@ export async function fetchProductBySlug(
       const dynamicVariants: any[] = [];
 
       for (const typeId of typeIds) {
-        const type = typesMap.get(typeId);
+        const type = typesMap.get(typeId) as any;
         if (!type) continue;
         const typeOptions = (optionsRes.data || []).filter((o: any) => o.variant_type_id === typeId);
         dynamicVariants.push({
