@@ -4487,6 +4487,10 @@ export type Database = {
         }
         Returns: Json
       }
+      can_access_store_orders: {
+        Args: { _store_id: string; _user_id: string }
+        Returns: boolean
+      }
       check_kyc_required: { Args: { p_user_id: string }; Returns: boolean }
       create_guest_support_ticket: {
         Args: {
