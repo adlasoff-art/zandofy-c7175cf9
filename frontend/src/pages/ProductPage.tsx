@@ -795,7 +795,7 @@ export default function ProductPage() {
                         return (<tr key={s} className="border-b border-border/50"><td className="p-2 font-medium">{s}</td><td className="p-2">{fmt((78+i*4)*factor)}–{fmt((82+i*4)*factor)}</td><td className="p-2">{fmt((60+i*4)*factor)}–{fmt((64+i*4)*factor)}</td><td className="p-2">{fmt((84+i*4)*factor)}–{fmt((88+i*4)*factor)}</td></tr>);
                       })}</tbody>
                     </table>
-                    <p className="text-xs text-muted-foreground italic">Le mannequin porte la taille M (175cm, 60kg).</p>
+                    <p className="text-xs text-muted-foreground italic">Le mannequin porte la taille {(product as any).model_size || "M"} (175cm, 60kg).</p>
                   </div>
                 </AccordionContent>
               </AccordionItem>

@@ -256,10 +256,11 @@ export async function fetchFlashSaleProducts(): Promise<(Product & { flashPrice?
 }
 
 export async function fetchCategories(): Promise<Category[]> {
-  const { data: parents, error: pErr } = await supabase
+  const { data: parents, error: pErr } = await (supabase as any)
     .from("categories")
-    .select("id, name, name_fr, icon")
+    .select("id, name, name_fr, icon, sort_order")
     .is("parent_id", null)
+    .order("sort_order")
     .order("name");
 
   if (pErr || !parents) {
