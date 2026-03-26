@@ -177,11 +177,14 @@ export default function DashboardPage() {
   const loadOrders = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("orders")
       .select("id, order_ref, created_at, total, status, subtotal, shipping_cost, discount_amount, coupon_code, shipping_first_name, shipping_last_name, shipping_address, shipping_city, shipping_country, payment_method, tracking_number, supplier_order_number, assigned_rider_name, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, last_mile_payment_status, rider_cash_collected, shipping_payment_proof_url, last_mile_payment_proof_url, hub_pickup_proof_url")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }) as any;
+    if (error) {
+      console.error("[DashboardPage] Error loading orders:", error);
+    }
     setOrders(data || []);
     setLoading(false);
   }, [user]);

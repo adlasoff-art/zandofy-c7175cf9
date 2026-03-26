@@ -37,11 +37,14 @@ export default function AdminOrdersPage() {
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["admin-orders", user?.id],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("orders")
         .select("id, order_ref, shipping_first_name, shipping_last_name, shipping_phone, shipping_address, shipping_city, shipping_country, total, subtotal, shipping_cost, status, created_at, store_id, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, payment_method, shipping_payment_status, last_mile_payment_method, last_mile_payment_status, deferred_payment_provider, discount_amount, coupon_code")
         .order("created_at", { ascending: false })
         .limit(200) as any;
+      if (error) {
+        console.error("[AdminOrdersPage] Error loading orders:", error);
+      }
       return (data ?? []) as any[];
     },
     enabled: !authLoading && !!user,
