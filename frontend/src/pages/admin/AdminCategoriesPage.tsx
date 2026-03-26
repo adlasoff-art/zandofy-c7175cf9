@@ -258,19 +258,28 @@ export default function AdminCategoriesPage() {
         <p className="text-center text-sm text-muted-foreground py-12">Aucune catégorie. Cliquez sur "Ajouter" pour commencer.</p>
       ) : (
         <div className="space-y-3">
-          {tree.map((cat) => (
+          {tree.map((cat, catIdx) => (
             <div key={cat.id} className="bg-card border border-border rounded-xl overflow-hidden">
-              <div className="flex items-center gap-3 p-4 border-b border-border/50">
+              <div className="flex items-center gap-2 p-4 border-b border-border/50">
+                <div className="flex flex-col gap-0.5">
+                  <button onClick={() => moveCategory(cat.id, tree, "up")} disabled={catIdx === 0} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20"><ChevronUp size={12} /></button>
+                  <button onClick={() => moveCategory(cat.id, tree, "down")} disabled={catIdx === tree.length - 1} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20"><ChevronDown size={12} /></button>
+                </div>
                 <span className="text-lg">{cat.icon || "📁"}</span>
                 <span className="text-sm font-semibold text-foreground flex-1">{cat.name_fr}</span>
+                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">#{catIdx + 1}</span>
                 <span className="text-xs text-muted-foreground">{cat.children.length} sous-cat.</span>
                 <button onClick={() => openAdd(cat.id)} className="p-1 text-primary hover:text-primary/80" title="Ajouter sous-catégorie"><Plus size={14} /></button>
                 <button onClick={() => openEdit(cat)} className="p-1 text-muted-foreground hover:text-foreground"><Edit2 size={14} /></button>
                 <button onClick={() => setDeleteId(cat.id)} className="p-1 text-destructive hover:text-destructive/80"><Trash2 size={14} /></button>
               </div>
-              {cat.children.map((sub) => (
+              {cat.children.map((sub, subIdx) => (
                 <div key={sub.id}>
-                  <div className="flex items-center gap-3 px-4 py-2.5 pl-10 border-b border-border/30 bg-muted/20">
+                  <div className="flex items-center gap-2 px-4 py-2.5 pl-8 border-b border-border/30 bg-muted/20">
+                    <div className="flex flex-col gap-0.5">
+                      <button onClick={() => moveCategory(sub.id, cat.children, "up")} disabled={subIdx === 0} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20"><ChevronUp size={10} /></button>
+                      <button onClick={() => moveCategory(sub.id, cat.children, "down")} disabled={subIdx === cat.children.length - 1} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20"><ChevronDown size={10} /></button>
+                    </div>
                     <ChevronRight size={12} className="text-muted-foreground" />
                     <span className="text-sm text-foreground flex-1">{sub.name_fr}</span>
                     {sub.children.length > 0 && <span className="text-[10px] text-muted-foreground">{sub.children.length}</span>}

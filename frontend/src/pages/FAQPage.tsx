@@ -67,8 +67,8 @@ const defaultFaqEn: FaqCategory[] = [
   {
     title: "Returns & Refunds",
     items: [
-      { q: "What is your return policy?", a: "You have 30 days after receipt to return an item in its original condition. Returns are free." },
-      { q: "How do I request a refund?", a: "Initiate a return request from your account. Once the item is received and verified, the refund is processed within 5-7 business days." },
+      { q: "What is your return policy?", a: "You have 30 days after receipt to return an item in its original condition (local products only). Return shipping costs are borne by the customer." },
+      { q: "How do I request a refund?", a: "Initiate a return request from your account. Once the item is received and verified, the refund is processed within 14-30 business days depending on the order amount." },
     ],
   },
   {

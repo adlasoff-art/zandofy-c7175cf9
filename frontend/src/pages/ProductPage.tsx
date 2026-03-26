@@ -679,16 +679,17 @@ export default function ProductPage() {
                   <div className="space-y-3 text-sm">
                     <div className="flex items-start gap-3 p-3 bg-secondary/50 rounded-sm">
                       <Check size={16} className="text-primary mt-0.5 shrink-0" />
-                      <div><span className="font-semibold text-foreground">Retour gratuit sous 30 jours</span><p className="text-muted-foreground mt-1">Retournez les articles dans leur état d'origine pour un remboursement complet.</p></div>
+                      <div><span className="font-semibold text-foreground">Retour sous 30 jours</span><p className="text-muted-foreground mt-1">Pour les produits vendus localement, vous pouvez retourner les articles dans leur état d'origine. Les frais de retour sont à la charge du client.</p></div>
                     </div>
                     <div className="flex items-start gap-3 p-3 bg-secondary/50 rounded-sm">
                       <Check size={16} className="text-primary mt-0.5 shrink-0" />
-                      <div><span className="font-semibold text-foreground">Échange facile</span><p className="text-muted-foreground mt-1">Échangez pour une autre taille ou couleur sans frais supplémentaires.</p></div>
+                      <div><span className="font-semibold text-foreground">Échange (produits locaux)</span><p className="text-muted-foreground mt-1">Échange possible pour une autre taille ou couleur sur les produits disponibles localement.</p></div>
                     </div>
                     <div className="flex items-start gap-3 p-3 bg-secondary/50 rounded-sm">
                       <Check size={16} className="text-primary mt-0.5 shrink-0" />
-                      <div><span className="font-semibold text-foreground">Remboursement rapide</span><p className="text-muted-foreground mt-1">Traitement du remboursement sous 5-7 jours ouvrés après réception.</p></div>
+                      <div><span className="font-semibold text-foreground">Remboursement sous 14 à 30 jours</span><p className="text-muted-foreground mt-1">Le délai de remboursement varie de 14 à 30 jours selon le montant de la commande, après réception et vérification de l'article.</p></div>
                     </div>
+                    <p className="text-xs text-muted-foreground italic">Les retours et échanges ne s'appliquent qu'aux produits vendus localement. Les produits importés ne sont pas éligibles au retour sauf en cas de défaut avéré.</p>
                   </div>
                 </DialogContent>
               </Dialog>
