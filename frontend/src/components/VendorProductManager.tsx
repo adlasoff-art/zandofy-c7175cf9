@@ -303,6 +303,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       cost_calc: (product as any).cost_calc || 0,
       auto_pricing_enabled: (product as any).auto_pricing_enabled !== false,
       vendor_extra_margin: (product as any).vendor_extra_margin || 0,
+      model_size: (product as any).model_size || "",
     });
     // Split images: position 0 = main, rest = variations
     const sorted = [...product.images].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
