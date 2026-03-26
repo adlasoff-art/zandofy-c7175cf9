@@ -12,6 +12,7 @@ import {
   canVendorAdvance,
   canAdminAdvance,
 } from "@/lib/order-status";
+import { withOptionalOrderFields } from "@/lib/order-query";
 import { useRoles } from "@/hooks/use-roles";
 import { TrackingNumberModal, RiderAssignmentModal, DeliveryFeeModal, EditTrackingModal, generateConfirmationCode } from "./OrderTransitionModals";
 import { format } from "date-fns";
@@ -98,7 +99,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected, shipping_payment_proof_url, last_mile_payment_proof_url, hub_pickup_proof_url")
+      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected")
       .eq("store_id", storeId)
       .not("status", "in", '("awaiting_payment","payment_failed")')
       .order("created_at", { ascending: false }) as any;
@@ -139,7 +140,13 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
       historyMap.set(h.order_id, arr);
     });
 
-    setOrders(data.map((o) => ({
+    const ordersWithOptionalFields = await withOptionalOrderFields(data, [
+      "shipping_payment_proof_url",
+      "last_mile_payment_proof_url",
+      "hub_pickup_proof_url",
+    ]);
+
+    setOrders(ordersWithOptionalFields.map((o) => ({
       ...o,
       items: itemMap.get(o.id) || [],
       history: historyMap.get(o.id) || [],
