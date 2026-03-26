@@ -444,6 +444,33 @@ export function VariantOrderDrawer({
               </div>
             )}
 
+            {/* Dynamic Variants (Pointure, Volume, Écran, etc.) */}
+            {dynamicVariants.map((dv) => (
+              <div key={dv.typeId} className="mb-4">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  {dv.icon ? `${dv.icon} ` : ""}{dv.typeName}{dv.unit ? ` (${dv.unit})` : ""}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {dv.options.map((opt) => {
+                    const isSelected = selectedDynamicOptions[dv.typeId] === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() => setSelectedDynamicOptions(prev => ({ ...prev, [dv.typeId]: isSelected ? "" : opt.id }))}
+                        className={`min-w-[44px] h-9 px-3 rounded-lg border text-sm font-medium transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border text-foreground hover:border-primary/40"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
             {/* Variant Table */}
             <div className="space-y-1">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
