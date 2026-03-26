@@ -115,7 +115,7 @@ export function OverviewTab({ period }: Props) {
         <KpiCard icon={Users} label="Utilisateurs" value={loading ? "..." : profileCount.toLocaleString()} />
         <KpiCard icon={ShoppingBag} label="Commandes valides" value={loading ? "..." : (orderStats?.count ?? 0).toLocaleString()} />
         <KpiCard icon={TrendingUp} label="Revenu actuel" value={loading ? "..." : `$${(orderStats?.currentRevenue ?? 0).toLocaleString()}`} color="text-amber-500" />
-        <KpiCard icon={DollarSign} label="Revenu réel" value={loading ? "..." : `$${(orderStats?.revenue ?? 0).toLocaleString()}`} />
+        <KpiCard icon={DollarSign} label="Revenu validé" value={loading ? "..." : `$${(orderStats?.revenue ?? 0).toLocaleString()}`} />
         <KpiCard icon={Package} label="Produits" value={productCount.toLocaleString()} />
         <KpiCard icon={StoreIcon} label="Boutiques" value={storeCount.toLocaleString()} />
       </div>
