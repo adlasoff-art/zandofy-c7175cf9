@@ -9,6 +9,12 @@ const corsHeaders = {
 
 // Statuses that trigger multi-channel notifications
 const NOTIFY_STATUSES: Record<string, { subject: string; heading: string; body: string; emoji: string }> = {
+  pending: {
+    subject: "🧾 Commande enregistrée",
+    heading: "Votre commande a bien été enregistrée !",
+    body: "Nous avons bien reçu votre paiement et votre commande est maintenant en attente de traitement par le vendeur.",
+    emoji: "🧾",
+  },
   confirmed: {
     subject: "✅ Commande confirmée",
     heading: "Votre commande est confirmée !",
@@ -115,14 +121,18 @@ Deno.serve(async (req) => {
     const results: Record<string, any> = { inApp: false, email: false, push: false };
 
     // 1. In-app notification (via DB)
-    await supabase.from("notifications").insert({
+    const { error: notificationError } = await supabase.from("notifications").insert({
       user_id: order.user_id,
       type: "order",
       title: template.subject,
       message: `${template.body} (Réf: ${order.order_ref})`,
       link: "/tracking",
     });
-    results.inApp = true;
+    if (notificationError) {
+      console.error("Notification insert error:", notificationError);
+    } else {
+      results.inApp = true;
+    }
 
     // 2. Email notification via SMTP
     const smtpHost = Deno.env.get("SMTP_HOST");
