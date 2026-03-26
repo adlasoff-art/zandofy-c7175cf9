@@ -79,6 +79,7 @@ export default function AdminCategoriesPage() {
         image_url: f.image_url || null,
         display_mode: f.display_mode || "icon",
         parent_id: f.parent_id || null,
+        sort_order: f.sort_order,
       };
       if (f.mode === "edit" && f.id) {
         const { error } = await supabase.from("categories").update(payload).eq("id", f.id);
