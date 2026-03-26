@@ -58,17 +58,36 @@ Deno.serve(async (req) => {
 
     // Update order status based on payment result
     if (isSuccess) {
-      await supabase
+      const { error: orderUpdateError } = await supabase
         .from("orders")
-        .update({ status: "confirmed" })
+        .update({ status: "pending" })
         .eq("id", tx.order_id)
-        .eq("status", "pending");
+        .in("status", ["awaiting_payment", "pending"]);
+
+      if (orderUpdateError) {
+        console.error("Order update after KelPay success failed:", orderUpdateError);
+      } else {
+        await fetch(`${supabaseUrl}/functions/v1/notify-order-status`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serviceRoleKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ orderId: tx.order_id, newStatus: "pending" }),
+        }).catch((notifyError) => {
+          console.error("Failed to trigger order notification after KelPay success:", notifyError);
+        });
+      }
     } else {
-      await supabase
+      const { error: orderUpdateError } = await supabase
         .from("orders")
         .update({ status: "payment_failed" })
         .eq("id", tx.order_id)
-        .eq("status", "pending");
+        .in("status", ["awaiting_payment", "pending"]);
+
+      if (orderUpdateError) {
+        console.error("Order update after KelPay failure failed:", orderUpdateError);
+      }
     }
 
     // Respond with OK as required by KelPay
