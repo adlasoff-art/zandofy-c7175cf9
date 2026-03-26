@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Plus, Edit2, Trash2, ChevronRight, Loader2, X, Save, Upload, Image } from "lucide-react";
+import { Plus, Edit2, Trash2, ChevronRight, ChevronUp, ChevronDown, Loader2, X, Save, Upload, Image, GripVertical } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ interface Category {
   icon: string | null;
   image_url: string | null;
   parent_id: string | null;
+  sort_order: number;
 }
 
 interface TreeNode extends Category {
@@ -29,6 +30,9 @@ function buildTree(cats: Category[]): TreeNode[] {
       roots.push(map[c.id]);
     }
   });
+  // Sort by sort_order
+  roots.sort((a, b) => a.sort_order - b.sort_order);
+  roots.forEach(r => r.children.sort((a, b) => a.sort_order - b.sort_order));
   return roots;
 }
 
@@ -41,9 +45,10 @@ interface FormState {
   image_url: string;
   display_mode: string;
   parent_id: string;
+  sort_order: number;
 }
 
-const emptyForm: FormState = { mode: "add", name: "", name_fr: "", icon: "", image_url: "", display_mode: "icon", parent_id: "" };
+const emptyForm: FormState = { mode: "add", name: "", name_fr: "", icon: "", image_url: "", display_mode: "icon", parent_id: "", sort_order: 0 };
 
 export default function AdminCategoriesPage() {
   const queryClient = useQueryClient();
@@ -55,7 +60,7 @@ export default function AdminCategoriesPage() {
   const { data: categories = [], isLoading } = useQuery({
     queryKey: ["admin-categories"],
     queryFn: async () => {
-      const { data } = await supabase.from("categories").select("*").order("name_fr");
+      const { data } = await (supabase as any).from("categories").select("*").order("sort_order").order("name_fr");
       return (data ?? []) as Category[];
     },
   });
@@ -74,12 +79,13 @@ export default function AdminCategoriesPage() {
         image_url: f.image_url || null,
         display_mode: f.display_mode || "icon",
         parent_id: f.parent_id || null,
+        sort_order: f.sort_order,
       };
       if (f.mode === "edit" && f.id) {
-        const { error } = await supabase.from("categories").update(payload).eq("id", f.id);
+        const { error } = await (supabase as any).from("categories").update(payload).eq("id", f.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("categories").insert(payload);
+        const { error } = await (supabase as any).from("categories").insert(payload);
         if (error) throw error;
       }
     },
@@ -106,8 +112,30 @@ export default function AdminCategoriesPage() {
   });
 
   const openEdit = (cat: Category) => {
-    setForm({ mode: "edit", id: cat.id, name: cat.name, name_fr: cat.name_fr, icon: cat.icon || "", image_url: cat.image_url || "", display_mode: (cat as any).display_mode || "icon", parent_id: cat.parent_id || "" });
+    setForm({ mode: "edit", id: cat.id, name: cat.name, name_fr: cat.name_fr, icon: cat.icon || "", image_url: cat.image_url || "", display_mode: (cat as any).display_mode || "icon", parent_id: cat.parent_id || "", sort_order: cat.sort_order ?? 0 });
     setShowForm(true);
+  };
+
+  const moveMutation = useMutation({
+    mutationFn: async ({ id, newOrder }: { id: string; newOrder: number }) => {
+      const { error } = await (supabase as any).from("categories").update({ sort_order: newOrder }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-categories"] }),
+  });
+
+  const moveCategory = (catId: string, siblings: Category[], direction: "up" | "down") => {
+    const idx = siblings.findIndex(c => c.id === catId);
+    if (idx < 0) return;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= siblings.length) return;
+    const currentOrder = siblings[idx].sort_order;
+    const swapOrder = siblings[swapIdx].sort_order;
+    // If they have the same sort_order, use index-based values
+    const newCurrent = swapOrder === currentOrder ? (direction === "up" ? currentOrder - 1 : currentOrder + 1) : swapOrder;
+    const newSwap = swapOrder === currentOrder ? currentOrder : currentOrder;
+    moveMutation.mutate({ id: siblings[idx].id, newOrder: newCurrent });
+    moveMutation.mutate({ id: siblings[swapIdx].id, newOrder: newSwap });
   };
 
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -230,19 +258,28 @@ export default function AdminCategoriesPage() {
         <p className="text-center text-sm text-muted-foreground py-12">Aucune catégorie. Cliquez sur "Ajouter" pour commencer.</p>
       ) : (
         <div className="space-y-3">
-          {tree.map((cat) => (
+          {tree.map((cat, catIdx) => (
             <div key={cat.id} className="bg-card border border-border rounded-xl overflow-hidden">
-              <div className="flex items-center gap-3 p-4 border-b border-border/50">
+              <div className="flex items-center gap-2 p-4 border-b border-border/50">
+                <div className="flex flex-col gap-0.5">
+                  <button onClick={() => moveCategory(cat.id, tree, "up")} disabled={catIdx === 0} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20"><ChevronUp size={12} /></button>
+                  <button onClick={() => moveCategory(cat.id, tree, "down")} disabled={catIdx === tree.length - 1} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20"><ChevronDown size={12} /></button>
+                </div>
                 <span className="text-lg">{cat.icon || "📁"}</span>
                 <span className="text-sm font-semibold text-foreground flex-1">{cat.name_fr}</span>
+                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">#{catIdx + 1}</span>
                 <span className="text-xs text-muted-foreground">{cat.children.length} sous-cat.</span>
                 <button onClick={() => openAdd(cat.id)} className="p-1 text-primary hover:text-primary/80" title="Ajouter sous-catégorie"><Plus size={14} /></button>
                 <button onClick={() => openEdit(cat)} className="p-1 text-muted-foreground hover:text-foreground"><Edit2 size={14} /></button>
                 <button onClick={() => setDeleteId(cat.id)} className="p-1 text-destructive hover:text-destructive/80"><Trash2 size={14} /></button>
               </div>
-              {cat.children.map((sub) => (
+              {cat.children.map((sub, subIdx) => (
                 <div key={sub.id}>
-                  <div className="flex items-center gap-3 px-4 py-2.5 pl-10 border-b border-border/30 bg-muted/20">
+                  <div className="flex items-center gap-2 px-4 py-2.5 pl-8 border-b border-border/30 bg-muted/20">
+                    <div className="flex flex-col gap-0.5">
+                      <button onClick={() => moveCategory(sub.id, cat.children, "up")} disabled={subIdx === 0} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20"><ChevronUp size={10} /></button>
+                      <button onClick={() => moveCategory(sub.id, cat.children, "down")} disabled={subIdx === cat.children.length - 1} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20"><ChevronDown size={10} /></button>
+                    </div>
                     <ChevronRight size={12} className="text-muted-foreground" />
                     <span className="text-sm text-foreground flex-1">{sub.name_fr}</span>
                     {sub.children.length > 0 && <span className="text-[10px] text-muted-foreground">{sub.children.length}</span>}

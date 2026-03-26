@@ -32,8 +32,8 @@ const defaultFaqFr: FaqCategory[] = [
   {
     title: "Retours & Remboursements",
     items: [
-      { q: "Quelle est votre politique de retour ?", a: "Vous disposez de 30 jours après réception pour retourner un article dans son état d'origine. Les retours sont gratuits." },
-      { q: "Comment demander un remboursement ?", a: "Initiez une demande de retour depuis votre espace client. Une fois l'article reçu et vérifié, le remboursement est effectué sous 5-7 jours ouvrés." },
+      { q: "Quelle est votre politique de retour ?", a: "Vous disposez de 30 jours après réception pour retourner un article dans son état d'origine (produits locaux uniquement). Les frais de retour sont à la charge du client." },
+      { q: "Comment demander un remboursement ?", a: "Initiez une demande de retour depuis votre espace client. Une fois l'article reçu et vérifié, le remboursement est effectué sous 14 à 30 jours selon le montant de la commande." },
     ],
   },
   {
@@ -67,8 +67,8 @@ const defaultFaqEn: FaqCategory[] = [
   {
     title: "Returns & Refunds",
     items: [
-      { q: "What is your return policy?", a: "You have 30 days after receipt to return an item in its original condition. Returns are free." },
-      { q: "How do I request a refund?", a: "Initiate a return request from your account. Once the item is received and verified, the refund is processed within 5-7 business days." },
+      { q: "What is your return policy?", a: "You have 30 days after receipt to return an item in its original condition (local products only). Return shipping costs are borne by the customer." },
+      { q: "How do I request a refund?", a: "Initiate a return request from your account. Once the item is received and verified, the refund is processed within 14-30 business days depending on the order amount." },
     ],
   },
   {

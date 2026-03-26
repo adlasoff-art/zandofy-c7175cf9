@@ -476,7 +476,7 @@ export default function ProductPage() {
               onClick={() => setVariantDrawerOpen(true)}
               className="w-full flex items-center justify-between px-4 py-3 bg-muted/50 hover:bg-muted rounded-lg border border-border transition-colors group"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold text-foreground">Sélectionner les options</span>
                 {(product.colors?.length ?? 0) > 0 && (
                   <span className="text-xs text-muted-foreground">{product.colors!.length} couleur{product.colors!.length > 1 ? "s" : ""}</span>
@@ -484,6 +484,9 @@ export default function ProductPage() {
                 {(product.sizes?.length ?? 0) > 0 && (
                   <span className="text-xs text-muted-foreground">· {product.sizes!.length} taille{product.sizes!.length > 1 ? "s" : ""}</span>
                 )}
+                {((product as any).dynamicVariants || []).map((dv: any) => (
+                  <span key={dv.typeId} className="text-xs text-muted-foreground">· {dv.options.length} {dv.typeName.toLowerCase()}{dv.options.length > 1 ? "s" : ""}</span>
+                ))}
               </div>
               <ChevronRight size={16} className="text-muted-foreground group-hover:text-foreground transition-colors" />
             </button>
@@ -590,6 +593,20 @@ export default function ProductPage() {
               </div>
             )}
 
+            {/* Dynamic Variants (Pointure, Volume, Écran, etc.) */}
+            {((product as any).dynamicVariants || []).map((dv: any) => (
+              <div key={dv.typeId} className="space-y-2">
+                <span className="text-sm font-medium text-foreground">{dv.icon ? `${dv.icon} ` : ""}{dv.typeName}{dv.unit ? ` (${dv.unit})` : ""}</span>
+                <div className="flex flex-wrap gap-2">
+                  {dv.options.map((opt: any) => (
+                    <span key={opt.id} className="min-w-[40px] h-9 px-3 rounded-sm border border-border text-sm font-medium flex items-center justify-center text-foreground">
+                      {opt.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+
             {/* Loyalty info */}
             <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-sm">🎁 Gagnez jusqu'à <span className="font-semibold text-primary">{loyaltyPoints} points</span> fidélité, calculés au checkout.</p>
 
@@ -679,16 +696,17 @@ export default function ProductPage() {
                   <div className="space-y-3 text-sm">
                     <div className="flex items-start gap-3 p-3 bg-secondary/50 rounded-sm">
                       <Check size={16} className="text-primary mt-0.5 shrink-0" />
-                      <div><span className="font-semibold text-foreground">Retour gratuit sous 30 jours</span><p className="text-muted-foreground mt-1">Retournez les articles dans leur état d'origine pour un remboursement complet.</p></div>
+                      <div><span className="font-semibold text-foreground">Retour sous 30 jours</span><p className="text-muted-foreground mt-1">Pour les produits vendus localement, vous pouvez retourner les articles dans leur état d'origine. Les frais de retour sont à la charge du client.</p></div>
                     </div>
                     <div className="flex items-start gap-3 p-3 bg-secondary/50 rounded-sm">
                       <Check size={16} className="text-primary mt-0.5 shrink-0" />
-                      <div><span className="font-semibold text-foreground">Échange facile</span><p className="text-muted-foreground mt-1">Échangez pour une autre taille ou couleur sans frais supplémentaires.</p></div>
+                      <div><span className="font-semibold text-foreground">Échange (produits locaux)</span><p className="text-muted-foreground mt-1">Échange possible pour une autre taille ou couleur sur les produits disponibles localement.</p></div>
                     </div>
                     <div className="flex items-start gap-3 p-3 bg-secondary/50 rounded-sm">
                       <Check size={16} className="text-primary mt-0.5 shrink-0" />
-                      <div><span className="font-semibold text-foreground">Remboursement rapide</span><p className="text-muted-foreground mt-1">Traitement du remboursement sous 5-7 jours ouvrés après réception.</p></div>
+                      <div><span className="font-semibold text-foreground">Remboursement sous 14 à 30 jours</span><p className="text-muted-foreground mt-1">Le délai de remboursement varie de 14 à 30 jours selon le montant de la commande, après réception et vérification de l'article.</p></div>
                     </div>
+                    <p className="text-xs text-muted-foreground italic">Les retours et échanges ne s'appliquent qu'aux produits vendus localement. Les produits importés ne sont pas éligibles au retour sauf en cas de défaut avéré.</p>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -794,7 +812,7 @@ export default function ProductPage() {
                         return (<tr key={s} className="border-b border-border/50"><td className="p-2 font-medium">{s}</td><td className="p-2">{fmt((78+i*4)*factor)}–{fmt((82+i*4)*factor)}</td><td className="p-2">{fmt((60+i*4)*factor)}–{fmt((64+i*4)*factor)}</td><td className="p-2">{fmt((84+i*4)*factor)}–{fmt((88+i*4)*factor)}</td></tr>);
                       })}</tbody>
                     </table>
-                    <p className="text-xs text-muted-foreground italic">Le mannequin porte la taille M (175cm, 60kg).</p>
+                    <p className="text-xs text-muted-foreground italic">Le mannequin porte la taille {(product as any).model_size || "M"} (175cm, 60kg).</p>
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -893,6 +911,7 @@ export default function ProductPage() {
         sizes={product.sizes?.map((s: string) => ({ label: s })) || []}
         pricingTiers={pricingTiers}
         moq={moq}
+        dynamicVariants={(product as any).dynamicVariants || []}
       />
     </div>
   );

@@ -80,6 +80,7 @@ const EMPTY_FORM = {
   cost_calc: 0,
   auto_pricing_enabled: true,
   vendor_extra_margin: 0,
+  model_size: "",
 };
 
 type ProductFormState = typeof EMPTY_FORM;
@@ -302,6 +303,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       cost_calc: (product as any).cost_calc || 0,
       auto_pricing_enabled: (product as any).auto_pricing_enabled !== false,
       vendor_extra_margin: (product as any).vendor_extra_margin || 0,
+      model_size: (product as any).model_size || "",
     });
     // Split images: position 0 = main, rest = variations
     const sorted = [...product.images].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
@@ -368,6 +370,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       cost_calc: form.cost_calc || null,
       auto_pricing_enabled: form.auto_pricing_enabled,
       vendor_extra_margin: form.vendor_extra_margin || 0,
+      model_size: form.model_size || null,
     };
 
     let productId = editing?.id;
@@ -563,6 +566,9 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
           <div className="grid grid-cols-2 gap-3">
             <Field label="Matière" value={form.material} onChange={(v) => setForm({ ...form, material: v })} />
             <CountryCombobox value={form.origin_country} onChange={(v) => setForm({ ...form, origin_country: v })} />
+          </div>
+          <div>
+            <Field label="Taille du mannequin (ex: M, XL, 42)" value={form.model_size} onChange={(v) => setForm({ ...form, model_size: v })} />
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Catégorie</label>

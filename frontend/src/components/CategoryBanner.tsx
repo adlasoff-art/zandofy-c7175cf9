@@ -7,10 +7,11 @@ export function CategoryBanner() {
   const { data: categories, isLoading } = useQuery({
     queryKey: ["category-banner"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("categories")
-        .select("id, name, name_fr, icon, image_url, parent_id")
+        .select("id, name, name_fr, icon, image_url, parent_id, sort_order")
         .is("parent_id", null)
+        .order("sort_order")
         .order("name_fr");
       if (error) throw error;
       return data || [];
