@@ -911,6 +911,7 @@ export default function ProductPage() {
         sizes={product.sizes?.map((s: string) => ({ label: s })) || []}
         pricingTiers={pricingTiers}
         moq={moq}
+        dynamicVariants={(product as any).dynamicVariants || []}
       />
     </div>
   );
