@@ -46,7 +46,7 @@ export default function AdminOrdersPage() {
       if (error) {
         console.error("[AdminOrdersPage] Error loading orders:", error);
       }
-      return await withOptionalOrderFields((data ?? []) as any[], ["deferred_payment_provider"]);
+      return await withOptionalOrderFields<any>((data ?? []) as any[], ["deferred_payment_provider"]);
     },
     enabled: !authLoading && !!user,
   });

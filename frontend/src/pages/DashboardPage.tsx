@@ -186,7 +186,7 @@ export default function DashboardPage() {
     if (error) {
       console.error("[DashboardPage] Error loading orders:", error);
     }
-    const ordersWithOptionalFields = await withOptionalOrderFields(data || [], [
+    const ordersWithOptionalFields = await withOptionalOrderFields<OrderRow>((data || []) as OrderRow[], [
       "shipping_payment_proof_url",
       "last_mile_payment_proof_url",
       "hub_pickup_proof_url",

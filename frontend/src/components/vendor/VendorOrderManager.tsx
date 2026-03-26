@@ -140,7 +140,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
       historyMap.set(h.order_id, arr);
     });
 
-    const ordersWithOptionalFields = await withOptionalOrderFields(data, [
+    const ordersWithOptionalFields = await withOptionalOrderFields<Order>((data || []) as Order[], [
       "shipping_payment_proof_url",
       "last_mile_payment_proof_url",
       "hub_pickup_proof_url",
