@@ -94,6 +94,7 @@ export function VariantOrderDrawer({
   sizes,
   pricingTiers,
   moq,
+  dynamicVariants = [],
 }: VariantOrderDrawerProps) {
   const isMobile = useIsMobile();
   const { addItem } = useCart();
