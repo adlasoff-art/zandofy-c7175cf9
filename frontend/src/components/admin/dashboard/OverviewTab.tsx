@@ -25,19 +25,19 @@ export function OverviewTab({ period }: Props) {
     queryKey: ["admin-order-stats", period],
     queryFn: async () => {
       const { data } = await supabase.from("orders").select("total, status").gte("created_at", since);
-      if (!data) return { count: 0, revenue: 0, cancelledRevenue: 0, cancelledCount: 0, deliveredCount: 0, pendingCount: 0, failedAmount: 0, failedCount: 0, byStatus: {} as Record<string, number> };
+      if (!data) return { count: 0, revenue: 0, currentRevenue: 0, cancelledRevenue: 0, cancelledCount: 0, deliveredCount: 0, pendingCount: 0, failedAmount: 0, failedCount: 0, byStatus: {} as Record<string, number> };
       const byStatus: Record<string, number> = {};
-      let revenue = 0, cancelledRevenue = 0, cancelledCount = 0, deliveredCount = 0, pendingCount = 0, failedAmount = 0, failedCount = 0, opCount = 0;
+      let revenue = 0, currentRevenue = 0, cancelledRevenue = 0, cancelledCount = 0, deliveredCount = 0, pendingCount = 0, failedAmount = 0, failedCount = 0, opCount = 0;
       data.forEach((o) => {
         byStatus[o.status] = (byStatus[o.status] || 0) + 1;
         if (o.status === "cancelled" || o.status === "returned") { cancelledRevenue += Number(o.total); cancelledCount++; }
-        if (!NON_REVENUE_ORDER_STATUSES.includes(o.status as never)) { opCount++; }
+        if (!NON_REVENUE_ORDER_STATUSES.includes(o.status as never)) { opCount++; currentRevenue += Number(o.total); }
         if (REAL_REVENUE_ORDER_STATUSES.includes(o.status as never)) { revenue += Number(o.total); }
         if (o.status === "delivered") deliveredCount++;
         if (o.status === "pending") pendingCount++;
         if (o.status === "payment_failed" || o.status === "awaiting_payment") { failedAmount += Number(o.total); failedCount++; }
       });
-      return { count: opCount, revenue, cancelledRevenue, cancelledCount, deliveredCount, pendingCount, failedAmount, failedCount, byStatus };
+      return { count: opCount, revenue, currentRevenue, cancelledRevenue, cancelledCount, deliveredCount, pendingCount, failedAmount, failedCount, byStatus };
     },
   });
 
