@@ -100,10 +100,16 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
       .from("orders")
       .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected, shipping_payment_proof_url, last_mile_payment_proof_url, hub_pickup_proof_url")
       .eq("store_id", storeId)
-      .not("status", "in", "(awaiting_payment,payment_failed)")
+      .not("status", "in", '("awaiting_payment","payment_failed")')
       .order("created_at", { ascending: false }) as any;
 
-    if (error || !data) {
+    if (error) {
+      console.error("[VendorOrderManager] Error loading orders:", error);
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
+    if (!data) {
       setOrders([]);
       setLoading(false);
       return;
@@ -112,10 +118,10 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
     const orderIds = data.map((o) => o.id);
     const [itemsRes, historyRes] = await Promise.all([
       orderIds.length > 0
-        ? supabase.from("order_items").select("id, order_id, product_name, product_image, price, quantity, color, size").in("order_id", orderIds)
+        ? supabase.from("order_items").select("id, order_id, product_name, product_image, price, quantity, color, size").in("order_id", orderIds) as any
         : Promise.resolve({ data: [] }),
       orderIds.length > 0
-        ? supabase.from("order_status_history").select("order_id, status, created_at").in("order_id", orderIds).order("created_at", { ascending: true })
+        ? supabase.from("order_status_history").select("order_id, status, created_at").in("order_id", orderIds).order("created_at", { ascending: true }) as any
         : Promise.resolve({ data: [] }),
     ]);
 
