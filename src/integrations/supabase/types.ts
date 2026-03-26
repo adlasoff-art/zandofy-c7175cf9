@@ -600,6 +600,7 @@ export type Database = {
           name: string
           name_fr: string
           parent_id: string | null
+          sort_order: number
         }
         Insert: {
           created_at?: string
@@ -610,6 +611,7 @@ export type Database = {
           name: string
           name_fr: string
           parent_id?: string | null
+          sort_order?: number
         }
         Update: {
           created_at?: string
@@ -620,6 +622,7 @@ export type Database = {
           name?: string
           name_fr?: string
           parent_id?: string | null
+          sort_order?: number
         }
         Relationships: [
           {
@@ -2615,6 +2618,7 @@ export type Database = {
           material: string | null
           meta_description: string | null
           meta_title: string | null
+          model_size: string | null
           moderated_at: string | null
           moderated_by: string | null
           moderation_reason: string | null
@@ -2667,6 +2671,7 @@ export type Database = {
           material?: string | null
           meta_description?: string | null
           meta_title?: string | null
+          model_size?: string | null
           moderated_at?: string | null
           moderated_by?: string | null
           moderation_reason?: string | null
@@ -2719,6 +2724,7 @@ export type Database = {
           material?: string | null
           meta_description?: string | null
           meta_title?: string | null
+          model_size?: string | null
           moderated_at?: string | null
           moderated_by?: string | null
           moderation_reason?: string | null
