@@ -476,7 +476,7 @@ export default function ProductPage() {
               onClick={() => setVariantDrawerOpen(true)}
               className="w-full flex items-center justify-between px-4 py-3 bg-muted/50 hover:bg-muted rounded-lg border border-border transition-colors group"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold text-foreground">Sélectionner les options</span>
                 {(product.colors?.length ?? 0) > 0 && (
                   <span className="text-xs text-muted-foreground">{product.colors!.length} couleur{product.colors!.length > 1 ? "s" : ""}</span>
@@ -484,6 +484,9 @@ export default function ProductPage() {
                 {(product.sizes?.length ?? 0) > 0 && (
                   <span className="text-xs text-muted-foreground">· {product.sizes!.length} taille{product.sizes!.length > 1 ? "s" : ""}</span>
                 )}
+                {((product as any).dynamicVariants || []).map((dv: any) => (
+                  <span key={dv.typeId} className="text-xs text-muted-foreground">· {dv.options.length} {dv.typeName.toLowerCase()}{dv.options.length > 1 ? "s" : ""}</span>
+                ))}
               </div>
               <ChevronRight size={16} className="text-muted-foreground group-hover:text-foreground transition-colors" />
             </button>
