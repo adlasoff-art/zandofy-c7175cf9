@@ -151,7 +151,7 @@ interface ProfileData {
 
 export default function DashboardPage() {
   const { t } = useI18n();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "overview";
@@ -203,13 +203,18 @@ export default function DashboardPage() {
   }, [user]);
 
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
     if (!user) {
       navigate("/auth");
       return;
     }
+
     void loadOrders();
     void loadProfileName();
-  }, [user, navigate, loadOrders, loadProfileName]);
+  }, [authLoading, user, navigate, loadOrders, loadProfileName]);
 
   useEffect(() => {
     if (!selectedOrder) { setOrderItems([]); setStatusHistory([]); return; }
@@ -230,6 +235,14 @@ export default function DashboardPage() {
     }
     loadDetails();
   }, [selectedOrder]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="animate-spin text-primary" size={24} />
+      </div>
+    );
+  }
 
   if (!user) return null;
 

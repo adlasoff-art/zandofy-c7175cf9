@@ -3,6 +3,7 @@ import { Search, Loader2, ChevronDown, ChevronUp, MapPin, Truck, AlertTriangle, 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
@@ -19,6 +20,7 @@ import {
 import { TrackingNumberModal, RiderAssignmentModal, DeliveryFeeModal } from "@/components/vendor/OrderTransitionModals";
 
 export default function AdminOrdersPage() {
+  const { user, loading: authLoading } = useAuth();
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all" | "payment_failed">("all");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export default function AdminOrdersPage() {
   const [deliveryFeeModal, setDeliveryFeeModal] = useState<string | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ["admin-orders"],
+    queryKey: ["admin-orders", user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from("orders")
@@ -42,11 +44,12 @@ export default function AdminOrdersPage() {
         .limit(200) as any;
       return (data ?? []) as any[];
     },
+    enabled: !authLoading && !!user,
   });
 
   // Cancellation requests
   const { data: cancelRequests = [] } = useQuery({
-    queryKey: ["admin-cancel-requests"],
+    queryKey: ["admin-cancel-requests", user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from("cancellation_requests")
@@ -55,6 +58,7 @@ export default function AdminOrdersPage() {
         .order("created_at", { ascending: false });
       return data ?? [];
     },
+    enabled: !authLoading && !!user,
   });
 
   const filtered = orders.filter((o) => {
