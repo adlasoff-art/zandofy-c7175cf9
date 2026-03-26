@@ -118,7 +118,7 @@ export default function AdminCategoriesPage() {
 
   const moveMutation = useMutation({
     mutationFn: async ({ id, newOrder }: { id: string; newOrder: number }) => {
-      const { error } = await supabase.from("categories").update({ sort_order: newOrder }).eq("id", id);
+      const { error } = await (supabase as any).from("categories").update({ sort_order: newOrder }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-categories"] }),
