@@ -32,8 +32,8 @@ const defaultFaqFr: FaqCategory[] = [
   {
     title: "Retours & Remboursements",
     items: [
-      { q: "Quelle est votre politique de retour ?", a: "Vous disposez de 30 jours après réception pour retourner un article dans son état d'origine. Les retours sont gratuits." },
-      { q: "Comment demander un remboursement ?", a: "Initiez une demande de retour depuis votre espace client. Une fois l'article reçu et vérifié, le remboursement est effectué sous 5-7 jours ouvrés." },
+      { q: "Quelle est votre politique de retour ?", a: "Vous disposez de 30 jours après réception pour retourner un article dans son état d'origine (produits locaux uniquement). Les frais de retour sont à la charge du client." },
+      { q: "Comment demander un remboursement ?", a: "Initiez une demande de retour depuis votre espace client. Une fois l'article reçu et vérifié, le remboursement est effectué sous 14 à 30 jours selon le montant de la commande." },
     ],
   },
   {
