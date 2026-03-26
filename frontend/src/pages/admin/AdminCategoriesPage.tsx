@@ -45,9 +45,10 @@ interface FormState {
   image_url: string;
   display_mode: string;
   parent_id: string;
+  sort_order: number;
 }
 
-const emptyForm: FormState = { mode: "add", name: "", name_fr: "", icon: "", image_url: "", display_mode: "icon", parent_id: "" };
+const emptyForm: FormState = { mode: "add", name: "", name_fr: "", icon: "", image_url: "", display_mode: "icon", parent_id: "", sort_order: 0 };
 
 export default function AdminCategoriesPage() {
   const queryClient = useQueryClient();
