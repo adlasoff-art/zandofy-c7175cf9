@@ -593,6 +593,20 @@ export default function ProductPage() {
               </div>
             )}
 
+            {/* Dynamic Variants (Pointure, Volume, Écran, etc.) */}
+            {((product as any).dynamicVariants || []).map((dv: any) => (
+              <div key={dv.typeId} className="space-y-2">
+                <span className="text-sm font-medium text-foreground">{dv.icon ? `${dv.icon} ` : ""}{dv.typeName}{dv.unit ? ` (${dv.unit})` : ""}</span>
+                <div className="flex flex-wrap gap-2">
+                  {dv.options.map((opt: any) => (
+                    <span key={opt.id} className="min-w-[40px] h-9 px-3 rounded-sm border border-border text-sm font-medium flex items-center justify-center text-foreground">
+                      {opt.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+
             {/* Loyalty info */}
             <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-sm">🎁 Gagnez jusqu'à <span className="font-semibold text-primary">{loyaltyPoints} points</span> fidélité, calculés au checkout.</p>
 
