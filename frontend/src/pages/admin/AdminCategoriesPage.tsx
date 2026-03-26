@@ -60,7 +60,7 @@ export default function AdminCategoriesPage() {
   const { data: categories = [], isLoading } = useQuery({
     queryKey: ["admin-categories"],
     queryFn: async () => {
-      const { data } = await supabase.from("categories").select("*").order("name_fr");
+      const { data } = await supabase.from("categories").select("*").order("sort_order").order("name_fr");
       return (data ?? []) as Category[];
     },
   });
