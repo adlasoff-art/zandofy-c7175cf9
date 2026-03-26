@@ -23,6 +23,14 @@ interface SizeOption {
   region?: string;
 }
 
+interface DynamicVariant {
+  typeId: string;
+  typeName: string;
+  unit: string;
+  icon: string;
+  options: Array<{ id: string; label: string }>;
+}
+
 interface VariantRow {
   key: string; // e.g. "Red-M"
   colorIndex: number;
@@ -38,6 +46,7 @@ interface VariantOrderDrawerProps {
   sizes: SizeOption[];
   pricingTiers: PricingTier[];
   moq: number;
+  dynamicVariants?: DynamicVariant[];
 }
 
 // ── Mini Quantity Input ──
