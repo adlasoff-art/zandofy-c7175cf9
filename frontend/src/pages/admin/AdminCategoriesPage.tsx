@@ -82,10 +82,10 @@ export default function AdminCategoriesPage() {
         sort_order: f.sort_order,
       };
       if (f.mode === "edit" && f.id) {
-        const { error } = await supabase.from("categories").update(payload).eq("id", f.id);
+        const { error } = await (supabase as any).from("categories").update(payload).eq("id", f.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("categories").insert(payload);
+        const { error } = await (supabase as any).from("categories").insert(payload);
         if (error) throw error;
       }
     },
