@@ -370,6 +370,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       cost_calc: form.cost_calc || null,
       auto_pricing_enabled: form.auto_pricing_enabled,
       vendor_extra_margin: form.vendor_extra_margin || 0,
+      model_size: form.model_size || null,
     };
 
     let productId = editing?.id;
