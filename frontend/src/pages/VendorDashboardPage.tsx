@@ -61,7 +61,7 @@ interface OrderCounters {
 }
 
 export default function VendorDashboardPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [store, setStore] = useState<VendorStore | null>(null);
   const [conversations, setConversations] = useState<VendorConversation[]>([]);
@@ -79,6 +79,10 @@ export default function VendorDashboardPage() {
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
     if (!user) {
       navigate("/auth");
       return;
@@ -270,7 +274,7 @@ export default function VendorDashboardPage() {
         realtimeChannelRef.current = null;
       }
     };
-  }, [user, navigate]);
+  }, [authLoading, user, navigate]);
 
   const openChat = (conv: VendorConversation) => {
     setSelectedConv(conv);
@@ -289,6 +293,14 @@ export default function VendorDashboardPage() {
         });
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="animate-spin text-primary" size={24} />
+      </div>
+    );
+  }
 
   if (!user) return null;
 
