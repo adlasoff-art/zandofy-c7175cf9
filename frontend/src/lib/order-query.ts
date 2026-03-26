@@ -20,15 +20,17 @@ const EMPTY_OPTIONAL_ORDER_VALUES: OptionalOrderValues = {
 export async function withOptionalOrderFields<T extends { id: string }>(
   orders: T[],
   fields: OptionalOrderField[],
-): Promise<Array<T & OptionalOrderValues>> {
+): Promise<T[]> {
   if (orders.length === 0) {
-    return [];
+    return orders;
   }
 
-  const baseOrders = orders.map((order) => ({ ...EMPTY_OPTIONAL_ORDER_VALUES, ...order }));
+  const baseOrders = orders.map((order) => ({ ...EMPTY_OPTIONAL_ORDER_VALUES, ...order })) as Array<
+    T & OptionalOrderValues
+  >;
 
   if (fields.length === 0) {
-    return baseOrders;
+    return baseOrders as T[];
   }
 
   const { data, error } = await fromTable("orders")
@@ -37,7 +39,7 @@ export async function withOptionalOrderFields<T extends { id: string }>(
 
   if (error || !data) {
     console.warn("[withOptionalOrderFields] Optional order fields unavailable:", error?.message || error);
-    return baseOrders;
+    return baseOrders as T[];
   }
 
   const optionalMap = new Map<string, Partial<OptionalOrderValues>>(
@@ -47,5 +49,5 @@ export async function withOptionalOrderFields<T extends { id: string }>(
   return baseOrders.map((order) => ({
     ...order,
     ...optionalMap.get(order.id),
-  }));
+  })) as T[];
 }
