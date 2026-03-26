@@ -80,6 +80,7 @@ const EMPTY_FORM = {
   cost_calc: 0,
   auto_pricing_enabled: true,
   vendor_extra_margin: 0,
+  model_size: "",
 };
 
 type ProductFormState = typeof EMPTY_FORM;
