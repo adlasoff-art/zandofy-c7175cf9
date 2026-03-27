@@ -101,10 +101,11 @@ export default function StorePage() {
     queryFn: async () => {
       if (!products || products.length === 0) return [];
       const productIds = products.map((p) => p.id);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("reviews")
         .select("id, rating, comment, created_at, user_id, profiles:user_id(first_name, last_name, avatar_url)")
         .in("product_id", productIds)
+        .eq("is_approved", true)
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) return [];
