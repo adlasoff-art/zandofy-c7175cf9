@@ -59,7 +59,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
       if (error) throw error;
 
       // Fetch profiles for review authors
-      const userIds = [...new Set((data || []).map((r) => r.user_id))];
+      const userIds = [...new Set((data || []).map((r: any) => r.user_id))] as string[];
       let profilesMap: Record<string, any> = {};
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
