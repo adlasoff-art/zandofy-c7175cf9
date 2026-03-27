@@ -264,7 +264,9 @@ export function Header() {
         </div>
       )}
 
-      <nav className="hidden lg:block border-b border-border bg-card relative">
+      <nav className="hidden lg:block border-b border-border bg-card relative"
+        onMouseLeave={handleMegaLeave}
+      >
         <div className="container">
           <div className="flex items-center gap-0 overflow-x-auto scrollbar-thin">
             {navLinks.map((link, idx) => (
@@ -272,7 +274,6 @@ export function Header() {
                 key={link.label + idx}
                 className={`relative ${link.hasMega ? "shrink-0 sticky left-0 z-10 bg-card" : ""}`}
                 onMouseEnter={link.hasMega ? handleMegaEnter : undefined}
-                onMouseLeave={link.hasMega ? handleMegaLeave : undefined}
               >
                 <Link
                   to={link.hasMega ? "#" : link.href}
@@ -290,7 +291,7 @@ export function Header() {
         </div>
 
         {megaOpen && (
-          <div onMouseEnter={handleMegaEnter} onMouseLeave={handleMegaLeave}>
+          <div onMouseEnter={handleMegaEnter}>
             <MegaMenu />
           </div>
         )}
