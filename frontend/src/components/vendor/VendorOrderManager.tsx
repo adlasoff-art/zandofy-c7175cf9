@@ -527,9 +527,11 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
             hasSelfDelivery={hasSelfDelivery}
             onCancel={() => setShippedModal(null)}
             onConfirm={(trackingNumber, deliveryFee) => {
+              const code = generateConfirmationCode();
               updateStatus(shippedModal, "shipped", {
                 tracking_number: trackingNumber,
                 last_mile_fee: deliveryFee > 0 ? deliveryFee : undefined,
+                confirmation_code: code,
               });
               setShippedModal(null);
             }}
