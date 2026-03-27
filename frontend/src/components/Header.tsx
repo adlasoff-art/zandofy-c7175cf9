@@ -1,5 +1,5 @@
 import { Search, ShoppingBag, Heart, User, Menu, X, Headphones, Globe, ChevronRight, LogOut, MessageCircle, ChevronDown, PackageSearch, Sun, Moon, Monitor } from "lucide-react";
-import { useState, useRef, Component, type ReactNode, type ErrorInfo } from "react";
+import { useState, useRef, useEffect, Component, type ReactNode, type ErrorInfo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,7 +16,6 @@ import { useUnreadSupport } from "@/hooks/use-unread-support";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useI18n, LOCALES, CURRENCIES, type CurrencyCode } from "@/contexts/I18nContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 // Mini error boundary to prevent Radix crashes from taking down the whole page
 class SafeRadix extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
@@ -51,8 +50,10 @@ export function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [megaOpen, setMegaOpen] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [expandedMobileCat, setExpandedMobileCat] = useState<string | null>(null);
   const megaTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const { user, signOut } = useAuth();
   const { isStaff } = useRoles();
   const { setDrawerOpen, itemCount } = useCart();
@@ -107,6 +108,18 @@ export function Header() {
     },
     staleTime: 5 * 60 * 1000,
   });
+
+  // Close user menu on outside click
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [userMenuOpen]);
 
   const handleMegaEnter = () => {
     clearTimeout(megaTimeoutRef.current);
@@ -202,28 +215,28 @@ export function Header() {
             </div>
 
             {user ? (
-              <SafeRadix fallback={
-                <Link to="/dashboard" className="hidden md:flex p-2 text-primary hover:text-primary/80 transition-colors" aria-label={t("header.account")}>
+              <div className="relative hidden md:block" ref={userMenuRef}>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="p-2 text-primary hover:text-primary/80 transition-colors"
+                  aria-label={t("header.account")}
+                >
                   <User size={20} />
-                </Link>
-              }>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="hidden md:flex p-2 text-primary hover:text-primary/80 transition-colors" aria-label={t("header.account")}>
-                      <User size={20} />
+                </button>
+                {userMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-56 bg-popover border border-border rounded-lg shadow-lg z-50 py-1 animate-fade-in">
+                    <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border">{user.email}</div>
+                    <Link to="/dashboard" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.mySpace")}</Link>
+                    <Link to="/messages" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.messages")} {unreadCount > 0 && `(${unreadCount})`}</Link>
+                    <Link to="/vendor" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.vendorSpace")}</Link>
+                    <Link to="/become-vendor" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">{t("header.becomeVendor")}</Link>
+                    {isStaff && <Link to="/admin" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.admin")}</Link>}
+                    <button onClick={() => { setUserMenuOpen(false); signOut(); }} className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-muted transition-colors flex items-center gap-2">
+                      <LogOut size={14} /> {t("header.logout")}
                     </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem className="text-xs text-muted-foreground" disabled>{user.email}</DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to="/dashboard">{t("header.mySpace")}</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to="/messages">{t("header.messages")} {unreadCount > 0 && `(${unreadCount})`}</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to="/vendor">{t("header.vendorSpace")}</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to="/become-vendor" className="text-primary font-medium">{t("header.becomeVendor")}</Link></DropdownMenuItem>
-                    {isStaff && <DropdownMenuItem asChild><Link to="/admin">{t("header.admin")}</Link></DropdownMenuItem>}
-                    <DropdownMenuItem onClick={signOut} className="text-destructive"><LogOut size={14} className="mr-2" /> {t("header.logout")}</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </SafeRadix>
+                  </div>
+                )}
+              </div>
             ) : (
               <Link to="/auth" className="hidden md:flex p-2 text-foreground hover:text-primary transition-colors" aria-label={t("header.account")}>
                 <User size={20} />
@@ -251,7 +264,9 @@ export function Header() {
         </div>
       )}
 
-      <nav className="hidden lg:block border-b border-border bg-card relative">
+      <nav className="hidden lg:block border-b border-border bg-card relative"
+        onMouseLeave={handleMegaLeave}
+      >
         <div className="container">
           <div className="flex items-center gap-0 overflow-x-auto scrollbar-thin">
             {navLinks.map((link, idx) => (
@@ -259,7 +274,6 @@ export function Header() {
                 key={link.label + idx}
                 className={`relative ${link.hasMega ? "shrink-0 sticky left-0 z-10 bg-card" : ""}`}
                 onMouseEnter={link.hasMega ? handleMegaEnter : undefined}
-                onMouseLeave={link.hasMega ? handleMegaLeave : undefined}
               >
                 <Link
                   to={link.hasMega ? "#" : link.href}
@@ -277,7 +291,7 @@ export function Header() {
         </div>
 
         {megaOpen && (
-          <div onMouseEnter={handleMegaEnter} onMouseLeave={handleMegaLeave}>
+          <div onMouseEnter={handleMegaEnter}>
             <MegaMenu />
           </div>
         )}

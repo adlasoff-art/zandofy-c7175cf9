@@ -790,7 +790,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       .from("platform_settings")
       .select("value")
       .eq("key", "cms_texts")
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
         if (data?.value && typeof data.value === "object") {
           const val = data.value as any;
