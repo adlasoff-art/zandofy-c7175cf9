@@ -98,6 +98,7 @@ const AdminCountriesPage = lazy(() => import("./pages/admin/AdminCountriesPage")
 const AdminPopupsPage = lazy(() => import("./pages/admin/AdminPopupsPage"));
 const AdminSupportPage = lazy(() => import("./pages/admin/AdminSupportPage"));
 const AdminProductModerationPage = lazy(() => import("./pages/admin/AdminProductModerationPage"));
+const AdminReviewModerationPage = lazy(() => import("./pages/admin/AdminReviewModerationPage"));
 const AdminVariantTypesPage = lazy(() => import("./pages/admin/AdminVariantTypesPage"));
 const AdminAnalyticsPage = lazy(() => import("./pages/admin/AdminAnalyticsPage"));
 const AdminEmailTemplatesPage = lazy(() => import("./pages/admin/AdminEmailTemplatesPage"));
