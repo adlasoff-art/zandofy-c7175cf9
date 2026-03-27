@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, Image, FolderTree, Bell, Settings, ShieldCheck, Truck, Package, DollarSign, Store, PenLine, Crown, ScrollText, Heart, Coins, Ticket, Banknote, RotateCcw, AlertTriangle, ArrowLeftRight, Globe, Megaphone, Headphones, Layers, BarChart3, Mail, User, Receipt,
+  LayoutDashboard, Users, Image, FolderTree, Bell, Settings, ShieldCheck, Truck, Package, DollarSign, Store, PenLine, Crown, ScrollText, Heart, Coins, Ticket, Banknote, RotateCcw, AlertTriangle, ArrowLeftRight, Globe, Megaphone, Headphones, Layers, BarChart3, Mail, User, Receipt, Star,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useRoles } from "@/hooks/use-roles";
@@ -19,6 +19,7 @@ const adminItems = [
   { title: "Catégories", url: "/admin/categories", icon: FolderTree },
   { title: "Types de variations", url: "/admin/variant-types", icon: Layers },
   { title: "Modération produits", url: "/admin/product-moderation", icon: ShieldCheck },
+  { title: "Modération avis", url: "/admin/review-moderation", icon: Star },
   { title: "Vérification KYC", url: "/admin/kyc", icon: ShieldCheck },
   { title: "Commandes", url: "/admin/orders", icon: Package },
   { title: "Support client", url: "/admin/support", icon: Headphones },

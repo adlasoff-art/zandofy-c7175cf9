@@ -3025,36 +3025,48 @@ export type Database = {
       }
       reviews: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           comment: string
           created_at: string
           helpful_count: number
           id: string
           images: string[] | null
+          is_approved: boolean
           is_verified_purchase: boolean
           product_id: string
           rating: number
+          reward_granted: boolean
           user_id: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           comment?: string
           created_at?: string
           helpful_count?: number
           id?: string
           images?: string[] | null
+          is_approved?: boolean
           is_verified_purchase?: boolean
           product_id: string
           rating: number
+          reward_granted?: boolean
           user_id: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           comment?: string
           created_at?: string
           helpful_count?: number
           id?: string
           images?: string[] | null
+          is_approved?: boolean
           is_verified_purchase?: boolean
           product_id?: string
           rating?: number
+          reward_granted?: boolean
           user_id?: string
         }
         Relationships: [
