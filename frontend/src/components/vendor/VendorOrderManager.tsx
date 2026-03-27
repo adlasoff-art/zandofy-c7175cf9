@@ -583,6 +583,27 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
           }}
         />
       )}
+      {/* Hub pickup modal — verify confirmation code and mark delivered */}
+      {hubPickupModal && (() => {
+        const order = orders.find(o => o.id === hubPickupModal);
+        if (!order) return null;
+        return (
+          <HubPickupModal
+            orderRef={order.order_ref}
+            expectedCode={order.confirmation_code || ""}
+            shippingPaymentStatus={order.shipping_payment_status}
+            shippingCost={Number(order.shipping_cost || 0)}
+            loading={!!updatingId}
+            onCancel={() => setHubPickupModal(null)}
+            onConfirm={() => {
+              updateStatus(hubPickupModal, "delivered", {
+                delivery_choice: "hub_pickup",
+              });
+              setHubPickupModal(null);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
