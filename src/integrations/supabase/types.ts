@@ -2057,7 +2057,9 @@ export type Database = {
           status: string
           store_id: string | null
           subtotal: number
+          supplier_link: string | null
           supplier_order_number: string | null
+          supplier_platform_id: string | null
           tip_amount: number | null
           total: number
           tracking_number: string | null
@@ -2097,7 +2099,9 @@ export type Database = {
           status?: string
           store_id?: string | null
           subtotal?: number
+          supplier_link?: string | null
           supplier_order_number?: string | null
+          supplier_platform_id?: string | null
           tip_amount?: number | null
           total?: number
           tracking_number?: string | null
@@ -2137,7 +2141,9 @@ export type Database = {
           status?: string
           store_id?: string | null
           subtotal?: number
+          supplier_link?: string | null
           supplier_order_number?: string | null
+          supplier_platform_id?: string | null
           tip_amount?: number | null
           total?: number
           tracking_number?: string | null
@@ -2150,6 +2156,13 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_supplier_platform_id_fkey"
+            columns: ["supplier_platform_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_platforms"
             referencedColumns: ["id"]
           },
         ]
@@ -3704,6 +3717,33 @@ export type Database = {
           verified_years?: number | null
           verified_years_override?: number | null
           whatsapp_number?: string | null
+        }
+        Relationships: []
+      }
+      supplier_platforms: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          logo_url: string | null
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          logo_url?: string | null
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          logo_url?: string | null
+          name?: string
+          sort_order?: number
         }
         Relationships: []
       }
