@@ -71,7 +71,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
         }
       }
 
-      return (data || []).map((r) => {
+      return (data || []).map((r: any) => {
         const { user_id, ...rest } = r;
         return {
           ...rest,
