@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     const userId = userData.user.id;
 
     const body = await req.json();
-    const { order_id, phone_number, amount, currency, provider } = body;
+    const { order_id, phone_number, amount, currency, provider, payment_type } = body;
 
     if (!order_id || !phone_number || !amount || !currency) {
       return new Response(
