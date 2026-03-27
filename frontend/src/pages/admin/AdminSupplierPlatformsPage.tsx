@@ -85,7 +85,7 @@ export default function AdminSupplierPlatformsPage() {
   };
 
   return (
-    <AdminLayout>
+    <AdminLayout title="Plateformes fournisseurs">
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Plateformes fournisseurs</h1>
