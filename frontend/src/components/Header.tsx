@@ -50,8 +50,10 @@ export function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [megaOpen, setMegaOpen] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [expandedMobileCat, setExpandedMobileCat] = useState<string | null>(null);
   const megaTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const { user, signOut } = useAuth();
   const { isStaff } = useRoles();
   const { setDrawerOpen, itemCount } = useCart();
