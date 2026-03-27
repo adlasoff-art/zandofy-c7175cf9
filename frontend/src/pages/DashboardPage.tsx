@@ -722,19 +722,10 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         </div>
       )}
 
-      {/* Supplier order number & tracking — visible from in_shipping onwards */}
-      {(order.supplier_order_number || order.tracking_number) && (
+      {/* Tracking number only — supplier info hidden from clients */}
+      {order.tracking_number && (
         <div className="space-y-2">
           <p className="text-xs font-semibold text-muted-foreground">Informations de suivi</p>
-          {order.supplier_order_number && (
-            <div className="flex items-center gap-2 text-sm bg-muted/30 rounded-md p-2.5">
-              <Package size={14} className="text-primary shrink-0" />
-              <div className="flex-1 min-w-0">
-                <span className="text-[11px] text-muted-foreground block">N° commande fournisseur</span>
-                <span className="font-mono font-bold text-foreground">{order.supplier_order_number}</span>
-              </div>
-            </div>
-          )}
           {order.tracking_number && (
             <div className="flex items-center gap-2 text-sm bg-muted/30 rounded-md p-2.5">
               <Truck size={14} className="text-primary shrink-0" />

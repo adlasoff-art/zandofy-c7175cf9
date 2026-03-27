@@ -512,14 +512,14 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
         <SupplierInfoModal
           loading={!!updatingId}
           onCancel={() => setSupplierModal(null)}
-          onConfirm={(platformId, supplierOrderNumber, supplierLink, trackingNumber) => {
-            updateStatus(supplierModal, "preparing", {
+          onConfirm={async (platformId, supplierOrderNumber, supplierLink, trackingNumber) => {
+            const ok = await updateStatus(supplierModal, "preparing", {
               supplier_platform_id: platformId,
               supplier_order_number: supplierOrderNumber,
               supplier_link: supplierLink,
               tracking_number: trackingNumber || null,
             });
-            setSupplierModal(null);
+            if (ok) setSupplierModal(null);
           }}
         />
       )}
@@ -533,14 +533,14 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
             currentTrackingNumber={order?.tracking_number || null}
             hasSelfDelivery={hasSelfDelivery}
             onCancel={() => setShippedModal(null)}
-            onConfirm={(trackingNumber, deliveryFee) => {
+            onConfirm={async (trackingNumber, deliveryFee) => {
               const code = generateConfirmationCode();
-              updateStatus(shippedModal, "shipped", {
+              const ok = await updateStatus(shippedModal, "shipped", {
                 tracking_number: trackingNumber,
                 last_mile_fee: deliveryFee > 0 ? deliveryFee : undefined,
                 confirmation_code: code,
               });
-              setShippedModal(null);
+              if (ok) setShippedModal(null);
             }}
           />
         );
