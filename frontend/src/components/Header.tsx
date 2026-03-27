@@ -178,8 +178,10 @@ export function Header() {
             </button>
 
             {user && (
-              <SafeRadix fallback={<Link to="/dashboard" className="p-2 text-foreground hover:text-primary"><User size={20} /></Link>}>
-                <NotificationCenter />
+              <SafeRadix fallback={<Link to="/dashboard" className="p-2 text-foreground hover:text-primary"><Bell size={20} /></Link>}>
+                <Suspense fallback={<span className="p-2 text-foreground"><Bell size={20} /></span>}>
+                  <NotificationCenter />
+                </Suspense>
               </SafeRadix>
             )}
 
