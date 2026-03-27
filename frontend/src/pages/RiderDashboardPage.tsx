@@ -577,7 +577,7 @@ export default function RiderDashboardPage() {
                         </div>
 
                         {/* Cash confirmation for rider */}
-                        {o.delivery_choice === "home" && o.last_mile_payment_method === "cash" && (
+                        {o.delivery_choice === "home_delivery" && o.last_mile_payment_method === "cash" && (
                           <div className="border-t border-border pt-3 space-y-2">
                             {o.rider_cash_collected ? (
                               <div className="flex items-center gap-2 bg-primary/5 rounded-lg px-3 py-2">
