@@ -203,28 +203,28 @@ export function Header() {
             </div>
 
             {user ? (
-              <SafeRadix fallback={
-                <Link to="/dashboard" className="hidden md:flex p-2 text-primary hover:text-primary/80 transition-colors" aria-label={t("header.account")}>
+              <div className="relative hidden md:block" ref={userMenuRef}>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="p-2 text-primary hover:text-primary/80 transition-colors"
+                  aria-label={t("header.account")}
+                >
                   <User size={20} />
-                </Link>
-              }>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="hidden md:flex p-2 text-primary hover:text-primary/80 transition-colors" aria-label={t("header.account")}>
-                      <User size={20} />
+                </button>
+                {userMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-56 bg-popover border border-border rounded-lg shadow-lg z-50 py-1 animate-fade-in">
+                    <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border">{user.email}</div>
+                    <Link to="/dashboard" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.mySpace")}</Link>
+                    <Link to="/messages" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.messages")} {unreadCount > 0 && `(${unreadCount})`}</Link>
+                    <Link to="/vendor" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.vendorSpace")}</Link>
+                    <Link to="/become-vendor" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">{t("header.becomeVendor")}</Link>
+                    {isStaff && <Link to="/admin" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.admin")}</Link>}
+                    <button onClick={() => { setUserMenuOpen(false); signOut(); }} className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-muted transition-colors flex items-center gap-2">
+                      <LogOut size={14} /> {t("header.logout")}
                     </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem className="text-xs text-muted-foreground" disabled>{user.email}</DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to="/dashboard">{t("header.mySpace")}</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to="/messages">{t("header.messages")} {unreadCount > 0 && `(${unreadCount})`}</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to="/vendor">{t("header.vendorSpace")}</Link></DropdownMenuItem>
-                    <DropdownMenuItem asChild><Link to="/become-vendor" className="text-primary font-medium">{t("header.becomeVendor")}</Link></DropdownMenuItem>
-                    {isStaff && <DropdownMenuItem asChild><Link to="/admin">{t("header.admin")}</Link></DropdownMenuItem>}
-                    <DropdownMenuItem onClick={signOut} className="text-destructive"><LogOut size={14} className="mr-2" /> {t("header.logout")}</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </SafeRadix>
+                  </div>
+                )}
+              </div>
             ) : (
               <Link to="/auth" className="hidden md:flex p-2 text-foreground hover:text-primary transition-colors" aria-label={t("header.account")}>
                 <User size={20} />
