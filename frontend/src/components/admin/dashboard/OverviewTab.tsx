@@ -24,7 +24,7 @@ export function OverviewTab({ period }: Props) {
   const { data: orderStats, isLoading: lo } = useQuery({
     queryKey: ["admin-order-stats", period],
     queryFn: async () => {
-      const { data } = await supabase.from("orders").select("total, status, shipping_payment_status, last_mile_payment_status, shipping_cost, last_mile_fee, shipping_payment_proof_url, last_mile_payment_proof_url").gte("created_at", since);
+      const { data } = await (supabase as any).from("orders").select("total, status, shipping_payment_status, last_mile_payment_status, shipping_cost, last_mile_fee, shipping_payment_proof_url, last_mile_payment_proof_url").gte("created_at", since);
       if (!data) return { count: 0, revenue: 0, currentRevenue: 0, cancelledRevenue: 0, cancelledCount: 0, deliveredCount: 0, pendingCount: 0, failedAmount: 0, failedCount: 0, byStatus: {} as Record<string, number>, proofShippingPaid: 0, proofLastMilePaid: 0 };
       const byStatus: Record<string, number> = {};
       let revenue = 0, currentRevenue = 0, cancelledRevenue = 0, cancelledCount = 0, deliveredCount = 0, pendingCount = 0, failedAmount = 0, failedCount = 0, opCount = 0;
