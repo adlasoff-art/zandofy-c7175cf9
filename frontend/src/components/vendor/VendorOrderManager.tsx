@@ -157,7 +157,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
 
   useEffect(() => { loadOrders(); }, [loadOrders]);
 
-  const updateStatus = async (orderId: string, newStatus: string, extraFields?: Record<string, any>) => {
+  const updateStatus = async (orderId: string, newStatus: string, extraFields?: Record<string, any>): Promise<boolean> => {
     setUpdatingId(orderId);
     const updateData: any = { status: newStatus, ...extraFields };
 
@@ -167,13 +167,20 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
       .eq("id", orderId);
 
     if (error) {
-      toast.error("Erreur lors de la mise à jour");
-    } else {
-      toast.success(`Commande passée à "${STATUS_CONFIG[newStatus]?.label || newStatus}"`);
-      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: newStatus, ...extraFields } : o));
-      triggerOrderStatusNotification(orderId, newStatus);
+      console.error("[VendorOrderManager] Update error:", error);
+      if (isStaff) {
+        toast.error(`Erreur : ${error.message || error.code || "Échec mise à jour"}`, { duration: 8000 });
+      } else {
+        toast.error("Erreur lors de la mise à jour. Veuillez réessayer ou contacter l'administrateur.");
+      }
+      setUpdatingId(null);
+      return false;
     }
+    toast.success(`Commande passée à "${STATUS_CONFIG[newStatus]?.label || newStatus}"`);
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: newStatus, ...extraFields } : o));
+    triggerOrderStatusNotification(orderId, newStatus);
     setUpdatingId(null);
+    return true;
   };
 
   const handleAdvance = (orderId: string, currentStatus: string) => {
@@ -505,14 +512,14 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
         <SupplierInfoModal
           loading={!!updatingId}
           onCancel={() => setSupplierModal(null)}
-          onConfirm={(platformId, supplierOrderNumber, supplierLink, trackingNumber) => {
-            updateStatus(supplierModal, "preparing", {
+          onConfirm={async (platformId, supplierOrderNumber, supplierLink, trackingNumber) => {
+            const ok = await updateStatus(supplierModal, "preparing", {
               supplier_platform_id: platformId,
               supplier_order_number: supplierOrderNumber,
               supplier_link: supplierLink,
               tracking_number: trackingNumber || null,
             });
-            setSupplierModal(null);
+            if (ok) setSupplierModal(null);
           }}
         />
       )}
@@ -526,14 +533,14 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
             currentTrackingNumber={order?.tracking_number || null}
             hasSelfDelivery={hasSelfDelivery}
             onCancel={() => setShippedModal(null)}
-            onConfirm={(trackingNumber, deliveryFee) => {
+            onConfirm={async (trackingNumber, deliveryFee) => {
               const code = generateConfirmationCode();
-              updateStatus(shippedModal, "shipped", {
+              const ok = await updateStatus(shippedModal, "shipped", {
                 tracking_number: trackingNumber,
                 last_mile_fee: deliveryFee > 0 ? deliveryFee : undefined,
                 confirmation_code: code,
               });
-              setShippedModal(null);
+              if (ok) setShippedModal(null);
             }}
           />
         );
@@ -555,7 +562,12 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
               if (supplierOrderNumber) updates.supplier_order_number = supplierOrderNumber;
               const { error } = await supabase.from("orders").update(updates).eq("id", editTrackingModal);
               if (error) {
-                toast.error("Erreur lors de la mise à jour");
+                console.error("[VendorOrderManager] Edit tracking error:", error);
+                if (isStaff) {
+                  toast.error(`Erreur : ${error.message || error.code}`, { duration: 8000 });
+                } else {
+                  toast.error("Erreur lors de la mise à jour. Veuillez contacter l'administrateur.");
+                }
               } else {
                 toast.success("Informations de suivi mises à jour");
                 setOrders(prev => prev.map(o => o.id === editTrackingModal ? { ...o, ...updates } : o));
