@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { HeroBanner } from "@/components/HeroBanner";
 import { CategoryBanner } from "@/components/CategoryBanner";
@@ -14,12 +15,12 @@ import { SEOHead } from "@/components/SEOHead";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
-  const [refreshKey, setRefreshKey] = useState(0);
+  const queryClient = useQueryClient();
 
   const handleRefresh = useCallback(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    setRefreshKey((k) => k + 1);
-  }, []);
+    await queryClient.invalidateQueries();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }, [queryClient]);
 
   const { pulling, pullProgress, refreshing, handlers } = usePullToRefresh(handleRefresh);
 
