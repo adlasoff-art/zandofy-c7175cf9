@@ -109,6 +109,18 @@ export function Header() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Close user menu on outside click
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [userMenuOpen]);
+
   const handleMegaEnter = () => {
     clearTimeout(megaTimeoutRef.current);
     setMegaOpen(true);
