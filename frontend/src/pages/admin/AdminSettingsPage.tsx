@@ -73,11 +73,14 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
+  const [gatewayFees, setGatewayFees] = useState({ mobile_money_fee_pct: 2.5 });
+  const [reviewBonus, setReviewBonus] = useState({ bonus_pct: 0.10 });
+
   useEffect(() => {
     supabase
       .from("platform_settings")
       .select("key, value")
-      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings"])
+      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings", "gateway_fees", "review_bonus"])
       .then(({ data }) => {
         data?.forEach((row) => {
           const v = row.value as any;
