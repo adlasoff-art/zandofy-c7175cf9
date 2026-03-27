@@ -562,7 +562,12 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
               if (supplierOrderNumber) updates.supplier_order_number = supplierOrderNumber;
               const { error } = await supabase.from("orders").update(updates).eq("id", editTrackingModal);
               if (error) {
-                toast.error("Erreur lors de la mise à jour");
+                console.error("[VendorOrderManager] Edit tracking error:", error);
+                if (isStaff) {
+                  toast.error(`Erreur : ${error.message || error.code}`, { duration: 8000 });
+                } else {
+                  toast.error("Erreur lors de la mise à jour. Veuillez contacter l'administrateur.");
+                }
               } else {
                 toast.success("Informations de suivi mises à jour");
                 setOrders(prev => prev.map(o => o.id === editTrackingModal ? { ...o, ...updates } : o));
