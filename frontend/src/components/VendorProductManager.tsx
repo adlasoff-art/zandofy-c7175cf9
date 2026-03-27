@@ -349,20 +349,20 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       currency: form.currency,
       description: form.description || null,
       short_description: form.short_description || null,
-      moq: form.moq || 1,
+      moq: form.moq ? Math.round(Number(form.moq)) : 1,
       sku: form.sku || null,
       is_new: form.is_new,
       is_sale: form.is_sale,
-      discount: form.discount || 0,
+      discount: form.discount ? Math.round(Number(form.discount)) : 0,
       material: form.material || null,
       origin_country: form.origin_country || null,
-      category_id: form.category_id || null,
-      trend_tag_id: form.trend_tag_id || null,
+      category_id: form.category_id && form.category_id.trim() !== '' ? form.category_id : null,
+      trend_tag_id: form.trend_tag_id && form.trend_tag_id.trim() !== '' ? form.trend_tag_id : null,
       store_id: storeId,
       flash_timer_enabled: form.flash_timer_enabled,
       promo_start_date: form.promo_start_date ? new Date(form.promo_start_date).toISOString() : null,
       promo_end_date: form.promo_end_date ? new Date(form.promo_end_date).toISOString() : null,
-      weight_grams: form.weight_grams || null,
+      weight_grams: form.weight_grams ? Math.round(Number(form.weight_grams)) : null,
       length_cm: form.length_cm || null,
       width_cm: form.width_cm || null,
       height_cm: form.height_cm || null,
@@ -370,7 +370,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       cost_calc: form.cost_calc || null,
       auto_pricing_enabled: form.auto_pricing_enabled,
       vendor_extra_margin: form.vendor_extra_margin || 0,
-      model_size: form.model_size || null,
+      model_size: form.model_size && form.model_size.trim() !== '' ? form.model_size.trim() : null,
     };
 
     let productId = editing?.id;
@@ -382,7 +382,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
         ? { ...payload, publish_status: "pending_approval" }
         : payload;
       const { error } = await (supabase.from("products").update(updatePayload as any) as any).eq("id", editing.id);
-      if (error) { toast.error("Erreur lors de la mise à jour"); setSaving(false); return; }
+      if (error) { console.error("Product update error:", error); toast.error("Erreur lors de la mise à jour : " + (error.message || "inconnue")); setSaving(false); return; }
     } else {
       const { data, error } = await (supabase.from("products").insert(payload as any) as any).select("id").single();
       if (error || !data) { console.error("Product insert error:", error); toast.error("Erreur lors de la création : " + (error?.message || "inconnue")); setSaving(false); return; }
