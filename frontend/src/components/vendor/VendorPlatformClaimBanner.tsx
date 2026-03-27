@@ -53,8 +53,8 @@ export function VendorPlatformClaimBanner({ storeId, userId, storeName }: Props)
 
   const isExpired = claim ? new Date(claim.expires_at) < new Date() : true;
 
-  // If claim is expired AND already resolved (accepted/rejected), hide the banner entirely
-  if (claim && isExpired && claim.status !== "pending") return null;
+  // After 72h expiry, hide banner completely regardless of status
+  if (!claim || isExpired) return null;
 
   const handleContest = async () => {
     if (!claim || isExpired) return;
