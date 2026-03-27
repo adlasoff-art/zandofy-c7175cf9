@@ -157,7 +157,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
 
   useEffect(() => { loadOrders(); }, [loadOrders]);
 
-  const updateStatus = async (orderId: string, newStatus: string, extraFields?: Record<string, any>) => {
+  const updateStatus = async (orderId: string, newStatus: string, extraFields?: Record<string, any>): Promise<boolean> => {
     setUpdatingId(orderId);
     const updateData: any = { status: newStatus, ...extraFields };
 
@@ -167,13 +167,20 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
       .eq("id", orderId);
 
     if (error) {
-      toast.error("Erreur lors de la mise à jour");
-    } else {
-      toast.success(`Commande passée à "${STATUS_CONFIG[newStatus]?.label || newStatus}"`);
-      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: newStatus, ...extraFields } : o));
-      triggerOrderStatusNotification(orderId, newStatus);
+      console.error("[VendorOrderManager] Update error:", error);
+      if (isStaff) {
+        toast.error(`Erreur : ${error.message || error.code || "Échec mise à jour"}`, { duration: 8000 });
+      } else {
+        toast.error("Erreur lors de la mise à jour. Veuillez réessayer ou contacter l'administrateur.");
+      }
+      setUpdatingId(null);
+      return false;
     }
+    toast.success(`Commande passée à "${STATUS_CONFIG[newStatus]?.label || newStatus}"`);
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: newStatus, ...extraFields } : o));
+    triggerOrderStatusNotification(orderId, newStatus);
     setUpdatingId(null);
+    return true;
   };
 
   const handleAdvance = (orderId: string, currentStatus: string) => {
