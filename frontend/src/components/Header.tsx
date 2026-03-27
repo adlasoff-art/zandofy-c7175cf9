@@ -160,7 +160,11 @@ export function Header() {
               <Search size={20} />
             </button>
 
-            {user && <NotificationCenter />}
+            {user && (
+              <SafeRadix fallback={<Link to="/dashboard" className="p-2 text-foreground hover:text-primary"><User size={20} /></Link>}>
+                <NotificationCenter />
+              </SafeRadix>
+            )}
 
             {user && (
               <Link to="/messages" className="p-2 text-foreground hover:text-primary transition-colors relative" aria-label={t("header.messages")} title={t("header.messages")}>
