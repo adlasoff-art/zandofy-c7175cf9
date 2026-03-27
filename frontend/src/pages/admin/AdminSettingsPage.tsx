@@ -254,6 +254,44 @@ export default function AdminSettingsPage() {
           </div>
         </section>
 
+        {/* Gateway Fees & Review Bonus */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Frais passerelle & Bonus avis</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Paramètres financiers pour le suivi des frais Mobile Money et les récompenses des avis clients.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Frais passerelle Mobile Money (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={20}
+                step={0.1}
+                value={gatewayFees.mobile_money_fee_pct}
+                onChange={(e) => setGatewayFees({ mobile_money_fee_pct: Number(e.target.value) || 2.5 })}
+                className={inputClass}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Déduit du brut pour estimer le revenu net (KPI indicatif)</p>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Bonus avis avec photos (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={5}
+                step={0.01}
+                value={reviewBonus.bonus_pct}
+                onChange={(e) => setReviewBonus({ bonus_pct: Number(e.target.value) || 0.10 })}
+                className={inputClass}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">% du sous-total commande crédité en ZandoPoints à l'approbation</p>
+            </div>
+          </div>
+        </section>
         <section className="bg-card border border-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Calculator size={18} className="text-primary" />

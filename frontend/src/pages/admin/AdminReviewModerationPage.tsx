@@ -16,6 +16,14 @@ export default function AdminReviewModerationPage() {
   const [filter, setFilter] = useState<ReviewFilter>("pending");
   const [previewImages, setPreviewImages] = useState<string[] | null>(null);
 
+  const { data: bonusPct = 0.10 } = useQuery({
+    queryKey: ["review-bonus-pct"],
+    queryFn: async () => {
+      const { data } = await supabase.from("platform_settings").select("value").eq("key", "review_bonus").maybeSingle();
+      return Number((data?.value as any)?.bonus_pct) || 0.10;
+    },
+  });
+
   const { data: reviews, isLoading } = useQuery({
     queryKey: ["admin-reviews", filter],
     queryFn: async () => {
