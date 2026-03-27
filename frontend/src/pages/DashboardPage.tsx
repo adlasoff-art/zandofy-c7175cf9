@@ -1008,6 +1008,18 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           onSuccess={() => { setShowRetryPayment(false); onCancelSuccess(); }}
         />
       )}
+
+      {/* Shipping / Last-Mile Payment Modal (USSD) */}
+      {showShippingPayment && (
+        <ShippingPaymentModal
+          orderId={order.id}
+          orderRef={order.order_ref}
+          amount={showShippingPayment === "shipping" ? Number(order.shipping_cost || 0) : Number(order.last_mile_fee || 0)}
+          paymentType={showShippingPayment}
+          onClose={() => setShowShippingPayment(null)}
+          onSuccess={() => { setShowShippingPayment(null); onCancelSuccess(); }}
+        />
+      )}
     </div>
   );
 }
