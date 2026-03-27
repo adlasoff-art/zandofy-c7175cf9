@@ -76,10 +76,11 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
   const isStaff = isAdmin || isManager;
 
   // Modal states
-  const [trackingModal, setTrackingModal] = useState<string | null>(null);
+  const [supplierModal, setSupplierModal] = useState<string | null>(null);
+  const [shippedModal, setShippedModal] = useState<string | null>(null);
   const [riderModal, setRiderModal] = useState<string | null>(null);
-  const [deliveryFeeModal, setDeliveryFeeModal] = useState<string | null>(null);
   const [editTrackingModal, setEditTrackingModal] = useState<string | null>(null);
+  const [hasSelfDelivery, setHasSelfDelivery] = useState(false);
   const [hasSelfDelivery, setHasSelfDelivery] = useState(false);
 
   // Check if store has self-delivery
