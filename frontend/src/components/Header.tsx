@@ -18,6 +18,16 @@ import { useI18n, LOCALES, CURRENCIES, type CurrencyCode } from "@/contexts/I18n
 import { useTheme } from "@/contexts/ThemeContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
+// Mini error boundary to prevent Radix crashes from taking down the whole page
+class SafeRadix extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.warn("[SafeRadix] Radix component crashed, rendering fallback:", error.message);
+  }
+  render() { return this.state.hasError ? this.props.fallback : this.props.children; }
+}
+
 // Fallback static nav items (used if CMS query fails or is loading)
 const NAV_LINK_KEYS = [
   { label: "Catégories", href: "#", hasMega: true, highlight: false },
