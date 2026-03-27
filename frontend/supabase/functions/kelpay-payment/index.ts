@@ -155,6 +155,7 @@ Deno.serve(async (req) => {
         currency: currency.toUpperCase(),
         reference,
         status: "failed",
+        payment_type: payment_type || "order",
         callback_payload: kelpayData,
       });
 
