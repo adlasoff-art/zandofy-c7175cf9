@@ -378,13 +378,26 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                   />
                 )}
 
-                {order.delivery_choice === "hub_pickup" && order.status !== "delivered" && order.status !== "cancelled" && (
-                  <PaymentProofUpload
+                {/* Hub proof photo — visible when order is at hub stage */}
+                {["shipped", "assigning_rider", "rider_assigned"].includes(order.status) && (
+                  <HubProofPhotoUpload
                     orderId={order.id}
-                    field="hub_pickup_proof_url"
-                    label="Preuve de remise au Hub (photo)"
                     existingUrl={order.hub_pickup_proof_url}
+                    onUploaded={(url) => {
+                      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, hub_pickup_proof_url: url } : o));
+                    }}
                   />
+                )}
+
+                {/* Hub pickup button — vendor can mark as picked up at hub */}
+                {["shipped", "assigning_rider", "rider_assigned"].includes(order.status) && order.confirmation_code && (
+                  <button
+                    onClick={() => setHubPickupModal(order.id)}
+                    className="w-full py-2 text-xs font-medium border-2 border-primary text-primary rounded-md hover:bg-primary/10 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Package size={12} />
+                    Retrait au Hub (client récupère)
+                  </button>
                 )}
 
                 {order.delivery_choice === "home_delivery" && order.last_mile_payment_method === "cash" && (
