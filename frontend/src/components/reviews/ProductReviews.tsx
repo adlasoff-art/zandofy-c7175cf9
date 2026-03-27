@@ -54,6 +54,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
         .from("reviews")
         .select("*")
         .eq("product_id", productId)
+        .eq("is_approved" as any, true)
         .order("created_at", { ascending: false });
       if (error) throw error;
 
