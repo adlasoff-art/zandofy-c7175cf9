@@ -127,6 +127,10 @@ export default function AdminSettingsPage() {
             if (tiers.length) {
               setBulkTiers(tiers.map((tier: any) => ({ min_quantity: Number(tier.min_quantity) || 1, discount_pct: Number(tier.discount_pct) || 0 })));
             }
+          } else if (row.key === "gateway_fees") {
+            setGatewayFees({ mobile_money_fee_pct: Number(v.mobile_money_fee_pct) || 2.5 });
+          } else if (row.key === "review_bonus") {
+            setReviewBonus({ bonus_pct: Number(v.bonus_pct) || 0.10 });
           }
         });
       });
