@@ -31,7 +31,7 @@ export function SupplierInfoModal({
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("supplier_platforms")
         .select("id, name")
         .eq("is_active", true)
