@@ -94,9 +94,15 @@ export default function AdminOrdersPage() {
     const next = getNextStatus(currentStatus);
     if (!next) return;
 
-    // preparing → in_shipping: ask for tracking number
-    if (currentStatus === "preparing" && next === "in_shipping") {
-      setTrackingModal(orderId);
+    // confirmed → preparing: ask for supplier info
+    if (currentStatus === "confirmed" && next === "preparing") {
+      setSupplierModal(orderId);
+      return;
+    }
+
+    // in_shipping → shipped: ask for tracking + delivery fee
+    if (currentStatus === "in_shipping" && next === "shipped") {
+      setShippedModal(orderId);
       return;
     }
 
