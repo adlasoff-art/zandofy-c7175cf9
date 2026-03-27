@@ -61,7 +61,7 @@ const Index = () => {
         </div>
       )}
 
-      <main key={refreshKey}>
+      <main>
         <HeroBanner />
         <CategoryBanner />
         <FlashSales />
