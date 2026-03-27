@@ -17,7 +17,7 @@ import {
   canAdminAdvance,
   type OrderStatus,
 } from "@/lib/order-status";
-import { TrackingNumberModal, RiderAssignmentModal, DeliveryFeeModal } from "@/components/vendor/OrderTransitionModals";
+import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, DeliveryFeeModal } from "@/components/vendor/OrderTransitionModals";
 import { withOptionalOrderFields } from "@/lib/order-query";
 
 export default function AdminOrdersPage() {

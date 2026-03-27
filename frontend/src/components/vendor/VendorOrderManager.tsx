@@ -81,7 +81,6 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
   const [riderModal, setRiderModal] = useState<string | null>(null);
   const [editTrackingModal, setEditTrackingModal] = useState<string | null>(null);
   const [hasSelfDelivery, setHasSelfDelivery] = useState(false);
-  const [hasSelfDelivery, setHasSelfDelivery] = useState(false);
 
   // Check if store has self-delivery
   useEffect(() => {
