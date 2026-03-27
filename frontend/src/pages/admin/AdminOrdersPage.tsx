@@ -31,9 +31,9 @@ export default function AdminOrdersPage() {
   const queryClient = useQueryClient();
 
   // Modal states for admin
-  const [trackingModal, setTrackingModal] = useState<string | null>(null);
+  const [supplierModal, setSupplierModal] = useState<string | null>(null);
+  const [shippedModal, setShippedModal] = useState<string | null>(null);
   const [riderModal, setRiderModal] = useState<string | null>(null);
-  const [deliveryFeeModal, setDeliveryFeeModal] = useState<string | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["admin-orders", user?.id],
