@@ -1,50 +1,108 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Truck, User, DollarSign, Hash, Edit2 } from "lucide-react";
+import { Loader2, Truck, User, DollarSign, Hash, Edit2, Globe, Link as LinkIcon } from "lucide-react";
 
-function generateConfirmationCode(): string {
+export function generateConfirmationCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
-/** Modal: enter supplier order number (required) + tracking number (optional) when advancing preparing → in_shipping */
-export function TrackingNumberModal({
+interface SupplierPlatform {
+  id: string;
+  name: string;
+}
+
+/** Modal: confirmed → preparing — requires supplier platform, supplier order number, supplier link */
+export function SupplierInfoModal({
   onConfirm,
   onCancel,
   loading,
 }: {
-  onConfirm: (trackingNumber: string, supplierOrderNumber: string) => void;
+  onConfirm: (platformId: string, supplierOrderNumber: string, supplierLink: string, trackingNumber: string) => void;
   onCancel: () => void;
   loading: boolean;
 }) {
-  const [trackingValue, setTrackingValue] = useState("");
-  const [supplierOrderValue, setSupplierOrderValue] = useState("");
+  const [platforms, setPlatforms] = useState<SupplierPlatform[]>([]);
+  const [loadingPlatforms, setLoadingPlatforms] = useState(true);
+  const [selectedPlatform, setSelectedPlatform] = useState("");
+  const [supplierOrderNumber, setSupplierOrderNumber] = useState("");
+  const [supplierLink, setSupplierLink] = useState("");
+  const [trackingNumber, setTrackingNumber] = useState("");
 
-  const canSubmit = supplierOrderValue.trim().length > 0;
+  useEffect(() => {
+    async function load() {
+      const { data } = await (supabase as any)
+        .from("supplier_platforms")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      setPlatforms((data as SupplierPlatform[]) || []);
+      setLoadingPlatforms(false);
+    }
+    load();
+  }, []);
+
+  const canSubmit = selectedPlatform && supplierOrderNumber.trim().length > 0 && supplierLink.trim().length > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
-      <div className="bg-card rounded-xl w-full max-w-sm p-5 space-y-4 border border-border" onClick={e => e.stopPropagation()}>
+      <div className="bg-card rounded-xl w-full max-w-sm p-5 space-y-4 border border-border max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-          <Hash size={16} className="text-primary" /> Informations fournisseur
+          <Globe size={16} className="text-primary" /> Informations fournisseur
         </h3>
+        <p className="text-[11px] text-muted-foreground">
+          Renseignez les détails de la commande fournisseur avant de passer en préparation.
+        </p>
+
+        {/* Supplier platform — required */}
+        <div>
+          <label className="text-xs font-medium text-foreground mb-1 block">
+            Plateforme fournisseur <span className="text-destructive">*</span>
+          </label>
+          {loadingPlatforms ? (
+            <div className="flex justify-center py-2"><Loader2 size={16} className="animate-spin text-primary" /></div>
+          ) : (
+            <select
+              value={selectedPlatform}
+              onChange={e => setSelectedPlatform(e.target.value)}
+              className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="">-- Sélectionner --</option>
+              {platforms.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
 
         {/* Supplier order number — required */}
         <div>
           <label className="text-xs font-medium text-foreground mb-1 block">
             N° de commande fournisseur <span className="text-destructive">*</span>
           </label>
-          <p className="text-[11px] text-muted-foreground mb-1.5">
-            Référence de commande Alibaba, 1688, Pinduoduo, AliExpress, Taobao, etc.
-          </p>
           <input
             type="text"
-            value={supplierOrderValue}
-            onChange={e => setSupplierOrderValue(e.target.value)}
+            value={supplierOrderNumber}
+            onChange={e => setSupplierOrderNumber(e.target.value)}
             placeholder="Ex: 73829461023847"
             maxLength={200}
             className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
-            autoFocus
+            style={{ fontSize: "16px" }}
+          />
+        </div>
+
+        {/* Supplier link — required */}
+        <div>
+          <label className="text-xs font-medium text-foreground mb-1 block flex items-center gap-1">
+            <LinkIcon size={12} /> Lien boutique fournisseur <span className="text-destructive">*</span>
+          </label>
+          <input
+            type="url"
+            value={supplierLink}
+            onChange={e => setSupplierLink(e.target.value)}
+            placeholder="https://..."
+            maxLength={500}
+            className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
             style={{ fontSize: "16px" }}
           />
         </div>
@@ -52,15 +110,12 @@ export function TrackingNumberModal({
         {/* Tracking number — optional */}
         <div>
           <label className="text-xs font-medium text-foreground mb-1 block">
-            N° de suivi (tracking)
+            N° de suivi (tracking) <span className="text-muted-foreground text-[10px]">(optionnel)</span>
           </label>
-          <p className="text-[11px] text-muted-foreground mb-1.5">
-            AWB ou numéro de tracking du colis. Peut être ajouté plus tard si indisponible.
-          </p>
           <input
             type="text"
-            value={trackingValue}
-            onChange={e => setTrackingValue(e.target.value)}
+            value={trackingNumber}
+            onChange={e => setTrackingNumber(e.target.value)}
             placeholder="Ex: AWB-2026-001234"
             maxLength={200}
             className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -73,7 +128,91 @@ export function TrackingNumberModal({
             Annuler
           </button>
           <button
-            onClick={() => onConfirm(trackingValue.trim(), supplierOrderValue.trim())}
+            onClick={() => onConfirm(selectedPlatform, supplierOrderNumber.trim(), supplierLink.trim(), trackingNumber.trim())}
+            disabled={loading || !canSubmit}
+            className="flex-1 px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <Globe size={14} />}
+            Confirmer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Modal: in_shipping → shipped — requires tracking number + delivery fee */
+export function ShippedTransitionModal({
+  onConfirm,
+  onCancel,
+  loading,
+  currentTrackingNumber,
+  hasSelfDelivery,
+}: {
+  onConfirm: (trackingNumber: string, deliveryFee: number) => void;
+  onCancel: () => void;
+  loading: boolean;
+  currentTrackingNumber: string | null;
+  hasSelfDelivery: boolean;
+}) {
+  const [trackingNumber, setTrackingNumber] = useState(currentTrackingNumber || "");
+  const [deliveryFee, setDeliveryFee] = useState("");
+
+  const canSubmit = trackingNumber.trim().length > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+      <div className="bg-card rounded-xl w-full max-w-sm p-5 space-y-4 border border-border" onClick={e => e.stopPropagation()}>
+        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <Truck size={16} className="text-primary" /> Arrivée au Hub
+        </h3>
+
+        <div>
+          <label className="text-xs font-medium text-foreground mb-1 block">
+            N° de suivi (tracking) <span className="text-destructive">*</span>
+          </label>
+          <p className="text-[11px] text-muted-foreground mb-1.5">
+            Le numéro de suivi est obligatoire pour passer à l'étape Hub.
+          </p>
+          <input
+            type="text"
+            value={trackingNumber}
+            onChange={e => setTrackingNumber(e.target.value)}
+            placeholder="Ex: AWB-2026-001234"
+            maxLength={200}
+            className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+            autoFocus
+            style={{ fontSize: "16px" }}
+          />
+        </div>
+
+        {hasSelfDelivery && (
+          <div>
+            <label className="text-xs font-medium text-foreground mb-1 block flex items-center gap-1">
+              <DollarSign size={12} /> Frais de livraison à domicile
+            </label>
+            <p className="text-[11px] text-muted-foreground mb-1.5">
+              Ce montant sera proposé au client. Il pourra choisir entre livraison à domicile ou retrait au Hub.
+            </p>
+            <input
+              type="number"
+              value={deliveryFee}
+              onChange={e => setDeliveryFee(e.target.value)}
+              placeholder="0.00"
+              min="0"
+              step="0.01"
+              className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+              style={{ fontSize: "16px" }}
+            />
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button onClick={onCancel} className="flex-1 px-4 py-2.5 text-sm border border-border rounded-lg hover:bg-muted">
+            Annuler
+          </button>
+          <button
+            onClick={() => onConfirm(trackingNumber.trim(), parseFloat(deliveryFee || "0"))}
             disabled={loading || !canSubmit}
             className="flex-1 px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
           >
@@ -366,5 +505,3 @@ export function DeliveryFeeModal({
     </div>
   );
 }
-
-export { generateConfirmationCode };

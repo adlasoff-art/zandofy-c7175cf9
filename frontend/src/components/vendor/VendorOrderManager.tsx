@@ -14,7 +14,7 @@ import {
 } from "@/lib/order-status";
 import { withOptionalOrderFields } from "@/lib/order-query";
 import { useRoles } from "@/hooks/use-roles";
-import { TrackingNumberModal, RiderAssignmentModal, DeliveryFeeModal, EditTrackingModal, generateConfirmationCode } from "./OrderTransitionModals";
+import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, DeliveryFeeModal, EditTrackingModal, generateConfirmationCode } from "./OrderTransitionModals";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { getColorDisplay } from "@/utils/colorName";
@@ -76,9 +76,9 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
   const isStaff = isAdmin || isManager;
 
   // Modal states
-  const [trackingModal, setTrackingModal] = useState<string | null>(null);
+  const [supplierModal, setSupplierModal] = useState<string | null>(null);
+  const [shippedModal, setShippedModal] = useState<string | null>(null);
   const [riderModal, setRiderModal] = useState<string | null>(null);
-  const [deliveryFeeModal, setDeliveryFeeModal] = useState<string | null>(null);
   const [editTrackingModal, setEditTrackingModal] = useState<string | null>(null);
   const [hasSelfDelivery, setHasSelfDelivery] = useState(false);
 
@@ -179,15 +179,15 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
     const next = getNextStatus(currentStatus);
     if (!next) return;
 
-    // preparing → in_shipping: ask for tracking number
-    if (currentStatus === "preparing" && next === "in_shipping") {
-      setTrackingModal(orderId);
+    // confirmed → preparing: ask for supplier info (platform, order number, link)
+    if (currentStatus === "confirmed" && next === "preparing") {
+      setSupplierModal(orderId);
       return;
     }
 
-    // in_shipping → shipped (hub): if self-delivery, ask for delivery fee
-    if (currentStatus === "in_shipping" && next === "shipped" && hasSelfDelivery) {
-      setDeliveryFeeModal(orderId);
+    // in_shipping → shipped (hub): ask for tracking number (required) + delivery fee
+    if (currentStatus === "in_shipping" && next === "shipped") {
+      setShippedModal(orderId);
       return;
     }
 
@@ -486,32 +486,42 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
         );
       })}
 
-      {/* Tracking number modal */}
-      {trackingModal && (
-        <TrackingNumberModal
+      {/* Supplier info modal: confirmed → preparing */}
+      {supplierModal && (
+        <SupplierInfoModal
           loading={!!updatingId}
-          onCancel={() => setTrackingModal(null)}
-          onConfirm={(trackingNumber, supplierOrderNumber) => {
-            updateStatus(trackingModal, "in_shipping", {
+          onCancel={() => setSupplierModal(null)}
+          onConfirm={(platformId, supplierOrderNumber, supplierLink, trackingNumber) => {
+            updateStatus(supplierModal, "preparing", {
+              supplier_platform_id: platformId,
+              supplier_order_number: supplierOrderNumber,
+              supplier_link: supplierLink,
               tracking_number: trackingNumber || null,
-              supplier_order_number: supplierOrderNumber || null,
             });
-            setTrackingModal(null);
+            setSupplierModal(null);
           }}
         />
       )}
 
-      {/* Delivery fee modal (self-delivery → shipped/hub) */}
-      {deliveryFeeModal && (
-        <DeliveryFeeModal
-          loading={!!updatingId}
-          onCancel={() => setDeliveryFeeModal(null)}
-          onConfirm={(fee) => {
-            updateStatus(deliveryFeeModal, "shipped", { last_mile_fee: fee });
-            setDeliveryFeeModal(null);
-          }}
-        />
-      )}
+      {/* Shipped transition modal: in_shipping → shipped */}
+      {shippedModal && (() => {
+        const order = orders.find(o => o.id === shippedModal);
+        return (
+          <ShippedTransitionModal
+            loading={!!updatingId}
+            currentTrackingNumber={order?.tracking_number || null}
+            hasSelfDelivery={hasSelfDelivery}
+            onCancel={() => setShippedModal(null)}
+            onConfirm={(trackingNumber, deliveryFee) => {
+              updateStatus(shippedModal, "shipped", {
+                tracking_number: trackingNumber,
+                last_mile_fee: deliveryFee > 0 ? deliveryFee : undefined,
+              });
+              setShippedModal(null);
+            }}
+          />
+        );
+      })()}
 
       {/* Edit tracking modal — no status change */}
       {editTrackingModal && (() => {
@@ -602,8 +612,9 @@ function OrderMiniStepper({ status, history, trackingNumber }: { status: string;
                 >
                   <cfg.icon size={14} />
                 </div>
-                {/* Tracking indicator on in_shipping step */}
-                {step === "in_shipping" && trackingNumber && (
+                {/* Tracking indicator — from in_shipping onwards if tracking exists */}
+                {["in_shipping", "shipped", "assigning_rider", "rider_assigned", "out_for_delivery"].includes(step) &&
+                  i <= currentIdx && trackingNumber && (
                   <span className="mt-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" title="Tracking disponible" />
                 )}
                 <span className={`text-[9px] sm:text-[10px] mt-1 text-center leading-tight max-w-[56px] sm:max-w-[68px] ${

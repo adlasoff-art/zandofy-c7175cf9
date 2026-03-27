@@ -579,7 +579,7 @@ export default function TrackingPage() {
   // Determine if we need to show the delivery choice panel
   const showDeliveryChoice = orderResult && orderResult.status === "shipped" && !orderResult.delivery_choice && user;
   // Show confirmation code entry for pickup
-  const showPickupCodeEntry = orderResult && orderResult.delivery_choice === "pickup" && orderResult.confirmation_code && orderResult.status !== "delivered" && user;
+  const showPickupCodeEntry = orderResult && orderResult.delivery_choice === "hub_pickup" && orderResult.confirmation_code && orderResult.status !== "delivered" && user;
 
   return (
     <div className="min-h-screen bg-background">
@@ -712,6 +712,17 @@ export default function TrackingPage() {
                 </div>
               )}
 
+              {/* Confirmation code — visible to customer */}
+              {orderResult.confirmation_code && orderResult.status !== "delivered" && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
+                  <p className="text-xs font-semibold text-foreground">🔐 Votre code de confirmation</p>
+                  <p className="text-[11px] text-muted-foreground">Présentez ce code lors de la réception de votre colis.</p>
+                  <div className="bg-background border border-border rounded-lg px-4 py-3 text-center">
+                    <span className="font-mono font-bold text-xl tracking-[0.3em] text-primary">{orderResult.confirmation_code}</span>
+                  </div>
+                </div>
+              )}
+
               {/* 10-step timeline */}
               <OrderTimeline currentStatus={orderResult.status} history={orderResult.history} />
 
@@ -740,7 +751,7 @@ export default function TrackingPage() {
               {/* Delivery choice info */}
               {orderResult.delivery_choice && orderResult.status !== "delivered" && (
                 <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-3 py-2">
-                  {orderResult.delivery_choice === "home" ? (
+                  {orderResult.delivery_choice === "home_delivery" ? (
                     <>
                       <Home size={14} className="text-primary shrink-0" />
                       <span className="text-foreground">Livraison à domicile</span>

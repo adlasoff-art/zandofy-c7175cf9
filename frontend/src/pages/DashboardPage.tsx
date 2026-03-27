@@ -754,7 +754,24 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         </div>
       )}
 
-      {/* Delivery choice for client */}
+      {/* Confirmation code — visible to customer */}
+      {order.confirmation_code && order.status !== "delivered" && order.status !== "cancelled" && (
+        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
+          <p className="text-xs font-semibold text-foreground flex items-center gap-2">
+            🔐 Votre code de confirmation
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Présentez ce code lors de la réception de votre colis (retrait au Hub ou livraison à domicile).
+          </p>
+          <div className="bg-background border border-border rounded-lg px-4 py-3 text-center">
+            <span className="font-mono font-bold text-xl tracking-[0.3em] text-primary">{order.confirmation_code}</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground text-center">
+            Ne partagez ce code qu'au moment de la réception.
+          </p>
+        </div>
+      )}
+
       {order.status === "shipped" && !order.delivery_choice && order.last_mile_fee != null && Number(order.last_mile_fee) > 0 && (
         <DeliveryChoicePanel order={order} />
       )}

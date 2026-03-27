@@ -17,7 +17,7 @@ import {
   canAdminAdvance,
   type OrderStatus,
 } from "@/lib/order-status";
-import { TrackingNumberModal, RiderAssignmentModal, DeliveryFeeModal } from "@/components/vendor/OrderTransitionModals";
+import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, DeliveryFeeModal } from "@/components/vendor/OrderTransitionModals";
 import { withOptionalOrderFields } from "@/lib/order-query";
 
 export default function AdminOrdersPage() {
@@ -31,9 +31,9 @@ export default function AdminOrdersPage() {
   const queryClient = useQueryClient();
 
   // Modal states for admin
-  const [trackingModal, setTrackingModal] = useState<string | null>(null);
+  const [supplierModal, setSupplierModal] = useState<string | null>(null);
+  const [shippedModal, setShippedModal] = useState<string | null>(null);
   const [riderModal, setRiderModal] = useState<string | null>(null);
-  const [deliveryFeeModal, setDeliveryFeeModal] = useState<string | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["admin-orders", user?.id],
@@ -94,9 +94,15 @@ export default function AdminOrdersPage() {
     const next = getNextStatus(currentStatus);
     if (!next) return;
 
-    // preparing → in_shipping: ask for tracking number
-    if (currentStatus === "preparing" && next === "in_shipping") {
-      setTrackingModal(orderId);
+    // confirmed → preparing: ask for supplier info
+    if (currentStatus === "confirmed" && next === "preparing") {
+      setSupplierModal(orderId);
+      return;
+    }
+
+    // in_shipping → shipped: ask for tracking + delivery fee
+    if (currentStatus === "in_shipping" && next === "shipped") {
+      setShippedModal(orderId);
       return;
     }
 
@@ -428,30 +434,40 @@ export default function AdminOrdersPage() {
       </div>
 
       {/* Transition modals for admin */}
-      {trackingModal && (
-        <TrackingNumberModal
+      {supplierModal && (
+        <SupplierInfoModal
           loading={!!updatingId}
-          onCancel={() => setTrackingModal(null)}
-          onConfirm={(trackingNumber, supplierOrderNumber) => {
-            updateStatus(trackingModal, "in_shipping", {
+          onCancel={() => setSupplierModal(null)}
+          onConfirm={(platformId, supplierOrderNumber, supplierLink, trackingNumber) => {
+            updateStatus(supplierModal, "preparing", {
+              supplier_platform_id: platformId,
+              supplier_order_number: supplierOrderNumber,
+              supplier_link: supplierLink,
               tracking_number: trackingNumber || null,
-              supplier_order_number: supplierOrderNumber || null,
             });
-            setTrackingModal(null);
+            setSupplierModal(null);
           }}
         />
       )}
 
-      {deliveryFeeModal && (
-        <DeliveryFeeModal
-          loading={!!updatingId}
-          onCancel={() => setDeliveryFeeModal(null)}
-          onConfirm={(fee) => {
-            updateStatus(deliveryFeeModal, "shipped", { last_mile_fee: fee });
-            setDeliveryFeeModal(null);
-          }}
-        />
-      )}
+      {shippedModal && (() => {
+        const order = orders.find((o: any) => o.id === shippedModal);
+        return (
+          <ShippedTransitionModal
+            loading={!!updatingId}
+            currentTrackingNumber={order?.tracking_number || null}
+            hasSelfDelivery={true}
+            onCancel={() => setShippedModal(null)}
+            onConfirm={(trackingNumber, deliveryFee) => {
+              updateStatus(shippedModal, "shipped", {
+                tracking_number: trackingNumber,
+                last_mile_fee: deliveryFee > 0 ? deliveryFee : undefined,
+              });
+              setShippedModal(null);
+            }}
+          />
+        );
+      })()}
 
       {riderModal && (
         <RiderAssignmentModal

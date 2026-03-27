@@ -566,7 +566,7 @@ export default function RiderDashboardPage() {
 
                         <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                           <span className="font-semibold text-foreground">${Number(o.total).toFixed(2)}</span>
-                          {o.delivery_choice === "home" && o.last_mile_fee > 0 && (
+                          {o.delivery_choice === "home_delivery" && o.last_mile_fee > 0 && (
                             <span>Frais livraison: ${Number(o.last_mile_fee).toFixed(2)} ({o.last_mile_payment_method === "mobile_money" ? "Mobile Money" : "Cash"})</span>
                           )}
                           {o.shipping_payment_status === "deferred" && (
@@ -577,7 +577,7 @@ export default function RiderDashboardPage() {
                         </div>
 
                         {/* Cash confirmation for rider */}
-                        {o.delivery_choice === "home" && o.last_mile_payment_method === "cash" && (
+                        {o.delivery_choice === "home_delivery" && o.last_mile_payment_method === "cash" && (
                           <div className="border-t border-border pt-3 space-y-2">
                             {o.rider_cash_collected ? (
                               <div className="flex items-center gap-2 bg-primary/5 rounded-lg px-3 py-2">
@@ -595,36 +595,34 @@ export default function RiderDashboardPage() {
                           </div>
                         )}
 
-                        {/* Confirmation code section */}
-                        {o.delivery_choice === "home" && (
-                          <div className="border-t border-border pt-3 space-y-2">
-                            {o.confirmation_code ? (
-                              <div className="flex items-center gap-2 bg-primary/5 rounded-lg px-3 py-2">
-                                <Hash size={14} className="text-primary" />
-                                <span className="text-xs text-muted-foreground">Code :</span>
-                                <span className="font-mono font-bold text-foreground tracking-widest">{o.confirmation_code}</span>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => generateCodeForOrder(o.id)}
-                                className="flex items-center gap-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-xs active:scale-95 touch-manipulation"
-                              >
-                                <Hash size={14} /> Générer code de confirmation
-                              </button>
-                            )}
+                        {/* Confirmation code & delivery actions */}
+                        <div className="border-t border-border pt-3 space-y-2">
+                          {o.confirmation_code ? (
+                            <div className="flex items-center gap-2 bg-primary/5 rounded-lg px-3 py-2">
+                              <Hash size={14} className="text-primary" />
+                              <span className="text-xs text-muted-foreground">Code :</span>
+                              <span className="font-mono font-bold text-foreground tracking-widest">{o.confirmation_code}</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => generateCodeForOrder(o.id)}
+                              className="flex items-center gap-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-xs active:scale-95 touch-manipulation"
+                            >
+                              <Hash size={14} /> Générer code de confirmation
+                            </button>
+                          )}
 
-                            {/* Mark as delivered - blocked if cash not confirmed */}
-                            {o.confirmation_code && (
-                              <button
-                                onClick={() => markOrderDelivered(o.id, o)}
-                                disabled={o.last_mile_payment_method === "cash" && !o.rider_cash_collected}
-                                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium active:scale-95 touch-manipulation disabled:opacity-50"
-                              >
-                                <CheckCircle size={14} /> Marquer comme livré
-                              </button>
-                            )}
-                          </div>
-                        )}
+                          {/* Mark as delivered - blocked if cash not confirmed */}
+                          {o.confirmation_code && (
+                            <button
+                              onClick={() => markOrderDelivered(o.id, o)}
+                              disabled={o.delivery_choice === "home_delivery" && o.last_mile_payment_method === "cash" && !o.rider_cash_collected}
+                              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium active:scale-95 touch-manipulation disabled:opacity-50"
+                            >
+                              <CheckCircle size={14} /> Marquer comme livré
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
