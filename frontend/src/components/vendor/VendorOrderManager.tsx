@@ -613,8 +613,9 @@ function OrderMiniStepper({ status, history, trackingNumber }: { status: string;
                 >
                   <cfg.icon size={14} />
                 </div>
-                {/* Tracking indicator on in_shipping step */}
-                {step === "in_shipping" && trackingNumber && (
+                {/* Tracking indicator — from in_shipping onwards if tracking exists */}
+                {["in_shipping", "shipped", "assigning_rider", "rider_assigned", "out_for_delivery"].includes(step) &&
+                  i <= currentIdx && trackingNumber && (
                   <span className="mt-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" title="Tracking disponible" />
                 )}
                 <span className={`text-[9px] sm:text-[10px] mt-1 text-center leading-tight max-w-[56px] sm:max-w-[68px] ${
