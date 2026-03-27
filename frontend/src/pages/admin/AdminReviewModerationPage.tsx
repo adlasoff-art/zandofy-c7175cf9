@@ -92,7 +92,7 @@ export default function AdminReviewModerationPage() {
       <div className="p-4 md:p-6 space-y-4 max-w-5xl">
         {/* Info banner */}
         <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm text-foreground">
-          <strong>Bonus avis :</strong> Lorsque vous approuvez un avis contenant des photos, le client reçoit automatiquement <strong>0.10%</strong> du sous-total de sa commande en ZandoPoints.
+          <strong>Bonus avis :</strong> Lorsque vous approuvez un avis contenant des photos, le client reçoit automatiquement <strong>{bonusPct}%</strong> du sous-total de sa commande en ZandoPoints.
         </div>
 
         {/* Filter tabs */}
