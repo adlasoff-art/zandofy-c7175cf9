@@ -579,7 +579,7 @@ export default function TrackingPage() {
   // Determine if we need to show the delivery choice panel
   const showDeliveryChoice = orderResult && orderResult.status === "shipped" && !orderResult.delivery_choice && user;
   // Show confirmation code entry for pickup
-  const showPickupCodeEntry = orderResult && orderResult.delivery_choice === "pickup" && orderResult.confirmation_code && orderResult.status !== "delivered" && user;
+  const showPickupCodeEntry = orderResult && orderResult.delivery_choice === "hub_pickup" && orderResult.confirmation_code && orderResult.status !== "delivered" && user;
 
   return (
     <div className="min-h-screen bg-background">
