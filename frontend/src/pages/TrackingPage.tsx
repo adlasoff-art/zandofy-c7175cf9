@@ -712,6 +712,17 @@ export default function TrackingPage() {
                 </div>
               )}
 
+              {/* Confirmation code — visible to customer */}
+              {orderResult.confirmation_code && orderResult.status !== "delivered" && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
+                  <p className="text-xs font-semibold text-foreground">🔐 Votre code de confirmation</p>
+                  <p className="text-[11px] text-muted-foreground">Présentez ce code lors de la réception de votre colis.</p>
+                  <div className="bg-background border border-border rounded-lg px-4 py-3 text-center">
+                    <span className="font-mono font-bold text-xl tracking-[0.3em] text-primary">{orderResult.confirmation_code}</span>
+                  </div>
+                </div>
+              )}
+
               {/* 10-step timeline */}
               <OrderTimeline currentStatus={orderResult.status} history={orderResult.history} />
 
