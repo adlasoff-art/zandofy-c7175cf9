@@ -105,6 +105,7 @@ const AdminKycPage = lazy(() => import("./pages/admin/AdminKycPage"));
 const AdminFeaturedPlacementsPage = lazy(() => import("./pages/admin/AdminFeaturedPlacementsPage"));
 const AdminVendorAccountingPage = lazy(() => import("./pages/admin/AdminVendorAccountingPage"));
 const AdminFlashSalesPage = lazy(() => import("./pages/admin/AdminFlashSalesPage"));
+const AdminSupplierPlatformsPage = lazy(() => import("./pages/admin/AdminSupplierPlatformsPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30 * 1000 } },
@@ -228,6 +229,7 @@ const App = () => (
                 <Route path="/admin/featured-placements" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminFeaturedPlacementsPage /></RoleGuard>} />
                 <Route path="/admin/vendor-accounting" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminVendorAccountingPage /></RoleGuard>} />
                 <Route path="/admin/flash-sales" element={<RoleGuard allowedRoles={["admin"]}><AdminFlashSalesPage /></RoleGuard>} />
+                <Route path="/admin/supplier-platforms" element={<RoleGuard allowedRoles={["admin"]}><AdminSupplierPlatformsPage /></RoleGuard>} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

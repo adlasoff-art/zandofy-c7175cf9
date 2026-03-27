@@ -25,6 +25,7 @@ import { ReferralDashboard } from "@/components/ReferralDashboard";
 import { AffiliateDashboard } from "@/components/AffiliateDashboard";
 import { ReturnsList } from "@/components/returns/ReturnsList";
 import { PaymentProofUpload } from "@/components/PaymentProofUpload";
+import { ShippingPaymentModal } from "@/components/payments/ShippingPaymentModal";
 import { ReturnRequestForm } from "@/components/returns/ReturnRequestForm";
 import { DisputesList } from "@/components/disputes/DisputesList";
 import { DisputeForm } from "@/components/disputes/DisputeForm";
@@ -651,6 +652,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [showDisputeForm, setShowDisputeForm] = useState(false);
   const [showRetryPayment, setShowRetryPayment] = useState(false);
+  const [showShippingPayment, setShowShippingPayment] = useState<"shipping" | "last_mile" | null>(null);
   if (!order) return null;
   const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
   const canCancel = order.status === "pending";
@@ -784,9 +786,16 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
             <span className="text-amber-700 dark:text-amber-400 font-medium">
-              ⏳ Frais d'expédition à régler à l'arrivée : <strong>${Number(order.shipping_cost || 0).toFixed(2)}</strong>
+              ⏳ Frais d'expédition à régler : <strong>${Number(order.shipping_cost || 0).toFixed(2)}</strong>
             </span>
           </div>
+          <Button
+            size="sm"
+            className="w-full gap-2"
+            onClick={() => setShowShippingPayment("shipping")}
+          >
+            <CreditCard size={14} /> Payer l'expédition (${Number(order.shipping_cost || 0).toFixed(2)})
+          </Button>
           <PaymentProofUpload
             orderId={order.id}
             field="shipping_payment_proof_url"
@@ -796,14 +805,30 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         </div>
       )}
 
-      {/* Last-mile payment proof for cash delivery */}
-      {order.delivery_choice === "home_delivery" && order.last_mile_payment_method === "cash" && order.status !== "delivered" && order.status !== "cancelled" && (
-        <PaymentProofUpload
-          orderId={order.id}
-          field="last_mile_payment_proof_url"
-          label="Preuve de paiement livraison (cash)"
-          existingUrl={order.last_mile_payment_proof_url}
-        />
+      {/* Last-mile payment for home delivery */}
+      {order.delivery_choice === "home_delivery" && order.last_mile_fee != null && Number(order.last_mile_fee) > 0 && order.last_mile_payment_status !== "paid" && order.last_mile_payment_status !== "paid_online" && order.last_mile_payment_status !== "paid_cash" && order.status !== "delivered" && order.status !== "cancelled" && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-2.5">
+            <span className="text-blue-700 dark:text-blue-400 font-medium">
+              🚚 Frais de livraison à domicile à payer : <strong>${Number(order.last_mile_fee).toFixed(2)}</strong>
+            </span>
+          </div>
+          <Button
+            size="sm"
+            className="w-full gap-2"
+            onClick={() => setShowShippingPayment("last_mile")}
+          >
+            <CreditCard size={14} /> Payer la livraison (${Number(order.last_mile_fee).toFixed(2)})
+          </Button>
+          {order.last_mile_payment_method === "cash" && (
+            <PaymentProofUpload
+              orderId={order.id}
+              field="last_mile_payment_proof_url"
+              label="Preuve de paiement livraison (cash)"
+              existingUrl={order.last_mile_payment_proof_url}
+            />
+          )}
+        </div>
       )}
 
       {/* Hub pickup proof upload */}
@@ -981,6 +1006,18 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           amount={Number(order.total)}
           onClose={() => setShowRetryPayment(false)}
           onSuccess={() => { setShowRetryPayment(false); onCancelSuccess(); }}
+        />
+      )}
+
+      {/* Shipping / Last-Mile Payment Modal (USSD) */}
+      {showShippingPayment && (
+        <ShippingPaymentModal
+          orderId={order.id}
+          orderRef={order.order_ref}
+          amount={showShippingPayment === "shipping" ? Number(order.shipping_cost || 0) : Number(order.last_mile_fee || 0)}
+          paymentType={showShippingPayment}
+          onClose={() => setShowShippingPayment(null)}
+          onSuccess={() => { setShowShippingPayment(null); onCancelSuccess(); }}
         />
       )}
     </div>
