@@ -382,7 +382,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
         ? { ...payload, publish_status: "pending_approval" }
         : payload;
       const { error } = await (supabase.from("products").update(updatePayload as any) as any).eq("id", editing.id);
-      if (error) { toast.error("Erreur lors de la mise à jour"); setSaving(false); return; }
+      if (error) { console.error("Product update error:", error); toast.error("Erreur lors de la mise à jour : " + (error.message || "inconnue")); setSaving(false); return; }
     } else {
       const { data, error } = await (supabase.from("products").insert(payload as any) as any).select("id").single();
       if (error || !data) { console.error("Product insert error:", error); toast.error("Erreur lors de la création : " + (error?.message || "inconnue")); setSaving(false); return; }
