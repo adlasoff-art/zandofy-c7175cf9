@@ -46,6 +46,7 @@ const adminItems = [
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
   { title: "Templates Email", url: "/admin/email-templates", icon: Mail },
   { title: "Mises en avant", url: "/admin/featured-placements", icon: Megaphone },
+  { title: "Plateformes fournisseurs", url: "/admin/supplier-platforms", icon: Globe },
 ];
 
 export function AdminSidebar() {
