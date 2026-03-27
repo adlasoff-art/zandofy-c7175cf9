@@ -566,7 +566,7 @@ export default function RiderDashboardPage() {
 
                         <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                           <span className="font-semibold text-foreground">${Number(o.total).toFixed(2)}</span>
-                          {o.delivery_choice === "home" && o.last_mile_fee > 0 && (
+                          {o.delivery_choice === "home_delivery" && o.last_mile_fee > 0 && (
                             <span>Frais livraison: ${Number(o.last_mile_fee).toFixed(2)} ({o.last_mile_payment_method === "mobile_money" ? "Mobile Money" : "Cash"})</span>
                           )}
                           {o.shipping_payment_status === "deferred" && (
