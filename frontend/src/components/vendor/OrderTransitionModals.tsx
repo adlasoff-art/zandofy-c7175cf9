@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { compressImage } from "@/utils/image-compress";
 import { Loader2, Truck, User, DollarSign, Hash, Edit2, Globe, Link as LinkIcon } from "lucide-react";
 
 export function generateConfirmationCode(): string {
