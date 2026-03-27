@@ -1,164 +1,87 @@
-# Zandofy — Charte de Protection & Politiques de Sécurité
+# Zandofy — Charte de Haute Disponibilité & Sécurité (V2.0)
 
-> **Version** : 1.0  
-> **Date** : 2026-03-27  
-> **Objectif** : Définir les règles que l'IA (Lovable) doit respecter AVANT toute modification du code, pour prévenir les régressions, les pannes et les failles de sécurité en production.
-
----
-
-## 1. Principe Fondamental
-
-**Ne jamais casser ce qui fonctionne.**
-
-Avant chaque modification, l'IA DOIT :
-1. Identifier tous les composants et fichiers impactés directement ET indirectement.
-2. Évaluer le risque de régression sur les fonctionnalités existantes.
-3. Signaler tout risque détecté à l'utilisateur AVANT d'agir.
-4. Proposer des alternatives sûres si le risque est élevé.
+> **Statut** : Critique / Force Exécutoire  
+> **Date de révision** : 27 Mars 2026  
+> **Cible** : IA Lovable & Collaborateurs  
+> **Objectif** : Garantir la stabilité et la sécurité de la plateforme pour un usage en production à grande échelle.
 
 ---
 
-## 2. Règles d'Impact — Analyse Obligatoire
+## 1. Classification de Gravité (Incident Severity)
 
-### 2.1 Avant toute modification, répondre à ces questions :
+Avant toute intervention, l'IA doit classifier la nature de sa tâche :
 
-| Question | Action si OUI |
-|----------|---------------|
-| Ce fichier est-il importé par d'autres composants ? | Lister TOUS les fichiers dépendants et vérifier la compatibilité |
-| Cette modification touche-t-elle au Header, Footer, Layout ou Navigation ? | ⚠️ ALERTE CRITIQUE — ces composants sont visibles sur TOUTES les pages |
-| Cette modification ajoute/supprime une colonne DB ou un champ d'API ? | Vérifier que TOUTES les requêtes existantes restent compatibles |
-| Cette modification change un import, un export ou une signature de fonction ? | Vérifier tous les consommateurs de ce module |
-| Cette modification touche aux styles globaux (index.css, tailwind.config) ? | Vérifier l'impact visuel sur l'ensemble du site |
-
-### 2.2 Composants Critiques — Zone Rouge
-
-Les fichiers suivants ont un impact sur **100% des pages**. Toute modification nécessite une vigilance maximale :
-
-- `Header.tsx` et tous ses sous-composants (MegaMenu, CategoryBanner, NotificationCenter, SearchBar)
-- `Footer.tsx`
-- `Layout.tsx` / `AppLayout.tsx`
-- `AuthContext.tsx` / `AuthProvider`
-- `App.tsx` (routes)
-- `index.css` (styles globaux)
-- `tailwind.config.ts`
-- `vite.config.ts`
-- `supabase/client.ts` (auto-généré, NE PAS TOUCHER)
-
-### 2.3 Composants Sensibles — Zone Orange
-
-- Services API (`services/api.ts`, hooks de données)
-- Composants de paiement et checkout
-- Système de rôles et permissions (RoleGuard, use-roles)
-- Gestion du panier (CartContext, cart_items)
-- Pages admin (tout le dossier `admin/`)
+* **P0 (Critique)** : Interruption totale du service, faille de sécurité majeure (fuite de données), ou corruption de la base de données.
+* **P1 (Majeur)** : Dégradation d'une fonctionnalité clé (Paiement, Login, Panier) alors que le site reste accessible.
+* **P2 (Standard)** : Évolutions mineures, corrections de bugs d'interface (UI/UX), ou optimisations.
 
 ---
 
-## 3. Règles de Sécurité
+## 2. Analyse d'Impact & "Blast Radius" (Rayon d'Action)
 
-### 3.1 Failles à détecter systématiquement
+### 2.1 Protocoles de Zone
 
-| Type de faille | Vérification |
-|----------------|-------------|
-| Données sensibles exposées | Jamais de mot de passe, clé API, email ou téléphone dans le code client |
-| RLS manquante | Toute nouvelle table DOIT avoir des politiques RLS |
-| Injection XSS | Tout HTML dynamique DOIT être sanitisé via DOMPurify |
-| Escalade de privilèges | Les rôles sont vérifiés côté serveur (RLS + has_role), jamais côté client uniquement |
-| Secrets en clair | Aucun secret dans le code source — utiliser les secrets Supabase |
+| Zone | Composants | Règle de Modification |
+| :--- | :--- | :--- |
+| **Zone ROUGE** | Header, Footer, Layout, AuthContext, App.tsx, `supabase/client.ts` (auto-généré, NE PAS TOUCHER), `index.css`, routes globales | **INTERDICTION** de modifier sans un plan de Rollback explicite. Impact global (100% des pages). |
+| **Zone ORANGE** | Checkout, API Services, Admin, Rôles/Permissions, CartContext, Hooks de données | Isolation obligatoire par `Error Boundaries`. Impact sur les revenus ou l'administration. |
+| **Zone VERTE** | Pages statiques, Composants isolés, Pages de contenu | Modification standard après vérification des dépendances directes. |
 
-### 3.2 Signalement obligatoire
+### 2.2 Analyse Pré-Modif (Mandatoire)
 
-Si l'IA détecte une faille de sécurité existante ou potentielle, elle DOIT :
-1. La signaler immédiatement, même si ce n'est pas lié à la tâche en cours.
-2. Proposer une correction.
-3. Ne pas la masquer ou l'ignorer.
+1. **Dépendances** : Identifier tous les composants qui importent le fichier modifié.
+2. **Effet Cascade** : Si ce composant échoue, le Layout principal doit-il survivre ? → OUI obligatoirement.
+3. **Schéma DB** : Vérifier que les colonnes utilisées existent en production.
 
 ---
 
-## 4. Règles de Compatibilité Base de Données
+## 3. Sécurité de Niveau Industriel
 
-### 4.1 Requêtes résilientes
+### 3.1 Protection des Données (Privacy by Design)
 
-- Ne JAMAIS supposer qu'une colonne existe en production sans vérifier le schéma.
-- Utiliser des colonnes explicites dans les `SELECT` (pas de `SELECT *`).
-- Si une colonne est ajoutée dans une migration, les requêtes doivent fonctionner AVEC ET SANS cette colonne jusqu'au déploiement confirmé.
-- Tester les requêtes contre le schéma de production connu.
+* **Zéro PII en clair** : Aucun email, téléphone ou donnée personnelle ne doit être exposé dans les logs client ou les attributs HTML.
+* **Sanitisation** : Utilisation de DOMPurify pour tout contenu HTML dynamique afin de prévenir les failles XSS.
+* **Validation Stricte** : Utiliser des schémas (type Zod) pour valider chaque entrée utilisateur avant traitement.
 
-### 4.2 Migrations
+### 3.2 Contrôle d'Accès (Zero Trust)
 
-- Les migrations doivent être idempotentes (`IF NOT EXISTS`, `IF EXISTS`).
-- Ne jamais supprimer une colonne utilisée par du code en production.
-- Documenter l'impact de chaque migration sur le code frontend.
-
----
-
-## 5. Règles de Modification de Code
-
-### 5.1 Principe de moindre impact
-
-- Modifier le MINIMUM de fichiers nécessaires pour la tâche.
-- Ne JAMAIS refactorer un fichier non lié à la tâche en cours.
-- Ne JAMAIS changer un import, un nom de variable ou une signature de fonction "en passant".
-
-### 5.2 Isolation des dépendances
-
-- Les nouveaux composants utilisant des librairies tierces (Radix, Leaflet, etc.) doivent être chargés en lazy-loading si leur échec peut impacter des composants critiques.
-- Utiliser des Error Boundaries autour des composants à risque.
-- Un composant qui plante ne doit JAMAIS faire planter la navigation ou le layout.
-
-### 5.3 Tests mentaux obligatoires
-
-Avant de valider une modification, l'IA doit mentalement vérifier :
-- [ ] La page d'accueil s'affiche-t-elle correctement ?
-- [ ] Le menu et les catégories sont-ils visibles ?
-- [ ] L'authentification fonctionne-t-elle ?
-- [ ] Le panier fonctionne-t-il ?
-- [ ] Les pages admin sont-elles accessibles aux admins ?
+* **RLS (Row Level Security)** : Toute nouvelle table de base de données DOIT avoir des politiques RLS définies.
+* **IDOR Prevention** : Vérifier systématiquement que l'accès à une ressource est lié à l'ID de l'utilisateur (`auth.uid()`) côté serveur.
+* **Rôles** : Les rôles sont vérifiés côté serveur (RLS + `has_role`), jamais côté client uniquement.
+* **Secrets** : Aucun secret dans le code source — utiliser les secrets backend.
 
 ---
 
-## 6. Protocole de Communication
+## 4. Standard de Base de Données & Résilience
 
-### 6.1 Alertes obligatoires
+### 4.1 Compatibilité Ascendante (Backward Compatibility)
 
-L'IA DOIT avertir l'utilisateur dans les cas suivants :
+* **Requêtes Résilientes** : Ne jamais utiliser `SELECT *`. Lister explicitement les colonnes requises.
+* **Graceful Handling** : Le code doit fonctionner même si une colonne récemment ajoutée est absente du schéma de production (prévention de l'erreur 400).
 
-| Situation | Format d'alerte |
-|-----------|----------------|
-| Risque de régression détecté | ⚠️ **RISQUE** : [description] — Composants impactés : [liste] |
-| Faille de sécurité détectée | 🔴 **SÉCURITÉ** : [description] — Recommandation : [action] |
-| Incohérence de données/schéma | 🟡 **INCOHÉRENCE** : [description] — État production vs développement |
-| Modification d'un composant Zone Rouge | 🔴 **ZONE ROUGE** : Modification de [fichier] — Impact : toutes les pages |
-| Action irréversible | 🔴 **IRRÉVERSIBLE** : [description] — Confirmation requise |
+### 4.2 Migrations Idempotentes
 
-### 6.2 Format de proposition
-
-Pour toute tâche à risque, proposer :
-1. **Ce que je vais faire** : description claire
-2. **Ce que ça impacte** : liste des fichiers et fonctionnalités
-3. **Risques identifiés** : liste des régressions possibles
-4. **Plan de mitigation** : comment minimiser les risques
-5. **Alternative sûre** : approche moins risquée si disponible
+* Utiliser systématiquement `IF NOT EXISTS` ou `IF EXISTS` dans les scripts SQL.
+* Ne jamais supprimer une colonne active sans une phase de dépréciation validée.
+* Documenter l'impact de chaque migration sur le code frontend.
 
 ---
 
-## 7. Fichiers Interdits
+## 5. Standard de Développement (Production Ready)
 
-Ces fichiers ne doivent JAMAIS être modifiés sans approbation explicite :
+### 5.1 Robustesse logicielle
 
-- `docker-compose.yaml`, `docker-compose.prod.yml`
-- `backend/Dockerfile`, `frontend/Dockerfile`
-- `src/integrations/supabase/client.ts` (auto-généré)
-- `src/integrations/supabase/types.ts` (auto-généré)
-- `.env` (auto-géré)
-- `.cursor/rules/*`
-- `AGENTS.md`
+* **Lazy Loading** : Obligatoire pour les bibliothèques tierces lourdes afin de ne pas bloquer le rendu initial.
+* **Circuit Breaker** : Si un service externe est indisponible, afficher un état dégradé au lieu de faire planter le composant.
+* **Error Boundaries** : Obligatoires autour des composants à risque. Un composant qui plante ne doit JAMAIS faire planter la navigation ou le layout.
 
----
+### 5.2 Principe de moindre impact
 
-## 8. Checklist Pré-Déploiement
+* Modifier le MINIMUM de fichiers nécessaires pour la tâche.
+* Ne JAMAIS refactorer un fichier non lié à la tâche en cours.
+* Ne JAMAIS changer un import, un nom de variable ou une signature de fonction "en passant".
 
-Avant de finaliser toute modification :
+### 5.3 Checklist Pré-Déploiement
 
 - [ ] Aucun `console.log` de debug laissé dans le code
 - [ ] Aucune donnée sensible exposée
@@ -171,7 +94,42 @@ Avant de finaliser toute modification :
 
 ---
 
-## 9. Leçons Apprises (Post-Mortems)
+## 6. Protocole de Communication (RFC)
+
+Pour toute modification impactant les zones Rouge ou Orange, l'IA doit fournir :
+
+1. **Scope** : Description technique précise.
+2. **Impact** : Liste des composants et fonctionnalités potentiellement affectés.
+3. **Risques** : Scénarios de régression possibles.
+4. **Plan de Mitigation** : Mesures prises (ex: ajout d'Error Boundary, fallback).
+5. **Validation Mentale** : Confirmation que le Header, le Panier et l'Auth restent opérationnels.
+
+### 6.1 Alertes Obligatoires
+
+| Situation | Format |
+|-----------|--------|
+| Risque de régression | ⚠️ **RISQUE** : [description] — Composants impactés : [liste] |
+| Faille de sécurité | 🔴 **SÉCURITÉ** : [description] — Recommandation : [action] |
+| Incohérence de données | 🟡 **INCOHÉRENCE** : [description] |
+| Zone Rouge touchée | 🔴 **ZONE ROUGE** : Modification de [fichier] — Impact : toutes les pages |
+| Action irréversible | 🔴 **IRRÉVERSIBLE** : [description] — Confirmation requise |
+
+---
+
+## 7. Fichiers Interdits (No-Fly Zone)
+
+Ces fichiers ne doivent JAMAIS être modifiés sans approbation explicite :
+
+* `src/integrations/supabase/client.ts` (auto-généré)
+* `src/integrations/supabase/types.ts` (auto-généré)
+* `.env` (auto-géré)
+* `docker-compose.yaml`, `docker-compose.prod.yml`
+* `backend/Dockerfile`, `frontend/Dockerfile`
+* `AGENTS.md`, `.cursor/rules/*`
+
+---
+
+## 8. Leçons Apprises (Post-Mortems)
 
 ### Incident 2026-03-27 : Disparition des catégories et du menu
 - **Cause** : Requête utilisant `sort_order` (colonne absente en production) → erreur 400 → crash silencieux du Header
@@ -181,5 +139,5 @@ Avant de finaliser toute modification :
 
 ---
 
-> Ce document est vivant. Il sera enrichi après chaque incident ou découverte de risque.  
-> L'IA doit le consulter mentalement avant chaque tâche de modification.
+> Ce document est une directive absolue. Toute déviation doit être justifiée et validée par l'administrateur.  
+> Ce document est vivant. Il sera enrichi après chaque incident ou découverte de risque.
