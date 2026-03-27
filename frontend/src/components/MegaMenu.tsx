@@ -21,11 +21,10 @@ export function MegaMenu() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("categories")
-        .select("id, name, name_fr, icon, parent_id, image_url, sort_order")
-        .order("sort_order")
+        .select("id, name, name_fr, icon, parent_id, image_url")
         .order("name_fr");
       if (error) throw error;
-      return (data || []) as (DBCategory & { sort_order: number })[];
+      return (data || []) as DBCategory[];
     },
     staleTime: 5 * 60 * 1000,
   });

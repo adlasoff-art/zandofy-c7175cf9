@@ -16,9 +16,8 @@ export function CategoryBanner() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name, name_fr, icon, image_url, parent_id, sort_order")
+        .select("id, name, name_fr, icon, image_url, parent_id")
         .is("parent_id", null)
-        .order("sort_order")
         .order("name_fr");
       if (error) {
         console.error("[CategoryBanner] Supabase error:", error.message, error.code, error.details);
