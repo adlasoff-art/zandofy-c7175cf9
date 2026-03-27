@@ -48,12 +48,49 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { transaction_id } = body;
+    const { transaction_id, reference } = body;
 
-    if (!transaction_id) {
+    if (!transaction_id && !reference) {
       return new Response(
-        JSON.stringify({ error: "Missing transaction_id" }),
+        JSON.stringify({ error: "Missing transaction_id or reference" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+    // If only reference provided, look up the transaction from our DB first
+    let kelpayTransactionId = transaction_id;
+    let localTx: any = null;
+
+    if (reference) {
+      const { data: txData } = await supabaseAdmin
+        .from("payment_transactions")
+        .select("id, order_id, status, transaction_id")
+        .eq("reference", reference)
+        .maybeSingle();
+
+      localTx = txData;
+
+      // If the callback already updated this to success/failed, return immediately
+      if (localTx && (localTx.status === "success" || localTx.status === "failed")) {
+        return new Response(
+          JSON.stringify({ status: localTx.status, reference }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Use the stored KelPay transaction_id for the API check
+      if (localTx?.transaction_id) {
+        kelpayTransactionId = localTx.transaction_id;
+      }
+    }
+
+    // If we still have no transaction_id to check with KelPay, return pending
+    if (!kelpayTransactionId) {
+      return new Response(
+        JSON.stringify({ status: "pending", reference }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -66,78 +103,87 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         merchantcode: merchantCode,
-        transactionid: transaction_id,
+        transactionid: kelpayTransactionId,
       }),
     });
 
     const checkData = await checkResponse.json();
+    console.log("KelPay check response:", JSON.stringify(checkData));
 
-    // Update local transaction if we got a result
-    if (checkData.reference) {
-      const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-      const isSuccess =
-        checkData.code === "0" || checkData.transactionstatus === "SUCCESS";
-      const isFailed =
-        checkData.code === "1" || checkData.transactionstatus === "FAILED";
+    // Determine status from KelPay response
+    const isSuccess =
+      checkData.code === "0" ||
+      checkData.transactionstatus === "SUCCESS" ||
+      checkData.transactionstatus === "Successful";
+    const isFailed =
+      (checkData.code === "1" && checkData.transactionstatus === "FAILED") ||
+      checkData.transactionstatus === "Failed";
 
-      if (isSuccess || isFailed) {
-        const newStatus = isSuccess ? "success" : "failed";
+    const normalizedStatus = isSuccess ? "success" : isFailed ? "failed" : "pending";
 
-        const { data: tx } = await supabaseAdmin
-          .from("payment_transactions")
-          .select("id, order_id, status")
-          .eq("reference", checkData.reference)
-          .maybeSingle();
+    // Update local transaction if we got a definitive result
+    if ((isSuccess || isFailed) && localTx && localTx.status !== "success") {
+      await supabaseAdmin
+        .from("payment_transactions")
+        .update({
+          status: normalizedStatus,
+          callback_payload: checkData,
+        })
+        .eq("id", localTx.id);
 
-        if (tx && tx.status !== "success") {
-          await supabaseAdmin
-            .from("payment_transactions")
-            .update({
-              status: newStatus,
-              callback_payload: checkData,
-            })
-            .eq("id", tx.id);
+      // For order payments (not shipping/last-mile), update order status
+      if (localTx.order_id) {
+        if (isSuccess) {
+          // Check if this is a regular order payment or a shipping payment
+          // by looking at the order's current status
+          const { data: orderData } = await supabaseAdmin
+            .from("orders")
+            .select("status")
+            .eq("id", localTx.order_id)
+            .maybeSingle();
 
-          if (isSuccess) {
+          if (orderData && ["awaiting_payment", "pending"].includes(orderData.status)) {
+            // Regular order payment
             const { error: orderUpdateError } = await supabaseAdmin
               .from("orders")
               .update({ status: "pending" })
-              .eq("id", tx.order_id)
+              .eq("id", localTx.order_id)
               .in("status", ["awaiting_payment", "pending"]);
 
-            if (orderUpdateError) {
-              console.error("Order update after KelPay check success failed:", orderUpdateError);
-            } else {
+            if (!orderUpdateError) {
               await fetch(`${supabaseUrl}/functions/v1/notify-order-status`, {
                 method: "POST",
                 headers: {
                   Authorization: `Bearer ${serviceRoleKey}`,
                   "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ orderId: tx.order_id, newStatus: "pending" }),
-              }).catch((notifyError) => {
-                console.error("Failed to trigger order notification after KelPay check success:", notifyError);
-              });
+                body: JSON.stringify({ orderId: localTx.order_id, newStatus: "pending" }),
+              }).catch(console.error);
             }
-          } else {
-            const { error: orderUpdateError } = await supabaseAdmin
+          }
+          // For shipping payments, the frontend handles updating shipping_payment_status
+        } else if (isFailed) {
+          const { data: orderData } = await supabaseAdmin
+            .from("orders")
+            .select("status")
+            .eq("id", localTx.order_id)
+            .maybeSingle();
+
+          if (orderData && ["awaiting_payment"].includes(orderData.status)) {
+            await supabaseAdmin
               .from("orders")
               .update({ status: "payment_failed" })
-              .eq("id", tx.order_id)
-              .in("status", ["awaiting_payment", "pending"]);
-
-            if (orderUpdateError) {
-              console.error("Order update after KelPay check failure failed:", orderUpdateError);
-            }
+              .eq("id", localTx.order_id)
+              .eq("status", "awaiting_payment");
           }
         }
       }
     }
 
-    return new Response(JSON.stringify(checkData), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ status: normalizedStatus, reference, kelpay: checkData }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (error) {
     console.error("KelPay check error:", error);
     return new Response(
