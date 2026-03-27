@@ -11,7 +11,7 @@ const MOBILE_MAX_ROWS = 2;
 export function CategoryBanner() {
   const [expanded, setExpanded] = useState(false);
 
-  const { data: categories, isLoading, isError } = useQuery({
+  const { data: categories, isLoading, isError, error } = useQuery({
     queryKey: ["category-banner"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -20,15 +20,26 @@ export function CategoryBanner() {
         .is("parent_id", null)
         .order("sort_order")
         .order("name_fr");
-      if (error) throw error;
+      if (error) {
+        console.error("[CategoryBanner] Supabase error:", error.message, error.code, error.details);
+        throw error;
+      }
+      if (!data || data.length === 0) {
+        console.warn("[CategoryBanner] No categories returned from database");
+      }
       return data || [];
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
-    retry: 2,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
+
+  if (isError) {
+    console.error("[CategoryBanner] Query failed:", error);
+  }
 
   if (isLoading) {
     return (
