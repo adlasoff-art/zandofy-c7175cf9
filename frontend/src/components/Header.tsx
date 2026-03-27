@@ -1,5 +1,5 @@
 import { Search, ShoppingBag, Heart, User, Menu, X, Headphones, Globe, ChevronRight, LogOut, MessageCircle, ChevronDown, PackageSearch, Sun, Moon, Monitor } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, Component, type ReactNode, type ErrorInfo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,16 @@ import { useWishlist } from "@/contexts/WishlistContext";
 import { useI18n, LOCALES, CURRENCIES, type CurrencyCode } from "@/contexts/I18nContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+
+// Mini error boundary to prevent Radix crashes from taking down the whole page
+class SafeRadix extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.warn("[SafeRadix] Radix component crashed, rendering fallback:", error.message);
+  }
+  render() { return this.state.hasError ? this.props.fallback : this.props.children; }
+}
 
 // Fallback static nav items (used if CMS query fails or is loading)
 const NAV_LINK_KEYS = [
@@ -150,7 +160,11 @@ export function Header() {
               <Search size={20} />
             </button>
 
-            {user && <NotificationCenter />}
+            {user && (
+              <SafeRadix fallback={<Link to="/dashboard" className="p-2 text-foreground hover:text-primary"><User size={20} /></Link>}>
+                <NotificationCenter />
+              </SafeRadix>
+            )}
 
             {user && (
               <Link to="/messages" className="p-2 text-foreground hover:text-primary transition-colors relative" aria-label={t("header.messages")} title={t("header.messages")}>
@@ -188,22 +202,28 @@ export function Header() {
             </div>
 
             {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="hidden md:flex p-2 text-primary hover:text-primary/80 transition-colors" aria-label={t("header.account")}>
-                    <User size={20} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem className="text-xs text-muted-foreground" disabled>{user.email}</DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to="/dashboard">{t("header.mySpace")}</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to="/messages">{t("header.messages")} {unreadCount > 0 && `(${unreadCount})`}</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to="/vendor">{t("header.vendorSpace")}</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link to="/become-vendor" className="text-primary font-medium">{t("header.becomeVendor")}</Link></DropdownMenuItem>
-                  {isStaff && <DropdownMenuItem asChild><Link to="/admin">{t("header.admin")}</Link></DropdownMenuItem>}
-                  <DropdownMenuItem onClick={signOut} className="text-destructive"><LogOut size={14} className="mr-2" /> {t("header.logout")}</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <SafeRadix fallback={
+                <Link to="/dashboard" className="hidden md:flex p-2 text-primary hover:text-primary/80 transition-colors" aria-label={t("header.account")}>
+                  <User size={20} />
+                </Link>
+              }>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="hidden md:flex p-2 text-primary hover:text-primary/80 transition-colors" aria-label={t("header.account")}>
+                      <User size={20} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem className="text-xs text-muted-foreground" disabled>{user.email}</DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to="/dashboard">{t("header.mySpace")}</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to="/messages">{t("header.messages")} {unreadCount > 0 && `(${unreadCount})`}</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to="/vendor">{t("header.vendorSpace")}</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link to="/become-vendor" className="text-primary font-medium">{t("header.becomeVendor")}</Link></DropdownMenuItem>
+                    {isStaff && <DropdownMenuItem asChild><Link to="/admin">{t("header.admin")}</Link></DropdownMenuItem>}
+                    <DropdownMenuItem onClick={signOut} className="text-destructive"><LogOut size={14} className="mr-2" /> {t("header.logout")}</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SafeRadix>
             ) : (
               <Link to="/auth" className="hidden md:flex p-2 text-foreground hover:text-primary transition-colors" aria-label={t("header.account")}>
                 <User size={20} />
