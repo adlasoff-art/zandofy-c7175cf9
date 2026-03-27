@@ -258,10 +258,9 @@ export async function fetchFlashSaleProducts(): Promise<(Product & { flashPrice?
 export async function fetchCategories(): Promise<Category[]> {
   const { data: parents, error: pErr } = await (supabase as any)
     .from("categories")
-    .select("id, name, name_fr, icon, sort_order")
+    .select("id, name, name_fr, icon")
     .is("parent_id", null)
-    .order("sort_order")
-    .order("name");
+    .order("name_fr");
 
   if (pErr || !parents) {
     console.error("Error fetching categories:", pErr);
