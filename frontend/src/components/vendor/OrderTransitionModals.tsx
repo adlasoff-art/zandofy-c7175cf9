@@ -506,3 +506,188 @@ export function DeliveryFeeModal({
     </div>
   );
 }
+
+/** Modal: hub pickup — vendor verifies confirmation code and marks as delivered */
+export function HubPickupModal({
+  orderRef,
+  expectedCode,
+  shippingPaymentStatus,
+  shippingCost,
+  onConfirm,
+  onCancel,
+  loading,
+}: {
+  orderRef: string;
+  expectedCode: string;
+  shippingPaymentStatus: string | null;
+  shippingCost: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  const [inputCode, setInputCode] = useState("");
+  const [codeValid, setCodeValid] = useState<boolean | null>(null);
+
+  const handleVerify = () => {
+    if (inputCode.trim().toUpperCase() === expectedCode.toUpperCase()) {
+      setCodeValid(true);
+    } else {
+      setCodeValid(false);
+    }
+  };
+
+  const shippingPaid = shippingPaymentStatus === "paid" || shippingCost === 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+      <div className="bg-card rounded-xl w-full max-w-sm p-5 space-y-4 border border-border" onClick={e => e.stopPropagation()}>
+        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <ShieldCheck size={16} className="text-primary" /> Retrait au Hub — {orderRef}
+        </h3>
+
+        <p className="text-[11px] text-muted-foreground">
+          Demandez le code de confirmation au client pour vérifier son identité avant de remettre le colis.
+        </p>
+
+        <div>
+          <label className="text-xs font-medium text-foreground mb-1 block">
+            Code de confirmation du client
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={inputCode}
+              onChange={e => {
+                setInputCode(e.target.value.toUpperCase());
+                setCodeValid(null);
+              }}
+              placeholder="Ex: ABC123"
+              maxLength={10}
+              className="flex-1 px-3 py-2.5 text-sm font-mono tracking-widest bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 uppercase"
+              autoFocus
+              style={{ fontSize: "16px" }}
+            />
+            <button
+              onClick={handleVerify}
+              disabled={!inputCode.trim()}
+              className="px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+            >
+              Vérifier
+            </button>
+          </div>
+          {codeValid === false && (
+            <p className="text-xs text-destructive mt-1">❌ Code incorrect. Demandez au client de vérifier.</p>
+          )}
+          {codeValid === true && (
+            <p className="text-xs text-primary mt-1 flex items-center gap-1">
+              <CheckCircle2 size={12} /> Code vérifié avec succès !
+            </p>
+          )}
+        </div>
+
+        {!shippingPaid && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+            ⚠️ L'expédition (${shippingCost.toFixed(2)}) n'a pas encore été payée. 
+            Assurez-vous que le client a effectué le paiement ou ajoutez la preuve de paiement manuellement.
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-2">
+          <button onClick={onCancel} className="flex-1 px-4 py-2.5 text-sm border border-border rounded-lg hover:bg-muted">
+            Annuler
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading || !codeValid}
+            className="flex-1 px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
+            Confirmer la remise
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Hub proof photo upload inline component for vendor */
+export function HubProofPhotoUpload({
+  orderId,
+  existingUrl,
+  onUploaded,
+}: {
+  orderId: string;
+  existingUrl: string | null;
+  onUploaded?: (url: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [url, setUrl] = useState<string | null>(existingUrl);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const compressed = await compressImage(file);
+      const ext = "webp";
+      const path = `hub-proofs/${orderId}_${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("delivery-proofs")
+        .upload(path, compressed, { contentType: "image/webp", upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from("delivery-proofs")
+        .getPublicUrl(path);
+
+      const publicUrl = publicUrlData.publicUrl;
+
+      await (supabase as any)
+        .from("orders")
+        .update({ hub_pickup_proof_url: publicUrl })
+        .eq("id", orderId);
+
+      setUrl(publicUrl);
+      onUploaded?.(publicUrl);
+    } catch (err: any) {
+      console.error("Hub proof upload error:", err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
+      <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+        <Camera size={14} className="text-primary" />
+        📦 Photo du colis au Hub
+      </p>
+      <p className="text-[10px] text-muted-foreground">
+        Prenez une photo du colis pour prouver son arrivée au Hub et inciter le client à récupérer ou payer la livraison.
+      </p>
+      {url ? (
+        <div className="relative">
+          <img src={url} alt="Preuve hub" className="w-full h-32 object-cover rounded-md" />
+          <span className="absolute top-1 right-1 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">
+            ✓ Envoyée
+          </span>
+        </div>
+      ) : (
+        <label className={`flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-primary/30 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors ${uploading ? "opacity-50" : ""}`}>
+          {uploading ? <Loader2 size={14} className="animate-spin text-primary" /> : <Camera size={14} className="text-primary" />}
+          <span className="text-xs text-primary font-medium">
+            {uploading ? "Envoi en cours..." : "Prendre / Ajouter une photo"}
+          </span>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleUpload}
+            disabled={uploading}
+            className="hidden"
+          />
+        </label>
+      )}
+    </div>
+  );
+}
