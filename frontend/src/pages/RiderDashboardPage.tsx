@@ -596,7 +596,7 @@ export default function RiderDashboardPage() {
                         )}
 
                         {/* Confirmation code section */}
-                        {o.delivery_choice === "home" && (
+                        {o.delivery_choice === "home_delivery" && (
                           <div className="border-t border-border pt-3 space-y-2">
                             {o.confirmation_code ? (
                               <div className="flex items-center gap-2 bg-primary/5 rounded-lg px-3 py-2">
