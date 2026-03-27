@@ -179,15 +179,15 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
     const next = getNextStatus(currentStatus);
     if (!next) return;
 
-    // preparing → in_shipping: ask for tracking number
-    if (currentStatus === "preparing" && next === "in_shipping") {
-      setTrackingModal(orderId);
+    // confirmed → preparing: ask for supplier info (platform, order number, link)
+    if (currentStatus === "confirmed" && next === "preparing") {
+      setSupplierModal(orderId);
       return;
     }
 
-    // in_shipping → shipped (hub): if self-delivery, ask for delivery fee
-    if (currentStatus === "in_shipping" && next === "shipped" && hasSelfDelivery) {
-      setDeliveryFeeModal(orderId);
+    // in_shipping → shipped (hub): ask for tracking number (required) + delivery fee
+    if (currentStatus === "in_shipping" && next === "shipped") {
+      setShippedModal(orderId);
       return;
     }
 
