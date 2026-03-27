@@ -434,30 +434,40 @@ export default function AdminOrdersPage() {
       </div>
 
       {/* Transition modals for admin */}
-      {trackingModal && (
-        <TrackingNumberModal
+      {supplierModal && (
+        <SupplierInfoModal
           loading={!!updatingId}
-          onCancel={() => setTrackingModal(null)}
-          onConfirm={(trackingNumber, supplierOrderNumber) => {
-            updateStatus(trackingModal, "in_shipping", {
+          onCancel={() => setSupplierModal(null)}
+          onConfirm={(platformId, supplierOrderNumber, supplierLink, trackingNumber) => {
+            updateStatus(supplierModal, "preparing", {
+              supplier_platform_id: platformId,
+              supplier_order_number: supplierOrderNumber,
+              supplier_link: supplierLink,
               tracking_number: trackingNumber || null,
-              supplier_order_number: supplierOrderNumber || null,
             });
-            setTrackingModal(null);
+            setSupplierModal(null);
           }}
         />
       )}
 
-      {deliveryFeeModal && (
-        <DeliveryFeeModal
-          loading={!!updatingId}
-          onCancel={() => setDeliveryFeeModal(null)}
-          onConfirm={(fee) => {
-            updateStatus(deliveryFeeModal, "shipped", { last_mile_fee: fee });
-            setDeliveryFeeModal(null);
-          }}
-        />
-      )}
+      {shippedModal && (() => {
+        const order = orders.find((o: any) => o.id === shippedModal);
+        return (
+          <ShippedTransitionModal
+            loading={!!updatingId}
+            currentTrackingNumber={order?.tracking_number || null}
+            hasSelfDelivery={true}
+            onCancel={() => setShippedModal(null)}
+            onConfirm={(trackingNumber, deliveryFee) => {
+              updateStatus(shippedModal, "shipped", {
+                tracking_number: trackingNumber,
+                last_mile_fee: deliveryFee > 0 ? deliveryFee : undefined,
+              });
+              setShippedModal(null);
+            }}
+          />
+        );
+      })()}
 
       {riderModal && (
         <RiderAssignmentModal
