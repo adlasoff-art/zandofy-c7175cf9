@@ -1,5 +1,5 @@
 import { Search, ShoppingBag, Heart, User, Menu, X, Headphones, Globe, ChevronRight, LogOut, MessageCircle, ChevronDown, PackageSearch, Sun, Moon, Monitor } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, Component, type ReactNode, type ErrorInfo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
