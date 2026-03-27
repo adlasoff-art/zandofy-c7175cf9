@@ -652,6 +652,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [showDisputeForm, setShowDisputeForm] = useState(false);
   const [showRetryPayment, setShowRetryPayment] = useState(false);
+  const [showShippingPayment, setShowShippingPayment] = useState<"shipping" | "last_mile" | null>(null);
   if (!order) return null;
   const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
   const canCancel = order.status === "pending";
