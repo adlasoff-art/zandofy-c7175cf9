@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Loader2 } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 
-const APP_VERSION = "1.8.3";
+const APP_VERSION = "1.8.4";
 const PWA_UPDATE_LOCK_KEY = "pwa-update-lock";
 const PWA_UPDATE_DONE_KEY = "pwa-update-done";
 
