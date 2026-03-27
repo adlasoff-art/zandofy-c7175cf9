@@ -14,7 +14,7 @@ import {
 } from "@/lib/order-status";
 import { withOptionalOrderFields } from "@/lib/order-query";
 import { useRoles } from "@/hooks/use-roles";
-import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, DeliveryFeeModal, EditTrackingModal, generateConfirmationCode } from "./OrderTransitionModals";
+import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, DeliveryFeeModal, EditTrackingModal, HubPickupModal, HubProofPhotoUpload, generateConfirmationCode } from "./OrderTransitionModals";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { getColorDisplay } from "@/utils/colorName";
@@ -80,6 +80,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
   const [shippedModal, setShippedModal] = useState<string | null>(null);
   const [riderModal, setRiderModal] = useState<string | null>(null);
   const [editTrackingModal, setEditTrackingModal] = useState<string | null>(null);
+  const [hubPickupModal, setHubPickupModal] = useState<string | null>(null);
   const [hasSelfDelivery, setHasSelfDelivery] = useState(false);
 
   // Check if store has self-delivery
@@ -377,13 +378,26 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
                   />
                 )}
 
-                {order.delivery_choice === "hub_pickup" && order.status !== "delivered" && order.status !== "cancelled" && (
-                  <PaymentProofUpload
+                {/* Hub proof photo — visible when order is at hub stage */}
+                {["shipped", "assigning_rider", "rider_assigned"].includes(order.status) && (
+                  <HubProofPhotoUpload
                     orderId={order.id}
-                    field="hub_pickup_proof_url"
-                    label="Preuve de remise au Hub (photo)"
                     existingUrl={order.hub_pickup_proof_url}
+                    onUploaded={(url) => {
+                      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, hub_pickup_proof_url: url } : o));
+                    }}
                   />
+                )}
+
+                {/* Hub pickup button — vendor can mark as picked up at hub */}
+                {["shipped", "assigning_rider", "rider_assigned"].includes(order.status) && order.confirmation_code && (
+                  <button
+                    onClick={() => setHubPickupModal(order.id)}
+                    className="w-full py-2 text-xs font-medium border-2 border-primary text-primary rounded-md hover:bg-primary/10 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Package size={12} />
+                    Retrait au Hub (client récupère)
+                  </button>
                 )}
 
                 {order.delivery_choice === "home_delivery" && order.last_mile_payment_method === "cash" && (
@@ -513,9 +527,11 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
             hasSelfDelivery={hasSelfDelivery}
             onCancel={() => setShippedModal(null)}
             onConfirm={(trackingNumber, deliveryFee) => {
+              const code = generateConfirmationCode();
               updateStatus(shippedModal, "shipped", {
                 tracking_number: trackingNumber,
                 last_mile_fee: deliveryFee > 0 ? deliveryFee : undefined,
+                confirmation_code: code,
               });
               setShippedModal(null);
             }}
@@ -569,6 +585,27 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
           }}
         />
       )}
+      {/* Hub pickup modal — verify confirmation code and mark delivered */}
+      {hubPickupModal && (() => {
+        const order = orders.find(o => o.id === hubPickupModal);
+        if (!order) return null;
+        return (
+          <HubPickupModal
+            orderRef={order.order_ref}
+            expectedCode={order.confirmation_code || ""}
+            shippingPaymentStatus={order.shipping_payment_status}
+            shippingCost={Number(order.shipping_cost || 0)}
+            loading={!!updatingId}
+            onCancel={() => setHubPickupModal(null)}
+            onConfirm={() => {
+              updateStatus(hubPickupModal, "delivered", {
+                delivery_choice: "hub_pickup",
+              });
+              setHubPickupModal(null);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

@@ -25,9 +25,9 @@ export function ShippingPaymentModal({ orderId, orderRef, amount, paymentType, o
   const [phoneNumber, setPhoneNumber] = useState("");
   const [provider, setProvider] = useState("mpesa");
   const [submitting, setSubmitting] = useState(false);
-  const [polling, setPolling] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "pending" | "success" | "failed">("idle");
-  const pollInterval = useRef<NodeJS.Timeout | null>(null);
+  const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const referenceRef = useRef<string | null>(null);
 
   // Load saved default payment method
   useEffect(() => {
@@ -57,6 +57,76 @@ export function ShippingPaymentModal({ orderId, orderRef, amount, paymentType, o
   const label = paymentType === "shipping" ? "Frais d'expédition" : "Frais de livraison à domicile";
   const statusField = paymentType === "shipping" ? "shipping_payment_status" : "last_mile_payment_status";
 
+  const startPolling = (reference: string) => {
+    referenceRef.current = reference;
+    let attempts = 0;
+
+    pollInterval.current = setInterval(async () => {
+      attempts++;
+      if (attempts > 60) {
+        if (pollInterval.current) clearInterval(pollInterval.current);
+        setPaymentStatus("failed");
+        toast.error("Délai de paiement expiré");
+        return;
+      }
+      try {
+        // Strategy 1: Check local DB first (callback may have already updated)
+        const { data: txData } = await (supabase as any)
+          .from("payment_transactions")
+          .select("status")
+          .eq("reference", reference)
+          .maybeSingle();
+
+        if (txData?.status === "success") {
+          if (pollInterval.current) clearInterval(pollInterval.current);
+          await (supabase as any)
+            .from("orders")
+            .update({ [statusField]: "paid" })
+            .eq("id", orderId);
+          setPaymentStatus("success");
+          toast.success(`${label} payés avec succès !`);
+          setTimeout(() => onSuccess(), 1500);
+          return;
+        }
+
+        if (txData?.status === "failed") {
+          if (pollInterval.current) clearInterval(pollInterval.current);
+          setPaymentStatus("failed");
+          toast.error("Paiement échoué");
+          return;
+        }
+
+        // Strategy 2: Every 3rd attempt, also check with KelPay API via edge function
+        if (attempts % 3 === 0) {
+          const checkRes = await supabase.functions.invoke("kelpay-check", {
+            body: { reference },
+          });
+
+          if (checkRes.data?.status === "success") {
+            if (pollInterval.current) clearInterval(pollInterval.current);
+            await (supabase as any)
+              .from("orders")
+              .update({ [statusField]: "paid" })
+              .eq("id", orderId);
+            setPaymentStatus("success");
+            toast.success(`${label} payés avec succès !`);
+            setTimeout(() => onSuccess(), 1500);
+            return;
+          }
+
+          if (checkRes.data?.status === "failed") {
+            if (pollInterval.current) clearInterval(pollInterval.current);
+            setPaymentStatus("failed");
+            toast.error("Paiement échoué");
+            return;
+          }
+        }
+      } catch {
+        // silently retry
+      }
+    }, 4000);
+  };
+
   const handleSubmit = async () => {
     if (!phoneNumber.trim()) {
       toast.error("Veuillez entrer un numéro de téléphone");
@@ -79,45 +149,10 @@ export function ShippingPaymentModal({ orderId, orderRef, amount, paymentType, o
       if (res.data?.error) throw new Error(res.data.error);
 
       setPaymentStatus("pending");
-      setPolling(true);
       toast.success(res.data.message || "Confirmez le paiement sur votre téléphone");
 
       const reference = res.data.reference;
-      let attempts = 0;
-      pollInterval.current = setInterval(async () => {
-        attempts++;
-        if (attempts > 60) {
-          if (pollInterval.current) clearInterval(pollInterval.current);
-          setPolling(false);
-          setPaymentStatus("failed");
-          toast.error("Délai de paiement expiré");
-          return;
-        }
-        try {
-          const checkRes = await supabase.functions.invoke("kelpay-check", {
-            body: { reference },
-          });
-          if (checkRes.data?.status === "success") {
-            if (pollInterval.current) clearInterval(pollInterval.current);
-            // Update order payment status
-            await (supabase as any)
-              .from("orders")
-              .update({ [statusField]: "paid" })
-              .eq("id", orderId);
-            setPolling(false);
-            setPaymentStatus("success");
-            toast.success(`${label} payés avec succès !`);
-            setTimeout(() => onSuccess(), 1500);
-          } else if (checkRes.data?.status === "failed") {
-            if (pollInterval.current) clearInterval(pollInterval.current);
-            setPolling(false);
-            setPaymentStatus("failed");
-            toast.error("Paiement échoué");
-          }
-        } catch {
-          // silently retry
-        }
-      }, 5000);
+      startPolling(reference);
     } catch (e: any) {
       toast.error(e.message || "Erreur lors du paiement");
     } finally {
@@ -154,6 +189,10 @@ export function ShippingPaymentModal({ orderId, orderRef, amount, paymentType, o
             <Loader2 size={32} className="animate-spin text-primary" />
             <p className="text-sm text-foreground font-medium">En attente de confirmation...</p>
             <p className="text-xs text-muted-foreground">Validez le paiement sur votre téléphone</p>
+            <p className="text-[10px] text-muted-foreground mt-2">
+              Vérification automatique en cours. Si le paiement est déjà confirmé, 
+              la page se mettra à jour sous peu.
+            </p>
           </div>
         ) : (
           <>
