@@ -80,6 +80,7 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
   const [shippedModal, setShippedModal] = useState<string | null>(null);
   const [riderModal, setRiderModal] = useState<string | null>(null);
   const [editTrackingModal, setEditTrackingModal] = useState<string | null>(null);
+  const [hubPickupModal, setHubPickupModal] = useState<string | null>(null);
   const [hasSelfDelivery, setHasSelfDelivery] = useState(false);
 
   // Check if store has self-delivery
