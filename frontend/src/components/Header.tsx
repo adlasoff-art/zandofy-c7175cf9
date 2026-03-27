@@ -1,5 +1,5 @@
-import { Search, ShoppingBag, Heart, User, Menu, X, Headphones, Globe, ChevronRight, LogOut, MessageCircle, ChevronDown, PackageSearch, Sun, Moon, Monitor } from "lucide-react";
-import { useState, useRef, useEffect, Component, type ReactNode, type ErrorInfo } from "react";
+import { Search, ShoppingBag, Heart, User, Menu, X, Headphones, Globe, ChevronRight, LogOut, MessageCircle, ChevronDown, PackageSearch, Sun, Moon, Monitor, Bell } from "lucide-react";
+import { useState, useRef, useEffect, Component, lazy, Suspense, type ReactNode, type ErrorInfo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +7,11 @@ import { PredictiveSearch } from "@/components/PredictiveSearch";
 import { BrandLogo } from "@/components/BrandLogo";
 import { MegaMenu } from "@/components/MegaMenu";
 import { CurrencySwitcher } from "@/components/CurrencySwitcher";
-import { NotificationCenter } from "@/components/NotificationCenter";
+
+// Lazy-load NotificationCenter to prevent Radix Popover import failures from crashing the entire Header
+const NotificationCenter = lazy(() =>
+  import("@/components/NotificationCenter").then((mod) => ({ default: mod.NotificationCenter }))
+);
 import { useAuth } from "@/contexts/AuthContext";
 import { useRoles } from "@/hooks/use-roles";
 import { useCart } from "@/contexts/CartContext";
@@ -174,8 +178,10 @@ export function Header() {
             </button>
 
             {user && (
-              <SafeRadix fallback={<Link to="/dashboard" className="p-2 text-foreground hover:text-primary"><User size={20} /></Link>}>
-                <NotificationCenter />
+              <SafeRadix fallback={<Link to="/dashboard" className="p-2 text-foreground hover:text-primary"><Bell size={20} /></Link>}>
+                <Suspense fallback={<span className="p-2 text-foreground"><Bell size={20} /></span>}>
+                  <NotificationCenter />
+                </Suspense>
               </SafeRadix>
             )}
 
