@@ -126,6 +126,7 @@ Deno.serve(async (req) => {
         reference,
         transaction_id: kelpayData.transactionid || null,
         status: "pending",
+        payment_type: payment_type || "order",
         callback_payload: kelpayData,
       });
 
