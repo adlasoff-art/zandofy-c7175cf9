@@ -178,7 +178,15 @@ export default function AdminSettingsPage() {
       .from("platform_settings")
       .upsert({ key: "max_discount_settings", value: discountCap as any, updated_at: now }, { onConflict: "key" });
 
-    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8;
+    const { error: e9 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "gateway_fees", value: gatewayFees as any, updated_at: now }, { onConflict: "key" });
+
+    const { error: e10 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "review_bonus", value: reviewBonus as any, updated_at: now }, { onConflict: "key" });
+
+    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8 || e9 || e10;
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
