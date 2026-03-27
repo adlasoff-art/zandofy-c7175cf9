@@ -73,11 +73,14 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
+  const [gatewayFees, setGatewayFees] = useState({ mobile_money_fee_pct: 2.5 });
+  const [reviewBonus, setReviewBonus] = useState({ bonus_pct: 0.10 });
+
   useEffect(() => {
     supabase
       .from("platform_settings")
       .select("key, value")
-      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings"])
+      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings", "gateway_fees", "review_bonus"])
       .then(({ data }) => {
         data?.forEach((row) => {
           const v = row.value as any;
@@ -124,6 +127,10 @@ export default function AdminSettingsPage() {
             if (tiers.length) {
               setBulkTiers(tiers.map((tier: any) => ({ min_quantity: Number(tier.min_quantity) || 1, discount_pct: Number(tier.discount_pct) || 0 })));
             }
+          } else if (row.key === "gateway_fees") {
+            setGatewayFees({ mobile_money_fee_pct: Number(v.mobile_money_fee_pct) || 2.5 });
+          } else if (row.key === "review_bonus") {
+            setReviewBonus({ bonus_pct: Number(v.bonus_pct) || 0.10 });
           }
         });
       });
@@ -171,7 +178,15 @@ export default function AdminSettingsPage() {
       .from("platform_settings")
       .upsert({ key: "max_discount_settings", value: discountCap as any, updated_at: now }, { onConflict: "key" });
 
-    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8;
+    const { error: e9 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "gateway_fees", value: gatewayFees as any, updated_at: now }, { onConflict: "key" });
+
+    const { error: e10 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "review_bonus", value: reviewBonus as any, updated_at: now }, { onConflict: "key" });
+
+    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8 || e9 || e10;
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
@@ -239,6 +254,44 @@ export default function AdminSettingsPage() {
           </div>
         </section>
 
+        {/* Gateway Fees & Review Bonus */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Frais passerelle & Bonus avis</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Paramètres financiers pour le suivi des frais Mobile Money et les récompenses des avis clients.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Frais passerelle Mobile Money (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={20}
+                step={0.1}
+                value={gatewayFees.mobile_money_fee_pct}
+                onChange={(e) => setGatewayFees({ mobile_money_fee_pct: Number(e.target.value) || 2.5 })}
+                className={inputClass}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Déduit du brut pour estimer le revenu net (KPI indicatif)</p>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Bonus avis avec photos (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={5}
+                step={0.01}
+                value={reviewBonus.bonus_pct}
+                onChange={(e) => setReviewBonus({ bonus_pct: Number(e.target.value) || 0.10 })}
+                className={inputClass}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">% du sous-total commande crédité en ZandoPoints à l'approbation</p>
+            </div>
+          </div>
+        </section>
         <section className="bg-card border border-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Calculator size={18} className="text-primary" />

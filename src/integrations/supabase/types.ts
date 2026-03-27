@@ -2206,6 +2206,7 @@ export type Database = {
           id: string
           method: string
           order_id: string
+          payment_type: string | null
           phone_number: string | null
           provider: string | null
           reference: string
@@ -2222,6 +2223,7 @@ export type Database = {
           id?: string
           method?: string
           order_id: string
+          payment_type?: string | null
           phone_number?: string | null
           provider?: string | null
           reference: string
@@ -2238,6 +2240,7 @@ export type Database = {
           id?: string
           method?: string
           order_id?: string
+          payment_type?: string | null
           phone_number?: string | null
           provider?: string | null
           reference?: string

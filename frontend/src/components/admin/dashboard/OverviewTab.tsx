@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Loader2, Users, Package, ShoppingBag, DollarSign, Store as StoreIcon, CheckCircle2, Clock, XCircle, Ban, ShieldAlert, RotateCcw, CreditCard, AlertTriangle, Bike, UserCheck, Ship, Truck, TrendingUp } from "lucide-react";
+import { Loader2, Users, Package, ShoppingBag, DollarSign, Store as StoreIcon, CheckCircle2, Clock, XCircle, Ban, ShieldAlert, RotateCcw, CreditCard, AlertTriangle, TrendingUp, Wallet, Receipt, Truck, Home } from "lucide-react";
 import { KpiCard, KpiCardRow, statusColor, statusLabels } from "./shared";
 import { NON_REVENUE_ORDER_STATUSES, REAL_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
 import type { PeriodKey } from "./DashboardPeriodSelector";
@@ -24,10 +24,11 @@ export function OverviewTab({ period }: Props) {
   const { data: orderStats, isLoading: lo } = useQuery({
     queryKey: ["admin-order-stats", period],
     queryFn: async () => {
-      const { data } = await supabase.from("orders").select("total, status").gte("created_at", since);
-      if (!data) return { count: 0, revenue: 0, currentRevenue: 0, cancelledRevenue: 0, cancelledCount: 0, deliveredCount: 0, pendingCount: 0, failedAmount: 0, failedCount: 0, byStatus: {} as Record<string, number> };
+      const { data } = await (supabase as any).from("orders").select("total, status, shipping_payment_status, last_mile_payment_status, shipping_cost, last_mile_fee, shipping_payment_proof_url, last_mile_payment_proof_url").gte("created_at", since);
+      if (!data) return { count: 0, revenue: 0, currentRevenue: 0, cancelledRevenue: 0, cancelledCount: 0, deliveredCount: 0, pendingCount: 0, failedAmount: 0, failedCount: 0, byStatus: {} as Record<string, number>, proofShippingPaid: 0, proofLastMilePaid: 0 };
       const byStatus: Record<string, number> = {};
       let revenue = 0, currentRevenue = 0, cancelledRevenue = 0, cancelledCount = 0, deliveredCount = 0, pendingCount = 0, failedAmount = 0, failedCount = 0, opCount = 0;
+      let proofShippingPaid = 0, proofLastMilePaid = 0;
       data.forEach((o) => {
         byStatus[o.status] = (byStatus[o.status] || 0) + 1;
         if (o.status === "cancelled" || o.status === "returned") { cancelledRevenue += Number(o.total); cancelledCount++; }
@@ -36,8 +37,10 @@ export function OverviewTab({ period }: Props) {
         if (o.status === "delivered") deliveredCount++;
         if (o.status === "pending") pendingCount++;
         if (o.status === "payment_failed" || o.status === "awaiting_payment") { failedAmount += Number(o.total); failedCount++; }
+        if (o.shipping_payment_status === "paid" && o.shipping_payment_proof_url) proofShippingPaid += Number(o.shipping_cost || 0);
+        if (o.last_mile_payment_status === "paid" && o.last_mile_payment_proof_url) proofLastMilePaid += Number(o.last_mile_fee || 0);
       });
-      return { count: opCount, revenue, currentRevenue, cancelledRevenue, cancelledCount, deliveredCount, pendingCount, failedAmount, failedCount, byStatus };
+      return { count: opCount, revenue, currentRevenue, cancelledRevenue, cancelledCount, deliveredCount, pendingCount, failedAmount, failedCount, byStatus, proofShippingPaid, proofLastMilePaid };
     },
   });
 
@@ -69,19 +72,59 @@ export function OverviewTab({ period }: Props) {
     },
   });
 
+  // Enhanced payment stats with payment_type breakdown
   const { data: paymentStats } = useQuery({
-    queryKey: ["admin-payment-stats", period],
+    queryKey: ["admin-payment-stats-v2", period],
     queryFn: async () => {
-      const { data } = await supabase.from("payment_transactions").select("status, amount").gte("created_at", since);
-      if (!data) return { successful: 0, failed: 0, pending: 0, totalAmount: 0 };
+      const { data } = await (supabase as any).from("payment_transactions").select("status, amount, method, payment_type").gte("created_at", since);
+      if (!data) return { successful: 0, failed: 0, pending: 0, totalAmount: 0, orderAmount: 0, shippingAmount: 0, lastMileAmount: 0, mobileMoneyGross: 0, gatewayFees: 0, netRevenue: 0 };
+
+      const successful = data.filter((p: any) => p.status === "success" || p.status === "completed");
+      const mobileMoneySuccessful = successful.filter((p: any) => p.method === "mobile_money");
+
+      let orderAmount = 0, shippingAmount = 0, lastMileAmount = 0;
+      successful.forEach((p: any) => {
+        const amt = Number(p.amount);
+        const pType = p.payment_type || "order";
+        if (pType === "shipping") shippingAmount += amt;
+        else if (pType === "last_mile") lastMileAmount += amt;
+        else orderAmount += amt;
+      });
+
+      const mobileMoneyGross = mobileMoneySuccessful.reduce((s: number, p: any) => s + Number(p.amount), 0);
+      // Read fee pct from settings will be done client-side, default 2.5%
+      const gatewayFeePct = 2.5;
+      const gatewayFees = Math.round(mobileMoneyGross * gatewayFeePct) / 100;
+      const netRevenue = mobileMoneyGross - gatewayFees;
+
       return {
-        successful: data.filter(p => p.status === "success" || p.status === "completed").length,
-        pending: data.filter(p => p.status === "pending").length,
-        failed: data.filter(p => p.status === "failed").length,
-        totalAmount: data.filter(p => p.status === "success" || p.status === "completed").reduce((s, p) => s + Number(p.amount), 0),
+        successful: successful.length,
+        pending: data.filter((p: any) => p.status === "pending").length,
+        failed: data.filter((p: any) => p.status === "failed").length,
+        totalAmount: successful.reduce((s: number, p: any) => s + Number(p.amount), 0),
+        orderAmount,
+        shippingAmount,
+        lastMileAmount,
+        mobileMoneyGross,
+        gatewayFees,
+        netRevenue,
       };
     },
   });
+
+  // Load gateway fee setting
+  const { data: gatewayFeePct = 2.5 } = useQuery({
+    queryKey: ["admin-gateway-fee-pct"],
+    queryFn: async () => {
+      const { data } = await supabase.from("platform_settings").select("value").eq("key", "gateway_fees").maybeSingle();
+      return Number((data?.value as any)?.mobile_money_fee_pct) || 2.5;
+    },
+  });
+
+  // Recalculate with actual fee pct
+  const mobileMoneyGross = paymentStats?.mobileMoneyGross ?? 0;
+  const actualGatewayFees = Math.round(mobileMoneyGross * gatewayFeePct) / 100;
+  const actualNetRevenue = mobileMoneyGross - actualGatewayFees;
 
   const { data: roleCounts = [] } = useQuery({
     queryKey: ["admin-role-counts"],
@@ -129,13 +172,27 @@ export function OverviewTab({ period }: Props) {
         <KpiCardRow icon={Ban} label="Montant cmd échouées" value={`$${(orderStats?.failedAmount ?? 0).toLocaleString()}`} color="text-destructive" />
       </div>
 
+      {/* Revenus & Passerelle */}
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Revenus & Passerelle Mobile Money</h2>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <KpiCard icon={CreditCard} label="Paiements commandes" value={`$${(paymentStats?.orderAmount ?? 0).toFixed(2)}`} sub="Mobile Money réussis" />
+        <KpiCard icon={Truck} label="Paiements expédition" value={`$${(paymentStats?.shippingAmount ?? 0).toFixed(2)}`} sub="Shipping payés via MM" color="text-blue-500" />
+        <KpiCard icon={Home} label="Paiements livraison domicile" value={`$${(paymentStats?.lastMileAmount ?? 0).toFixed(2)}`} sub="Last-mile payés via MM" color="text-purple-500" />
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard icon={Wallet} label="Brut Mobile Money" value={`$${mobileMoneyGross.toFixed(2)}`} sub="Total perçu via MM" />
+        <KpiCard icon={Receipt} label={`Frais passerelle (${gatewayFeePct}%)`} value={`-$${actualGatewayFees.toFixed(2)}`} sub="Estimé KelPay" color="text-destructive" />
+        <KpiCard icon={DollarSign} label="Net plateforme (MM)" value={`$${actualNetRevenue.toFixed(2)}`} sub="Après déduction frais" color="text-green-500" />
+        <KpiCard icon={CheckCircle2} label="Preuves validées" value={`$${((orderStats?.proofShippingPaid ?? 0) + (orderStats?.proofLastMilePaid ?? 0)).toFixed(2)}`} sub={`Expéd: $${(orderStats?.proofShippingPaid ?? 0).toFixed(2)} | Livr: $${(orderStats?.proofLastMilePaid ?? 0).toFixed(2)}`} />
+      </div>
+
       {/* Après-vente */}
       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Après-vente & Paiements</h2>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard icon={ShieldAlert} label="Litiges" value={(disputeStats?.total ?? 0).toString()} color="text-destructive" sub={`${disputeStats?.open ?? 0} ouvert(s)`} />
         <KpiCard icon={RotateCcw} label="Retours" value={(returnStats?.total ?? 0).toString()} color="text-amber-500" sub={`${returnStats?.pending ?? 0} en attente`} />
         <KpiCard icon={CreditCard} label="Paiements réussis" value={(paymentStats?.successful ?? 0).toString()} sub={`$${(paymentStats?.totalAmount ?? 0).toLocaleString()}`} />
-        <KpiCard icon={AlertTriangle} label="Paiements échoués" value={(orderStats?.failedCount ?? 0).toString()} color="text-destructive" sub={`${paymentStats?.pending ?? 0} transaction(s) en attente`} />
+        <KpiCard icon={AlertTriangle} label="Paiements échoués" value={(paymentStats?.failed ?? 0).toString()} color="text-destructive" sub={`${paymentStats?.pending ?? 0} transaction(s) en attente`} />
       </div>
 
       {/* Bottom: Recent orders + sidebar */}
