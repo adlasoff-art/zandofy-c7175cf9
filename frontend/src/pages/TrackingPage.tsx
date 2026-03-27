@@ -740,7 +740,7 @@ export default function TrackingPage() {
               {/* Delivery choice info */}
               {orderResult.delivery_choice && orderResult.status !== "delivered" && (
                 <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-3 py-2">
-                  {orderResult.delivery_choice === "home" ? (
+                  {orderResult.delivery_choice === "home_delivery" ? (
                     <>
                       <Home size={14} className="text-primary shrink-0" />
                       <span className="text-foreground">Livraison à domicile</span>
