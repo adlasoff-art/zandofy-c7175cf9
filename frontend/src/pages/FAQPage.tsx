@@ -16,7 +16,7 @@ const defaultFaqFr: FaqCategory[] = [
     title: "Commandes & Paiements",
     items: [
       { q: "Comment passer une commande ?", a: "Parcourez nos produits, ajoutez-les au panier et procédez au checkout. Vous pouvez payer par carte bancaire, Mobile Money ou à la livraison selon votre zone." },
-      { q: "Quels moyens de paiement acceptez-vous ?", a: "Nous acceptons Visa, Mastercard, PayPal, Apple Pay, Google Pay et Mobile Money (Orange Money, Wave, MTN MoMo)." },
+      { q: "Quels moyens de paiement acceptez-vous ?", a: "Nous acceptons Visa, Mastercard, PayPal, Apple Pay, Google Pay et Mobile Money (Orange Money, M-Pesa, Airtel Money, AfriMoney)." },
       { q: "Puis-je utiliser un code promo ?", a: "Oui ! Entrez votre code promo dans le champ dédié lors du checkout. La réduction s'appliquera automatiquement si le code est valide." },
       { q: "Puis-je modifier ou annuler ma commande ?", a: "Vous pouvez annuler votre commande tant qu'elle n'a pas été expédiée. Rendez-vous dans votre espace client > Commandes." },
     ],
