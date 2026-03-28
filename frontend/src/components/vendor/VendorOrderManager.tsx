@@ -658,18 +658,32 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
       {riderModal && (
         <RiderAssignmentModal
           loading={!!updatingId}
-          showDeliveryFee={hasSelfDelivery}
+          showDeliveryFee={hasSelfDelivery || isLocalShop}
           onCancel={() => setRiderModal(null)}
           onConfirm={(riderId, riderName, deliveryFee, paymentMethod, confirmationCode) => {
-            updateStatus(riderModal, "assigning_rider", {
-              assigned_rider_id: riderId,
-              assigned_rider_name: riderName,
-              last_mile_fee: deliveryFee || undefined,
-              last_mile_payment_method: paymentMethod,
-              confirmation_code: confirmationCode,
-            });
+            if (isLocalShop) {
+              // Local flow: assign driver and move to ready_for_pickup
+              updateStatus(riderModal, "ready_for_pickup", {
+                assigned_driver_id: riderId,
+                assigned_driver_name: riderName,
+                delivery_option: "home_delivery",
+                last_mile_fee: deliveryFee || undefined,
+                last_mile_payment_method: paymentMethod,
+                confirmation_code: confirmationCode,
+              });
+            } else {
+              // International flow: assign rider and move to assigning_rider
+              updateStatus(riderModal, "assigning_rider", {
+                assigned_rider_id: riderId,
+                assigned_rider_name: riderName,
+                last_mile_fee: deliveryFee || undefined,
+                last_mile_payment_method: paymentMethod,
+                confirmation_code: confirmationCode,
+              });
+            }
             setRiderModal(null);
           }}
+        />
         />
       )}
       {/* Hub pickup modal — verify confirmation code and mark delivered */}
