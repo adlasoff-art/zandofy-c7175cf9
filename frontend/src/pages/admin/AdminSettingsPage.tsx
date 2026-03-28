@@ -234,6 +234,7 @@ export default function AdminSettingsPage() {
               { key: "stripe" as const, label: "Carte bancaire (Visa, Mastercard)" },
               { key: "mobile_money" as const, label: "Mobile Money (Orange, M-Pesa, Airtel)" },
               { key: "cod" as const, label: "Paiement à la livraison (COD)" },
+              { key: "off_platform" as const, label: "Paiement hors plateforme (preuve + validation)" },
             ]).map((pm) => (
               <div key={pm.key} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                 <span className="text-sm text-foreground">{pm.label}</span>
