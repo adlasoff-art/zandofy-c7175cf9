@@ -421,6 +421,17 @@ export default function AdminVendorPricingPage() {
                   />
                 </div>
 
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Retours autorisés</p>
+                    <p className="text-[10px] text-muted-foreground">Les clients peuvent demander un retour produit.</p>
+                  </div>
+                  <Switch
+                    checked={edit.returns_enabled}
+                    onCheckedChange={(v) => updateEdit(store.id, "returns_enabled", v)}
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
                     <label className="text-xs text-muted-foreground block mb-1">
