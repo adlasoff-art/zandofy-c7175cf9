@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.expire-pending-orders]
 verify_jwt = false
+
+[functions.verify-confirmation-code]
+verify_jwt = false
