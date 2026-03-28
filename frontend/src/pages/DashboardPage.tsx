@@ -903,6 +903,47 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         </div>
       )}
 
+      {/* Hub photo uploaded by vendor — read-only for client */}
+      {order.hub_pickup_proof_url && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+            📦 Photo du colis au Hub
+          </p>
+          <img
+            src={order.hub_pickup_proof_url}
+            alt="Photo du colis"
+            className="w-full max-w-xs rounded-lg border border-border object-cover"
+            decoding="async"
+          />
+        </div>
+      )}
+
+      {/* Off-platform payment: client uploads proof */}
+      {order.payment_method === "off_platform" && order.status === "awaiting_payment" && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
+            <span className="text-amber-700 dark:text-amber-400 font-medium">
+              💳 Paiement hors plateforme — Envoyez votre preuve de paiement pour validation
+            </span>
+          </div>
+          <PaymentProofUpload
+            orderId={order.id}
+            field="shipping_payment_proof_url"
+            label="Preuve de paiement (capture d'écran)"
+            existingUrl={order.shipping_payment_proof_url}
+          />
+        </div>
+      )}
+
+      {/* Off-platform payment: waiting for vendor validation */}
+      {order.payment_method === "off_platform" && order.status === "awaiting_payment" && order.shipping_payment_proof_url && (
+        <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-2.5">
+          <span className="text-blue-700 dark:text-blue-400 font-medium">
+            ⏳ Preuve envoyée — En attente de validation par le vendeur
+          </span>
+        </div>
+      )}
+
       {/* Hub pickup proof upload */}
       {order.delivery_choice === "hub_pickup" && order.status !== "delivered" && order.status !== "cancelled" && (
         <PaymentProofUpload
