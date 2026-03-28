@@ -2617,6 +2617,7 @@ export type Database = {
       products: {
         Row: {
           auto_pricing_enabled: boolean
+          care_instructions: string | null
           category_id: string | null
           cost_calc: number | null
           cost_real: number | null
@@ -2651,7 +2652,9 @@ export type Database = {
           rating: number | null
           review_count: number | null
           review_count_override: number | null
+          sales_count: number
           sales_count_override: number | null
+          season: string | null
           seo_keywords: string[] | null
           short_description: string | null
           sku: string | null
@@ -2670,6 +2673,7 @@ export type Database = {
         }
         Insert: {
           auto_pricing_enabled?: boolean
+          care_instructions?: string | null
           category_id?: string | null
           cost_calc?: number | null
           cost_real?: number | null
@@ -2704,7 +2708,9 @@ export type Database = {
           rating?: number | null
           review_count?: number | null
           review_count_override?: number | null
+          sales_count?: number
           sales_count_override?: number | null
+          season?: string | null
           seo_keywords?: string[] | null
           short_description?: string | null
           sku?: string | null
@@ -2723,6 +2729,7 @@ export type Database = {
         }
         Update: {
           auto_pricing_enabled?: boolean
+          care_instructions?: string | null
           category_id?: string | null
           cost_calc?: number | null
           cost_real?: number | null
@@ -2757,7 +2764,9 @@ export type Database = {
           rating?: number | null
           review_count?: number | null
           review_count_override?: number | null
+          sales_count?: number
           sales_count_override?: number | null
+          season?: string | null
           seo_keywords?: string[] | null
           short_description?: string | null
           sku?: string | null
