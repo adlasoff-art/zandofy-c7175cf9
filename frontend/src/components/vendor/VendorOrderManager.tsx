@@ -751,17 +751,15 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
         return (
           <HubPickupModal
             orderRef={order.order_ref}
-            expectedCode={order.confirmation_code || ""}
+            orderId={order.id}
             shippingPaymentStatus={order.shipping_payment_status}
             shippingCost={Number(order.shipping_cost || 0)}
             loading={!!updatingId}
             onCancel={() => setHubPickupModal(null)}
             onConfirm={() => {
-              updateStatus(hubPickupModal, "delivered", {
-                delivery_choice: "hub_pickup",
-              });
               setHubPickupModal(null);
             }}
+          />
           />
         );
       })()}
