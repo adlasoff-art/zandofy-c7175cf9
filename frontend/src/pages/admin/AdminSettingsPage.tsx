@@ -271,7 +271,7 @@ export default function AdminSettingsPage() {
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Message carte bancaire</label>
-              <input type="text" value={paymentMethods.stripe_notice_text} onChange={(e) => setPaymentMethods((prev) => ({ ...prev, stripe_notice_text: e.target.value }))} className={inputClass} />
+              <input type="text" value={paymentMethods.stripe_notice_text} onChange={(e) => updatePaymentMethod('stripe_notice_text', e.target.value)} className={inputClass} />
             </div>
           </div>
         </section>
