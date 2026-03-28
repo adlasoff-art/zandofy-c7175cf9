@@ -196,11 +196,14 @@ export default function CheckoutPage() {
 
       const { data: overrides } = await (supabase as any)
         .from("vendor_pricing_overrides")
-        .select("store_id, vendor_cod_enabled")
+        .select("store_id, vendor_cod_enabled, vendor_off_platform_enabled")
         .in("store_id", storeIds);
 
       const codMap = new Map((overrides || []).map((override: any) => [override.store_id, !!override.vendor_cod_enabled]));
       setVendorCodAllowed(storeIds.every((storeId) => codMap.get(storeId) === true));
+
+      const offPlatformMap = new Map((overrides || []).map((override: any) => [override.store_id, !!override.vendor_off_platform_enabled]));
+      setVendorOffPlatformAllowed(storeIds.every((storeId) => offPlatformMap.get(storeId) === true));
     };
 
     void loadVendorCodEligibility();
