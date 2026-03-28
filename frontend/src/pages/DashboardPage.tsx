@@ -1443,20 +1443,23 @@ function ConfirmationCodeEntry({ orderId, onSuccess }: { orderId: string; onSucc
   const handleVerify = async () => {
     if (!code.trim()) return;
     setVerifying(true);
-    // Check if code matches
-    const { data } = await supabase
-      .from("orders")
-      .select("confirmation_code")
-      .eq("id", orderId)
-      .single();
-
-    if (data?.confirmation_code && data.confirmation_code.toUpperCase() === code.trim().toUpperCase()) {
-      // Code matches - mark as delivered
-      await supabase.from("orders").update({ status: "delivered" }).eq("id", orderId);
-      toast({ title: "✅ Commande confirmée !", description: "Votre commande est marquée comme livrée." });
-      onSuccess();
-    } else {
-      toast({ title: "Code incorrect", description: "Vérifiez le code fourni par le vendeur.", variant: "destructive" });
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-confirmation-code", {
+        body: { order_id: orderId, code: code.trim() },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        if (data.retry_after) {
+          toast({ title: "Trop de tentatives", description: `Réessayez dans ${data.retry_after} secondes.`, variant: "destructive" });
+        } else {
+          toast({ title: "Code incorrect", description: data.error, variant: "destructive" });
+        }
+      } else if (data?.success) {
+        toast({ title: "✅ Commande confirmée !", description: "Votre commande est marquée comme livrée." });
+        onSuccess();
+      }
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message || "Erreur de vérification", variant: "destructive" });
     }
     setVerifying(false);
   };

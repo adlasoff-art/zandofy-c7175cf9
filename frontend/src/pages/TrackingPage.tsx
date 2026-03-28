@@ -307,16 +307,15 @@ function ConfirmationCodeEntry({ order, onConfirmed }: { order: OrderTrackingRes
     if (!code.trim()) return;
     setVerifying(true);
     try {
-      if (code.trim().toUpperCase() === order.confirmation_code?.toUpperCase()) {
-        const { error } = await supabase
-          .from("orders")
-          .update({ status: "delivered" })
-          .eq("id", order.id);
-        if (error) throw error;
+      const { data, error } = await supabase.functions.invoke("verify-confirmation-code", {
+        body: { order_id: order.id, code: code.trim() },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        toast.error(data.error);
+      } else if (data?.success) {
         toast.success("Commande récupérée avec succès !");
         onConfirmed();
-      } else {
-        toast.error("Code incorrect. Veuillez réessayer.");
       }
     } catch (e: any) {
       toast.error(e.message || "Erreur");

@@ -507,10 +507,10 @@ export function DeliveryFeeModal({
   );
 }
 
-/** Modal: hub pickup — vendor verifies confirmation code and marks as delivered */
+/** Modal: hub pickup — vendor verifies confirmation code server-side and marks as delivered */
 export function HubPickupModal({
   orderRef,
-  expectedCode,
+  orderId,
   shippingPaymentStatus,
   shippingCost,
   onConfirm,
@@ -518,7 +518,7 @@ export function HubPickupModal({
   loading,
 }: {
   orderRef: string;
-  expectedCode: string;
+  orderId: string;
   shippingPaymentStatus: string | null;
   shippingCost: number;
   onConfirm: () => void;
@@ -527,12 +527,31 @@ export function HubPickupModal({
 }) {
   const [inputCode, setInputCode] = useState("");
   const [codeValid, setCodeValid] = useState<boolean | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleVerify = () => {
-    if (inputCode.trim().toUpperCase() === expectedCode.toUpperCase()) {
-      setCodeValid(true);
-    } else {
+  const handleVerify = async () => {
+    if (!inputCode.trim()) return;
+    setVerifying(true);
+    setErrorMsg(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-confirmation-code", {
+        body: { order_id: orderId, code: inputCode.trim() },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        setCodeValid(false);
+        setErrorMsg(data.retry_after
+          ? `Trop de tentatives. Réessayez dans ${data.retry_after}s.`
+          : data.error);
+      } else if (data?.success) {
+        setCodeValid(true);
+      }
+    } catch (e: any) {
       setCodeValid(false);
+      setErrorMsg(e.message || "Erreur de vérification");
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -560,6 +579,7 @@ export function HubPickupModal({
               onChange={e => {
                 setInputCode(e.target.value.toUpperCase());
                 setCodeValid(null);
+                setErrorMsg(null);
               }}
               placeholder="Ex: ABC123"
               maxLength={10}
@@ -569,18 +589,18 @@ export function HubPickupModal({
             />
             <button
               onClick={handleVerify}
-              disabled={!inputCode.trim()}
-              className="px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+              disabled={!inputCode.trim() || verifying}
+              className="px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1"
             >
-              Vérifier
+              {verifying ? <Loader2 size={14} className="animate-spin" /> : "Vérifier"}
             </button>
           </div>
-          {codeValid === false && (
-            <p className="text-xs text-destructive mt-1">❌ Code incorrect. Demandez au client de vérifier.</p>
+          {codeValid === false && errorMsg && (
+            <p className="text-xs text-destructive mt-1">❌ {errorMsg}</p>
           )}
           {codeValid === true && (
             <p className="text-xs text-primary mt-1 flex items-center gap-1">
-              <CheckCircle2 size={12} /> Code vérifié avec succès !
+              <CheckCircle2 size={12} /> Code vérifié — commande marquée comme livrée !
             </p>
           )}
         </div>
@@ -594,16 +614,18 @@ export function HubPickupModal({
 
         <div className="flex gap-2 pt-2">
           <button onClick={onCancel} className="flex-1 px-4 py-2.5 text-sm border border-border rounded-lg hover:bg-muted">
-            Annuler
+            {codeValid ? "Fermer" : "Annuler"}
           </button>
-          <button
-            onClick={onConfirm}
-            disabled={loading || !codeValid}
-            className="flex-1 px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
-            Confirmer la remise
-          </button>
+          {codeValid && (
+            <button
+              onClick={onConfirm}
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
+              OK
+            </button>
+          )}
         </div>
       </div>
     </div>
