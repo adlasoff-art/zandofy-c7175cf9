@@ -360,8 +360,18 @@ export default function ProductPage() {
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Truck size={14} className="text-primary shrink-0" />
-                    <span className="text-muted-foreground">Expédition rapide sous 24-48h</span>
+                    <span className="text-muted-foreground">
+                      {(product as any).shopType === "local"
+                        ? "🏪 En stock local · Livraison 1-2 jours"
+                        : "Expédition rapide sous 24-48h"}
+                    </span>
                   </div>
+                  {(product as any).shopType === "local" && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <MapPin size={14} className="text-emerald-600 shrink-0" />
+                      <span className="text-emerald-600 font-medium">Stock physique disponible</span>
+                    </div>
+                  )}
                   {(product as any).store?.is_verified && (product as any).store?.verified_years > 0 && (
                     <div className="flex items-center gap-2 text-sm">
                       <Award size={14} className="text-primary shrink-0" />
