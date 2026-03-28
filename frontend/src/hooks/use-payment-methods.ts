@@ -17,6 +17,7 @@ const DEFAULT_CONFIG: PaymentMethodsConfig = {
   mobile_money: true,
   stripe: true,
   cod: true,
+  off_platform: true,
   stripe_notice_enabled: false,
   stripe_notice_text: "Pour l'instant, ce moyen de paiement n'est pas actif.",
 };

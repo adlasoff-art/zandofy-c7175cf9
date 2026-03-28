@@ -462,7 +462,7 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
                 )}
 
                 {/* Off-platform payment validation by vendor */}
-                {(order as any).payment_method === "off_platform" && order.status === "awaiting_payment" && (
+                {order.payment_method === "off_platform" && order.status === "awaiting_payment" && (
                   <div className="space-y-2 border border-amber-200 dark:border-amber-700 rounded-lg p-3 bg-amber-50 dark:bg-amber-900/20">
                     <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                       💳 Paiement hors plateforme — Validation requise
