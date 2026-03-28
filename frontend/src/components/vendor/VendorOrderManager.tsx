@@ -230,18 +230,26 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
   };
 
   const handleAdvance = (orderId: string, currentStatus: string) => {
-    const next = getNextStatus(currentStatus);
+    const next = getNextStatus(currentStatus, shopType);
     if (!next) return;
 
-    if (currentStatus === "confirmed" && next === "preparing") {
+    // International flow: require supplier info for confirmed → preparing
+    if (!isLocalShop && currentStatus === "confirmed" && next === "preparing") {
       setSupplierModal(orderId);
       return;
     }
-    if (currentStatus === "in_shipping" && next === "shipped") {
+    // International flow: require tracking for in_shipping → shipped
+    if (!isLocalShop && currentStatus === "in_shipping" && next === "shipped") {
       setShippedModal(orderId);
       return;
     }
-    if (currentStatus === "shipped" && next === "assigning_rider") {
+    // International flow: require rider for shipped → assigning_rider
+    if (!isLocalShop && currentStatus === "shipped" && next === "assigning_rider") {
+      setRiderModal(orderId);
+      return;
+    }
+    // Local flow: assign driver at preparing → ready_for_pickup
+    if (isLocalShop && currentStatus === "preparing" && next === "ready_for_pickup") {
       setRiderModal(orderId);
       return;
     }
