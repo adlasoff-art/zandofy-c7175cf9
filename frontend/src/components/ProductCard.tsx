@@ -199,7 +199,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
         <div className="min-h-[1rem] flex items-center gap-1 mt-1">
           <Star size={10} className="fill-accent text-accent shrink-0" />
           <span className="text-[10px] text-muted-foreground">{product.rating > 0 ? product.rating : "—"}</span>
-          <span className="text-[10px] text-muted-foreground">| {product.reviewCount} {t("product.sold")}</span>
+          <span className="text-[10px] text-muted-foreground">| {(product as any).salesCount ?? product.reviewCount} {t("product.sold")}</span>
         </div>
 
         {/* Certification badge below rating — only if store is verified */}

@@ -26,6 +26,9 @@ export interface Product {
   sku?: string;
   material?: string;
   style?: string;
+  careInstructions?: string;
+  season?: string;
+  salesCount?: number;
   storeId?: string;
   shortDescription?: string;
   description?: string;
