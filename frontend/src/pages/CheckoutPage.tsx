@@ -1194,10 +1194,10 @@ export default function CheckoutPage() {
                     </p>
                     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1">
                       <p className="font-semibold">📋 Comment ça marche :</p>
-                      <ol className="list-decimal list-inside space-y-0.5">
-                        <li>Effectuez le paiement directement au vendeur (Mobile Money, virement, etc.)</li>
-                        <li>Après la commande, uploadez la preuve de paiement depuis votre espace client</li>
-                        <li>Le vendeur valide la preuve et votre commande est confirmée</li>
+                      <ol className="list-decimal list-inside space-y-1">
+                        <li>Effectuez le paiement directement au vendeur (Mobile Money, virement ou paiement en espèces, etc.)</li>
+                        <li>Après la commande, uploadez la preuve de paiement depuis votre espace client. Pour un paiement Mobile Money, assurez-vous que le <strong>numéro de transaction</strong>, le <strong>nom du destinataire</strong>, le <strong>numéro de téléphone utilisé</strong> et la <strong>date</strong> soient clairement visibles sur la capture.</li>
+                        <li>Le vendeur valide la preuve et votre commande est confirmée pour la suite du processus.</li>
                       </ol>
                     </div>
                   </div>
