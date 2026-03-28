@@ -105,6 +105,7 @@ interface OrderRow {
   shipping_payment_proof_url: string | null;
   last_mile_payment_proof_url: string | null;
   hub_pickup_proof_url: string | null;
+  store_id: string | null;
 }
 
 interface OrderItemRow {
