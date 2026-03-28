@@ -262,6 +262,15 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     });
   }, [products, catalogSearch, catalogStatusFilter]);
 
+  const catalogStatusTabs = [
+    { key: "all", label: "Tous" },
+    { key: "published", label: "Publiés" },
+    { key: "draft", label: "Brouillons" },
+    { key: "pending_approval", label: "En attente" },
+    { key: "rejected", label: "Refusés" },
+    { key: "revision_requested", label: "Révision" },
+  ];
+
   const toLocalDatetime = (iso: string | null) => {
     if (!iso) return "";
     try {
