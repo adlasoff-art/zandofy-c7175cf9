@@ -267,7 +267,7 @@ export default function AdminSettingsPage() {
                 <p className="text-sm text-foreground">Afficher le message d’indisponibilité carte</p>
                 <p className="text-xs text-muted-foreground">Si activé et la carte est désactivée, le client voit un message au lieu d’un choix caché.</p>
               </div>
-              <Switch checked={paymentMethods.stripe_notice_enabled} onCheckedChange={(v) => setPaymentMethods((prev) => ({ ...prev, stripe_notice_enabled: v }))} />
+              <Switch checked={paymentMethods.stripe_notice_enabled} onCheckedChange={(v) => updatePaymentMethod('stripe_notice_enabled', v)} />
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Message carte bancaire</label>
