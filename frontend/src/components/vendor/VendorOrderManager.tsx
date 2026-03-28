@@ -499,7 +499,7 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
                 )}
 
                 {/* Mini stepper with dates */}
-                <OrderMiniStepper status={order.status} history={order.history} trackingNumber={order.tracking_number} />
+                <OrderMiniStepper status={order.status} history={order.history} trackingNumber={order.tracking_number} shopType={shopType} />
 
                 {/* Items */}
                 <div className="space-y-1.5">
