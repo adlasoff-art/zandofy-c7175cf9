@@ -1,78 +1,37 @@
 
 
-# Plan : Corrections de sécurité P0/P1 + Templates email paiements
+# Plan : Corriger les seuils de marge vendeur et valider le flux complet
 
-## Ce qui est EXCLU (en attente de KelPay)
-- Point 3 : Vérification HMAC du callback KelPay → Nécessite le webhook secret de KelPay
+## Constat
 
----
+Le code est **déjà fonctionnel** dans sa structure :
+- Le toggle admin `vendor_extra_margin_enabled` existe dans `vendor_pricing_overrides` (DB ✅)
+- La colonne `vendor_extra_margin` existe dans `products` (DB ✅)
+- Le champ s'affiche dans `PricingCalculator.tsx` quand le toggle est activé (UI ✅)
+- Le calcul de prix intègre la marge vendeur (logique ✅)
 
-## Tâche 1 — P0 : Sanitiser autocomplete (search.ts)
+## Problème identifié
 
-**Fichier** : `frontend/src/services/search.ts` ligne 105
-- Appliquer `sanitizeLike(query)` dans `autocompleteProducts()` comme c'est déjà fait dans `searchProducts()`
-- Changement d'une seule ligne
+La fonction `getMaxExtraMargin()` dans `pricing-utils.ts` utilise un seuil de **$50** au lieu de **$99** :
+- Actuellement : < $50 → $0.50, ≥ $100 → $1.00, entre $50-$100 → interpolation
+- Attendu : < $100 → $0.50, ≥ $100 → $1.00 (pas d'interpolation)
 
----
+## Modifications
 
-## Tâche 2 — P0 : Supprimer le bypass maintenance hardcodé
+### 1. Corriger `getMaxExtraMargin()` dans `pricing-utils.ts`
+Remplacer la logique d'interpolation par un seuil net à $100 :
+- Prix < $100 → max $0.50
+- Prix ≥ $100 → max $1.00
 
-**Fichier** : `frontend/src/components/MaintenancePage.tsx` lignes 107-119
-- Supprimer entièrement le bloc invisible `onDoubleClick` qui contient le code `"zandofy-admin-bypass"` en clair
-- **Fichier** : `frontend/src/components/MaintenanceGuard.tsx` lignes 74, 94
-- Supprimer les vérifications `sessionStorage.getItem("maintenance_bypass")` — les admins passent déjà via la vérification de rôle `isAdmin` (ligne 91), ce bypass est redondant et dangereux
+### 2. Valider le clamp côté `PricingCalculator.tsx`
+S'assurer que quand le prix change (recalcul auto), la valeur `vendorExtraMargin` est automatiquement réduite si elle dépasse le nouveau max autorisé.
 
----
-
-## Tâche 3 — P1 : Sécuriser send-email (contrôle de rôle)
-
-**Fichier** : `frontend/supabase/functions/send-email/index.ts`
-- Ajouter une vérification de rôle admin/manager avant d'autoriser l'envoi
-- Vérifier que le `to` est un email valide (regex basique)
-- Redéployer la fonction
-
----
-
-## Tâche 4 — P1 : CORS dynamique sur les Edge Functions sensibles
-
-**Fonctions concernées** : `send-email`, `admin-users`, `impersonate-user`
-- Remplacer `"Access-Control-Allow-Origin": "*"` par une lecture de `SITE_BASE_URL` pour restreindre l'origin
-- Les fonctions publiques (callback KelPay, generate-sitemap) restent en wildcard car elles doivent accepter des requêtes externes
-
----
-
-## Tâche 5 — Templates email pour paiements shipping et last-mile
-
-**Fichier** : `frontend/supabase/functions/notify-order-status/index.ts`
-- Ajouter des templates pour les événements de paiement (pas juste les statuts de commande)
-- Créer une nouvelle Edge Function ou étendre `kelpay-callback` pour déclencher un email spécifique quand un paiement shipping ou last-mile réussit
-
-Templates à créer :
-| Template | Déclencheur | Contenu |
-|---|---|---|
-| `shipping_payment_success` | Paiement expédition réussi via KelPay | "Votre paiement de $X pour l'expédition de la commande #REF a été confirmé" |
-| `last_mile_payment_success` | Paiement livraison domicile réussi | "Votre paiement de $X pour la livraison à domicile de la commande #REF a été confirmé" |
-
-**Implémentation** : Dans `kelpay-callback/index.ts`, après la mise à jour réussie d'un paiement shipping/last_mile, invoquer `notify-order-status` avec un type étendu ou envoyer directement l'email via SMTP avec le template approprié.
-
----
+### 3. Aucune migration nécessaire
+Toutes les colonnes et tables sont déjà en place dans la base de données.
 
 ## Fichiers modifiés
-
 | Fichier | Modification |
 |---|---|
-| `frontend/src/services/search.ts` | sanitizeLike sur autocomplete |
-| `frontend/src/components/MaintenancePage.tsx` | Suppression bypass hardcodé |
-| `frontend/src/components/MaintenanceGuard.tsx` | Suppression sessionStorage bypass |
-| `frontend/supabase/functions/send-email/index.ts` | Ajout vérif rôle admin |
-| `frontend/supabase/functions/send-email/index.ts` | CORS dynamique |
-| `frontend/supabase/functions/admin-users/index.ts` | CORS dynamique |
-| `frontend/supabase/functions/impersonate-user/index.ts` | CORS dynamique |
-| `frontend/supabase/functions/kelpay-callback/index.ts` | Envoi email après paiement shipping/last_mile |
-| `frontend/supabase/functions/notify-order-status/index.ts` | Ajout templates paiement |
-
-## Risques
-- **Zone ORANGE** : Modifications des Edge Functions et du MaintenanceGuard
-- **Aucun risque Zone ROUGE** : Pas de modification du Header, Layout, Auth principal
-- **Backward compatible** : Les admins utilisent déjà le bypass par rôle, la suppression du bypass secret ne casse rien
+| `frontend/src/lib/pricing-utils.ts` | Seuil $100 net au lieu de $50/$100 interpolé |
+| `frontend/src/components/vendor/PricingCalculator.tsx` | Auto-clamp de la marge si elle dépasse le max après recalcul |
 
