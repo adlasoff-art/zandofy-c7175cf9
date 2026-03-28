@@ -290,7 +290,7 @@ export default function BecomeVendorPage() {
 
   const saveProgress = async (nextStep?: number) => {
     setSaving(true);
-    const payload = {
+    const payload: any = {
       user_id: user.id,
       full_name: form.full_name,
       phone: form.phone,
@@ -305,6 +305,9 @@ export default function BecomeVendorPage() {
       company_country: form.company_country,
       current_step: nextStep || step,
       status: form.status,
+      shop_type: form.shop_type,
+      fulfillment_type: form.fulfillment_type,
+      fleet_management: form.fleet_management,
     };
 
     let appId = form.id;
