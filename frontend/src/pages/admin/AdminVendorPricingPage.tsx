@@ -216,21 +216,21 @@ export default function AdminVendorPricingPage() {
     setSavingId(store.id);
     const edit = getEdit(store);
 
-    // Update is_platform_owned on store
+    // Update is_platform_owned and returns_enabled on store
+    const storeUpdates: Record<string, any> = {};
     if (edit.is_platform_owned !== (store.is_platform_owned ?? false)) {
+      storeUpdates.is_platform_owned = edit.is_platform_owned;
+    }
+    if (edit.returns_enabled !== ((store as any).returns_enabled ?? false)) {
+      storeUpdates.returns_enabled = edit.returns_enabled;
+    }
+
+    if (Object.keys(storeUpdates).length > 0) {
       const { data: storeUpdateData, error: storeUpdateError } = await (supabase as any)
         .from("stores")
-        .update({ is_platform_owned: edit.is_platform_owned })
+        .update(storeUpdates)
         .eq("id", store.id)
         .select();
-
-      if (storeUpdateError || !storeUpdateData?.length) {
-        toast({ title: "Erreur", description: storeUpdateError?.message || "Impossible de modifier le statut plateforme. Vérifiez vos permissions.", variant: "destructive" });
-        setSavingId(null);
-        return;
-      }
-
-      // Send email notification to vendor
       try {
         const { data: ownerProfile } = await supabase
           .from("profiles")
