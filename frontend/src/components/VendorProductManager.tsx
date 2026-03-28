@@ -595,6 +595,13 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Matière" value={form.material} onChange={(v) => setForm({ ...form, material: v })} />
+            <Field label="Style" value={form.style} onChange={(v) => setForm({ ...form, style: v })} placeholder="Ex: Décontracté, Chic, Sportif" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Saison" value={form.season} onChange={(v) => setForm({ ...form, season: v })} placeholder="Ex: Été, Hiver, Toute saison" />
+            <Field label="Entretien" value={form.care_instructions} onChange={(v) => setForm({ ...form, care_instructions: v })} placeholder="Ex: Lavage à la main" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <CountryCombobox value={form.origin_country} onChange={(v) => setForm({ ...form, origin_country: v })} />
           </div>
           <div>
