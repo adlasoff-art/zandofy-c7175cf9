@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { orderId, newStatus } = await req.json();
+    const { orderId, newStatus, amount } = await req.json();
 
     if (!orderId || !newStatus) {
       return new Response(JSON.stringify({ error: "Missing orderId or newStatus" }), {
