@@ -47,6 +47,7 @@ export interface Product {
   flashEndsAt?: string;
   store?: any;
   sellerRank?: number;
+  shopType?: string;
 }
 
 export interface TrendTag {
