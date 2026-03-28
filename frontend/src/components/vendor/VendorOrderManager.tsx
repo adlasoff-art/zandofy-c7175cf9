@@ -731,7 +731,7 @@ function OrderMiniStepper({ status, history, trackingNumber, shopType }: { statu
   return (
     <div className="py-3 overflow-x-auto">
       <div className="flex items-start gap-0 min-w-max">
-        {STATUS_FLOW.map((step, i) => {
+        {flow.map((step, i) => {
           const done = i <= currentIdx;
           const isCurrent = i === currentIdx;
           const cfg = STATUS_CONFIG[step];
@@ -767,7 +767,7 @@ function OrderMiniStepper({ status, history, trackingNumber, shopType }: { statu
                   </span>
                 )}
               </div>
-              {i < STATUS_FLOW.length - 1 && (
+              {i < flow.length - 1 && (
                 <div className={`w-4 sm:w-6 h-0.5 mt-3.5 sm:mt-4 shrink-0 ${i < currentIdx ? "bg-primary" : "bg-border"}`} />
               )}
             </div>
