@@ -760,7 +760,6 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
               setHubPickupModal(null);
             }}
           />
-          />
         );
       })()}
     </div>
