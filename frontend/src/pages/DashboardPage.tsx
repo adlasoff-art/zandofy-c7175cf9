@@ -234,7 +234,7 @@ export default function DashboardPage() {
       const [itemsRes, historyRes] = await Promise.all([
         supabase
           .from("order_items")
-          .select("id, product_name, product_image, quantity, price, size, color")
+          .select("id, product_name, product_image, product_id, quantity, price, size, color")
           .eq("order_id", selectedOrder),
         supabase
           .from("order_status_history")
