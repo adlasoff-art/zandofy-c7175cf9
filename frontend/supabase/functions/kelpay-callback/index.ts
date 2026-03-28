@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
     // Find the payment transaction by reference
     const { data: tx, error: txErr } = await supabase
       .from("payment_transactions")
-      .select("id, order_id, status")
+      .select("id, order_id, status, payment_type, amount")
       .eq("reference", reference)
       .maybeSingle();
 
@@ -58,24 +58,64 @@ Deno.serve(async (req) => {
 
     // Update order status based on payment result
     if (isSuccess) {
-      const { error: orderUpdateError } = await supabase
-        .from("orders")
-        .update({ status: "pending" })
-        .eq("id", tx.order_id)
-        .in("status", ["awaiting_payment", "pending"]);
+      const paymentType = tx.payment_type || "order";
+      const txAmount = tx.amount ? Number(tx.amount) : undefined;
 
-      if (orderUpdateError) {
-        console.error("Order update after KelPay success failed:", orderUpdateError);
-      } else {
+      if (paymentType === "order") {
+        // Standard order payment
+        const { error: orderUpdateError } = await supabase
+          .from("orders")
+          .update({ status: "pending" })
+          .eq("id", tx.order_id)
+          .in("status", ["awaiting_payment", "pending"]);
+
+        if (orderUpdateError) {
+          console.error("Order update after KelPay success failed:", orderUpdateError);
+        } else {
+          await fetch(`${supabaseUrl}/functions/v1/notify-order-status`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${serviceRoleKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ orderId: tx.order_id, newStatus: "pending" }),
+          }).catch((notifyError) => {
+            console.error("Failed to trigger order notification after KelPay success:", notifyError);
+          });
+        }
+      } else if (paymentType === "shipping") {
+        // Shipping payment
+        await supabase
+          .from("orders")
+          .update({ shipping_payment_status: "paid" })
+          .eq("id", tx.order_id);
+
         await fetch(`${supabaseUrl}/functions/v1/notify-order-status`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${serviceRoleKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ orderId: tx.order_id, newStatus: "pending" }),
+          body: JSON.stringify({ orderId: tx.order_id, newStatus: "shipping_payment_success", amount: txAmount }),
         }).catch((notifyError) => {
-          console.error("Failed to trigger order notification after KelPay success:", notifyError);
+          console.error("Failed to trigger shipping payment notification:", notifyError);
+        });
+      } else if (paymentType === "last_mile") {
+        // Last-mile delivery payment
+        await supabase
+          .from("orders")
+          .update({ last_mile_payment_status: "paid" })
+          .eq("id", tx.order_id);
+
+        await fetch(`${supabaseUrl}/functions/v1/notify-order-status`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serviceRoleKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ orderId: tx.order_id, newStatus: "last_mile_payment_success", amount: txAmount }),
+        }).catch((notifyError) => {
+          console.error("Failed to trigger last-mile payment notification:", notifyError);
         });
       }
     } else {

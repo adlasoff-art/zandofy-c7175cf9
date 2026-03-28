@@ -71,7 +71,7 @@ export function MaintenanceGuard({ children }: { children: ReactNode }) {
       if (cached) {
         const parsed = JSON.parse(cached) as MaintenanceConfig;
         if (parsed.enabled && new Date(parsed.end_time).getTime() > Date.now()) {
-          if (!isAdmin && sessionStorage.getItem("maintenance_bypass") !== "true") {
+          if (!isAdmin) {
             return <MaintenancePage title={parsed.title} message={parsed.message} endTime={parsed.end_time} />;
           }
         }
@@ -89,11 +89,6 @@ export function MaintenanceGuard({ children }: { children: ReactNode }) {
     if (isStillActive) {
       // Admin bypass via role
       if (isAdmin) return <>{children}</>;
-
-      // Session bypass (secret code entered on maintenance page)
-      if (sessionStorage.getItem("maintenance_bypass") === "true") {
-        return <>{children}</>;
-      }
 
       return (
         <MaintenancePage

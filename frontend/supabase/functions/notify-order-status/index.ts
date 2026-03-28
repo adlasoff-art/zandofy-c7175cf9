@@ -45,9 +45,30 @@ const NOTIFY_STATUSES: Record<string, { subject: string; heading: string; body: 
     body: "Votre colis a été livré avec succès. Merci pour votre confiance !",
     emoji: "🎉",
   },
+  // Payment-specific notifications
+  shipping_payment_success: {
+    subject: "💳 Paiement expédition confirmé",
+    heading: "Votre paiement d'expédition a été confirmé !",
+    body: "Le paiement pour l'expédition de votre commande a bien été reçu. Votre colis sera bientôt en route.",
+    emoji: "💳",
+  },
+  last_mile_payment_success: {
+    subject: "💳 Paiement livraison confirmé",
+    heading: "Votre paiement de livraison à domicile a été confirmé !",
+    body: "Le paiement pour la livraison à domicile de votre commande a bien été reçu. Un livreur sera assigné prochainement.",
+    emoji: "💳",
+  },
 };
 
-function buildEmailHtml(heading: string, body: string, orderRef: string, emoji: string) {
+function buildEmailHtml(heading: string, body: string, orderRef: string, emoji: string, amount?: number) {
+  const amountBlock = amount != null
+    ? `<table cellpadding="0" cellspacing="0" style="background:#e8f5e9;border-radius:8px;width:100%;margin-bottom:16px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0;font-size:12px;color:#388e3c;">Montant payé</p>
+              <p style="margin:4px 0 0;font-size:18px;font-weight:bold;color:#1b5e20;">$${amount.toFixed(2)}</p>
+            </td></tr>
+          </table>`
+    : "";
   return `
 <!DOCTYPE html>
 <html>
@@ -60,6 +81,7 @@ function buildEmailHtml(heading: string, body: string, orderRef: string, emoji: 
           <p style="font-size:40px;margin:0 0 8px;">${emoji}</p>
           <h1 style="margin:0 0 12px;font-size:22px;color:#1a1a1a;">${heading}</h1>
           <p style="margin:0 0 20px;font-size:15px;color:#555;line-height:1.6;">${body}</p>
+          ${amountBlock}
           <table cellpadding="0" cellspacing="0" style="background:#f1f3f5;border-radius:8px;width:100%;margin-bottom:24px;">
             <tr><td style="padding:16px;">
               <p style="margin:0;font-size:12px;color:#888;">Référence commande</p>
@@ -84,7 +106,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { orderId, newStatus } = await req.json();
+    const { orderId, newStatus, amount } = await req.json();
 
     if (!orderId || !newStatus) {
       return new Response(JSON.stringify({ error: "Missing orderId or newStatus" }), {
@@ -156,7 +178,7 @@ Deno.serve(async (req) => {
           from: fromEmail,
           to: recipientEmail,
           subject: `${template.subject} — ${order.order_ref}`,
-          html: buildEmailHtml(template.heading, template.body, order.order_ref, template.emoji),
+          html: buildEmailHtml(template.heading, template.body, order.order_ref, template.emoji, amount),
         });
         results.email = true;
       } catch (emailErr) {

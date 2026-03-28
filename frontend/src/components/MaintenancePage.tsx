@@ -104,19 +104,6 @@ export function MaintenancePage({ title, message, endTime }: MaintenancePageProp
         </div>
       </div>
 
-      {/* Secret admin bypass: triple-click on the brand name area */}
-      <div
-        className="fixed bottom-4 right-4 w-8 h-8 opacity-0 cursor-default"
-        onDoubleClick={() => {
-          // Show a subtle input for admin bypass
-          const code = prompt("");
-          if (code === "zandofy-admin-bypass") {
-            sessionStorage.setItem("maintenance_bypass", "true");
-            window.location.reload();
-          }
-        }}
-        aria-hidden="true"
-      />
     </div>
   );
 }

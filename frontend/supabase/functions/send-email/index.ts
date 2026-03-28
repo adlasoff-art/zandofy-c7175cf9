@@ -1,12 +1,23 @@
 import nodemailer from "npm:nodemailer@6.9.16";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_HEADERS =
+  "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
+
+function getCorsHeaders(req: Request) {
+  const siteBase = Deno.env.get("SITE_BASE_URL") || "*";
+  const origin = req.headers.get("Origin") || "";
+  const allowed = siteBase === "*" || origin === siteBase;
+  return {
+    "Access-Control-Allow-Origin": allowed ? origin || "*" : siteBase,
+    "Access-Control-Allow-Headers": ALLOWED_HEADERS,
+  };
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -37,11 +48,41 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Verify admin or manager role
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+
+    const hasPermission = roles?.some(
+      (r: { role: string }) => r.role === "admin" || r.role === "manager"
+    );
+    if (!hasPermission) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden: admin or manager role required" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const { to, subject, html } = await req.json();
 
     if (!to || !subject || !html) {
       return new Response(
         JSON.stringify({ error: "Missing required fields: to, subject, html" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Validate email format
+    if (!EMAIL_REGEX.test(to)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid email address" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
