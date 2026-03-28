@@ -651,16 +651,94 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
   onCancelSuccess: () => void;
 }) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [showDisputeForm, setShowDisputeForm] = useState(false);
   const [showRetryPayment, setShowRetryPayment] = useState(false);
   const [showShippingPayment, setShowShippingPayment] = useState<"shipping" | "last_mile" | null>(null);
+  const [returnsEnabled, setReturnsEnabled] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewImages, setReviewImages] = useState<string[]>([]);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [existingReviews, setExistingReviews] = useState<Set<string>>(new Set());
+
+  // Check if store has returns_enabled
+  useEffect(() => {
+    if (!order.store_id) return;
+    supabase
+      .from("stores")
+      .select("returns_enabled")
+      .eq("id", order.store_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setReturnsEnabled(!!(data as any)?.returns_enabled);
+      });
+  }, [order.store_id]);
+
+  // Check existing reviews for this order's products
+  useEffect(() => {
+    if (!user || order.status !== "delivered" || !orderItems.length) return;
+    const productIds = orderItems.map(i => i.product_id).filter(Boolean) as string[];
+    if (!productIds.length) return;
+    supabase
+      .from("reviews")
+      .select("product_id")
+      .eq("user_id", user.id)
+      .in("product_id", productIds)
+      .then(({ data }) => {
+        setExistingReviews(new Set((data || []).map((r: any) => r.product_id)));
+      });
+  }, [user, order.status, orderItems]);
+
   if (!order) return null;
   const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
   const canCancel = order.status === "pending";
-  const canReturn = order.status === "delivered";
+  const canReturn = order.status === "delivered" && returnsEnabled;
   const canRetryPayment = ["awaiting_payment", "payment_failed"].includes(order.status);
   const canDispute = ["delivered", "returned"].includes(order.status);
+
+  const handleSubmitReview = async (productId: string) => {
+    if (!user || !reviewRating) return;
+    setReviewSubmitting(true);
+    const { error } = await supabase.from("reviews").insert({
+      product_id: productId,
+      user_id: user.id,
+      rating: reviewRating,
+      comment: reviewComment.trim(),
+      images: reviewImages.length > 0 ? reviewImages : null,
+      is_verified_purchase: true,
+    });
+    if (error) {
+      toast({ title: "Erreur", description: "Impossible de soumettre l'avis.", variant: "destructive" });
+    } else {
+      toast({ title: "Merci !", description: "Votre avis a été soumis. Ajoutez des photos pour gagner des ZandoPoints !" });
+      setExistingReviews(prev => new Set([...prev, productId]));
+      setReviewRating(0);
+      setReviewComment("");
+      setReviewImages([]);
+      setReviewSubmitted(true);
+    }
+    setReviewSubmitting(false);
+  };
+
+  const handleReviewImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length || !user) return;
+    const { compressImage } = await import("@/utils/image-compress");
+    const urls: string[] = [];
+    for (const file of Array.from(files).slice(0, 3)) {
+      const compressed = await compressImage(file);
+      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
+      const { error } = await supabase.storage.from("reviews").upload(fileName, compressed);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("reviews").getPublicUrl(fileName);
+        urls.push(pub.publicUrl);
+      }
+    }
+    setReviewImages(prev => [...prev, ...urls].slice(0, 5));
+  };
 
   return (
     <div className="bg-card border border-border rounded-lg p-5 space-y-5">
