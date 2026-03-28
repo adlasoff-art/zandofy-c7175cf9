@@ -656,14 +656,18 @@ export default function CheckoutPage() {
         setProcessing(false);
       }
     } else {
-      // COD or Stripe (existing mock flow)
+      // COD, off_platform, or Stripe (existing mock flow)
       await new Promise(r => setTimeout(r, 1500));
       const { orderRef } = await createOrderForPayment();
       setOrderId(orderRef);
       await clearCart();
       setStep("confirmation");
       setProcessing(false);
-      toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
+      if (paymentMethod === "off_platform") {
+        toast({ title: "Commande enregistrée", description: `N° ${orderRef} — Uploadez votre preuve de paiement depuis votre espace client.` });
+      } else {
+        toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
+      }
     }
   };
 
