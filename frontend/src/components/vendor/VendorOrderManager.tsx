@@ -505,7 +505,7 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
                                 .eq("id", order.id);
                               if (!error) {
                                 setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "payment_failed" } : o));
-                                toast({ title: "Paiement refusé", description: "La commande a été marquée comme échouée." });
+                                toast.error("Paiement refusé — commande marquée comme échouée.");
                               }
                             }}
                           >
