@@ -191,6 +191,7 @@ export default function CheckoutPage() {
 
       const { data: products } = await supabase.from("products").select("id, store_id").in("id", productIds);
       const storeIds = [...new Set((products || []).map((product: any) => product.store_id).filter(Boolean))];
+      setCartStoreIds(storeIds);
       if (storeIds.length === 0) {
         setVendorCodAllowed(false);
         return;
