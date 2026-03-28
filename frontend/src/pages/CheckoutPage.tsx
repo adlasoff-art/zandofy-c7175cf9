@@ -101,6 +101,7 @@ export default function CheckoutPage() {
   const [paymentReference, setPaymentReference] = useState<string | null>(null);
   const [paymentOrderIds, setPaymentOrderIds] = useState<string[]>([]);
   const [vendorCodAllowed, setVendorCodAllowed] = useState(false);
+  const [vendorOffPlatformAllowed, setVendorOffPlatformAllowed] = useState(false);
   const paymentChannelRef = useRef<any>(null);
 
   const [shipping, setShipping] = useState<ShippingInfo>({ ...emptyShipping, email: user?.email || "" });
