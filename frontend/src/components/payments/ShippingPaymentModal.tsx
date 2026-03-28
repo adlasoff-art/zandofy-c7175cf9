@@ -4,6 +4,7 @@ import { X, Loader2, Phone, CheckCircle2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 
 const PROVIDERS = [
   { value: "mpesa", label: "M-Pesa" },
@@ -26,6 +27,7 @@ export function ShippingPaymentModal({ orderId, orderRef, amount, paymentType, o
   const [provider, setProvider] = useState("mpesa");
   const [submitting, setSubmitting] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "pending" | "success" | "failed">("idle");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const referenceRef = useRef<string | null>(null);
 
@@ -231,9 +233,24 @@ export function ShippingPaymentModal({ orderId, orderRef, amount, paymentType, o
               </div>
             </div>
 
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={e => setTermsAccepted(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-primary rounded"
+              />
+              <span className="text-[11px] text-muted-foreground leading-tight">
+                J'accepte les{" "}
+                <Link to="/terms" target="_blank" className="text-primary underline hover:text-primary/80">
+                  Conditions Générales de Vente
+                </Link>.
+              </span>
+            </label>
+
             <Button
               onClick={handleSubmit}
-              disabled={submitting || !phoneNumber.trim()}
+              disabled={submitting || !phoneNumber.trim() || !termsAccepted}
               className="w-full gap-2"
             >
               {submitting ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}

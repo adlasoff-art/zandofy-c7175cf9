@@ -102,6 +102,7 @@ export default function AdminVendorPricingPage() {
     commission_rate: string;
     is_platform_owned: boolean;
     vendor_cod_enabled: boolean;
+    returns_enabled: boolean;
   }>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -121,7 +122,7 @@ export default function AdminVendorPricingPage() {
   const { data: stores, isLoading } = useQuery({
     queryKey: ["admin-stores-pricing", search],
     queryFn: async () => {
-      let q = (supabase as any).from("stores").select("id, name, owner_id, is_platform_owned").order("name");
+      let q = (supabase as any).from("stores").select("id, name, owner_id, is_platform_owned, returns_enabled").order("name");
       if (search) q = q.ilike("name", `%${search}%`);
       const { data: storesData } = await q.limit(50);
       if (!storesData?.length) return [];
@@ -194,6 +195,7 @@ export default function AdminVendorPricingPage() {
       commission_rate: o?.commission_rate != null ? String(o.commission_rate) : "",
       is_platform_owned: store.is_platform_owned ?? false,
       vendor_cod_enabled: (o as any)?.vendor_cod_enabled ?? false,
+      returns_enabled: (store as any).returns_enabled ?? false,
     };
   };
 
@@ -206,7 +208,7 @@ export default function AdminVendorPricingPage() {
 
   const getEditForId = (storeId: string) => {
     const store = stores?.find((s) => s.id === storeId);
-    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false };
+    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, returns_enabled: false };
     return getEdit(store);
   };
 
@@ -214,39 +216,49 @@ export default function AdminVendorPricingPage() {
     setSavingId(store.id);
     const edit = getEdit(store);
 
-    // Update is_platform_owned on store
+    // Update is_platform_owned and returns_enabled on store
+    const storeUpdates: Record<string, any> = {};
     if (edit.is_platform_owned !== (store.is_platform_owned ?? false)) {
+      storeUpdates.is_platform_owned = edit.is_platform_owned;
+    }
+    if (edit.returns_enabled !== ((store as any).returns_enabled ?? false)) {
+      storeUpdates.returns_enabled = edit.returns_enabled;
+    }
+
+    if (Object.keys(storeUpdates).length > 0) {
       const { data: storeUpdateData, error: storeUpdateError } = await (supabase as any)
         .from("stores")
-        .update({ is_platform_owned: edit.is_platform_owned })
+        .update(storeUpdates)
         .eq("id", store.id)
         .select();
 
       if (storeUpdateError || !storeUpdateData?.length) {
-        toast({ title: "Erreur", description: storeUpdateError?.message || "Impossible de modifier le statut plateforme. Vérifiez vos permissions.", variant: "destructive" });
+        toast({ title: "Erreur", description: storeUpdateError?.message || "Impossible de modifier la boutique.", variant: "destructive" });
         setSavingId(null);
         return;
       }
 
-      // Send email notification to vendor
-      try {
-        const { data: ownerProfile } = await supabase
-          .from("profiles")
-          .select("email")
-          .eq("id", store.owner_id)
-          .single();
+      // Send email notification to vendor if platform ownership changed
+      if (storeUpdates.is_platform_owned !== undefined) {
+        try {
+          const { data: ownerProfile } = await supabase
+            .from("profiles")
+            .select("email")
+            .eq("id", store.owner_id)
+            .single();
 
-        if (ownerProfile?.email) {
-          const emailType = edit.is_platform_owned ? "platform_owned" : "reverted_independent";
-          supabase.functions.invoke("send-vendor-email", {
-            body: {
-              to: ownerProfile.email,
-              storeName: store.name,
-              type: emailType,
-            },
-          }).catch(() => {}); // Fire-and-forget, don't block save
-        }
-      } catch {}
+          if (ownerProfile?.email) {
+            const emailType = edit.is_platform_owned ? "platform_owned" : "reverted_independent";
+            supabase.functions.invoke("send-vendor-email", {
+              body: {
+                to: ownerProfile.email,
+                storeName: store.name,
+                type: emailType,
+              },
+            }).catch(() => {});
+          }
+        } catch {}
+      }
     }
 
     const payload = {
@@ -406,6 +418,17 @@ export default function AdminVendorPricingPage() {
                   <Switch
                     checked={edit.vendor_cod_enabled}
                     onCheckedChange={(v) => updateEdit(store.id, "vendor_cod_enabled", v)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Retours autorisés</p>
+                    <p className="text-[10px] text-muted-foreground">Les clients peuvent demander un retour produit.</p>
+                  </div>
+                  <Switch
+                    checked={edit.returns_enabled}
+                    onCheckedChange={(v) => updateEdit(store.id, "returns_enabled", v)}
                   />
                 </div>
 

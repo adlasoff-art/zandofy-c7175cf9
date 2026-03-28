@@ -7,6 +7,7 @@ import { Footer } from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -105,12 +106,14 @@ interface OrderRow {
   shipping_payment_proof_url: string | null;
   last_mile_payment_proof_url: string | null;
   hub_pickup_proof_url: string | null;
+  store_id: string | null;
 }
 
 interface OrderItemRow {
   id: string;
   product_name: string;
   product_image: string | null;
+  product_id: string | null;
   quantity: number;
   price: number;
   size: string | null;
@@ -181,7 +184,7 @@ export default function DashboardPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_ref, created_at, total, status, subtotal, shipping_cost, discount_amount, coupon_code, shipping_first_name, shipping_last_name, shipping_address, shipping_city, shipping_country, payment_method, tracking_number, assigned_rider_name, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, last_mile_payment_status, rider_cash_collected")
+      .select("id, order_ref, created_at, total, status, subtotal, shipping_cost, discount_amount, coupon_code, shipping_first_name, shipping_last_name, shipping_address, shipping_city, shipping_country, payment_method, tracking_number, assigned_rider_name, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, last_mile_payment_status, rider_cash_collected, store_id")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }) as any;
     if (error) {
@@ -232,7 +235,7 @@ export default function DashboardPage() {
       const [itemsRes, historyRes] = await Promise.all([
         supabase
           .from("order_items")
-          .select("id, product_name, product_image, quantity, price, size, color")
+          .select("id, product_name, product_image, product_id, quantity, price, size, color")
           .eq("order_id", selectedOrder),
         supabase
           .from("order_status_history")
@@ -649,16 +652,94 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
   onCancelSuccess: () => void;
 }) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [showDisputeForm, setShowDisputeForm] = useState(false);
   const [showRetryPayment, setShowRetryPayment] = useState(false);
   const [showShippingPayment, setShowShippingPayment] = useState<"shipping" | "last_mile" | null>(null);
+  const [returnsEnabled, setReturnsEnabled] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewImages, setReviewImages] = useState<string[]>([]);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [existingReviews, setExistingReviews] = useState<Set<string>>(new Set());
+
+  // Check if store has returns_enabled
+  useEffect(() => {
+    if (!order.store_id) return;
+    supabase
+      .from("stores")
+      .select("returns_enabled")
+      .eq("id", order.store_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setReturnsEnabled(!!(data as any)?.returns_enabled);
+      });
+  }, [order.store_id]);
+
+  // Check existing reviews for this order's products
+  useEffect(() => {
+    if (!user || order.status !== "delivered" || !orderItems.length) return;
+    const productIds = orderItems.map(i => i.product_id).filter(Boolean) as string[];
+    if (!productIds.length) return;
+    supabase
+      .from("reviews")
+      .select("product_id")
+      .eq("user_id", user.id)
+      .in("product_id", productIds)
+      .then(({ data }) => {
+        setExistingReviews(new Set((data || []).map((r: any) => r.product_id)));
+      });
+  }, [user, order.status, orderItems]);
+
   if (!order) return null;
   const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
   const canCancel = order.status === "pending";
-  const canReturn = order.status === "delivered";
+  const canReturn = order.status === "delivered" && returnsEnabled;
   const canRetryPayment = ["awaiting_payment", "payment_failed"].includes(order.status);
   const canDispute = ["delivered", "returned"].includes(order.status);
+
+  const handleSubmitReview = async (productId: string) => {
+    if (!user || !reviewRating) return;
+    setReviewSubmitting(true);
+    const { error } = await supabase.from("reviews").insert({
+      product_id: productId,
+      user_id: user.id,
+      rating: reviewRating,
+      comment: reviewComment.trim(),
+      images: reviewImages.length > 0 ? reviewImages : null,
+      is_verified_purchase: true,
+    });
+    if (error) {
+      toast({ title: "Erreur", description: "Impossible de soumettre l'avis.", variant: "destructive" });
+    } else {
+      toast({ title: "Merci !", description: "Votre avis a été soumis. Ajoutez des photos pour gagner des ZandoPoints !" });
+      setExistingReviews(prev => new Set([...prev, productId]));
+      setReviewRating(0);
+      setReviewComment("");
+      setReviewImages([]);
+      setReviewSubmitted(true);
+    }
+    setReviewSubmitting(false);
+  };
+
+  const handleReviewImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length || !user) return;
+    const { compressImage } = await import("@/utils/image-compress");
+    const urls: string[] = [];
+    for (const file of Array.from(files).slice(0, 3)) {
+      const compressed = await compressImage(file);
+      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
+      const { error } = await supabase.storage.from("reviews").upload(fileName, compressed);
+      if (!error) {
+        const { data: pub } = supabase.storage.from("reviews").getPublicUrl(fileName);
+        urls.push(pub.publicUrl);
+      }
+    }
+    setReviewImages(prev => [...prev, ...urls].slice(0, 5));
+  };
 
   return (
     <div className="bg-card border border-border rounded-lg p-5 space-y-5">
@@ -972,12 +1053,87 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         )}
       </div>
 
+      {/* Inline Review Section for delivered orders */}
+      {order.status === "delivered" && orderItems.length > 0 && (
+        <div className="border-t border-border pt-4 space-y-3">
+          <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Star size={14} className="text-primary" /> Laisser un avis
+          </h4>
+          <p className="text-xs text-muted-foreground">
+            Partagez votre expérience et gagnez des ZandoPoints en ajoutant des photos ! 📸
+          </p>
+          {orderItems.filter(item => item.product_id && !existingReviews.has(item.product_id)).map(item => (
+            <div key={item.id} className="bg-muted/30 border border-border rounded-lg p-3 space-y-3">
+              <div className="flex items-center gap-3">
+                {item.product_image && (
+                  <img src={item.product_image} alt="" className="w-10 h-10 object-cover rounded border border-border" />
+                )}
+                <p className="text-sm font-medium text-foreground">{item.product_name}</p>
+              </div>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button
+                    key={star}
+                    onClick={() => setReviewRating(star)}
+                    className="transition-colors"
+                  >
+                    <Star size={20} className={star <= reviewRating ? "fill-primary text-primary" : "text-muted-foreground"} />
+                  </button>
+                ))}
+              </div>
+              <Textarea
+                placeholder="Décrivez votre expérience avec ce produit..."
+                value={reviewComment}
+                onChange={e => setReviewComment(e.target.value)}
+                className="text-sm min-h-[60px]"
+                maxLength={1000}
+              />
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-xs text-primary cursor-pointer">
+                  <Camera size={14} />
+                  <span>Ajouter des photos (bonus ZandoPoints)</span>
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={handleReviewImageUpload} />
+                </label>
+                {reviewImages.length > 0 && (
+                  <div className="flex gap-2 flex-wrap">
+                    {reviewImages.map((url, i) => (
+                      <div key={i} className="relative">
+                        <img src={url} alt="" className="w-14 h-14 object-cover rounded border border-border" />
+                        <button
+                          onClick={() => setReviewImages(prev => prev.filter((_, idx) => idx !== i))}
+                          className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Button
+                size="sm"
+                disabled={!reviewRating || reviewSubmitting}
+                onClick={() => handleSubmitReview(item.product_id!)}
+              >
+                {reviewSubmitting ? <Loader2 size={14} className="animate-spin mr-1" /> : <Star size={14} className="mr-1" />}
+                Soumettre l'avis
+              </Button>
+            </div>
+          ))}
+          {orderItems.every(item => !item.product_id || existingReviews.has(item.product_id)) && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <CheckCircle2 size={12} className="text-primary" /> Vous avez déjà laissé un avis pour tous les articles.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Return Request Form */}
       {showReturnForm && (
         <ReturnRequestForm
           orderId={order.id}
           orderRef={order.order_ref}
-          storeId={null}
+          storeId={order.store_id}
           orderTotal={Number(order.total)}
           onSuccess={() => { setShowReturnForm(false); onCancelSuccess(); }}
           onCancel={() => setShowReturnForm(false)}

@@ -3714,6 +3714,7 @@ export type Database = {
           repurchase_rate: string | null
           response_rate: string | null
           response_time: string | null
+          returns_enabled: boolean
           review_count_override: number | null
           sales_count: number | null
           sales_override: number | null
@@ -3759,6 +3760,7 @@ export type Database = {
           repurchase_rate?: string | null
           response_rate?: string | null
           response_time?: string | null
+          returns_enabled?: boolean
           review_count_override?: number | null
           sales_count?: number | null
           sales_override?: number | null
@@ -3804,6 +3806,7 @@ export type Database = {
           repurchase_rate?: string | null
           response_rate?: string | null
           response_time?: string | null
+          returns_enabled?: boolean
           review_count_override?: number | null
           sales_count?: number | null
           sales_override?: number | null

@@ -137,6 +137,7 @@ export default function CheckoutPage() {
   // Discount caps
   const [maxTotalDiscountPct, setMaxTotalDiscountPct] = useState(20);
   const [maxPointsDiscountPct, setMaxPointsDiscountPct] = useState(10);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -463,7 +464,7 @@ export default function CheckoutPage() {
 
     setStep("payment");
   };
-
+  
 
 
 
@@ -1178,13 +1179,38 @@ export default function CheckoutPage() {
                 )}
 
                 {!paymentPending && (
-                  <Button onClick={handlePayment} disabled={processing} className="w-full h-12 font-bold">
-                    {processing ? (
-                      <><Loader2 size={16} className="animate-spin mr-2" /> {t("checkout.processing")}</>
-                    ) : (
-                      `${t("checkout.placeOrder")} — $${total.toFixed(2)}`
+                  <div className="space-y-3">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={e => setTermsAccepted(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-primary rounded"
+                      />
+                      <span className="text-xs text-muted-foreground leading-tight">
+                        J'accepte les{" "}
+                        <Link to="/terms" target="_blank" className="text-primary underline hover:text-primary/80">
+                          Conditions Générales de Vente
+                        </Link>{" "}
+                        et la{" "}
+                        <Link to="/privacy" target="_blank" className="text-primary underline hover:text-primary/80">
+                          Politique de confidentialité
+                        </Link>.
+                      </span>
+                    </label>
+                    <Button onClick={handlePayment} disabled={processing || !termsAccepted} className="w-full h-12 font-bold">
+                      {processing ? (
+                        <><Loader2 size={16} className="animate-spin mr-2" /> {t("checkout.processing")}</>
+                      ) : (
+                        `${t("checkout.placeOrder")} — $${total.toFixed(2)}`
+                      )}
+                    </Button>
+                    {!termsAccepted && (
+                      <p className="text-[10px] text-muted-foreground text-center">
+                        Veuillez accepter les conditions pour continuer.
+                      </p>
                     )}
-                  </Button>
+                  </div>
                 )}
               </div>
             )}
