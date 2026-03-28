@@ -231,24 +231,34 @@ export default function AdminVendorPricingPage() {
         .update(storeUpdates)
         .eq("id", store.id)
         .select();
-      try {
-        const { data: ownerProfile } = await supabase
-          .from("profiles")
-          .select("email")
-          .eq("id", store.owner_id)
-          .single();
 
-        if (ownerProfile?.email) {
-          const emailType = edit.is_platform_owned ? "platform_owned" : "reverted_independent";
-          supabase.functions.invoke("send-vendor-email", {
-            body: {
-              to: ownerProfile.email,
-              storeName: store.name,
-              type: emailType,
-            },
-          }).catch(() => {}); // Fire-and-forget, don't block save
-        }
-      } catch {}
+      if (storeUpdateError || !storeUpdateData?.length) {
+        toast({ title: "Erreur", description: storeUpdateError?.message || "Impossible de modifier la boutique.", variant: "destructive" });
+        setSavingId(null);
+        return;
+      }
+
+      // Send email notification to vendor if platform ownership changed
+      if (storeUpdates.is_platform_owned !== undefined) {
+        try {
+          const { data: ownerProfile } = await supabase
+            .from("profiles")
+            .select("email")
+            .eq("id", store.owner_id)
+            .single();
+
+          if (ownerProfile?.email) {
+            const emailType = edit.is_platform_owned ? "platform_owned" : "reverted_independent";
+            supabase.functions.invoke("send-vendor-email", {
+              body: {
+                to: ownerProfile.email,
+                storeName: store.name,
+                type: emailType,
+              },
+            }).catch(() => {});
+          }
+        } catch {}
+      }
     }
 
     const payload = {
