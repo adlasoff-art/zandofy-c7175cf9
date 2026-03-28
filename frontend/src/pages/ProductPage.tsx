@@ -763,6 +763,42 @@ export default function ProductPage() {
             </div>
 
             {/* ═══ ACCORDION DETAILS ═══ */}
+            {/* Weight & Dimensions */}
+            {(product.weightGrams || product.lengthCm || product.widthCm || product.heightCm) && (
+              <div className="border border-border rounded-sm px-4 py-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Ruler size={16} className="text-primary shrink-0" />
+                  Poids & Dimensions
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  {product.weightGrams && (
+                    <div className="bg-muted/50 p-2 rounded-sm text-center">
+                      <span className="text-muted-foreground block">Poids</span>
+                      <span className="font-semibold text-foreground">{product.weightGrams >= 1000 ? `${(product.weightGrams / 1000).toFixed(1)} kg` : `${product.weightGrams} g`}</span>
+                    </div>
+                  )}
+                  {product.lengthCm && (
+                    <div className="bg-muted/50 p-2 rounded-sm text-center">
+                      <span className="text-muted-foreground block">Longueur</span>
+                      <span className="font-semibold text-foreground">{product.lengthCm} cm</span>
+                    </div>
+                  )}
+                  {product.widthCm && (
+                    <div className="bg-muted/50 p-2 rounded-sm text-center">
+                      <span className="text-muted-foreground block">Largeur</span>
+                      <span className="font-semibold text-foreground">{product.widthCm} cm</span>
+                    </div>
+                  )}
+                  {product.heightCm && (
+                    <div className="bg-muted/50 p-2 rounded-sm text-center">
+                      <span className="text-muted-foreground block">Hauteur</span>
+                      <span className="font-semibold text-foreground">{product.heightCm} cm</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <Accordion type="multiple" className="border border-border rounded-sm">
               {/* Description */}
               <AccordionItem value="description" className="border-b border-border last:border-0">
@@ -771,13 +807,13 @@ export default function ProductPage() {
                   <table className="w-full text-sm">
                     <tbody>
                       {[
-                        ["Matière", "Cachemire 100%"],
-                        ["Type", product.categoryFr],
-                        ["Style", "Décontracté / Chic"],
-                        ["Saison", "Automne / Hiver"],
-                        ["Entretien", "Lavage à la main"],
+                        ["Matière", product.material || "—"],
+                        ["Type", product.categoryFr || "—"],
+                        ["Style", product.style || "—"],
+                        ["Saison", (product as any).season || "—"],
+                        ["Entretien", (product as any).careInstructions || "—"],
                         ["Origine", product.originCountry ? getCountryName(product.originCountry) : "—"],
-                      ].map(([label, value]) => (
+                      ].filter(([, value]) => value !== "—").map(([label, value]) => (
                         <tr key={label} className="border-b border-border/50 last:border-0">
                           <td className="py-2 text-muted-foreground w-1/3">{label}</td>
                           <td className="py-2 font-medium text-foreground">{value}</td>
