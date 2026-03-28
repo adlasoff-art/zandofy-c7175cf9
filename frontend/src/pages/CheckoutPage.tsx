@@ -106,6 +106,7 @@ export default function CheckoutPage() {
   const [vendorOffPlatformAllowed, setVendorOffPlatformAllowed] = useState(false);
   const [cartStoreIds, setCartStoreIds] = useState<string[]>([]);
   const paymentChannelRef = useRef<any>(null);
+  const { data: paymentNumbers = [] } = useStorePaymentNumbers(cartStoreIds);
 
   const [shipping, setShipping] = useState<ShippingInfo>({ ...emptyShipping, email: user?.email || "" });
 
