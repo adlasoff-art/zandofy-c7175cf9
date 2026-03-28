@@ -22,7 +22,7 @@ import { KycBanner } from "@/components/kyc/KycBanner";
 import { getColorDisplay } from "@/utils/colorName";
 
 type Step = "shipping" | "payment" | "confirmation";
-type PaymentMethod = "stripe" | "mobile_money" | "cod";
+type PaymentMethod = "stripe" | "mobile_money" | "cod" | "off_platform";
 
 interface ShippingInfo {
   firstName: string;
