@@ -500,6 +500,46 @@ export default function BecomeVendorPage() {
                   <Label>{t("vendor.storeDesc")}</Label>
                   <Textarea value={form.store_description} onChange={(e) => updateField("store_description", e.target.value)} rows={4} />
                 </div>
+
+                {/* Shop type selection */}
+                <div className="space-y-2 border-t border-border pt-4 mt-4">
+                  <Label className="text-base font-semibold">Type de boutique *</Label>
+                  <p className="text-xs text-muted-foreground">Définit le flux de traitement de vos commandes</p>
+                  <Select value={form.shop_type} onValueChange={(v) => updateField("shop_type", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="international">🌍 International (Import / Sourcing)</SelectItem>
+                      <SelectItem value="local">🏪 Local (Stock physique en RDC)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {form.shop_type === "local" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Type de stockage</Label>
+                      <Select value={form.fulfillment_type} onValueChange={(v) => updateField("fulfillment_type", v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="zandofy_warehouse">Entrepôt Zandofy</SelectItem>
+                          <SelectItem value="vendor_warehouse">Entrepôt propre</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Gestion de la flotte de livraison</Label>
+                      <Select value={form.fleet_management} onValueChange={(v) => updateField("fleet_management", v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="platform">Livreurs de la plateforme</SelectItem>
+                          <SelectItem value="own_fleet">Ma propre flotte</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
               </>
             )}
 
