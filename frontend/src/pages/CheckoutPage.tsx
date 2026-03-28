@@ -101,6 +101,7 @@ export default function CheckoutPage() {
   const [paymentReference, setPaymentReference] = useState<string | null>(null);
   const [paymentOrderIds, setPaymentOrderIds] = useState<string[]>([]);
   const [vendorCodAllowed, setVendorCodAllowed] = useState(false);
+  const [vendorOffPlatformAllowed, setVendorOffPlatformAllowed] = useState(false);
   const paymentChannelRef = useRef<any>(null);
 
   const [shipping, setShipping] = useState<ShippingInfo>({ ...emptyShipping, email: user?.email || "" });
@@ -195,11 +196,14 @@ export default function CheckoutPage() {
 
       const { data: overrides } = await (supabase as any)
         .from("vendor_pricing_overrides")
-        .select("store_id, vendor_cod_enabled")
+        .select("store_id, vendor_cod_enabled, vendor_off_platform_enabled")
         .in("store_id", storeIds);
 
       const codMap = new Map((overrides || []).map((override: any) => [override.store_id, !!override.vendor_cod_enabled]));
       setVendorCodAllowed(storeIds.every((storeId) => codMap.get(storeId) === true));
+
+      const offPlatformMap = new Map((overrides || []).map((override: any) => [override.store_id, !!override.vendor_off_platform_enabled]));
+      setVendorOffPlatformAllowed(storeIds.every((storeId) => offPlatformMap.get(storeId) === true));
     };
 
     void loadVendorCodEligibility();
@@ -986,7 +990,7 @@ export default function CheckoutPage() {
                     { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, Wave, MTN", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
                     { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
                     { id: "off_platform" as const, label: "Paiement hors plateforme", sub: "Transfert direct, puis envoyez la preuve", icon: <Banknote size={20} />, configKey: "off_platform" as const },
-                  ]).filter(m => (m.id === "stripe" ? (paymentConfig?.stripe !== false || paymentConfig?.stripe_notice_enabled) : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).map(method => (
+                  ]).filter(m => (m.id === "stripe" ? (paymentConfig?.stripe !== false || paymentConfig?.stripe_notice_enabled) : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).filter(m => m.id !== "off_platform" || vendorOffPlatformAllowed).map(method => (
                     <button
                       key={method.id}
                       disabled={method.id === "stripe" && paymentConfig?.stripe === false}
