@@ -460,6 +460,64 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
                   />
                 )}
 
+                {/* Off-platform payment validation by vendor */}
+                {(order as any).payment_method === "off_platform" && order.status === "awaiting_payment" && (
+                  <div className="space-y-2 border border-amber-200 dark:border-amber-700 rounded-lg p-3 bg-amber-50 dark:bg-amber-900/20">
+                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                      💳 Paiement hors plateforme — Validation requise
+                    </p>
+                    {order.shipping_payment_proof_url ? (
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground">Le client a envoyé une preuve de paiement :</p>
+                        <img
+                          src={order.shipping_payment_proof_url}
+                          alt="Preuve de paiement"
+                          className="w-full max-w-xs rounded-lg border border-border object-cover cursor-pointer"
+                          onClick={() => window.open(order.shipping_payment_proof_url!, '_blank')}
+                          decoding="async"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="flex-1 text-xs gap-1"
+                            onClick={async () => {
+                              const { error } = await supabase
+                                .from("orders")
+                                .update({ status: "pending", shipping_payment_status: "paid" } as any)
+                                .eq("id", order.id);
+                              if (!error) {
+                                setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "pending", shipping_payment_status: "paid" } : o));
+                                toast({ title: "Paiement validé", description: "La commande passe en statut confirmé." });
+                              }
+                            }}
+                          >
+                            <Check size={12} /> Valider le paiement
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="flex-1 text-xs gap-1"
+                            onClick={async () => {
+                              const { error } = await supabase
+                                .from("orders")
+                                .update({ status: "payment_failed" } as any)
+                                .eq("id", order.id);
+                              if (!error) {
+                                setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "payment_failed" } : o));
+                                toast({ title: "Paiement refusé", description: "La commande a été marquée comme échouée." });
+                              }
+                            }}
+                          >
+                            <X size={12} /> Refuser
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">⏳ En attente de la preuve de paiement du client...</p>
+                    )}
+                  </div>
+                )}
+
                 {/* Hub proof photo — visible when order is at hub stage */}
                 {["shipped", "assigning_rider", "rider_assigned"].includes(order.status) && (
                   <HubProofPhotoUpload
