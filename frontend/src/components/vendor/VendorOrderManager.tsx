@@ -257,7 +257,42 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
       <h3 className="text-base font-bold text-foreground flex items-center gap-2">
         <Package size={16} /> Commandes ({filteredOrders.length})
       </h3>
-      {orders.map((order) => {
+
+      {/* Search bar */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <input
+          placeholder="Rechercher (réf, client, produit, montant, code confirmation, livreur...)"
+          value={orderSearch}
+          onChange={(e) => setOrderSearch(e.target.value)}
+          className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+        />
+      </div>
+
+      {/* Status filter tabs */}
+      <div className="flex gap-1 overflow-x-auto pb-1">
+        {vendorOrderStatusTabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setOrderStatusFilter(tab.key)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${
+              orderStatusFilter === tab.key
+                ? "bg-foreground text-card border-foreground"
+                : "bg-card text-foreground border-border hover:bg-muted"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {filteredOrders.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-sm text-muted-foreground">
+            {orders.length === 0 ? "Aucune commande reçue pour le moment." : "Aucune commande ne correspond aux filtres."}
+          </p>
+        </div>
+      ) : filteredOrders.map((order) => {
         const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
         const StatusIcon = config.icon;
         const next = getNextStatus(order.status);
