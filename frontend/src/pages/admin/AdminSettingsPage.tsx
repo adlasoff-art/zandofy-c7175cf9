@@ -259,7 +259,7 @@ export default function AdminSettingsPage() {
             ]).map((pm) => (
               <div key={pm.key} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                 <span className="text-sm text-foreground">{pm.label}</span>
-                <Switch checked={paymentMethods[pm.key]} onCheckedChange={(v) => setPaymentMethods((prev) => ({ ...prev, [pm.key]: v }))} />
+                <Switch checked={paymentMethods[pm.key]} onCheckedChange={(v) => updatePaymentMethod(pm.key, v)} />
               </div>
             ))}
             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
