@@ -22,19 +22,12 @@ interface LocalShippingRate {
 export function useLocalDelivery() {
   /** Fetch local shipping rates for a given city */
   const fetchLocalRates = useCallback(async (city: string = "Kinshasa", storeId?: string): Promise<LocalShippingRate[]> => {
-    let query = supabase
+    const { data, error } = await (supabase as any)
       .from("local_shipping_rates")
       .select("id, zone_name, city, country, base_price, price_per_km, vendor_override_allowed, store_id")
-      .ilike("city", city);
+      .ilike("city", city)
+      .order("zone_name");
 
-    // If store has own_fleet, include store-specific rates
-    if (storeId) {
-      query = query.or(`store_id.is.null,store_id.eq.${storeId}`);
-    } else {
-      query = query.is("store_id", null);
-    }
-
-    const { data, error } = await query.order("zone_name");
     if (error) {
       console.error("[useLocalDelivery] fetchLocalRates error:", error);
       return [];
