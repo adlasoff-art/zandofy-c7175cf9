@@ -121,7 +121,7 @@ export default function AdminVendorPricingPage() {
   const { data: stores, isLoading } = useQuery({
     queryKey: ["admin-stores-pricing", search],
     queryFn: async () => {
-      let q = (supabase as any).from("stores").select("id, name, owner_id, is_platform_owned").order("name");
+      let q = (supabase as any).from("stores").select("id, name, owner_id, is_platform_owned, returns_enabled").order("name");
       if (search) q = q.ilike("name", `%${search}%`);
       const { data: storesData } = await q.limit(50);
       if (!storesData?.length) return [];
