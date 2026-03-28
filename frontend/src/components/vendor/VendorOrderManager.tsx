@@ -683,8 +683,7 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
             }
             setRiderModal(null);
           }}
-        />
-        />
+      )}
       )}
       {/* Hub pickup modal — verify confirmation code and mark delivered */}
       {hubPickupModal && (() => {

@@ -58,6 +58,9 @@ const initialData: ApplicationData = {
   company_country: "Sénégal",
   current_step: 1,
   status: "draft",
+  shop_type: "international",
+  fulfillment_type: "zandofy_warehouse",
+  fleet_management: "platform",
 };
 
 interface VendorApplicationLocalDraft {
