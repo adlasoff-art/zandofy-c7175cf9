@@ -195,6 +195,7 @@ export default function AdminVendorPricingPage() {
       commission_rate: o?.commission_rate != null ? String(o.commission_rate) : "",
       is_platform_owned: store.is_platform_owned ?? false,
       vendor_cod_enabled: (o as any)?.vendor_cod_enabled ?? false,
+      returns_enabled: (store as any).returns_enabled ?? false,
     };
   };
 
