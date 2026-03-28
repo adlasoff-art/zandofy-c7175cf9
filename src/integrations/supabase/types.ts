@@ -1842,6 +1842,53 @@ export type Database = {
         }
         Relationships: []
       }
+      local_shipping_rates: {
+        Row: {
+          base_price: number
+          city: string
+          country: string
+          created_at: string | null
+          id: string
+          price_per_km: number | null
+          store_id: string | null
+          updated_at: string | null
+          vendor_override_allowed: boolean | null
+          zone_name: string
+        }
+        Insert: {
+          base_price?: number
+          city?: string
+          country?: string
+          created_at?: string | null
+          id?: string
+          price_per_km?: number | null
+          store_id?: string | null
+          updated_at?: string | null
+          vendor_override_allowed?: boolean | null
+          zone_name: string
+        }
+        Update: {
+          base_price?: number
+          city?: string
+          country?: string
+          created_at?: string | null
+          id?: string
+          price_per_km?: number | null
+          store_id?: string | null
+          updated_at?: string | null
+          vendor_override_allowed?: boolean | null
+          zone_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "local_shipping_rates_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       logistic_zones: {
         Row: {
           continent: string
@@ -2025,6 +2072,8 @@ export type Database = {
       }
       orders: {
         Row: {
+          assigned_driver_id: string | null
+          assigned_driver_name: string | null
           assigned_rider_id: string | null
           assigned_rider_name: string | null
           confirmation_code: string | null
@@ -2033,6 +2082,7 @@ export type Database = {
           deferred_payment_phone: string | null
           deferred_payment_provider: string | null
           delivery_choice: string | null
+          delivery_option: string | null
           discount_amount: number | null
           hub_pickup_proof_url: string | null
           id: string
@@ -2067,6 +2117,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          assigned_driver_id?: string | null
+          assigned_driver_name?: string | null
           assigned_rider_id?: string | null
           assigned_rider_name?: string | null
           confirmation_code?: string | null
@@ -2075,6 +2127,7 @@ export type Database = {
           deferred_payment_phone?: string | null
           deferred_payment_provider?: string | null
           delivery_choice?: string | null
+          delivery_option?: string | null
           discount_amount?: number | null
           hub_pickup_proof_url?: string | null
           id?: string
@@ -2109,6 +2162,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          assigned_driver_id?: string | null
+          assigned_driver_name?: string | null
           assigned_rider_id?: string | null
           assigned_rider_name?: string | null
           confirmation_code?: string | null
@@ -2117,6 +2172,7 @@ export type Database = {
           deferred_payment_phone?: string | null
           deferred_payment_provider?: string | null
           delivery_choice?: string | null
+          delivery_option?: string | null
           discount_amount?: number | null
           hub_pickup_proof_url?: string | null
           id?: string
@@ -2151,6 +2207,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_assigned_driver_id_fkey"
+            columns: ["assigned_driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_store_id_fkey"
             columns: ["store_id"]
@@ -3627,8 +3690,10 @@ export type Database = {
           description: string | null
           flash_timer_duration_hours: number | null
           flash_timer_enabled: boolean | null
+          fleet_management: string
           followers_count: number | null
           followers_override: number | null
+          fulfillment_type: string
           id: string
           is_online: boolean | null
           is_platform_owned: boolean
@@ -3654,6 +3719,7 @@ export type Database = {
           sales_override: number | null
           sales_trend: string | null
           seo_keywords: string[] | null
+          shop_type: string
           verified_years: number | null
           verified_years_override: number | null
           whatsapp_number: string | null
@@ -3669,8 +3735,10 @@ export type Database = {
           description?: string | null
           flash_timer_duration_hours?: number | null
           flash_timer_enabled?: boolean | null
+          fleet_management?: string
           followers_count?: number | null
           followers_override?: number | null
+          fulfillment_type?: string
           id?: string
           is_online?: boolean | null
           is_platform_owned?: boolean
@@ -3696,6 +3764,7 @@ export type Database = {
           sales_override?: number | null
           sales_trend?: string | null
           seo_keywords?: string[] | null
+          shop_type?: string
           verified_years?: number | null
           verified_years_override?: number | null
           whatsapp_number?: string | null
@@ -3711,8 +3780,10 @@ export type Database = {
           description?: string | null
           flash_timer_duration_hours?: number | null
           flash_timer_enabled?: boolean | null
+          fleet_management?: string
           followers_count?: number | null
           followers_override?: number | null
+          fulfillment_type?: string
           id?: string
           is_online?: boolean | null
           is_platform_owned?: boolean
@@ -3738,6 +3809,7 @@ export type Database = {
           sales_override?: number | null
           sales_trend?: string | null
           seo_keywords?: string[] | null
+          shop_type?: string
           verified_years?: number | null
           verified_years_override?: number | null
           whatsapp_number?: string | null
@@ -4042,11 +4114,14 @@ export type Database = {
           company_name: string | null
           created_at: string
           current_step: number
+          fleet_management: string | null
+          fulfillment_type: string | null
           full_name: string | null
           id: string
           phone: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          shop_type: string | null
           status: string
           store_banner_url: string | null
           store_description: string | null
@@ -4065,11 +4140,14 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           current_step?: number
+          fleet_management?: string | null
+          fulfillment_type?: string | null
           full_name?: string | null
           id?: string
           phone?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          shop_type?: string | null
           status?: string
           store_banner_url?: string | null
           store_description?: string | null
@@ -4088,11 +4166,14 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           current_step?: number
+          fleet_management?: string | null
+          fulfillment_type?: string | null
           full_name?: string | null
           id?: string
           phone?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          shop_type?: string | null
           status?: string
           store_banner_url?: string | null
           store_description?: string | null
