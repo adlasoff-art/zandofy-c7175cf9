@@ -70,7 +70,9 @@ interface Order {
   history: StatusHistoryEntry[];
 }
 
-export function VendorOrderManager({ storeId }: { storeId: string }) {
+export function VendorOrderManager({ storeId, shopType }: { storeId: string; shopType?: string }) {
+  const isLocalShop = shopType === "local";
+  const activeFlow = isLocalShop ? LOCAL_STATUS_FLOW : STATUS_FLOW;
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
