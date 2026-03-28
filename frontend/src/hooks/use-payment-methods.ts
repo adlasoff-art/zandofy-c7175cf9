@@ -32,7 +32,15 @@ export function usePaymentMethods() {
         .eq("key", "payment_methods")
         .single();
       if (data?.value && typeof data.value === "object") {
-        return { ...DEFAULT_CONFIG, ...(data.value as Record<string, boolean>) };
+        const v = data.value as Record<string, any>;
+        return {
+          mobile_money: v.mobile_money === true,
+          stripe: v.stripe === true,
+          cod: v.cod === true,
+          off_platform: v.off_platform === true,
+          stripe_notice_enabled: !!v.stripe_notice_enabled,
+          stripe_notice_text: v.stripe_notice_text || DEFAULT_CONFIG.stripe_notice_text,
+        };
       }
       return DEFAULT_CONFIG;
     },
