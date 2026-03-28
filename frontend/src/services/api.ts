@@ -26,6 +26,9 @@ export interface Product {
   sku?: string;
   material?: string;
   style?: string;
+  careInstructions?: string;
+  season?: string;
+  salesCount?: number;
   storeId?: string;
   shortDescription?: string;
   description?: string;
@@ -92,6 +95,7 @@ export function mapProduct(row: any): Product {
     categoryFr: row.categories?.name_fr || "",
     rating: realRating,
     reviewCount: realReviewCount,
+    salesCount: row.sales_count_override ?? row.sales_count ?? 0,
     isNew: row.is_new || false,
     isSale: row.is_sale || false,
     discount: row.discount || 0,
@@ -103,6 +107,8 @@ export function mapProduct(row: any): Product {
     sku: row.sku || "",
     material: row.material || "",
     style: row.style || "",
+    careInstructions: row.care_instructions || "",
+    season: row.season || "",
     storeId: row.store_id || "",
     shortDescription: row.short_description || undefined,
     description: row.description || undefined,

@@ -66,6 +66,9 @@ const EMPTY_FORM = {
   is_sale: false,
   discount: 0,
   material: "",
+  style: "",
+  season: "",
+  care_instructions: "",
   origin_country: "",
   category_id: "" as string,
   trend_tag_id: "" as string,
@@ -133,7 +136,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     setLoading(true);
     const { data } = await (supabase
       .from("products")
-      .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, origin_country, category_id, trend_tag_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status") as any)
+      .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status") as any)
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
 
@@ -310,6 +313,9 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       is_sale: product.is_sale || false,
       discount: product.discount || 0,
       material: product.material || "",
+      style: (product as any).style || "",
+      season: (product as any).season || "",
+      care_instructions: (product as any).care_instructions || "",
       origin_country: product.origin_country || "",
       category_id: product.category_id || "",
       trend_tag_id: (product as any).trend_tag_id || "",
@@ -376,6 +382,9 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       is_sale: form.is_sale,
       discount: form.discount ? Math.round(Number(form.discount)) : 0,
       material: form.material || null,
+      style: form.style || null,
+      season: form.season || null,
+      care_instructions: form.care_instructions || null,
       origin_country: form.origin_country || null,
       category_id: form.category_id && form.category_id.trim() !== '' ? form.category_id : null,
       trend_tag_id: form.trend_tag_id && form.trend_tag_id.trim() !== '' ? form.trend_tag_id : null,
@@ -586,6 +595,13 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Matière" value={form.material} onChange={(v) => setForm({ ...form, material: v })} />
+            <Field label="Style" value={form.style} onChange={(v) => setForm({ ...form, style: v })} placeholder="Ex: Décontracté, Chic, Sportif" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Saison" value={form.season} onChange={(v) => setForm({ ...form, season: v })} placeholder="Ex: Été, Hiver, Toute saison" />
+            <Field label="Entretien" value={form.care_instructions} onChange={(v) => setForm({ ...form, care_instructions: v })} placeholder="Ex: Lavage à la main" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <CountryCombobox value={form.origin_country} onChange={(v) => setForm({ ...form, origin_country: v })} />
           </div>
           <div>
@@ -816,9 +832,9 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
 }
 
 function Field({
-  label, value, onChange, type = "text", disabled = false,
+  label, value, onChange, type = "text", disabled = false, placeholder,
 }: {
-  label: string; value: string; onChange: (v: string) => void; type?: string; disabled?: boolean;
+  label: string; value: string; onChange: (v: string) => void; type?: string; disabled?: boolean; placeholder?: string;
 }) {
   return (
     <div>
@@ -829,6 +845,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
+        placeholder={placeholder}
       />
     </div>
   );

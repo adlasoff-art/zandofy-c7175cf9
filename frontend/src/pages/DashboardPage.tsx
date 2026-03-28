@@ -943,11 +943,16 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
                 { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess.session.access_token}` }, body: JSON.stringify({ orderId: order.id, format: "pdf" }), retries: 2, timeout: 20000 }
               );
               if (!resp.ok) throw new Error(resp.status === 401 ? "Session expirée" : `Erreur ${resp.status}`);
-              const blob = await resp.blob();
-              if (blob.size === 0) return;
-              const url = URL.createObjectURL(blob);
-              const w = window.open(url, "_blank", "noopener,noreferrer");
-              if (w) setTimeout(() => URL.revokeObjectURL(url), 60000);
+              const html = await resp.text();
+              if (!html) return;
+              const printWindow = window.open("", "_blank", "width=800,height=600");
+              if (printWindow) {
+                printWindow.document.write(html);
+                printWindow.document.close();
+                printWindow.onload = () => {
+                  setTimeout(() => { printWindow.print(); }, 500);
+                };
+              }
             } catch (e) {
               toast({ title: "Erreur", description: e instanceof Error ? e.message : "Impossible de télécharger la facture.", variant: "destructive" });
             }
