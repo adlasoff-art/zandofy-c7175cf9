@@ -258,7 +258,7 @@ export default function AdminOrdersPage() {
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
-            placeholder="Rechercher une commande..."
+            placeholder="Rechercher (réf, client, produit, montant, code, livreur, téléphone...)"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
