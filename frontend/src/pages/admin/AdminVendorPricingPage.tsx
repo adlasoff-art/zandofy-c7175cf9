@@ -271,6 +271,7 @@ export default function AdminVendorPricingPage() {
       vendor_extra_margin_enabled: edit.vendor_extra_margin_enabled,
       commission_rate: edit.commission_rate ? Number(edit.commission_rate) : null,
       vendor_cod_enabled: edit.vendor_cod_enabled,
+      vendor_off_platform_enabled: edit.vendor_off_platform_enabled,
       updated_at: new Date().toISOString(),
     };
 
