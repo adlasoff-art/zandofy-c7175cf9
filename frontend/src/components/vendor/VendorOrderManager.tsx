@@ -75,6 +75,10 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
   const { isAdmin, isManager } = useRoles();
   const isStaff = isAdmin || isManager;
 
+  // Search and filter states
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
+
   // Modal states
   const [supplierModal, setSupplierModal] = useState<string | null>(null);
   const [shippedModal, setShippedModal] = useState<string | null>(null);
