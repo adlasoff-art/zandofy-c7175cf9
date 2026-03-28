@@ -32,6 +32,9 @@ interface ApplicationData {
   company_country: string;
   current_step: number;
   status: string;
+  shop_type: string;
+  fulfillment_type: string;
+  fleet_management: string;
 }
 
 interface DocFile {
