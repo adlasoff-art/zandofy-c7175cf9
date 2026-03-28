@@ -195,6 +195,13 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
           )}
         </div>
 
+        {/* Local stock badge */}
+        {(product as any).shopType === "local" && (
+          <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded mt-0.5">
+            🏪 En stock · Livraison rapide
+          </span>
+        )}
+
         {/* Rating + Reviews */}
         <div className="min-h-[1rem] flex items-center gap-1 mt-1">
           <Star size={10} className="fill-accent text-accent shrink-0" />

@@ -137,7 +137,7 @@ const PRODUCT_SELECT = `
   product_images(image_url, position),
   product_colors(color_hex, color_name, image_url),
   product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
-  stores!products_store_id_fkey(id, name, is_verified, verified_years, verified_years_override, is_online, sales_count, sales_override, followers_count, followers_override)
+  stores!products_store_id_fkey(id, name, is_verified, verified_years, verified_years_override, is_online, sales_count, sales_override, followers_count, followers_override, shop_type)
 `;
 
 export async function fetchProducts(params?: {
