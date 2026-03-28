@@ -127,6 +127,7 @@ export function mapProduct(row: any): Product {
       name: c.color_name || "",
       imageUrl: c.image_url || null,
     })),
+    shopType: storeData?.shop_type || "international",
   };
 }
 
