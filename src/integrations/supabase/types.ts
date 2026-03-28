@@ -4328,6 +4328,7 @@ export type Database = {
           updated_at: string
           vendor_cod_enabled: boolean
           vendor_extra_margin_enabled: boolean
+          vendor_off_platform_enabled: boolean
         }
         Insert: {
           commission_rate?: number | null
@@ -4342,6 +4343,7 @@ export type Database = {
           updated_at?: string
           vendor_cod_enabled?: boolean
           vendor_extra_margin_enabled?: boolean
+          vendor_off_platform_enabled?: boolean
         }
         Update: {
           commission_rate?: number | null
@@ -4356,6 +4358,7 @@ export type Database = {
           updated_at?: string
           vendor_cod_enabled?: boolean
           vendor_extra_margin_enabled?: boolean
+          vendor_off_platform_enabled?: boolean
         }
         Relationships: [
           {
