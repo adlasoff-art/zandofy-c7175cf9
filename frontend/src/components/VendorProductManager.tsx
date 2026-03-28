@@ -832,9 +832,9 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
 }
 
 function Field({
-  label, value, onChange, type = "text", disabled = false,
+  label, value, onChange, type = "text", disabled = false, placeholder,
 }: {
-  label: string; value: string; onChange: (v: string) => void; type?: string; disabled?: boolean;
+  label: string; value: string; onChange: (v: string) => void; type?: string; disabled?: boolean; placeholder?: string;
 }) {
   return (
     <div>
@@ -845,6 +845,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
+        placeholder={placeholder}
       />
     </div>
   );
