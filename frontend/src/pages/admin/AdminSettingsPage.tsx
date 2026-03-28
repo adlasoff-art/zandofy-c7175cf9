@@ -702,6 +702,11 @@ export default function AdminSettingsPage() {
           </div>
           <MonetizationSettings />
         </div>
+
+        {/* Default Payment Numbers */}
+        <div className="border-t border-border pt-6 mt-6">
+          <AdminDefaultPaymentNumbers />
+        </div>
       </div>
     </AdminLayout>
   );
