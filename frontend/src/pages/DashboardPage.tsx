@@ -112,6 +112,7 @@ interface OrderItemRow {
   id: string;
   product_name: string;
   product_image: string | null;
+  product_id: string | null;
   quantity: number;
   price: number;
   size: string | null;
