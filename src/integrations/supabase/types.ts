@@ -3589,6 +3589,53 @@ export type Database = {
           },
         ]
       }
+      store_payment_numbers: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          operator: string
+          operator_label: string
+          phone_number: string
+          sort_order: number
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          operator: string
+          operator_label: string
+          phone_number?: string
+          sort_order?: number
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          operator?: string
+          operator_label?: string
+          phone_number?: string
+          sort_order?: number
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_payment_numbers_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_quick_replies: {
         Row: {
           content: string
@@ -4327,6 +4374,7 @@ export type Database = {
           store_id: string
           updated_at: string
           vendor_cod_enabled: boolean
+          vendor_custom_payment_numbers_enabled: boolean
           vendor_extra_margin_enabled: boolean
           vendor_off_platform_enabled: boolean
         }
@@ -4342,6 +4390,7 @@ export type Database = {
           store_id: string
           updated_at?: string
           vendor_cod_enabled?: boolean
+          vendor_custom_payment_numbers_enabled?: boolean
           vendor_extra_margin_enabled?: boolean
           vendor_off_platform_enabled?: boolean
         }
@@ -4357,6 +4406,7 @@ export type Database = {
           store_id?: string
           updated_at?: string
           vendor_cod_enabled?: boolean
+          vendor_custom_payment_numbers_enabled?: boolean
           vendor_extra_margin_enabled?: boolean
           vendor_off_platform_enabled?: boolean
         }
