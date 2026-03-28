@@ -8,6 +8,7 @@ export interface PaymentMethodsConfig {
   mobile_money: boolean;
   stripe: boolean;
   cod: boolean;
+  off_platform: boolean;
   stripe_notice_enabled?: boolean;
   stripe_notice_text?: string;
 }
