@@ -308,8 +308,8 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
       ) : filteredOrders.map((order) => {
         const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
         const StatusIcon = config.icon;
-        const next = getNextStatus(order.status);
-        const canAdvance = isStaff ? canAdminAdvance(order.status) : canVendorAdvance(order.status);
+        const next = getNextStatus(order.status, shopType);
+        const canAdvance = isStaff ? canAdminAdvance(order.status, shopType) : (isLocalShop ? canVendorAdvanceLocal(order.status) : canVendorAdvance(order.status));
         const isExpanded = expandedId === order.id;
 
         return (
