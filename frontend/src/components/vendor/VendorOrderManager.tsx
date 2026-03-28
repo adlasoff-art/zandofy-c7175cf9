@@ -488,7 +488,7 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
                                 .eq("id", order.id);
                               if (!error) {
                                 setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "pending", shipping_payment_status: "paid" } : o));
-                                toast({ title: "Paiement validé", description: "La commande passe en statut confirmé." });
+                                toast.success("Paiement validé — la commande passe en statut confirmé.");
                               }
                             }}
                           >
