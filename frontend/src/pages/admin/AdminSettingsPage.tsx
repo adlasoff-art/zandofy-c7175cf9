@@ -113,7 +113,7 @@ export default function AdminSettingsPage() {
           } else if (row.key === "newness_duration_days") {
             setNewnessDays(Number(v) || 14);
           } else if (row.key === "payment_methods") {
-            setPaymentMethods({ mobile_money: v.mobile_money !== false, stripe: v.stripe !== false, cod: v.cod !== false, stripe_notice_enabled: !!v.stripe_notice_enabled, stripe_notice_text: v.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif." });
+            setPaymentMethods({ mobile_money: v.mobile_money !== false, stripe: v.stripe !== false, cod: v.cod !== false, off_platform: v.off_platform !== false, stripe_notice_enabled: !!v.stripe_notice_enabled, stripe_notice_text: v.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif." });
           } else if (row.key === "pricing_defaults") {
             setPricing({
               margin_pct: Number(v.margin_pct) || 15,
