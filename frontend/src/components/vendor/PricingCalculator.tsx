@@ -94,6 +94,16 @@ export function PricingCalculator({
   }, [recalculate]);
 
   const maxExtra = getMaxExtraMargin(price, settings);
+
+  // Auto-clamp vendor extra margin when price changes cause the max to decrease
+  useEffect(() => {
+    const currentMax = overrides?.max_extra_margin != null
+      ? Math.min(maxExtra, overrides.max_extra_margin)
+      : maxExtra;
+    if (vendorExtraMarginAllowed && vendorExtraMargin > currentMax) {
+      onVendorExtraMarginChange(currentMax);
+    }
+  }, [maxExtra, overrides?.max_extra_margin, vendorExtraMargin, vendorExtraMarginAllowed, onVendorExtraMarginChange]);
   const effectiveMaxExtra = overrides?.max_extra_margin != null
     ? Math.min(maxExtra, overrides.max_extra_margin)
     : maxExtra;
