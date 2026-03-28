@@ -500,7 +500,7 @@ export default function CheckoutPage() {
         .insert({
           user_id: user!.id,
           store_id: storeId !== "default" ? storeId : null,
-          status: paymentMethod === "mobile_money" ? "awaiting_payment" : "pending",
+          status: (paymentMethod === "mobile_money" || paymentMethod === "off_platform") ? "awaiting_payment" : "pending",
           payment_method: paymentMethod,
           shipping_first_name: shipping.firstName,
           shipping_last_name: shipping.lastName,
