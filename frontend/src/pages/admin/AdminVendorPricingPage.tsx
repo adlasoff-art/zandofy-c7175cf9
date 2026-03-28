@@ -440,6 +440,17 @@ export default function AdminVendorPricingPage() {
 
                 <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
                   <div>
+                    <p className="text-xs font-medium text-foreground">Numéros de paiement personnalisés</p>
+                    <p className="text-[10px] text-muted-foreground">Autorise le vendeur à renseigner ses propres numéros Mobile Money.</p>
+                  </div>
+                  <Switch
+                    checked={edit.vendor_custom_payment_numbers_enabled}
+                    onCheckedChange={(v) => updateEdit(store.id, "vendor_custom_payment_numbers_enabled", v)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
                     <p className="text-xs font-medium text-foreground">Retours autorisés</p>
                     <p className="text-[10px] text-muted-foreground">Les clients peuvent demander un retour produit.</p>
                   </div>
