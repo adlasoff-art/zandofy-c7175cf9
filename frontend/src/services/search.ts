@@ -102,7 +102,7 @@ export async function autocompleteProducts(query: string): Promise<Product[]> {
     .from("products")
     .select("id, name, name_fr, price, currency, product_images(image_url, position)")
     .eq("publish_status", "published")
-    .or(`name.ilike.%${query}%,name_fr.ilike.%${query}%`)
+    .or(`name.ilike.%${sanitizeLike(query)}%,name_fr.ilike.%${sanitizeLike(query)}%`)
     .limit(6);
 
   if (error || !data) return [];

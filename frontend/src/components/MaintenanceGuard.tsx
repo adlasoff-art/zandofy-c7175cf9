@@ -90,11 +90,6 @@ export function MaintenanceGuard({ children }: { children: ReactNode }) {
       // Admin bypass via role
       if (isAdmin) return <>{children}</>;
 
-      // Session bypass (secret code entered on maintenance page)
-      if (sessionStorage.getItem("maintenance_bypass") === "true") {
-        return <>{children}</>;
-      }
-
       return (
         <MaintenancePage
           title={config.title}
