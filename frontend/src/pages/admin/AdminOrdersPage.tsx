@@ -368,7 +368,7 @@ export default function AdminOrdersPage() {
                       <div className="flex flex-wrap gap-1.5 text-[10px]">
                         {o.payment_method && (
                           <span className="px-2 py-0.5 rounded-full bg-muted font-medium">
-                            Paiement : {o.payment_method === "mobile_money" ? "Mobile Money" : o.payment_method === "cod" ? "Cash à la livraison" : o.payment_method}
+                            Paiement : {o.payment_method === "mobile_money" ? "Mobile Money" : o.payment_method === "cod" ? "Cash à la livraison" : o.payment_method === "off_platform" ? "Hors plateforme" : o.payment_method}
                           </span>
                         )}
                         {o.shipping_payment_status && (
