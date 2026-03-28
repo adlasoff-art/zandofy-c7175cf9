@@ -137,6 +137,7 @@ export default function CheckoutPage() {
   // Discount caps
   const [maxTotalDiscountPct, setMaxTotalDiscountPct] = useState(20);
   const [maxPointsDiscountPct, setMaxPointsDiscountPct] = useState(10);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     if (!user) return;
