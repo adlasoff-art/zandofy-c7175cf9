@@ -20,6 +20,7 @@ import { usePaymentMethods } from "@/hooks/use-payment-methods";
 import { useKycStatus } from "@/hooks/use-kyc";
 import { KycBanner } from "@/components/kyc/KycBanner";
 import { getColorDisplay } from "@/utils/colorName";
+import { useStorePaymentNumbers } from "@/hooks/use-store-payment-numbers";
 
 type Step = "shipping" | "payment" | "confirmation";
 type PaymentMethod = "stripe" | "mobile_money" | "cod" | "off_platform";
