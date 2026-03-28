@@ -102,6 +102,7 @@ export default function AdminVendorPricingPage() {
     commission_rate: string;
     is_platform_owned: boolean;
     vendor_cod_enabled: boolean;
+    returns_enabled: boolean;
   }>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
