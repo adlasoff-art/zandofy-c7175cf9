@@ -103,6 +103,7 @@ export default function AdminVendorPricingPage() {
     is_platform_owned: boolean;
     vendor_cod_enabled: boolean;
     vendor_off_platform_enabled: boolean;
+    vendor_custom_payment_numbers_enabled: boolean;
     returns_enabled: boolean;
   }>>({});
   const { toast } = useToast();
@@ -197,6 +198,7 @@ export default function AdminVendorPricingPage() {
       is_platform_owned: store.is_platform_owned ?? false,
       vendor_cod_enabled: (o as any)?.vendor_cod_enabled ?? false,
       vendor_off_platform_enabled: (o as any)?.vendor_off_platform_enabled ?? false,
+      vendor_custom_payment_numbers_enabled: (o as any)?.vendor_custom_payment_numbers_enabled ?? false,
       returns_enabled: (store as any).returns_enabled ?? false,
     };
   };
@@ -210,7 +212,7 @@ export default function AdminVendorPricingPage() {
 
   const getEditForId = (storeId: string) => {
     const store = stores?.find((s) => s.id === storeId);
-    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, returns_enabled: false };
+    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, returns_enabled: false };
     return getEdit(store);
   };
 
@@ -272,6 +274,7 @@ export default function AdminVendorPricingPage() {
       commission_rate: edit.commission_rate ? Number(edit.commission_rate) : null,
       vendor_cod_enabled: edit.vendor_cod_enabled,
       vendor_off_platform_enabled: edit.vendor_off_platform_enabled,
+      vendor_custom_payment_numbers_enabled: edit.vendor_custom_payment_numbers_enabled,
       updated_at: new Date().toISOString(),
     };
 
@@ -432,6 +435,17 @@ export default function AdminVendorPricingPage() {
                   <Switch
                     checked={edit.vendor_off_platform_enabled}
                     onCheckedChange={(v) => updateEdit(store.id, "vendor_off_platform_enabled", v)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Numéros de paiement personnalisés</p>
+                    <p className="text-[10px] text-muted-foreground">Autorise le vendeur à renseigner ses propres numéros Mobile Money.</p>
+                  </div>
+                  <Switch
+                    checked={edit.vendor_custom_payment_numbers_enabled}
+                    onCheckedChange={(v) => updateEdit(store.id, "vendor_custom_payment_numbers_enabled", v)}
                   />
                 </div>
 

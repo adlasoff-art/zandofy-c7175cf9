@@ -20,6 +20,7 @@ import { usePaymentMethods } from "@/hooks/use-payment-methods";
 import { useKycStatus } from "@/hooks/use-kyc";
 import { KycBanner } from "@/components/kyc/KycBanner";
 import { getColorDisplay } from "@/utils/colorName";
+import { useStorePaymentNumbers } from "@/hooks/use-store-payment-numbers";
 
 type Step = "shipping" | "payment" | "confirmation";
 type PaymentMethod = "stripe" | "mobile_money" | "cod" | "off_platform";
@@ -75,6 +76,7 @@ export default function CheckoutPage() {
   const { t } = useI18n();
   const { data: paymentConfig } = usePaymentMethods();
   const { isVerified: isKycVerified, isOrderBlocked, needsKyc, kycStatus } = useKycStatus();
+  
 
   const [step, setStep] = useState<Step>("shipping");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("mobile_money");
@@ -102,7 +104,9 @@ export default function CheckoutPage() {
   const [paymentOrderIds, setPaymentOrderIds] = useState<string[]>([]);
   const [vendorCodAllowed, setVendorCodAllowed] = useState(false);
   const [vendorOffPlatformAllowed, setVendorOffPlatformAllowed] = useState(false);
+  const [cartStoreIds, setCartStoreIds] = useState<string[]>([]);
   const paymentChannelRef = useRef<any>(null);
+  const { data: paymentNumbers = [] } = useStorePaymentNumbers(cartStoreIds);
 
   const [shipping, setShipping] = useState<ShippingInfo>({ ...emptyShipping, email: user?.email || "" });
 
@@ -189,6 +193,7 @@ export default function CheckoutPage() {
 
       const { data: products } = await supabase.from("products").select("id, store_id").in("id", productIds);
       const storeIds = [...new Set((products || []).map((product: any) => product.store_id).filter(Boolean))];
+      setCartStoreIds(storeIds);
       if (storeIds.length === 0) {
         setVendorCodAllowed(false);
         return;
@@ -987,7 +992,7 @@ export default function CheckoutPage() {
                 <div className="space-y-3">
                   {([
                     { id: "stripe" as const, label: t("checkout.creditCard"), sub: "Visa, Mastercard, AMEX", icon: <CreditCard size={20} />, configKey: "stripe" as const },
-                    { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, Wave, MTN", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
+                    { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, M-Pesa, Airtel Money, AfriMoney", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
                     { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
                     { id: "off_platform" as const, label: "Paiement hors plateforme", sub: "Transfert direct, puis envoyez la preuve", icon: <Banknote size={20} />, configKey: "off_platform" as const },
                   ]).filter(m => (m.id === "stripe" ? (paymentConfig?.stripe !== false || paymentConfig?.stripe_notice_enabled) : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).filter(m => m.id !== "off_platform" || vendorOffPlatformAllowed).map(method => (
@@ -1188,16 +1193,37 @@ export default function CheckoutPage() {
                 )}
 
                 {paymentMethod === "off_platform" && (
-                  <div className="pt-2 border-t border-border space-y-2">
+                  <div className="pt-2 border-t border-border space-y-3">
                     <p className="text-sm text-muted-foreground">
                       Montant à payer : <strong className="text-foreground">${total.toFixed(2)}</strong>
                     </p>
+
+                    {/* Payment numbers */}
+                    {paymentNumbers.length > 0 && (
+                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
+                        <p className="text-xs font-semibold text-foreground">📱 Numéros de paiement du vendeur :</p>
+                        <div className="grid gap-2">
+                          {paymentNumbers.map((pn) => (
+                            <div key={pn.operator} className="flex items-center gap-3 bg-card border border-border rounded-md px-3 py-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-foreground">{pn.operator_label}</p>
+                                <p className="text-sm font-semibold text-primary tracking-wide">{pn.phone_number}</p>
+                                {pn.display_name && (
+                                  <p className="text-[11px] text-muted-foreground">Nom affiché : <span className="font-medium text-foreground">{pn.display_name}</span></p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1">
                       <p className="font-semibold">📋 Comment ça marche :</p>
-                      <ol className="list-decimal list-inside space-y-0.5">
-                        <li>Effectuez le paiement directement au vendeur (Mobile Money, virement, etc.)</li>
-                        <li>Après la commande, uploadez la preuve de paiement depuis votre espace client</li>
-                        <li>Le vendeur valide la preuve et votre commande est confirmée</li>
+                      <ol className="list-decimal list-inside space-y-1">
+                        <li>Effectuez le paiement directement au vendeur (Mobile Money, virement ou paiement en espèces, etc.)</li>
+                        <li>Après la commande, uploadez la preuve de paiement depuis votre espace client. Pour un paiement Mobile Money, assurez-vous que le <strong>numéro de transaction</strong>, le <strong>nom du destinataire</strong>, le <strong>numéro de téléphone utilisé</strong> et la <strong>date</strong> soient clairement visibles sur la capture.</li>
+                        <li>Le vendeur valide la preuve et votre commande est confirmée pour la suite du processus.</li>
                       </ol>
                     </div>
                   </div>

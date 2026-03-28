@@ -20,6 +20,7 @@ import { VendorReturnsTab } from "@/components/vendor/VendorReturnsTab";
 import { VendorDisputesTab } from "@/components/vendor/VendorDisputesTab";
 import { VendorRiderTracking } from "@/components/vendor/VendorRiderTracking";
 import { VendorTeamTab } from "@/components/vendor/VendorTeamTab";
+import { VendorPaymentNumbers } from "@/components/vendor/VendorPaymentNumbers";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
@@ -932,6 +933,9 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
           />
         </div>
       </div>
+
+      {/* Mobile Money Payment Numbers */}
+      <VendorPaymentNumbers storeId={store.id} />
 
       {/* SEO Section */}
       <div className="bg-card border border-border rounded-lg p-4 space-y-4">

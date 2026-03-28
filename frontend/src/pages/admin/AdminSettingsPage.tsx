@@ -1,6 +1,7 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator, Crown, Shield } from "lucide-react";
 import { MonetizationSettings } from "@/components/admin/MonetizationSettings";
+import { AdminDefaultPaymentNumbers } from "@/components/admin/AdminDefaultPaymentNumbers";
 import { useState, useEffect, useCallback } from "react";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
@@ -700,6 +701,11 @@ export default function AdminSettingsPage() {
             <h2 className="text-lg font-bold text-foreground">Monétisation & Features optionnelles</h2>
           </div>
           <MonetizationSettings />
+        </div>
+
+        {/* Default Payment Numbers */}
+        <div className="border-t border-border pt-6 mt-6">
+          <AdminDefaultPaymentNumbers />
         </div>
       </div>
     </AdminLayout>
