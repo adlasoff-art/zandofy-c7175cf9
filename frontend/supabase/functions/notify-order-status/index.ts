@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
           from: fromEmail,
           to: recipientEmail,
           subject: `${template.subject} — ${order.order_ref}`,
-          html: buildEmailHtml(template.heading, template.body, order.order_ref, template.emoji),
+          html: buildEmailHtml(template.heading, template.body, order.order_ref, template.emoji, amount),
         });
         results.email = true;
       } catch (emailErr) {
