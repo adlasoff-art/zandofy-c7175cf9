@@ -426,6 +426,17 @@ export default function AdminVendorPricingPage() {
 
                 <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
                   <div>
+                    <p className="text-xs font-medium text-foreground">Paiement hors plateforme</p>
+                    <p className="text-[10px] text-muted-foreground">Autorise cette boutique à accepter les paiements hors plateforme (preuve + validation).</p>
+                  </div>
+                  <Switch
+                    checked={edit.vendor_off_platform_enabled}
+                    onCheckedChange={(v) => updateEdit(store.id, "vendor_off_platform_enabled", v)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
                     <p className="text-xs font-medium text-foreground">Retours autorisés</p>
                     <p className="text-[10px] text-muted-foreground">Les clients peuvent demander un retour produit.</p>
                   </div>
