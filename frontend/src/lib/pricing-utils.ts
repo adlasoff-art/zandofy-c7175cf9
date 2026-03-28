@@ -72,10 +72,7 @@ export function getMaxExtraMargin(
   settings: Pick<PricingDefaults, "max_extra_margin_under_50" | "max_extra_margin_over_100"> = DEFAULT_PRICING,
 ): number {
   if (salePrice >= 100) return settings.max_extra_margin_over_100;
-  if (salePrice < 50) return settings.max_extra_margin_under_50;
-  // Between 50 and 100: interpolate linearly
-  const ratio = (salePrice - 50) / 50;
-  return Number((settings.max_extra_margin_under_50 + ratio * (settings.max_extra_margin_over_100 - settings.max_extra_margin_under_50)).toFixed(2));
+  return settings.max_extra_margin_under_50;
 }
 
 /**
