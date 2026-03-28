@@ -103,6 +103,7 @@ export default function AdminVendorPricingPage() {
     is_platform_owned: boolean;
     vendor_cod_enabled: boolean;
     vendor_off_platform_enabled: boolean;
+    vendor_custom_payment_numbers_enabled: boolean;
     returns_enabled: boolean;
   }>>({});
   const { toast } = useToast();
