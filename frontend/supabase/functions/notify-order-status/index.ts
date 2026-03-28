@@ -45,6 +45,19 @@ const NOTIFY_STATUSES: Record<string, { subject: string; heading: string; body: 
     body: "Votre colis a été livré avec succès. Merci pour votre confiance !",
     emoji: "🎉",
   },
+  // Payment-specific notifications
+  shipping_payment_success: {
+    subject: "💳 Paiement expédition confirmé",
+    heading: "Votre paiement d'expédition a été confirmé !",
+    body: "Le paiement pour l'expédition de votre commande a bien été reçu. Votre colis sera bientôt en route.",
+    emoji: "💳",
+  },
+  last_mile_payment_success: {
+    subject: "💳 Paiement livraison confirmé",
+    heading: "Votre paiement de livraison à domicile a été confirmé !",
+    body: "Le paiement pour la livraison à domicile de votre commande a bien été reçu. Un livreur sera assigné prochainement.",
+    emoji: "💳",
+  },
 };
 
 function buildEmailHtml(heading: string, body: string, orderRef: string, emoji: string) {
