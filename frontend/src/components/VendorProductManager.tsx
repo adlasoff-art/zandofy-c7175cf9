@@ -665,11 +665,32 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     );
   }
 
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogStatusFilter, setCatalogStatusFilter] = useState<string>("all");
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchStatus = catalogStatusFilter === "all" || p.publish_status === catalogStatusFilter;
+      const q = catalogSearch.toLowerCase().trim();
+      const matchSearch = !q || p.name_fr.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q));
+      return matchStatus && matchSearch;
+    });
+  }, [products, catalogSearch, catalogStatusFilter]);
+
+  const catalogStatusTabs = [
+    { key: "all", label: "Tous" },
+    { key: "published", label: "Publiés" },
+    { key: "draft", label: "Brouillons" },
+    { key: "pending_approval", label: "En attente" },
+    { key: "rejected", label: "Refusés" },
+    { key: "revision_requested", label: "Révision" },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-          <Package size={16} /> Catalogue ({products.length}
+          <Package size={16} /> Catalogue ({filteredProducts.length}
           {subscription && subscription.max_products < Infinity && `/${subscription.max_products}`})
         </h3>
         <button
@@ -681,20 +702,48 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
         </button>
       </div>
 
+      {/* Search bar */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <input
+          placeholder="Rechercher un produit (nom, SKU)..."
+          value={catalogSearch}
+          onChange={(e) => setCatalogSearch(e.target.value)}
+          className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+        />
+      </div>
 
+      {/* Status filter tabs */}
+      <div className="flex gap-1 overflow-x-auto pb-1">
+        {catalogStatusTabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setCatalogStatusFilter(tab.key)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${
+              catalogStatusFilter === tab.key
+                ? "bg-foreground text-card border-foreground"
+                : "bg-card text-foreground border-border hover:bg-muted"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="animate-spin text-primary" size={24} />
         </div>
-      ) : products.length === 0 ? (
+      ) : filteredProducts.length === 0 ? (
         <div className="text-center py-12 space-y-2">
           <Package size={40} className="mx-auto text-muted-foreground/20" />
-          <p className="text-sm text-muted-foreground">Aucun produit. Ajoutez votre premier article.</p>
+          <p className="text-sm text-muted-foreground">
+            {products.length === 0 ? "Aucun produit. Ajoutez votre premier article." : "Aucun produit ne correspond aux filtres."}
+          </p>
         </div>
       ) : (
         <div className="space-y-2">
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <div
               key={product.id}
               className="bg-card border border-border rounded-lg p-3 flex items-center gap-3"
