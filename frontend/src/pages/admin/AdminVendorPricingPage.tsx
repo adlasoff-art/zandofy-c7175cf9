@@ -198,6 +198,7 @@ export default function AdminVendorPricingPage() {
       is_platform_owned: store.is_platform_owned ?? false,
       vendor_cod_enabled: (o as any)?.vendor_cod_enabled ?? false,
       vendor_off_platform_enabled: (o as any)?.vendor_off_platform_enabled ?? false,
+      vendor_custom_payment_numbers_enabled: (o as any)?.vendor_custom_payment_numbers_enabled ?? false,
       returns_enabled: (store as any).returns_enabled ?? false,
     };
   };
