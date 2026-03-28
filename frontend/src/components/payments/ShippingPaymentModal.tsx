@@ -30,6 +30,7 @@ export function ShippingPaymentModal({ orderId, orderRef, amount, paymentType, o
   const [provider, setProvider] = useState("mpesa");
   const [submitting, setSubmitting] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "pending" | "success" | "failed">("idle");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const referenceRef = useRef<string | null>(null);
 
