@@ -51,7 +51,7 @@ const defaultFaqEn: FaqCategory[] = [
     title: "Orders & Payments",
     items: [
       { q: "How do I place an order?", a: "Browse our products, add them to your cart and proceed to checkout. You can pay by credit card, Mobile Money or cash on delivery depending on your area." },
-      { q: "What payment methods do you accept?", a: "We accept Visa, Mastercard, PayPal, Apple Pay, Google Pay and Mobile Money (Orange Money, Wave, MTN MoMo)." },
+      { q: "What payment methods do you accept?", a: "We accept Visa, Mastercard, PayPal, Apple Pay, Google Pay and Mobile Money (Orange Money, M-Pesa, Airtel Money, AfriMoney)." },
       { q: "Can I use a promo code?", a: "Yes! Enter your promo code in the dedicated field at checkout. The discount will be applied automatically if the code is valid." },
       { q: "Can I modify or cancel my order?", a: "You can cancel your order as long as it hasn't been shipped. Go to your account > Orders." },
     ],
