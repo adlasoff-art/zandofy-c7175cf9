@@ -32,6 +32,9 @@ interface ApplicationData {
   company_country: string;
   current_step: number;
   status: string;
+  shop_type: string;
+  fulfillment_type: string;
+  fleet_management: string;
 }
 
 interface DocFile {
@@ -55,6 +58,9 @@ const initialData: ApplicationData = {
   company_country: "Sénégal",
   current_step: 1,
   status: "draft",
+  shop_type: "international",
+  fulfillment_type: "zandofy_warehouse",
+  fleet_management: "platform",
 };
 
 interface VendorApplicationLocalDraft {
@@ -110,6 +116,9 @@ export default function BecomeVendorPage() {
           company_country: data.company_country || "Sénégal",
           current_step: data.current_step || 1,
           status: data.status || "draft",
+          shop_type: (data as any).shop_type || "international",
+          fulfillment_type: (data as any).fulfillment_type || "zandofy_warehouse",
+          fleet_management: (data as any).fleet_management || "platform",
         });
         setStep(data.current_step || 1);
         setExistingApp(true);
@@ -281,7 +290,7 @@ export default function BecomeVendorPage() {
 
   const saveProgress = async (nextStep?: number) => {
     setSaving(true);
-    const payload = {
+    const payload: any = {
       user_id: user.id,
       full_name: form.full_name,
       phone: form.phone,
@@ -296,6 +305,9 @@ export default function BecomeVendorPage() {
       company_country: form.company_country,
       current_step: nextStep || step,
       status: form.status,
+      shop_type: form.shop_type,
+      fulfillment_type: form.fulfillment_type,
+      fleet_management: form.fleet_management,
     };
 
     let appId = form.id;
@@ -488,6 +500,44 @@ export default function BecomeVendorPage() {
                   <Label>{t("vendor.storeDesc")}</Label>
                   <Textarea value={form.store_description} onChange={(e) => updateField("store_description", e.target.value)} rows={4} />
                 </div>
+
+                {/* Shop type selection */}
+                <div className="space-y-2 border-t border-border pt-4 mt-4">
+                  <Label className="text-base font-semibold">Type de boutique *</Label>
+                  <p className="text-xs text-muted-foreground">Définit le flux de traitement de vos commandes</p>
+                  <Select value={form.shop_type} onValueChange={(v) => updateField("shop_type", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="international">🌍 International (Import / Sourcing)</SelectItem>
+                      <SelectItem value="local">🏪 Local (Stock physique en RDC)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {form.shop_type === "local" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Type de stockage</Label>
+                      <Select value={form.fulfillment_type} onValueChange={(v) => updateField("fulfillment_type", v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="zandofy_warehouse">Entrepôt Zandofy</SelectItem>
+                          <SelectItem value="vendor_warehouse">Entrepôt propre</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Gestion de la flotte de livraison</Label>
+                      <Select value={form.fleet_management} onValueChange={(v) => updateField("fleet_management", v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="platform">Livreurs de la plateforme</SelectItem>
+                          <SelectItem value="own_fleet">Ma propre flotte</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
               </>
             )}
 

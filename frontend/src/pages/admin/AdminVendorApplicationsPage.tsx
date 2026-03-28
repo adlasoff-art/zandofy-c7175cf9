@@ -109,7 +109,7 @@ export default function AdminVendorApplicationsPage() {
 
     // If approved, create store + assign vendor role
     if (action === "approved") {
-      // Create the store
+      // Create the store with shop_type fields
       await supabase.from("stores").insert({
         name: selected.store_name || "Nouvelle boutique",
         description: selected.store_description || null,
@@ -117,7 +117,10 @@ export default function AdminVendorApplicationsPage() {
         banner_url: selected.store_banner_url || null,
         owner_id: selected.user_id,
         is_verified: false,
-      });
+        shop_type: selected.shop_type || "international",
+        fulfillment_type: selected.fulfillment_type || "zandofy_warehouse",
+        fleet_management: selected.fleet_management || "platform",
+      } as any);
 
       // Assign vendor role
       await supabase.from("user_roles").insert({
