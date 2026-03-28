@@ -1,7 +1,7 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator, Crown, Shield } from "lucide-react";
 import { MonetizationSettings } from "@/components/admin/MonetizationSettings";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -113,7 +113,7 @@ export default function AdminSettingsPage() {
           } else if (row.key === "newness_duration_days") {
             setNewnessDays(Number(v) || 14);
           } else if (row.key === "payment_methods") {
-            setPaymentMethods({ mobile_money: v.mobile_money !== false, stripe: v.stripe !== false, cod: v.cod !== false, off_platform: v.off_platform !== false, stripe_notice_enabled: !!v.stripe_notice_enabled, stripe_notice_text: v.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif." });
+            setPaymentMethods({ mobile_money: v.mobile_money === true, stripe: v.stripe === true, cod: v.cod === true, off_platform: v.off_platform === true, stripe_notice_enabled: !!v.stripe_notice_enabled, stripe_notice_text: v.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif." });
           } else if (row.key === "pricing_defaults") {
             setPricing({
               margin_pct: Number(v.margin_pct) || 15,
@@ -135,6 +135,27 @@ export default function AdminSettingsPage() {
         });
       });
   }, []);
+
+  // Auto-save payment methods immediately on toggle change
+  const savePaymentMethods = useCallback(async (newMethods: typeof paymentMethods) => {
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "payment_methods", value: newMethods as any, updated_at: now }, { onConflict: "key" });
+    if (error) {
+      toast({ title: "Erreur", description: "Impossible de sauvegarder les moyens de paiement : " + error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Sauvegardé", description: "Moyens de paiement mis à jour." });
+    }
+  }, [toast]);
+
+  const updatePaymentMethod = useCallback((key: string, value: any) => {
+    setPaymentMethods((prev) => {
+      const updated = { ...prev, [key]: value };
+      savePaymentMethods(updated);
+      return updated;
+    });
+  }, [savePaymentMethods]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -238,7 +259,7 @@ export default function AdminSettingsPage() {
             ]).map((pm) => (
               <div key={pm.key} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                 <span className="text-sm text-foreground">{pm.label}</span>
-                <Switch checked={paymentMethods[pm.key]} onCheckedChange={(v) => setPaymentMethods((prev) => ({ ...prev, [pm.key]: v }))} />
+                <Switch checked={paymentMethods[pm.key]} onCheckedChange={(v) => updatePaymentMethod(pm.key, v)} />
               </div>
             ))}
             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
@@ -246,11 +267,11 @@ export default function AdminSettingsPage() {
                 <p className="text-sm text-foreground">Afficher le message d’indisponibilité carte</p>
                 <p className="text-xs text-muted-foreground">Si activé et la carte est désactivée, le client voit un message au lieu d’un choix caché.</p>
               </div>
-              <Switch checked={paymentMethods.stripe_notice_enabled} onCheckedChange={(v) => setPaymentMethods((prev) => ({ ...prev, stripe_notice_enabled: v }))} />
+              <Switch checked={paymentMethods.stripe_notice_enabled} onCheckedChange={(v) => updatePaymentMethod('stripe_notice_enabled', v)} />
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Message carte bancaire</label>
-              <input type="text" value={paymentMethods.stripe_notice_text} onChange={(e) => setPaymentMethods((prev) => ({ ...prev, stripe_notice_text: e.target.value }))} className={inputClass} />
+              <input type="text" value={paymentMethods.stripe_notice_text} onChange={(e) => updatePaymentMethod('stripe_notice_text', e.target.value)} className={inputClass} />
             </div>
           </div>
         </section>
