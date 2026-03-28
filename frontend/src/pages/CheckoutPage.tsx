@@ -463,7 +463,7 @@ export default function CheckoutPage() {
 
     setStep("payment");
   };
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  
 
 
 
