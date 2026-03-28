@@ -540,8 +540,6 @@ export default function BecomeVendorPage() {
                 )}
               </>
             )}
-              </>
-            )}
 
             {step === 3 && (
               <div className="space-y-4">
