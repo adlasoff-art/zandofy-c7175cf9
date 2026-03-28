@@ -136,6 +136,27 @@ export default function AdminSettingsPage() {
       });
   }, []);
 
+  // Auto-save payment methods immediately on toggle change
+  const savePaymentMethods = useCallback(async (newMethods: typeof paymentMethods) => {
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "payment_methods", value: newMethods as any, updated_at: now }, { onConflict: "key" });
+    if (error) {
+      toast({ title: "Erreur", description: "Impossible de sauvegarder les moyens de paiement : " + error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Sauvegardé", description: "Moyens de paiement mis à jour." });
+    }
+  }, [toast]);
+
+  const updatePaymentMethod = useCallback((key: string, value: any) => {
+    setPaymentMethods((prev) => {
+      const updated = { ...prev, [key]: value };
+      savePaymentMethods(updated);
+      return updated;
+    });
+  }, [savePaymentMethods]);
+
   const handleSave = async () => {
     setSaving(true);
     const now = new Date().toISOString();
