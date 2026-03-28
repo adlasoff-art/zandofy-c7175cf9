@@ -198,7 +198,7 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
 
   const vendorOrderStatusTabs = [
     { key: "all", label: "Toutes" },
-    ...STATUS_FLOW.map((s) => ({ key: s, label: STATUS_CONFIG[s]?.label || s })),
+    ...activeFlow.map((s) => ({ key: s, label: STATUS_CONFIG[s]?.label || s })),
     { key: "cancelled", label: "Annulées" },
     { key: "returned", label: "Retournées" },
   ];
