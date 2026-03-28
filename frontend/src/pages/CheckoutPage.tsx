@@ -22,7 +22,7 @@ import { KycBanner } from "@/components/kyc/KycBanner";
 import { getColorDisplay } from "@/utils/colorName";
 
 type Step = "shipping" | "payment" | "confirmation";
-type PaymentMethod = "stripe" | "mobile_money" | "cod";
+type PaymentMethod = "stripe" | "mobile_money" | "cod" | "off_platform";
 
 interface ShippingInfo {
   firstName: string;
@@ -500,7 +500,7 @@ export default function CheckoutPage() {
         .insert({
           user_id: user!.id,
           store_id: storeId !== "default" ? storeId : null,
-          status: paymentMethod === "mobile_money" ? "awaiting_payment" : "pending",
+          status: (paymentMethod === "mobile_money" || paymentMethod === "off_platform") ? "awaiting_payment" : "pending",
           payment_method: paymentMethod,
           shipping_first_name: shipping.firstName,
           shipping_last_name: shipping.lastName,
@@ -656,14 +656,18 @@ export default function CheckoutPage() {
         setProcessing(false);
       }
     } else {
-      // COD or Stripe (existing mock flow)
+      // COD, off_platform, or Stripe (existing mock flow)
       await new Promise(r => setTimeout(r, 1500));
       const { orderRef } = await createOrderForPayment();
       setOrderId(orderRef);
       await clearCart();
       setStep("confirmation");
       setProcessing(false);
-      toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
+      if (paymentMethod === "off_platform") {
+        toast({ title: "Commande enregistrée", description: `N° ${orderRef} — Uploadez votre preuve de paiement depuis votre espace client.` });
+      } else {
+        toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
+      }
     }
   };
 
@@ -981,7 +985,8 @@ export default function CheckoutPage() {
                     { id: "stripe" as const, label: t("checkout.creditCard"), sub: "Visa, Mastercard, AMEX", icon: <CreditCard size={20} />, configKey: "stripe" as const },
                     { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, Wave, MTN", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
                     { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
-                  ]).filter(m => (m.id === "stripe" ? (paymentConfig?.stripe !== false || paymentConfig?.stripe_notice_enabled) : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).map(method => (
+                    { id: "off_platform" as const, label: "Paiement hors plateforme", sub: "Transfert direct, puis envoyez la preuve", icon: <Banknote size={20} />, configKey: "off_platform" as const },
+                  ]).filter(m => (m.id === "stripe" ? (paymentConfig?.stripe !== false || paymentConfig?.stripe_notice_enabled) : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).map(method => (
                     <button
                       key={method.id}
                       disabled={method.id === "stripe" && paymentConfig?.stripe === false}
@@ -1175,6 +1180,22 @@ export default function CheckoutPage() {
                     <p className="text-sm text-muted-foreground">
                       Montant à payer à la livraison : <strong className="text-foreground">${total.toFixed(2)}</strong>
                     </p>
+                  </div>
+                )}
+
+                {paymentMethod === "off_platform" && (
+                  <div className="pt-2 border-t border-border space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Montant à payer : <strong className="text-foreground">${total.toFixed(2)}</strong>
+                    </p>
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                      <p className="font-semibold">📋 Comment ça marche :</p>
+                      <ol className="list-decimal list-inside space-y-0.5">
+                        <li>Effectuez le paiement directement au vendeur (Mobile Money, virement, etc.)</li>
+                        <li>Après la commande, uploadez la preuve de paiement depuis votre espace client</li>
+                        <li>Le vendeur valide la preuve et votre commande est confirmée</li>
+                      </ol>
+                    </div>
                   </div>
                 )}
 
