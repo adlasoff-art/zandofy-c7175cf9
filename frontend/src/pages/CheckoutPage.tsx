@@ -1193,10 +1193,31 @@ export default function CheckoutPage() {
                 )}
 
                 {paymentMethod === "off_platform" && (
-                  <div className="pt-2 border-t border-border space-y-2">
+                  <div className="pt-2 border-t border-border space-y-3">
                     <p className="text-sm text-muted-foreground">
                       Montant à payer : <strong className="text-foreground">${total.toFixed(2)}</strong>
                     </p>
+
+                    {/* Payment numbers */}
+                    {paymentNumbers.length > 0 && (
+                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
+                        <p className="text-xs font-semibold text-foreground">📱 Numéros de paiement du vendeur :</p>
+                        <div className="grid gap-2">
+                          {paymentNumbers.map((pn) => (
+                            <div key={pn.operator} className="flex items-center gap-3 bg-card border border-border rounded-md px-3 py-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-foreground">{pn.operator_label}</p>
+                                <p className="text-sm font-semibold text-primary tracking-wide">{pn.phone_number}</p>
+                                {pn.display_name && (
+                                  <p className="text-[11px] text-muted-foreground">Nom affiché : <span className="font-medium text-foreground">{pn.display_name}</span></p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1">
                       <p className="font-semibold">📋 Comment ça marche :</p>
                       <ol className="list-decimal list-inside space-y-1">
