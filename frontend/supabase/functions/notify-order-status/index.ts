@@ -60,7 +60,15 @@ const NOTIFY_STATUSES: Record<string, { subject: string; heading: string; body: 
   },
 };
 
-function buildEmailHtml(heading: string, body: string, orderRef: string, emoji: string) {
+function buildEmailHtml(heading: string, body: string, orderRef: string, emoji: string, amount?: number) {
+  const amountBlock = amount != null
+    ? `<table cellpadding="0" cellspacing="0" style="background:#e8f5e9;border-radius:8px;width:100%;margin-bottom:16px;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0;font-size:12px;color:#388e3c;">Montant payé</p>
+              <p style="margin:4px 0 0;font-size:18px;font-weight:bold;color:#1b5e20;">$${amount.toFixed(2)}</p>
+            </td></tr>
+          </table>`
+    : "";
   return `
 <!DOCTYPE html>
 <html>
@@ -73,6 +81,7 @@ function buildEmailHtml(heading: string, body: string, orderRef: string, emoji: 
           <p style="font-size:40px;margin:0 0 8px;">${emoji}</p>
           <h1 style="margin:0 0 12px;font-size:22px;color:#1a1a1a;">${heading}</h1>
           <p style="margin:0 0 20px;font-size:15px;color:#555;line-height:1.6;">${body}</p>
+          ${amountBlock}
           <table cellpadding="0" cellspacing="0" style="background:#f1f3f5;border-radius:8px;width:100%;margin-bottom:24px;">
             <tr><td style="padding:16px;">
               <p style="margin:0;font-size:12px;color:#888;">Référence commande</p>
