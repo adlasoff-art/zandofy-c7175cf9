@@ -677,27 +677,6 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     );
   }
 
-  const [catalogSearch, setCatalogSearch] = useState("");
-  const [catalogStatusFilter, setCatalogStatusFilter] = useState<string>("all");
-
-  const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
-      const matchStatus = catalogStatusFilter === "all" || p.publish_status === catalogStatusFilter;
-      const q = catalogSearch.toLowerCase().trim();
-      const matchSearch = !q || p.name_fr.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q));
-      return matchStatus && matchSearch;
-    });
-  }, [products, catalogSearch, catalogStatusFilter]);
-
-  const catalogStatusTabs = [
-    { key: "all", label: "Tous" },
-    { key: "published", label: "Publiés" },
-    { key: "draft", label: "Brouillons" },
-    { key: "pending_approval", label: "En attente" },
-    { key: "rejected", label: "Refusés" },
-    { key: "revision_requested", label: "Révision" },
-  ];
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
