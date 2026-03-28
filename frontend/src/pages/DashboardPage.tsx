@@ -1052,12 +1052,87 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         )}
       </div>
 
+      {/* Inline Review Section for delivered orders */}
+      {order.status === "delivered" && orderItems.length > 0 && (
+        <div className="border-t border-border pt-4 space-y-3">
+          <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Star size={14} className="text-primary" /> Laisser un avis
+          </h4>
+          <p className="text-xs text-muted-foreground">
+            Partagez votre expérience et gagnez des ZandoPoints en ajoutant des photos ! 📸
+          </p>
+          {orderItems.filter(item => item.product_id && !existingReviews.has(item.product_id)).map(item => (
+            <div key={item.id} className="bg-muted/30 border border-border rounded-lg p-3 space-y-3">
+              <div className="flex items-center gap-3">
+                {item.product_image && (
+                  <img src={item.product_image} alt="" className="w-10 h-10 object-cover rounded border border-border" />
+                )}
+                <p className="text-sm font-medium text-foreground">{item.product_name}</p>
+              </div>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button
+                    key={star}
+                    onClick={() => setReviewRating(star)}
+                    className="transition-colors"
+                  >
+                    <Star size={20} className={star <= reviewRating ? "fill-primary text-primary" : "text-muted-foreground"} />
+                  </button>
+                ))}
+              </div>
+              <Textarea
+                placeholder="Décrivez votre expérience avec ce produit..."
+                value={reviewComment}
+                onChange={e => setReviewComment(e.target.value)}
+                className="text-sm min-h-[60px]"
+                maxLength={1000}
+              />
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-xs text-primary cursor-pointer">
+                  <Camera size={14} />
+                  <span>Ajouter des photos (bonus ZandoPoints)</span>
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={handleReviewImageUpload} />
+                </label>
+                {reviewImages.length > 0 && (
+                  <div className="flex gap-2 flex-wrap">
+                    {reviewImages.map((url, i) => (
+                      <div key={i} className="relative">
+                        <img src={url} alt="" className="w-14 h-14 object-cover rounded border border-border" />
+                        <button
+                          onClick={() => setReviewImages(prev => prev.filter((_, idx) => idx !== i))}
+                          className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Button
+                size="sm"
+                disabled={!reviewRating || reviewSubmitting}
+                onClick={() => handleSubmitReview(item.product_id!)}
+              >
+                {reviewSubmitting ? <Loader2 size={14} className="animate-spin mr-1" /> : <Star size={14} className="mr-1" />}
+                Soumettre l'avis
+              </Button>
+            </div>
+          ))}
+          {orderItems.every(item => !item.product_id || existingReviews.has(item.product_id)) && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <CheckCircle2 size={12} className="text-primary" /> Vous avez déjà laissé un avis pour tous les articles.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Return Request Form */}
       {showReturnForm && (
         <ReturnRequestForm
           orderId={order.id}
           orderRef={order.order_ref}
-          storeId={null}
+          storeId={order.store_id}
           orderTotal={Number(order.total)}
           onSuccess={() => { setShowReturnForm(false); onCancelSuccess(); }}
           onCancel={() => setShowReturnForm(false)}
