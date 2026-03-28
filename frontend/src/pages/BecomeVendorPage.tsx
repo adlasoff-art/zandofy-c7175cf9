@@ -116,6 +116,9 @@ export default function BecomeVendorPage() {
           company_country: data.company_country || "Sénégal",
           current_step: data.current_step || 1,
           status: data.status || "draft",
+          shop_type: (data as any).shop_type || "international",
+          fulfillment_type: (data as any).fulfillment_type || "zandofy_warehouse",
+          fleet_management: (data as any).fleet_management || "platform",
         });
         setStep(data.current_step || 1);
         setExistingApp(true);
