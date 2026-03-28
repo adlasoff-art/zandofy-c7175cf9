@@ -1179,6 +1179,22 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                {paymentMethod === "off_platform" && (
+                  <div className="pt-2 border-t border-border space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Montant à payer : <strong className="text-foreground">${total.toFixed(2)}</strong>
+                    </p>
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                      <p className="font-semibold">📋 Comment ça marche :</p>
+                      <ol className="list-decimal list-inside space-y-0.5">
+                        <li>Effectuez le paiement directement au vendeur (Mobile Money, virement, etc.)</li>
+                        <li>Après la commande, uploadez la preuve de paiement depuis votre espace client</li>
+                        <li>Le vendeur valide la preuve et votre commande est confirmée</li>
+                      </ol>
+                    </div>
+                  </div>
+                )}
+
                 {!paymentPending && (
                   <div className="space-y-3">
                     <label className="flex items-start gap-2 cursor-pointer">
