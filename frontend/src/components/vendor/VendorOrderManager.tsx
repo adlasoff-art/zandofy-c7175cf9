@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send, Edit2, Truck } from "lucide-react";
+import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send, Edit2, Truck, Search } from "lucide-react";
 import { PaymentProofUpload } from "@/components/PaymentProofUpload";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -74,6 +74,10 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const { isAdmin, isManager } = useRoles();
   const isStaff = isAdmin || isManager;
+
+  // Search and filter states
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
 
   // Modal states
   const [supplierModal, setSupplierModal] = useState<string | null>(null);
@@ -157,6 +161,43 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
 
   useEffect(() => { loadOrders(); }, [loadOrders]);
 
+  // Multi-criteria search filter
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      // Status filter
+      if (orderStatusFilter !== "all" && o.status !== orderStatusFilter) return false;
+
+      // Search filter (multi-criteria)
+      if (orderSearch.trim()) {
+        const q = orderSearch.toLowerCase().trim();
+        const clientName = `${o.shipping_first_name || ""} ${o.shipping_last_name || ""}`.toLowerCase();
+        const itemNames = o.items.map((i) => i.product_name.toLowerCase()).join(" ");
+        const totalStr = String(o.total);
+        const matchAny =
+          o.order_ref.toLowerCase().includes(q) ||
+          clientName.includes(q) ||
+          (o.payment_method && o.payment_method.toLowerCase().includes(q)) ||
+          (o.delivery_choice && o.delivery_choice.toLowerCase().includes(q)) ||
+          (o.shipping_city && o.shipping_city.toLowerCase().includes(q)) ||
+          (o.tracking_number && o.tracking_number.toLowerCase().includes(q)) ||
+          (o.confirmation_code && o.confirmation_code.toLowerCase().includes(q)) ||
+          (o.assigned_rider_name && o.assigned_rider_name.toLowerCase().includes(q)) ||
+          (o.last_mile_payment_method && o.last_mile_payment_method.toLowerCase().includes(q)) ||
+          itemNames.includes(q) ||
+          totalStr.includes(q);
+        if (!matchAny) return false;
+      }
+      return true;
+    });
+  }, [orders, orderSearch, orderStatusFilter]);
+
+  const vendorOrderStatusTabs = [
+    { key: "all", label: "Toutes" },
+    ...STATUS_FLOW.map((s) => ({ key: s, label: STATUS_CONFIG[s]?.label || s })),
+    { key: "cancelled", label: "Annulées" },
+    { key: "returned", label: "Retournées" },
+  ];
+
   const updateStatus = async (orderId: string, newStatus: string, extraFields?: Record<string, any>): Promise<boolean> => {
     setUpdatingId(orderId);
     const updateData: any = { status: newStatus, ...extraFields };
@@ -187,19 +228,14 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
     const next = getNextStatus(currentStatus);
     if (!next) return;
 
-    // confirmed → preparing: ask for supplier info (platform, order number, link)
     if (currentStatus === "confirmed" && next === "preparing") {
       setSupplierModal(orderId);
       return;
     }
-
-    // in_shipping → shipped (hub): ask for tracking number (required) + delivery fee
     if (currentStatus === "in_shipping" && next === "shipped") {
       setShippedModal(orderId);
       return;
     }
-
-    // shipped → assigning_rider: ask for rider selection
     if (currentStatus === "shipped" && next === "assigning_rider") {
       setRiderModal(orderId);
       return;
@@ -216,21 +252,47 @@ export function VendorOrderManager({ storeId }: { storeId: string }) {
     );
   }
 
-  if (orders.length === 0) {
-    return (
-      <div className="text-center py-12 space-y-2">
-        <Package size={40} className="mx-auto text-muted-foreground/20" />
-        <p className="text-sm text-muted-foreground">Aucune commande reçue pour le moment.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-        <Package size={16} /> Commandes ({orders.length})
+        <Package size={16} /> Commandes ({filteredOrders.length})
       </h3>
-      {orders.map((order) => {
+
+      {/* Search bar */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <input
+          placeholder="Rechercher (réf, client, produit, montant, code confirmation, livreur...)"
+          value={orderSearch}
+          onChange={(e) => setOrderSearch(e.target.value)}
+          className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+        />
+      </div>
+
+      {/* Status filter tabs */}
+      <div className="flex gap-1 overflow-x-auto pb-1">
+        {vendorOrderStatusTabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setOrderStatusFilter(tab.key)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${
+              orderStatusFilter === tab.key
+                ? "bg-foreground text-card border-foreground"
+                : "bg-card text-foreground border-border hover:bg-muted"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {filteredOrders.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-sm text-muted-foreground">
+            {orders.length === 0 ? "Aucune commande reçue pour le moment." : "Aucune commande ne correspond aux filtres."}
+          </p>
+        </div>
+      ) : filteredOrders.map((order) => {
         const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
         const StatusIcon = config.icon;
         const next = getNextStatus(order.status);

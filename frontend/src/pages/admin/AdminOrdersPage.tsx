@@ -46,7 +46,26 @@ export default function AdminOrdersPage() {
       if (error) {
         console.error("[AdminOrdersPage] Error loading orders:", error);
       }
-      return await withOptionalOrderFields<any>((data ?? []) as any[], ["deferred_payment_provider"]);
+      const ordersData = await withOptionalOrderFields<any>((data ?? []) as any[], ["deferred_payment_provider"]);
+
+      // Load order items for search by product name
+      const orderIds = ordersData.map((o: any) => o.id);
+      if (orderIds.length > 0) {
+        const { data: items } = await supabase
+          .from("order_items")
+          .select("order_id, product_name")
+          .in("order_id", orderIds);
+        const itemMap = new Map<string, string[]>();
+        (items || []).forEach((item: any) => {
+          const arr = itemMap.get(item.order_id) || [];
+          arr.push(item.product_name);
+          itemMap.set(item.order_id, arr);
+        });
+        ordersData.forEach((o: any) => {
+          o._itemNames = (itemMap.get(o.id) || []).join(" ").toLowerCase();
+        });
+      }
+      return ordersData;
     },
     enabled: !authLoading && !!user,
   });
@@ -65,10 +84,30 @@ export default function AdminOrdersPage() {
     enabled: !authLoading && !!user,
   });
 
-  const filtered = orders.filter((o) => {
+  const filtered = orders.filter((o: any) => {
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
-    const matchSearch = !search || o.order_ref.toLowerCase().includes(search.toLowerCase());
-    return matchStatus && matchSearch;
+    if (!matchStatus) return false;
+    if (!search.trim()) return true;
+
+    const q = search.toLowerCase().trim();
+    const clientName = `${o.shipping_first_name || ""} ${o.shipping_last_name || ""}`.toLowerCase();
+    const totalStr = String(o.total);
+
+    return (
+      o.order_ref.toLowerCase().includes(q) ||
+      clientName.includes(q) ||
+      (o.payment_method && o.payment_method.toLowerCase().includes(q)) ||
+      (o.delivery_choice && o.delivery_choice.toLowerCase().includes(q)) ||
+      (o.shipping_city && o.shipping_city.toLowerCase().includes(q)) ||
+      (o.shipping_phone && o.shipping_phone.includes(q)) ||
+      (o.tracking_number && o.tracking_number.toLowerCase().includes(q)) ||
+      (o.confirmation_code && o.confirmation_code.toLowerCase().includes(q)) ||
+      (o.assigned_rider_name && o.assigned_rider_name.toLowerCase().includes(q)) ||
+      (o.last_mile_payment_method && o.last_mile_payment_method.toLowerCase().includes(q)) ||
+      (o.coupon_code && o.coupon_code.toLowerCase().includes(q)) ||
+      (o._itemNames && o._itemNames.includes(q)) ||
+      totalStr.includes(q)
+    );
   });
 
   const updateStatus = async (orderId: string, newStatus: string, extraFields?: Record<string, any>) => {
@@ -219,7 +258,7 @@ export default function AdminOrdersPage() {
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
-            placeholder="Rechercher une commande..."
+            placeholder="Rechercher (réf, client, produit, montant, code, livreur, téléphone...)"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
