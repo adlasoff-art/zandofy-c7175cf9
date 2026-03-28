@@ -250,6 +250,18 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     return () => window.removeEventListener("beforeunload", beforeUnloadHandler);
   }, [showForm]);
 
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogStatusFilter, setCatalogStatusFilter] = useState<string>("all");
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchStatus = catalogStatusFilter === "all" || p.publish_status === catalogStatusFilter;
+      const q = catalogSearch.toLowerCase().trim();
+      const matchSearch = !q || p.name_fr.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q));
+      return matchStatus && matchSearch;
+    });
+  }, [products, catalogSearch, catalogStatusFilter]);
+
   const toLocalDatetime = (iso: string | null) => {
     if (!iso) return "";
     try {
