@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Search, UserCheck, ShieldCheck, Store, Truck, Bike, Loader2, Download, Ban, Filter, Users } from "lucide-react";
+import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
