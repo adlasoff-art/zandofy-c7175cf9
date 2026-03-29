@@ -211,9 +211,15 @@ export function CheckoutShippingCalculator({
     });
   }, [products]);
 
-  // 5. Calculate quotes with surcharges
+  // 5. Calculate quotes with surcharges — only when all data is ready
+  const dataReady = useMemo(() => {
+    if (!destCity || products.length === 0 || originCities.size === 0) return false;
+    const neededCountries = [...new Set(products.map(p => p.originCountry))];
+    return neededCountries.every(cc => originCities.has(cc));
+  }, [destCity, products, originCities]);
+
   useEffect(() => {
-    if (!destCity || products.length === 0 || originCities.size === 0) return;
+    if (!dataReady || !destCity) return;
     
     setLoading(true);
 
