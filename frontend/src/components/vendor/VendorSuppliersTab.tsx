@@ -208,8 +208,17 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
               </div>
             </div>
           ))}
+          </>;
+          })()}
+          <DataTablePagination
+            totalItems={suppliers.length}
+            currentPage={supplierPage}
+            pageSize={25}
+            onPageChange={setSupplierPage}
+            onPageSizeChange={() => {}}
+            pageSizeOptions={[25]}
+          />
         </div>
-      )}
 
       {/* Modal Add/Edit */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
