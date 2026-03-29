@@ -337,10 +337,13 @@ export default function DashboardPage() {
               </div>
             )}
             {kycStatus === "approved" && (
-              <div className="bg-card rounded-lg p-6 border border-border text-center space-y-2">
-                <ShieldCheck size={32} className="mx-auto text-primary" />
-                <h3 className="font-bold text-foreground">Identité vérifiée</h3>
-                <p className="text-sm text-muted-foreground">Vous avez accès à toutes les options de paiement et livraison avancées.</p>
+              <div className="space-y-4">
+                <div className="bg-card rounded-lg p-6 border border-border text-center space-y-2">
+                  <ShieldCheck size={32} className="mx-auto text-primary" />
+                  <h3 className="font-bold text-foreground">Identité vérifiée</h3>
+                  <p className="text-sm text-muted-foreground">Vous avez accès à toutes les options de paiement et livraison avancées.</p>
+                </div>
+                <ClientCertificationSection />
               </div>
             )}
           </div>
