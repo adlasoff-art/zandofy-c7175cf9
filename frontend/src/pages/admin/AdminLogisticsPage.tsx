@@ -248,29 +248,88 @@ export default function AdminLogisticsPage() {
             ))}
           </div>
 
-          {/* Multi-rider fleet map */}
-          {riderLocations.length > 0 && (
+          {/* Multi-rider fleet map with customer positions */}
+          {(riderLocations.length > 0 || customerLocations.length > 0) && (
             <div className="bg-card border border-border rounded-xl p-4 mb-4">
               <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                 <MapPin size={16} className="text-primary" /> Flotte en temps réel
               </h2>
               <DeliveryMap
-                markers={riderLocations.map((rl: any, i: number) => ({
-                  lat: rl.latitude,
-                  lng: rl.longitude,
-                  type: "rider" as const,
-                  label: `🚴 Livreur ${i + 1}${rl.delivery_id ? " (en livraison)" : ""}`,
-                  id: `rider-${rl.rider_id}`,
-                }))}
+                markers={[
+                  ...riderLocations.map((rl: any, i: number) => ({
+                    lat: rl.latitude,
+                    lng: rl.longitude,
+                    type: "rider" as const,
+                    label: `🚴 Livreur ${i + 1}${rl.delivery_id ? " (en livraison)" : ""}`,
+                    id: `rider-${rl.rider_id}`,
+                  })),
+                  ...customerLocations.map((cl: any, i: number) => ({
+                    lat: cl.latitude,
+                    lng: cl.longitude,
+                    type: "customer" as const,
+                    label: `📍 Client`,
+                    id: `customer-${cl.user_id}`,
+                  })),
+                ]}
+                showPolylines
                 fleetMode
-                className="h-[350px]"
+                className="h-[400px]"
               />
-              <div className="flex items-center gap-3 mt-2">
+              <div className="flex items-center gap-4 mt-2">
                 <div className="flex items-center gap-1.5">
                   <span className="w-3 h-3 rounded-full" style={{ background: "#1a5c2e" }} />
-                  <span className="text-[10px] text-muted-foreground">Livreur</span>
+                  <span className="text-[10px] text-muted-foreground">Livreur ({riderLocations.length})</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground">{riderLocations.length} livreur(s) en ligne</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full" style={{ background: "#dc2626" }} />
+                  <span className="text-[10px] text-muted-foreground">Client ({customerLocations.length})</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Active delivery tracking cards */}
+          {activeDeliveries.length > 0 && (
+            <div className="bg-card border border-border rounded-xl p-4 mb-4">
+              <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Bike size={16} className="text-primary" /> Livraisons en cours ({activeDeliveries.length})
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {activeDeliveries.map((d: any) => {
+                  const riderLoc = riderLocations.find((rl: any) => rl.rider_id === d.rider_id);
+                  const customerLoc = d.order_id ? customerLocations.find((cl: any) => cl.order_id === d.order_id) : null;
+                  return (
+                    <div key={d.id} className="border border-border rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold font-mono text-foreground">{d.order_ref || "Manuel"}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{d.status}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{d.customer_name} · {d.address}</p>
+                      <div className="flex items-center gap-2 text-[10px]">
+                        {riderLoc ? (
+                          <span className="flex items-center gap-1 text-primary"><span className="w-2 h-2 rounded-full bg-primary animate-pulse" /> GPS Livreur OK</span>
+                        ) : (
+                          <button onClick={() => sendGpsRequest.mutate({ userId: d.rider_id, type: "rider" })}
+                            className="flex items-center gap-1 text-destructive hover:underline">
+                            <MapPin size={10} /> Demander GPS livreur
+                          </button>
+                        )}
+                        {customerLoc ? (
+                          <span className="flex items-center gap-1 text-primary"><span className="w-2 h-2 rounded-full bg-primary animate-pulse" /> GPS Client OK</span>
+                        ) : d.order_id ? (
+                          <button onClick={async () => {
+                            // Get customer user_id from the order
+                            const { data: ord } = await supabase.from("orders").select("user_id").eq("id", d.order_id).single();
+                            if (ord) sendGpsRequest.mutate({ userId: ord.user_id, type: "customer" });
+                          }}
+                            className="flex items-center gap-1 text-destructive hover:underline">
+                            <MapPin size={10} /> Demander GPS client
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
