@@ -95,6 +95,26 @@ export function CheckoutShippingCalculator({
           };
         });
         setProducts(mapped);
+
+        // Calculate max prep days across cart products
+        const maxPrepMin = Math.max(...data.map((d: any) => d.prep_days_min ?? 2));
+        const maxPrepMax = Math.max(...data.map((d: any) => d.prep_days_max ?? 5));
+        setPrepDays({ min: maxPrepMin, max: maxPrepMax });
+
+        // Check if first product's store is local
+        const firstStoreId = data[0]?.store_id;
+        if (firstStoreId) {
+          supabase
+            .from("stores")
+            .select("shop_type, default_transit_days_min, default_transit_days_max")
+            .eq("id", firstStoreId)
+            .maybeSingle()
+            .then(({ data: store }) => {
+              if (store) {
+                setIsLocalStore((store as any).shop_type === "local");
+              }
+            });
+        }
       });
   }, [cartItems]);
 
