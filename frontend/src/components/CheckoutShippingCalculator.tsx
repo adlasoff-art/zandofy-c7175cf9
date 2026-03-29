@@ -8,10 +8,10 @@ import {
 } from "@/services/dynamic-shipping";
 
 const MODE_META = {
-  air:  { icon: Plane,     label: "Aérien",     unit: "kg" },
-  sea:  { icon: Ship,      label: "Maritime",   unit: "cbm" },
-  road: { icon: TruckIcon, label: "Routier",    unit: "kg" },
-  rail: { icon: Train,     label: "Ferroviaire",unit: "kg" },
+  air:  { icon: Plane,     label: "Aérien",     localLabel: "Aérien local",  unit: "kg" },
+  sea:  { icon: Ship,      label: "Maritime",   localLabel: "Maritime",      unit: "cbm" },
+  road: { icon: TruckIcon, label: "Routier",    localLabel: "Routier",       unit: "kg" },
+  rail: { icon: Train,     label: "Ferroviaire",localLabel: "Ferroviaire",   unit: "kg" },
 } as const;
 
 type TransportMode = keyof typeof MODE_META;
