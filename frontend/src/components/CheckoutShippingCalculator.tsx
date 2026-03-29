@@ -223,13 +223,25 @@ export function CheckoutShippingCalculator({
     
     setLoading(true);
 
-    // Determine available modes: road/rail only if all origins are same country or neighboring
+    // Determine available modes based on store type
     const destCountry = destCity.country_code;
-    const allLandFeasible = products.every(p => {
-      const oc = originCities.get(p.originCountry);
-      return oc && isLandTransportFeasible(oc.country_code, destCountry);
-    });
-    const modes: TransportMode[] = allLandFeasible ? ["air", "sea", "road", "rail"] : ["air", "sea"];
+    let modes: TransportMode[];
+    
+    if (isLocalStore) {
+      // Local stores: Air (inter-city), Road, Rail — NO Maritime
+      const allLandFeasible = products.every(p => {
+        const oc = originCities.get(p.originCountry);
+        return oc && isLandTransportFeasible(oc.country_code, destCountry);
+      });
+      modes = allLandFeasible ? ["air", "road", "rail"] : ["air"];
+    } else {
+      // International stores: Air + Sea (with threshold), Road/Rail only if neighboring
+      const allLandFeasible = products.every(p => {
+        const oc = originCities.get(p.originCountry);
+        return oc && isLandTransportFeasible(oc.country_code, destCountry);
+      });
+      modes = allLandFeasible ? ["air", "sea", "road", "rail"] : ["air", "sea"];
+    }
 
     const byOrigin = new Map<string, CartProductInfo[]>();
     products.forEach(p => {
