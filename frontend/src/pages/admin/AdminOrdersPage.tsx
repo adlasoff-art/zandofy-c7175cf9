@@ -474,6 +474,15 @@ export default function AdminOrdersPage() {
                 </div>
               );
             })}
+            </>;
+            })()}
+            <DataTablePagination
+              totalItems={filtered.length}
+              currentPage={adminOrderPage}
+              pageSize={adminOrderPageSize}
+              onPageChange={setAdminOrderPage}
+              onPageSizeChange={(s) => { setAdminOrderPageSize(s); setAdminOrderPage(1); }}
+            />
           </div>
         )}
       </div>
