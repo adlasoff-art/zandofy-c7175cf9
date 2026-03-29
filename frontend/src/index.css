@@ -197,6 +197,7 @@
   animation: marquee 20s linear infinite;
 }
 
+.skeleton-shimmer {
   background: linear-gradient(90deg, hsl(120 20% 92%) 25%, hsl(120 20% 96%) 50%, hsl(120 20% 92%) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
