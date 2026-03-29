@@ -20,6 +20,7 @@ import { useUnreadSupport } from "@/hooks/use-unread-support";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useI18n, LOCALES, CURRENCIES, type CurrencyCode } from "@/contexts/I18nContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useHeaderTheme } from "@/hooks/use-header-theme";
 
 // Mini error boundary to prevent Radix crashes from taking down the whole page
 class SafeRadix extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
@@ -49,6 +50,14 @@ const NAV_LINK_KEYS = [
   { label: "Enfants", href: "/category/kids", hasMega: false, highlight: false },
 ];
 
+interface TopBarConfig {
+  enabled: boolean;
+  mode: "static" | "slide" | "marquee";
+  bg_color: string;
+  text_color: string;
+  messages: { text_fr: string; text_en: string; visible: boolean }[];
+}
+
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -56,6 +65,7 @@ export function Header() {
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [expandedMobileCat, setExpandedMobileCat] = useState<string | null>(null);
+  const [slideIdx, setSlideIdx] = useState(0);
   const megaTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const userMenuRef = useRef<HTMLDivElement>(null);
   const { user, signOut } = useAuth();
@@ -66,11 +76,30 @@ export function Header() {
   const { count: wishlistCount } = useWishlist();
   const { t, locale, currency, setLocale, setCurrency } = useI18n();
   const { theme, setTheme } = useTheme();
-  const topBarMessages = [
-    t("topbar.freeShipping"),
-    t("topbar.freeReturns"),
-    t("topbar.noHiddenFees"),
-  ];
+  const headerTheme = useHeaderTheme();
+
+  // Top bar config from CMS
+  const { data: topBarConfig } = useQuery({
+    queryKey: ["topbar-config"],
+    queryFn: async () => {
+      const { data } = await supabase.from("platform_settings").select("value").eq("key", "topbar_config").maybeSingle();
+      return (data?.value || null) as unknown as TopBarConfig | null;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const topBarMessages = (() => {
+    if (!topBarConfig?.enabled) return [];
+    const msgs = (topBarConfig.messages || []).filter(m => m.visible);
+    return msgs.map(m => locale === "fr" ? m.text_fr : m.text_en).filter(Boolean);
+  })();
+
+  // Slide mode auto-rotate
+  useEffect(() => {
+    if (!topBarConfig || topBarConfig.mode !== "slide" || topBarMessages.length <= 1) return;
+    const interval = setInterval(() => setSlideIdx(prev => (prev + 1) % topBarMessages.length), 3500);
+    return () => clearInterval(interval);
+  }, [topBarConfig?.mode, topBarMessages.length]);
 
   // Dynamic category nav from CMS
   const { data: cmsNavItems } = useQuery({
@@ -136,20 +165,55 @@ export function Header() {
   const getCatLabel = (cat: { name: string; name_fr: string }) =>
     locale === "fr" ? cat.name_fr : cat.name;
 
+  const ht = headerTheme;
+  const headerBg = ht.bg_color || undefined;
+  const headerTextColor = ht.text_color || undefined;
+  const headerIconColor = ht.icon_color || undefined;
+  const badgeBg = ht.badge_bg_color || undefined;
+  const badgeText = ht.badge_text_color || undefined;
+  const navBg = ht.nav_bg_color || undefined;
+  const navText = ht.nav_text_color || undefined;
+  const navHighlight = ht.nav_highlight_color || undefined;
+
+  const topBarBg = topBarConfig?.bg_color || undefined;
+  const topBarText = topBarConfig?.text_color || undefined;
+  const topBarMode = topBarConfig?.mode || "static";
+
   return (
-    <header className="sticky top-0 z-50 bg-card" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-      {/* Green promo zone */}
-      <div className="bg-foreground md:bg-foreground text-card text-[11px] py-1.5 max-md:bg-primary max-md:text-primary-foreground" style={{ marginTop: "calc(-1 * env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="container flex items-center justify-center gap-8 overflow-hidden">
-          {topBarMessages.map((msg, i) => (
-            <span key={i} className="whitespace-nowrap hidden md:inline-flex items-center gap-1.5">
-              {msg}
-              {i < topBarMessages.length - 1 && <span className="mx-4 text-card/30">|</span>}
-            </span>
-          ))}
-          <span className="md:hidden text-center">{topBarMessages[0]}</span>
+    <header className="sticky top-0 z-50 bg-card" style={{ paddingTop: "env(safe-area-inset-top)", backgroundColor: headerBg }}>
+      {/* Top bar / promo zone */}
+      {topBarMessages.length > 0 && (
+        <div
+          className="text-[11px] py-1.5"
+          style={{
+            backgroundColor: topBarBg || "hsl(var(--foreground))",
+            color: topBarText || "hsl(var(--card))",
+            marginTop: "calc(-1 * env(safe-area-inset-top))",
+            paddingTop: "env(safe-area-inset-top)",
+          }}
+        >
+          <div className="container flex items-center justify-center gap-8 overflow-hidden">
+            {topBarMode === "marquee" ? (
+              <div className="whitespace-nowrap animate-marquee inline-flex gap-12">
+                {topBarMessages.map((msg, i) => <span key={i}>{msg}</span>)}
+                {topBarMessages.map((msg, i) => <span key={`d-${i}`}>{msg}</span>)}
+              </div>
+            ) : topBarMode === "slide" ? (
+              <span className="text-center transition-opacity duration-500">{topBarMessages[slideIdx % topBarMessages.length]}</span>
+            ) : (
+              <>
+                {topBarMessages.map((msg, i) => (
+                  <span key={i} className="whitespace-nowrap hidden md:inline-flex items-center gap-1.5">
+                    {msg}
+                    {i < topBarMessages.length - 1 && <span className="mx-4 opacity-30">|</span>}
+                  </span>
+                ))}
+                <span className="md:hidden text-center">{topBarMessages[0]}</span>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main header row */}
       <div className="border-b border-border">
@@ -270,7 +334,8 @@ export function Header() {
         </div>
       )}
 
-      <nav className="hidden lg:block border-b border-border bg-card relative"
+      <nav className="hidden lg:block border-b border-border relative"
+        style={{ backgroundColor: navBg || undefined }}
         onMouseLeave={handleMegaLeave}
       >
         <div className="container">
@@ -278,14 +343,19 @@ export function Header() {
             {navLinks.map((link, idx) => (
               <div
                 key={link.label + idx}
-                className={`relative ${link.hasMega ? "shrink-0 sticky left-0 z-10 bg-card" : ""}`}
+                className={`relative ${link.hasMega ? "shrink-0 sticky left-0 z-10" : ""}`}
+                style={link.hasMega ? { backgroundColor: navBg || undefined } : undefined}
                 onMouseEnter={link.hasMega ? handleMegaEnter : undefined}
               >
                 <Link
                   to={link.hasMega ? "#" : link.href}
                   className={`flex items-center gap-0.5 px-3 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors hover:text-primary border-b-2 border-transparent hover:border-primary ${
-                    link.highlight ? "text-sale font-bold" : "text-foreground"
-                  } ${link.hasMega ? "font-bold" : ""}`}
+                    link.hasMega ? "font-bold" : ""
+                  }`}
+                  style={{
+                    color: link.highlight ? (navHighlight || undefined) : (navText || undefined),
+                    fontWeight: link.highlight ? 700 : undefined,
+                  }}
                   onClick={link.hasMega ? (e) => e.preventDefault() : undefined}
                 >
                   {link.label}

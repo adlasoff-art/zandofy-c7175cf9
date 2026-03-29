@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
-  Image, Menu, FileText, LayoutDashboard, Palette, MapPin, FootprintsIcon, Languages, Scale, BookOpen, Briefcase, Stamp, TrendingUp,
+  Image, Menu, FileText, LayoutDashboard, Palette, MapPin, FootprintsIcon, Languages, Scale, BookOpen, Briefcase, Stamp, TrendingUp, Megaphone, PanelTop, PanelBottom,
 } from "lucide-react";
 import { HeroBannerEditor } from "@/components/admin/HeroBannerEditor";
 import { ColorPaletteEditor } from "@/components/admin/ColorPaletteEditor";
@@ -20,13 +20,19 @@ const BlogTab = lazy(() => import("@/components/admin/cms/BlogTab"));
 const JobPostingsTab = lazy(() => import("@/components/admin/cms/JobPostingsTab"));
 const BrandingTab = lazy(() => import("@/components/admin/cms/BrandingTab"));
 const TrendTagsTab = lazy(() => import("@/components/admin/cms/TrendTagsTabWrapper"));
+const TopBarEditor = lazy(() => import("@/components/admin/cms/TopBarEditor"));
+const HeaderThemeEditor = lazy(() => import("@/components/admin/cms/HeaderThemeEditor"));
+const FooterThemeEditor = lazy(() => import("@/components/admin/cms/FooterThemeEditor"));
 
-type Tab = "hero" | "banners" | "menus" | "pages" | "sections" | "trends" | "colors" | "branding" | "footer" | "texts" | "legal" | "blog" | "jobs";
+type Tab = "hero" | "banners" | "topbar" | "header_theme" | "footer_theme" | "menus" | "pages" | "sections" | "trends" | "colors" | "branding" | "footer" | "texts" | "legal" | "blog" | "jobs";
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "hero", label: "Hero Banner", icon: Image },
+  { key: "topbar", label: "Top Bar", icon: Megaphone },
   { key: "banners", label: "Bannières", icon: MapPin },
   { key: "branding", label: "Branding & Logo", icon: Stamp },
+  { key: "header_theme", label: "Thème Header", icon: PanelTop },
+  { key: "footer_theme", label: "Thème Footer", icon: PanelBottom },
   { key: "menus", label: "Menus", icon: Menu },
   { key: "pages", label: "Pages", icon: FileText },
   { key: "sections", label: "Sections", icon: LayoutDashboard },
@@ -71,6 +77,9 @@ const AdminCMSPage: React.FC = () => {
       {tab === "banners" && <PositionableBannersEditor />}
       {tab === "colors" && <ColorPaletteEditor />}
       <Suspense fallback={<FallbackLoader />}>
+        {tab === "topbar" && <TopBarEditor />}
+        {tab === "header_theme" && <HeaderThemeEditor />}
+        {tab === "footer_theme" && <FooterThemeEditor />}
         {tab === "branding" && <BrandingTab />}
         {tab === "menus" && <MenusTab />}
         {tab === "pages" && <PagesTab />}
