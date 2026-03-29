@@ -244,11 +244,11 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
     onError: (e: any) => toast.error(`Analyse IA échouée: ${e.message}`),
   });
 
-  // Impersonation
+  // Impersonation — open in new tab
   const impersonateMutation = useMutation({
     mutationFn: async () => {
       const res = await supabase.functions.invoke("impersonate-user", {
-        body: { action: "start_impersonation", targetUserId: user.id },
+        body: { action: "start", targetUserId: user.id },
       });
       if (res.error) throw new Error(res.error.message);
       if (res.data?.error) throw new Error(res.data.error);
@@ -256,20 +256,10 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["user-audit-logs", user.id] });
-      // Open impersonation panel with full data
-      startImpersonation({
-        id: data.target.id,
-        email: data.target.email,
-        first_name: data.target.first_name,
-        last_name: data.target.last_name,
-        roles: data.target.roles || [],
-        orders: data.orders || [],
-        stats: data.stats || { total_orders: 0, total_spent: 0, total_delivered: 0 },
-        addresses: data.addresses || [],
-        wallet: data.wallet || null,
-        payment_methods: data.payment_methods || [],
-      });
-      toast.success(`Mode impersonation activé pour ${data.target?.first_name || data.target?.email}`);
+      // Open new tab with impersonation token
+      const url = `${window.location.origin}/impersonate?token=${data.token}`;
+      window.open(url, "_blank");
+      toast.success(`Onglet d'impersonation ouvert pour ${data.targetName}`);
     },
     onError: (e: any) => toast.error(e.message),
   });
