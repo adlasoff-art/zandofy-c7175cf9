@@ -52,6 +52,9 @@ import { KycStatusBadge } from "@/components/kyc/KycStatusBadge";
 import { ShieldCheck } from "lucide-react";
 import { getColorDisplay } from "@/utils/colorName";
 import { withOptionalOrderFields } from "@/lib/order-query";
+import { useCertification } from "@/hooks/use-certification";
+import { CertificationBadge } from "@/components/CertificationBadge";
+import { Switch } from "@/components/ui/switch";
 
 const TABS = [
   { key: "overview", label: "Aperçu", icon: Package },
