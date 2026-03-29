@@ -132,7 +132,7 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
     const orderIds = data.map((o) => o.id);
     const [itemsRes, historyRes] = await Promise.all([
       orderIds.length > 0
-        ? supabase.from("order_items").select("id, order_id, product_name, product_image, price, quantity, color, size").in("order_id", orderIds) as any
+        ? supabase.from("order_items").select("id, order_id, product_id, product_name, product_image, price, quantity, color, size").in("order_id", orderIds) as any
         : Promise.resolve({ data: [] }),
       orderIds.length > 0
         ? supabase.from("order_status_history").select("order_id, status, created_at").in("order_id", orderIds).order("created_at", { ascending: true }) as any
