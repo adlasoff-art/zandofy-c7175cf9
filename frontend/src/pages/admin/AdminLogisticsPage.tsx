@@ -98,6 +98,53 @@ export default function AdminLogisticsPage() {
     refetchInterval: 10000,
   });
 
+  // Customer locations for map
+  const { data: customerLocations = [] } = useQuery({
+    queryKey: ["admin-customer-locations"],
+    queryFn: async () => {
+      const { data } = await supabase.from("customer_locations" as any).select("*");
+      return (data ?? []) as any[];
+    },
+    refetchInterval: 10000,
+  });
+
+  // Active deliveries with rider + order info for detailed tracking
+  const { data: activeDeliveries = [] } = useQuery({
+    queryKey: ["admin-active-deliveries"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("deliveries")
+        .select("id, rider_id, order_id, order_ref, customer_name, customer_phone, address, status, amount")
+        .in("status", ["pending", "in_progress"])
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return data ?? [];
+    },
+    refetchInterval: 15000,
+  });
+
+  // Send GPS activation notification
+  const sendGpsRequest = useMutation({
+    mutationFn: async ({ userId, type }: { userId: string; type: "rider" | "customer" }) => {
+      const title = type === "rider" ? "Activez votre GPS" : "Activez votre GPS";
+      const message = type === "rider"
+        ? "L'administrateur demande l'activation de votre GPS pour le suivi de livraison en temps réel. Ouvrez l'application et activez la géolocalisation."
+        : "Activez votre GPS pour permettre au livreur de vous localiser. Ouvrez votre page de suivi de commande.";
+      const link = type === "rider" ? "/rider" : "/tracking";
+
+      const { error } = await supabase.from("notifications").insert({
+        user_id: userId,
+        type: "delivery",
+        title,
+        message,
+        link,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => toast.success("Notification GPS envoyée !"),
+    onError: (e: any) => toast.error(e.message || "Erreur"),
+  });
+
   // Assign rider to order
   const [assignModal, setAssignModal] = useState<any>(null);
   const [assignForm, setAssignForm] = useState({ rider_id: "", amount: "0", notes: "" });
