@@ -8,10 +8,10 @@ import {
 } from "@/services/dynamic-shipping";
 
 const MODE_META = {
-  air:  { icon: Plane,     label: "Aérien",     unit: "kg" },
-  sea:  { icon: Ship,      label: "Maritime",   unit: "cbm" },
-  road: { icon: TruckIcon, label: "Routier",    unit: "kg" },
-  rail: { icon: Train,     label: "Ferroviaire",unit: "kg" },
+  air:  { icon: Plane,     label: "Aérien",     localLabel: "Aérien local",  unit: "kg" },
+  sea:  { icon: Ship,      label: "Maritime",   localLabel: "Maritime",      unit: "cbm" },
+  road: { icon: TruckIcon, label: "Routier",    localLabel: "Routier",       unit: "kg" },
+  rail: { icon: Train,     label: "Ferroviaire",localLabel: "Ferroviaire",   unit: "kg" },
 } as const;
 
 type TransportMode = keyof typeof MODE_META;
@@ -223,13 +223,25 @@ export function CheckoutShippingCalculator({
     
     setLoading(true);
 
-    // Determine available modes: road/rail only if all origins are same country or neighboring
+    // Determine available modes based on store type
     const destCountry = destCity.country_code;
-    const allLandFeasible = products.every(p => {
-      const oc = originCities.get(p.originCountry);
-      return oc && isLandTransportFeasible(oc.country_code, destCountry);
-    });
-    const modes: TransportMode[] = allLandFeasible ? ["air", "sea", "road", "rail"] : ["air", "sea"];
+    let modes: TransportMode[];
+    
+    if (isLocalStore) {
+      // Local stores: Air (inter-city), Road, Rail — NO Maritime
+      const allLandFeasible = products.every(p => {
+        const oc = originCities.get(p.originCountry);
+        return oc && isLandTransportFeasible(oc.country_code, destCountry);
+      });
+      modes = allLandFeasible ? ["air", "road", "rail"] : ["air"];
+    } else {
+      // International stores: Air + Sea (with threshold), Road/Rail only if neighboring
+      const allLandFeasible = products.every(p => {
+        const oc = originCities.get(p.originCountry);
+        return oc && isLandTransportFeasible(oc.country_code, destCountry);
+      });
+      modes = allLandFeasible ? ["air", "sea", "road", "rail"] : ["air", "sea"];
+    }
 
     const byOrigin = new Map<string, CartProductInfo[]>();
     products.forEach(p => {
@@ -415,7 +427,7 @@ export function CheckoutShippingCalculator({
               }`}
             >
               <Icon size={12} />
-              <span>{Meta.label}</span>
+              <span>{isLocalStore ? Meta.localLabel : Meta.label}</span>
               {(mode === "road" || mode === "rail") && destCity && (() => {
                 const allSameCountry = products.every(p => {
                   const oc = originCities.get(p.originCountry);

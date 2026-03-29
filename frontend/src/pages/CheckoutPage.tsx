@@ -60,6 +60,11 @@ interface CouponData {
 
 const FALLBACK_SHIPPING_COST = 5.99;
 
+function preciseRound(v: number, d: number): number {
+  const f = Math.pow(10, d);
+  return Math.round(v * f) / f;
+}
+
 type DeliveryOption = "none" | "home_delivery" | "hub_pickup";
 type LastMilePayment = "pay_with_shipping" | "pay_cash_on_delivery";
 
@@ -262,13 +267,11 @@ export default function CheckoutPage() {
 
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
-  // Calculate last-mile delivery fee (only if home delivery + pay_with_shipping)
-  const lastMileFee = dynamicShippingCost !== null && deliveryOption === "home_delivery" 
-    ? Math.max(dynamicShippingCost * 0.15, 2) // 15% of shipping as delivery fee, min $2
-    : 0;
-  const effectiveLastMile = (deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping") ? lastMileFee : 0;
+  // Last-mile fee removed from checkout — calculated at hub arrival stage
+  const lastMileFee = 0;
+  const effectiveLastMile = 0;
   
-  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping + effectiveLastMile);
+  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping);
 
   // Load saved addresses
   useEffect(() => {
@@ -478,7 +481,7 @@ export default function CheckoutPage() {
 
 
   const createOrderForPayment = async () => {
-    const mockOrderRef = `ZND-${Date.now().toString(36).toUpperCase()}`;
+    const baseRef = `ZND-${Date.now().toString(36).toUpperCase()}`;
 
     const productIds = [...new Set(items.map((i) => i.productId).filter(Boolean))];
     const { data: prods } = productIds.length > 0
@@ -495,14 +498,24 @@ export default function CheckoutPage() {
     });
 
     const createdOrderIds: string[] = [];
+    const storeEntries = [...storeGroups.entries()];
+    const needsSuffix = storeEntries.length > 1;
 
-    for (const [storeId, storeItems] of storeGroups) {
+    for (let idx = 0; idx < storeEntries.length; idx++) {
+      const [storeId, storeItems] = storeEntries[idx];
       const orderSubtotal = storeItems.reduce((s, i) => s + i.price * i.quantity, 0);
-      const orderShippingCost = shippingCost;
-      const orderLastMile = deliveryOption === "home_delivery" ? lastMileFee : 0;
+      
+      // Proportional shipping & discount distribution
+      const ratio = subtotal > 0 ? orderSubtotal / subtotal : 0;
+      const orderShippingCost = preciseRound(shippingCost * ratio, 2);
+      const orderDiscount = preciseRound(discountAmount * ratio, 2);
+      const orderPointsDiscount = preciseRound(pointsDiscount * ratio, 2);
+      
       const effectiveShip = shippingPaymentChoice === "pay_on_arrival" ? 0 : orderShippingCost;
-      const effectiveLM = (deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping") ? orderLastMile : 0;
-      const orderTotal = Math.max(0, orderSubtotal - discountAmount + effectiveShip + effectiveLM);
+      const orderTotal = Math.max(0, preciseRound(orderSubtotal - orderDiscount - orderPointsDiscount + effectiveShip, 2));
+      
+      // Unique order_ref per sub-order (suffix A, B, C...)
+      const orderRef = needsSuffix ? `${baseRef}-${String.fromCharCode(65 + idx)}` : baseRef;
 
       const { data: order, error: orderErr } = await supabase
         .from("orders")
@@ -522,16 +535,14 @@ export default function CheckoutPage() {
           subtotal: orderSubtotal,
           shipping_cost: orderShippingCost,
           total: orderTotal,
-          order_ref: mockOrderRef,
+          order_ref: orderRef,
           coupon_code: appliedCoupon?.code || null,
-          discount_amount: discountAmount,
+          discount_amount: orderDiscount,
           shipping_payment_status: shippingPaymentChoice === "pay_on_arrival" ? "deferred" : "paid",
-          delivery_choice: deliveryOption !== "none" ? (deliveryOption === "home_delivery" ? "home" : "hub") : null,
-          last_mile_fee: orderLastMile,
-          last_mile_payment_method: deliveryOption === "home_delivery" ? (lastMilePayment === "pay_cash_on_delivery" ? "cash" : "mobile_money") : null,
-          last_mile_payment_status: deliveryOption === "home_delivery" 
-            ? (lastMilePayment === "pay_with_shipping" ? "paid_online" : "pending")
-            : null,
+          delivery_choice: deliveryOption !== "none" ? deliveryOption : null,
+          last_mile_fee: 0,
+          last_mile_payment_method: null,
+          last_mile_payment_status: null,
         } as any)
         .select("id")
         .single();
@@ -553,7 +564,26 @@ export default function CheckoutPage() {
       }
     }
 
-    return { orderRef: mockOrderRef, orderIds: createdOrderIds };
+    // Deduct ZandoPoints if used
+    if (pointsDiscount > 0 && pointsToUse > 0) {
+      await (supabase.rpc as any)("deduct_points", { p_user_id: user!.id, p_amount: pointsToUse });
+    }
+
+    // Increment coupon uses
+    if (appliedCoupon) {
+      const couponTable = appliedCoupon.source === "store" ? "store_coupons" : "coupons";
+      // Find coupon ID by code
+      const { data: couponRow } = await (supabase as any)
+        .from(couponTable)
+        .select("id")
+        .eq("code", appliedCoupon.code)
+        .maybeSingle();
+      if (couponRow?.id) {
+        await (supabase.rpc as any)("increment_coupon_uses", { p_coupon_id: couponRow.id, p_table: couponTable });
+      }
+    }
+
+    return { orderRef: baseRef, orderIds: createdOrderIds };
   };
 
   const handlePayment = async () => {
@@ -928,39 +958,7 @@ export default function CheckoutPage() {
                       ))}
                     </div>
 
-                    {/* Last-mile payment option (only for home delivery) */}
-                    {deliveryOption === "home_delivery" && lastMileFee > 0 && (
-                      <div className="ml-4 mt-2 space-y-2 border-l-2 border-primary/30 pl-3">
-                        <p className="text-xs font-medium text-foreground">
-                          Frais de livraison à domicile : <strong className="text-primary">${lastMileFee.toFixed(2)}</strong>
-                        </p>
-                        {[
-                          { key: "pay_with_shipping" as LastMilePayment, label: "Payer maintenant", desc: "Inclure dans le total actuel" },
-                          { key: "pay_cash_on_delivery" as LastMilePayment, label: "Payer au livreur (cash)", desc: "Régler en espèces à la réception" },
-                        ].map(opt => (
-                          <button
-                            key={opt.key}
-                            type="button"
-                            onClick={() => setLastMilePayment(opt.key)}
-                            className={`w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left text-xs ${
-                              lastMilePayment === opt.key
-                                ? "border-primary bg-secondary"
-                                : "border-border hover:border-primary/50"
-                            }`}
-                          >
-                            <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                              lastMilePayment === opt.key ? "border-primary" : "border-border"
-                            }`}>
-                              {lastMilePayment === opt.key && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
-                            </div>
-                            <div>
-                              <p className="font-medium text-foreground">{opt.label}</p>
-                              <p className="text-[10px] text-muted-foreground">{opt.desc}</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {/* Last-mile choice deferred to hub arrival — no payment option at checkout */}
                   </div>
 
                   <Button type="submit" className="w-full h-12 font-bold mt-2">
@@ -995,7 +993,7 @@ export default function CheckoutPage() {
                     { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, M-Pesa, Airtel Money, AfriMoney", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
                     { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
                     { id: "off_platform" as const, label: "Paiement hors plateforme", sub: "Transfert direct, puis envoyez la preuve", icon: <Banknote size={20} />, configKey: "off_platform" as const },
-                  ]).filter(m => (m.id === "stripe" ? (paymentConfig?.stripe !== false || paymentConfig?.stripe_notice_enabled) : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).filter(m => m.id !== "off_platform" || vendorOffPlatformAllowed).map(method => (
+                  ]).filter(m => (m.id === "stripe" ? paymentConfig?.stripe === true : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).filter(m => m.id !== "off_platform" || vendorOffPlatformAllowed).map(method => (
                     <button
                       key={method.id}
                       disabled={method.id === "stripe" && paymentConfig?.stripe === false}
@@ -1444,16 +1442,7 @@ export default function CheckoutPage() {
                       </span>
                     )}
                   </div>
-                  {deliveryOption === "home_delivery" && lastMileFee > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Livraison domicile</span>
-                      {lastMilePayment === "pay_cash_on_delivery" ? (
-                        <span className="text-amber-600 font-medium text-xs">${lastMileFee.toFixed(2)} — cash</span>
-                      ) : (
-                        <span className="text-foreground">${lastMileFee.toFixed(2)}</span>
-                      )}
-                    </div>
-                  )}
+                  {/* Last-mile fee shown at hub arrival, not checkout */}
                   {deliveryOption === "hub_pickup" && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Livraison</span>
