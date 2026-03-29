@@ -105,6 +105,7 @@ export default function AdminVendorPricingPage() {
     vendor_off_platform_enabled: boolean;
     vendor_custom_payment_numbers_enabled: boolean;
     returns_enabled: boolean;
+    suppliers_enabled: boolean;
   }>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
