@@ -36,6 +36,8 @@ export interface Product {
   lengthCm?: number;
   widthCm?: number;
   heightCm?: number;
+  prepDaysMin?: number;
+  prepDaysMax?: number;
   trendTagId?: string;
   // Extended properties set by mapProduct
   storeIsVerified?: boolean;
