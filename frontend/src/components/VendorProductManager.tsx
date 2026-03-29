@@ -880,6 +880,15 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
               </div>
             </div>
           ))}
+          </>;
+          })()}
+          <DataTablePagination
+            totalItems={filteredProducts.length}
+            currentPage={productPage}
+            pageSize={productPageSize}
+            onPageChange={setProductPage}
+            onPageSizeChange={(s) => { setProductPageSize(s); setProductPage(1); }}
+          />
         </div>
       )}
     </div>
