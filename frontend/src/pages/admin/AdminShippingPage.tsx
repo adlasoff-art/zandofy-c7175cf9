@@ -1141,7 +1141,99 @@ const AdminShippingPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Last-Mile Delivery Zones */}
+      {/* Delivery Time Defaults */}
+      <div className="mt-8 border-t border-border pt-6">
+        <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+          <Package size={16} />
+          Délais de livraison par défaut
+        </h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          Configurer les délais par défaut pour les boutiques locales (en heures) et internationales (en jours).
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Local */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-semibold text-foreground">🏪 Boutiques locales (heures)</h4>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <Label className="text-[10px] text-muted-foreground">Min (heures)</Label>
+                <Input
+                  type="number"
+                  step="0.25"
+                  min={0}
+                  value={deliveryDefaults.local_hours_min}
+                  onChange={e => setDeliveryDefaults(d => ({ ...d, local_hours_min: Number(e.target.value) }))}
+                  onBlur={() => saveDeliveryDefaults(deliveryDefaults)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="flex-1">
+                <Label className="text-[10px] text-muted-foreground">Max (heures)</Label>
+                <Input
+                  type="number"
+                  step="0.25"
+                  min={0}
+                  value={deliveryDefaults.local_hours_max}
+                  onChange={e => setDeliveryDefaults(d => ({ ...d, local_hours_max: Number(e.target.value) }))}
+                  onBlur={() => saveDeliveryDefaults(deliveryDefaults)}
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+          </div>
+          {/* International */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-semibold text-foreground">✈️ Import international (jours)</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Préparation min</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={deliveryDefaults.intl_prep_min}
+                  onChange={e => setDeliveryDefaults(d => ({ ...d, intl_prep_min: Number(e.target.value) }))}
+                  onBlur={() => saveDeliveryDefaults(deliveryDefaults)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Préparation max</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={deliveryDefaults.intl_prep_max}
+                  onChange={e => setDeliveryDefaults(d => ({ ...d, intl_prep_max: Number(e.target.value) }))}
+                  onBlur={() => saveDeliveryDefaults(deliveryDefaults)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Transit min</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={deliveryDefaults.intl_transit_min}
+                  onChange={e => setDeliveryDefaults(d => ({ ...d, intl_transit_min: Number(e.target.value) }))}
+                  onBlur={() => saveDeliveryDefaults(deliveryDefaults)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Transit max</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={deliveryDefaults.intl_transit_max}
+                  onChange={e => setDeliveryDefaults(d => ({ ...d, intl_transit_max: Number(e.target.value) }))}
+                  onBlur={() => saveDeliveryDefaults(deliveryDefaults)}
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="mt-8 border-t border-border pt-6">
         <DeliveryZonesManager />
       </div>
