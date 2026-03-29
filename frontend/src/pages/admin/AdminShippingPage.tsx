@@ -1127,7 +1127,7 @@ const AdminShippingPage: React.FC = () => {
             <span className="text-foreground">Activer le seuil</span>
           </label>
           <div className="flex items-center gap-2">
-            <Label className="text-xs text-muted-foreground">Montant minimum ($)</Label>
+            <Label className="text-xs text-muted-foreground">Fret maritime minimum ($)</Label>
             <Input
               type="number"
               min={1}

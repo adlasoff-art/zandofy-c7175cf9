@@ -439,21 +439,14 @@ export function CheckoutShippingCalculator({
 
       {/* Sea mode threshold hint */}
       {isSeaBlocked && seaHasQuotes && seaThreshold && (() => {
-        const amountNeeded = preciseRound(seaThreshold.min_subtotal - cartSubtotal, 2);
-        // Find cheapest product in cart to suggest how many more units
-        const cheapest = products.length > 0
-          ? products.reduce((min, p) => {
-              // Estimate unit price from subtotal / total qty as approximation
-              return p;
-            }, products[0])
-          : null;
+        const freightGap = preciseRound(seaThreshold.min_subtotal - seaQuoteTotal, 2);
         return (
           <div className="flex items-start gap-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-2">
             <Ship size={12} className="shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium">🚢 Maritime indisponible — seuil non atteint</p>
+              <p className="font-medium">🚢 Maritime indisponible — seuil de fret non atteint</p>
               <p className="text-[10px] mt-0.5 text-amber-600 dark:text-amber-500">
-                Ajoutez ${amountNeeded.toFixed(2)} à votre panier (sous-total minimum : ${seaThreshold.min_subtotal}) pour débloquer l'expédition maritime.
+                Le fret maritime actuel est de ${seaQuoteTotal.toFixed(2)} — ajoutez du poids/volume (encore ${freightGap.toFixed(2)} de fret) pour atteindre le seuil de ${seaThreshold.min_subtotal} et débloquer ce mode.
               </p>
             </div>
           </div>
