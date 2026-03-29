@@ -655,6 +655,22 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
               ))}
             </select>
           </div>
+          <div>
+            <label className="text-xs text-muted-foreground">🏭 Fournisseur</label>
+            <select
+              className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md"
+              value={form.supplier_id}
+              onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
+            >
+              <option value="">— Aucun —</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>{s.agent_name}{s.platform_name ? ` (${s.platform_name})` : ""}</option>
+              ))}
+            </select>
+            {suppliers.length === 0 && (
+              <p className="text-[10px] text-muted-foreground mt-1">Ajoutez vos fournisseurs dans l'onglet "Fournisseurs"</p>
+            )}
+          </div>
           <div className="flex gap-4">
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.is_new || false} onChange={(e) => setForm({ ...form, is_new: e.target.checked })} />
