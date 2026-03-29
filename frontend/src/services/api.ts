@@ -119,6 +119,8 @@ export function mapProduct(row: any): Product {
     lengthCm: row.length_cm ? Number(row.length_cm) : undefined,
     widthCm: row.width_cm ? Number(row.width_cm) : undefined,
     heightCm: row.height_cm ? Number(row.height_cm) : undefined,
+    prepDaysMin: row.prep_days_min ?? 2,
+    prepDaysMax: row.prep_days_max ?? 5,
     trendTagId: row.trend_tag_id || undefined,
     storeIsVerified,
     galleryImages: row.product_images || [],
