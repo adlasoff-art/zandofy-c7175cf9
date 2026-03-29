@@ -879,9 +879,9 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
                 </button>
               </div>
             </div>
-          ))}
-          </>;
+          ))
           })()}
+          
           <DataTablePagination
             totalItems={filteredProducts.length}
             currentPage={productPage}
