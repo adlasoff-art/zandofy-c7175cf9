@@ -520,6 +520,14 @@ const AdminShippingPage: React.FC = () => {
     toast.success("Seuil maritime sauvegardé");
   };
 
+  const saveDeliveryDefaults = async (dd: typeof deliveryDefaults) => {
+    await supabase.from("platform_settings").upsert(
+      { key: "delivery_time_defaults", value: dd },
+      { onConflict: "key" }
+    );
+    toast.success("Délais par défaut sauvegardés");
+  };
+
   // Filtered routes
   const filteredRoutes = useMemo(() => {
     let result = routes;
