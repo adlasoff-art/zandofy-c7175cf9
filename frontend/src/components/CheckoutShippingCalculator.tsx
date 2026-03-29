@@ -77,7 +77,7 @@ export function CheckoutShippingCalculator({
     
     supabase
       .from("products")
-      .select("id, weight_grams, length_cm, width_cm, height_cm, origin_country, category_id")
+      .select("id, weight_grams, length_cm, width_cm, height_cm, origin_country, category_id, prep_days_min, prep_days_max, store_id" as any)
       .in("id", ids)
       .then(({ data }) => {
         if (!data) return;
