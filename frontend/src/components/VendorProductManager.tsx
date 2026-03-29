@@ -112,7 +112,7 @@ interface ProductDraftSnapshot {
 
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 
-export function VendorProductManager({ storeId }: { storeId: string }) {
+export function VendorProductManager({ storeId, suppliersEnabled = false }: { storeId: string; suppliersEnabled?: boolean }) {
   const { user } = useAuth();
   const { subscription, tierConfig, canAddProduct } = useVendorSubscription(storeId);
   const [products, setProducts] = useState<Product[]>([]);
