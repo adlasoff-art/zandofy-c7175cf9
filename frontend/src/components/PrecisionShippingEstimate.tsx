@@ -388,7 +388,20 @@ export function PrecisionShippingEstimate({
                     {q.transitMin && q.transitMax && (
                       <p className="text-[10px] text-muted-foreground">{q.transitMin}–{q.transitMax} jours</p>
                     )}
-                  </div>
+                    {q.transitMin != null && q.transitMax != null && (() => {
+                      const totalMin = prepDaysMin + q.transitMin;
+                      const totalMax = prepDaysMax + q.transitMax;
+                      const now = new Date();
+                      const dMin = new Date(now); dMin.setDate(dMin.getDate() + totalMin);
+                      const dMax = new Date(now); dMax.setDate(dMax.getDate() + totalMax);
+                      const fmt = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+                      return (
+                        <p className="text-[10px] text-primary font-medium flex items-center gap-1">
+                          <CalendarDays size={9} />
+                          {fmt(dMin)} – {fmt(dMax)}
+                        </p>
+                      );
+                    })()}
                 </div>
                 {/* Breakdown */}
                 <div className="px-3 pb-2 text-[10px] text-muted-foreground space-y-0.5">
