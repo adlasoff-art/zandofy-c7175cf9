@@ -83,7 +83,7 @@ export function Header() {
     queryKey: ["topbar-config"],
     queryFn: async () => {
       const { data } = await supabase.from("platform_settings").select("value").eq("key", "topbar_config").maybeSingle();
-      return (data?.value || null) as TopBarConfig | null;
+      return (data?.value || null) as unknown as TopBarConfig | null;
     },
     staleTime: 5 * 60 * 1000,
   });
