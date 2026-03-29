@@ -336,8 +336,8 @@ export default function VendorDashboardPage() {
 
   const renderTabContent = () => (
     <>
-      {activeTab === "catalogue" && <VendorProductManager storeId={store!.id} />}
-      {activeTab === "orders" && <VendorOrderManager storeId={store!.id} shopType={(store as any)?.shop_type} />}
+      {activeTab === "catalogue" && <VendorProductManager storeId={store!.id} suppliersEnabled={suppliersEnabled} />}
+      {activeTab === "orders" && <VendorOrderManager storeId={store!.id} shopType={(store as any)?.shop_type} suppliersEnabled={suppliersEnabled} />}
       {activeTab === "deliveries" && <VendorRiderTracking storeId={store!.id} />}
       {activeTab === "promos" && <VendorPromotionsTab storeId={store!.id} />}
       {activeTab === "coupons" && (
