@@ -7,9 +7,11 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   Loader2, AlertTriangle, Ban, ShieldCheck, Mail, ChevronRight, X,
-  ClipboardList, Activity, Brain, UserCheck, LogIn
+  ClipboardList, Activity, Brain, UserCheck, LogIn, Truck
 } from "lucide-react";
 import type { AppRole } from "@/hooks/use-roles";
+import { Switch } from "@/components/ui/switch";
+import { CertificationBadge } from "@/components/CertificationBadge";
 
 const ALL_ROLES: AppRole[] = ["admin", "manager", "vendor", "shipper", "rider"];
 
