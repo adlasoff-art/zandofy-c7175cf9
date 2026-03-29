@@ -165,20 +165,55 @@ export function Header() {
   const getCatLabel = (cat: { name: string; name_fr: string }) =>
     locale === "fr" ? cat.name_fr : cat.name;
 
+  const ht = headerTheme;
+  const headerBg = ht.bg_color || undefined;
+  const headerTextColor = ht.text_color || undefined;
+  const headerIconColor = ht.icon_color || undefined;
+  const badgeBg = ht.badge_bg_color || undefined;
+  const badgeText = ht.badge_text_color || undefined;
+  const navBg = ht.nav_bg_color || undefined;
+  const navText = ht.nav_text_color || undefined;
+  const navHighlight = ht.nav_highlight_color || undefined;
+
+  const topBarBg = topBarConfig?.bg_color || undefined;
+  const topBarText = topBarConfig?.text_color || undefined;
+  const topBarMode = topBarConfig?.mode || "static";
+
   return (
-    <header className="sticky top-0 z-50 bg-card" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-      {/* Green promo zone */}
-      <div className="bg-foreground md:bg-foreground text-card text-[11px] py-1.5 max-md:bg-primary max-md:text-primary-foreground" style={{ marginTop: "calc(-1 * env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="container flex items-center justify-center gap-8 overflow-hidden">
-          {topBarMessages.map((msg, i) => (
-            <span key={i} className="whitespace-nowrap hidden md:inline-flex items-center gap-1.5">
-              {msg}
-              {i < topBarMessages.length - 1 && <span className="mx-4 text-card/30">|</span>}
-            </span>
-          ))}
-          <span className="md:hidden text-center">{topBarMessages[0]}</span>
+    <header className="sticky top-0 z-50 bg-card" style={{ paddingTop: "env(safe-area-inset-top)", backgroundColor: headerBg }}>
+      {/* Top bar / promo zone */}
+      {topBarMessages.length > 0 && (
+        <div
+          className="text-[11px] py-1.5"
+          style={{
+            backgroundColor: topBarBg || "hsl(var(--foreground))",
+            color: topBarText || "hsl(var(--card))",
+            marginTop: "calc(-1 * env(safe-area-inset-top))",
+            paddingTop: "env(safe-area-inset-top)",
+          }}
+        >
+          <div className="container flex items-center justify-center gap-8 overflow-hidden">
+            {topBarMode === "marquee" ? (
+              <div className="whitespace-nowrap animate-marquee inline-flex gap-12">
+                {topBarMessages.map((msg, i) => <span key={i}>{msg}</span>)}
+                {topBarMessages.map((msg, i) => <span key={`d-${i}`}>{msg}</span>)}
+              </div>
+            ) : topBarMode === "slide" ? (
+              <span className="text-center transition-opacity duration-500">{topBarMessages[slideIdx % topBarMessages.length]}</span>
+            ) : (
+              <>
+                {topBarMessages.map((msg, i) => (
+                  <span key={i} className="whitespace-nowrap hidden md:inline-flex items-center gap-1.5">
+                    {msg}
+                    {i < topBarMessages.length - 1 && <span className="mx-4 opacity-30">|</span>}
+                  </span>
+                ))}
+                <span className="md:hidden text-center">{topBarMessages[0]}</span>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main header row */}
       <div className="border-b border-border">
