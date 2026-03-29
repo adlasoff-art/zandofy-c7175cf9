@@ -272,6 +272,8 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
 
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogStatusFilter, setCatalogStatusFilter] = useState<string>("all");
+  const [productPage, setProductPage] = useState(1);
+  const [productPageSize, setProductPageSize] = useState(25);
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
