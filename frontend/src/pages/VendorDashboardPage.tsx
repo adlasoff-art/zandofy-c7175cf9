@@ -354,6 +354,7 @@ export default function VendorDashboardPage() {
       {activeTab === "returns" && <VendorReturnsTab storeId={store!.id} />}
       {activeTab === "disputes" && <VendorDisputesTab storeId={store!.id} />}
       {activeTab === "featured" && <VendorFeaturedRequestTab storeId={store!.id} />}
+      {activeTab === "suppliers" && <VendorSuppliersTab storeId={store!.id} />}
       {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
       {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
       {activeTab === "messages" && (
