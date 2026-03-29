@@ -7,6 +7,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { CertificationBadge } from "@/components/CertificationBadge";
 import { FollowStoreButton } from "@/components/FollowStoreButton";
 import {
   Store, Users, Package, TrendingUp, Star,
