@@ -6,7 +6,8 @@ const ALLOWED_HEADERS =
 function getCorsHeaders(req: Request) {
   const siteBase = Deno.env.get("SITE_BASE_URL") || "*";
   const origin = req.headers.get("Origin") || "";
-  const allowed = siteBase === "*" || origin === siteBase;
+  const isLovablePreview = origin.includes(".lovableproject.com") || origin.includes(".lovable.app");
+  const allowed = siteBase === "*" || origin === siteBase || isLovablePreview;
   return {
     "Access-Control-Allow-Origin": allowed ? origin || "*" : siteBase,
     "Access-Control-Allow-Headers": ALLOWED_HEADERS,
