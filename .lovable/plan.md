@@ -1,43 +1,69 @@
 
 
-## Plan : Seuil minimum de commande pour le mode Maritime
+## Plan : Estimation de la date d'arrivée (délais préparation + transit)
 
-### Contexte du problème
+### Concept
 
-Actuellement, le mode maritime est proposé même pour des commandes très petites (1 pièce à $0.55 de fret), ce qui est commercialement absurde. Le maritime est pertinent uniquement pour des volumes/montants significatifs.
+Ajouter une estimation de date d'arrivée visible au checkout et sur la page produit, calculée ainsi :
 
-### Approche
+```text
+Date arrivée = Aujourd'hui + Délai préparation (vendeur) + Délai transit (route/mode)
+```
 
-Ajouter un **seuil minimum de sous-total panier** (configurable par l'admin, défaut : $29) en dessous duquel le bouton Maritime n'apparaît pas dans le sélecteur de mode au checkout. Le client voit un petit message explicatif s'il n'atteint pas le seuil.
+**Boutiques locales** : préparation fixe 0j, transit estimé 45min–2h (affiché en heures, pas en jours).
+**Boutiques internationales (import)** : préparation configurable par produit + transit de la route.
+
+### Migration SQL nécessaire
+
+```sql
+-- 1. Temps de préparation par produit (vendeur)
+ALTER TABLE public.products
+  ADD COLUMN IF NOT EXISTS prep_days_min integer DEFAULT 2,
+  ADD COLUMN IF NOT EXISTS prep_days_max integer DEFAULT 5;
+
+-- 2. Temps de transit par défaut au niveau boutique (fallback si pas de route)
+ALTER TABLE public.stores
+  ADD COLUMN IF NOT EXISTS default_transit_days_min integer DEFAULT 4,
+  ADD COLUMN IF NOT EXISTS default_transit_days_max integer DEFAULT 6;
+
+-- 3. Config globale admin pour la préparation par défaut (platform_settings)
+-- Clé: "delivery_time_defaults"
+-- Valeur: { "local_hours_min": 0.75, "local_hours_max": 2, "intl_prep_min": 2, "intl_prep_max": 5, "intl_transit_min": 4, "intl_transit_max": 6 }
+```
 
 ### Changements
 
-**1. Paramètre admin (`platform_settings`)**
+**1. `VendorProductManager.tsx`** — Champs préparation par produit
+- Ajouter `prep_days_min` et `prep_days_max` dans le formulaire produit (section "Logistique")
+- Label : "Délai de préparation fournisseur (jours)" — min/max
+- Sauvegardé sur le produit, utilisé au checkout
 
-Ajouter une clé `sea_mode_min_order` dans `platform_settings` (JSONB) avec valeur par défaut `{ "enabled": true, "min_subtotal": 29 }`. Pas de migration nécessaire — c'est un simple `INSERT ... ON CONFLICT DO NOTHING` dans le code ou via seed.
+**2. Vendor Dashboard Settings** — Transit par défaut de la boutique
+- Ajouter 2 champs `default_transit_days_min/max` dans les settings boutique
+- Label : "Temps de transit warehouse → destination (jours)"
+- Permet au vendeur de configurer le temps que son transitaire met
 
-**2. `AdminShippingPage.tsx`** — Section paramètres
+**3. Admin Shipping Page** — Paramètres globaux par défaut
+- Section "Délais par défaut" dans `AdminShippingPage.tsx`
+- Configuration des defaults locaux (en heures) et internationaux (en jours)
+- Sauvegardé dans `platform_settings` clé `delivery_time_defaults`
 
-Ajouter un bloc dans la page Shipping admin :
-- Toggle « Seuil minimum pour le Maritime »
-- Input numérique « Montant minimum ($) » (défaut 29)
-- Auto-save dans `platform_settings` clé `sea_mode_min_order`
+**4. `CheckoutShippingCalculator.tsx`** — Affichage date d'arrivée estimée
+- Lire `prep_days_min/max` des produits du panier (prendre le max du panier)
+- Lire `transit_min/max` de la route ou fallback sur `store.default_transit_days_min/max` ou fallback global
+- Calculer fourchette de dates : `today + max(prep) + transit`
+- Afficher sous le coût : "📦 Arrivée estimée : 15 avr – 22 avr 2026"
+- Pour boutiques locales : "🏪 Livraison estimée : 45min – 2h"
 
-**3. `CheckoutShippingCalculator.tsx`** — Filtrage du mode maritime
-
-- Recevoir le sous-total du panier via une nouvelle prop `cartSubtotal: number`
-- Charger le paramètre `sea_mode_min_order` depuis `platform_settings`
-- Dans le rendu des boutons de mode (ligne 304), si `mode === "sea"` et `cartSubtotal < min_subtotal`, ne pas afficher le bouton
-- Afficher un petit texte informatif sous les boutons : « 🚢 Maritime disponible à partir de $29 de commande » si le seuil n'est pas atteint mais que des quotes maritime existent
-
-**4. `CheckoutPage.tsx`** — Passer le sous-total
-
-- Calculer le sous-total du panier (déjà disponible dans la variable `subtotal`)
-- Passer `cartSubtotal={subtotal}` au composant `CheckoutShippingCalculator`
+**5. Page produit (`PrecisionShippingEstimate.tsx`)** — Aperçu délai
+- Afficher la fourchette de délai sous l'estimation de fret sur la fiche produit
 
 ### Détails techniques
 
-- Le paramètre est lu une seule fois au mount du composant via `supabase.from("platform_settings").select("value").eq("key", "sea_mode_min_order").maybeSingle()`
-- Si le paramètre n'existe pas ou `enabled === false`, aucun filtrage n'est appliqué (rétrocompatible)
-- Si l'utilisateur avait sélectionné `sea` et que le sous-total descend sous le seuil (ex: retrait d'un produit), le mode bascule automatiquement vers `air`
+- Les champs `prep_days_min/max` sur `products` sont `DEFAULT 2` et `DEFAULT 5` (valeurs sensées pour l'import Chine)
+- La formule finale au checkout :
+  - `date_min = today + max(prep_min des produits) + transit_min`
+  - `date_max = today + max(prep_max des produits) + transit_max`
+- Pour les boutiques locales (`shop_type = 'local'`), on ignore prep/transit jours et on affiche directement la fourchette heures depuis `platform_settings`
+- Le transit vient en priorité de : route shipping → store defaults → platform defaults
 
