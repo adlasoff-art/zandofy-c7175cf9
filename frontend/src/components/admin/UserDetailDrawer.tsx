@@ -535,6 +535,27 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
             )}
           </div>
 
+          {/* Certification Badge (Rider or Client) */}
+          {(user.roles.includes("rider") || user.roles.length === 0) && (
+            <div className="bg-muted/20 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CertificationBadge type={user.roles.includes("rider") ? "rider" : "client"} variant="full" />
+                </div>
+                <Switch
+                  checked={!!(certStatus as any)?.is_certified}
+                  onCheckedChange={(enabled) => toggleCertMutation.mutate(enabled)}
+                  disabled={toggleCertMutation.isPending}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {user.roles.includes("rider")
+                  ? "Activez le badge de livreur certifié. La vérification KYC de l'utilisateur doit être approuvée."
+                  : "Activez le badge de client certifié. La vérification KYC de l'utilisateur doit être approuvée."}
+              </p>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="space-y-2">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</h4>
