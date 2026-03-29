@@ -2708,6 +2708,8 @@ export type Database = {
           name_fr: string
           origin_country: string | null
           original_price: number | null
+          prep_days_max: number | null
+          prep_days_min: number | null
           price: number
           promo_end_date: string | null
           promo_start_date: string | null
@@ -2764,6 +2766,8 @@ export type Database = {
           name_fr: string
           origin_country?: string | null
           original_price?: number | null
+          prep_days_max?: number | null
+          prep_days_min?: number | null
           price: number
           promo_end_date?: string | null
           promo_start_date?: string | null
@@ -2820,6 +2824,8 @@ export type Database = {
           name_fr?: string
           origin_country?: string | null
           original_price?: number | null
+          prep_days_max?: number | null
+          prep_days_min?: number | null
           price?: number
           promo_end_date?: string | null
           promo_start_date?: string | null
@@ -3734,6 +3740,8 @@ export type Database = {
           chat_phone_allowed: boolean
           collaborators_enabled: boolean
           created_at: string
+          default_transit_days_max: number | null
+          default_transit_days_min: number | null
           description: string | null
           flash_timer_duration_hours: number | null
           flash_timer_enabled: boolean | null
@@ -3780,6 +3788,8 @@ export type Database = {
           chat_phone_allowed?: boolean
           collaborators_enabled?: boolean
           created_at?: string
+          default_transit_days_max?: number | null
+          default_transit_days_min?: number | null
           description?: string | null
           flash_timer_duration_hours?: number | null
           flash_timer_enabled?: boolean | null
@@ -3826,6 +3836,8 @@ export type Database = {
           chat_phone_allowed?: boolean
           collaborators_enabled?: boolean
           created_at?: string
+          default_transit_days_max?: number | null
+          default_transit_days_min?: number | null
           description?: string | null
           flash_timer_duration_hours?: number | null
           flash_timer_enabled?: boolean | null

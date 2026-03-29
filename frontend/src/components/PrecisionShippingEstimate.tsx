@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plane, Ship, TruckIcon, Train, Loader2, MapPin, Info, Lightbulb, Package, Ruler } from "lucide-react";
+import { Plane, Ship, TruckIcon, Train, Loader2, MapPin, Info, Lightbulb, Package, Ruler, CalendarDays } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,6 +25,8 @@ interface Props {
   productHeightCm?: number | null;
   originCountry?: string | null;
   quantity: number;
+  prepDaysMin?: number;
+  prepDaysMax?: number;
 }
 
 // ── High-precision math helpers ──
@@ -91,6 +93,8 @@ export function PrecisionShippingEstimate({
   productHeightCm,
   originCountry,
   quantity,
+  prepDaysMin = 2,
+  prepDaysMax = 5,
 }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<City[]>([]);
@@ -384,6 +388,20 @@ export function PrecisionShippingEstimate({
                     {q.transitMin && q.transitMax && (
                       <p className="text-[10px] text-muted-foreground">{q.transitMin}–{q.transitMax} jours</p>
                     )}
+                    {q.transitMin != null && q.transitMax != null && (() => {
+                      const totalMin = prepDaysMin + q.transitMin;
+                      const totalMax = prepDaysMax + q.transitMax;
+                      const now = new Date();
+                      const dMin = new Date(now); dMin.setDate(dMin.getDate() + totalMin);
+                      const dMax = new Date(now); dMax.setDate(dMax.getDate() + totalMax);
+                      const fmt = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+                      return (
+                        <p className="text-[10px] text-primary font-medium flex items-center gap-1">
+                          <CalendarDays size={9} />
+                          {fmt(dMin)} – {fmt(dMax)}
+                        </p>
+                      );
+                    })()}
                   </div>
                 </div>
                 {/* Breakdown */}

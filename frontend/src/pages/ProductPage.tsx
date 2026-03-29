@@ -689,6 +689,8 @@ export default function ProductPage() {
                   productHeightCm={product.heightCm}
                   originCountry={product.originCountry}
                   quantity={currentQty}
+                  prepDaysMin={product.prepDaysMin}
+                  prepDaysMax={product.prepDaysMax}
                 />
               </div>
 

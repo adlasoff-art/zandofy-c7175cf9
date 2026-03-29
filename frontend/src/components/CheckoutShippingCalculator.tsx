@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plane, Ship, TruckIcon, Train, Loader2, Info, Lightbulb, Package } from "lucide-react";
+import { Plane, Ship, TruckIcon, Train, Loader2, Info, Lightbulb, Package, CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { isLandTransportFeasible } from "@/utils/neighboring-countries";
 import {
@@ -62,6 +62,13 @@ export function CheckoutShippingCalculator({
   const [activeMode, setActiveMode] = useState<TransportMode>(selectedMode || "air");
   const [userHasSelected, setUserHasSelected] = useState(false);
   const [seaThreshold, setSeaThreshold] = useState<{ enabled: boolean; min_subtotal: number } | null>(null);
+  const [prepDays, setPrepDays] = useState<{ min: number; max: number }>({ min: 2, max: 5 });
+  const [deliveryDefaults, setDeliveryDefaults] = useState<{
+    local_hours_min: number; local_hours_max: number;
+    intl_prep_min: number; intl_prep_max: number;
+    intl_transit_min: number; intl_transit_max: number;
+  } | null>(null);
+  const [isLocalStore, setIsLocalStore] = useState(false);
 
   // 1. Fetch product details (weight, dimensions, origin, category) for cart items
   useEffect(() => {
@@ -70,12 +77,12 @@ export function CheckoutShippingCalculator({
     
     supabase
       .from("products")
-      .select("id, weight_grams, length_cm, width_cm, height_cm, origin_country, category_id")
+      .select("id, weight_grams, length_cm, width_cm, height_cm, origin_country, category_id, prep_days_min, prep_days_max, store_id" as any)
       .in("id", ids)
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         if (!data) return;
         const mapped = cartItems.map(item => {
-          const p = data.find((d: any) => d.id === item.productId);
+          const p = (data as any[]).find((d: any) => d.id === item.productId);
           return {
             productId: item.productId,
             quantity: item.quantity,
@@ -88,6 +95,26 @@ export function CheckoutShippingCalculator({
           };
         });
         setProducts(mapped);
+
+        // Calculate max prep days across cart products
+        const maxPrepMin = Math.max(...data.map((d: any) => d.prep_days_min ?? 2));
+        const maxPrepMax = Math.max(...data.map((d: any) => d.prep_days_max ?? 5));
+        setPrepDays({ min: maxPrepMin, max: maxPrepMax });
+
+        // Check if first product's store is local
+        const firstStoreId = data[0]?.store_id;
+        if (firstStoreId) {
+          supabase
+            .from("stores")
+            .select("shop_type, default_transit_days_min, default_transit_days_max")
+            .eq("id", firstStoreId)
+            .maybeSingle()
+            .then(({ data: store }) => {
+              if (store) {
+                setIsLocalStore((store as any).shop_type === "local");
+              }
+            });
+        }
       });
   }, [cartItems]);
 
@@ -104,6 +131,28 @@ export function CheckoutShippingCalculator({
           setSeaThreshold({
             enabled: v.enabled === true,
             min_subtotal: Number(v.min_subtotal) || 29,
+          });
+        }
+      });
+  }, []);
+
+  // 2b. Fetch delivery time defaults
+  useEffect(() => {
+    supabase
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "delivery_time_defaults")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value && typeof data.value === "object" && !Array.isArray(data.value)) {
+          const v = data.value as Record<string, unknown>;
+          setDeliveryDefaults({
+            local_hours_min: Number(v.local_hours_min) || 0.75,
+            local_hours_max: Number(v.local_hours_max) || 2,
+            intl_prep_min: Number(v.intl_prep_min) || 2,
+            intl_prep_max: Number(v.intl_prep_max) || 5,
+            intl_transit_min: Number(v.intl_transit_min) || 4,
+            intl_transit_max: Number(v.intl_transit_max) || 6,
           });
         }
       });
@@ -425,6 +474,37 @@ export function CheckoutShippingCalculator({
                 {details[0].route_type === "default" && " · Tarif indicatif"}
               </div>
             )}
+            {/* Estimated arrival date */}
+            {(() => {
+              if (isLocalStore && deliveryDefaults) {
+                const minH = deliveryDefaults.local_hours_min;
+                const maxH = deliveryDefaults.local_hours_max;
+                const fmtH = (h: number) => h < 1 ? `${Math.round(h * 60)}min` : `${h}h`;
+                return (
+                  <div className="flex items-center gap-1.5 text-[10px] text-primary font-medium pt-1 border-t border-border/50 mt-1">
+                    <CalendarDays size={11} className="shrink-0" />
+                    <span>🏪 Livraison estimée : {fmtH(minH)} – {fmtH(maxH)}</span>
+                  </div>
+                );
+              }
+              // International: prep + transit
+              const transitMin = data.transitMin ?? deliveryDefaults?.intl_transit_min ?? 4;
+              const transitMax = data.transitMax ?? deliveryDefaults?.intl_transit_max ?? 6;
+              const totalMin = prepDays.min + transitMin;
+              const totalMax = prepDays.max + transitMax;
+              const now = new Date();
+              const dateMin = new Date(now);
+              dateMin.setDate(dateMin.getDate() + totalMin);
+              const dateMax = new Date(now);
+              dateMax.setDate(dateMax.getDate() + totalMax);
+              const fmt = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+              return (
+                <div className="flex items-center gap-1.5 text-[10px] text-primary font-medium pt-1 border-t border-border/50 mt-1">
+                  <CalendarDays size={11} className="shrink-0" />
+                  <span>📦 Arrivée estimée : {fmt(dateMin)} – {fmt(dateMax)} {dateMax.getFullYear()}</span>
+                </div>
+              );
+            })()}
           </div>
         );
       })()}
