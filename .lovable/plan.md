@@ -1,69 +1,66 @@
 
 
-## Plan : Estimation de la date d'arrivée (délais préparation + transit)
+## Plan : Fonctionnalité Fournisseurs payante (toggle admin) + isolation des données
 
-### Concept
+### Contexte actuel
 
-Ajouter une estimation de date d'arrivée visible au checkout et sur la page produit, calculée ainsi :
+- Les commandes sont liées à une boutique (`store_id`), donc un vendeur ne voit **que ses propres commandes** — pas celles d'autres boutiques.
+- Le `SupplierPopover` lit le `supplier_id` du produit, puis charge le fournisseur. Puisque la RLS limite les fournisseurs au `vendor_id = auth.uid()`, un vendeur ne peut déjà pas voir les fournisseurs d'un autre vendeur. **L'isolation est déjà en place.**
+- L'admin gère les toggles par boutique dans `AdminVendorPricingPage.tsx` via `vendor_pricing_overrides`.
 
-```text
-Date arrivée = Aujourd'hui + Délai préparation (vendeur) + Délai transit (route/mode)
-```
+### Réponse à la question "commande multi-fournisseurs"
 
-**Boutiques locales** : préparation fixe 0j, transit estimé 45min–2h (affiché en heures, pas en jours).
-**Boutiques internationales (import)** : préparation configurable par produit + transit de la route.
+Une commande = une boutique = un vendeur. Si le panier contient des produits de 2 boutiques, le système crée 2 commandes séparées (une par `store_id`). Donc un vendeur ne voit jamais les produits/fournisseurs d'un autre vendeur dans "sa" commande. **Pas de split à implémenter.**
 
-### Migration SQL nécessaire
+Au sein d'une même commande (même boutique), un vendeur peut avoir 2 produits liés à 2 fournisseurs différents. Le `SupplierPopover` est déjà affiché **par produit**, donc chaque icône montre le bon fournisseur. Aucun changement nécessaire ici.
+
+---
+
+### Changements à implémenter
+
+#### 1. Migration SQL — Ajouter toggle `suppliers_enabled` sur `vendor_pricing_overrides`
 
 ```sql
--- 1. Temps de préparation par produit (vendeur)
-ALTER TABLE public.products
-  ADD COLUMN IF NOT EXISTS prep_days_min integer DEFAULT 2,
-  ADD COLUMN IF NOT EXISTS prep_days_max integer DEFAULT 5;
-
--- 2. Temps de transit par défaut au niveau boutique (fallback si pas de route)
-ALTER TABLE public.stores
-  ADD COLUMN IF NOT EXISTS default_transit_days_min integer DEFAULT 4,
-  ADD COLUMN IF NOT EXISTS default_transit_days_max integer DEFAULT 6;
-
--- 3. Config globale admin pour la préparation par défaut (platform_settings)
--- Clé: "delivery_time_defaults"
--- Valeur: { "local_hours_min": 0.75, "local_hours_max": 2, "intl_prep_min": 2, "intl_prep_max": 5, "intl_transit_min": 4, "intl_transit_max": 6 }
+ALTER TABLE public.vendor_pricing_overrides
+  ADD COLUMN IF NOT EXISTS suppliers_enabled BOOLEAN NOT NULL DEFAULT false;
 ```
 
-### Changements
+#### 2. Admin — Toggle dans `AdminVendorPricingPage.tsx`
 
-**1. `VendorProductManager.tsx`** — Champs préparation par produit
-- Ajouter `prep_days_min` et `prep_days_max` dans le formulaire produit (section "Logistique")
-- Label : "Délai de préparation fournisseur (jours)" — min/max
-- Sauvegardé sur le produit, utilisé au checkout
+- Ajouter `suppliers_enabled` dans l'état `edits`, le `getEdit`, et le `handleSave`
+- Ajouter un bloc Switch comme les autres toggles existants :
+  - Label : **"Gestion des fournisseurs"**
+  - Description : *"Fonctionnalité payante : permet au vendeur de gérer ses fournisseurs et de les lier à ses produits."*
 
-**2. Vendor Dashboard Settings** — Transit par défaut de la boutique
-- Ajouter 2 champs `default_transit_days_min/max` dans les settings boutique
-- Label : "Temps de transit warehouse → destination (jours)"
-- Permet au vendeur de configurer le temps que son transitaire met
+#### 3. Vendor Dashboard — Conditionner l'onglet "Fournisseurs"
 
-**3. Admin Shipping Page** — Paramètres globaux par défaut
-- Section "Délais par défaut" dans `AdminShippingPage.tsx`
-- Configuration des defaults locaux (en heures) et internationaux (en jours)
-- Sauvegardé dans `platform_settings` clé `delivery_time_defaults`
+- Dans `VendorDashboardPage.tsx`, charger `suppliers_enabled` depuis `vendor_pricing_overrides` pour le store courant
+- Conditionner l'affichage du tab "Fournisseurs" dans le sidebar : `...(suppliersEnabled ? [{ key: "suppliers", ... }] : [])`
 
-**4. `CheckoutShippingCalculator.tsx`** — Affichage date d'arrivée estimée
-- Lire `prep_days_min/max` des produits du panier (prendre le max du panier)
-- Lire `transit_min/max` de la route ou fallback sur `store.default_transit_days_min/max` ou fallback global
-- Calculer fourchette de dates : `today + max(prep) + transit`
-- Afficher sous le coût : "📦 Arrivée estimée : 15 avr – 22 avr 2026"
-- Pour boutiques locales : "🏪 Livraison estimée : 45min – 2h"
+#### 4. Product Form — Conditionner le champ fournisseur
 
-**5. Page produit (`PrecisionShippingEstimate.tsx`)** — Aperçu délai
-- Afficher la fourchette de délai sous l'estimation de fret sur la fiche produit
+- Dans `VendorProductManager.tsx`, passer un prop `suppliersEnabled` et masquer le select fournisseur quand `false`
 
-### Détails techniques
+#### 5. Order View — Conditionner l'icône fournisseur
 
-- Les champs `prep_days_min/max` sur `products` sont `DEFAULT 2` et `DEFAULT 5` (valeurs sensées pour l'import Chine)
-- La formule finale au checkout :
-  - `date_min = today + max(prep_min des produits) + transit_min`
-  - `date_max = today + max(prep_max des produits) + transit_max`
-- Pour les boutiques locales (`shop_type = 'local'`), on ignore prep/transit jours et on affiche directement la fourchette heures depuis `platform_settings`
-- Le transit vient en priorité de : route shipping → store defaults → platform defaults
+- Dans `VendorOrderManager.tsx`, passer `suppliersEnabled` et ne rendre le `<SupplierPopover>` que si activé
+
+---
+
+### SQL à exécuter manuellement (Supabase.com)
+
+```sql
+ALTER TABLE public.vendor_pricing_overrides
+  ADD COLUMN IF NOT EXISTS suppliers_enabled BOOLEAN NOT NULL DEFAULT false;
+```
+
+### Fichiers modifiés
+
+| Fichier | Modification |
+|---|---|
+| `AdminVendorPricingPage.tsx` | Nouveau toggle "Gestion des fournisseurs" |
+| `VendorDashboardPage.tsx` | Charger `suppliers_enabled`, conditionner tab + passer prop |
+| `VendorProductManager.tsx` | Cacher champ fournisseur si non activé |
+| `VendorOrderManager.tsx` | Cacher icône fournisseur si non activé |
+| Migration SQL | `suppliers_enabled` sur `vendor_pricing_overrides` |
 
