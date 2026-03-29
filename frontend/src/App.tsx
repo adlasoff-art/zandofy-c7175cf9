@@ -145,6 +145,7 @@ const App = () => (
             <CmsThemeInjector />
             <AnalyticsTrackerInjector />
             <DynamicFavicon />
+            <UserPresenceTracker />
             <Toaster />
             <Sonner />
             <NotificationListener />
