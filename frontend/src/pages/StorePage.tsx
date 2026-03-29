@@ -321,6 +321,9 @@ export default function StorePage() {
                       {store.is_verified && (
                         <VerificationBadge variant="icon-only" verifiedYears={store.verified_years} />
                       )}
+                      {(store as any).is_certified && (
+                        <CertificationBadge type="vendor" variant="icon-only" />
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {store.is_online ? (
