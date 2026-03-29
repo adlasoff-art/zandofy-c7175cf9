@@ -402,6 +402,7 @@ export function PrecisionShippingEstimate({
                         </p>
                       );
                     })()}
+                  </div>
                 </div>
                 {/* Breakdown */}
                 <div className="px-3 pb-2 text-[10px] text-muted-foreground space-y-0.5">
