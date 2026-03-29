@@ -530,7 +530,12 @@ export default function ProductPage() {
 
             {/* Zandofy Verified badge — only if store is verified */}
             {(product as any).store?.is_verified && (product as any).store?.verified_years > 0 && (
-              <VerificationBadge variant="full" verifiedYears={(product as any).store?.verified_years_override ?? (product as any).store?.verified_years} />
+              <div className="flex items-center gap-2">
+                <VerificationBadge variant="full" verifiedYears={(product as any).store?.verified_years_override ?? (product as any).store?.verified_years} />
+                {(product as any).store?.is_certified && (
+                  <CertificationBadge type="vendor" variant="icon-only" />
+                )}
+              </div>
             )}
 
             {/* ═══ TIERED PRICING TABLE ═══ */}
