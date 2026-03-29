@@ -439,6 +439,10 @@ const AdminShippingPage: React.FC = () => {
   const [search, setSearch] = useState("");
   const [modeFilter, setModeFilter] = useState("all");
 
+  // Sea mode threshold
+  const [seaEnabled, setSeaEnabled] = useState(true);
+  const [seaMinSubtotal, setSeaMinSubtotal] = useState(29);
+
   // Dialogs
   const [zoneDialog, setZoneDialog] = useState<{ open: boolean; zone: Partial<ShippingZone> | null }>({ open: false, zone: null });
   const [routeDialog, setRouteDialog] = useState<{ open: boolean; route: Partial<ShippingRoute> | null }>({ open: false, route: null });
@@ -461,10 +465,32 @@ const AdminShippingPage: React.FC = () => {
       fetchCategorySurcharges(), fetchCategories(),
     ]);
     setZones(z); setRoutes(r); setDefaults(d); setSurcharges(s); setCategories(c);
+
+    // Load sea threshold setting
+    const { data: seaSetting } = await supabase
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "sea_mode_min_order")
+      .maybeSingle();
+    if (seaSetting?.value && typeof seaSetting.value === "object" && !Array.isArray(seaSetting.value)) {
+      const v = seaSetting.value as Record<string, unknown>;
+      setSeaEnabled(v.enabled === true);
+      setSeaMinSubtotal(Number(v.min_subtotal) || 29);
+    }
+
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+
+  const saveSeaThreshold = async (enabled: boolean, minSubtotal: number) => {
+    const value = { enabled, min_subtotal: minSubtotal };
+    await supabase.from("platform_settings").upsert(
+      { key: "sea_mode_min_order", value },
+      { onConflict: "key" }
+    );
+    toast.success("Seuil maritime sauvegardé");
+  };
 
   // Filtered routes
   const filteredRoutes = useMemo(() => {
@@ -1039,6 +1065,43 @@ const AdminShippingPage: React.FC = () => {
         {/* Calculator Sidebar */}
         <div className="w-full lg:w-80 shrink-0">
           <QuoteCalculator zones={zones} routes={routes} defaults={defaults} />
+        </div>
+      </div>
+
+      {/* Sea Mode Threshold */}
+      <div className="mt-8 border-t border-border pt-6">
+        <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+          <Ship size={16} />
+          Seuil minimum Maritime
+        </h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Définir un montant minimum de commande pour activer le mode maritime au checkout.
+        </p>
+        <div className="flex items-center gap-4 flex-wrap">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={seaEnabled}
+              onChange={e => {
+                setSeaEnabled(e.target.checked);
+                saveSeaThreshold(e.target.checked, seaMinSubtotal);
+              }}
+              className="rounded border-input"
+            />
+            <span className="text-foreground">Activer le seuil</span>
+          </label>
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground">Montant minimum ($)</Label>
+            <Input
+              type="number"
+              min={1}
+              value={seaMinSubtotal}
+              onChange={e => setSeaMinSubtotal(Number(e.target.value))}
+              onBlur={() => saveSeaThreshold(seaEnabled, seaMinSubtotal)}
+              className="w-24 h-8 text-sm"
+              disabled={!seaEnabled}
+            />
+          </div>
         </div>
       </div>
 

@@ -36,6 +36,7 @@ interface CategorySurchargeInfo {
 interface Props {
   shippingCity: string;
   cartItems: Array<{ productId: string; quantity: number }>;
+  cartSubtotal?: number;
   selectedMode?: TransportMode;
   onShippingCostChange: (cost: number, mode: string) => void;
 }
@@ -48,6 +49,7 @@ function preciseRound(v: number, d: number): number {
 export function CheckoutShippingCalculator({
   shippingCity,
   cartItems,
+  cartSubtotal = 0,
   selectedMode,
   onShippingCostChange,
 }: Props) {
@@ -59,6 +61,7 @@ export function CheckoutShippingCalculator({
   const [loading, setLoading] = useState(false);
   const [activeMode, setActiveMode] = useState<TransportMode>(selectedMode || "air");
   const [userHasSelected, setUserHasSelected] = useState(false);
+  const [seaThreshold, setSeaThreshold] = useState<{ enabled: boolean; min_subtotal: number } | null>(null);
 
   // 1. Fetch product details (weight, dimensions, origin, category) for cart items
   useEffect(() => {
@@ -88,7 +91,25 @@ export function CheckoutShippingCalculator({
       });
   }, [cartItems]);
 
-  // 2. Fetch active category surcharges
+  // 2. Fetch sea mode threshold setting
+  useEffect(() => {
+    supabase
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "sea_mode_min_order")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value && typeof data.value === "object" && !Array.isArray(data.value)) {
+          const v = data.value as Record<string, unknown>;
+          setSeaThreshold({
+            enabled: v.enabled === true,
+            min_subtotal: Number(v.min_subtotal) || 29,
+          });
+        }
+      });
+  }, []);
+
+  // 3. Fetch active category surcharges
   useEffect(() => {
     supabase
       .from("category_surcharges")
@@ -238,6 +259,17 @@ export function CheckoutShippingCalculator({
     return totals;
   }, [quotes, products, surcharges]);
 
+  // Check if sea mode is blocked by threshold
+  const isSeaBlocked = seaThreshold?.enabled === true && cartSubtotal < seaThreshold.min_subtotal;
+  const seaHasQuotes = modeTotals.has("sea") && (modeTotals.get("sea")?.total ?? 0) > 0;
+
+  // Auto-fallback: if user had sea selected but it's now blocked, switch to air
+  useEffect(() => {
+    if (isSeaBlocked && activeMode === "sea") {
+      setActiveMode("air");
+    }
+  }, [isSeaBlocked, activeMode]);
+
   // Notify parent of shipping cost changes
   useEffect(() => {
     const selected = modeTotals.get(activeMode);
@@ -304,6 +336,8 @@ export function CheckoutShippingCalculator({
         {(["air", "sea", "road", "rail"] as TransportMode[]).map(mode => {
           const data = modeTotals.get(mode);
           if (!data || data.total <= 0) return null;
+          // Hide sea mode if blocked by threshold
+          if (mode === "sea" && isSeaBlocked) return null;
           const Meta = MODE_META[mode];
           const Icon = Meta.icon;
           const isActive = activeMode === mode;
@@ -340,6 +374,14 @@ export function CheckoutShippingCalculator({
           );
         })}
       </div>
+
+      {/* Sea mode threshold hint */}
+      {isSeaBlocked && seaHasQuotes && seaThreshold && (
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground bg-muted/40 rounded-md px-2.5 py-1.5">
+          <Ship size={11} className="shrink-0" />
+          <span>🚢 Maritime disponible à partir de ${seaThreshold.min_subtotal} de commande</span>
+        </div>
+      )}
 
       {/* Selected mode details */}
       {(() => {

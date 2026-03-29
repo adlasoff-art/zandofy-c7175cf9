@@ -1361,6 +1361,7 @@ export default function CheckoutPage() {
                   <CheckoutShippingCalculator
                     shippingCity={shipping.city}
                     cartItems={items.map(i => ({ productId: i.productId, quantity: i.quantity }))}
+                    cartSubtotal={subtotal}
                     onShippingCostChange={handleShippingCostChange}
                   />
                 </div>
