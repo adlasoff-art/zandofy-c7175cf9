@@ -201,6 +201,7 @@ export default function AdminVendorPricingPage() {
       vendor_off_platform_enabled: (o as any)?.vendor_off_platform_enabled ?? false,
       vendor_custom_payment_numbers_enabled: (o as any)?.vendor_custom_payment_numbers_enabled ?? false,
       returns_enabled: (store as any).returns_enabled ?? false,
+      suppliers_enabled: (o as any)?.suppliers_enabled ?? false,
     };
   };
 
