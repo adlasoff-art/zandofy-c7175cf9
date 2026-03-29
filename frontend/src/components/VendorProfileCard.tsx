@@ -3,6 +3,7 @@ import { MessageCircle, ExternalLink, MapPin, Store, ChevronDown, Globe } from "
 import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { Button } from "@/components/ui/button";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { CertificationBadge } from "@/components/CertificationBadge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { InternalChat } from "@/components/InternalChat";
 import { motion, AnimatePresence } from "framer-motion";
