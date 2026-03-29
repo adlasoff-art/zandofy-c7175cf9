@@ -1111,7 +1111,7 @@ const AdminShippingPage: React.FC = () => {
           Seuil minimum Maritime
         </h3>
         <p className="text-xs text-muted-foreground mb-3">
-          Définir un montant minimum de commande pour activer le mode maritime au checkout.
+          Montant minimum de fret maritime calculé (poids × volume × quantité) pour activer le mode maritime au checkout. Ce n'est pas le sous-total panier mais le coût de fret maritime lui-même qui doit atteindre ce seuil.
         </p>
         <div className="flex items-center gap-4 flex-wrap">
           <label className="flex items-center gap-2 text-sm">
@@ -1127,7 +1127,7 @@ const AdminShippingPage: React.FC = () => {
             <span className="text-foreground">Activer le seuil</span>
           </label>
           <div className="flex items-center gap-2">
-            <Label className="text-xs text-muted-foreground">Montant minimum ($)</Label>
+            <Label className="text-xs text-muted-foreground">Fret maritime minimum ($)</Label>
             <Input
               type="number"
               min={1}

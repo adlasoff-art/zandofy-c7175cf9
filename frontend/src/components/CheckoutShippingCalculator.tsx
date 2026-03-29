@@ -211,9 +211,15 @@ export function CheckoutShippingCalculator({
     });
   }, [products]);
 
-  // 5. Calculate quotes with surcharges
+  // 5. Calculate quotes with surcharges — only when all data is ready
+  const dataReady = useMemo(() => {
+    if (!destCity || products.length === 0 || originCities.size === 0) return false;
+    const neededCountries = [...new Set(products.map(p => p.originCountry))];
+    return neededCountries.every(cc => originCities.has(cc));
+  }, [destCity, products, originCities]);
+
   useEffect(() => {
-    if (!destCity || products.length === 0 || originCities.size === 0) return;
+    if (!dataReady || !destCity) return;
     
     setLoading(true);
 
@@ -275,7 +281,7 @@ export function CheckoutShippingCalculator({
       }
       setLoading(false);
     });
-  }, [destCity, products, originCities, selectedMode]);
+  }, [dataReady, selectedMode]);
 
   // Compute aggregated totals per mode WITH surcharges
   const modeTotals = useMemo(() => {
@@ -308,9 +314,10 @@ export function CheckoutShippingCalculator({
     return totals;
   }, [quotes, products, surcharges]);
 
-  // Check if sea mode is blocked by threshold
-  const isSeaBlocked = seaThreshold?.enabled === true && cartSubtotal < seaThreshold.min_subtotal;
-  const seaHasQuotes = modeTotals.has("sea") && (modeTotals.get("sea")?.total ?? 0) > 0;
+  // Check if sea mode is blocked by threshold — compare against calculated sea FREIGHT cost
+  const seaQuoteTotal = modeTotals.get("sea")?.total ?? 0;
+  const isSeaBlocked = seaThreshold?.enabled === true && seaQuoteTotal < seaThreshold.min_subtotal;
+  const seaHasQuotes = modeTotals.has("sea") && seaQuoteTotal > 0;
 
   // Auto-fallback: if user had sea selected but it's now blocked, switch to air
   useEffect(() => {
@@ -432,21 +439,14 @@ export function CheckoutShippingCalculator({
 
       {/* Sea mode threshold hint */}
       {isSeaBlocked && seaHasQuotes && seaThreshold && (() => {
-        const amountNeeded = preciseRound(seaThreshold.min_subtotal - cartSubtotal, 2);
-        // Find cheapest product in cart to suggest how many more units
-        const cheapest = products.length > 0
-          ? products.reduce((min, p) => {
-              // Estimate unit price from subtotal / total qty as approximation
-              return p;
-            }, products[0])
-          : null;
+        const freightGap = preciseRound(seaThreshold.min_subtotal - seaQuoteTotal, 2);
         return (
           <div className="flex items-start gap-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-2">
             <Ship size={12} className="shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium">🚢 Maritime indisponible — seuil non atteint</p>
+              <p className="font-medium">🚢 Maritime indisponible — seuil de fret non atteint</p>
               <p className="text-[10px] mt-0.5 text-amber-600 dark:text-amber-500">
-                Ajoutez ${amountNeeded.toFixed(2)} à votre panier (sous-total minimum : ${seaThreshold.min_subtotal}) pour débloquer l'expédition maritime.
+                Le fret maritime actuel est de ${seaQuoteTotal.toFixed(2)} — ajoutez du poids/volume (encore ${freightGap.toFixed(2)} de fret) pour atteindre le seuil de ${seaThreshold.min_subtotal} et débloquer ce mode.
               </p>
             </div>
           </div>
