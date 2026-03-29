@@ -46,7 +46,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
     },
   });
 
-  // Fetch reviews with profiles join
+  // Fetch reviews with profiles join (show all reviews, not just approved)
   const { data: reviews, isLoading } = useQuery({
     queryKey: ["reviews", productId],
     queryFn: async () => {
@@ -54,7 +54,6 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
         .from("reviews")
         .select("*")
         .eq("product_id", productId)
-        .eq("is_approved", true)
         .order("created_at", { ascending: false });
       if (error) throw error;
 
