@@ -309,7 +309,12 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
             {orders.length === 0 ? "Aucune commande reçue pour le moment." : "Aucune commande ne correspond aux filtres."}
           </p>
         </div>
-      ) : filteredOrders.map((order) => {
+      ) : (() => {
+        const orderPageSize = 25;
+        const orderPage = Math.max(1, Math.min(currentOrderPage, Math.ceil(filteredOrders.length / orderPageSize)));
+        const paginatedOrders = filteredOrders.slice((orderPage - 1) * orderPageSize, orderPage * orderPageSize);
+        return (<>
+        {paginatedOrders.map((order) => {
         const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
         const StatusIcon = config.icon;
         const next = getNextStatus(order.status, shopType);
