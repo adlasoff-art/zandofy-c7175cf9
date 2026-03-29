@@ -334,7 +334,8 @@ export function Header() {
         </div>
       )}
 
-      <nav className="hidden lg:block border-b border-border bg-card relative"
+      <nav className="hidden lg:block border-b border-border relative"
+        style={{ backgroundColor: navBg || undefined }}
         onMouseLeave={handleMegaLeave}
       >
         <div className="container">
@@ -342,14 +343,19 @@ export function Header() {
             {navLinks.map((link, idx) => (
               <div
                 key={link.label + idx}
-                className={`relative ${link.hasMega ? "shrink-0 sticky left-0 z-10 bg-card" : ""}`}
+                className={`relative ${link.hasMega ? "shrink-0 sticky left-0 z-10" : ""}`}
+                style={link.hasMega ? { backgroundColor: navBg || undefined } : undefined}
                 onMouseEnter={link.hasMega ? handleMegaEnter : undefined}
               >
                 <Link
                   to={link.hasMega ? "#" : link.href}
                   className={`flex items-center gap-0.5 px-3 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors hover:text-primary border-b-2 border-transparent hover:border-primary ${
-                    link.highlight ? "text-sale font-bold" : "text-foreground"
-                  } ${link.hasMega ? "font-bold" : ""}`}
+                    link.hasMega ? "font-bold" : ""
+                  }`}
+                  style={{
+                    color: link.highlight ? (navHighlight || undefined) : (navText || undefined),
+                    fontWeight: link.highlight ? 700 : undefined,
+                  }}
                   onClick={link.hasMega ? (e) => e.preventDefault() : undefined}
                 >
                   {link.label}
