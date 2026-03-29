@@ -293,7 +293,10 @@ export default function AdminOrdersPage() {
           <p className="text-center py-8 text-sm text-muted-foreground">Aucune commande trouvée.</p>
         ) : (
           <div className="divide-y divide-border">
-            {filtered.map((o) => {
+            {(() => {
+              const safeAdminPage = Math.max(1, Math.min(adminOrderPage, Math.ceil(filtered.length / adminOrderPageSize)));
+              const paginatedFiltered = filtered.slice((safeAdminPage - 1) * adminOrderPageSize, safeAdminPage * adminOrderPageSize);
+              return paginatedFiltered.map((o) => {
               const cfg = STATUS_CONFIG[o.status] || STATUS_CONFIG.pending;
               const StatusIcon = cfg.icon;
               const next = getNextStatus(o.status);
