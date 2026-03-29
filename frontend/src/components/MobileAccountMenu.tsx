@@ -108,7 +108,10 @@ export function MobileAccountMenu() {
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-foreground truncate">{displayName}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-foreground truncate">{displayName}</p>
+            {isCertified && <CertificationBadge type="client" variant="icon-only" />}
+          </div>
           <p className="text-xs text-muted-foreground truncate">{email}</p>
         </div>
       </div>
