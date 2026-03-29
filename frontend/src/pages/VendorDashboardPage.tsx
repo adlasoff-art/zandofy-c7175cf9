@@ -125,6 +125,14 @@ export default function VendorDashboardPage() {
       setStore(storeData);
       storeIdForRealtime = storeData.id;
 
+      // Load suppliers_enabled from vendor_pricing_overrides
+      const { data: overrideData } = await (supabase as any)
+        .from("vendor_pricing_overrides")
+        .select("suppliers_enabled")
+        .eq("store_id", storeData.id)
+        .maybeSingle();
+      setSuppliersEnabled(overrideData?.suppliers_enabled ?? false);
+
       // Load order counters
       await fetchOrderCounters(storeData.id);
 
