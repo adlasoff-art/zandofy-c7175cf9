@@ -1068,6 +1068,43 @@ const AdminShippingPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Sea Mode Threshold */}
+      <div className="mt-8 border-t border-border pt-6">
+        <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+          <Ship size={16} />
+          Seuil minimum Maritime
+        </h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Définir un montant minimum de commande pour activer le mode maritime au checkout.
+        </p>
+        <div className="flex items-center gap-4 flex-wrap">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={seaEnabled}
+              onChange={e => {
+                setSeaEnabled(e.target.checked);
+                saveSeaThreshold(e.target.checked, seaMinSubtotal);
+              }}
+              className="rounded border-input"
+            />
+            <span className="text-foreground">Activer le seuil</span>
+          </label>
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground">Montant minimum ($)</Label>
+            <Input
+              type="number"
+              min={1}
+              value={seaMinSubtotal}
+              onChange={e => setSeaMinSubtotal(Number(e.target.value))}
+              onBlur={() => saveSeaThreshold(seaEnabled, seaMinSubtotal)}
+              className="w-24 h-8 text-sm"
+              disabled={!seaEnabled}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Last-Mile Delivery Zones */}
       <div className="mt-8 border-t border-border pt-6">
         <DeliveryZonesManager />
