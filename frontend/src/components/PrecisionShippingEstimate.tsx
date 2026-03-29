@@ -25,6 +25,8 @@ interface Props {
   productHeightCm?: number | null;
   originCountry?: string | null;
   quantity: number;
+  prepDaysMin?: number;
+  prepDaysMax?: number;
 }
 
 // ── High-precision math helpers ──
