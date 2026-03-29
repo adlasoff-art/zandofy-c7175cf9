@@ -481,7 +481,7 @@ export default function CheckoutPage() {
 
 
   const createOrderForPayment = async () => {
-    const mockOrderRef = `ZND-${Date.now().toString(36).toUpperCase()}`;
+    const baseRef = `ZND-${Date.now().toString(36).toUpperCase()}`;
 
     const productIds = [...new Set(items.map((i) => i.productId).filter(Boolean))];
     const { data: prods } = productIds.length > 0
@@ -498,14 +498,24 @@ export default function CheckoutPage() {
     });
 
     const createdOrderIds: string[] = [];
+    const storeEntries = [...storeGroups.entries()];
+    const needsSuffix = storeEntries.length > 1;
 
-    for (const [storeId, storeItems] of storeGroups) {
+    for (let idx = 0; idx < storeEntries.length; idx++) {
+      const [storeId, storeItems] = storeEntries[idx];
       const orderSubtotal = storeItems.reduce((s, i) => s + i.price * i.quantity, 0);
-      const orderShippingCost = shippingCost;
-      const orderLastMile = deliveryOption === "home_delivery" ? lastMileFee : 0;
+      
+      // Proportional shipping & discount distribution
+      const ratio = subtotal > 0 ? orderSubtotal / subtotal : 0;
+      const orderShippingCost = preciseRound(shippingCost * ratio, 2);
+      const orderDiscount = preciseRound(discountAmount * ratio, 2);
+      const orderPointsDiscount = preciseRound(pointsDiscount * ratio, 2);
+      
       const effectiveShip = shippingPaymentChoice === "pay_on_arrival" ? 0 : orderShippingCost;
-      const effectiveLM = (deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping") ? orderLastMile : 0;
-      const orderTotal = Math.max(0, orderSubtotal - discountAmount + effectiveShip + effectiveLM);
+      const orderTotal = Math.max(0, preciseRound(orderSubtotal - orderDiscount - orderPointsDiscount + effectiveShip, 2));
+      
+      // Unique order_ref per sub-order (suffix A, B, C...)
+      const orderRef = needsSuffix ? `${baseRef}-${String.fromCharCode(65 + idx)}` : baseRef;
 
       const { data: order, error: orderErr } = await supabase
         .from("orders")
@@ -525,16 +535,14 @@ export default function CheckoutPage() {
           subtotal: orderSubtotal,
           shipping_cost: orderShippingCost,
           total: orderTotal,
-          order_ref: mockOrderRef,
+          order_ref: orderRef,
           coupon_code: appliedCoupon?.code || null,
-          discount_amount: discountAmount,
+          discount_amount: orderDiscount,
           shipping_payment_status: shippingPaymentChoice === "pay_on_arrival" ? "deferred" : "paid",
-          delivery_choice: deliveryOption !== "none" ? (deliveryOption === "home_delivery" ? "home" : "hub") : null,
-          last_mile_fee: orderLastMile,
-          last_mile_payment_method: deliveryOption === "home_delivery" ? (lastMilePayment === "pay_cash_on_delivery" ? "cash" : "mobile_money") : null,
-          last_mile_payment_status: deliveryOption === "home_delivery" 
-            ? (lastMilePayment === "pay_with_shipping" ? "paid_online" : "pending")
-            : null,
+          delivery_choice: deliveryOption !== "none" ? deliveryOption : null,
+          last_mile_fee: 0,
+          last_mile_payment_method: null,
+          last_mile_payment_status: null,
         } as any)
         .select("id")
         .single();
@@ -556,7 +564,26 @@ export default function CheckoutPage() {
       }
     }
 
-    return { orderRef: mockOrderRef, orderIds: createdOrderIds };
+    // Deduct ZandoPoints if used
+    if (pointsDiscount > 0 && pointsToUse > 0) {
+      await supabase.rpc("deduct_points", { p_user_id: user!.id, p_amount: pointsToUse } as any);
+    }
+
+    // Increment coupon uses
+    if (appliedCoupon) {
+      const couponTable = appliedCoupon.source === "store" ? "store_coupons" : "coupons";
+      // Find coupon ID by code
+      const { data: couponRow } = await (supabase as any)
+        .from(couponTable)
+        .select("id")
+        .eq("code", appliedCoupon.code)
+        .maybeSingle();
+      if (couponRow?.id) {
+        await supabase.rpc("increment_coupon_uses", { p_coupon_id: couponRow.id, p_table: couponTable } as any);
+      }
+    }
+
+    return { orderRef: baseRef, orderIds: createdOrderIds };
   };
 
   const handlePayment = async () => {
