@@ -26,6 +26,7 @@ import { getColorDisplay } from "@/utils/colorName";
 
 interface OrderItem {
   id: string;
+  product_id: string | null;
   product_name: string;
   product_image: string | null;
   price: number;
