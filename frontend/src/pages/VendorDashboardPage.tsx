@@ -1023,10 +1023,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
 }
 
 function StoreCertificationSection({ storeId }: { storeId: string }) {
-  const { useStoreCertification } = require("@/hooks/use-certification");
   const { isCertified, isLoading, toggleCertification, isToggling } = useStoreCertification(storeId);
-  const { CertificationBadge } = require("@/components/CertificationBadge");
-  const { Switch } = require("@/components/ui/switch");
 
   if (isLoading) return null;
 
