@@ -330,6 +330,8 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       height_cm: (product as any).height_cm || 0,
       cost_real: (product as any).cost_real || 0,
       cost_calc: (product as any).cost_calc || 0,
+      prep_days_min: (product as any).prep_days_min ?? 2,
+      prep_days_max: (product as any).prep_days_max ?? 5,
       auto_pricing_enabled: (product as any).auto_pricing_enabled !== false,
       vendor_extra_margin: (product as any).vendor_extra_margin || 0,
       model_size: (product as any).model_size || "",
