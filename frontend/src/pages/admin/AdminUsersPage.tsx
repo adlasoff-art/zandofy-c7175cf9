@@ -79,9 +79,9 @@ export default function AdminUsersPage() {
     return matchesSearch && matchesRole && matchesStatus;
   }), [users, search, roleFilter, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
-  const paginated = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
+  const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const handleSearch = (val: string) => { setSearch(val); setCurrentPage(1); };
   const handleRoleFilter = (val: RoleFilter) => { setRoleFilter(val); setCurrentPage(1); };
