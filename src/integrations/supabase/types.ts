@@ -2111,8 +2111,12 @@ export type Database = {
           created_at: string
           deferred_payment_phone: string | null
           deferred_payment_provider: string | null
+          delivered_at: string | null
+          delivery_address_confirmed: string | null
           delivery_choice: string | null
+          delivery_date_requested: string | null
           delivery_option: string | null
+          delivery_time_requested: string | null
           discount_amount: number | null
           hub_pickup_proof_url: string | null
           id: string
@@ -2122,6 +2126,8 @@ export type Database = {
           last_mile_payment_status: string | null
           order_ref: string
           payment_method: string | null
+          review_reminder_count: number
+          review_reminder_last: string | null
           rider_cash_collected: boolean | null
           shipping_address: string | null
           shipping_city: string | null
@@ -2156,8 +2162,12 @@ export type Database = {
           created_at?: string
           deferred_payment_phone?: string | null
           deferred_payment_provider?: string | null
+          delivered_at?: string | null
+          delivery_address_confirmed?: string | null
           delivery_choice?: string | null
+          delivery_date_requested?: string | null
           delivery_option?: string | null
+          delivery_time_requested?: string | null
           discount_amount?: number | null
           hub_pickup_proof_url?: string | null
           id?: string
@@ -2167,6 +2177,8 @@ export type Database = {
           last_mile_payment_status?: string | null
           order_ref: string
           payment_method?: string | null
+          review_reminder_count?: number
+          review_reminder_last?: string | null
           rider_cash_collected?: boolean | null
           shipping_address?: string | null
           shipping_city?: string | null
@@ -2201,8 +2213,12 @@ export type Database = {
           created_at?: string
           deferred_payment_phone?: string | null
           deferred_payment_provider?: string | null
+          delivered_at?: string | null
+          delivery_address_confirmed?: string | null
           delivery_choice?: string | null
+          delivery_date_requested?: string | null
           delivery_option?: string | null
+          delivery_time_requested?: string | null
           discount_amount?: number | null
           hub_pickup_proof_url?: string | null
           id?: string
@@ -2212,6 +2228,8 @@ export type Database = {
           last_mile_payment_status?: string | null
           order_ref?: string
           payment_method?: string | null
+          review_reminder_count?: number
+          review_reminder_last?: string | null
           rider_cash_collected?: boolean | null
           shipping_address?: string | null
           shipping_city?: string | null
@@ -3084,6 +3102,36 @@ export type Database = {
           referrer_id?: string
           rewarded_orders_count?: number
           status?: string
+        }
+        Relationships: []
+      }
+      restricted_zones: {
+        Row: {
+          city: string
+          country_code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          reason: string | null
+          zone_name: string
+        }
+        Insert: {
+          city: string
+          country_code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          reason?: string | null
+          zone_name: string
+        }
+        Update: {
+          city?: string
+          country_code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          reason?: string | null
+          zone_name?: string
         }
         Relationships: []
       }
@@ -4379,6 +4427,51 @@ export type Database = {
           },
         ]
       }
+      vendor_customer_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          order_id: string
+          rating: number
+          store_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          order_id: string
+          rating: number
+          store_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          order_id?: string
+          rating?: number
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_customer_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_customer_reviews_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_delivery_zones: {
         Row: {
           city: string
@@ -4826,6 +4919,10 @@ export type Database = {
           ticket_reference: string
         }[]
       }
+      deduct_points: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: undefined
+      }
       expire_inactive_points: {
         Args: { months_limit?: number }
         Returns: number
@@ -4892,6 +4989,10 @@ export type Database = {
       }
       increment_blog_post_views: {
         Args: { p_post_id: string; p_session_id?: string }
+        Returns: undefined
+      }
+      increment_coupon_uses: {
+        Args: { p_coupon_id: string; p_table: string }
         Returns: undefined
       }
       increment_helpful: { Args: { review_id: string }; Returns: undefined }
