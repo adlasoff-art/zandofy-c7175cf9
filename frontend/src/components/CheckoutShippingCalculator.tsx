@@ -36,6 +36,7 @@ interface CategorySurchargeInfo {
 interface Props {
   shippingCity: string;
   cartItems: Array<{ productId: string; quantity: number }>;
+  cartSubtotal?: number;
   selectedMode?: TransportMode;
   onShippingCostChange: (cost: number, mode: string) => void;
 }
