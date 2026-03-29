@@ -400,6 +400,8 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       length_cm: form.length_cm || null,
       width_cm: form.width_cm || null,
       height_cm: form.height_cm || null,
+      prep_days_min: form.prep_days_min ? Math.round(Number(form.prep_days_min)) : 2,
+      prep_days_max: form.prep_days_max ? Math.round(Number(form.prep_days_max)) : 5,
       cost_real: form.cost_real || null,
       cost_calc: form.cost_calc || null,
       auto_pricing_enabled: form.auto_pricing_enabled,
