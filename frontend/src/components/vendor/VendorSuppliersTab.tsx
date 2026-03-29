@@ -166,7 +166,11 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
         </div>
       ) : (
         <div className="grid gap-3">
-          {suppliers.map((s) => (
+          {(() => {
+            const suppPageSize = 25;
+            const safeSuppPage = Math.max(1, Math.min(supplierPage, Math.ceil(suppliers.length / suppPageSize)));
+            const paginatedSuppliers = suppliers.slice((safeSuppPage - 1) * suppPageSize, safeSuppPage * suppPageSize);
+            return paginatedSuppliers.map((s) => (
             <div key={s.id} className="bg-card border border-border rounded-lg p-4 flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <User size={18} className="text-primary" />
