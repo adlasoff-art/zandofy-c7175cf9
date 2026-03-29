@@ -620,59 +620,108 @@ function VendorSummaryWidgets({
 }) {
   const { subscription, tierConfig } = useVendorSubscription(storeId);
 
+  // Today's sales and pending orders
+  const { data: todayStats } = useQuery({
+    queryKey: ["vendor-today-stats", storeId],
+    queryFn: async () => {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayISO = todayStart.toISOString();
+
+      const [salesRes, pendingRes] = await Promise.all([
+        supabase
+          .from("orders")
+          .select("total")
+          .eq("store_id", storeId)
+          .gte("created_at", todayISO)
+          .not("status", "in", '("cancelled","payment_failed","refunded")'),
+        supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("store_id", storeId)
+          .in("status", ["pending", "confirmed"]),
+      ]);
+
+      const todaySales = (salesRes.data || []).reduce((sum: number, o: any) => sum + Number(o.total || 0), 0);
+      return { todaySales, pendingCount: pendingRes.count || 0 };
+    },
+    refetchInterval: 30000,
+  });
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-      {/* Store card with tier badge */}
-      <div className="bg-card border border-border rounded-lg p-3">
-        <div className="flex items-center gap-2 mb-1">
-          <Store size={16} className="text-primary shrink-0" />
-          <p className="text-sm font-bold text-foreground truncate">{store.name}</p>
+    <div className="space-y-3 mb-6">
+      {/* Today's highlight row */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Wallet size={16} className="text-emerald-600" />
+            <span className="text-[11px] text-muted-foreground font-medium">Ventes du jour</span>
+          </div>
+          <p className="text-xl font-bold text-emerald-600">${(todayStats?.todaySales || 0).toFixed(2)}</p>
         </div>
-        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 ${tierConfig.badgeClass}`}>
-          <Crown size={8} />
-          {tierConfig.label}
-        </span>
+        <div className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/20 rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Clock size={16} className="text-amber-600" />
+            <span className="text-[11px] text-muted-foreground font-medium">En attente</span>
+          </div>
+          <p className="text-xl font-bold text-amber-600">{todayStats?.pendingCount || 0}</p>
+          <p className="text-[10px] text-muted-foreground">commandes à traiter</p>
+        </div>
       </div>
 
-      {/* Products */}
-      <div className="bg-card border border-border rounded-lg p-3">
-        <div className="flex items-center gap-2">
-          <Package size={16} className="text-primary shrink-0" />
-          <p className="text-xl font-bold text-foreground leading-none">{store.products_count || 0}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Store card with tier badge */}
+        <div className="bg-card border border-border rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Store size={16} className="text-primary shrink-0" />
+            <p className="text-sm font-bold text-foreground truncate">{store.name}</p>
+          </div>
+          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 ${tierConfig.badgeClass}`}>
+            <Crown size={8} />
+            {tierConfig.label}
+          </span>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-1">
-          Produits
-          {subscription && subscription.max_products < Infinity && (
-            <span className="text-muted-foreground/60"> / {subscription.max_products}</span>
-          )}
-        </p>
-      </div>
 
-      {/* Orders */}
-      <div className="bg-card border border-border rounded-lg p-3">
-        <div className="flex items-center gap-2">
-          <ShoppingBag size={16} className="text-primary shrink-0" />
-          <p className="text-xl font-bold text-foreground leading-none">{orderCounters.total}</p>
-        </div>
-        <p className="text-[11px] text-muted-foreground mt-1">
-          Commandes
-          {orderCounters.in_progress > 0 && (
-            <span className="text-primary"> · {orderCounters.in_progress} en cours</span>
-          )}
-        </p>
-      </div>
-
-      {/* Messages */}
-      <div className="bg-card border border-border rounded-lg p-3">
-        <div className="flex items-center gap-2">
-          <Inbox size={16} className="text-primary shrink-0" />
-          <p className={`text-xl font-bold leading-none ${totalUnread > 0 ? "text-primary" : "text-foreground"}`}>
-            {totalUnread > 0 ? totalUnread : 0}
+        {/* Products */}
+        <div className="bg-card border border-border rounded-lg p-3">
+          <div className="flex items-center gap-2">
+            <Package size={16} className="text-primary shrink-0" />
+            <p className="text-xl font-bold text-foreground leading-none">{store.products_count || 0}</p>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Produits
+            {subscription && subscription.max_products < Infinity && (
+              <span className="text-muted-foreground/60"> / {subscription.max_products}</span>
+            )}
           </p>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-1">
-          {totalUnread > 0 ? "Non lu(s)" : "Messages"}
-        </p>
+
+        {/* Orders */}
+        <div className="bg-card border border-border rounded-lg p-3">
+          <div className="flex items-center gap-2">
+            <ShoppingBag size={16} className="text-primary shrink-0" />
+            <p className="text-xl font-bold text-foreground leading-none">{orderCounters.total}</p>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Commandes
+            {orderCounters.in_progress > 0 && (
+              <span className="text-primary"> · {orderCounters.in_progress} en cours</span>
+            )}
+          </p>
+        </div>
+
+        {/* Messages */}
+        <div className="bg-card border border-border rounded-lg p-3">
+          <div className="flex items-center gap-2">
+            <Inbox size={16} className="text-primary shrink-0" />
+            <p className={`text-xl font-bold leading-none ${totalUnread > 0 ? "text-primary" : "text-foreground"}`}>
+              {totalUnread > 0 ? totalUnread : 0}
+            </p>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            {totalUnread > 0 ? "Non lu(s)" : "Messages"}
+          </p>
+        </div>
       </div>
     </div>
   );
