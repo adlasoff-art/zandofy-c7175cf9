@@ -31,6 +31,9 @@ import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { ACTIVE_ORDER_STATUSES, NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
 import { VENDOR_TIERS } from "@/lib/vendor-tiers";
 import { useStorePresence } from "@/hooks/useStorePresence";
+import { useStoreCertification } from "@/hooks/use-certification";
+import { CertificationBadge } from "@/components/CertificationBadge";
+import { Switch } from "@/components/ui/switch";
 
 interface VendorConversation {
   id: string;
