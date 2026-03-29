@@ -259,6 +259,17 @@ export function CheckoutShippingCalculator({
     return totals;
   }, [quotes, products, surcharges]);
 
+  // Check if sea mode is blocked by threshold
+  const isSeaBlocked = seaThreshold?.enabled === true && cartSubtotal < seaThreshold.min_subtotal;
+  const seaHasQuotes = modeTotals.has("sea") && (modeTotals.get("sea")?.total ?? 0) > 0;
+
+  // Auto-fallback: if user had sea selected but it's now blocked, switch to air
+  useEffect(() => {
+    if (isSeaBlocked && activeMode === "sea") {
+      setActiveMode("air");
+    }
+  }, [isSeaBlocked, activeMode]);
+
   // Notify parent of shipping cost changes
   useEffect(() => {
     const selected = modeTotals.get(activeMode);
