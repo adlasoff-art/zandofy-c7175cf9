@@ -2935,11 +2935,13 @@ export type Database = {
           id: string
           is_banned: boolean
           is_certified: boolean
+          is_online: boolean
           last_known_geo_at: string | null
           last_known_lat: number | null
           last_known_lng: number | null
           last_login_at: string | null
           last_name: string | null
+          last_seen_at: string | null
           login_count: number | null
           nationality: string | null
           notifications_enabled: boolean | null
@@ -2969,11 +2971,13 @@ export type Database = {
           id: string
           is_banned?: boolean
           is_certified?: boolean
+          is_online?: boolean
           last_known_geo_at?: string | null
           last_known_lat?: number | null
           last_known_lng?: number | null
           last_login_at?: string | null
           last_name?: string | null
+          last_seen_at?: string | null
           login_count?: number | null
           nationality?: string | null
           notifications_enabled?: boolean | null
@@ -3003,11 +3007,13 @@ export type Database = {
           id?: string
           is_banned?: boolean
           is_certified?: boolean
+          is_online?: boolean
           last_known_geo_at?: string | null
           last_known_lat?: number | null
           last_known_lng?: number | null
           last_login_at?: string | null
           last_name?: string | null
+          last_seen_at?: string | null
           login_count?: number | null
           nationality?: string | null
           notifications_enabled?: boolean | null
@@ -4893,6 +4899,7 @@ export type Database = {
       is_kyc_verified: { Args: { p_user_id: string }; Returns: boolean }
       release_vendor_pending_funds: { Args: never; Returns: number }
       set_store_offline: { Args: { p_store_id: string }; Returns: undefined }
+      set_user_offline: { Args: { p_user_id: string }; Returns: undefined }
       track_delivery: {
         Args: { p_order_ref: string }
         Returns: {
@@ -4925,6 +4932,7 @@ export type Database = {
         Args: { p_store_id: string }
         Returns: undefined
       }
+      update_user_presence: { Args: { p_user_id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "manager" | "vendor" | "shipper" | "rider"
