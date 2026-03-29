@@ -62,6 +62,13 @@ export function CheckoutShippingCalculator({
   const [activeMode, setActiveMode] = useState<TransportMode>(selectedMode || "air");
   const [userHasSelected, setUserHasSelected] = useState(false);
   const [seaThreshold, setSeaThreshold] = useState<{ enabled: boolean; min_subtotal: number } | null>(null);
+  const [prepDays, setPrepDays] = useState<{ min: number; max: number }>({ min: 2, max: 5 });
+  const [deliveryDefaults, setDeliveryDefaults] = useState<{
+    local_hours_min: number; local_hours_max: number;
+    intl_prep_min: number; intl_prep_max: number;
+    intl_transit_min: number; intl_transit_max: number;
+  } | null>(null);
+  const [isLocalStore, setIsLocalStore] = useState(false);
 
   // 1. Fetch product details (weight, dimensions, origin, category) for cart items
   useEffect(() => {
