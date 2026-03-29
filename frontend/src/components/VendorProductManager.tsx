@@ -186,7 +186,12 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     (supabase as any).from("trend_tags").select("id, name_fr").eq("is_active", true).order("sort_order").then(({ data }: any) => {
       if (data) setTrendTags(data);
     });
-  }, [loadProducts]);
+    if (user) {
+      (supabase as any).from("suppliers").select("id, agent_name, platform_name").eq("vendor_id", user.id).order("agent_name").then(({ data }: any) => {
+        if (data) setSuppliers(data);
+      });
+    }
+  }, [loadProducts, user]);
 
   useEffect(() => {
     if (hasRestoredDraftRef.current || loading || showForm) return;
