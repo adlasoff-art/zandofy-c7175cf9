@@ -32,6 +32,7 @@ export function MobileAccountMenu() {
   const { user, loading: authLoading, signOut } = useAuth();
   const { isAdmin, isManager, isVendor, isShipper, isRider, isStaff, loading: rolesLoading } = useRoles();
   const { t } = useI18n();
+  const { isCertified } = useCertification();
 
   if (authLoading || rolesLoading) {
     return (
