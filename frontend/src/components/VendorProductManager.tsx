@@ -79,6 +79,7 @@ const EMPTY_FORM = {
   origin_country: "",
   category_id: "" as string,
   trend_tag_id: "" as string,
+  supplier_id: "" as string,
   flash_timer_enabled: false,
   promo_start_date: "",
   promo_end_date: "",
