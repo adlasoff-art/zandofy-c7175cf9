@@ -20,6 +20,7 @@ import { useUnreadSupport } from "@/hooks/use-unread-support";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useI18n, LOCALES, CURRENCIES, type CurrencyCode } from "@/contexts/I18nContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useHeaderTheme } from "@/hooks/use-header-theme";
 
 // Mini error boundary to prevent Radix crashes from taking down the whole page
 class SafeRadix extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
@@ -49,6 +50,14 @@ const NAV_LINK_KEYS = [
   { label: "Enfants", href: "/category/kids", hasMega: false, highlight: false },
 ];
 
+interface TopBarConfig {
+  enabled: boolean;
+  mode: "static" | "slide" | "marquee";
+  bg_color: string;
+  text_color: string;
+  messages: { text_fr: string; text_en: string; visible: boolean }[];
+}
+
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -56,6 +65,7 @@ export function Header() {
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [expandedMobileCat, setExpandedMobileCat] = useState<string | null>(null);
+  const [slideIdx, setSlideIdx] = useState(0);
   const megaTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const userMenuRef = useRef<HTMLDivElement>(null);
   const { user, signOut } = useAuth();
@@ -66,38 +76,30 @@ export function Header() {
   const { count: wishlistCount } = useWishlist();
   const { t, locale, currency, setLocale, setCurrency } = useI18n();
   const { theme, setTheme } = useTheme();
-  const topBarMessages = [
-    t("topbar.freeShipping"),
-    t("topbar.freeReturns"),
-    t("topbar.noHiddenFees"),
-  ];
+  const headerTheme = useHeaderTheme();
 
-  // Dynamic category nav from CMS
-  const { data: cmsNavItems } = useQuery({
-    queryKey: ["cms-category-nav"],
+  // Top bar config from CMS
+  const { data: topBarConfig } = useQuery({
+    queryKey: ["topbar-config"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("cms_menu_items")
-        .select("*")
-        .eq("menu_group", "category_nav")
-        .eq("is_visible", true)
-        .is("parent_id", null)
-        .order("sort_order");
-      if (error) throw error;
-      return data || [];
+      const { data } = await supabase.from("platform_settings").select("value").eq("key", "topbar_config").maybeSingle();
+      return (data?.value || null) as TopBarConfig | null;
     },
     staleTime: 5 * 60 * 1000,
   });
 
-  // Build nav links: CMS data or fallback
-  const navLinks = (cmsNavItems && cmsNavItems.length > 0)
-    ? cmsNavItems.map((item: any) => ({
-        label: item.label,
-        href: item.url,
-        hasMega: item.has_mega ?? false,
-        highlight: item.highlight ?? false,
-      }))
-    : NAV_LINK_KEYS;
+  const topBarMessages = (() => {
+    if (!topBarConfig?.enabled) return [];
+    const msgs = (topBarConfig.messages || []).filter(m => m.visible);
+    return msgs.map(m => locale === "fr" ? m.text_fr : m.text_en).filter(Boolean);
+  })();
+
+  // Slide mode auto-rotate
+  useEffect(() => {
+    if (!topBarConfig || topBarConfig.mode !== "slide" || topBarMessages.length <= 1) return;
+    const interval = setInterval(() => setSlideIdx(prev => (prev + 1) % topBarMessages.length), 3500);
+    return () => clearInterval(interval);
+  }, [topBarConfig?.mode, topBarMessages.length]);
 
   const { data: mobileCategories } = useQuery({
     queryKey: ["mobile-categories"],
