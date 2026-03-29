@@ -517,6 +517,8 @@ export function VariantOrderDrawer({
               productHeightCm={product.heightCm}
               originCountry={product.originCountry}
               quantity={Math.max(totalQty, 1)}
+              prepDaysMin={product.prepDaysMin}
+              prepDaysMax={product.prepDaysMax}
             />
           </div>
 
