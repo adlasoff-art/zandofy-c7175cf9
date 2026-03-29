@@ -25,6 +25,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useCertification } from "@/hooks/use-certification";
+import { CertificationBadge } from "@/components/CertificationBadge";
 
 export function MobileAccountMenu() {
   const { user, loading: authLoading, signOut } = useAuth();
