@@ -117,6 +117,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
   const { subscription, tierConfig, canAddProduct } = useVendorSubscription(storeId);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [trendTags, setTrendTags] = useState<{ id: string; name_fr: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Product | null>(null);
