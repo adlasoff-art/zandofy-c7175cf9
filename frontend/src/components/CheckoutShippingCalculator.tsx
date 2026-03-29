@@ -79,10 +79,10 @@ export function CheckoutShippingCalculator({
       .from("products")
       .select("id, weight_grams, length_cm, width_cm, height_cm, origin_country, category_id, prep_days_min, prep_days_max, store_id" as any)
       .in("id", ids)
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         if (!data) return;
         const mapped = cartItems.map(item => {
-          const p = data.find((d: any) => d.id === item.productId);
+          const p = (data as any[]).find((d: any) => d.id === item.productId);
           return {
             productId: item.productId,
             quantity: item.quantity,
