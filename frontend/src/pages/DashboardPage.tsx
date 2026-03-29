@@ -2052,3 +2052,28 @@ function AddressesTab({ userId }: { userId: string }) {
     </div>
   );
 }
+
+function ClientCertificationSection() {
+  const { isCertified, canCertify, isLoading, toggleCertification, isToggling } = useCertification();
+
+  if (isLoading) return null;
+  if (!canCertify) return null;
+
+  return (
+    <div className="bg-card rounded-lg p-5 border border-border space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <CertificationBadge type="client" variant="full" />
+        </div>
+        <Switch
+          checked={isCertified}
+          onCheckedChange={toggleCertification}
+          disabled={isToggling}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Activez votre badge de certification pour afficher un symbole de confiance vérifié à côté de votre nom sur la plateforme.
+      </p>
+    </div>
+  );
+}

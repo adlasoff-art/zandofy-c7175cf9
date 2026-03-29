@@ -1018,3 +1018,31 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
     </div>
   );
 }
+
+function StoreCertificationSection({ storeId }: { storeId: string }) {
+  const { useStoreCertification } = require("@/hooks/use-certification");
+  const { isCertified, isLoading, toggleCertification, isToggling } = useStoreCertification(storeId);
+  const { CertificationBadge } = require("@/components/CertificationBadge");
+  const { Switch } = require("@/components/ui/switch");
+
+  if (isLoading) return null;
+
+  return (
+    <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <CertificationBadge type="vendor" variant="full" />
+        </div>
+        <Switch
+          checked={isCertified}
+          onCheckedChange={toggleCertification}
+          disabled={isToggling}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Activez le badge de certification pour afficher un symbole de confiance vérifié sur votre boutique.
+        La vérification KYB du propriétaire est requise.
+      </p>
+    </div>
+  );
+}
