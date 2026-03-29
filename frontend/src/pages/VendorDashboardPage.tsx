@@ -327,7 +327,7 @@ export default function VendorDashboardPage() {
     { key: "returns" as const, label: "Retours", icon: RotateCcw },
     { key: "disputes" as const, label: "Litiges", icon: AlertTriangle },
     { key: "featured" as const, label: "Mise en avant", icon: Sparkles },
-    { key: "suppliers" as const, label: "Fournisseurs", icon: Truck },
+    ...(suppliersEnabled ? [{ key: "suppliers" as const, label: "Fournisseurs", icon: Truck }] : []),
     { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
     ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
     { key: "messages" as const, label: "Messages", icon: MessageCircle },
