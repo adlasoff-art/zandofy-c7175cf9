@@ -1442,16 +1442,7 @@ export default function CheckoutPage() {
                       </span>
                     )}
                   </div>
-                  {deliveryOption === "home_delivery" && lastMileFee > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Livraison domicile</span>
-                      {lastMilePayment === "pay_cash_on_delivery" ? (
-                        <span className="text-amber-600 font-medium text-xs">${lastMileFee.toFixed(2)} — cash</span>
-                      ) : (
-                        <span className="text-foreground">${lastMileFee.toFixed(2)}</span>
-                      )}
-                    </div>
-                  )}
+                  {/* Last-mile fee shown at hub arrival, not checkout */}
                   {deliveryOption === "hub_pickup" && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Livraison</span>
