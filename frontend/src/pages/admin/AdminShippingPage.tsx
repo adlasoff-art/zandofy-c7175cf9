@@ -443,6 +443,16 @@ const AdminShippingPage: React.FC = () => {
   const [seaEnabled, setSeaEnabled] = useState(true);
   const [seaMinSubtotal, setSeaMinSubtotal] = useState(29);
 
+  // Delivery time defaults
+  const [deliveryDefaults, setDeliveryDefaults] = useState({
+    local_hours_min: 0.75,
+    local_hours_max: 2,
+    intl_prep_min: 2,
+    intl_prep_max: 5,
+    intl_transit_min: 4,
+    intl_transit_max: 6,
+  });
+
   // Dialogs
   const [zoneDialog, setZoneDialog] = useState<{ open: boolean; zone: Partial<ShippingZone> | null }>({ open: false, zone: null });
   const [routeDialog, setRouteDialog] = useState<{ open: boolean; route: Partial<ShippingRoute> | null }>({ open: false, route: null });
