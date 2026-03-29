@@ -112,7 +112,7 @@ interface ProductDraftSnapshot {
 
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 
-export function VendorProductManager({ storeId }: { storeId: string }) {
+export function VendorProductManager({ storeId, suppliersEnabled = false }: { storeId: string; suppliersEnabled?: boolean }) {
   const { user } = useAuth();
   const { subscription, tierConfig, canAddProduct } = useVendorSubscription(storeId);
   const [products, setProducts] = useState<Product[]>([]);
@@ -655,6 +655,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
               ))}
             </select>
           </div>
+          {suppliersEnabled && (
           <div>
             <label className="text-xs text-muted-foreground">🏭 Fournisseur</label>
             <select
@@ -671,6 +672,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
               <p className="text-[10px] text-muted-foreground mt-1">Ajoutez vos fournisseurs dans l'onglet "Fournisseurs"</p>
             )}
           </div>
+          )}
           <div className="flex gap-4">
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.is_new || false} onChange={(e) => setForm({ ...form, is_new: e.target.checked })} />

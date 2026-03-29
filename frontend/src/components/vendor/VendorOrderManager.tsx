@@ -73,7 +73,7 @@ interface Order {
   history: StatusHistoryEntry[];
 }
 
-export function VendorOrderManager({ storeId, shopType }: { storeId: string; shopType?: string }) {
+export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false }: { storeId: string; shopType?: string; suppliersEnabled?: boolean }) {
   const isLocalShop = shopType === "local";
   const activeFlow = isLocalShop ? LOCAL_STATUS_FLOW : STATUS_FLOW;
   const [orders, setOrders] = useState<Order[]>([]);
@@ -576,7 +576,7 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1">
                           <p className="text-xs font-medium text-foreground truncate">{item.product_name}</p>
-                          <SupplierPopover productId={item.product_id} />
+                          {suppliersEnabled && <SupplierPopover productId={item.product_id} />}
                         </div>
                         <p className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
                           <span>{item.quantity}x ${Number(item.price).toFixed(2)}</span>

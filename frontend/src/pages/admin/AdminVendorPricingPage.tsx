@@ -105,6 +105,7 @@ export default function AdminVendorPricingPage() {
     vendor_off_platform_enabled: boolean;
     vendor_custom_payment_numbers_enabled: boolean;
     returns_enabled: boolean;
+    suppliers_enabled: boolean;
   }>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -200,6 +201,7 @@ export default function AdminVendorPricingPage() {
       vendor_off_platform_enabled: (o as any)?.vendor_off_platform_enabled ?? false,
       vendor_custom_payment_numbers_enabled: (o as any)?.vendor_custom_payment_numbers_enabled ?? false,
       returns_enabled: (store as any).returns_enabled ?? false,
+      suppliers_enabled: (o as any)?.suppliers_enabled ?? false,
     };
   };
 
@@ -212,7 +214,7 @@ export default function AdminVendorPricingPage() {
 
   const getEditForId = (storeId: string) => {
     const store = stores?.find((s) => s.id === storeId);
-    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, returns_enabled: false };
+    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, returns_enabled: false, suppliers_enabled: false };
     return getEdit(store);
   };
 
@@ -275,6 +277,7 @@ export default function AdminVendorPricingPage() {
       vendor_cod_enabled: edit.vendor_cod_enabled,
       vendor_off_platform_enabled: edit.vendor_off_platform_enabled,
       vendor_custom_payment_numbers_enabled: edit.vendor_custom_payment_numbers_enabled,
+      suppliers_enabled: edit.suppliers_enabled,
       updated_at: new Date().toISOString(),
     };
 
@@ -457,6 +460,17 @@ export default function AdminVendorPricingPage() {
                   <Switch
                     checked={edit.returns_enabled}
                     onCheckedChange={(v) => updateEdit(store.id, "returns_enabled", v)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Gestion des fournisseurs</p>
+                    <p className="text-[10px] text-muted-foreground">Fonctionnalité payante : permet au vendeur de gérer ses fournisseurs et de les lier à ses produits.</p>
+                  </div>
+                  <Switch
+                    checked={edit.suppliers_enabled}
+                    onCheckedChange={(v) => updateEdit(store.id, "suppliers_enabled", v)}
                   />
                 </div>
 

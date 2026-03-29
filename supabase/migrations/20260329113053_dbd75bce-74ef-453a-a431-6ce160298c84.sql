@@ -1,0 +1,1 @@
+ALTER TABLE public.vendor_pricing_overrides ADD COLUMN IF NOT EXISTS suppliers_enabled BOOLEAN NOT NULL DEFAULT false;

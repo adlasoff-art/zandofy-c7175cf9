@@ -73,6 +73,7 @@ export default function VendorDashboardPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "team" | "suppliers" | "settings">("catalogue");
   const [orderCounters, setOrderCounters] = useState<OrderCounters>({ total: 0, in_progress: 0, delivered: 0 });
+  const [suppliersEnabled, setSuppliersEnabled] = useState(false);
 
   // Presence heartbeat — marks store as online while vendor is on dashboard
   useStorePresence(store?.id);
@@ -123,6 +124,14 @@ export default function VendorDashboardPage() {
 
       setStore(storeData);
       storeIdForRealtime = storeData.id;
+
+      // Load suppliers_enabled from vendor_pricing_overrides
+      const { data: overrideData } = await (supabase as any)
+        .from("vendor_pricing_overrides")
+        .select("suppliers_enabled")
+        .eq("store_id", storeData.id)
+        .maybeSingle();
+      setSuppliersEnabled(overrideData?.suppliers_enabled ?? false);
 
       // Load order counters
       await fetchOrderCounters(storeData.id);
@@ -318,7 +327,7 @@ export default function VendorDashboardPage() {
     { key: "returns" as const, label: "Retours", icon: RotateCcw },
     { key: "disputes" as const, label: "Litiges", icon: AlertTriangle },
     { key: "featured" as const, label: "Mise en avant", icon: Sparkles },
-    { key: "suppliers" as const, label: "Fournisseurs", icon: Truck },
+    ...(suppliersEnabled ? [{ key: "suppliers" as const, label: "Fournisseurs", icon: Truck }] : []),
     { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
     ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
     { key: "messages" as const, label: "Messages", icon: MessageCircle },
@@ -327,8 +336,8 @@ export default function VendorDashboardPage() {
 
   const renderTabContent = () => (
     <>
-      {activeTab === "catalogue" && <VendorProductManager storeId={store!.id} />}
-      {activeTab === "orders" && <VendorOrderManager storeId={store!.id} shopType={(store as any)?.shop_type} />}
+      {activeTab === "catalogue" && <VendorProductManager storeId={store!.id} suppliersEnabled={suppliersEnabled} />}
+      {activeTab === "orders" && <VendorOrderManager storeId={store!.id} shopType={(store as any)?.shop_type} suppliersEnabled={suppliersEnabled} />}
       {activeTab === "deliveries" && <VendorRiderTracking storeId={store!.id} />}
       {activeTab === "promos" && <VendorPromotionsTab storeId={store!.id} />}
       {activeTab === "coupons" && (
