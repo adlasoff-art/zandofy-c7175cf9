@@ -84,6 +84,8 @@ const EMPTY_FORM = {
   auto_pricing_enabled: true,
   vendor_extra_margin: 0,
   model_size: "",
+  prep_days_min: 2,
+  prep_days_max: 5,
 };
 
 type ProductFormState = typeof EMPTY_FORM;
