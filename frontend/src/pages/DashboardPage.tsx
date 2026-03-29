@@ -52,6 +52,9 @@ import { KycStatusBadge } from "@/components/kyc/KycStatusBadge";
 import { ShieldCheck } from "lucide-react";
 import { getColorDisplay } from "@/utils/colorName";
 import { withOptionalOrderFields } from "@/lib/order-query";
+import { useCertification } from "@/hooks/use-certification";
+import { CertificationBadge } from "@/components/CertificationBadge";
+import { Switch } from "@/components/ui/switch";
 
 const TABS = [
   { key: "overview", label: "Aperçu", icon: Package },
@@ -334,10 +337,13 @@ export default function DashboardPage() {
               </div>
             )}
             {kycStatus === "approved" && (
-              <div className="bg-card rounded-lg p-6 border border-border text-center space-y-2">
-                <ShieldCheck size={32} className="mx-auto text-primary" />
-                <h3 className="font-bold text-foreground">Identité vérifiée</h3>
-                <p className="text-sm text-muted-foreground">Vous avez accès à toutes les options de paiement et livraison avancées.</p>
+              <div className="space-y-4">
+                <div className="bg-card rounded-lg p-6 border border-border text-center space-y-2">
+                  <ShieldCheck size={32} className="mx-auto text-primary" />
+                  <h3 className="font-bold text-foreground">Identité vérifiée</h3>
+                  <p className="text-sm text-muted-foreground">Vous avez accès à toutes les options de paiement et livraison avancées.</p>
+                </div>
+                <ClientCertificationSection />
               </div>
             )}
           </div>
@@ -2043,6 +2049,31 @@ function AddressesTab({ userId }: { userId: string }) {
           Limite atteinte ({maxAddresses} adresses). {!isKycVerified && "Vérifiez votre identité pour en ajouter jusqu'à 5."}
         </p>
       )}
+    </div>
+  );
+}
+
+function ClientCertificationSection() {
+  const { isCertified, canCertify, isLoading, toggleCertification, isToggling } = useCertification();
+
+  if (isLoading) return null;
+  if (!canCertify) return null;
+
+  return (
+    <div className="bg-card rounded-lg p-5 border border-border space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <CertificationBadge type="client" variant="full" />
+        </div>
+        <Switch
+          checked={isCertified}
+          onCheckedChange={toggleCertification}
+          disabled={isToggling}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Activez votre badge de certification pour afficher un symbole de confiance vérifié à côté de votre nom sur la plateforme.
+      </p>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { MessageCircle, ExternalLink, MapPin, Store, ChevronDown, Globe } from "
 import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { Button } from "@/components/ui/button";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { CertificationBadge } from "@/components/CertificationBadge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { InternalChat } from "@/components/InternalChat";
 import { motion, AnimatePresence } from "framer-motion";
@@ -89,6 +90,9 @@ export function VendorProfileCard({ store, productName, productId, originCountry
             <span className="font-semibold text-foreground text-sm truncate">{store.name}</span>
             {store.is_verified && (
               <VerificationBadge variant="icon-only" verifiedYears={store.verified_years} />
+            )}
+            {(store as any).is_certified && (
+              <CertificationBadge type="vendor" variant="icon-only" />
             )}
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">

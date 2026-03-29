@@ -7,6 +7,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { CertificationBadge } from "@/components/CertificationBadge";
 import { FollowStoreButton } from "@/components/FollowStoreButton";
 import {
   Store, Users, Package, TrendingUp, Star,
@@ -319,6 +320,9 @@ export default function StorePage() {
                       </h1>
                       {store.is_verified && (
                         <VerificationBadge variant="icon-only" verifiedYears={store.verified_years} />
+                      )}
+                      {(store as any).is_certified && (
+                        <CertificationBadge type="vendor" variant="icon-only" />
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">

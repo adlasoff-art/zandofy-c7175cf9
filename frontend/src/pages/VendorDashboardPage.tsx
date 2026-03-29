@@ -31,6 +31,9 @@ import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { ACTIVE_ORDER_STATUSES, NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
 import { VENDOR_TIERS } from "@/lib/vendor-tiers";
 import { useStorePresence } from "@/hooks/useStorePresence";
+import { useStoreCertification } from "@/hooks/use-certification";
+import { CertificationBadge } from "@/components/CertificationBadge";
+import { Switch } from "@/components/ui/switch";
 
 interface VendorConversation {
   id: string;
@@ -949,6 +952,9 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
       {/* Mobile Money Payment Numbers */}
       <VendorPaymentNumbers storeId={store.id} />
 
+      {/* Store Certification Badge */}
+      <StoreCertificationSection storeId={store.id} />
+
       {/* SEO Section */}
       <div className="bg-card border border-border rounded-lg p-4 space-y-4">
         <label className="text-sm font-medium text-foreground flex items-center gap-2">
@@ -1012,6 +1018,31 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
         {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
         Enregistrer
       </button>
+    </div>
+  );
+}
+
+function StoreCertificationSection({ storeId }: { storeId: string }) {
+  const { isCertified, isLoading, toggleCertification, isToggling } = useStoreCertification(storeId);
+
+  if (isLoading) return null;
+
+  return (
+    <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <CertificationBadge type="vendor" variant="full" />
+        </div>
+        <Switch
+          checked={isCertified}
+          onCheckedChange={toggleCertification}
+          disabled={isToggling}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Activez le badge de certification pour afficher un symbole de confiance vérifié sur votre boutique.
+        La vérification KYB du propriétaire est requise.
+      </p>
     </div>
   );
 }

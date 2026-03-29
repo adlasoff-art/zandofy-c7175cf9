@@ -2934,6 +2934,7 @@ export type Database = {
           gender: string | null
           id: string
           is_banned: boolean
+          is_certified: boolean
           last_known_geo_at: string | null
           last_known_lat: number | null
           last_known_lng: number | null
@@ -2967,6 +2968,7 @@ export type Database = {
           gender?: string | null
           id: string
           is_banned?: boolean
+          is_certified?: boolean
           last_known_geo_at?: string | null
           last_known_lat?: number | null
           last_known_lng?: number | null
@@ -3000,6 +3002,7 @@ export type Database = {
           gender?: string | null
           id?: string
           is_banned?: boolean
+          is_certified?: boolean
           last_known_geo_at?: string | null
           last_known_lat?: number | null
           last_known_lng?: number | null
@@ -3790,6 +3793,7 @@ export type Database = {
           followers_override: number | null
           fulfillment_type: string
           id: string
+          is_certified: boolean
           is_online: boolean | null
           is_platform_owned: boolean
           is_verified: boolean | null
@@ -3838,6 +3842,7 @@ export type Database = {
           followers_override?: number | null
           fulfillment_type?: string
           id?: string
+          is_certified?: boolean
           is_online?: boolean | null
           is_platform_owned?: boolean
           is_verified?: boolean | null
@@ -3886,6 +3891,7 @@ export type Database = {
           followers_override?: number | null
           fulfillment_type?: string
           id?: string
+          is_certified?: boolean
           is_online?: boolean | null
           is_platform_owned?: boolean
           is_verified?: boolean | null
@@ -4793,6 +4799,10 @@ export type Database = {
       }
       can_access_store_orders: {
         Args: { _store_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_activate_certification: {
+        Args: { p_user_id: string }
         Returns: boolean
       }
       check_kyc_required: { Args: { p_user_id: string }; Returns: boolean }

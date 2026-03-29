@@ -7,9 +7,11 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   Loader2, AlertTriangle, Ban, ShieldCheck, Mail, ChevronRight, X,
-  ClipboardList, Activity, Brain, UserCheck, LogIn
+  ClipboardList, Activity, Brain, UserCheck, LogIn, Truck
 } from "lucide-react";
 import type { AppRole } from "@/hooks/use-roles";
+import { Switch } from "@/components/ui/switch";
+import { CertificationBadge } from "@/components/CertificationBadge";
 
 const ALL_ROLES: AppRole[] = ["admin", "manager", "vendor", "shipper", "rider"];
 
@@ -135,7 +137,35 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
   const [showActivityLogs, setShowActivityLogs] = useState(false);
   const [showAiAnalysis, setShowAiAnalysis] = useState(false);
 
-  // Fetch warnings
+  // Fetch certification status
+  const { data: certStatus } = useQuery({
+    queryKey: ["user-certification", user.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("is_certified")
+        .eq("id", user.id)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const toggleCertMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_certified: enabled } as any)
+        .eq("id", user.id);
+      if (error) throw error;
+      await logAudit(enabled ? "certification_enabled" : "certification_disabled", user.id, { type: user.roles.includes("rider") ? "rider" : "client" });
+    },
+    onSuccess: (_, enabled) => {
+      queryClient.invalidateQueries({ queryKey: ["user-certification", user.id] });
+      toast.success(enabled ? "Badge certifié activé" : "Badge certifié désactivé");
+    },
+    onError: () => toast.error("Erreur : la vérification KYC est requise"),
+  });
+
   const { data: warnings = [] } = useQuery({
     queryKey: ["user-warnings", user.id],
     queryFn: async () => {
@@ -504,6 +534,27 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
               </div>
             )}
           </div>
+
+          {/* Certification Badge (Rider or Client) */}
+          {(user.roles.includes("rider") || user.roles.length === 0) && (
+            <div className="bg-muted/20 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CertificationBadge type={user.roles.includes("rider") ? "rider" : "client"} variant="full" />
+                </div>
+                <Switch
+                  checked={!!(certStatus as any)?.is_certified}
+                  onCheckedChange={(enabled) => toggleCertMutation.mutate(enabled)}
+                  disabled={toggleCertMutation.isPending}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {user.roles.includes("rider")
+                  ? "Activez le badge de livreur certifié. La vérification KYC de l'utilisateur doit être approuvée."
+                  : "Activez le badge de client certifié. La vérification KYC de l'utilisateur doit être approuvée."}
+              </p>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="space-y-2">

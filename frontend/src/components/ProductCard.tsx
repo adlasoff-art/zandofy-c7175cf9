@@ -7,6 +7,7 @@ import { useWishlist } from "@/contexts/WishlistContext";
 import { useCompare } from "@/contexts/CompareContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { CertificationBadge } from "@/components/CertificationBadge";
 import type { Product } from "@/services/api";
 
 interface ProductCardProps {
@@ -211,8 +212,11 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
 
         {/* Certification badge below rating — only if store is verified */}
         {(product as any).storeIsVerified && product.verifiedYears > 0 && (
-          <div className="mt-1">
+          <div className="mt-1 flex items-center gap-1">
             <VerificationBadge variant="icon-only" verifiedYears={product.verifiedYears} />
+            {(product as any).storeIsCertified && (
+              <CertificationBadge type="vendor" variant="icon-only" />
+            )}
           </div>
         )}
 

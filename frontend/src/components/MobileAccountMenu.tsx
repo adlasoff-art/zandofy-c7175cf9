@@ -25,11 +25,14 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useCertification } from "@/hooks/use-certification";
+import { CertificationBadge } from "@/components/CertificationBadge";
 
 export function MobileAccountMenu() {
   const { user, loading: authLoading, signOut } = useAuth();
   const { isAdmin, isManager, isVendor, isShipper, isRider, isStaff, loading: rolesLoading } = useRoles();
   const { t } = useI18n();
+  const { isCertified } = useCertification();
 
   if (authLoading || rolesLoading) {
     return (
@@ -105,7 +108,10 @@ export function MobileAccountMenu() {
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-foreground truncate">{displayName}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-foreground truncate">{displayName}</p>
+            {isCertified && <CertificationBadge type="client" variant="icon-only" />}
+          </div>
           <p className="text-xs text-muted-foreground truncate">{email}</p>
         </div>
       </div>

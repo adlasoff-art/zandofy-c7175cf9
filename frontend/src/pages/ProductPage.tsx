@@ -13,6 +13,7 @@ import { FloatingActions } from "@/components/FloatingActions";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductReviews } from "@/components/reviews/ProductReviews";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { CertificationBadge } from "@/components/CertificationBadge";
 import { VendorProfileCard } from "@/components/VendorProfileCard";
 import { FollowStoreButton } from "@/components/FollowStoreButton";
 import { TieredPricingTable, calculateTieredPrice, type PricingTier } from "@/components/TieredPricingTable";
@@ -529,7 +530,12 @@ export default function ProductPage() {
 
             {/* Zandofy Verified badge — only if store is verified */}
             {(product as any).store?.is_verified && (product as any).store?.verified_years > 0 && (
-              <VerificationBadge variant="full" verifiedYears={(product as any).store?.verified_years_override ?? (product as any).store?.verified_years} />
+              <div className="flex items-center gap-2">
+                <VerificationBadge variant="full" verifiedYears={(product as any).store?.verified_years_override ?? (product as any).store?.verified_years} />
+                {(product as any).store?.is_certified && (
+                  <CertificationBadge type="vendor" variant="icon-only" />
+                )}
+              </div>
             )}
 
             {/* ═══ TIERED PRICING TABLE ═══ */}
@@ -885,6 +891,9 @@ export default function ProductPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-foreground">{(product as any).store.name}</span>
                             <VerificationBadge variant="icon-only" verifiedYears={(product as any).store.verified_years} />
+                            {(product as any).store.is_certified && (
+                              <CertificationBadge type="vendor" variant="icon-only" />
+                            )}
                             <span className={`w-2 h-2 rounded-full ${(product as any).store.is_online ? "bg-emerald-500" : "bg-amber-500/60"}`} />
                             <span className={`text-xs ${(product as any).store.is_online ? "text-emerald-600" : "text-amber-600"}`}>
                               {(product as any).store.is_online ? "En ligne" : "Hors ligne"}

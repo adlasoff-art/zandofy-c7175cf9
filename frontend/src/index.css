@@ -65,6 +65,14 @@
 
     --zandofy-certified: 217 91% 60%;
     --zandofy-certified-foreground: 0 0% 100%;
+
+    /* Certification badges */
+    --cert-vendor: 38 92% 50%;
+    --cert-vendor-foreground: 38 80% 15%;
+    --cert-rider: 152 69% 40%;
+    --cert-rider-foreground: 0 0% 100%;
+    --cert-client: 210 60% 60%;
+    --cert-client-foreground: 0 0% 100%;
   }
 
   .dark {
@@ -116,6 +124,13 @@
 
     --zandofy-certified: 217 91% 60%;
     --zandofy-certified-foreground: 0 0% 100%;
+
+    --cert-vendor: 38 92% 55%;
+    --cert-vendor-foreground: 38 80% 15%;
+    --cert-rider: 152 69% 45%;
+    --cert-rider-foreground: 0 0% 100%;
+    --cert-client: 210 60% 65%;
+    --cert-client-foreground: 0 0% 100%;
   }
 }
 
