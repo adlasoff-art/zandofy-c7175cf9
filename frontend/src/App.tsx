@@ -233,6 +233,7 @@ const App = () => (
                 <Route path="/admin/vendor-accounting" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminVendorAccountingPage /></RoleGuard>} />
                 <Route path="/admin/flash-sales" element={<RoleGuard allowedRoles={["admin"]}><AdminFlashSalesPage /></RoleGuard>} />
                 <Route path="/admin/supplier-platforms" element={<RoleGuard allowedRoles={["admin"]}><AdminSupplierPlatformsPage /></RoleGuard>} />
+                <Route path="/impersonate" element={<ImpersonatePage />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
