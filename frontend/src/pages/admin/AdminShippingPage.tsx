@@ -439,6 +439,10 @@ const AdminShippingPage: React.FC = () => {
   const [search, setSearch] = useState("");
   const [modeFilter, setModeFilter] = useState("all");
 
+  // Sea mode threshold
+  const [seaEnabled, setSeaEnabled] = useState(true);
+  const [seaMinSubtotal, setSeaMinSubtotal] = useState(29);
+
   // Dialogs
   const [zoneDialog, setZoneDialog] = useState<{ open: boolean; zone: Partial<ShippingZone> | null }>({ open: false, zone: null });
   const [routeDialog, setRouteDialog] = useState<{ open: boolean; route: Partial<ShippingRoute> | null }>({ open: false, route: null });
@@ -461,10 +465,32 @@ const AdminShippingPage: React.FC = () => {
       fetchCategorySurcharges(), fetchCategories(),
     ]);
     setZones(z); setRoutes(r); setDefaults(d); setSurcharges(s); setCategories(c);
+
+    // Load sea threshold setting
+    const { data: seaSetting } = await supabase
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "sea_mode_min_order")
+      .maybeSingle();
+    if (seaSetting?.value && typeof seaSetting.value === "object" && !Array.isArray(seaSetting.value)) {
+      const v = seaSetting.value as Record<string, unknown>;
+      setSeaEnabled(v.enabled === true);
+      setSeaMinSubtotal(Number(v.min_subtotal) || 29);
+    }
+
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+
+  const saveSeaThreshold = async (enabled: boolean, minSubtotal: number) => {
+    const value = { enabled, min_subtotal: minSubtotal };
+    await supabase.from("platform_settings").upsert(
+      { key: "sea_mode_min_order", value },
+      { onConflict: "key" }
+    );
+    toast.success("Seuil maritime sauvegardé");
+  };
 
   // Filtered routes
   const filteredRoutes = useMemo(() => {

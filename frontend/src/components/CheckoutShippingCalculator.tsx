@@ -336,6 +336,8 @@ export function CheckoutShippingCalculator({
         {(["air", "sea", "road", "rail"] as TransportMode[]).map(mode => {
           const data = modeTotals.get(mode);
           if (!data || data.total <= 0) return null;
+          // Hide sea mode if blocked by threshold
+          if (mode === "sea" && isSeaBlocked) return null;
           const Meta = MODE_META[mode];
           const Icon = Meta.icon;
           const isActive = activeMode === mode;
@@ -372,6 +374,14 @@ export function CheckoutShippingCalculator({
           );
         })}
       </div>
+
+      {/* Sea mode threshold hint */}
+      {isSeaBlocked && seaHasQuotes && seaThreshold && (
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground bg-muted/40 rounded-md px-2.5 py-1.5">
+          <Ship size={11} className="shrink-0" />
+          <span>🚢 Maritime disponible à partir de ${seaThreshold.min_subtotal} de commande</span>
+        </div>
+      )}
 
       {/* Selected mode details */}
       {(() => {
