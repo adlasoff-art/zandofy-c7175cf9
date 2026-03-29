@@ -44,6 +44,7 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState<SupplierForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [supplierPage, setSupplierPage] = useState(1);
 
   const loadSuppliers = useCallback(async () => {
     if (!user) return;
