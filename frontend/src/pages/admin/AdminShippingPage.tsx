@@ -488,6 +488,24 @@ const AdminShippingPage: React.FC = () => {
       setSeaMinSubtotal(Number(v.min_subtotal) || 29);
     }
 
+    // Load delivery time defaults
+    const { data: dtSetting } = await supabase
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "delivery_time_defaults")
+      .maybeSingle();
+    if (dtSetting?.value && typeof dtSetting.value === "object" && !Array.isArray(dtSetting.value)) {
+      const v = dtSetting.value as Record<string, unknown>;
+      setDeliveryDefaults({
+        local_hours_min: Number(v.local_hours_min) || 0.75,
+        local_hours_max: Number(v.local_hours_max) || 2,
+        intl_prep_min: Number(v.intl_prep_min) || 2,
+        intl_prep_max: Number(v.intl_prep_max) || 5,
+        intl_transit_min: Number(v.intl_transit_min) || 4,
+        intl_transit_max: Number(v.intl_transit_max) || 6,
+      });
+    }
+
     setLoading(false);
   };
 
