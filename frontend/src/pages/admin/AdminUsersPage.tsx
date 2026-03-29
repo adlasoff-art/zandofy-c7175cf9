@@ -31,7 +31,7 @@ const roleBadgeColors: Record<string, string> = {
   rider: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
 };
 
-const ITEMS_PER_PAGE = 15;
+const DEFAULT_PAGE_SIZE = 25;
 
 export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
