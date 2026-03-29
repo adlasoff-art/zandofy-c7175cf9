@@ -101,7 +101,34 @@ export function Header() {
     return () => clearInterval(interval);
   }, [topBarConfig?.mode, topBarMessages.length]);
 
-  const { data: mobileCategories } = useQuery({
+  // Dynamic category nav from CMS
+  const { data: cmsNavItems } = useQuery({
+    queryKey: ["cms-category-nav"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cms_menu_items")
+        .select("*")
+        .eq("menu_group", "category_nav")
+        .eq("is_visible", true)
+        .is("parent_id", null)
+        .order("sort_order");
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Build nav links: CMS data or fallback
+  const navLinks = (cmsNavItems && cmsNavItems.length > 0)
+    ? cmsNavItems.map((item: any) => ({
+        label: item.label,
+        href: item.url,
+        hasMega: item.has_mega ?? false,
+        highlight: item.highlight ?? false,
+      }))
+    : NAV_LINK_KEYS;
+
+
     queryKey: ["mobile-categories"],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
