@@ -87,6 +87,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
   // Search and filter states
   const [orderSearch, setOrderSearch] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
+  const [currentOrderPage, setCurrentOrderPage] = useState(1);
 
   // Modal states
   const [supplierModal, setSupplierModal] = useState<string | null>(null);
