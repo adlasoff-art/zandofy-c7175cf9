@@ -463,6 +463,17 @@ export default function AdminVendorPricingPage() {
                   />
                 </div>
 
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Gestion des fournisseurs</p>
+                    <p className="text-[10px] text-muted-foreground">Fonctionnalité payante : permet au vendeur de gérer ses fournisseurs et de les lier à ses produits.</p>
+                  </div>
+                  <Switch
+                    checked={edit.suppliers_enabled}
+                    onCheckedChange={(v) => updateEdit(store.id, "suppliers_enabled", v)}
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
                     <label className="text-xs text-muted-foreground block mb-1">
