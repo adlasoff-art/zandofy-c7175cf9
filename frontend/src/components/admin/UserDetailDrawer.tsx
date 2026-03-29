@@ -7,11 +7,9 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   Loader2, AlertTriangle, Ban, ShieldCheck, Mail, ChevronRight, X,
-  ClipboardList, Activity, Brain, UserCheck, Eye
+  ClipboardList, Activity, Brain, UserCheck, LogIn
 } from "lucide-react";
 import type { AppRole } from "@/hooks/use-roles";
-import { useImpersonation } from "@/contexts/ImpersonationContext";
-import { ImpersonationPanel } from "@/components/admin/ImpersonationPanel";
 
 const ALL_ROLES: AppRole[] = ["admin", "manager", "vendor", "shipper", "rider"];
 
