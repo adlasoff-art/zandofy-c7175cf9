@@ -281,7 +281,7 @@ export function CheckoutShippingCalculator({
       }
       setLoading(false);
     });
-  }, [destCity, products, originCities, selectedMode]);
+  }, [dataReady, selectedMode]);
 
   // Compute aggregated totals per mode WITH surcharges
   const modeTotals = useMemo(() => {
