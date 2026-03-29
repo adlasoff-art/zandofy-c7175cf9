@@ -207,8 +207,7 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
                 </button>
               </div>
             </div>
-          ))}
-          </>;
+          ))
           })()}
           <DataTablePagination
             totalItems={suppliers.length}
