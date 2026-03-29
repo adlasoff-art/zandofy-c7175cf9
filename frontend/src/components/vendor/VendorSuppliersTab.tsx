@@ -218,7 +218,7 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
             pageSizeOptions={[25]}
           />
         </div>
-
+      )
       {/* Modal Add/Edit */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-md">
