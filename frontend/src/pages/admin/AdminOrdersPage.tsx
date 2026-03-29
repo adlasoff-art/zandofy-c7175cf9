@@ -26,6 +26,8 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all" | "payment_failed">("all");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [adminOrderPage, setAdminOrderPage] = useState(1);
+  const [adminOrderPageSize, setAdminOrderPageSize] = useState(25);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [logisticsInfo, setLogisticsInfo] = useState<Record<string, { zones: DeliveryZoneMatch[]; usePlatform: boolean; riderAvailable: boolean; riderCount: number } | null>>({});
   const [loadingLogistics, setLoadingLogistics] = useState<string | null>(null);
