@@ -33,10 +33,13 @@ export function VendorWalletTab({ storeId }: Props) {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawMethod, setWithdrawMethod] = useState("mobile_money");
 
-  // Fetch wallet
+  // Release pending funds on load
   const { data: wallet, isLoading: walletLoading } = useQuery({
     queryKey: ["vendor-wallet", storeId],
     queryFn: async () => {
+      // First release any pending funds past retention
+      await supabase.rpc("release_pending_wallet_funds", { p_store_id: storeId });
+      // Then fetch wallet
       const { data } = await supabase
         .from("vendor_wallets")
         .select("*")
