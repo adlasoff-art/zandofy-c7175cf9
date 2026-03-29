@@ -579,7 +579,7 @@ export default function CheckoutPage() {
         .eq("code", appliedCoupon.code)
         .maybeSingle();
       if (couponRow?.id) {
-        await supabase.rpc("increment_coupon_uses", { p_coupon_id: couponRow.id, p_table: couponTable } as any);
+        await (supabase.rpc as any)("increment_coupon_uses", { p_coupon_id: couponRow.id, p_table: couponTable });
       }
     }
 
