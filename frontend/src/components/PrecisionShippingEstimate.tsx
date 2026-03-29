@@ -93,6 +93,8 @@ export function PrecisionShippingEstimate({
   productHeightCm,
   originCountry,
   quantity,
+  prepDaysMin = 2,
+  prepDaysMax = 5,
 }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<City[]>([]);
