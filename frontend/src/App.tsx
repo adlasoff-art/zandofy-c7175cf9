@@ -133,7 +133,7 @@ const App = () => (
     <TooltipProvider>
       <AuthProvider>
         <ImpersonationProvider>
-        <ImpersonationPanel />
+        <ImpersonationBanner />
         <CartProvider>
           <WishlistProvider>
           <CompareProvider>
