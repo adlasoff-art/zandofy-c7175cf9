@@ -574,7 +574,10 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-foreground truncate">{item.product_name}</p>
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs font-medium text-foreground truncate">{item.product_name}</p>
+                          <SupplierPopover productId={item.product_id} />
+                        </div>
                         <p className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
                           <span>{item.quantity}x ${Number(item.price).toFixed(2)}</span>
                           {item.color && (() => {
