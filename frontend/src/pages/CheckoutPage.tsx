@@ -566,7 +566,7 @@ export default function CheckoutPage() {
 
     // Deduct ZandoPoints if used
     if (pointsDiscount > 0 && pointsToUse > 0) {
-      await supabase.rpc("deduct_points", { p_user_id: user!.id, p_amount: pointsToUse } as any);
+      await (supabase.rpc as any)("deduct_points", { p_user_id: user!.id, p_amount: pointsToUse });
     }
 
     // Increment coupon uses
