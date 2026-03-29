@@ -385,20 +385,26 @@ export function CheckoutShippingCalculator({
         {(["air", "sea", "road", "rail"] as TransportMode[]).map(mode => {
           const data = modeTotals.get(mode);
           if (!data || data.total <= 0) return null;
-          // Hide sea mode if blocked by threshold
-          if (mode === "sea" && isSeaBlocked) return null;
+          const isSeaDisabled = mode === "sea" && isSeaBlocked;
           const Meta = MODE_META[mode];
           const Icon = Meta.icon;
-          const isActive = activeMode === mode;
+          const isActive = activeMode === mode && !isSeaDisabled;
           
           return (
             <button
               key={mode}
-              onClick={() => { setUserHasSelected(true); setActiveMode(mode); }}
+              disabled={isSeaDisabled}
+              onClick={() => {
+                if (isSeaDisabled) return;
+                setUserHasSelected(true);
+                setActiveMode(mode);
+              }}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all border ${
-                isActive
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground hover:border-primary/50"
+                isSeaDisabled
+                  ? "border-border bg-muted/50 text-muted-foreground/50 cursor-not-allowed opacity-60"
+                  : isActive
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:border-primary/50"
               }`}
             >
               <Icon size={12} />
