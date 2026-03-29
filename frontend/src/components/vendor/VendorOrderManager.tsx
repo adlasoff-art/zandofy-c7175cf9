@@ -651,6 +651,16 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
           </div>
         );
       })}
+        <DataTablePagination
+          totalItems={filteredOrders.length}
+          currentPage={orderPage}
+          pageSize={orderPageSize}
+          onPageChange={setCurrentOrderPage}
+          onPageSizeChange={() => {}}
+          pageSizeOptions={[25]}
+        />
+        </>);
+      })()}
 
       {/* Supplier info modal: confirmed → preparing */}
       {supplierModal && (

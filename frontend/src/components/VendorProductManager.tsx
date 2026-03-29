@@ -5,6 +5,7 @@ import {
   Plus, Pencil, Trash2, Loader2, X, Save, Package,
   ImageIcon, ChevronLeft, Eye, EyeOff, Send, Crown, EyeOff as EyeOffIcon, Search,
 } from "lucide-react";
+import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { toast } from "sonner";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
 import { MediaUploader } from "@/components/vendor/MediaUploader";
