@@ -4436,6 +4436,7 @@ export type Database = {
           multiplier: number | null
           notes: string | null
           store_id: string
+          suppliers_enabled: boolean
           updated_at: string
           vendor_cod_enabled: boolean
           vendor_custom_payment_numbers_enabled: boolean
@@ -4452,6 +4453,7 @@ export type Database = {
           multiplier?: number | null
           notes?: string | null
           store_id: string
+          suppliers_enabled?: boolean
           updated_at?: string
           vendor_cod_enabled?: boolean
           vendor_custom_payment_numbers_enabled?: boolean
@@ -4468,6 +4470,7 @@ export type Database = {
           multiplier?: number | null
           notes?: string | null
           store_id?: string
+          suppliers_enabled?: boolean
           updated_at?: string
           vendor_cod_enabled?: boolean
           vendor_custom_payment_numbers_enabled?: boolean
