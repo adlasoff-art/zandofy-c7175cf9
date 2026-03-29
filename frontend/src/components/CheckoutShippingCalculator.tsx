@@ -385,20 +385,26 @@ export function CheckoutShippingCalculator({
         {(["air", "sea", "road", "rail"] as TransportMode[]).map(mode => {
           const data = modeTotals.get(mode);
           if (!data || data.total <= 0) return null;
-          // Hide sea mode if blocked by threshold
-          if (mode === "sea" && isSeaBlocked) return null;
+          const isSeaDisabled = mode === "sea" && isSeaBlocked;
           const Meta = MODE_META[mode];
           const Icon = Meta.icon;
-          const isActive = activeMode === mode;
+          const isActive = activeMode === mode && !isSeaDisabled;
           
           return (
             <button
               key={mode}
-              onClick={() => { setUserHasSelected(true); setActiveMode(mode); }}
+              disabled={isSeaDisabled}
+              onClick={() => {
+                if (isSeaDisabled) return;
+                setUserHasSelected(true);
+                setActiveMode(mode);
+              }}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all border ${
-                isActive
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground hover:border-primary/50"
+                isSeaDisabled
+                  ? "border-border bg-muted/50 text-muted-foreground/50 cursor-not-allowed opacity-60"
+                  : isActive
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:border-primary/50"
               }`}
             >
               <Icon size={12} />
@@ -425,12 +431,27 @@ export function CheckoutShippingCalculator({
       </div>
 
       {/* Sea mode threshold hint */}
-      {isSeaBlocked && seaHasQuotes && seaThreshold && (
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground bg-muted/40 rounded-md px-2.5 py-1.5">
-          <Ship size={11} className="shrink-0" />
-          <span>🚢 Maritime disponible à partir de ${seaThreshold.min_subtotal} de commande</span>
-        </div>
-      )}
+      {isSeaBlocked && seaHasQuotes && seaThreshold && (() => {
+        const amountNeeded = preciseRound(seaThreshold.min_subtotal - cartSubtotal, 2);
+        // Find cheapest product in cart to suggest how many more units
+        const cheapest = products.length > 0
+          ? products.reduce((min, p) => {
+              // Estimate unit price from subtotal / total qty as approximation
+              return p;
+            }, products[0])
+          : null;
+        return (
+          <div className="flex items-start gap-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-2">
+            <Ship size={12} className="shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">🚢 Maritime indisponible — seuil non atteint</p>
+              <p className="text-[10px] mt-0.5 text-amber-600 dark:text-amber-500">
+                Ajoutez ${amountNeeded.toFixed(2)} à votre panier (sous-total minimum : ${seaThreshold.min_subtotal}) pour débloquer l'expédition maritime.
+              </p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Selected mode details */}
       {(() => {
