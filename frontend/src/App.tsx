@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
-import { ImpersonationPanel } from "@/components/admin/ImpersonationPanel";
+import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { CartProvider } from "@/contexts/CartContext";
 import { WishlistProvider } from "@/contexts/WishlistContext";
 import { CompareProvider } from "@/contexts/CompareContext";
@@ -107,6 +107,7 @@ const AdminFeaturedPlacementsPage = lazy(() => import("./pages/admin/AdminFeatur
 const AdminVendorAccountingPage = lazy(() => import("./pages/admin/AdminVendorAccountingPage"));
 const AdminFlashSalesPage = lazy(() => import("./pages/admin/AdminFlashSalesPage"));
 const AdminSupplierPlatformsPage = lazy(() => import("./pages/admin/AdminSupplierPlatformsPage"));
+const ImpersonatePage = lazy(() => import("./pages/ImpersonatePage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30 * 1000 } },
@@ -133,7 +134,7 @@ const App = () => (
     <TooltipProvider>
       <AuthProvider>
         <ImpersonationProvider>
-        <ImpersonationPanel />
+        <ImpersonationBanner />
         <CartProvider>
           <WishlistProvider>
           <CompareProvider>
@@ -232,6 +233,7 @@ const App = () => (
                 <Route path="/admin/vendor-accounting" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminVendorAccountingPage /></RoleGuard>} />
                 <Route path="/admin/flash-sales" element={<RoleGuard allowedRoles={["admin"]}><AdminFlashSalesPage /></RoleGuard>} />
                 <Route path="/admin/supplier-platforms" element={<RoleGuard allowedRoles={["admin"]}><AdminSupplierPlatformsPage /></RoleGuard>} />
+                <Route path="/impersonate" element={<ImpersonatePage />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Loader2, Truck, Globe, Mail, Phone, Clock, User } from "lucide-react";
+import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -43,6 +44,7 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState<SupplierForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [supplierPage, setSupplierPage] = useState(1);
 
   const loadSuppliers = useCallback(async () => {
     if (!user) return;
@@ -164,7 +166,11 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
         </div>
       ) : (
         <div className="grid gap-3">
-          {suppliers.map((s) => (
+          {(() => {
+            const suppPageSize = 25;
+            const safeSuppPage = Math.max(1, Math.min(supplierPage, Math.ceil(suppliers.length / suppPageSize)));
+            const paginatedSuppliers = suppliers.slice((safeSuppPage - 1) * suppPageSize, safeSuppPage * suppPageSize);
+            return paginatedSuppliers.map((s) => (
             <div key={s.id} className="bg-card border border-border rounded-lg p-4 flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <User size={18} className="text-primary" />
@@ -201,7 +207,16 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
                 </button>
               </div>
             </div>
-          ))}
+          ))
+          })()}
+          <DataTablePagination
+            totalItems={suppliers.length}
+            currentPage={supplierPage}
+            pageSize={25}
+            onPageChange={setSupplierPage}
+            onPageSizeChange={() => {}}
+            pageSizeOptions={[25]}
+          />
         </div>
       )}
 

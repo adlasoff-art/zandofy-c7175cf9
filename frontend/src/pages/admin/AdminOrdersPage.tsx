@@ -1,6 +1,7 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Search, Loader2, ChevronDown, ChevronUp, MapPin, Truck, AlertTriangle, Download, Hash, Bike, DollarSign } from "lucide-react";
 import { useState } from "react";
+import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,6 +26,8 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all" | "payment_failed">("all");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [adminOrderPage, setAdminOrderPage] = useState(1);
+  const [adminOrderPageSize, setAdminOrderPageSize] = useState(25);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [logisticsInfo, setLogisticsInfo] = useState<Record<string, { zones: DeliveryZoneMatch[]; usePlatform: boolean; riderAvailable: boolean; riderCount: number } | null>>({});
   const [loadingLogistics, setLoadingLogistics] = useState<string | null>(null);
@@ -290,7 +293,10 @@ export default function AdminOrdersPage() {
           <p className="text-center py-8 text-sm text-muted-foreground">Aucune commande trouvée.</p>
         ) : (
           <div className="divide-y divide-border">
-            {filtered.map((o) => {
+            {(() => {
+              const safeAdminPage = Math.max(1, Math.min(adminOrderPage, Math.ceil(filtered.length / adminOrderPageSize)));
+              const paginatedFiltered = filtered.slice((safeAdminPage - 1) * adminOrderPageSize, safeAdminPage * adminOrderPageSize);
+              return paginatedFiltered.map((o) => {
               const cfg = STATUS_CONFIG[o.status] || STATUS_CONFIG.pending;
               const StatusIcon = cfg.icon;
               const next = getNextStatus(o.status);
@@ -467,7 +473,15 @@ export default function AdminOrdersPage() {
                   )}
                 </div>
               );
-            })}
+            })
+            })()}
+            <DataTablePagination
+              totalItems={filtered.length}
+              currentPage={adminOrderPage}
+              pageSize={adminOrderPageSize}
+              onPageChange={setAdminOrderPage}
+              onPageSizeChange={(s) => { setAdminOrderPageSize(s); setAdminOrderPage(1); }}
+            />
           </div>
         )}
       </div>

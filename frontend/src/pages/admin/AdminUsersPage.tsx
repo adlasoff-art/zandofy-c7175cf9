@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Search, UserCheck, ShieldCheck, Store, Truck, Bike, Loader2, Download, Ban, Filter, Users } from "lucide-react";
+import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -30,13 +31,14 @@ const roleBadgeColors: Record<string, string> = {
   rider: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
 };
 
-const ITEMS_PER_PAGE = 15;
+const DEFAULT_PAGE_SIZE = 25;
 
 export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -77,9 +79,9 @@ export default function AdminUsersPage() {
     return matchesSearch && matchesRole && matchesStatus;
   }), [users, search, roleFilter, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
-  const paginated = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
+  const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const handleSearch = (val: string) => { setSearch(val); setCurrentPage(1); };
   const handleRoleFilter = (val: RoleFilter) => { setRoleFilter(val); setCurrentPage(1); };
@@ -275,29 +277,13 @@ export default function AdminUsersPage() {
         {!isLoading && filtered.length === 0 && (
           <div className="text-center py-8 text-sm text-muted-foreground">Aucun utilisateur trouvé.</div>
         )}
-        {!isLoading && totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-            <p className="text-xs text-muted-foreground">
-              {filtered.length} utilisateur{filtered.length > 1 ? "s" : ""} · Page {safePage}/{totalPages}
-            </p>
-            <div className="flex gap-1">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, safePage - 1))}
-                disabled={safePage <= 1}
-                className="px-3 py-1.5 text-xs rounded-lg border border-border bg-card hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Précédent
-              </button>
-              <button
-                onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
-                disabled={safePage >= totalPages}
-                className="px-3 py-1.5 text-xs rounded-lg border border-border bg-card hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Suivant
-              </button>
-            </div>
-          </div>
-        )}
+        <DataTablePagination
+          totalItems={filtered.length}
+          currentPage={safePage}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+        />
       </div>
 
       {/* User detail drawer */}

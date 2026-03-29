@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SupplierPopover } from "@/components/vendor/SupplierPopover";
 import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send, Edit2, Truck, Search, Check, X } from "lucide-react";
+import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { Button } from "@/components/ui/button";
 import { PaymentProofUpload } from "@/components/PaymentProofUpload";
 import { useAuth } from "@/contexts/AuthContext";
@@ -86,6 +87,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
   // Search and filter states
   const [orderSearch, setOrderSearch] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
+  const [currentOrderPage, setCurrentOrderPage] = useState(1);
 
   // Modal states
   const [supplierModal, setSupplierModal] = useState<string | null>(null);
@@ -308,7 +310,12 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
             {orders.length === 0 ? "Aucune commande reçue pour le moment." : "Aucune commande ne correspond aux filtres."}
           </p>
         </div>
-      ) : filteredOrders.map((order) => {
+      ) : (() => {
+        const orderPageSize = 25;
+        const orderPage = Math.max(1, Math.min(currentOrderPage, Math.ceil(filteredOrders.length / orderPageSize)));
+        const paginatedOrders = filteredOrders.slice((orderPage - 1) * orderPageSize, orderPage * orderPageSize);
+        return (<>
+        {paginatedOrders.map((order) => {
         const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
         const StatusIcon = config.icon;
         const next = getNextStatus(order.status, shopType);
@@ -645,6 +652,16 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
           </div>
         );
       })}
+        <DataTablePagination
+          totalItems={filteredOrders.length}
+          currentPage={orderPage}
+          pageSize={orderPageSize}
+          onPageChange={setCurrentOrderPage}
+          onPageSizeChange={() => {}}
+          pageSizeOptions={[25]}
+        />
+        </>);
+      })()}
 
       {/* Supplier info modal: confirmed → preparing */}
       {supplierModal && (

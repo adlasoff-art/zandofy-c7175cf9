@@ -1669,6 +1669,36 @@ export type Database = {
         }
         Relationships: []
       }
+      impersonation_tokens: {
+        Row: {
+          admin_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          target_user_id: string
+          token: string
+          used: boolean
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          target_user_id: string
+          token: string
+          used?: boolean
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          target_user_id?: string
+          token?: string
+          used?: boolean
+        }
+        Relationships: []
+      }
       job_postings: {
         Row: {
           contract_type: string

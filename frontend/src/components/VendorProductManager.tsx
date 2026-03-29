@@ -5,6 +5,7 @@ import {
   Plus, Pencil, Trash2, Loader2, X, Save, Package,
   ImageIcon, ChevronLeft, Eye, EyeOff, Send, Crown, EyeOff as EyeOffIcon, Search,
 } from "lucide-react";
+import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { toast } from "sonner";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
 import { MediaUploader } from "@/components/vendor/MediaUploader";
@@ -271,6 +272,8 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
 
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogStatusFilter, setCatalogStatusFilter] = useState<string>("all");
+  const [productPage, setProductPage] = useState(1);
+  const [productPageSize, setProductPageSize] = useState(25);
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -808,7 +811,10 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredProducts.map((product) => (
+          {(() => {
+            const safeProdPage = Math.max(1, Math.min(productPage, Math.ceil(filteredProducts.length / productPageSize)));
+            const paginatedProducts = filteredProducts.slice((safeProdPage - 1) * productPageSize, safeProdPage * productPageSize);
+            return paginatedProducts.map((product) => (
             <div
               key={product.id}
               className="bg-card border border-border rounded-lg p-3 flex items-center gap-3"
@@ -873,7 +879,16 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
                 </button>
               </div>
             </div>
-          ))}
+          ))
+          })()}
+          
+          <DataTablePagination
+            totalItems={filteredProducts.length}
+            currentPage={productPage}
+            pageSize={productPageSize}
+            onPageChange={setProductPage}
+            onPageSizeChange={(s) => { setProductPageSize(s); setProductPage(1); }}
+          />
         </div>
       )}
     </div>

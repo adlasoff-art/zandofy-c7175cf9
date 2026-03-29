@@ -7,11 +7,9 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   Loader2, AlertTriangle, Ban, ShieldCheck, Mail, ChevronRight, X,
-  ClipboardList, Activity, Brain, UserCheck, Eye
+  ClipboardList, Activity, Brain, UserCheck, LogIn
 } from "lucide-react";
 import type { AppRole } from "@/hooks/use-roles";
-import { useImpersonation } from "@/contexts/ImpersonationContext";
-import { ImpersonationPanel } from "@/components/admin/ImpersonationPanel";
 
 const ALL_ROLES: AppRole[] = ["admin", "manager", "vendor", "shipper", "rider"];
 
@@ -128,7 +126,6 @@ async function logAudit(action: string, targetUserId: string, details: Record<st
 
 export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
   const queryClient = useQueryClient();
-  const { startImpersonation } = useImpersonation();
   const [warningReason, setWarningReason] = useState("");
   const [warningSeverity, setWarningSeverity] = useState<"warning" | "final_warning">("warning");
   const [banReason, setBanReason] = useState("");
@@ -247,11 +244,11 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
     onError: (e: any) => toast.error(`Analyse IA échouée: ${e.message}`),
   });
 
-  // Impersonation
+  // Impersonation — open in new tab
   const impersonateMutation = useMutation({
     mutationFn: async () => {
       const res = await supabase.functions.invoke("impersonate-user", {
-        body: { action: "start_impersonation", targetUserId: user.id },
+        body: { action: "start", targetUserId: user.id },
       });
       if (res.error) throw new Error(res.error.message);
       if (res.data?.error) throw new Error(res.data.error);
@@ -259,20 +256,10 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["user-audit-logs", user.id] });
-      // Open impersonation panel with full data
-      startImpersonation({
-        id: data.target.id,
-        email: data.target.email,
-        first_name: data.target.first_name,
-        last_name: data.target.last_name,
-        roles: data.target.roles || [],
-        orders: data.orders || [],
-        stats: data.stats || { total_orders: 0, total_spent: 0, total_delivered: 0 },
-        addresses: data.addresses || [],
-        wallet: data.wallet || null,
-        payment_methods: data.payment_methods || [],
-      });
-      toast.success(`Mode impersonation activé pour ${data.target?.first_name || data.target?.email}`);
+      // Open new tab with impersonation token
+      const url = `${window.location.origin}/impersonate?token=${data.token}`;
+      window.open(url, "_blank");
+      toast.success(`Onglet d'impersonation ouvert pour ${data.targetName}`);
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -528,8 +515,8 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
               disabled={impersonateMutation.isPending}
               className="w-full flex items-center gap-3 px-4 py-3 bg-blue-500/5 rounded-xl hover:bg-blue-500/10 transition-colors text-sm text-blue-600 dark:text-blue-400"
             >
-              <Eye size={16} />
-              <span className="flex-1 text-left">Voir comme cet utilisateur</span>
+              <LogIn size={16} />
+              <span className="flex-1 text-left">Se connecter en tant que cet utilisateur</span>
               {impersonateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <ChevronRight size={14} className="text-muted-foreground" />}
             </button>
 
