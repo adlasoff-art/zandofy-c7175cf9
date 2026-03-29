@@ -156,6 +156,7 @@ export function CheckoutShippingCalculator({
           });
         }
       });
+  }, []);
 
   // 3. Fetch active category surcharges
   useEffect(() => {
