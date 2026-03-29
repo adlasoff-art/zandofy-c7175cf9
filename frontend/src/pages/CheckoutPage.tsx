@@ -60,6 +60,11 @@ interface CouponData {
 
 const FALLBACK_SHIPPING_COST = 5.99;
 
+function preciseRound(v: number, d: number): number {
+  const f = Math.pow(10, d);
+  return Math.round(v * f) / f;
+}
+
 type DeliveryOption = "none" | "home_delivery" | "hub_pickup";
 type LastMilePayment = "pay_with_shipping" | "pay_cash_on_delivery";
 
