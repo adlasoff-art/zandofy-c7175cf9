@@ -15,6 +15,12 @@ import { PricingCalculator } from "@/components/vendor/PricingCalculator";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 
+interface Supplier {
+  id: string;
+  agent_name: string;
+  platform_name: string;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -33,6 +39,7 @@ interface Product {
   origin_country: string | null;
   category_id: string | null;
   store_id: string | null;
+  supplier_id: string | null;
   promo_start_date: string | null;
   promo_end_date: string | null;
   flash_timer_enabled: boolean | null;
