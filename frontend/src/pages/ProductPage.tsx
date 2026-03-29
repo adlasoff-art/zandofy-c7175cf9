@@ -891,6 +891,9 @@ export default function ProductPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-foreground">{(product as any).store.name}</span>
                             <VerificationBadge variant="icon-only" verifiedYears={(product as any).store.verified_years} />
+                            {(product as any).store.is_certified && (
+                              <CertificationBadge type="vendor" variant="icon-only" />
+                            )}
                             <span className={`w-2 h-2 rounded-full ${(product as any).store.is_online ? "bg-emerald-500" : "bg-amber-500/60"}`} />
                             <span className={`text-xs ${(product as any).store.is_online ? "text-emerald-600" : "text-amber-600"}`}>
                               {(product as any).store.is_online ? "En ligne" : "Hors ligne"}
