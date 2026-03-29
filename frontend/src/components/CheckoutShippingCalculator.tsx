@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plane, Ship, TruckIcon, Train, Loader2, Info, Lightbulb, Package } from "lucide-react";
+import { Plane, Ship, TruckIcon, Train, Loader2, Info, Lightbulb, Package, CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { isLandTransportFeasible } from "@/utils/neighboring-countries";
 import {
