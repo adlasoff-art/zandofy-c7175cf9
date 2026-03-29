@@ -38,7 +38,7 @@ export function VendorWalletTab({ storeId }: Props) {
     queryKey: ["vendor-wallet", storeId],
     queryFn: async () => {
       // First release any pending funds past retention
-      await supabase.rpc("release_pending_wallet_funds", { p_store_id: storeId });
+      await (supabase as any).rpc("release_pending_wallet_funds", { p_store_id: storeId });
       // Then fetch wallet
       const { data } = await supabase
         .from("vendor_wallets")
