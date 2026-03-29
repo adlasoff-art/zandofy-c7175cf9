@@ -107,6 +107,7 @@ const AdminFeaturedPlacementsPage = lazy(() => import("./pages/admin/AdminFeatur
 const AdminVendorAccountingPage = lazy(() => import("./pages/admin/AdminVendorAccountingPage"));
 const AdminFlashSalesPage = lazy(() => import("./pages/admin/AdminFlashSalesPage"));
 const AdminSupplierPlatformsPage = lazy(() => import("./pages/admin/AdminSupplierPlatformsPage"));
+const ImpersonatePage = lazy(() => import("./pages/ImpersonatePage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30 * 1000 } },
