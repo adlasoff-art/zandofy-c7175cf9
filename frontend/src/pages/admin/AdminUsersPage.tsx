@@ -277,29 +277,13 @@ export default function AdminUsersPage() {
         {!isLoading && filtered.length === 0 && (
           <div className="text-center py-8 text-sm text-muted-foreground">Aucun utilisateur trouvé.</div>
         )}
-        {!isLoading && totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-            <p className="text-xs text-muted-foreground">
-              {filtered.length} utilisateur{filtered.length > 1 ? "s" : ""} · Page {safePage}/{totalPages}
-            </p>
-            <div className="flex gap-1">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, safePage - 1))}
-                disabled={safePage <= 1}
-                className="px-3 py-1.5 text-xs rounded-lg border border-border bg-card hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Précédent
-              </button>
-              <button
-                onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
-                disabled={safePage >= totalPages}
-                className="px-3 py-1.5 text-xs rounded-lg border border-border bg-card hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Suivant
-              </button>
-            </div>
-          </div>
-        )}
+        <DataTablePagination
+          totalItems={filtered.length}
+          currentPage={safePage}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+        />
       </div>
 
       {/* User detail drawer */}
