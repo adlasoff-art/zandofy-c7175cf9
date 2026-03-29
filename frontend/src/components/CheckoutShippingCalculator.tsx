@@ -474,6 +474,37 @@ export function CheckoutShippingCalculator({
                 {details[0].route_type === "default" && " · Tarif indicatif"}
               </div>
             )}
+            {/* Estimated arrival date */}
+            {(() => {
+              if (isLocalStore && deliveryDefaults) {
+                const minH = deliveryDefaults.local_hours_min;
+                const maxH = deliveryDefaults.local_hours_max;
+                const fmtH = (h: number) => h < 1 ? `${Math.round(h * 60)}min` : `${h}h`;
+                return (
+                  <div className="flex items-center gap-1.5 text-[10px] text-primary font-medium pt-1 border-t border-border/50 mt-1">
+                    <CalendarDays size={11} className="shrink-0" />
+                    <span>🏪 Livraison estimée : {fmtH(minH)} – {fmtH(maxH)}</span>
+                  </div>
+                );
+              }
+              // International: prep + transit
+              const transitMin = data.transitMin ?? deliveryDefaults?.intl_transit_min ?? 4;
+              const transitMax = data.transitMax ?? deliveryDefaults?.intl_transit_max ?? 6;
+              const totalMin = prepDays.min + transitMin;
+              const totalMax = prepDays.max + transitMax;
+              const now = new Date();
+              const dateMin = new Date(now);
+              dateMin.setDate(dateMin.getDate() + totalMin);
+              const dateMax = new Date(now);
+              dateMax.setDate(dateMax.getDate() + totalMax);
+              const fmt = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+              return (
+                <div className="flex items-center gap-1.5 text-[10px] text-primary font-medium pt-1 border-t border-border/50 mt-1">
+                  <CalendarDays size={11} className="shrink-0" />
+                  <span>📦 Arrivée estimée : {fmt(dateMin)} – {fmt(dateMax)} {dateMax.getFullYear()}</span>
+                </div>
+              );
+            })()}
           </div>
         );
       })()}
