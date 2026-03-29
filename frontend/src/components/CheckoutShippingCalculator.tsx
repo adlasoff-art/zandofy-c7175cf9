@@ -49,6 +49,7 @@ function preciseRound(v: number, d: number): number {
 export function CheckoutShippingCalculator({
   shippingCity,
   cartItems,
+  cartSubtotal = 0,
   selectedMode,
   onShippingCostChange,
 }: Props) {
@@ -60,6 +61,7 @@ export function CheckoutShippingCalculator({
   const [loading, setLoading] = useState(false);
   const [activeMode, setActiveMode] = useState<TransportMode>(selectedMode || "air");
   const [userHasSelected, setUserHasSelected] = useState(false);
+  const [seaThreshold, setSeaThreshold] = useState<{ enabled: boolean; min_subtotal: number } | null>(null);
 
   // 1. Fetch product details (weight, dimensions, origin, category) for cart items
   useEffect(() => {
