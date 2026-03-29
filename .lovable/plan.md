@@ -1,27 +1,43 @@
 
 
-## Plan : Corriger l'erreur "vendor_off_platform_enabled not in schema cache"
+## Plan : Seuil minimum de commande pour le mode Maritime
 
-### Diagnostic
+### Contexte du problème
 
-- La colonne `vendor_off_platform_enabled` **existe** dans la base de données (vérifié par requête SQL directe).
-- La migration qui l'ajoute (`20260328204639`) se trouve dans `supabase/migrations/` (racine) mais **pas** dans `frontend/supabase/migrations/` qui est le répertoire source de vérité pour Lovable Cloud.
-- Le cache de schéma PostgREST n'a pas été rafraîchi après l'ajout de cette colonne.
+Actuellement, le mode maritime est proposé même pour des commandes très petites (1 pièce à $0.55 de fret), ce qui est commercialement absurde. Le maritime est pertinent uniquement pour des volumes/montants significatifs.
 
-### Solution
+### Approche
 
-Créer une migration dans `frontend/supabase/migrations/` qui ajoute la colonne de manière idempotente. Cela forcera un rechargement du cache PostgREST.
+Ajouter un **seuil minimum de sous-total panier** (configurable par l'admin, défaut : $29) en dessous duquel le bouton Maritime n'apparaît pas dans le sélecteur de mode au checkout. Le client voit un petit message explicatif s'il n'atteint pas le seuil.
 
-**Fichier** : `frontend/supabase/migrations/<new>_add_vendor_off_platform_enabled.sql`
+### Changements
 
-```sql
-ALTER TABLE public.vendor_pricing_overrides
-  ADD COLUMN IF NOT EXISTS vendor_off_platform_enabled boolean NOT NULL DEFAULT false;
-```
+**1. Paramètre admin (`platform_settings`)**
 
-C'est une migration d'une seule ligne, idempotente — si la colonne existe déjà, elle ne fait rien. L'exécution de la migration rafraîchira le schema cache PostgREST et l'erreur disparaîtra.
+Ajouter une clé `sea_mode_min_order` dans `platform_settings` (JSONB) avec valeur par défaut `{ "enabled": true, "min_subtotal": 29 }`. Pas de migration nécessaire — c'est un simple `INSERT ... ON CONFLICT DO NOTHING` dans le code ou via seed.
 
-### Aucun changement de code frontend nécessaire
+**2. `AdminShippingPage.tsx`** — Section paramètres
 
-Les requêtes existantes dans `CheckoutPage.tsx` et `AdminVendorPricingPage.tsx` utilisent déjà `(supabase as any)` pour contourner le typage strict — elles fonctionneront dès que le cache sera rafraîchi.
+Ajouter un bloc dans la page Shipping admin :
+- Toggle « Seuil minimum pour le Maritime »
+- Input numérique « Montant minimum ($) » (défaut 29)
+- Auto-save dans `platform_settings` clé `sea_mode_min_order`
+
+**3. `CheckoutShippingCalculator.tsx`** — Filtrage du mode maritime
+
+- Recevoir le sous-total du panier via une nouvelle prop `cartSubtotal: number`
+- Charger le paramètre `sea_mode_min_order` depuis `platform_settings`
+- Dans le rendu des boutons de mode (ligne 304), si `mode === "sea"` et `cartSubtotal < min_subtotal`, ne pas afficher le bouton
+- Afficher un petit texte informatif sous les boutons : « 🚢 Maritime disponible à partir de $29 de commande » si le seuil n'est pas atteint mais que des quotes maritime existent
+
+**4. `CheckoutPage.tsx`** — Passer le sous-total
+
+- Calculer le sous-total du panier (déjà disponible dans la variable `subtotal`)
+- Passer `cartSubtotal={subtotal}` au composant `CheckoutShippingCalculator`
+
+### Détails techniques
+
+- Le paramètre est lu une seule fois au mount du composant via `supabase.from("platform_settings").select("value").eq("key", "sea_mode_min_order").maybeSingle()`
+- Si le paramètre n'existe pas ou `enabled === false`, aucun filtrage n'est appliqué (rétrocompatible)
+- Si l'utilisateur avait sélectionné `sea` et que le sous-total descend sous le seuil (ex: retrait d'un produit), le mode bascule automatiquement vers `air`
 
