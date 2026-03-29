@@ -949,6 +949,9 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
       {/* Mobile Money Payment Numbers */}
       <VendorPaymentNumbers storeId={store.id} />
 
+      {/* Store Certification Badge */}
+      <StoreCertificationSection storeId={store.id} />
+
       {/* SEO Section */}
       <div className="bg-card border border-border rounded-lg p-4 space-y-4">
         <label className="text-sm font-medium text-foreground flex items-center gap-2">
