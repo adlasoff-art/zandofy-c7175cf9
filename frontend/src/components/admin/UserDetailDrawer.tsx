@@ -137,7 +137,35 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
   const [showActivityLogs, setShowActivityLogs] = useState(false);
   const [showAiAnalysis, setShowAiAnalysis] = useState(false);
 
-  // Fetch warnings
+  // Fetch certification status
+  const { data: certStatus } = useQuery({
+    queryKey: ["user-certification", user.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("is_certified")
+        .eq("id", user.id)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const toggleCertMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_certified: enabled } as any)
+        .eq("id", user.id);
+      if (error) throw error;
+      await logAudit(enabled ? "certification_enabled" : "certification_disabled", user.id, { type: user.roles.includes("rider") ? "rider" : "client" });
+    },
+    onSuccess: (_, enabled) => {
+      queryClient.invalidateQueries({ queryKey: ["user-certification", user.id] });
+      toast.success(enabled ? "Badge certifié activé" : "Badge certifié désactivé");
+    },
+    onError: () => toast.error("Erreur : la vérification KYC est requise"),
+  });
+
   const { data: warnings = [] } = useQuery({
     queryKey: ["user-warnings", user.id],
     queryFn: async () => {
