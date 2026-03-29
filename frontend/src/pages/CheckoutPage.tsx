@@ -958,39 +958,7 @@ export default function CheckoutPage() {
                       ))}
                     </div>
 
-                    {/* Last-mile payment option (only for home delivery) */}
-                    {deliveryOption === "home_delivery" && lastMileFee > 0 && (
-                      <div className="ml-4 mt-2 space-y-2 border-l-2 border-primary/30 pl-3">
-                        <p className="text-xs font-medium text-foreground">
-                          Frais de livraison à domicile : <strong className="text-primary">${lastMileFee.toFixed(2)}</strong>
-                        </p>
-                        {[
-                          { key: "pay_with_shipping" as LastMilePayment, label: "Payer maintenant", desc: "Inclure dans le total actuel" },
-                          { key: "pay_cash_on_delivery" as LastMilePayment, label: "Payer au livreur (cash)", desc: "Régler en espèces à la réception" },
-                        ].map(opt => (
-                          <button
-                            key={opt.key}
-                            type="button"
-                            onClick={() => setLastMilePayment(opt.key)}
-                            className={`w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left text-xs ${
-                              lastMilePayment === opt.key
-                                ? "border-primary bg-secondary"
-                                : "border-border hover:border-primary/50"
-                            }`}
-                          >
-                            <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                              lastMilePayment === opt.key ? "border-primary" : "border-border"
-                            }`}>
-                              {lastMilePayment === opt.key && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
-                            </div>
-                            <div>
-                              <p className="font-medium text-foreground">{opt.label}</p>
-                              <p className="text-[10px] text-muted-foreground">{opt.desc}</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {/* Last-mile choice deferred to hub arrival — no payment option at checkout */}
                   </div>
 
                   <Button type="submit" className="w-full h-12 font-bold mt-2">
