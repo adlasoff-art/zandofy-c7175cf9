@@ -515,8 +515,8 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
               disabled={impersonateMutation.isPending}
               className="w-full flex items-center gap-3 px-4 py-3 bg-blue-500/5 rounded-xl hover:bg-blue-500/10 transition-colors text-sm text-blue-600 dark:text-blue-400"
             >
-              <Eye size={16} />
-              <span className="flex-1 text-left">Voir comme cet utilisateur</span>
+              <LogIn size={16} />
+              <span className="flex-1 text-left">Se connecter en tant que cet utilisateur</span>
               {impersonateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <ChevronRight size={14} className="text-muted-foreground" />}
             </button>
 
