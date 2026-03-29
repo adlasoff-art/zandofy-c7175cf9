@@ -811,7 +811,10 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredProducts.map((product) => (
+          {(() => {
+            const safeProdPage = Math.max(1, Math.min(productPage, Math.ceil(filteredProducts.length / productPageSize)));
+            const paginatedProducts = filteredProducts.slice((safeProdPage - 1) * productPageSize, safeProdPage * productPageSize);
+            return paginatedProducts.map((product) => (
             <div
               key={product.id}
               className="bg-card border border-border rounded-lg p-3 flex items-center gap-3"
