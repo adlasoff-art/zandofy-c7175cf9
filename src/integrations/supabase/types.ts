@@ -4897,6 +4897,10 @@ export type Database = {
       increment_helpful: { Args: { review_id: string }; Returns: undefined }
       is_kyc_order_blocked: { Args: { p_user_id: string }; Returns: boolean }
       is_kyc_verified: { Args: { p_user_id: string }; Returns: boolean }
+      release_pending_wallet_funds: {
+        Args: { p_store_id: string }
+        Returns: undefined
+      }
       release_vendor_pending_funds: { Args: never; Returns: number }
       set_store_offline: { Args: { p_store_id: string }; Returns: undefined }
       set_user_offline: { Args: { p_user_id: string }; Returns: undefined }
