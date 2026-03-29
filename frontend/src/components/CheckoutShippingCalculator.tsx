@@ -136,6 +136,27 @@ export function CheckoutShippingCalculator({
       });
   }, []);
 
+  // 2b. Fetch delivery time defaults
+  useEffect(() => {
+    supabase
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "delivery_time_defaults")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value && typeof data.value === "object" && !Array.isArray(data.value)) {
+          const v = data.value as Record<string, unknown>;
+          setDeliveryDefaults({
+            local_hours_min: Number(v.local_hours_min) || 0.75,
+            local_hours_max: Number(v.local_hours_max) || 2,
+            intl_prep_min: Number(v.intl_prep_min) || 2,
+            intl_prep_max: Number(v.intl_prep_max) || 5,
+            intl_transit_min: Number(v.intl_transit_min) || 4,
+            intl_transit_max: Number(v.intl_transit_max) || 6,
+          });
+        }
+      });
+
   // 3. Fetch active category surcharges
   useEffect(() => {
     supabase
