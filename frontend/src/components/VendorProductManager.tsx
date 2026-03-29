@@ -15,6 +15,12 @@ import { PricingCalculator } from "@/components/vendor/PricingCalculator";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 
+interface Supplier {
+  id: string;
+  agent_name: string;
+  platform_name: string;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -33,6 +39,7 @@ interface Product {
   origin_country: string | null;
   category_id: string | null;
   store_id: string | null;
+  supplier_id: string | null;
   promo_start_date: string | null;
   promo_end_date: string | null;
   flash_timer_enabled: boolean | null;
@@ -72,6 +79,7 @@ const EMPTY_FORM = {
   origin_country: "",
   category_id: "" as string,
   trend_tag_id: "" as string,
+  supplier_id: "" as string,
   flash_timer_enabled: false,
   promo_start_date: "",
   promo_end_date: "",
@@ -109,6 +117,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
   const { subscription, tierConfig, canAddProduct } = useVendorSubscription(storeId);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [trendTags, setTrendTags] = useState<{ id: string; name_fr: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -138,7 +147,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     setLoading(true);
     const { data } = await (supabase
       .from("products")
-      .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max") as any)
+      .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max") as any)
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
 
@@ -177,7 +186,12 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
     (supabase as any).from("trend_tags").select("id, name_fr").eq("is_active", true).order("sort_order").then(({ data }: any) => {
       if (data) setTrendTags(data);
     });
-  }, [loadProducts]);
+    if (user) {
+      (supabase as any).from("suppliers").select("id, agent_name, platform_name").eq("vendor_id", user.id).order("agent_name").then(({ data }: any) => {
+        if (data) setSuppliers(data);
+      });
+    }
+  }, [loadProducts, user]);
 
   useEffect(() => {
     if (hasRestoredDraftRef.current || loading || showForm) return;
@@ -321,6 +335,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       origin_country: product.origin_country || "",
       category_id: product.category_id || "",
       trend_tag_id: (product as any).trend_tag_id || "",
+      supplier_id: (product as any).supplier_id || "",
       flash_timer_enabled: product.flash_timer_enabled || false,
       promo_start_date: toLocalDatetime(product.promo_start_date),
       promo_end_date: toLocalDatetime(product.promo_end_date),
@@ -392,6 +407,7 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
       origin_country: form.origin_country || null,
       category_id: form.category_id && form.category_id.trim() !== '' ? form.category_id : null,
       trend_tag_id: form.trend_tag_id && form.trend_tag_id.trim() !== '' ? form.trend_tag_id : null,
+      supplier_id: form.supplier_id && form.supplier_id.trim() !== '' ? form.supplier_id : null,
       store_id: storeId,
       flash_timer_enabled: form.flash_timer_enabled,
       promo_start_date: form.promo_start_date ? new Date(form.promo_start_date).toISOString() : null,
@@ -638,6 +654,22 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
                 <option key={t.id} value={t.id}>{t.name_fr}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">🏭 Fournisseur</label>
+            <select
+              className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md"
+              value={form.supplier_id}
+              onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
+            >
+              <option value="">— Aucun —</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>{s.agent_name}{s.platform_name ? ` (${s.platform_name})` : ""}</option>
+              ))}
+            </select>
+            {suppliers.length === 0 && (
+              <p className="text-[10px] text-muted-foreground mt-1">Ajoutez vos fournisseurs dans l'onglet "Fournisseurs"</p>
+            )}
           </div>
           <div className="flex gap-4">
             <label className="flex items-center gap-2 text-sm">

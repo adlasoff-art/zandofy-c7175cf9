@@ -21,10 +21,11 @@ import { VendorDisputesTab } from "@/components/vendor/VendorDisputesTab";
 import { VendorRiderTracking } from "@/components/vendor/VendorRiderTracking";
 import { VendorTeamTab } from "@/components/vendor/VendorTeamTab";
 import { VendorPaymentNumbers } from "@/components/vendor/VendorPaymentNumbers";
+import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
-  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles,
+  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { ACTIVE_ORDER_STATUSES, NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
@@ -70,7 +71,7 @@ export default function VendorDashboardPage() {
   const [noStore, setNoStore] = useState(false);
   const [selectedConv, setSelectedConv] = useState<VendorConversation | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "team" | "settings">("catalogue");
+  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "team" | "suppliers" | "settings">("catalogue");
   const [orderCounters, setOrderCounters] = useState<OrderCounters>({ total: 0, in_progress: 0, delivered: 0 });
 
   // Presence heartbeat — marks store as online while vendor is on dashboard
@@ -317,6 +318,7 @@ export default function VendorDashboardPage() {
     { key: "returns" as const, label: "Retours", icon: RotateCcw },
     { key: "disputes" as const, label: "Litiges", icon: AlertTriangle },
     { key: "featured" as const, label: "Mise en avant", icon: Sparkles },
+    { key: "suppliers" as const, label: "Fournisseurs", icon: Truck },
     { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
     ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
     { key: "messages" as const, label: "Messages", icon: MessageCircle },
@@ -352,6 +354,7 @@ export default function VendorDashboardPage() {
       {activeTab === "returns" && <VendorReturnsTab storeId={store!.id} />}
       {activeTab === "disputes" && <VendorDisputesTab storeId={store!.id} />}
       {activeTab === "featured" && <VendorFeaturedRequestTab storeId={store!.id} />}
+      {activeTab === "suppliers" && <VendorSuppliersTab storeId={store!.id} />}
       {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
       {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
       {activeTab === "messages" && (

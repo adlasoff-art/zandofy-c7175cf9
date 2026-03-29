@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { SupplierPopover } from "@/components/vendor/SupplierPopover";
 import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send, Edit2, Truck, Search, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PaymentProofUpload } from "@/components/PaymentProofUpload";
@@ -25,6 +26,7 @@ import { getColorDisplay } from "@/utils/colorName";
 
 interface OrderItem {
   id: string;
+  product_id: string | null;
   product_name: string;
   product_image: string | null;
   price: number;
@@ -130,7 +132,7 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
     const orderIds = data.map((o) => o.id);
     const [itemsRes, historyRes] = await Promise.all([
       orderIds.length > 0
-        ? supabase.from("order_items").select("id, order_id, product_name, product_image, price, quantity, color, size").in("order_id", orderIds) as any
+        ? supabase.from("order_items").select("id, order_id, product_id, product_name, product_image, price, quantity, color, size").in("order_id", orderIds) as any
         : Promise.resolve({ data: [] }),
       orderIds.length > 0
         ? supabase.from("order_status_history").select("order_id, status, created_at").in("order_id", orderIds).order("created_at", { ascending: true }) as any
@@ -572,7 +574,10 @@ export function VendorOrderManager({ storeId, shopType }: { storeId: string; sho
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-foreground truncate">{item.product_name}</p>
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs font-medium text-foreground truncate">{item.product_name}</p>
+                          <SupplierPopover productId={item.product_id} />
+                        </div>
                         <p className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
                           <span>{item.quantity}x ${Number(item.price).toFixed(2)}</span>
                           {item.color && (() => {

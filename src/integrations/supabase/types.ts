@@ -2727,6 +2727,7 @@ export type Database = {
           stock_quantity: number | null
           store_id: string | null
           style: string | null
+          supplier_id: string | null
           transaction_fee_pct: number | null
           trend_tag_id: string | null
           updated_at: string
@@ -2785,6 +2786,7 @@ export type Database = {
           stock_quantity?: number | null
           store_id?: string | null
           style?: string | null
+          supplier_id?: string | null
           transaction_fee_pct?: number | null
           trend_tag_id?: string | null
           updated_at?: string
@@ -2843,6 +2845,7 @@ export type Database = {
           stock_quantity?: number | null
           store_id?: string | null
           style?: string | null
+          supplier_id?: string | null
           transaction_fee_pct?: number | null
           trend_tag_id?: string | null
           updated_at?: string
@@ -2865,6 +2868,13 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
           {
@@ -3902,6 +3912,48 @@ export type Database = {
           logo_url?: string | null
           name?: string
           sort_order?: number
+        }
+        Relationships: []
+      }
+      suppliers: {
+        Row: {
+          agent_name: string
+          average_processing_time: string | null
+          created_at: string
+          direct_contact: string | null
+          email: string
+          id: string
+          platform_name: string
+          seniority: string | null
+          store_url: string | null
+          updated_at: string
+          vendor_id: string
+        }
+        Insert: {
+          agent_name: string
+          average_processing_time?: string | null
+          created_at?: string
+          direct_contact?: string | null
+          email?: string
+          id?: string
+          platform_name?: string
+          seniority?: string | null
+          store_url?: string | null
+          updated_at?: string
+          vendor_id: string
+        }
+        Update: {
+          agent_name?: string
+          average_processing_time?: string | null
+          created_at?: string
+          direct_contact?: string | null
+          email?: string
+          id?: string
+          platform_name?: string
+          seniority?: string | null
+          store_url?: string | null
+          updated_at?: string
+          vendor_id?: string
         }
         Relationships: []
       }
