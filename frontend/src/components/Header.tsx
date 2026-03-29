@@ -128,7 +128,7 @@ export function Header() {
       }))
     : NAV_LINK_KEYS;
 
-
+  const { data: mobileCategories } = useQuery({
     queryKey: ["mobile-categories"],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
