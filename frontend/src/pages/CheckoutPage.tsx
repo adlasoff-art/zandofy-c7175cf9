@@ -267,13 +267,11 @@ export default function CheckoutPage() {
 
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
-  // Calculate last-mile delivery fee (only if home delivery + pay_with_shipping)
-  const lastMileFee = dynamicShippingCost !== null && deliveryOption === "home_delivery" 
-    ? Math.max(dynamicShippingCost * 0.15, 2) // 15% of shipping as delivery fee, min $2
-    : 0;
-  const effectiveLastMile = (deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping") ? lastMileFee : 0;
+  // Last-mile fee removed from checkout — calculated at hub arrival stage
+  const lastMileFee = 0;
+  const effectiveLastMile = 0;
   
-  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping + effectiveLastMile);
+  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping);
 
   // Load saved addresses
   useEffect(() => {
