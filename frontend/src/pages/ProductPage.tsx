@@ -13,6 +13,7 @@ import { FloatingActions } from "@/components/FloatingActions";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductReviews } from "@/components/reviews/ProductReviews";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { CertificationBadge } from "@/components/CertificationBadge";
 import { VendorProfileCard } from "@/components/VendorProfileCard";
 import { FollowStoreButton } from "@/components/FollowStoreButton";
 import { TieredPricingTable, calculateTieredPrice, type PricingTier } from "@/components/TieredPricingTable";
