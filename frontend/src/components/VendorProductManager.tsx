@@ -666,7 +666,16 @@ export function VendorProductManager({ storeId }: { storeId: string }) {
             <Field label="Hauteur (cm)" type="number" value={String(form.height_cm)} onChange={(v) => setForm({ ...form, height_cm: Number(v) })} />
           </div>
 
-          {/* Shipping Estimator */}
+          {/* Délai de préparation fournisseur */}
+          <div className="border-t border-border pt-3 mt-1">
+            <label className="text-xs font-semibold text-foreground">⏱️ Délai de préparation fournisseur (jours)</label>
+            <p className="text-[10px] text-muted-foreground mb-2">Temps que le fournisseur met pour préparer la commande avant expédition</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Min (jours)" type="number" value={String(form.prep_days_min)} onChange={(v) => setForm({ ...form, prep_days_min: Number(v) })} />
+            <Field label="Max (jours)" type="number" value={String(form.prep_days_max)} onChange={(v) => setForm({ ...form, prep_days_max: Number(v) })} />
+          </div>
+
           <ShippingEstimator
             weightGrams={form.weight_grams}
             lengthCm={form.length_cm}
