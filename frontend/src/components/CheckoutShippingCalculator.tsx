@@ -91,7 +91,25 @@ export function CheckoutShippingCalculator({
       });
   }, [cartItems]);
 
-  // 2. Fetch active category surcharges
+  // 2. Fetch sea mode threshold setting
+  useEffect(() => {
+    supabase
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "sea_mode_min_order")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value && typeof data.value === "object" && !Array.isArray(data.value)) {
+          const v = data.value as Record<string, unknown>;
+          setSeaThreshold({
+            enabled: v.enabled === true,
+            min_subtotal: Number(v.min_subtotal) || 29,
+          });
+        }
+      });
+  }, []);
+
+  // 3. Fetch active category surcharges
   useEffect(() => {
     supabase
       .from("category_surcharges")
