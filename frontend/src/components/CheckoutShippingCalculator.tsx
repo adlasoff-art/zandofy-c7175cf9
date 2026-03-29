@@ -427,7 +427,7 @@ export function CheckoutShippingCalculator({
               }`}
             >
               <Icon size={12} />
-              <span>{Meta.label}</span>
+              <span>{isLocalStore ? Meta.localLabel : Meta.label}</span>
               {(mode === "road" || mode === "rail") && destCity && (() => {
                 const allSameCountry = products.every(p => {
                   const oc = originCities.get(p.originCountry);
