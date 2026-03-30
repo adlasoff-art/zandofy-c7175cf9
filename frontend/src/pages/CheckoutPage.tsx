@@ -745,6 +745,25 @@ export default function CheckoutPage() {
           setProcessing(false);
         }
       } catch (err: any) {
+        // Mark any created orders as payment_failed so they don't appear as active
+        try {
+          const { data: pendingOrders } = await supabase
+            .from("orders")
+            .select("id")
+            .eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "")
+            .eq("status", "awaiting_payment")
+            .order("created_at", { ascending: false })
+            .limit(1);
+          if (pendingOrders && pendingOrders.length > 0) {
+            await supabase
+              .from("orders")
+              .update({ status: "payment_failed" })
+              .eq("id", pendingOrders[0].id)
+              .eq("status", "awaiting_payment");
+          }
+        } catch (cleanupErr) {
+          console.error("Failed to clean up order:", cleanupErr);
+        }
         toast({ title: "Erreur paiement", description: err.message || "Impossible d'initier le paiement par carte.", variant: "destructive" });
         setProcessing(false);
       }

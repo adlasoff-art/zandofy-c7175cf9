@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle2, XCircle, Clock, ArrowLeft, ShoppingBag } from "lucide-react";
@@ -7,6 +7,9 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
 type PaymentStatus = "success" | "failed" | "cancelled" | "pending" | "loading";
+
+const MAX_POLL_ATTEMPTS = 60; // 5 minutes at 5s intervals
+const POLL_INTERVAL_MS = 5000;
 
 export default function PaymentReturnPage() {
   const [params] = useSearchParams();
@@ -18,7 +21,17 @@ export default function PaymentReturnPage() {
   const [orderRef, setOrderRef] = useState<string | null>(null);
   const [amount, setAmount] = useState<number | null>(null);
   const [currency, setCurrency] = useState("USD");
+  const [pollCount, setPollCount] = useState(0);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const stopPolling = useCallback(() => {
+    if (pollTimer.current) {
+      clearInterval(pollTimer.current);
+      pollTimer.current = null;
+    }
+  }, []);
+
+  // Initial fetch
   useEffect(() => {
     async function fetchTransaction() {
       if (!ref && !orderId) {
@@ -46,7 +59,6 @@ export default function PaymentReturnPage() {
         else if (data.status === "failed") setStatus("failed");
         else setStatus("pending");
 
-        // Fetch order ref
         if (data.order_id) {
           const { data: order } = await supabase
             .from("orders")
@@ -56,7 +68,6 @@ export default function PaymentReturnPage() {
           if (order) setOrderRef(order.order_ref);
         }
       } else {
-        // No transaction found, use URL param
         setStatus(statusParam === "success" ? "success" : statusParam === "failed" ? "failed" : "pending");
       }
     }
@@ -64,7 +75,62 @@ export default function PaymentReturnPage() {
     fetchTransaction();
   }, [ref, orderId, statusParam]);
 
-  // Subscribe to realtime updates on the transaction
+  // Polling kelpay-check when status is pending
+  useEffect(() => {
+    if (status !== "pending" || (!ref && !orderId)) {
+      stopPolling();
+      return;
+    }
+
+    let attempts = 0;
+
+    const poll = async () => {
+      attempts++;
+      setPollCount(attempts);
+
+      if (attempts > MAX_POLL_ATTEMPTS) {
+        stopPolling();
+        return;
+      }
+
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (!token) return;
+
+        const body: Record<string, string> = {};
+        if (ref) body.reference = ref;
+        else if (orderId) body.transaction_id = orderId;
+
+        const { data, error } = await supabase.functions.invoke("kelpay-check", { body });
+
+        if (error) {
+          console.error("kelpay-check poll error:", error);
+          return;
+        }
+
+        if (data?.status === "success") {
+          setStatus("success");
+          if (data.kelpay?.amount) setAmount(Number(data.kelpay.amount));
+          stopPolling();
+        } else if (data?.status === "failed") {
+          setStatus("failed");
+          stopPolling();
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    };
+
+    // First poll immediately
+    poll();
+
+    pollTimer.current = setInterval(poll, POLL_INTERVAL_MS);
+
+    return () => stopPolling();
+  }, [status, ref, orderId, stopPolling]);
+
+  // Realtime as secondary channel
   useEffect(() => {
     if (!ref && !orderId) return;
 
@@ -173,7 +239,7 @@ export default function PaymentReturnPage() {
       );
     }
 
-    // Pending
+    // Pending with polling info
     return (
       <div className="flex flex-col items-center gap-6 py-12 text-center">
         <div className="w-20 h-20 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
@@ -182,7 +248,9 @@ export default function PaymentReturnPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Paiement en cours de traitement</h1>
           <p className="text-muted-foreground mt-2">
-            Votre paiement est en cours de vérification. Cette page se mettra à jour automatiquement.
+            {pollCount >= MAX_POLL_ATTEMPTS
+              ? "La vérification prend plus de temps que prévu. Vérifiez le statut dans vos commandes."
+              : "Votre paiement est en cours de vérification. Cette page se mettra à jour automatiquement."}
           </p>
         </div>
         {orderRef && (
