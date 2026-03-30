@@ -230,7 +230,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   return (
     <CartContext.Provider value={{
       items, selectedItems, loading, drawerOpen, setDrawerOpen,
-      addItem, updateQuantity, removeItem, clearCart,
+      addItem, updateVariant, updateQuantity, removeItem, clearCart,
       toggleSelected, selectAll, deselectAll, removeSelectedItems,
       itemCount, subtotal, selectedCount, selectedSubtotal,
     }}>
