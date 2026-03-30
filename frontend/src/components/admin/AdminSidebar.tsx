@@ -40,6 +40,7 @@ const adminItems = [
   { title: "Paliers affiliation", url: "/admin/affiliate-tiers", icon: Crown },
   { title: "Référencement SEO", url: "/admin/seo", icon: Globe },
   { title: "Pays actifs", url: "/admin/countries", icon: Globe },
+  { title: "Zones géographiques", url: "/admin/geography", icon: MapPin },
   { title: "Popups & Cookies", url: "/admin/popups", icon: Megaphone },
   { title: "Journal d'audit", url: "/admin/audit", icon: ScrollText },
   { title: "Notifications", url: "/admin/notifications", icon: Bell },
