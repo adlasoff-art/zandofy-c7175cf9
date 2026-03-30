@@ -896,15 +896,12 @@ export default function CheckoutPage() {
                       />
                       <Label htmlFor="save-addr" className="text-sm cursor-pointer">{t("checkout.saveAddress")}</Label>
                       {saveAddress && (
-                        <select
+                        <Input
                           value={addressLabel}
                           onChange={e => setAddressLabel(e.target.value)}
-                          className="text-sm border border-border rounded px-2 py-1 bg-background text-foreground"
-                        >
-                          <option>Domicile</option>
-                          <option>Bureau</option>
-                          <option>Autre</option>
-                        </select>
+                          className="w-32 h-8 text-sm"
+                          placeholder="Ex: Domicile 1, Bureau..."
+                        />
                       )}
                     </div>
                   )}
