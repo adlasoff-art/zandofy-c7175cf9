@@ -46,9 +46,10 @@ interface SavedAddress {
   last_name: string;
   phone: string;
   address: string;
-  commune: string | null;
   quartier: string | null;
+  commune: string | null;
   city: string;
+  province: string | null;
   country: string;
   postal_code: string;
   is_default: boolean;
