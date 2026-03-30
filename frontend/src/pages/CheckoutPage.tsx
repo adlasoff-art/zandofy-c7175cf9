@@ -709,8 +709,38 @@ export default function CheckoutPage() {
         }
         setProcessing(false);
       }
+    } else if (paymentMethod === "card" || paymentMethod === "paypal" || paymentMethod === "stripe") {
+      // Card/PayPal via Keccel — redirect flow
+      try {
+        setProcessing(true);
+        const { orderRef, orderId: newOrderId } = await createOrderForPayment();
+        const { data, error } = await supabase.functions.invoke("keccel-cardpay", {
+          body: {
+            order_id: newOrderId,
+            payment_method: paymentMethod === "stripe" ? "card" : paymentMethod,
+            payment_type: "order",
+          },
+        });
+        if (error || !data) throw new Error("Erreur lors de l'initiation du paiement");
+        if (data.redirect_url) {
+          window.location.href = data.redirect_url;
+          return;
+        } else if (data.fallback_terminal_url) {
+          window.location.href = data.fallback_terminal_url;
+          return;
+        } else {
+          // No redirect URL — show confirmation page
+          setOrderId(orderRef);
+          await removeSelectedItems();
+          setStep("confirmation");
+          setProcessing(false);
+        }
+      } catch (err: any) {
+        toast({ title: "Erreur paiement", description: err.message || "Impossible d'initier le paiement par carte.", variant: "destructive" });
+        setProcessing(false);
+      }
     } else {
-      // COD, off_platform, or Stripe (existing mock flow)
+      // COD, off_platform
       await new Promise(r => setTimeout(r, 1500));
       const { orderRef } = await createOrderForPayment();
       setOrderId(orderRef);
