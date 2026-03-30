@@ -9,6 +9,7 @@ export interface PaymentMethodsConfig {
   stripe: boolean;
   cod: boolean;
   off_platform: boolean;
+  paypal: boolean;
   stripe_notice_enabled?: boolean;
   stripe_notice_text?: string;
 }
