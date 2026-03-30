@@ -25,6 +25,7 @@ interface CartContextType {
   drawerOpen: boolean;
   setDrawerOpen: (open: boolean) => void;
   addItem: (item: Omit<CartItem, "id" | "selected">) => Promise<void>;
+  updateVariant: (id: string, color: string | null, size: string | null) => Promise<void>;
   updateQuantity: (id: string, quantity: number) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
   clearCart: () => Promise<void>;
@@ -45,6 +46,7 @@ const CartContext = createContext<CartContextType>({
   drawerOpen: false,
   setDrawerOpen: () => {},
   addItem: async () => {},
+  updateVariant: async () => {},
   updateQuantity: async () => {},
   removeItem: async () => {},
   clearCart: async () => {},
@@ -161,6 +163,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     toast({ title: "Ajouté au panier !" });
   };
 
+  const updateVariant = async (id: string, color: string | null, size: string | null) => {
+    const { error } = await supabase.from("cart_items").update({ color, size }).eq("id", id);
+    if (!error) {
+      await fetchCart(); // Re-fetch to handle potential merges with existing variant rows
+    }
+  };
+
   const updateQuantity = async (id: string, quantity: number) => {
     if (quantity < 1) return removeItem(id);
     const { error } = await supabase.from("cart_items").update({ quantity }).eq("id", id);
@@ -221,7 +230,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   return (
     <CartContext.Provider value={{
       items, selectedItems, loading, drawerOpen, setDrawerOpen,
-      addItem, updateQuantity, removeItem, clearCart,
+      addItem, updateVariant, updateQuantity, removeItem, clearCart,
       toggleSelected, selectAll, deselectAll, removeSelectedItems,
       itemCount, subtotal, selectedCount, selectedSubtotal,
     }}>

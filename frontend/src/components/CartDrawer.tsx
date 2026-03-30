@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Minus, Plus, Trash2, ShoppingBag, CheckSquare, Square } from "lucide-react";
 import { Link } from "react-router-dom";
+import { CartItemVariantEditor } from "@/components/CartItemVariantEditor";
 
 export function CartDrawer() {
   const {
@@ -100,6 +101,12 @@ export function CartDrawer() {
                     {item.moq > 1 && item.quantity < item.moq && (
                       <p className="text-xs text-sale">Min. {item.moq} pièces requis</p>
                     )}
+                    <CartItemVariantEditor
+                      cartItemId={item.id}
+                      productId={item.productId}
+                      currentColor={item.color}
+                      currentSize={item.size}
+                    />
                   </div>
                 </div>
               ))}
