@@ -81,6 +81,7 @@ const AdminLogisticsPage = lazy(() => import("./pages/admin/AdminLogisticsPage")
 const AdminNotificationsPage = lazy(() => import("./pages/admin/AdminNotificationsPage"));
 const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage"));
 const AdminShippingPage = lazy(() => import("./pages/admin/AdminShippingPage"));
+const AdminGeographyPage = lazy(() => import("./pages/admin/AdminGeographyPage"));
 const AdminVendorApplicationsPage = lazy(() => import("./pages/admin/AdminVendorApplicationsPage"));
 const AdminStoreNamesPage = lazy(() => import("./pages/admin/AdminStoreNamesPage"));
 const AdminVendorSubscriptionsPage = lazy(() => import("./pages/admin/AdminVendorSubscriptionsPage"));
