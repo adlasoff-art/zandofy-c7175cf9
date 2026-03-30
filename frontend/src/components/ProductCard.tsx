@@ -36,6 +36,10 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
     : null;
   const displayImage = hovered && secondImage ? secondImage : (imgError ? "/placeholder.svg" : product.image);
 
+  // Determine first available variant defaults
+  const firstColor = product.colors?.[0] ?? null;
+  const firstSize = product.sizes?.[0] ?? null;
+
   const handleAddToCart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -47,8 +51,8 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
       image: product.image,
       price: product.price,
       originalPrice: product.originalPrice,
-      color: null,
-      size: null,
+      color: firstColor,
+      size: firstSize,
       quantity: product.moq || 1,
       moq: product.moq || 1,
     });
