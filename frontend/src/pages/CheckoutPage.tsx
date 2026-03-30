@@ -468,11 +468,13 @@ export default function CheckoutPage() {
         last_name: shipping.lastName,
         phone: shipping.phone,
         address: shipping.address,
+        commune: shipping.commune || null,
+        quartier: shipping.quartier || null,
         city: shipping.city,
         country: shipping.country,
         postal_code: shipping.postalCode,
         is_default: savedAddresses.length === 0,
-      });
+      } as any);
       if (!error) {
         const { data } = await supabase.from("saved_addresses").select("*").eq("user_id", user.id).order("is_default", { ascending: false });
         if (data) setSavedAddresses(data as unknown as SavedAddress[]);
