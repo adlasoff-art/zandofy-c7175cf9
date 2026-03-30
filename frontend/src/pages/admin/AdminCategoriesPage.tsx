@@ -4,6 +4,7 @@ import { Plus, Edit2, Trash2, ChevronRight, ChevronUp, ChevronDown, Loader2, X, 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { slugify } from "@/utils/slugify";
 
 interface Category {
   id: string;
@@ -142,7 +143,10 @@ export default function AdminCategoriesPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const path = `categories/${Date.now()}_${file.name}`;
+    const ext = file.name.split(".").pop() || "webp";
+    const nameWithoutExt = file.name.replace(/\.[^.]+$/, "");
+    const safeName = slugify(nameWithoutExt) || "image";
+    const path = `categories/${Date.now()}_${safeName}.${ext}`;
     const { error } = await supabase.storage.from("cms-assets").upload(path, file);
     if (error) { toast.error(error.message); setUploading(false); return; }
     const { data: urlData } = supabase.storage.from("cms-assets").getPublicUrl(path);
