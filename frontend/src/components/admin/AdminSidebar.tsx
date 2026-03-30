@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, Image, FolderTree, Bell, Settings, ShieldCheck, Truck, Package, DollarSign, Store, PenLine, Crown, ScrollText, Heart, Coins, Ticket, Banknote, RotateCcw, AlertTriangle, ArrowLeftRight, Globe, Megaphone, Headphones, Layers, BarChart3, Mail, User, Receipt, Star,
+  LayoutDashboard, Users, Image, FolderTree, Bell, Settings, ShieldCheck, Truck, Package, DollarSign, Store, PenLine, Crown, ScrollText, Heart, Coins, Ticket, Banknote, RotateCcw, AlertTriangle, ArrowLeftRight, Globe, Megaphone, Headphones, Layers, BarChart3, Mail, User, Receipt, Star, MapPin,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useRoles } from "@/hooks/use-roles";
@@ -40,6 +40,7 @@ const adminItems = [
   { title: "Paliers affiliation", url: "/admin/affiliate-tiers", icon: Crown },
   { title: "Référencement SEO", url: "/admin/seo", icon: Globe },
   { title: "Pays actifs", url: "/admin/countries", icon: Globe },
+  { title: "Zones géographiques", url: "/admin/geography", icon: MapPin },
   { title: "Popups & Cookies", url: "/admin/popups", icon: Megaphone },
   { title: "Journal d'audit", url: "/admin/audit", icon: ScrollText },
   { title: "Notifications", url: "/admin/notifications", icon: Bell },

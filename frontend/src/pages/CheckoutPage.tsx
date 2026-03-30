@@ -31,9 +31,10 @@ interface ShippingInfo {
   email: string;
   phone: string;
   address: string;
-  commune: string;
   quartier: string;
+  commune: string;
   city: string;
+  province: string;
   country: string;
   postalCode: string;
 }
@@ -45,9 +46,10 @@ interface SavedAddress {
   last_name: string;
   phone: string;
   address: string;
-  commune: string | null;
   quartier: string | null;
+  commune: string | null;
   city: string;
+  province: string | null;
   country: string;
   postal_code: string;
   is_default: boolean;
@@ -74,7 +76,7 @@ type LastMilePayment = "pay_with_shipping" | "pay_cash_on_delivery";
 
 const emptyShipping: ShippingInfo = {
   firstName: "", lastName: "", email: "", phone: "",
-  address: "", commune: "", quartier: "", city: "", country: "CD", postalCode: "",
+  address: "", quartier: "", commune: "", city: "", province: "", country: "CD", postalCode: "",
 };
 
 export default function CheckoutPage() {
@@ -299,9 +301,10 @@ export default function CheckoutPage() {
       email: user?.email || "",
       phone: addr.phone,
       address: addr.address,
-      commune: addr.commune || "",
       quartier: addr.quartier || "",
+      commune: addr.commune || "",
       city: addr.city,
+      province: addr.province || "",
       country: addr.country,
       postalCode: addr.postal_code || "",
     });
@@ -468,9 +471,10 @@ export default function CheckoutPage() {
         last_name: shipping.lastName,
         phone: shipping.phone,
         address: shipping.address,
-        commune: shipping.commune || null,
         quartier: shipping.quartier || null,
+        commune: shipping.commune || null,
         city: shipping.city,
+        province: shipping.province || null,
         country: shipping.country,
         postal_code: shipping.postalCode,
         is_default: savedAddresses.length === 0,
@@ -537,9 +541,10 @@ export default function CheckoutPage() {
           shipping_email: shipping.email || user?.email || "",
           shipping_phone: shipping.phone,
            shipping_address: shipping.address,
-           shipping_commune: shipping.commune || null,
            shipping_quartier: shipping.quartier || null,
+           shipping_commune: shipping.commune || null,
            shipping_city: shipping.city,
+           shipping_province: shipping.province || null,
            shipping_country: shipping.country,
            shipping_postal_code: shipping.postalCode,
           subtotal: orderSubtotal,
@@ -813,6 +818,7 @@ export default function CheckoutPage() {
                           </div>
                           <p className="text-xs text-muted-foreground">{addr.first_name} {addr.last_name}</p>
                           <p className="text-xs text-muted-foreground line-clamp-1">{addr.address}, {addr.city}</p>
+                          <p className="text-xs text-muted-foreground">{addr.phone}</p>
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDeleteAddress(addr.id); }}
                             className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
@@ -822,89 +828,110 @@ export default function CheckoutPage() {
                         </button>
                       ))}
                     </div>
+                    {/* When an address is selected, show summary + option to edit */}
+                    {selectedAddressId && (
+                      <div className="bg-secondary/50 rounded-lg p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-foreground flex items-center gap-2"><Check size={14} className="text-primary" /> Adresse sélectionnée</p>
+                          <button type="button" onClick={() => { setSelectedAddressId(null); setShipping({ ...emptyShipping, email: user?.email || "" }); }} className="text-xs text-primary hover:underline">Modifier manuellement</button>
+                        </div>
+                        <div className="text-xs text-muted-foreground space-y-0.5">
+                          <p>{shipping.firstName} {shipping.lastName} · {shipping.phone}</p>
+                          <p>{shipping.address}{shipping.quartier ? `, Q. ${shipping.quartier}` : ""}{shipping.commune ? `, C. ${shipping.commune}` : ""}</p>
+                          <p>{shipping.city}{shipping.province ? `, ${shipping.province}` : ""}, {getCountryName(shipping.country)}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 <form onSubmit={handleShippingSubmit} className="bg-card rounded-lg p-6 shadow-card space-y-4">
-                  <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                    <MapPin size={18} /> {savedAddresses.length > 0 ? t("checkout.editAddress") : t("checkout.shippingAddress")}
-                  </h2>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="fn">{t("checkout.firstName")} *</Label>
-                      <Input id="fn" value={shipping.firstName} onChange={e => updateField("firstName", e.target.value)} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="ln">{t("checkout.lastName")} *</Label>
-                      <Input id="ln" value={shipping.lastName} onChange={e => updateField("lastName", e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="email">{t("auth.email")}</Label>
-                      <Input id="email" type="email" value={shipping.email} onChange={e => updateField("email", e.target.value)} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="phone">{t("checkout.phone")} *</Label>
-                      <Input id="phone" type="tel" value={shipping.phone} onChange={e => updateField("phone", e.target.value)} placeholder="+221 7X XXX XX XX" />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="addr">{t("checkout.address")} *</Label>
-                    <Input id="addr" value={shipping.address} onChange={e => updateField("address", e.target.value)} placeholder="N° parcelle, avenue/rue" />
-                  </div>
-                  <div className="grid sm:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="quartier">Quartier</Label>
-                      <Input id="quartier" value={shipping.quartier} onChange={e => updateField("quartier", e.target.value)} placeholder="Quartier" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="commune">Commune</Label>
-                      <Input id="commune" value={shipping.commune} onChange={e => updateField("commune", e.target.value)} placeholder="Commune" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="city">{t("checkout.city")} *</Label>
-                      <Input id="city" value={shipping.city} onChange={e => updateField("city", e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="grid sm:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <Label>{t("checkout.country")} *</Label>
-                      <CountryCombobox
-                        value={shipping.country}
-                        onChange={(v) => updateField("country", v)}
-                        label=""
-                        placeholder="Sélectionner un pays..."
-                        showNone={false}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="zip">{t("checkout.postalCode")}</Label>
-                      <Input id="zip" value={shipping.postalCode} onChange={e => updateField("postalCode", e.target.value)} />
-                    </div>
-                  </div>
+                  {/* If saved address selected, hide the form fields */}
+                  {!selectedAddressId ? (
+                    <>
+                      <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                        <MapPin size={18} /> {savedAddresses.length > 0 ? t("checkout.editAddress") : t("checkout.shippingAddress")}
+                      </h2>
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="fn">{t("checkout.firstName")} *</Label>
+                          <Input id="fn" value={shipping.firstName} onChange={e => updateField("firstName", e.target.value)} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="ln">{t("checkout.lastName")} *</Label>
+                          <Input id="ln" value={shipping.lastName} onChange={e => updateField("lastName", e.target.value)} />
+                        </div>
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="email">{t("auth.email")}</Label>
+                          <Input id="email" type="email" value={shipping.email} onChange={e => updateField("email", e.target.value)} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="phone">{t("checkout.phone")} *</Label>
+                          <Input id="phone" type="tel" value={shipping.phone} onChange={e => updateField("phone", e.target.value)} placeholder="+243 XXX XXX XXX" />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="addr">{t("checkout.address")} *</Label>
+                        <Input id="addr" value={shipping.address} onChange={e => updateField("address", e.target.value)} placeholder="N° parcelle, N° appartement, Avenue/Rue" />
+                      </div>
+                      <div className="grid sm:grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="quartier">Quartier / Bloc</Label>
+                          <Input id="quartier" value={shipping.quartier} onChange={e => updateField("quartier", e.target.value)} placeholder="Quartier" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="commune">Commune / Département</Label>
+                          <Input id="commune" value={shipping.commune} onChange={e => updateField("commune", e.target.value)} placeholder="Commune" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="city">{t("checkout.city")} *</Label>
+                          <Input id="city" value={shipping.city} onChange={e => updateField("city", e.target.value)} />
+                        </div>
+                      </div>
+                      <div className="grid sm:grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="province">Province / État</Label>
+                          <Input id="province" value={shipping.province} onChange={e => updateField("province", e.target.value)} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>{t("checkout.country")} *</Label>
+                          <CountryCombobox
+                            value={shipping.country}
+                            onChange={(v) => updateField("country", v)}
+                            label=""
+                            placeholder="Sélectionner un pays..."
+                            showNone={false}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="zip">{t("checkout.postalCode")}</Label>
+                          <Input id="zip" value={shipping.postalCode} onChange={e => updateField("postalCode", e.target.value)} />
+                        </div>
+                      </div>
 
-                  {/* Save address checkbox */}
-                  {!selectedAddressId && (
-                    <div className="flex items-center gap-3 pt-2 border-t border-border">
-                      <input
-                        type="checkbox"
-                        id="save-addr"
-                        checked={saveAddress}
-                        onChange={e => setSaveAddress(e.target.checked)}
-                        className="rounded border-border"
-                      />
-                      <Label htmlFor="save-addr" className="text-sm cursor-pointer">{t("checkout.saveAddress")}</Label>
-                      {saveAddress && (
-                        <Input
-                          value={addressLabel}
-                          onChange={e => setAddressLabel(e.target.value)}
-                          className="w-32 h-8 text-sm"
-                          placeholder="Ex: Domicile 1, Bureau..."
+                      {/* Save address checkbox */}
+                      <div className="flex items-center gap-3 pt-2 border-t border-border">
+                        <input
+                          type="checkbox"
+                          id="save-addr"
+                          checked={saveAddress}
+                          onChange={e => setSaveAddress(e.target.checked)}
+                          className="rounded border-border"
                         />
-                      )}
-                    </div>
-                  )}
+                        <Label htmlFor="save-addr" className="text-sm cursor-pointer">{t("checkout.saveAddress")}</Label>
+                        {saveAddress && (
+                          <Input
+                            value={addressLabel}
+                            onChange={e => setAddressLabel(e.target.value)}
+                            className="w-32 h-8 text-sm"
+                            placeholder="Ex: Domicile 1, Bureau..."
+                          />
+                        )}
+                      </div>
+                    </>
+                  ) : null}
 
                   {/* Deferred shipping payment option */}
                   {shippingCost > 0 && (

@@ -55,6 +55,7 @@ import { withOptionalOrderFields } from "@/lib/order-query";
 import { useCertification } from "@/hooks/use-certification";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { Switch } from "@/components/ui/switch";
+import { CountryCombobox } from "@/components/vendor/CountryCombobox";
 
 const TABS = [
   { key: "overview", label: "Aperçu", icon: Package },
@@ -1691,7 +1692,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Téléphone</Label>
-            <Input className="mt-1" value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} placeholder="+221 7X XXX XX XX" />
+            <Input className="mt-1" value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} placeholder="+243 XXX XXX XXX" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -1866,7 +1867,7 @@ function AddressesTab({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ label: "", first_name: "", last_name: "", phone: "", address: "", commune: "", quartier: "", city: "", country: "Sénégal", postal_code: "" });
+  const [form, setForm] = useState({ label: "", first_name: "", last_name: "", phone: "", address: "", quartier: "", commune: "", city: "", province: "", country: "CD", postal_code: "" });
   const [saving, setSaving] = useState(false);
   const [isKycVerified, setIsKycVerified] = useState(false);
 
@@ -1889,7 +1890,7 @@ function AddressesTab({ userId }: { userId: string }) {
   }, [userId]);
 
   const resetForm = () => {
-    setForm({ label: "", first_name: "", last_name: "", phone: "", address: "", commune: "", quartier: "", city: "", country: "Sénégal", postal_code: "" });
+    setForm({ label: "", first_name: "", last_name: "", phone: "", address: "", quartier: "", commune: "", city: "", province: "", country: "CD", postal_code: "" });
     setEditId(null);
     setShowForm(false);
   };
@@ -1901,9 +1902,10 @@ function AddressesTab({ userId }: { userId: string }) {
       last_name: addr.last_name,
       phone: addr.phone,
       address: addr.address,
-      commune: addr.commune || "",
       quartier: addr.quartier || "",
+      commune: addr.commune || "",
       city: addr.city,
+      province: (addr as any).province || "",
       country: addr.country,
       postal_code: addr.postal_code || "",
     });
@@ -1917,7 +1919,7 @@ function AddressesTab({ userId }: { userId: string }) {
       return;
     }
     setSaving(true);
-    const payload = { ...form, postal_code: form.postal_code || null, commune: form.commune || null, quartier: form.quartier || null };
+    const payload = { ...form, postal_code: form.postal_code || null, commune: form.commune || null, quartier: form.quartier || null, province: form.province || null };
     if (editId) {
       await supabase.from("saved_addresses").update(payload as any).eq("id", editId);
     } else {
@@ -1965,7 +1967,7 @@ function AddressesTab({ userId }: { userId: string }) {
                 {addr.is_default && <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold">Par défaut</span>}
               </div>
               <p className="text-sm text-foreground">{addr.first_name} {addr.last_name}</p>
-              <p className="text-xs text-muted-foreground">{addr.address}{addr.quartier ? `, ${addr.quartier}` : ""}{addr.commune ? `, ${addr.commune}` : ""}, {addr.city}, {addr.country}</p>
+              <p className="text-xs text-muted-foreground">{addr.address}{addr.quartier ? `, Q. ${addr.quartier}` : ""}{addr.commune ? `, C. ${addr.commune}` : ""}, {addr.city}{(addr as any).province ? `, ${(addr as any).province}` : ""}, {addr.country}</p>
               <p className="text-xs text-muted-foreground">{addr.phone}</p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
@@ -2009,19 +2011,19 @@ function AddressesTab({ userId }: { userId: string }) {
           </div>
           <div>
             <Label className="text-xs">Téléphone *</Label>
-            <Input className="mt-1" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+221 7X XXX XX XX" />
+            <Input className="mt-1" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+243 XXX XXX XXX" />
           </div>
           <div>
             <Label className="text-xs">Adresse *</Label>
-            <Input className="mt-1" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="N° parcelle, avenue/rue" />
+            <Input className="mt-1" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="N° parcelle, N° appartement, Avenue/Rue" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Quartier</Label>
+              <Label className="text-xs">Quartier / Bloc</Label>
               <Input className="mt-1" value={form.quartier} onChange={e => setForm(f => ({ ...f, quartier: e.target.value }))} placeholder="Quartier" />
             </div>
             <div>
-              <Label className="text-xs">Commune</Label>
+              <Label className="text-xs">Commune / Département</Label>
               <Input className="mt-1" value={form.commune} onChange={e => setForm(f => ({ ...f, commune: e.target.value }))} placeholder="Commune" />
             </div>
           </div>
@@ -2031,13 +2033,22 @@ function AddressesTab({ userId }: { userId: string }) {
               <Input className="mt-1" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
             </div>
             <div>
-              <Label className="text-xs">Pays</Label>
-              <Input className="mt-1" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))} />
+              <Label className="text-xs">Province / État</Label>
+              <Input className="mt-1" value={form.province} onChange={e => setForm(f => ({ ...f, province: e.target.value }))} />
             </div>
             <div>
               <Label className="text-xs">Code postal</Label>
               <Input className="mt-1" value={form.postal_code} onChange={e => setForm(f => ({ ...f, postal_code: e.target.value }))} />
             </div>
+          </div>
+          <div>
+            <CountryCombobox
+              value={form.country}
+              onChange={(v) => setForm(f => ({ ...f, country: v }))}
+              label="Pays *"
+              placeholder="Sélectionner un pays..."
+              showNone={false}
+            />
           </div>
           <Button onClick={handleSave} disabled={saving} size="sm">
             {saving ? <Loader2 className="animate-spin mr-2" size={14} /> : <Save size={14} className="mr-2" />}
