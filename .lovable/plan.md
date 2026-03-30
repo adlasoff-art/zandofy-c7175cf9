@@ -1,47 +1,63 @@
 
 
-# Analyse des secrets et corrections à appliquer
+# Plan : Finaliser le flux de paiement par carte bancaire
 
-## Bilan des secrets sur supabase.com
+## Diagnostic
 
-| Secret | Statut | Impact |
-|--------|--------|--------|
-| `SUPABASE_URL` | ✅ Automatique | Fourni par Supabase |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ Automatique | Fourni par Supabase |
-| `KELPAY_TOKEN` | ✅ Déjà configuré | Utilisé par keccel-cardpay, kelpay-payment, kelpay-check |
-| `SITE_BASE_URL` | ✅ Vient d'être ajouté | URL de retour après paiement |
-| `KECCEL_CARD_MERCHANT_CODE` | ✅ Vient d'être ajouté | Code marchand carte (`jam`) |
-| `KELPAY_WEBHOOK_SECRET` | ⚠️ Manquant mais OPTIONNEL | Vérification HMAC des callbacks |
+Le paiement par carte fonctionne (prélèvement confirmé par Keccel), mais deux problèmes empêchent la finalisation :
 
-### Le `KELPAY_WEBHOOK_SECRET` n'est PAS bloquant
+1. **Le webhook Keccel ne met pas à jour la transaction** — soit le callback n'arrive jamais, soit le format des champs diffère pour les paiements par carte. Résultat : `payment_transactions.status` reste `"pending"` et la commande reste bloquée à `"awaiting_payment"`.
 
-Le code du webhook (ligne 24) fait : `if (webhookSecret) { ... }` — la vérification HMAC ne s'active **que si** le secret est configuré. Sans lui, le webhook accepte tous les callbacks sans vérifier la signature. Ce n'est pas idéal pour la sécurité en production, mais **ça fonctionne**.
+2. **La page `/payment/return` ne fait pas de polling actif** — elle attend passivement un événement Realtime qui ne viendra jamais si le webhook ne se déclenche pas. Il n'y a aucun appel à `kelpay-check` pour vérifier le statut côté Keccel.
 
-Keccel doit vous fournir ce secret si vous le souhaitez. Ce n'est pas quelque chose que vous générez vous-même.
+3. **Les commandes échouées (tests) restent visibles** pour les vendeurs et admins car le code du paiement carte (lignes 747-750 de CheckoutPage) ne met pas à jour le statut des commandes créées en cas d'erreur.
 
-## Problème restant : le vrai bloqueur
+## Corrections (3 fichiers)
 
-Les secrets sont maintenant en place. L'erreur "Erreur lors de l'initiation du paiement" vient probablement de **deux problèmes dans le code** :
+### 1. `frontend/src/pages/PaymentReturnPage.tsx` — Ajouter un polling avec `kelpay-check`
 
-1. **L'edge function `frontend/supabase/functions/kelpay-webhook/index.ts` utilise une librairie incompatible** (`import { hmac } from "https://deno.land/x/hmac@v2.0.1/mod.ts"`) qui peut faire crasher le déploiement sur supabase.com. Il faut la remplacer par l'API Web Crypto native.
+Quand le statut est `"pending"`, la page doit appeler `kelpay-check` toutes les 5 secondes (max 60 tentatives = 5 min) avec la `reference` de la transaction. Si `kelpay-check` retourne `success` ou `failed`, la page se met à jour immédiatement. Le Realtime reste en place comme canal secondaire.
 
-2. **L'edge function `keccel-cardpay` retourne des codes HTTP 400/401/502** que le SDK Supabase traite comme des erreurs opaques, masquant le vrai message. Il faut retourner HTTP 200 avec `success: false`.
+```text
+Page chargée → fetch transaction (status = pending)
+   ↓
+Démarrer polling kelpay-check toutes les 5s
+   ↓
+kelpay-check retourne "success" → mise à jour page ✅
+   ou
+kelpay-check retourne "failed" → afficher échec ❌
+   ou
+5 min écoulées → afficher message "Vérifiez vos commandes"
+```
 
-3. **Le frontend affiche un message générique** au lieu du vrai message d'erreur retourné par Keccel.
+### 2. `frontend/supabase/functions/kelpay-check/index.ts` — Support CardPay
 
-## Plan de corrections (3 fichiers dans `frontend/`)
+Le `kelpay-check` utilise actuellement l'URL Mobile Money (`checktransaction.asp`) et le `KELPAY_MERCHANT_CODE`. Pour les paiements par carte, il faut :
+- Détecter la méthode de paiement via le champ `method` de la transaction (`card` vs `mobile_money`)
+- Utiliser l'API CardPay de Keccel pour vérifier les transactions carte (ou utiliser la même API si elle est universelle)
+- Utiliser `KECCEL_CARD_MERCHANT_CODE` pour les transactions carte
 
-### 1. `frontend/supabase/functions/kelpay-webhook/index.ts`
-- Remplacer `import { hmac }` par une fonction native Web Crypto API (comme déjà fait dans `supabase/functions/kelpay-webhook/index.ts`)
+### 3. `frontend/src/pages/CheckoutPage.tsx` — Nettoyage des commandes carte échouées
 
-### 2. `frontend/supabase/functions/keccel-cardpay/index.ts`
-- Changer toutes les réponses d'erreur (status 400, 401, 403, 404, 500, 502) pour retourner `status: 200` avec `{ success: false, error: "..." }`
-- Ajouter `success: true` dans la réponse de succès finale
+Ajouter dans le `catch` du bloc carte (ligne 747) la mise à jour du statut des commandes créées vers `"payment_failed"`, comme c'est déjà fait pour le Mobile Money (ligne 707-708).
 
-### 3. `frontend/src/pages/CheckoutPage.tsx`
-- Remplacer le message générique par `data?.error || error?.message` pour afficher la vraie raison de l'échec
+### 4. Filtrage des commandes `awaiting_payment` et `payment_failed` côté vendeur
+
+Vérifier que le dashboard vendeur exclut bien les commandes `awaiting_payment` de la liste des commandes à traiter (déjà couvert par `NON_REVENUE_ORDER_STATUSES` pour les KPIs, mais vérifier le listing).
+
+## Fichiers impactés
+
+| Fichier | Action |
+|---------|--------|
+| `frontend/src/pages/PaymentReturnPage.tsx` | Ajouter polling `kelpay-check` toutes les 5s |
+| `frontend/supabase/functions/kelpay-check/index.ts` | Supporter les transactions carte (merchant code + API) |
+| `frontend/src/pages/CheckoutPage.tsx` | Nettoyer les commandes en cas d'erreur carte |
 
 ## Résultat attendu
 
-Après ces corrections (poussées vers GitHub → déployées via Vercel + Supabase), le paiement par carte devrait soit fonctionner (redirection vers Keccel), soit afficher le message d'erreur exact de l'API Keccel dans le toast, permettant un diagnostic précis.
+Après ces corrections, quand un client revient sur `/payment/return` après un paiement carte réussi :
+1. La page interroge `kelpay-check` toutes les 5 secondes
+2. `kelpay-check` appelle l'API Keccel avec la bonne référence
+3. Keccel confirme le paiement → la transaction et la commande sont mises à jour
+4. La page affiche "Paiement confirmé !" avec le numéro de commande et le montant
 
