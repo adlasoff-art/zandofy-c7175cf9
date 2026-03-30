@@ -1,57 +1,47 @@
 
 
-# Plan : Correction de l'Edge Function keccel-cardpay selon la doc officielle
+# Analyse des secrets et corrections à appliquer
 
-## Résumé
+## Bilan des secrets sur supabase.com
 
-Aligner l'edge function `keccel-cardpay` et le webhook `kelpay-webhook` sur les noms de champs exacts de la documentation Keccel CardPay API.
+| Secret | Statut | Impact |
+|--------|--------|--------|
+| `SUPABASE_URL` | ✅ Automatique | Fourni par Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ Automatique | Fourni par Supabase |
+| `KELPAY_TOKEN` | ✅ Déjà configuré | Utilisé par keccel-cardpay, kelpay-payment, kelpay-check |
+| `SITE_BASE_URL` | ✅ Vient d'être ajouté | URL de retour après paiement |
+| `KECCEL_CARD_MERCHANT_CODE` | ✅ Vient d'être ajouté | Code marchand carte (`jam`) |
+| `KELPAY_WEBHOOK_SECRET` | ⚠️ Manquant mais OPTIONNEL | Vérification HMAC des callbacks |
 
----
+### Le `KELPAY_WEBHOOK_SECRET` n'est PAS bloquant
 
-## 1. Corriger `keccel-cardpay/index.ts` — Payload API
+Le code du webhook (ligne 24) fait : `if (webhookSecret) { ... }` — la vérification HMAC ne s'active **que si** le secret est configuré. Sans lui, le webhook accepte tous les callbacks sans vérifier la signature. Ce n'est pas idéal pour la sécurité en production, mais **ça fonctionne**.
 
-Remplacer le payload actuel par les 7 champs obligatoires de la doc :
+Keccel doit vous fournir ce secret si vous le souhaitez. Ce n'est pas quelque chose que vous générez vous-même.
 
-```json
-{
-  "merchantcode": "jam",
-  "reference": "keccel_card_{order_id}_{timestamp}",
-  "amount": 100,
-  "currency": "USD",
-  "description": "Commande ZD-XXXXX - Zandofy",
-  "callbackurl": "{SUPABASE_URL}/functions/v1/kelpay-webhook",
-  "returnUrl": "{SITE_BASE_URL}/payment/return?ref={reference}&order_id={id}"
-}
-```
+## Problème restant : le vrai bloqueur
 
-Changements :
-- `merchant_code` → `merchantcode`
-- `callback_url` → `callbackurl`
-- `return_url` → `returnUrl` (case-sensitive !)
-- Supprimer : `order_id`, `payment_method`, `cancel_url`, `save_card`
-- Ajouter : `reference` et `description` comme champs requis
+Les secrets sont maintenant en place. L'erreur "Erreur lors de l'initiation du paiement" vient probablement de **deux problèmes dans le code** :
 
-Extraire `checkoutUrl` de la réponse (au lieu de `payment_url`/`redirect_url`) et `transactionid` (pas `transaction_id`).
+1. **L'edge function `frontend/supabase/functions/kelpay-webhook/index.ts` utilise une librairie incompatible** (`import { hmac } from "https://deno.land/x/hmac@v2.0.1/mod.ts"`) qui peut faire crasher le déploiement sur supabase.com. Il faut la remplacer par l'API Web Crypto native.
 
-Vérifier `code === "0"` pour confirmer que la requête a été acceptée avant de rediriger.
+2. **L'edge function `keccel-cardpay` retourne des codes HTTP 400/401/502** que le SDK Supabase traite comme des erreurs opaques, masquant le vrai message. Il faut retourner HTTP 200 avec `success: false`.
 
-## 2. Ajuster `kelpay-webhook/index.ts` — Callback
+3. **Le frontend affiche un message générique** au lieu du vrai message d'erreur retourné par Keccel.
 
-Le webhook gère déjà `code`, `reference`, `transactionid`, `transactionstatus`, `description`. Ajustements mineurs :
-- S'assurer que `code === "0"` est bien traité comme succès (c'est déjà le cas)
-- Ajouter `code === "1"` comme échec explicite (déjà couvert par le fallback)
-- Pas de changement structurel majeur nécessaire
+## Plan de corrections (3 fichiers dans `frontend/`)
 
-## 3. Fichiers impactés
+### 1. `frontend/supabase/functions/kelpay-webhook/index.ts`
+- Remplacer `import { hmac }` par une fonction native Web Crypto API (comme déjà fait dans `supabase/functions/kelpay-webhook/index.ts`)
 
-| Fichier | Action |
-|---------|--------|
-| `frontend/supabase/functions/keccel-cardpay/index.ts` | **Modifier** — corriger les noms de champs API |
-| `frontend/supabase/functions/kelpay-webhook/index.ts` | **Vérifier** — ajustements mineurs si nécessaire |
+### 2. `frontend/supabase/functions/keccel-cardpay/index.ts`
+- Changer toutes les réponses d'erreur (status 400, 401, 403, 404, 500, 502) pour retourner `status: 200` avec `{ success: false, error: "..." }`
+- Ajouter `success: true` dans la réponse de succès finale
 
-## Ce qui reste à obtenir de Keccel
+### 3. `frontend/src/pages/CheckoutPage.tsx`
+- Remplacer le message générique par `data?.error || error?.message` pour afficher la vraie raison de l'échec
 
-1. **PayPal** — même endpoint `/cardpay` ou endpoint séparé ?
-2. **Tokenisation** — support de sauvegarde de carte pour paiements récurrents ?
-3. **Credentials** — confirmer que le token KELPAY_TOKEN et merchantcode `jam` sont les mêmes pour carte et Mobile Money
+## Résultat attendu
+
+Après ces corrections (poussées vers GitHub → déployées via Vercel + Supabase), le paiement par carte devrait soit fonctionner (redirection vers Keccel), soit afficher le message d'erreur exact de l'API Keccel dans le toast, permettant un diagnostic précis.
 
