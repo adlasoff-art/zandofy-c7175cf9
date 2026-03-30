@@ -559,6 +559,7 @@ export type Database = {
           id: string
           product_id: string
           quantity: number
+          selected: boolean
           size: string | null
           user_id: string
         }
@@ -568,6 +569,7 @@ export type Database = {
           id?: string
           product_id: string
           quantity?: number
+          selected?: boolean
           size?: string | null
           user_id: string
         }
@@ -577,6 +579,7 @@ export type Database = {
           id?: string
           product_id?: string
           quantity?: number
+          selected?: boolean
           size?: string | null
           user_id?: string
         }
@@ -932,6 +935,33 @@ export type Database = {
           start_date?: string | null
           title?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      communes: {
+        Row: {
+          city: string
+          country_code: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+        }
+        Insert: {
+          city: string
+          country_code?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+        }
+        Update: {
+          city?: string
+          country_code?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
         }
         Relationships: []
       }
@@ -2131,6 +2161,7 @@ export type Database = {
           rider_cash_collected: boolean | null
           shipping_address: string | null
           shipping_city: string | null
+          shipping_commune: string | null
           shipping_cost: number
           shipping_country: string | null
           shipping_email: string | null
@@ -2140,6 +2171,7 @@ export type Database = {
           shipping_payment_status: string | null
           shipping_phone: string | null
           shipping_postal_code: string | null
+          shipping_quartier: string | null
           status: string
           store_id: string | null
           subtotal: number
@@ -2182,6 +2214,7 @@ export type Database = {
           rider_cash_collected?: boolean | null
           shipping_address?: string | null
           shipping_city?: string | null
+          shipping_commune?: string | null
           shipping_cost?: number
           shipping_country?: string | null
           shipping_email?: string | null
@@ -2191,6 +2224,7 @@ export type Database = {
           shipping_payment_status?: string | null
           shipping_phone?: string | null
           shipping_postal_code?: string | null
+          shipping_quartier?: string | null
           status?: string
           store_id?: string | null
           subtotal?: number
@@ -2233,6 +2267,7 @@ export type Database = {
           rider_cash_collected?: boolean | null
           shipping_address?: string | null
           shipping_city?: string | null
+          shipping_commune?: string | null
           shipping_cost?: number
           shipping_country?: string | null
           shipping_email?: string | null
@@ -2242,6 +2277,7 @@ export type Database = {
           shipping_payment_status?: string | null
           shipping_phone?: string | null
           shipping_postal_code?: string | null
+          shipping_quartier?: string | null
           status?: string
           store_id?: string | null
           subtotal?: number
@@ -3072,6 +3108,44 @@ export type Database = {
         }
         Relationships: []
       }
+      quartiers: {
+        Row: {
+          commune_id: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          is_restricted: boolean | null
+          name: string
+          restriction_reason: string | null
+        }
+        Insert: {
+          commune_id: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_restricted?: boolean | null
+          name: string
+          restriction_reason?: string | null
+        }
+        Update: {
+          commune_id?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_restricted?: boolean | null
+          name?: string
+          restriction_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quartiers_commune_id_fkey"
+            columns: ["commune_id"]
+            isOneToOne: false
+            referencedRelation: "communes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referrals: {
         Row: {
           commission_pct: number
@@ -3357,6 +3431,7 @@ export type Database = {
         Row: {
           address: string
           city: string
+          commune: string | null
           country: string
           created_at: string
           first_name: string
@@ -3366,11 +3441,13 @@ export type Database = {
           last_name: string
           phone: string
           postal_code: string | null
+          quartier: string | null
           user_id: string
         }
         Insert: {
           address: string
           city: string
+          commune?: string | null
           country?: string
           created_at?: string
           first_name: string
@@ -3380,11 +3457,13 @@ export type Database = {
           last_name: string
           phone: string
           postal_code?: string | null
+          quartier?: string | null
           user_id: string
         }
         Update: {
           address?: string
           city?: string
+          commune?: string | null
           country?: string
           created_at?: string
           first_name?: string
@@ -3394,6 +3473,7 @@ export type Database = {
           last_name?: string
           phone?: string
           postal_code?: string | null
+          quartier?: string | null
           user_id?: string
         }
         Relationships: []

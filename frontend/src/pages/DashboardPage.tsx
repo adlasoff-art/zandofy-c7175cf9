@@ -137,6 +137,8 @@ interface SavedAddress {
   last_name: string;
   phone: string;
   address: string;
+  commune: string | null;
+  quartier: string | null;
   city: string;
   country: string;
   postal_code: string | null;
@@ -1864,7 +1866,7 @@ function AddressesTab({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ label: "Domicile", first_name: "", last_name: "", phone: "", address: "", city: "", country: "Sénégal", postal_code: "" });
+  const [form, setForm] = useState({ label: "", first_name: "", last_name: "", phone: "", address: "", commune: "", quartier: "", city: "", country: "Sénégal", postal_code: "" });
   const [saving, setSaving] = useState(false);
   const [isKycVerified, setIsKycVerified] = useState(false);
 
@@ -1873,7 +1875,7 @@ function AddressesTab({ userId }: { userId: string }) {
   const fetchAddresses = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase.from("saved_addresses").select("*").eq("user_id", userId).order("is_default", { ascending: false });
-    setAddresses((data || []) as SavedAddress[]);
+    setAddresses((data || []) as unknown as SavedAddress[]);
     setLoading(false);
   }, [userId]);
 
@@ -1887,7 +1889,7 @@ function AddressesTab({ userId }: { userId: string }) {
   }, [userId]);
 
   const resetForm = () => {
-    setForm({ label: "Domicile", first_name: "", last_name: "", phone: "", address: "", city: "", country: "Sénégal", postal_code: "" });
+    setForm({ label: "", first_name: "", last_name: "", phone: "", address: "", commune: "", quartier: "", city: "", country: "Sénégal", postal_code: "" });
     setEditId(null);
     setShowForm(false);
   };
@@ -1899,6 +1901,8 @@ function AddressesTab({ userId }: { userId: string }) {
       last_name: addr.last_name,
       phone: addr.phone,
       address: addr.address,
+      commune: addr.commune || "",
+      quartier: addr.quartier || "",
       city: addr.city,
       country: addr.country,
       postal_code: addr.postal_code || "",
@@ -1913,15 +1917,15 @@ function AddressesTab({ userId }: { userId: string }) {
       return;
     }
     setSaving(true);
+    const payload = { ...form, postal_code: form.postal_code || null, commune: form.commune || null, quartier: form.quartier || null };
     if (editId) {
-      await supabase.from("saved_addresses").update({ ...form, postal_code: form.postal_code || null }).eq("id", editId);
+      await supabase.from("saved_addresses").update(payload as any).eq("id", editId);
     } else {
       await supabase.from("saved_addresses").insert({
         user_id: userId,
-        ...form,
-        postal_code: form.postal_code || null,
+        ...payload,
         is_default: addresses.length === 0,
-      });
+      } as any);
     }
     setSaving(false);
     resetForm();
@@ -1961,7 +1965,7 @@ function AddressesTab({ userId }: { userId: string }) {
                 {addr.is_default && <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold">Par défaut</span>}
               </div>
               <p className="text-sm text-foreground">{addr.first_name} {addr.last_name}</p>
-              <p className="text-xs text-muted-foreground">{addr.address}, {addr.city}, {addr.country}</p>
+              <p className="text-xs text-muted-foreground">{addr.address}{addr.quartier ? `, ${addr.quartier}` : ""}{addr.commune ? `, ${addr.commune}` : ""}, {addr.city}, {addr.country}</p>
               <p className="text-xs text-muted-foreground">{addr.phone}</p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
@@ -1990,11 +1994,7 @@ function AddressesTab({ userId }: { userId: string }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Libellé</Label>
-              <select className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-card" value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))}>
-                <option>Domicile</option>
-                <option>Bureau</option>
-                <option>Autre</option>
-              </select>
+              <Input className="mt-1" value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="Ex: Domicile 1, Bureau..." />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -2013,7 +2013,17 @@ function AddressesTab({ userId }: { userId: string }) {
           </div>
           <div>
             <Label className="text-xs">Adresse *</Label>
-            <Input className="mt-1" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
+            <Input className="mt-1" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="N° parcelle, avenue/rue" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Quartier</Label>
+              <Input className="mt-1" value={form.quartier} onChange={e => setForm(f => ({ ...f, quartier: e.target.value }))} placeholder="Quartier" />
+            </div>
+            <div>
+              <Label className="text-xs">Commune</Label>
+              <Input className="mt-1" value={form.commune} onChange={e => setForm(f => ({ ...f, commune: e.target.value }))} placeholder="Commune" />
+            </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>

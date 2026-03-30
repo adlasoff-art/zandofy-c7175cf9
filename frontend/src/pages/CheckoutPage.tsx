@@ -31,6 +31,8 @@ interface ShippingInfo {
   email: string;
   phone: string;
   address: string;
+  commune: string;
+  quartier: string;
   city: string;
   country: string;
   postalCode: string;
@@ -43,6 +45,8 @@ interface SavedAddress {
   last_name: string;
   phone: string;
   address: string;
+  commune: string | null;
+  quartier: string | null;
   city: string;
   country: string;
   postal_code: string;
@@ -70,11 +74,11 @@ type LastMilePayment = "pay_with_shipping" | "pay_cash_on_delivery";
 
 const emptyShipping: ShippingInfo = {
   firstName: "", lastName: "", email: "", phone: "",
-  address: "", city: "", country: "CD", postalCode: "",
+  address: "", commune: "", quartier: "", city: "", country: "CD", postalCode: "",
 };
 
 export default function CheckoutPage() {
-  const { items, subtotal, clearCart } = useCart();
+  const { selectedItems: items, selectedSubtotal: subtotal, removeSelectedItems } = useCart();
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -278,11 +282,11 @@ export default function CheckoutPage() {
     if (!user) return;
     supabase.from("saved_addresses").select("*").eq("user_id", user.id).order("is_default", { ascending: false }).then(({ data }) => {
       if (data) {
-        setSavedAddresses(data as SavedAddress[]);
+        setSavedAddresses(data as unknown as SavedAddress[]);
         const def = data.find((a: any) => a.is_default);
         if (def) {
           setSelectedAddressId(def.id);
-          applyAddress(def as SavedAddress);
+          applyAddress(def as unknown as SavedAddress);
         }
       }
     });
@@ -295,6 +299,8 @@ export default function CheckoutPage() {
       email: user?.email || "",
       phone: addr.phone,
       address: addr.address,
+      commune: addr.commune || "",
+      quartier: addr.quartier || "",
       city: addr.city,
       country: addr.country,
       postalCode: addr.postal_code || "",
@@ -462,14 +468,16 @@ export default function CheckoutPage() {
         last_name: shipping.lastName,
         phone: shipping.phone,
         address: shipping.address,
+        commune: shipping.commune || null,
+        quartier: shipping.quartier || null,
         city: shipping.city,
         country: shipping.country,
         postal_code: shipping.postalCode,
         is_default: savedAddresses.length === 0,
-      });
+      } as any);
       if (!error) {
         const { data } = await supabase.from("saved_addresses").select("*").eq("user_id", user.id).order("is_default", { ascending: false });
-        if (data) setSavedAddresses(data as SavedAddress[]);
+        if (data) setSavedAddresses(data as unknown as SavedAddress[]);
         setSaveAddress(false);
       }
     }
@@ -528,10 +536,12 @@ export default function CheckoutPage() {
           shipping_last_name: shipping.lastName,
           shipping_email: shipping.email || user?.email || "",
           shipping_phone: shipping.phone,
-          shipping_address: shipping.address,
-          shipping_city: shipping.city,
-          shipping_country: shipping.country,
-          shipping_postal_code: shipping.postalCode,
+           shipping_address: shipping.address,
+           shipping_commune: shipping.commune || null,
+           shipping_quartier: shipping.quartier || null,
+           shipping_city: shipping.city,
+           shipping_country: shipping.country,
+           shipping_postal_code: shipping.postalCode,
           subtotal: orderSubtotal,
           shipping_cost: orderShippingCost,
           total: orderTotal,
@@ -654,7 +664,7 @@ export default function CheckoutPage() {
               if (newStatus === "success") {
                 await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
                 setPaymentPending(false);
-                clearCart();
+                removeSelectedItems();
                 setStep("confirmation");
                 toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
                 supabase.removeChannel(channel);
@@ -699,7 +709,7 @@ export default function CheckoutPage() {
       await new Promise(r => setTimeout(r, 1500));
       const { orderRef } = await createOrderForPayment();
       setOrderId(orderRef);
-      await clearCart();
+      await removeSelectedItems();
       setStep("confirmation");
       setProcessing(false);
       if (paymentMethod === "off_platform") {
@@ -721,7 +731,7 @@ export default function CheckoutPage() {
           await supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
         }
         setPaymentPending(false);
-        await clearCart();
+        await removeSelectedItems();
         setStep("confirmation");
         toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderId}` });
       } else if (data?.transactionstatus === "FAILED") {
@@ -841,13 +851,23 @@ export default function CheckoutPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="addr">{t("checkout.address")} *</Label>
-                    <Input id="addr" value={shipping.address} onChange={e => updateField("address", e.target.value)} />
+                    <Input id="addr" value={shipping.address} onChange={e => updateField("address", e.target.value)} placeholder="N° parcelle, avenue/rue" />
                   </div>
                   <div className="grid sm:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="quartier">Quartier</Label>
+                      <Input id="quartier" value={shipping.quartier} onChange={e => updateField("quartier", e.target.value)} placeholder="Quartier" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="commune">Commune</Label>
+                      <Input id="commune" value={shipping.commune} onChange={e => updateField("commune", e.target.value)} placeholder="Commune" />
+                    </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="city">{t("checkout.city")} *</Label>
                       <Input id="city" value={shipping.city} onChange={e => updateField("city", e.target.value)} />
                     </div>
+                  </div>
+                  <div className="grid sm:grid-cols-3 gap-4">
                     <div className="space-y-1.5">
                       <Label>{t("checkout.country")} *</Label>
                       <CountryCombobox
@@ -876,15 +896,12 @@ export default function CheckoutPage() {
                       />
                       <Label htmlFor="save-addr" className="text-sm cursor-pointer">{t("checkout.saveAddress")}</Label>
                       {saveAddress && (
-                        <select
+                        <Input
                           value={addressLabel}
                           onChange={e => setAddressLabel(e.target.value)}
-                          className="text-sm border border-border rounded px-2 py-1 bg-background text-foreground"
-                        >
-                          <option>Domicile</option>
-                          <option>Bureau</option>
-                          <option>Autre</option>
-                        </select>
+                          className="w-32 h-8 text-sm"
+                          placeholder="Ex: Domicile 1, Bureau..."
+                        />
                       )}
                     </div>
                   )}
@@ -983,7 +1000,7 @@ export default function CheckoutPage() {
                 <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
                   <p className="font-medium text-foreground flex items-center gap-1.5"><MapPin size={14} /> {t("checkout.shipping")} :</p>
                   <p className="text-muted-foreground">{shipping.firstName} {shipping.lastName}</p>
-                  <p className="text-muted-foreground">{shipping.address}, {shipping.city}, {shipping.country}</p>
+                  <p className="text-muted-foreground">{shipping.address}{shipping.quartier ? `, ${shipping.quartier}` : ""}{shipping.commune ? `, ${shipping.commune}` : ""}, {shipping.city}, {shipping.country}</p>
                   <p className="text-muted-foreground">{shipping.phone}</p>
                 </div>
 
@@ -1161,7 +1178,7 @@ export default function CheckoutPage() {
                                     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "payment_transactions", filter: `reference=eq.${data.reference}` },
                                       (payload: any) => {
                                         const ns = payload.new?.status;
-                                        if (ns === "success") { supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment"); setPaymentPending(false); clearCart(); setStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel); }
+                                        if (ns === "success") { supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment"); setPaymentPending(false); removeSelectedItems(); setStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel); }
                                         else if (ns === "failed") { supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds); setPaymentPending(false); toast({ title: "Paiement échoué", variant: "destructive" }); supabase.removeChannel(channel); }
                                       }
                                     ).subscribe();
