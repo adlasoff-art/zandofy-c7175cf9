@@ -23,7 +23,7 @@ import { getColorDisplay } from "@/utils/colorName";
 import { useStorePaymentNumbers } from "@/hooks/use-store-payment-numbers";
 
 type Step = "shipping" | "payment" | "confirmation";
-type PaymentMethod = "stripe" | "mobile_money" | "cod" | "off_platform";
+type PaymentMethod = "stripe" | "card" | "paypal" | "mobile_money" | "cod" | "off_platform";
 
 interface ShippingInfo {
   firstName: string;
