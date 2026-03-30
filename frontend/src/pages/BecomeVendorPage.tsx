@@ -474,7 +474,7 @@ export default function BecomeVendorPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>{t("vendor.phone")} *</Label>
-                  <Input value={form.phone} onChange={(e) => updateField("phone", e.target.value)} placeholder="+221 77 123 45 67" />
+                  <Input value={form.phone} onChange={(e) => updateField("phone", e.target.value)} placeholder="+243 XXX XXX XXX" />
                 </div>
                 <div className="space-y-2">
                   <Label>{t("vendor.businessType")} *</Label>

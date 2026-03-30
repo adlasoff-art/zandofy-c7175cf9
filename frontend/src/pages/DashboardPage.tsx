@@ -1691,7 +1691,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Téléphone</Label>
-            <Input className="mt-1" value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} placeholder="+221 7X XXX XX XX" />
+            <Input className="mt-1" value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} placeholder="+243 XXX XXX XXX" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
