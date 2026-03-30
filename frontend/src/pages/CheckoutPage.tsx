@@ -475,7 +475,7 @@ export default function CheckoutPage() {
       });
       if (!error) {
         const { data } = await supabase.from("saved_addresses").select("*").eq("user_id", user.id).order("is_default", { ascending: false });
-        if (data) setSavedAddresses(data as SavedAddress[]);
+        if (data) setSavedAddresses(data as unknown as SavedAddress[]);
         setSaveAddress(false);
       }
     }
