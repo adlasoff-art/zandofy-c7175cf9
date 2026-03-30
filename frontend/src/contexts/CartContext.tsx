@@ -15,23 +15,32 @@ export interface CartItem {
   size: string | null;
   quantity: number;
   moq: number;
+  selected: boolean;
 }
 
 interface CartContextType {
   items: CartItem[];
+  selectedItems: CartItem[];
   loading: boolean;
   drawerOpen: boolean;
   setDrawerOpen: (open: boolean) => void;
-  addItem: (item: Omit<CartItem, "id">) => Promise<void>;
+  addItem: (item: Omit<CartItem, "id" | "selected">) => Promise<void>;
   updateQuantity: (id: string, quantity: number) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
   clearCart: () => Promise<void>;
+  toggleSelected: (id: string) => Promise<void>;
+  selectAll: () => Promise<void>;
+  deselectAll: () => Promise<void>;
+  removeSelectedItems: () => Promise<void>;
   itemCount: number;
   subtotal: number;
+  selectedCount: number;
+  selectedSubtotal: number;
 }
 
 const CartContext = createContext<CartContextType>({
   items: [],
+  selectedItems: [],
   loading: false,
   drawerOpen: false,
   setDrawerOpen: () => {},
@@ -39,8 +48,14 @@ const CartContext = createContext<CartContextType>({
   updateQuantity: async () => {},
   removeItem: async () => {},
   clearCart: async () => {},
+  toggleSelected: async () => {},
+  selectAll: async () => {},
+  deselectAll: async () => {},
+  removeSelectedItems: async () => {},
   itemCount: 0,
   subtotal: 0,
+  selectedCount: 0,
+  selectedSubtotal: 0,
 });
 
 export const useCart = () => useContext(CartContext);
@@ -59,7 +74,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase
       .from("cart_items")
       .select(`
-        id, product_id, color, size, quantity,
+        id, product_id, color, size, quantity, selected,
         products(name, name_fr, price, original_price, moq,
           product_images(image_url, position)
         )
@@ -85,25 +100,33 @@ export function CartProvider({ children }: { children: ReactNode }) {
       size: row.size,
       quantity: row.quantity,
       moq: row.products?.moq || 1,
+      selected: row.selected ?? true,
     })));
     setLoading(false);
   }, [user]);
 
   useEffect(() => { fetchCart(); }, [fetchCart]);
 
-  const addItem = async (item: Omit<CartItem, "id">) => {
+  const addItem = async (item: Omit<CartItem, "id" | "selected">) => {
     if (!user) {
       toast({ title: "Connexion requise", description: "Connectez-vous pour ajouter au panier.", variant: "destructive" });
       return;
     }
 
-    // Check if same product+color+size already exists
-    const existing = items.find(
-      i => i.productId === item.productId && i.color === item.color && i.size === item.size
-    );
+    // Use upsert with ON CONFLICT to handle duplicates at DB level
+    const { data: existing } = await supabase
+      .from("cart_items")
+      .select("id, quantity")
+      .eq("user_id", user.id)
+      .eq("product_id", item.productId)
+      .eq("color", item.color || "")
+      .eq("size", item.size || "")
+      .maybeSingle();
 
     if (existing) {
-      await updateQuantity(existing.id, existing.quantity + item.quantity);
+      // Increment quantity on existing item
+      const newQty = existing.quantity + item.quantity;
+      await supabase.from("cart_items").update({ quantity: newQty }).eq("id", existing.id);
     } else {
       const { error } = await supabase.from("cart_items").insert({
         user_id: user.id,
@@ -113,11 +136,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
         quantity: item.quantity,
       });
       if (error) {
-        toast({ title: "Erreur", description: error.message, variant: "destructive" });
-        return;
+        // If unique constraint violation, try to increment instead
+        if (error.code === "23505") {
+          const { data: dup } = await supabase
+            .from("cart_items")
+            .select("id, quantity")
+            .eq("user_id", user.id)
+            .eq("product_id", item.productId)
+            .eq("color", item.color || "")
+            .eq("size", item.size || "")
+            .maybeSingle();
+          if (dup) {
+            await supabase.from("cart_items").update({ quantity: dup.quantity + item.quantity }).eq("id", dup.id);
+          }
+        } else {
+          toast({ title: "Erreur", description: error.message, variant: "destructive" });
+          return;
+        }
       }
-      await fetchCart();
     }
+
+    await fetchCart();
     setDrawerOpen(true);
     toast({ title: "Ajouté au panier !" });
   };
@@ -143,11 +182,49 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems([]);
   };
 
+  const toggleSelected = async (id: string) => {
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+    const newVal = !item.selected;
+    const { error } = await supabase.from("cart_items").update({ selected: newVal } as any).eq("id", id);
+    if (!error) {
+      setItems(prev => prev.map(i => i.id === id ? { ...i, selected: newVal } : i));
+    }
+  };
+
+  const selectAll = async () => {
+    if (!user) return;
+    await supabase.from("cart_items").update({ selected: true } as any).eq("user_id", user.id);
+    setItems(prev => prev.map(i => ({ ...i, selected: true })));
+  };
+
+  const deselectAll = async () => {
+    if (!user) return;
+    await supabase.from("cart_items").update({ selected: false } as any).eq("user_id", user.id);
+    setItems(prev => prev.map(i => ({ ...i, selected: false })));
+  };
+
+  const removeSelectedItems = async () => {
+    if (!user) return;
+    const selectedIds = items.filter(i => i.selected).map(i => i.id);
+    if (selectedIds.length === 0) return;
+    await supabase.from("cart_items").delete().in("id", selectedIds);
+    setItems(prev => prev.filter(i => !i.selected));
+  };
+
+  const selectedItems = items.filter(i => i.selected);
   const itemCount = items.reduce((s, i) => s + i.quantity, 0);
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const selectedCount = selectedItems.reduce((s, i) => s + i.quantity, 0);
+  const selectedSubtotal = selectedItems.reduce((s, i) => s + i.price * i.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ items, loading, drawerOpen, setDrawerOpen, addItem, updateQuantity, removeItem, clearCart, itemCount, subtotal }}>
+    <CartContext.Provider value={{
+      items, selectedItems, loading, drawerOpen, setDrawerOpen,
+      addItem, updateQuantity, removeItem, clearCart,
+      toggleSelected, selectAll, deselectAll, removeSelectedItems,
+      itemCount, subtotal, selectedCount, selectedSubtotal,
+    }}>
       {children}
     </CartContext.Provider>
   );

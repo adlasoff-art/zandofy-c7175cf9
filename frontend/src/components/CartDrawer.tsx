@@ -3,12 +3,20 @@ import { getColorDisplay } from "@/utils/colorName";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Minus, Plus, Trash2, ShoppingBag, CheckSquare, Square } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export function CartDrawer() {
-  const { items, drawerOpen, setDrawerOpen, updateQuantity, removeItem, itemCount, subtotal } = useCart();
+  const {
+    items, drawerOpen, setDrawerOpen, updateQuantity, removeItem,
+    itemCount, selectedCount, selectedSubtotal,
+    toggleSelected, selectAll, deselectAll,
+  } = useCart();
   const { user } = useAuth();
+
+  const allSelected = items.length > 0 && items.every(i => i.selected);
+  const noneSelected = items.every(i => !i.selected);
 
   return (
     <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -35,9 +43,30 @@ export function CartDrawer() {
           </div>
         ) : (
           <>
+            {/* Select all / deselect all */}
+            <div className="flex items-center justify-between py-2 px-1 border-b border-border">
+              <button
+                onClick={() => allSelected ? deselectAll() : selectAll()}
+                className="text-xs font-medium text-primary hover:underline flex items-center gap-1.5"
+              >
+                {allSelected ? <Square size={14} /> : <CheckSquare size={14} />}
+                {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+              </button>
+              <span className="text-xs text-muted-foreground">
+                {selectedCount} article{selectedCount !== 1 ? "s" : ""} sélectionné{selectedCount !== 1 ? "s" : ""}
+              </span>
+            </div>
+
             <div className="flex-1 overflow-y-auto space-y-3 py-4">
               {items.map(item => (
-                <div key={item.id} className="flex gap-3 p-3 bg-muted/50 rounded-sm">
+                <div key={item.id} className={`flex gap-3 p-3 rounded-sm transition-colors ${item.selected ? "bg-muted/50" : "bg-muted/20 opacity-60"}`}>
+                  {/* Checkbox */}
+                  <div className="flex items-start pt-1">
+                    <Checkbox
+                      checked={item.selected}
+                      onCheckedChange={() => toggleSelected(item.id)}
+                    />
+                  </div>
                   <img src={item.image} alt={item.nameFr} className="w-20 h-24 object-cover rounded-sm shrink-0" />
                   <div className="flex-1 min-w-0 space-y-1">
                     <p className="text-sm font-medium text-foreground line-clamp-2">{item.nameFr}</p>
@@ -79,13 +108,19 @@ export function CartDrawer() {
             {/* Footer */}
             <div className="border-t border-border pt-4 space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Sous-total</span>
-                <span className="font-bold text-foreground">${subtotal.toFixed(2)}</span>
+                <span className="text-muted-foreground">Sous-total ({selectedCount} sélectionné{selectedCount !== 1 ? "s" : ""})</span>
+                <span className="font-bold text-foreground">${selectedSubtotal.toFixed(2)}</span>
               </div>
               <p className="text-xs text-muted-foreground">Frais de port calculés au checkout</p>
-              <Link to="/checkout" onClick={() => setDrawerOpen(false)}>
-                <Button className="w-full h-12 font-bold">Commander (${subtotal.toFixed(2)})</Button>
-              </Link>
+              {noneSelected ? (
+                <Button className="w-full h-12 font-bold" disabled>
+                  Sélectionnez des articles
+                </Button>
+              ) : (
+                <Link to="/checkout" onClick={() => setDrawerOpen(false)}>
+                  <Button className="w-full h-12 font-bold">Commander ({selectedCount}) — ${selectedSubtotal.toFixed(2)}</Button>
+                </Link>
+              )}
             </div>
           </>
         )}
