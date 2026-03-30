@@ -80,8 +80,8 @@ Deno.serve(async (req) => {
       return errorResponse("Montant invalide");
     }
 
-    // Max 35 chars for Keccel compatibility: "KC-" (3) + base36 timestamp (8) + "-" (1) + random (4) = 16 chars
-    const reference = `KC-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    // Max 25 chars for Keccel compatibility: "KC-" (3) + base36 timestamp (8) + "-" (1) + random (13) = 25 chars
+    const reference = `KC-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
     const returnUrl = `${siteBaseUrl}/payment/return?ref=${encodeURIComponent(reference)}&order_id=${order.id}`;
     const callbackUrl = `${supabaseUrl}/functions/v1/kelpay-webhook`;
 
