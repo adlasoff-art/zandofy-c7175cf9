@@ -46,6 +46,7 @@ const CartContext = createContext<CartContextType>({
   drawerOpen: false,
   setDrawerOpen: () => {},
   addItem: async () => {},
+  updateVariant: async () => {},
   updateQuantity: async () => {},
   removeItem: async () => {},
   clearCart: async () => {},
