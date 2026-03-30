@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 const KELPAY_CHECK_URL = "https://pay.keccel.com/kelpay/v1/checktransaction.asp";
+const KECCEL_CARD_CHECK_URL = "https://pay.keccel.com/kelpay/v1/checktransaction.asp";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -25,15 +26,10 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const merchantCode = Deno.env.get("KELPAY_MERCHANT_CODE");
-    const merchantToken = Deno.env.get("KELPAY_TOKEN");
-
-    if (!merchantCode || !merchantToken) {
-      return new Response(
-        JSON.stringify({ error: "KelPay credentials not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const mobileMoneyMerchantCode = Deno.env.get("KELPAY_MERCHANT_CODE");
+    const mobileMoneyToken = Deno.env.get("KELPAY_TOKEN");
+    const cardMerchantCode = Deno.env.get("KECCEL_CARD_MERCHANT_CODE");
+    const cardToken = Deno.env.get("KECCEL_CARD_TOKEN") || mobileMoneyToken;
 
     // Verify user
     const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
@@ -59,20 +55,20 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    // If only reference provided, look up the transaction from our DB first
+    // Look up the transaction from our DB
     let kelpayTransactionId = transaction_id;
     let localTx: any = null;
 
     if (reference) {
       const { data: txData } = await supabaseAdmin
         .from("payment_transactions")
-        .select("id, order_id, status, transaction_id")
+        .select("id, order_id, status, transaction_id, method")
         .eq("reference", reference)
         .maybeSingle();
 
       localTx = txData;
 
-      // If the callback already updated this to success/failed, return immediately
+      // If already finalized, return immediately
       if (localTx && (localTx.status === "success" || localTx.status === "failed")) {
         return new Response(
           JSON.stringify({ status: localTx.status, reference }),
@@ -80,13 +76,12 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Use the stored KelPay transaction_id for the API check
       if (localTx?.transaction_id) {
         kelpayTransactionId = localTx.transaction_id;
       }
     }
 
-    // If we still have no transaction_id to check with KelPay, return pending
+    // If we still have no transaction_id to check, return pending
     if (!kelpayTransactionId) {
       return new Response(
         JSON.stringify({ status: "pending", reference }),
@@ -94,8 +89,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Call KelPay CheckTransaction
-    const checkResponse = await fetch(KELPAY_CHECK_URL, {
+    // Determine which merchant code and token to use based on payment method
+    const isCardPayment = localTx?.method === "card";
+    const merchantCode = isCardPayment ? (cardMerchantCode || mobileMoneyMerchantCode) : mobileMoneyMerchantCode;
+    const merchantToken = isCardPayment ? cardToken : mobileMoneyToken;
+    const checkUrl = isCardPayment ? KECCEL_CARD_CHECK_URL : KELPAY_CHECK_URL;
+
+    if (!merchantCode || !merchantToken) {
+      return new Response(
+        JSON.stringify({ error: "Payment credentials not configured for " + (isCardPayment ? "card" : "mobile_money") }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Checking ${isCardPayment ? "card" : "mobile_money"} transaction ${kelpayTransactionId} with merchant ${merchantCode}`);
+
+    // Call Keccel CheckTransaction
+    const checkResponse = await fetch(checkUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${merchantToken}`,
@@ -108,9 +118,9 @@ Deno.serve(async (req) => {
     });
 
     const checkData = await checkResponse.json();
-    console.log("KelPay check response:", JSON.stringify(checkData));
+    console.log("Keccel check response:", JSON.stringify(checkData));
 
-    // Determine status from KelPay response
+    // Determine status from response
     const isSuccess =
       checkData.code === "0" ||
       checkData.transactionstatus === "SUCCESS" ||
@@ -131,11 +141,9 @@ Deno.serve(async (req) => {
         })
         .eq("id", localTx.id);
 
-      // For order payments (not shipping/last-mile), update order status
+      // Update order status
       if (localTx.order_id) {
         if (isSuccess) {
-          // Check if this is a regular order payment or a shipping payment
-          // by looking at the order's current status
           const { data: orderData } = await supabaseAdmin
             .from("orders")
             .select("status")
@@ -143,7 +151,6 @@ Deno.serve(async (req) => {
             .maybeSingle();
 
           if (orderData && ["awaiting_payment", "pending"].includes(orderData.status)) {
-            // Regular order payment
             const { error: orderUpdateError } = await supabaseAdmin
               .from("orders")
               .update({ status: "pending" })
@@ -161,7 +168,6 @@ Deno.serve(async (req) => {
               }).catch(console.error);
             }
           }
-          // For shipping payments, the frontend handles updating shipping_payment_status
         } else if (isFailed) {
           const { data: orderData } = await supabaseAdmin
             .from("orders")
