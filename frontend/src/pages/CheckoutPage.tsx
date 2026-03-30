@@ -713,10 +713,11 @@ export default function CheckoutPage() {
       // Card/PayPal via Keccel — redirect flow
       try {
         setProcessing(true);
-        const { orderRef, orderId: newOrderId } = await createOrderForPayment();
+        const { orderRef, orderIds } = await createOrderForPayment();
+        if (orderIds.length === 0) throw new Error("Impossible de créer la commande");
         const { data, error } = await supabase.functions.invoke("keccel-cardpay", {
           body: {
-            order_id: newOrderId,
+            order_id: orderIds[0],
             payment_method: paymentMethod === "stripe" ? "card" : paymentMethod,
             payment_type: "order",
           },
