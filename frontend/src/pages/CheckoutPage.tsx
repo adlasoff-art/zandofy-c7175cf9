@@ -664,7 +664,7 @@ export default function CheckoutPage() {
               if (newStatus === "success") {
                 await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
                 setPaymentPending(false);
-                clearCart();
+                removeSelectedItems();
                 setStep("confirmation");
                 toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
                 supabase.removeChannel(channel);
@@ -709,7 +709,7 @@ export default function CheckoutPage() {
       await new Promise(r => setTimeout(r, 1500));
       const { orderRef } = await createOrderForPayment();
       setOrderId(orderRef);
-      await clearCart();
+      await removeSelectedItems();
       setStep("confirmation");
       setProcessing(false);
       if (paymentMethod === "off_platform") {
@@ -731,7 +731,7 @@ export default function CheckoutPage() {
           await supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
         }
         setPaymentPending(false);
-        await clearCart();
+        await removeSelectedItems();
         setStep("confirmation");
         toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderId}` });
       } else if (data?.transactionstatus === "FAILED") {
@@ -1171,7 +1171,7 @@ export default function CheckoutPage() {
                                     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "payment_transactions", filter: `reference=eq.${data.reference}` },
                                       (payload: any) => {
                                         const ns = payload.new?.status;
-                                        if (ns === "success") { supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment"); setPaymentPending(false); clearCart(); setStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel); }
+                                        if (ns === "success") { supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment"); setPaymentPending(false); removeSelectedItems(); setStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel); }
                                         else if (ns === "failed") { supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds); setPaymentPending(false); toast({ title: "Paiement échoué", variant: "destructive" }); supabase.removeChannel(channel); }
                                       }
                                     ).subscribe();
