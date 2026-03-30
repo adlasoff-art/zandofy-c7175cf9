@@ -1889,7 +1889,7 @@ function AddressesTab({ userId }: { userId: string }) {
   }, [userId]);
 
   const resetForm = () => {
-    setForm({ label: "Domicile", first_name: "", last_name: "", phone: "", address: "", city: "", country: "Sénégal", postal_code: "" });
+    setForm({ label: "", first_name: "", last_name: "", phone: "", address: "", commune: "", quartier: "", city: "", country: "Sénégal", postal_code: "" });
     setEditId(null);
     setShowForm(false);
   };
