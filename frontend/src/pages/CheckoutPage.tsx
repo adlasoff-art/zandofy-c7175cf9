@@ -74,7 +74,7 @@ type LastMilePayment = "pay_with_shipping" | "pay_cash_on_delivery";
 
 const emptyShipping: ShippingInfo = {
   firstName: "", lastName: "", email: "", phone: "",
-  address: "", city: "", country: "CD", postalCode: "",
+  address: "", commune: "", quartier: "", city: "", country: "CD", postalCode: "",
 };
 
 export default function CheckoutPage() {
