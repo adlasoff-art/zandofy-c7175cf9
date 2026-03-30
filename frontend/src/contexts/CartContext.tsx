@@ -163,6 +163,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     toast({ title: "Ajouté au panier !" });
   };
 
+  const updateVariant = async (id: string, color: string | null, size: string | null) => {
+    const { error } = await supabase.from("cart_items").update({ color, size }).eq("id", id);
+    if (!error) {
+      await fetchCart(); // Re-fetch to handle potential merges with existing variant rows
+    }
+  };
+
   const updateQuantity = async (id: string, quantity: number) => {
     if (quantity < 1) return removeItem(id);
     const { error } = await supabase.from("cart_items").update({ quantity }).eq("id", id);
