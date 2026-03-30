@@ -78,7 +78,7 @@ const emptyShipping: ShippingInfo = {
 };
 
 export default function CheckoutPage() {
-  const { selectedItems: items, selectedSubtotal: subtotal, removeSelectedItems, clearCart } = useCart();
+  const { selectedItems: items, selectedSubtotal: subtotal, removeSelectedItems } = useCart();
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
