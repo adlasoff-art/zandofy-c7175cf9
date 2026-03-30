@@ -19,6 +19,7 @@ const DEFAULT_CONFIG: PaymentMethodsConfig = {
   stripe: true,
   cod: true,
   off_platform: true,
+  paypal: true,
   stripe_notice_enabled: false,
   stripe_notice_text: "Pour l'instant, ce moyen de paiement n'est pas actif.",
 };
