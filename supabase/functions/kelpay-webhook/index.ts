@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     if (webhookSecret) {
       const signature = req.headers.get("x-kelpay-signature") || req.headers.get("X-KelPay-Signature");
       if (signature) {
-        const expectedHex = hmac("sha256", webhookSecret, rawBody, "utf8", "hex") as string;
+        const expectedHex = await computeHmacSha256(webhookSecret, rawBody);
         const expected = `sha256=${expectedHex}`;
         if (signature !== expected && signature !== expectedHex) {
           console.error("Invalid webhook signature");
