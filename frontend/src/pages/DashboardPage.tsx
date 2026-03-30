@@ -1866,7 +1866,7 @@ function AddressesTab({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ label: "Domicile", first_name: "", last_name: "", phone: "", address: "", city: "", country: "Sénégal", postal_code: "" });
+  const [form, setForm] = useState({ label: "", first_name: "", last_name: "", phone: "", address: "", commune: "", quartier: "", city: "", country: "Sénégal", postal_code: "" });
   const [saving, setSaving] = useState(false);
   const [isKycVerified, setIsKycVerified] = useState(false);
 
