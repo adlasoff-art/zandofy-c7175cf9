@@ -156,7 +156,7 @@ export function VendorRiderTracking({ storeId }: VendorRiderTrackingProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_ref, status, shipping_address, shipping_city, shipping_first_name, shipping_last_name, shipping_phone, assigned_rider_id, assigned_rider_name, total")
+        .select("id, order_ref, status, shipping_address, shipping_city, shipping_first_name, shipping_last_name, shipping_phone, assigned_rider_id, assigned_rider_name, total, user_id")
         .eq("store_id", storeId)
         .not("assigned_rider_id", "is", null)
         .in("status", ["rider_assigned", "out_for_delivery", "in_delivery", "shipped"])
@@ -166,6 +166,27 @@ export function VendorRiderTracking({ storeId }: VendorRiderTrackingProps) {
       return data;
     },
     refetchInterval: 15000,
+  });
+
+  const sendGpsRequest = useMutation({
+    mutationFn: async ({ userId, type }: { userId: string; type: "rider" | "customer" }) => {
+      const title = "Activez votre GPS";
+      const message = type === "rider"
+        ? "Le vendeur demande l'activation de votre GPS pour le suivi de livraison en temps réel."
+        : "Activez votre GPS pour permettre au livreur de vous localiser facilement.";
+      const link = type === "rider" ? "/rider" : "/tracking";
+
+      const { error } = await supabase.from("notifications").insert({
+        user_id: userId,
+        type: "delivery",
+        title,
+        message,
+        link,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => toast.success("Notification GPS envoyée !"),
+    onError: (e: any) => toast.error(e.message || "Erreur"),
   });
 
   if (isLoading) {
@@ -197,7 +218,7 @@ export function VendorRiderTracking({ storeId }: VendorRiderTrackingProps) {
         </h2>
       </div>
       {orders.map((order) => (
-        <RiderTrackingCard key={order.id} order={order} />
+        <RiderTrackingCard key={order.id} order={order} sendGpsRequest={sendGpsRequest} />
       ))}
     </div>
   );
