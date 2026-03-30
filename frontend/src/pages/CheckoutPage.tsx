@@ -722,7 +722,15 @@ export default function CheckoutPage() {
             payment_type: "order",
           },
         });
-        if (error || !data) throw new Error("Erreur lors de l'initiation du paiement");
+        if (error) {
+          console.error("keccel-cardpay SDK error:", error);
+          throw new Error(error.message || "Erreur lors de l'initiation du paiement");
+        }
+        if (!data) throw new Error("Pas de réponse de la passerelle de paiement");
+        if (data.success === false) {
+          console.error("keccel-cardpay API error:", data);
+          throw new Error(data.error || "Erreur de la passerelle de paiement");
+        }
         if (data.redirect_url) {
           window.location.href = data.redirect_url;
           return;
