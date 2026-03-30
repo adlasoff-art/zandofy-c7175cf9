@@ -1,0 +1,174 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { hmac } from "https://deno.land/x/hmac@v2.0.1/mod.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-kelpay-signature",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const webhookSecret = Deno.env.get("KELPAY_WEBHOOK_SECRET");
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    const rawBody = await req.text();
+
+    // Verify HMAC signature if webhook secret is configured
+    if (webhookSecret) {
+      const signature = req.headers.get("x-kelpay-signature") || req.headers.get("X-KelPay-Signature");
+      if (signature) {
+        const expectedHex = hmac("sha256", webhookSecret, rawBody, "utf8", "hex") as string;
+        const expected = `sha256=${expectedHex}`;
+        if (signature !== expected && signature !== expectedHex) {
+          console.error("Invalid webhook signature");
+          return new Response("Invalid signature", { status: 401, headers: corsHeaders });
+        }
+      }
+    }
+
+    const payload = JSON.parse(rawBody);
+    console.log("KelPay webhook received:", JSON.stringify(payload));
+
+    const {
+      code,
+      reference,
+      transactionid,
+      transactionstatus,
+      description,
+      amount,
+      currency,
+    } = payload;
+
+    if (!reference) {
+      console.warn("KelPay webhook: no reference in payload");
+      return new Response("OK", { status: 200, headers: corsHeaders });
+    }
+
+    // Find the payment transaction by reference
+    const { data: tx, error: txErr } = await supabase
+      .from("payment_transactions")
+      .select("id, order_id, status, payment_type, amount, user_id, method")
+      .eq("reference", reference)
+      .maybeSingle();
+
+    if (txErr || !tx) {
+      console.error("Payment transaction not found for reference:", reference, txErr);
+      return new Response("OK", { status: 200, headers: corsHeaders });
+    }
+
+    // Don't reprocess if already successful
+    if (tx.status === "success") {
+      console.log("Transaction already successful, skipping:", reference);
+      return new Response("OK", { status: 200, headers: corsHeaders });
+    }
+
+    const isSuccess =
+      code === "0" || code === 0 ||
+      transactionstatus === "SUCCESS" ||
+      transactionstatus === "Successful";
+    const isFailed =
+      transactionstatus === "FAILED" ||
+      transactionstatus === "Failed" ||
+      (code !== "0" && code !== 0 && code !== "1");
+
+    const newStatus = isSuccess ? "success" : isFailed ? "failed" : "pending";
+
+    // Only update if we got a definitive result
+    if (!isSuccess && !isFailed) {
+      console.log("KelPay webhook: non-definitive status, ignoring:", payload);
+      return new Response("OK", { status: 200, headers: corsHeaders });
+    }
+
+    // Update payment transaction
+    await supabase
+      .from("payment_transactions")
+      .update({
+        status: newStatus,
+        transaction_id: transactionid || undefined,
+        callback_payload: payload,
+      })
+      .eq("id", tx.id);
+
+    // Update order status
+    if (isSuccess) {
+      const paymentType = tx.payment_type || "order";
+
+      if (paymentType === "order") {
+        const { error: orderUpdateError } = await supabase
+          .from("orders")
+          .update({ status: "pending" })
+          .eq("id", tx.order_id)
+          .in("status", ["awaiting_payment", "pending"]);
+
+        if (!orderUpdateError) {
+          await fetch(`${supabaseUrl}/functions/v1/notify-order-status`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${serviceRoleKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ orderId: tx.order_id, newStatus: "pending" }),
+          }).catch(console.error);
+        }
+      } else if (paymentType === "shipping") {
+        await supabase
+          .from("orders")
+          .update({ shipping_payment_status: "paid" })
+          .eq("id", tx.order_id);
+      } else if (paymentType === "last_mile") {
+        await supabase
+          .from("orders")
+          .update({ last_mile_payment_status: "paid" })
+          .eq("id", tx.order_id);
+      }
+
+      // Notification in-app
+      if (tx.user_id) {
+        await supabase.from("notifications").insert({
+          user_id: tx.user_id,
+          type: "payment",
+          title: "Paiement confirmé",
+          message: `Votre paiement de ${tx.amount} a été confirmé avec succès.`,
+          link: "/dashboard",
+        });
+      }
+    } else if (isFailed) {
+      const { data: orderData } = await supabase
+        .from("orders")
+        .select("status")
+        .eq("id", tx.order_id)
+        .maybeSingle();
+
+      if (orderData && ["awaiting_payment"].includes(orderData.status)) {
+        await supabase
+          .from("orders")
+          .update({ status: "payment_failed" })
+          .eq("id", tx.order_id)
+          .eq("status", "awaiting_payment");
+      }
+
+      if (tx.user_id) {
+        await supabase.from("notifications").insert({
+          user_id: tx.user_id,
+          type: "payment",
+          title: "Paiement échoué",
+          message: `Votre paiement a échoué. ${description || "Veuillez réessayer."}`,
+          link: "/dashboard",
+        });
+      }
+    }
+
+    return new Response("OK", { status: 200, headers: corsHeaders });
+  } catch (error) {
+    console.error("KelPay webhook error:", error);
+    // Always return OK to avoid KelPay retries
+    return new Response("OK", { status: 200, headers: corsHeaders });
+  }
+});
