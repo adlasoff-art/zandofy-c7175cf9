@@ -25,6 +25,7 @@ interface CartContextType {
   drawerOpen: boolean;
   setDrawerOpen: (open: boolean) => void;
   addItem: (item: Omit<CartItem, "id" | "selected">) => Promise<void>;
+  updateVariant: (id: string, color: string | null, size: string | null) => Promise<void>;
   updateQuantity: (id: string, quantity: number) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
   clearCart: () => Promise<void>;
