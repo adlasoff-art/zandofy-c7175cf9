@@ -313,7 +313,15 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
                     </span>
                   </div>
                   {conv.product_name && (
-                    <p className="text-[11px] text-primary truncate">{conv.product_name}</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      {conv.product_image && (
+                        <img src={conv.product_image} alt="" className="w-4 h-4 rounded-sm object-cover shrink-0" />
+                      )}
+                      <p className="text-[11px] text-primary truncate">
+                        {conv.product_name}
+                        {conv.product_price ? ` · $${conv.product_price.toFixed(2)}` : ""}
+                      </p>
+                    </div>
                   )}
                   <div className="flex items-center justify-between gap-1 mt-0.5">
                     <p className={cn(
