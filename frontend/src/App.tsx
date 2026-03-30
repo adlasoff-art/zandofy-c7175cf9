@@ -70,6 +70,7 @@ const BlogPage = lazy(() => import("./pages/BlogPage"));
 const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
 const ComparePage = lazy(() => import("./pages/ComparePage"));
 const AccountPage = lazy(() => import("./pages/AccountPage"));
+const PaymentReturnPage = lazy(() => import("./pages/PaymentReturnPage"));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -175,6 +176,7 @@ const App = () => (
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
+                <Route path="/payment/return" element={<PaymentReturnPage />} />
                 <Route path="/account" element={<AccountPage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/messages" element={<MessagesPage />} />

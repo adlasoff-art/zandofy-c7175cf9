@@ -23,7 +23,7 @@ import { getColorDisplay } from "@/utils/colorName";
 import { useStorePaymentNumbers } from "@/hooks/use-store-payment-numbers";
 
 type Step = "shipping" | "payment" | "confirmation";
-type PaymentMethod = "stripe" | "mobile_money" | "cod" | "off_platform";
+type PaymentMethod = "stripe" | "card" | "paypal" | "mobile_money" | "cod" | "off_platform";
 
 interface ShippingInfo {
   firstName: string;
@@ -709,8 +709,39 @@ export default function CheckoutPage() {
         }
         setProcessing(false);
       }
+    } else if (paymentMethod === "card" || paymentMethod === "paypal" || paymentMethod === "stripe") {
+      // Card/PayPal via Keccel — redirect flow
+      try {
+        setProcessing(true);
+        const { orderRef, orderIds } = await createOrderForPayment();
+        if (orderIds.length === 0) throw new Error("Impossible de créer la commande");
+        const { data, error } = await supabase.functions.invoke("keccel-cardpay", {
+          body: {
+            order_id: orderIds[0],
+            payment_method: paymentMethod === "stripe" ? "card" : paymentMethod,
+            payment_type: "order",
+          },
+        });
+        if (error || !data) throw new Error("Erreur lors de l'initiation du paiement");
+        if (data.redirect_url) {
+          window.location.href = data.redirect_url;
+          return;
+        } else if (data.fallback_terminal_url) {
+          window.location.href = data.fallback_terminal_url;
+          return;
+        } else {
+          // No redirect URL — show confirmation page
+          setOrderId(orderRef);
+          await removeSelectedItems();
+          setStep("confirmation");
+          setProcessing(false);
+        }
+      } catch (err: any) {
+        toast({ title: "Erreur paiement", description: err.message || "Impossible d'initier le paiement par carte.", variant: "destructive" });
+        setProcessing(false);
+      }
     } else {
-      // COD, off_platform, or Stripe (existing mock flow)
+      // COD, off_platform
       await new Promise(r => setTimeout(r, 1500));
       const { orderRef } = await createOrderForPayment();
       setOrderId(orderRef);
@@ -1033,17 +1064,18 @@ export default function CheckoutPage() {
 
                 <div className="space-y-3">
                   {([
-                    { id: "stripe" as const, label: t("checkout.creditCard"), sub: "Visa, Mastercard, AMEX", icon: <CreditCard size={20} />, configKey: "stripe" as const },
+                    { id: "card" as const, label: "Carte bancaire (Visa/Mastercard)", sub: "Paiement sécurisé via Keccel", icon: <CreditCard size={20} />, configKey: "stripe" as const },
+                    { id: "paypal" as const, label: "PayPal", sub: "Paiement via votre compte PayPal", icon: <CreditCard size={20} />, configKey: "paypal" as const },
                     { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, M-Pesa, Airtel Money, AfriMoney", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
                     { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
                     { id: "off_platform" as const, label: "Paiement hors plateforme", sub: "Transfert direct, puis envoyez la preuve", icon: <Banknote size={20} />, configKey: "off_platform" as const },
-                  ]).filter(m => (m.id === "stripe" ? paymentConfig?.stripe === true : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).filter(m => m.id !== "off_platform" || vendorOffPlatformAllowed).map(method => (
+                  ]).filter(m => (m.id === "card" ? paymentConfig?.stripe !== false : m.id === "paypal" ? (paymentConfig as any)?.paypal !== false : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).filter(m => m.id !== "off_platform" || vendorOffPlatformAllowed).map(method => (
                     <button
                       key={method.id}
-                      disabled={method.id === "stripe" && paymentConfig?.stripe === false}
+                      disabled={method.id === "card" && paymentConfig?.stripe === false}
                       onClick={() => setPaymentMethod(method.id)}
                       className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-all text-left ${
-                        method.id === "stripe" && paymentConfig?.stripe === false
+                        method.id === "card" && paymentConfig?.stripe === false
                           ? "border-border bg-muted/40 opacity-60 cursor-not-allowed"
                           :
                         paymentMethod === method.id
@@ -1056,7 +1088,7 @@ export default function CheckoutPage() {
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-foreground">{method.label}</p>
-                          <p className="text-xs text-muted-foreground">{method.id === "stripe" && paymentConfig?.stripe === false ? (paymentConfig?.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif.") : method.sub}</p>
+                          <p className="text-xs text-muted-foreground">{method.id === "card" && paymentConfig?.stripe === false ? (paymentConfig?.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif.") : method.sub}</p>
                       </div>
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                         paymentMethod === method.id ? "border-primary" : "border-border"
@@ -1067,23 +1099,17 @@ export default function CheckoutPage() {
                   ))}
                 </div>
 
-                {paymentMethod === "stripe" && (
-                  <div className="space-y-3 pt-2 border-t border-border">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1"><ShieldCheck size={14} /> Paiement sécurisé (mode test)</p>
-                    <div className="space-y-1.5">
-                      <Label>Numéro de carte</Label>
-                      <Input placeholder="4242 4242 4242 4242" disabled className="bg-muted" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label>Expiration</Label>
-                        <Input placeholder="12/28" disabled className="bg-muted" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>CVC</Label>
-                        <Input placeholder="123" disabled className="bg-muted" />
-                      </div>
-                    </div>
+                {(paymentMethod === "card" || paymentMethod === "stripe") && (
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1"><ShieldCheck size={14} /> Paiement sécurisé via Keccel / Mastercard</p>
+                    <p className="text-xs text-muted-foreground">Vous serez redirigé vers la page de paiement sécurisé Visa/Mastercard pour finaliser votre transaction.</p>
+                  </div>
+                )}
+
+                {paymentMethod === "paypal" && (
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1"><ShieldCheck size={14} /> Paiement sécurisé via PayPal</p>
+                    <p className="text-xs text-muted-foreground">Vous serez redirigé vers PayPal pour finaliser votre paiement en toute sécurité.</p>
                   </div>
                 )}
 

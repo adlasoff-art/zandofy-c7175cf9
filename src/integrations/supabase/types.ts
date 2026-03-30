@@ -2351,6 +2351,7 @@ export type Database = {
         Row: {
           amount: number
           callback_payload: Json | null
+          card_token_id: string | null
           created_at: string
           currency: string
           id: string
@@ -2368,6 +2369,7 @@ export type Database = {
         Insert: {
           amount: number
           callback_payload?: Json | null
+          card_token_id?: string | null
           created_at?: string
           currency?: string
           id?: string
@@ -2385,6 +2387,7 @@ export type Database = {
         Update: {
           amount?: number
           callback_payload?: Json | null
+          card_token_id?: string | null
           created_at?: string
           currency?: string
           id?: string
@@ -2400,6 +2403,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payment_transactions_card_token_id_fkey"
+            columns: ["card_token_id"]
+            isOneToOne: false
+            referencedRelation: "saved_cards"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payment_transactions_order_id_fkey"
             columns: ["order_id"]
@@ -3480,6 +3490,51 @@ export type Database = {
           postal_code?: string | null
           province?: string | null
           quartier?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      saved_cards: {
+        Row: {
+          card_brand: string | null
+          card_token: string
+          created_at: string | null
+          expiry_month: number | null
+          expiry_year: number | null
+          id: string
+          is_default: boolean | null
+          label: string | null
+          last_four: string
+          provider: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          card_brand?: string | null
+          card_token: string
+          created_at?: string | null
+          expiry_month?: number | null
+          expiry_year?: number | null
+          id?: string
+          is_default?: boolean | null
+          label?: string | null
+          last_four: string
+          provider?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          card_brand?: string | null
+          card_token?: string
+          created_at?: string | null
+          expiry_month?: number | null
+          expiry_year?: number | null
+          id?: string
+          is_default?: boolean | null
+          label?: string | null
+          last_four?: string
+          provider?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []

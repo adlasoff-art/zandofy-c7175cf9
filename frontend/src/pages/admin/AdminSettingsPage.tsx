@@ -64,7 +64,7 @@ export default function AdminSettingsPage() {
     duration_minutes: 60,
   });
   const [newnessDays, setNewnessDays] = useState(14);
-  const [paymentMethods, setPaymentMethods] = useState({ mobile_money: true, stripe: true, cod: true, off_platform: true, stripe_notice_enabled: false, stripe_notice_text: "Pour l'instant, ce moyen de paiement n'est pas actif." });
+  const [paymentMethods, setPaymentMethods] = useState({ mobile_money: true, stripe: true, cod: true, off_platform: true, paypal: true, stripe_notice_enabled: false, stripe_notice_text: "Pour l'instant, ce moyen de paiement n'est pas actif." });
   const [pricing, setPricing] = useState<PricingConfig>({ margin_pct: 15, multiplier: 3, max_extra_margin_under_50: 0.50, max_extra_margin_over_100: 1.00, platform_commission_default: 10 });
   const [bulkTiers, setBulkTiers] = useState<BulkTierConfig[]>([
     { min_quantity: 1, discount_pct: 0 },
@@ -115,7 +115,7 @@ export default function AdminSettingsPage() {
           } else if (row.key === "newness_duration_days") {
             setNewnessDays(Number(v) || 14);
           } else if (row.key === "payment_methods") {
-            setPaymentMethods({ mobile_money: v.mobile_money === true, stripe: v.stripe === true, cod: v.cod === true, off_platform: v.off_platform === true, stripe_notice_enabled: !!v.stripe_notice_enabled, stripe_notice_text: v.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif." });
+            setPaymentMethods({ mobile_money: v.mobile_money === true, stripe: v.stripe === true, cod: v.cod === true, off_platform: v.off_platform === true, paypal: v.paypal !== false, stripe_notice_enabled: !!v.stripe_notice_enabled, stripe_notice_text: v.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif." });
           } else if (row.key === "pricing_defaults") {
             setPricing({
               margin_pct: Number(v.margin_pct) || 15,
@@ -254,7 +254,8 @@ export default function AdminSettingsPage() {
           <p className="text-xs text-muted-foreground mb-3">Activez ou désactivez les moyens de paiement disponibles pour les clients.</p>
           <div className="space-y-3">
             {([
-              { key: "stripe" as const, label: "Carte bancaire (Visa, Mastercard)" },
+              { key: "stripe" as const, label: "Carte bancaire (Visa/Mastercard via Keccel)" },
+              { key: "paypal" as const, label: "PayPal" },
               { key: "mobile_money" as const, label: "Mobile Money (Orange, M-Pesa, Airtel)" },
               { key: "cod" as const, label: "Paiement à la livraison (COD)" },
               { key: "off_platform" as const, label: "Paiement hors plateforme (preuve + validation)" },
