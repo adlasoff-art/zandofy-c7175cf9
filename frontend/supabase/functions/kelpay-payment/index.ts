@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
 
     const cleanAmount = Math.round(Number(amount) * 100) / 100;
     const reference = `ZPY-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-    const callbackUrl = `${supabaseUrl}/functions/v1/kelpay-callback`;
+    const callbackUrl = `${supabaseUrl}/functions/v1/kelpay-webhook`;
 
     console.log("KelPay request:", JSON.stringify({
       merchantcode: merchantCode,
