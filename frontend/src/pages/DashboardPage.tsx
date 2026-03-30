@@ -1901,9 +1901,10 @@ function AddressesTab({ userId }: { userId: string }) {
       last_name: addr.last_name,
       phone: addr.phone,
       address: addr.address,
-      commune: addr.commune || "",
       quartier: addr.quartier || "",
+      commune: addr.commune || "",
       city: addr.city,
+      province: (addr as any).province || "",
       country: addr.country,
       postal_code: addr.postal_code || "",
     });
