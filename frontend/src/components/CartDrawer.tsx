@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Minus, Plus, Trash2, ShoppingBag, CheckSquare, Square } from "lucide-react";
 import { Link } from "react-router-dom";
+import { CartItemVariantEditor } from "@/components/CartItemVariantEditor";
 
 export function CartDrawer() {
   const {
