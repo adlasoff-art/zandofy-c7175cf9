@@ -299,8 +299,16 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
     <div className="flex flex-col h-full">
       {/* Product context banner */}
       {productName && (
-        <div className="px-3 py-2 bg-muted/50 border-b border-border text-xs text-muted-foreground">
-          À propos de : <span className="font-medium text-foreground">{productName}</span>
+        <div className="px-3 py-2 bg-muted/50 border-b border-border flex items-center gap-2.5">
+          {productImage && (
+            <img src={productImage} alt={productName} className="w-10 h-10 rounded-md object-cover border border-border shrink-0" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-foreground truncate">{productName}</p>
+            {productPrice && (
+              <p className="text-[11px] font-semibold text-primary">{productPrice}</p>
+            )}
+          </div>
         </div>
       )}
 
