@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     // Find the payment transaction by reference
     const { data: tx, error: txErr } = await supabase
       .from("payment_transactions")
-      .select("id, order_id, status, payment_type, amount, user_id")
+      .select("id, order_id, status, payment_type, amount, user_id, method")
       .eq("reference", reference)
       .maybeSingle();
 
