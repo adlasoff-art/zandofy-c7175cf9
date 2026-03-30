@@ -55,6 +55,7 @@ import { withOptionalOrderFields } from "@/lib/order-query";
 import { useCertification } from "@/hooks/use-certification";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { Switch } from "@/components/ui/switch";
+import { CountryCombobox } from "@/components/vendor/CountryCombobox";
 
 const TABS = [
   { key: "overview", label: "Aperçu", icon: Package },
