@@ -278,6 +278,9 @@ export default function AdminSettingsPage() {
           </div>
         </section>
 
+        {/* KelPay Webhook Panel */}
+        <KelpayWebhookPanel />
+
         {/* Gateway Fees & Review Bonus */}
         <section className="bg-card border border-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
