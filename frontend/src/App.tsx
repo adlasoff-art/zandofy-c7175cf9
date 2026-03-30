@@ -213,6 +213,7 @@ const App = () => (
                 <Route path="/admin/notifications" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminNotificationsPage /></RoleGuard>} />
                 <Route path="/admin/settings" element={<RoleGuard allowedRoles={["admin"]}><AdminSettingsPage /></RoleGuard>} />
                 <Route path="/admin/shipping" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminShippingPage /></RoleGuard>} />
+                <Route path="/admin/geography" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminGeographyPage /></RoleGuard>} />
                 <Route path="/admin/vendor-applications" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminVendorApplicationsPage /></RoleGuard>} />
                 <Route path="/admin/store-names" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminStoreNamesPage /></RoleGuard>} />
                 <Route path="/admin/vendor-subscriptions" element={<RoleGuard allowedRoles={["admin"]}><AdminVendorSubscriptionsPage /></RoleGuard>} />
