@@ -1087,7 +1087,7 @@ export default function CheckoutPage() {
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-foreground">{method.label}</p>
-                          <p className="text-xs text-muted-foreground">{method.id === "stripe" && paymentConfig?.stripe === false ? (paymentConfig?.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif.") : method.sub}</p>
+                          <p className="text-xs text-muted-foreground">{method.id === "card" && paymentConfig?.stripe === false ? (paymentConfig?.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif.") : method.sub}</p>
                       </div>
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                         paymentMethod === method.id ? "border-primary" : "border-border"
