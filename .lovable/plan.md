@@ -1,110 +1,138 @@
 
 
-# Plan : Webhook KelPay — Edge Functions + Admin UI
+# Plan : Page de retour paiement + Ajout PayPal + Refactoring carte bancaire + Tokenisation
 
-## Contexte
+## Résumé
 
-KelPay demande l'URL webhook pour envoyer les confirmations de paiement. Le frontend appelle déjà `kelpay-payment` et `kelpay-check` via `supabase.functions.invoke()`, mais ces edge functions n'existent pas encore. Il faut les créer, ainsi qu'un endpoint webhook public que KelPay appellera.
-
-## URLs Webhook
-
-Les URLs seront construites automatiquement à partir du project ID Supabase :
-
-- **Staging** : `https://uogkklwfvwoxkifpkzpu.supabase.co/functions/v1/kelpay-webhook`
-- **Production** : même format avec le project ref de production
-
-L'admin verra ces URLs dans un panneau dédié avec bouton copier.
+Implémenter ce qui est faisable immédiatement sans attendre la doc Keccel : la page `/payment/return`, l'ajout de PayPal comme méthode de paiement, le remplacement du formulaire Stripe factice, la table de tokenisation cartes, et l'edge function squelette pour les paiements carte/PayPal.
 
 ---
 
-## Edge Functions à créer
+## 1. Page `/payment/return` (Thank You Page pour redirections)
 
-### 1. `kelpay-webhook` (endpoint public, appelé par KelPay)
+Créer `frontend/src/pages/PaymentReturnPage.tsx` :
+- Lit les query params : `?ref={reference}&status={success|failed|cancelled}&order_id={id}`
+- Interroge `payment_transactions` par référence pour afficher le statut réel
+- Souscrit au realtime sur `payment_transactions` pour mise à jour live (si le webhook arrive après la redirection)
+- Affiche : confirmation avec n° commande et montant si succès, bouton "Réessayer" si échec, lien vers le dashboard
+- Design cohérent avec la page de confirmation existante dans CheckoutPage
 
-- Reçoit le callback POST de KelPay (confirmation/échec paiement)
-- Vérifie la signature HMAC via le secret `KELPAY_WEBHOOK_SECRET`
-- Cherche la `payment_transaction` par `transaction_id` ou `reference`
-- Met à jour le statut (`success` / `failed`) + stocke le payload
-- Si succès : met à jour `orders.status` → `pending` (commande confirmée)
-- Si échec : met à jour `orders.status` → `payment_failed`
-- Envoie une notification in-app via insert dans `notifications`
-- **Pas de JWT requis** (webhook externe)
+Ajouter la route dans `App.tsx` : `<Route path="/payment/return" element={<PaymentReturnPage />} />`
 
-### 2. `kelpay-payment` (appelé par le frontend, JWT requis)
+## 2. Refactoring des méthodes de paiement
 
-- Reçoit `order_id`, `phone_number`, `amount`, `currency`, `provider`
-- Vérifie que l'utilisateur est propriétaire de la commande
-- Construit le callback_url dynamiquement : `{SUPABASE_URL}/functions/v1/kelpay-webhook`
-- Appelle l'API KelPay pour initier le paiement
-- Crée une entrée `payment_transactions` avec statut `pending`
-- Retourne `{ success, transaction_id, reference }`
+### Checkout (`CheckoutPage.tsx`)
+- Renommer le type `"stripe"` en `"card"` dans `PaymentMethod` (ou garder `"stripe"` comme clé technique interne mais afficher "Carte bancaire via Keccel")
+- Supprimer le formulaire carte factice (inputs 4242 disabled, lignes 1070-1088)
+- Remplacer par un message : "Vous serez redirigé vers la page de paiement sécurisé Visa/Mastercard"
+- Ajouter `"paypal"` comme 5e option avec icône dédiée
 
-### 3. `kelpay-check` (polling, JWT requis)
+### Hook `use-payment-methods.ts`
+- Ajouter `paypal: boolean` dans `PaymentMethodsConfig`
 
-- Reçoit `transaction_id` ou `reference`
-- Appelle l'API KelPay pour vérifier le statut
-- Met à jour `payment_transactions` et `orders` en conséquence
-- Retourne le statut actuel
+### Admin Settings
+- Ajouter le toggle PayPal dans la section moyens de paiement
 
-## Secrets nécessaires
+### Dashboard
+- Ajouter le label PayPal dans l'affichage des commandes
 
-Les secrets suivants doivent être configurés (via l'outil secrets) :
-- `KELPAY_MERCHANT_CODE`
-- `KELPAY_TOKEN`
-- `KELPAY_WEBHOOK_SECRET`
-- `KELPAY_BASE_URL` (défaut : `https://api.kelpay.com`)
+## 3. Migration SQL — Table `saved_cards` (tokenisation)
 
-## RLS : politique update pour le webhook
+```sql
+CREATE TABLE public.saved_cards (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  provider text NOT NULL DEFAULT 'keccel',
+  card_token text NOT NULL,
+  last_four text NOT NULL,
+  card_brand text, -- visa, mastercard
+  expiry_month int,
+  expiry_year int,
+  is_default boolean DEFAULT false,
+  label text, -- "Ma Visa ***1234"
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
 
-Actuellement seuls les admins/managers peuvent mettre à jour `payment_transactions`. Le webhook utilise le `service_role` key donc pas de problème RLS — les edge functions avec `createClient(url, service_role_key)` contournent le RLS.
+ALTER TABLE saved_cards ENABLE ROW LEVEL SECURITY;
 
-## Admin UI : Panneau Webhook
-
-Ajouter une section dans `AdminSettingsPage.tsx` ou créer un sous-onglet "Passerelle de paiement" avec :
-
-```text
-┌─────────────────────────────────────────────┐
-│ 🔗 Webhook KelPay                          │
-├─────────────────────────────────────────────┤
-│ Staging:                                    │
-│ [https://...supabase.co/functions/v1/      │
-│  kelpay-webhook]                  [Copier]  │
-│                                             │
-│ Production:                                 │
-│ [https://...supabase.co/functions/v1/      │
-│  kelpay-webhook]                  [Copier]  │
-├─────────────────────────────────────────────┤
-│ Statut: ● Connecté / ○ En attente          │
-│ Dernier callback reçu : il y a 2 min       │
-│                                             │
-│ 📋 Derniers callbacks (5 derniers)          │
-│ ┌─────┬──────────┬────────┬───────────┐    │
-│ │ Réf │ Statut   │ Montant│ Date      │    │
-│ └─────┴──────────┴────────┴───────────┘    │
-└─────────────────────────────────────────────┘
+-- Users read/manage own cards only
+CREATE POLICY "Users read own cards" ON saved_cards FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "Users insert own cards" ON saved_cards FOR INSERT WITH CHECK (user_id = auth.uid());
+CREATE POLICY "Users update own cards" ON saved_cards FOR UPDATE USING (user_id = auth.uid());
+CREATE POLICY "Users delete own cards" ON saved_cards FOR DELETE USING (user_id = auth.uid());
 ```
 
-- URLs webhook copiables en un clic
-- Historique des 10 derniers callbacks reçus (depuis `payment_transactions` où `callback_payload` IS NOT NULL)
-- Badge de statut basé sur la dernière réception
+Note : la tokenisation réelle dépend de Keccel/Mastercard. Cette table prépare le stockage côté notre DB. Les tokens viendront de l'API Keccel une fois la doc reçue.
+
+## 4. Migration SQL — Colonne `payment_method` étendue
+
+Ajouter `paypal` et `card` comme valeurs acceptées dans les commandes :
+- `orders.payment_method` est déjà un `text` libre, pas besoin de migration pour les valeurs
+- Ajouter `card_token_id` sur `payment_transactions` pour lier à `saved_cards` :
+
+```sql
+ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS card_token_id uuid REFERENCES saved_cards(id);
+```
+
+## 5. Edge Function squelette `keccel-cardpay`
+
+Créer `supabase/functions/keccel-cardpay/index.ts` :
+- Reçoit `order_id`, `payment_method` (card/paypal), `save_card` (boolean)
+- Vérifie le JWT, vérifie la propriété de la commande
+- Construit `return_url` = `{SITE_BASE_URL}/payment/return?order_id={id}`
+- Construit `callback_url` = `{SUPABASE_URL}/functions/v1/kelpay-webhook`
+- Appelle `https://api.keccel.net/cardpay` (POST, Content-Type: application/json)
+- Crée `payment_transaction` avec statut `pending`
+- Retourne l'URL de redirection (Mastercard ou PayPal)
+- Paramètres API Keccel : à compléter dès réception de la doc (merchant code `jam` en minuscule pour carte)
+
+## 6. Mise à jour du webhook `kelpay-webhook`
+
+Adapter pour gérer aussi les callbacks carte/PayPal :
+- Détecter le type de transaction (mobile_money vs card vs paypal) via le payload
+- Même logique : update `payment_transactions.status` et `orders.status`
 
 ## Fichiers impactés
 
 | Fichier | Action |
 |---------|--------|
-| `supabase/functions/kelpay-webhook/index.ts` | **Créer** — endpoint webhook public |
-| `supabase/functions/kelpay-payment/index.ts` | **Créer** — initiation paiement |
-| `supabase/functions/kelpay-check/index.ts` | **Créer** — vérification statut |
-| `frontend/src/pages/admin/AdminSettingsPage.tsx` | **Modifier** — ajouter section Webhook KelPay |
+| `frontend/src/pages/PaymentReturnPage.tsx` | **Créer** — Thank You page |
+| `frontend/src/App.tsx` | **Modifier** — ajouter route `/payment/return` |
+| `frontend/src/pages/CheckoutPage.tsx` | **Modifier** — ajouter PayPal, supprimer formulaire Stripe factice, message redirection carte |
+| `frontend/src/hooks/use-payment-methods.ts` | **Modifier** — ajouter `paypal` |
+| `frontend/src/pages/admin/AdminSettingsPage.tsx` | **Modifier** — toggle PayPal |
+| `frontend/src/pages/DashboardPage.tsx` | **Modifier** — label PayPal |
+| `supabase/functions/keccel-cardpay/index.ts` | **Créer** — squelette edge function |
+| `supabase/functions/kelpay-webhook/index.ts` | **Modifier** — support carte/PayPal |
+| Migration SQL | **Créer** — table `saved_cards` + colonne `card_token_id` |
 
-## Pas de migration SQL nécessaire
+## Ce qui reste à obtenir de Keccel
 
-La table `payment_transactions` et les colonnes requises existent déjà. Le `callback_payload` (JSONB) stockera les données du webhook.
+1. **Documentation API `api.keccel.net/cardpay`** — paramètres POST et format réponse
+2. **Endpoint PayPal** — même endpoint ou séparé ?
+3. **Support `return_url` et `callback_url`** dans l'appel API
+4. **Format du callback carte/PayPal** — identique au Mobile Money ?
+5. **Credentials carte** — `jam` (minuscule) confirmé ? Même token ?
+6. **Tokenisation** — supportent-ils le stockage de token carte pour paiements récurrents ?
+
+## Arguments à envoyer à Keccel
+
+> Nous développons une plateforme e-commerce professionnelle (Zandofy) et souhaitons offrir une expérience de paiement fluide à nos clients, similaire aux standards internationaux (Amazon, Jumia). Voici pourquoi nous préférons l'intégration API directe plutôt que le terminal :
+>
+> 1. **Expérience utilisateur** : Le client choisit son moyen de paiement une seule fois sur notre site, puis est redirigé directement vers la page sécurisée Mastercard/PayPal. Pas d'étape intermédiaire avec le terminal.
+> 2. **Cohérence visuelle** : Notre marque reste visible tout au long du parcours d'achat.
+> 3. **Paiements fractionnés** : Un client peut payer la commande par carte et l'expédition par Mobile Money. Cela nécessite des appels API séparés avec des montants différents.
+> 4. **Tokenisation** : Pour les clients réguliers, pouvoir enregistrer leur carte (via token) et payer en un clic lors des prochaines commandes.
+> 5. **Webhooks** : Nous avons déjà configuré un endpoint webhook sécurisé pour recevoir les confirmations en temps réel.
+> 6. **Return URLs** : Pages de retour dédiées (staging + production) pour rediriger le client après paiement.
 
 ## Ordre d'implémentation
 
-1. Configurer les secrets KelPay (demander à l'utilisateur)
-2. Créer les 3 edge functions
-3. Ajouter le panneau admin Webhook
-4. Fournir les URLs webhook à communiquer à KelPay
+1. Migration SQL (table `saved_cards` + colonne)
+2. Page `/payment/return`
+3. Edge function `keccel-cardpay` (squelette)
+4. Refactoring checkout (PayPal + carte)
+5. Mise à jour webhook
+6. Admin settings (toggle PayPal)
 
