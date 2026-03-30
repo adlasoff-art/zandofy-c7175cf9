@@ -182,6 +182,8 @@ export function VendorProfileCard({ store, productName, productId, originCountry
                         storeName={store.name}
                         productId={productId}
                         productName={productName}
+                        productImage={productImage}
+                        productPrice={productPrice}
                       />
                     </div>
                   </SheetContent>
