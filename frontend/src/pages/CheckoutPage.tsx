@@ -299,6 +299,8 @@ export default function CheckoutPage() {
       email: user?.email || "",
       phone: addr.phone,
       address: addr.address,
+      commune: addr.commune || "",
+      quartier: addr.quartier || "",
       city: addr.city,
       country: addr.country,
       postalCode: addr.postal_code || "",
