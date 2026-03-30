@@ -1994,11 +1994,7 @@ function AddressesTab({ userId }: { userId: string }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Libellé</Label>
-              <select className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-card" value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))}>
-                <option>Domicile</option>
-                <option>Bureau</option>
-                <option>Autre</option>
-              </select>
+              <Input className="mt-1" value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="Ex: Domicile 1, Bureau..." />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -2017,7 +2013,17 @@ function AddressesTab({ userId }: { userId: string }) {
           </div>
           <div>
             <Label className="text-xs">Adresse *</Label>
-            <Input className="mt-1" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
+            <Input className="mt-1" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="N° parcelle, avenue/rue" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Quartier</Label>
+              <Input className="mt-1" value={form.quartier} onChange={e => setForm(f => ({ ...f, quartier: e.target.value }))} placeholder="Quartier" />
+            </div>
+            <div>
+              <Label className="text-xs">Commune</Label>
+              <Input className="mt-1" value={form.commune} onChange={e => setForm(f => ({ ...f, commune: e.target.value }))} placeholder="Commune" />
+            </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
