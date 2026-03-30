@@ -258,7 +258,8 @@ export default function ProductPage() {
             productId={product.id}
             originCountry={product.originCountry}
             productSku={product.sku}
-            productPrice={`${product.price.toFixed(2)} ${product.currency}`}
+            productPrice={`$${currentUnitPrice.toFixed(2)}`}
+            productImage={gallery[0]?.url || product.image}
           />
         )}
 

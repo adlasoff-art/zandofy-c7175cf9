@@ -15,6 +15,8 @@ export interface ConversationItem {
   store_name: string;
   store_logo: string | null;
   product_name: string | null;
+  product_image: string | null;
+  product_price: number | null;
   last_message: string | null;
   unread_count: number;
   is_starred: boolean;
@@ -105,7 +107,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
     const [storesRes, productsRes, profilesRes] = await Promise.all([
       supabase.from("stores").select("id, name, logo_url, is_online").in("id", storeIds),
       productIds.length > 0
-        ? supabase.from("products").select("id, name_fr").in("id", productIds)
+        ? supabase.from("products").select("id, name_fr, image, price").in("id", productIds)
         : Promise.resolve({ data: [] }),
       otherUserIds.length > 0
         ? supabase.from("profiles").select("id, first_name, last_name, avatar_url").in("id", otherUserIds)
@@ -157,6 +159,8 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
         store_name: store?.name || "Boutique",
         store_logo: store?.logo_url || null,
         product_name: product?.name_fr || null,
+        product_image: product?.image || null,
+        product_price: product?.price || null,
         last_message: lastMsgRes.data?.content || null,
         unread_count: unreadRes.count || 0,
         is_starred: conv.is_starred ?? false,
@@ -309,7 +313,15 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
                     </span>
                   </div>
                   {conv.product_name && (
-                    <p className="text-[11px] text-primary truncate">{conv.product_name}</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      {conv.product_image && (
+                        <img src={conv.product_image} alt="" className="w-4 h-4 rounded-sm object-cover shrink-0" />
+                      )}
+                      <p className="text-[11px] text-primary truncate">
+                        {conv.product_name}
+                        {conv.product_price ? ` · $${conv.product_price.toFixed(2)}` : ""}
+                      </p>
+                    </div>
                   )}
                   <div className="flex items-center justify-between gap-1 mt-0.5">
                     <p className={cn(

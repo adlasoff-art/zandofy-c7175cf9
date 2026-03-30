@@ -30,6 +30,7 @@ interface VendorProfileCardProps {
   originCountry?: string;
   productSku?: string;
   productPrice?: string;
+  productImage?: string;
 }
 
 function StatusDot({ isOnline }: { isOnline: boolean }) {
@@ -49,7 +50,7 @@ function StatusDot({ isOnline }: { isOnline: boolean }) {
   );
 }
 
-export function VendorProfileCard({ store, productName, productId, originCountry, productSku, productPrice }: VendorProfileCardProps) {
+export function VendorProfileCard({ store, productName, productId, originCountry, productSku, productPrice, productImage }: VendorProfileCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isOnline = store.is_online ?? false;
 
@@ -181,6 +182,8 @@ export function VendorProfileCard({ store, productName, productId, originCountry
                         storeName={store.name}
                         productId={productId}
                         productName={productName}
+                        productImage={productImage}
+                        productPrice={productPrice}
                       />
                     </div>
                   </SheetContent>

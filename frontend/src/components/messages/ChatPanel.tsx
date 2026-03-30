@@ -408,7 +408,15 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
             </p>
           )}
           {conversation.product_name && (
-            <p className="text-[11px] text-primary truncate">{conversation.product_name}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {conversation.product_image && (
+                <img src={conversation.product_image} alt="" className="w-5 h-5 rounded-sm object-cover border border-border shrink-0" />
+              )}
+              <p className="text-[11px] text-primary truncate">
+                {conversation.product_name}
+                {conversation.product_price ? ` · $${conversation.product_price.toFixed(2)}` : ""}
+              </p>
+            </div>
           )}
         </div>
         <button

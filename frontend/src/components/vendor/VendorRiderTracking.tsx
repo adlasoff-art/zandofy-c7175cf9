@@ -1,12 +1,13 @@
 import { useState, useCallback } from "react";
 import { Bike, MapPin, Loader2, Package, Phone } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DeliveryMap } from "@/components/DeliveryMap";
 import { useRiderLocationSubscription } from "@/hooks/use-rider-location";
 import { STATUS_CONFIG } from "@/lib/order-status";
+import { toast } from "sonner";
 
-function RiderTrackingCard({ order }: { order: any }) {
+function RiderTrackingCard({ order, sendGpsRequest }: { order: any; sendGpsRequest: any }) {
   const [riderLat, setRiderLat] = useState<number | null>(null);
   const [riderLng, setRiderLng] = useState<number | null>(null);
 
@@ -16,12 +17,26 @@ function RiderTrackingCard({ order }: { order: any }) {
     queryFn: async () => {
       const { data } = await supabase
         .from("deliveries")
-        .select("id")
+        .select("id, rider_id")
         .eq("order_id", order.id)
         .neq("status", "delivered")
         .maybeSingle();
       return data;
     },
+  });
+
+  // Customer location
+  const { data: customerLoc } = useQuery({
+    queryKey: ["vendor-customer-loc", order.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("customer_locations" as any)
+        .select("latitude, longitude")
+        .eq("order_id", order.id)
+        .maybeSingle();
+      return data as any;
+    },
+    refetchInterval: 10000,
   });
 
   useRiderLocationSubscription(
@@ -34,6 +49,15 @@ function RiderTrackingCard({ order }: { order: any }) {
 
   const cfg = STATUS_CONFIG[order.status];
   const fullAddress = [order.shipping_address, order.shipping_city].filter(Boolean).join(", ");
+
+  // Build map markers
+  const markers = [];
+  if (riderLat && riderLng) {
+    markers.push({ lat: riderLat, lng: riderLng, type: "rider" as const, label: `🚴 ${order.assigned_rider_name || "Livreur"}`, id: `rider-${order.id}` });
+  }
+  if (customerLoc?.latitude && customerLoc?.longitude) {
+    markers.push({ lat: customerLoc.latitude, lng: customerLoc.longitude, type: "customer" as const, label: `📍 ${order.shipping_first_name || "Client"}`, id: `customer-${order.id}` });
+  }
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 space-y-3">
@@ -71,11 +95,48 @@ function RiderTrackingCard({ order }: { order: any }) {
         </div>
       )}
 
-      {riderLat && riderLng && (
-        <DeliveryMap riderLat={riderLat} riderLng={riderLng} showEta className="h-[200px]" />
+      {/* GPS status & request buttons */}
+      <div className="flex items-center gap-3 text-[10px]">
+        {delivery?.rider_id && (
+          riderLat ? (
+            <span className="flex items-center gap-1 text-primary">
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" /> GPS Livreur OK
+            </span>
+          ) : (
+            <button
+              onClick={() => sendGpsRequest.mutate({ userId: delivery.rider_id, type: "rider" })}
+              className="flex items-center gap-1 text-destructive hover:underline"
+            >
+              <MapPin size={10} /> Demander GPS livreur
+            </button>
+          )
+        )}
+        {order.user_id && (
+          customerLoc ? (
+            <span className="flex items-center gap-1 text-primary">
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" /> GPS Client OK
+            </span>
+          ) : (
+            <button
+              onClick={() => sendGpsRequest.mutate({ userId: order.user_id, type: "customer" })}
+              className="flex items-center gap-1 text-destructive hover:underline"
+            >
+              <MapPin size={10} /> Demander GPS client
+            </button>
+          )
+        )}
+      </div>
+
+      {markers.length > 0 && (
+        <DeliveryMap
+          markers={markers}
+          showPolylines={markers.length >= 2}
+          showEta={markers.length >= 2}
+          className="h-[200px]"
+        />
       )}
 
-      {!riderLat && delivery && (
+      {!riderLat && delivery && markers.length === 0 && (
         <div className="bg-muted/30 rounded-lg p-4 text-center">
           <Bike size={20} className="text-muted-foreground mx-auto mb-1" />
           <p className="text-xs text-muted-foreground">En attente de la position du livreur...</p>
@@ -95,7 +156,7 @@ export function VendorRiderTracking({ storeId }: VendorRiderTrackingProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_ref, status, shipping_address, shipping_city, shipping_first_name, shipping_last_name, shipping_phone, assigned_rider_id, assigned_rider_name, total")
+        .select("id, order_ref, status, shipping_address, shipping_city, shipping_first_name, shipping_last_name, shipping_phone, assigned_rider_id, assigned_rider_name, total, user_id")
         .eq("store_id", storeId)
         .not("assigned_rider_id", "is", null)
         .in("status", ["rider_assigned", "out_for_delivery", "in_delivery", "shipped"])
@@ -105,6 +166,27 @@ export function VendorRiderTracking({ storeId }: VendorRiderTrackingProps) {
       return data;
     },
     refetchInterval: 15000,
+  });
+
+  const sendGpsRequest = useMutation({
+    mutationFn: async ({ userId, type }: { userId: string; type: "rider" | "customer" }) => {
+      const title = "Activez votre GPS";
+      const message = type === "rider"
+        ? "Le vendeur demande l'activation de votre GPS pour le suivi de livraison en temps réel."
+        : "Activez votre GPS pour permettre au livreur de vous localiser facilement.";
+      const link = type === "rider" ? "/rider" : "/tracking";
+
+      const { error } = await supabase.from("notifications").insert({
+        user_id: userId,
+        type: "delivery",
+        title,
+        message,
+        link,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => toast.success("Notification GPS envoyée !"),
+    onError: (e: any) => toast.error(e.message || "Erreur"),
   });
 
   if (isLoading) {
@@ -136,7 +218,7 @@ export function VendorRiderTracking({ storeId }: VendorRiderTrackingProps) {
         </h2>
       </div>
       {orders.map((order) => (
-        <RiderTrackingCard key={order.id} order={order} />
+        <RiderTrackingCard key={order.id} order={order} sendGpsRequest={sendGpsRequest} />
       ))}
     </div>
   );

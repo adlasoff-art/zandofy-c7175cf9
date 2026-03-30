@@ -19,12 +19,14 @@ interface InternalChatProps {
   storeName: string;
   productId?: string;
   productName?: string;
+  productImage?: string;
+  productPrice?: string;
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 
-export function InternalChat({ storeId, storeName, productId, productName }: InternalChatProps) {
+export function InternalChat({ storeId, storeName, productId, productName, productImage, productPrice }: InternalChatProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -297,8 +299,16 @@ export function InternalChat({ storeId, storeName, productId, productName }: Int
     <div className="flex flex-col h-full">
       {/* Product context banner */}
       {productName && (
-        <div className="px-3 py-2 bg-muted/50 border-b border-border text-xs text-muted-foreground">
-          À propos de : <span className="font-medium text-foreground">{productName}</span>
+        <div className="px-3 py-2 bg-muted/50 border-b border-border flex items-center gap-2.5">
+          {productImage && (
+            <img src={productImage} alt={productName} className="w-10 h-10 rounded-md object-cover border border-border shrink-0" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-foreground truncate">{productName}</p>
+            {productPrice && (
+              <p className="text-[11px] font-semibold text-primary">{productPrice}</p>
+            )}
+          </div>
         </div>
       )}
 
