@@ -282,11 +282,11 @@ export default function CheckoutPage() {
     if (!user) return;
     supabase.from("saved_addresses").select("*").eq("user_id", user.id).order("is_default", { ascending: false }).then(({ data }) => {
       if (data) {
-        setSavedAddresses(data as SavedAddress[]);
+        setSavedAddresses(data as unknown as SavedAddress[]);
         const def = data.find((a: any) => a.is_default);
         if (def) {
           setSelectedAddressId(def.id);
-          applyAddress(def as SavedAddress);
+          applyAddress(def as unknown as SavedAddress);
         }
       }
     });
