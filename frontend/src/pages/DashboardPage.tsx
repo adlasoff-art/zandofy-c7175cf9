@@ -2010,19 +2010,19 @@ function AddressesTab({ userId }: { userId: string }) {
           </div>
           <div>
             <Label className="text-xs">Téléphone *</Label>
-            <Input className="mt-1" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+221 7X XXX XX XX" />
+            <Input className="mt-1" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+243 XXX XXX XXX" />
           </div>
           <div>
             <Label className="text-xs">Adresse *</Label>
-            <Input className="mt-1" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="N° parcelle, avenue/rue" />
+            <Input className="mt-1" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="N° parcelle, N° appartement, Avenue/Rue" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Quartier</Label>
+              <Label className="text-xs">Quartier / Bloc</Label>
               <Input className="mt-1" value={form.quartier} onChange={e => setForm(f => ({ ...f, quartier: e.target.value }))} placeholder="Quartier" />
             </div>
             <div>
-              <Label className="text-xs">Commune</Label>
+              <Label className="text-xs">Commune / Département</Label>
               <Input className="mt-1" value={form.commune} onChange={e => setForm(f => ({ ...f, commune: e.target.value }))} placeholder="Commune" />
             </div>
           </div>
@@ -2032,13 +2032,22 @@ function AddressesTab({ userId }: { userId: string }) {
               <Input className="mt-1" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
             </div>
             <div>
-              <Label className="text-xs">Pays</Label>
-              <Input className="mt-1" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))} />
+              <Label className="text-xs">Province / État</Label>
+              <Input className="mt-1" value={form.province} onChange={e => setForm(f => ({ ...f, province: e.target.value }))} />
             </div>
             <div>
               <Label className="text-xs">Code postal</Label>
               <Input className="mt-1" value={form.postal_code} onChange={e => setForm(f => ({ ...f, postal_code: e.target.value }))} />
             </div>
+          </div>
+          <div>
+            <CountryCombobox
+              value={form.country}
+              onChange={(v) => setForm(f => ({ ...f, country: v }))}
+              label="Pays *"
+              placeholder="Sélectionner un pays..."
+              showNone={false}
+            />
           </div>
           <Button onClick={handleSave} disabled={saving} size="sm">
             {saving ? <Loader2 className="animate-spin mr-2" size={14} /> : <Save size={14} className="mr-2" />}
