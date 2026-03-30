@@ -24,6 +24,9 @@ verify_jwt = false
 [functions.kelpay-check]
 verify_jwt = false
 
+[functions.kelpay-webhook]
+verify_jwt = false
+
 [functions.calculate-shipping]
 verify_jwt = false
 
