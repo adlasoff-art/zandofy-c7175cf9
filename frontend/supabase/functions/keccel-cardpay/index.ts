@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
         amount: amount,
         currency: "USD",
         reference: reference.substring(0, 255),
-        transaction_id: keccelResponse?.transaction_id || keccelResponse?.id || null,
+        transaction_id: keccelResponse?.transactionid || null,
         status: "pending",
         payment_type: pType,
         callback_payload: keccelResponse,
