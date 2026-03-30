@@ -2171,6 +2171,7 @@ export type Database = {
           shipping_payment_status: string | null
           shipping_phone: string | null
           shipping_postal_code: string | null
+          shipping_province: string | null
           shipping_quartier: string | null
           status: string
           store_id: string | null
@@ -2224,6 +2225,7 @@ export type Database = {
           shipping_payment_status?: string | null
           shipping_phone?: string | null
           shipping_postal_code?: string | null
+          shipping_province?: string | null
           shipping_quartier?: string | null
           status?: string
           store_id?: string | null
@@ -2277,6 +2279,7 @@ export type Database = {
           shipping_payment_status?: string | null
           shipping_phone?: string | null
           shipping_postal_code?: string | null
+          shipping_province?: string | null
           shipping_quartier?: string | null
           status?: string
           store_id?: string | null
@@ -3441,6 +3444,7 @@ export type Database = {
           last_name: string
           phone: string
           postal_code: string | null
+          province: string | null
           quartier: string | null
           user_id: string
         }
@@ -3457,6 +3461,7 @@ export type Database = {
           last_name: string
           phone: string
           postal_code?: string | null
+          province?: string | null
           quartier?: string | null
           user_id: string
         }
@@ -3473,6 +3478,7 @@ export type Database = {
           last_name?: string
           phone?: string
           postal_code?: string | null
+          province?: string | null
           quartier?: string | null
           user_id?: string
         }
