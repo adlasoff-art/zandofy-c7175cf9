@@ -50,7 +50,7 @@ function StatusDot({ isOnline }: { isOnline: boolean }) {
   );
 }
 
-export function VendorProfileCard({ store, productName, productId, originCountry, productSku, productPrice }: VendorProfileCardProps) {
+export function VendorProfileCard({ store, productName, productId, originCountry, productSku, productPrice, productImage }: VendorProfileCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isOnline = store.is_online ?? false;
 
