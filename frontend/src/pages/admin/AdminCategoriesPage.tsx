@@ -4,6 +4,7 @@ import { Plus, Edit2, Trash2, ChevronRight, ChevronUp, ChevronDown, Loader2, X, 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { slugify } from "@/utils/slugify";
 
 interface Category {
   id: string;
