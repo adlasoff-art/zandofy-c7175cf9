@@ -15,6 +15,8 @@ export interface ConversationItem {
   store_name: string;
   store_logo: string | null;
   product_name: string | null;
+  product_image: string | null;
+  product_price: number | null;
   last_message: string | null;
   unread_count: number;
   is_starred: boolean;
