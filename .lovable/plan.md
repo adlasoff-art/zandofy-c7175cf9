@@ -1,165 +1,110 @@
 
 
-# Plan : Sélection partielle du panier, correction duplicata, et refonte adresses avec Commune/Quartier
+# Plan : Webhook KelPay — Edge Functions + Admin UI
 
 ## Contexte
 
-Trois fonctionnalités demandées :
-1. **Checkout sélectif** : pouvoir choisir quels articles du panier commander, les autres restent pour plus tard
-2. **Correction duplicata panier** : ajouter le même produit+couleur+taille doit incrémenter la quantité, pas créer une ligne en double (le code JS le fait mais la DB n'a pas de contrainte UNIQUE — un insert concurrent ou un bug de state peut créer des doublons)
-3. **Refonte adresses** : ajouter les champs Commune et Quartier (combobox admin-gérés), combobox de sélection d'adresse au checkout, placeholder adapté
+KelPay demande l'URL webhook pour envoyer les confirmations de paiement. Le frontend appelle déjà `kelpay-payment` et `kelpay-check` via `supabase.functions.invoke()`, mais ces edge functions n'existent pas encore. Il faut les créer, ainsi qu'un endpoint webhook public que KelPay appellera.
+
+## URLs Webhook
+
+Les URLs seront construites automatiquement à partir du project ID Supabase :
+
+- **Staging** : `https://uogkklwfvwoxkifpkzpu.supabase.co/functions/v1/kelpay-webhook`
+- **Production** : même format avec le project ref de production
+
+L'admin verra ces URLs dans un panneau dédié avec bouton copier.
 
 ---
 
-## Migration SQL requise
+## Edge Functions à créer
 
-```sql
--- 1. Contrainte unique sur cart_items pour empêcher les doublons
-CREATE UNIQUE INDEX IF NOT EXISTS uq_cart_items_variant
-  ON public.cart_items (user_id, product_id, COALESCE(color, ''), COALESCE(size, ''));
+### 1. `kelpay-webhook` (endpoint public, appelé par KelPay)
 
--- 2. Champs Commune et Quartier sur saved_addresses
-ALTER TABLE public.saved_addresses ADD COLUMN IF NOT EXISTS commune text;
-ALTER TABLE public.saved_addresses ADD COLUMN IF NOT EXISTS quartier text;
+- Reçoit le callback POST de KelPay (confirmation/échec paiement)
+- Vérifie la signature HMAC via le secret `KELPAY_WEBHOOK_SECRET`
+- Cherche la `payment_transaction` par `transaction_id` ou `reference`
+- Met à jour le statut (`success` / `failed`) + stocke le payload
+- Si succès : met à jour `orders.status` → `pending` (commande confirmée)
+- Si échec : met à jour `orders.status` → `payment_failed`
+- Envoie une notification in-app via insert dans `notifications`
+- **Pas de JWT requis** (webhook externe)
 
--- 3. Champs Commune et Quartier sur orders (shipping)
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_commune text;
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_quartier text;
+### 2. `kelpay-payment` (appelé par le frontend, JWT requis)
 
--- 4. Table communes (admin-gérée)
-CREATE TABLE IF NOT EXISTS public.communes (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  city text NOT NULL,
-  country_code text NOT NULL DEFAULT 'CD',
-  name text NOT NULL,
-  is_active boolean DEFAULT true,
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(city, name, country_code)
-);
-ALTER TABLE public.communes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can read communes" ON public.communes FOR SELECT USING (true);
-CREATE POLICY "Admins manage communes" ON public.communes FOR ALL
-  USING (public.has_role(auth.uid(), 'admin'));
+- Reçoit `order_id`, `phone_number`, `amount`, `currency`, `provider`
+- Vérifie que l'utilisateur est propriétaire de la commande
+- Construit le callback_url dynamiquement : `{SUPABASE_URL}/functions/v1/kelpay-webhook`
+- Appelle l'API KelPay pour initier le paiement
+- Crée une entrée `payment_transactions` avec statut `pending`
+- Retourne `{ success, transaction_id, reference }`
 
--- 5. Table quartiers (admin-gérée, liée à commune)
-CREATE TABLE IF NOT EXISTS public.quartiers (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  commune_id uuid NOT NULL REFERENCES public.communes(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  is_active boolean DEFAULT true,
-  is_restricted boolean DEFAULT false,
-  restriction_reason text,
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(commune_id, name)
-);
-ALTER TABLE public.quartiers ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can read quartiers" ON public.quartiers FOR SELECT USING (true);
-CREATE POLICY "Admins manage quartiers" ON public.quartiers FOR ALL
-  USING (public.has_role(auth.uid(), 'admin'));
+### 3. `kelpay-check` (polling, JWT requis)
 
--- 6. Colonne selected sur cart_items pour le checkout sélectif
-ALTER TABLE public.cart_items ADD COLUMN IF NOT EXISTS selected boolean NOT NULL DEFAULT true;
-```
+- Reçoit `transaction_id` ou `reference`
+- Appelle l'API KelPay pour vérifier le statut
+- Met à jour `payment_transactions` et `orders` en conséquence
+- Retourne le statut actuel
 
----
+## Secrets nécessaires
 
-## Lot 1 : Checkout sélectif (panier partiel)
+Les secrets suivants doivent être configurés (via l'outil secrets) :
+- `KELPAY_MERCHANT_CODE`
+- `KELPAY_TOKEN`
+- `KELPAY_WEBHOOK_SECRET`
+- `KELPAY_BASE_URL` (défaut : `https://api.kelpay.com`)
 
-### Principe
-- Chaque `cart_item` a un champ `selected` (boolean, default true)
-- Le CartDrawer affiche une checkbox par article
-- Le bouton "Commander" ne prend que les articles sélectionnés
-- Seuls les articles sélectionnés sont envoyés au checkout ; les autres restent dans le panier
+## RLS : politique update pour le webhook
 
-### Fichiers impactés
+Actuellement seuls les admins/managers peuvent mettre à jour `payment_transactions`. Le webhook utilise le `service_role` key donc pas de problème RLS — les edge functions avec `createClient(url, service_role_key)` contournent le RLS.
 
-| Fichier | Modification |
-|---------|-------------|
-| `CartContext.tsx` | Ajouter `selected` à `CartItem`, exposer `toggleSelected(id)`, `selectAll()`, `deselectAll()`. Adapter `itemCount` et `subtotal` pour ne compter que les sélectionnés. Ajouter `selectedItems` |
-| `CartDrawer.tsx` | Ajouter checkbox par article, boutons "Tout sélectionner / Tout désélectionner", afficher sous-total des sélectionnés uniquement |
-| `CheckoutPage.tsx` | Remplacer `items` par `selectedItems` (items filtrés `selected === true`). Après commande réussie, ne supprimer que les articles commandés (pas `clearCart()`) |
+## Admin UI : Panneau Webhook
 
----
-
-## Lot 2 : Correction duplicata panier
-
-### Problème
-Le code JS (`CartContext.tsx` lignes 100-103) cherche le doublon côté state, mais si le state n'est pas encore rafraîchi ou en cas de clic rapide, l'insert DB peut créer un doublon car il n'y a pas de contrainte UNIQUE.
-
-### Solution
-1. **DB** : Ajouter un index unique `(user_id, product_id, COALESCE(color, ''), COALESCE(size, ''))` sur `cart_items`
-2. **Code** : Modifier `addItem` pour utiliser un upsert (`ON CONFLICT`) côté DB au lieu de vérifier uniquement le state local. Utiliser l'approche : tenter l'insert, si conflit → update quantity += new quantity
-
-### Fichier impacté
-- `CartContext.tsx` : refactorer `addItem` avec upsert DB + refresh
-
----
-
-## Lot 3 : Refonte adresses — Commune/Quartier + Combobox
-
-### 3a. Nouveaux champs DB
-- `saved_addresses` : +`commune`, +`quartier`
-- `orders` : +`shipping_commune`, +`shipping_quartier`
-- Tables `communes` et `quartiers` gérées par l'admin
-
-### 3b. Formulaire Checkout (`CheckoutPage.tsx`)
-
-Refonte du formulaire d'expédition :
+Ajouter une section dans `AdminSettingsPage.tsx` ou créer un sous-onglet "Passerelle de paiement" avec :
 
 ```text
-┌─────────────────────────────────────────┐
-│ [Combobox: Sélectionner une adresse ▼]  │  ← liste des saved_addresses
-├──────────────┬──────────────────────────┤
-│ Prénom *     │ Nom *                    │
-├──────────────┼──────────────────────────┤
-│ Email        │ Téléphone *              │
-├──────────────┴──────────────────────────┤
-│ Adresse * (placeholder: N° parcelle,   │
-│            avenue/rue)                  │
-├──────────────┬──────────────┬───────────┤
-│ Quartier *   │ Commune *    │ Ville *   │
-│ (combobox)   │ (combobox)   │           │
-├──────────────┼──────────────┼───────────┤
-│ Pays *       │ Code postal  │           │
-└──────────────┴──────────────┴───────────┘
+┌─────────────────────────────────────────────┐
+│ 🔗 Webhook KelPay                          │
+├─────────────────────────────────────────────┤
+│ Staging:                                    │
+│ [https://...supabase.co/functions/v1/      │
+│  kelpay-webhook]                  [Copier]  │
+│                                             │
+│ Production:                                 │
+│ [https://...supabase.co/functions/v1/      │
+│  kelpay-webhook]                  [Copier]  │
+├─────────────────────────────────────────────┤
+│ Statut: ● Connecté / ○ En attente          │
+│ Dernier callback reçu : il y a 2 min       │
+│                                             │
+│ 📋 Derniers callbacks (5 derniers)          │
+│ ┌─────┬──────────┬────────┬───────────┐    │
+│ │ Réf │ Statut   │ Montant│ Date      │    │
+│ └─────┴──────────┴────────┴───────────┘    │
+└─────────────────────────────────────────────┘
 ```
 
-- Le combobox adresse en haut : quand le client sélectionne une adresse, tous les champs se remplissent automatiquement
-- Quartier et Commune : combobox alimentés par les tables `quartiers` et `communes`
-- Commune filtrée par ville sélectionnée ; Quartier filtré par commune sélectionnée
-- Code postal non obligatoire
-- L'adresse label peut être saisie librement (ex: "Bureau 1", "Domicile 2")
+- URLs webhook copiables en un clic
+- Historique des 10 derniers callbacks reçus (depuis `payment_transactions` où `callback_payload` IS NOT NULL)
+- Badge de statut basé sur la dernière réception
 
-### 3c. Formulaire Dashboard Adresses (`DashboardPage.tsx` — `AddressesTab`)
-- Mêmes ajouts : champs commune et quartier (combobox)
-- Le label d'adresse devient un champ texte libre au lieu du select "Domicile/Bureau/Autre"
+## Fichiers impactés
 
-### 3d. `ShippingInfo` type
-Ajouter `commune` et `quartier` au type, et les inclure dans l'insertion order
+| Fichier | Action |
+|---------|--------|
+| `supabase/functions/kelpay-webhook/index.ts` | **Créer** — endpoint webhook public |
+| `supabase/functions/kelpay-payment/index.ts` | **Créer** — initiation paiement |
+| `supabase/functions/kelpay-check/index.ts` | **Créer** — vérification statut |
+| `frontend/src/pages/admin/AdminSettingsPage.tsx` | **Modifier** — ajouter section Webhook KelPay |
 
-### Fichiers impactés
+## Pas de migration SQL nécessaire
 
-| Fichier | Modification |
-|---------|-------------|
-| `CheckoutPage.tsx` | Ajouter `commune`/`quartier` à `ShippingInfo`, combobox adresse en haut, combobox commune/quartier dans le formulaire, insérer dans `orders`, sauvegarder dans `saved_addresses` |
-| `DashboardPage.tsx` | Ajouter commune/quartier au formulaire d'adresses, label texte libre |
-| Migration SQL | Tables `communes`, `quartiers`, colonnes sur `saved_addresses` et `orders` |
-
----
+La table `payment_transactions` et les colonnes requises existent déjà. Le `callback_payload` (JSONB) stockera les données du webhook.
 
 ## Ordre d'implémentation
 
-1. Migration SQL (contrainte unique cart, tables communes/quartiers, colonnes)
-2. Lot 2 — Correction duplicata cart (petit, rapide)
-3. Lot 1 — Checkout sélectif (CartContext, CartDrawer, CheckoutPage)
-4. Lot 3 — Refonte adresses (communes/quartiers combobox, formulaires checkout + dashboard)
-
----
-
-## Section technique
-
-- La contrainte unique `cart_items` utilise `COALESCE` car `color` et `size` sont nullable — deux NULL ne sont pas considérés égaux par PostgreSQL sans COALESCE
-- L'upsert dans `addItem` utilisera `.upsert()` de Supabase avec `onConflict` ou un RPC dédié
-- Les tables `communes`/`quartiers` sont en lecture publique (SELECT) pour que tout utilisateur puisse les voir dans les combobox, mais seul l'admin peut les gérer (INSERT/UPDATE/DELETE)
-- Le champ `is_restricted` sur `quartiers` remplace/complète la table `restricted_zones` pour un filtrage plus fin au checkout
+1. Configurer les secrets KelPay (demander à l'utilisateur)
+2. Créer les 3 edge functions
+3. Ajouter le panneau admin Webhook
+4. Fournir les URLs webhook à communiquer à KelPay
 
