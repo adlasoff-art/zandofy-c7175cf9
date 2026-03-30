@@ -1917,15 +1917,15 @@ function AddressesTab({ userId }: { userId: string }) {
       return;
     }
     setSaving(true);
+    const payload = { ...form, postal_code: form.postal_code || null, commune: form.commune || null, quartier: form.quartier || null };
     if (editId) {
-      await supabase.from("saved_addresses").update({ ...form, postal_code: form.postal_code || null }).eq("id", editId);
+      await supabase.from("saved_addresses").update(payload as any).eq("id", editId);
     } else {
       await supabase.from("saved_addresses").insert({
         user_id: userId,
-        ...form,
-        postal_code: form.postal_code || null,
+        ...payload,
         is_default: addresses.length === 0,
-      });
+      } as any);
     }
     setSaving(false);
     resetForm();
