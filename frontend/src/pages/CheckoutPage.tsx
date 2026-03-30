@@ -31,9 +31,10 @@ interface ShippingInfo {
   email: string;
   phone: string;
   address: string;
-  commune: string;
   quartier: string;
+  commune: string;
   city: string;
+  province: string;
   country: string;
   postalCode: string;
 }
