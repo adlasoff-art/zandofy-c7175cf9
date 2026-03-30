@@ -1,5 +1,17 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { hmac } from "https://deno.land/x/hmac@v2.0.1/mod.ts";
+
+async function computeHmacSha256(key: string, message: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(key),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(message));
+  return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,7 +36,7 @@ Deno.serve(async (req) => {
     if (webhookSecret) {
       const signature = req.headers.get("x-kelpay-signature") || req.headers.get("X-KelPay-Signature");
       if (signature) {
-        const expectedHex = hmac("sha256", webhookSecret, rawBody, "utf8", "hex") as string;
+        const expectedHex = await computeHmacSha256(webhookSecret, rawBody);
         const expected = `sha256=${expectedHex}`;
         if (signature !== expected && signature !== expectedHex) {
           console.error("Invalid webhook signature");
