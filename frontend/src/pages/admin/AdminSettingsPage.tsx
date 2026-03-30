@@ -64,7 +64,7 @@ export default function AdminSettingsPage() {
     duration_minutes: 60,
   });
   const [newnessDays, setNewnessDays] = useState(14);
-  const [paymentMethods, setPaymentMethods] = useState({ mobile_money: true, stripe: true, cod: true, off_platform: true, stripe_notice_enabled: false, stripe_notice_text: "Pour l'instant, ce moyen de paiement n'est pas actif." });
+  const [paymentMethods, setPaymentMethods] = useState({ mobile_money: true, stripe: true, cod: true, off_platform: true, paypal: true, stripe_notice_enabled: false, stripe_notice_text: "Pour l'instant, ce moyen de paiement n'est pas actif." });
   const [pricing, setPricing] = useState<PricingConfig>({ margin_pct: 15, multiplier: 3, max_extra_margin_under_50: 0.50, max_extra_margin_over_100: 1.00, platform_commission_default: 10 });
   const [bulkTiers, setBulkTiers] = useState<BulkTierConfig[]>([
     { min_quantity: 1, discount_pct: 0 },
