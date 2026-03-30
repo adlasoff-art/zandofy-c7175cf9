@@ -1071,10 +1071,10 @@ export default function CheckoutPage() {
                   ]).filter(m => (m.id === "card" ? paymentConfig?.stripe !== false : m.id === "paypal" ? (paymentConfig as any)?.paypal !== false : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).filter(m => m.id !== "off_platform" || vendorOffPlatformAllowed).map(method => (
                     <button
                       key={method.id}
-                      disabled={method.id === "stripe" && paymentConfig?.stripe === false}
+                      disabled={method.id === "card" && paymentConfig?.stripe === false}
                       onClick={() => setPaymentMethod(method.id)}
                       className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-all text-left ${
-                        method.id === "stripe" && paymentConfig?.stripe === false
+                        method.id === "card" && paymentConfig?.stripe === false
                           ? "border-border bg-muted/40 opacity-60 cursor-not-allowed"
                           :
                         paymentMethod === method.id
