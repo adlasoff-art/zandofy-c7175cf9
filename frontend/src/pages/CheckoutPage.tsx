@@ -31,6 +31,8 @@ interface ShippingInfo {
   email: string;
   phone: string;
   address: string;
+  commune: string;
+  quartier: string;
   city: string;
   country: string;
   postalCode: string;
@@ -43,6 +45,8 @@ interface SavedAddress {
   last_name: string;
   phone: string;
   address: string;
+  commune: string | null;
+  quartier: string | null;
   city: string;
   country: string;
   postal_code: string;
