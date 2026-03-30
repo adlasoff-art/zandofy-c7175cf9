@@ -1966,7 +1966,7 @@ function AddressesTab({ userId }: { userId: string }) {
                 {addr.is_default && <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold">Par défaut</span>}
               </div>
               <p className="text-sm text-foreground">{addr.first_name} {addr.last_name}</p>
-              <p className="text-xs text-muted-foreground">{addr.address}{addr.quartier ? `, ${addr.quartier}` : ""}{addr.commune ? `, ${addr.commune}` : ""}, {addr.city}, {addr.country}</p>
+              <p className="text-xs text-muted-foreground">{addr.address}{addr.quartier ? `, Q. ${addr.quartier}` : ""}{addr.commune ? `, C. ${addr.commune}` : ""}, {addr.city}{(addr as any).province ? `, ${(addr as any).province}` : ""}, {addr.country}</p>
               <p className="text-xs text-muted-foreground">{addr.phone}</p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
