@@ -30,6 +30,7 @@ interface VendorProfileCardProps {
   originCountry?: string;
   productSku?: string;
   productPrice?: string;
+  productImage?: string;
 }
 
 function StatusDot({ isOnline }: { isOnline: boolean }) {
