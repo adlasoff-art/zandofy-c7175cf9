@@ -159,6 +159,8 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
         store_name: store?.name || "Boutique",
         store_logo: store?.logo_url || null,
         product_name: product?.name_fr || null,
+        product_image: product?.image || null,
+        product_price: product?.price || null,
         last_message: lastMsgRes.data?.content || null,
         unread_count: unreadRes.count || 0,
         is_starred: conv.is_starred ?? false,
