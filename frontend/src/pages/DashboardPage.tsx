@@ -1918,7 +1918,7 @@ function AddressesTab({ userId }: { userId: string }) {
       return;
     }
     setSaving(true);
-    const payload = { ...form, postal_code: form.postal_code || null, commune: form.commune || null, quartier: form.quartier || null };
+    const payload = { ...form, postal_code: form.postal_code || null, commune: form.commune || null, quartier: form.quartier || null, province: form.province || null };
     if (editId) {
       await supabase.from("saved_addresses").update(payload as any).eq("id", editId);
     } else {
