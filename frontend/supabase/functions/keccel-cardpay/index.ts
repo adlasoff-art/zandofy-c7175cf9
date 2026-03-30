@@ -185,10 +185,6 @@ Deno.serve(async (req) => {
         redirect_url: redirectUrl,
         reference: reference,
         status: "pending",
-        // If no redirect URL from Keccel, return the terminal fallback
-        fallback_terminal_url: !redirectUrl
-          ? `https://terminal.keccel.com/payment.php?m=${keccelMerchantCode}`
-          : undefined,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
