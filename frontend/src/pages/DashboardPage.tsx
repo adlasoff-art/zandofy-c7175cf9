@@ -1875,7 +1875,7 @@ function AddressesTab({ userId }: { userId: string }) {
   const fetchAddresses = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase.from("saved_addresses").select("*").eq("user_id", userId).order("is_default", { ascending: false });
-    setAddresses((data || []) as SavedAddress[]);
+    setAddresses((data || []) as unknown as SavedAddress[]);
     setLoading(false);
   }, [userId]);
 
