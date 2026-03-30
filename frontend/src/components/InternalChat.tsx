@@ -19,6 +19,8 @@ interface InternalChatProps {
   storeName: string;
   productId?: string;
   productName?: string;
+  productImage?: string;
+  productPrice?: string;
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
