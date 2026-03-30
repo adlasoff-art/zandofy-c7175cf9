@@ -93,23 +93,16 @@ Deno.serve(async (req) => {
     const returnUrl = `${siteBaseUrl}/payment/return?ref=${encodeURIComponent(reference)}&order_id=${order.id}`;
     const callbackUrl = `${supabaseUrl}/functions/v1/kelpay-webhook`;
 
-    // ============================================================
-    // APPEL API KECCEL — À COMPLÉTER AVEC LA DOC OFFICIELLE
-    // ============================================================
-    // L'endpoint est https://api.keccel.net/cardpay (POST)
-    // Les paramètres exacts seront ajustés dès réception de la documentation.
-    // Pour l'instant, nous construisons un payload probable basé sur le terminal.
+    // Payload conforme à la doc officielle Keccel CardPay API
+    // 7 champs obligatoires : merchantcode, reference, amount, currency, description, callbackurl, returnUrl
     const keccelPayload = {
-      merchant_code: keccelMerchantCode,
+      merchantcode: keccelMerchantCode,
+      reference: reference,
       amount: amount,
       currency: "USD",
-      order_id: order.order_ref,
-      payment_method: method, // "card" or "paypal"
-      return_url: returnUrl,
-      cancel_url: `${siteBaseUrl}/payment/return?ref=${encodeURIComponent(reference)}&status=cancelled&order_id=${order.id}`,
-      callback_url: callbackUrl,
       description: `Commande ${order.order_ref} - Zandofy`,
-      save_card: save_card || false,
+      callbackurl: callbackUrl,
+      returnUrl: returnUrl,
     };
 
     let keccelResponse: any = null;
@@ -128,13 +121,20 @@ Deno.serve(async (req) => {
       keccelResponse = await resp.json();
       console.log("Keccel cardpay response:", JSON.stringify(keccelResponse));
 
-      // Extract redirect URL — adapt field names once doc is available
-      redirectUrl =
-        keccelResponse?.payment_url ||
-        keccelResponse?.redirect_url ||
-        keccelResponse?.checkout_url ||
-        keccelResponse?.url ||
-        null;
+      // Vérifier code === "0" (succès selon la doc)
+      if (String(keccelResponse?.code) !== "0") {
+        console.error("Keccel API returned error:", keccelResponse);
+        return new Response(
+          JSON.stringify({
+            error: keccelResponse?.description || "Erreur de la passerelle de paiement",
+            details: keccelResponse,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // checkoutUrl est le champ de redirection selon la doc officielle
+      redirectUrl = keccelResponse?.checkoutUrl || null;
     } catch (apiError) {
       console.error("Keccel API error:", apiError);
       return new Response(
@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
         amount: amount,
         currency: "USD",
         reference: reference.substring(0, 255),
-        transaction_id: keccelResponse?.transaction_id || keccelResponse?.id || null,
+        transaction_id: keccelResponse?.transactionid || null,
         status: "pending",
         payment_type: pType,
         callback_payload: keccelResponse,
@@ -185,10 +185,6 @@ Deno.serve(async (req) => {
         redirect_url: redirectUrl,
         reference: reference,
         status: "pending",
-        // If no redirect URL from Keccel, return the terminal fallback
-        fallback_terminal_url: !redirectUrl
-          ? `https://terminal.keccel.com/payment.php?m=${keccelMerchantCode}`
-          : undefined,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
