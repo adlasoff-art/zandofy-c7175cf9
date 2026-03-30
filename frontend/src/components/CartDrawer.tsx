@@ -101,6 +101,12 @@ export function CartDrawer() {
                     {item.moq > 1 && item.quantity < item.moq && (
                       <p className="text-xs text-sale">Min. {item.moq} pièces requis</p>
                     )}
+                    <CartItemVariantEditor
+                      cartItemId={item.id}
+                      productId={item.productId}
+                      currentColor={item.color}
+                      currentSize={item.size}
+                    />
                   </div>
                 </div>
               ))}
