@@ -851,13 +851,23 @@ export default function CheckoutPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="addr">{t("checkout.address")} *</Label>
-                    <Input id="addr" value={shipping.address} onChange={e => updateField("address", e.target.value)} />
+                    <Input id="addr" value={shipping.address} onChange={e => updateField("address", e.target.value)} placeholder="N° parcelle, avenue/rue" />
                   </div>
                   <div className="grid sm:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="quartier">Quartier</Label>
+                      <Input id="quartier" value={shipping.quartier} onChange={e => updateField("quartier", e.target.value)} placeholder="Quartier" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="commune">Commune</Label>
+                      <Input id="commune" value={shipping.commune} onChange={e => updateField("commune", e.target.value)} placeholder="Commune" />
+                    </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="city">{t("checkout.city")} *</Label>
                       <Input id="city" value={shipping.city} onChange={e => updateField("city", e.target.value)} />
                     </div>
+                  </div>
+                  <div className="grid sm:grid-cols-3 gap-4">
                     <div className="space-y-1.5">
                       <Label>{t("checkout.country")} *</Label>
                       <CountryCombobox
