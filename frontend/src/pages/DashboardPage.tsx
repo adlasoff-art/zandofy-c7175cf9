@@ -137,6 +137,8 @@ interface SavedAddress {
   last_name: string;
   phone: string;
   address: string;
+  commune: string | null;
+  quartier: string | null;
   city: string;
   country: string;
   postal_code: string | null;
