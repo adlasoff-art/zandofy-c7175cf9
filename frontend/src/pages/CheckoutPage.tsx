@@ -1000,7 +1000,7 @@ export default function CheckoutPage() {
                 <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
                   <p className="font-medium text-foreground flex items-center gap-1.5"><MapPin size={14} /> {t("checkout.shipping")} :</p>
                   <p className="text-muted-foreground">{shipping.firstName} {shipping.lastName}</p>
-                  <p className="text-muted-foreground">{shipping.address}, {shipping.city}, {shipping.country}</p>
+                  <p className="text-muted-foreground">{shipping.address}{shipping.quartier ? `, ${shipping.quartier}` : ""}{shipping.commune ? `, ${shipping.commune}` : ""}, {shipping.city}, {shipping.country}</p>
                   <p className="text-muted-foreground">{shipping.phone}</p>
                 </div>
 
