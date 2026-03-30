@@ -1098,23 +1098,17 @@ export default function CheckoutPage() {
                   ))}
                 </div>
 
-                {paymentMethod === "stripe" && (
-                  <div className="space-y-3 pt-2 border-t border-border">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1"><ShieldCheck size={14} /> Paiement sécurisé (mode test)</p>
-                    <div className="space-y-1.5">
-                      <Label>Numéro de carte</Label>
-                      <Input placeholder="4242 4242 4242 4242" disabled className="bg-muted" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label>Expiration</Label>
-                        <Input placeholder="12/28" disabled className="bg-muted" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>CVC</Label>
-                        <Input placeholder="123" disabled className="bg-muted" />
-                      </div>
-                    </div>
+                {(paymentMethod === "card" || paymentMethod === "stripe") && (
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1"><ShieldCheck size={14} /> Paiement sécurisé via Keccel / Mastercard</p>
+                    <p className="text-xs text-muted-foreground">Vous serez redirigé vers la page de paiement sécurisé Visa/Mastercard pour finaliser votre transaction.</p>
+                  </div>
+                )}
+
+                {paymentMethod === "paypal" && (
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1"><ShieldCheck size={14} /> Paiement sécurisé via PayPal</p>
+                    <p className="text-xs text-muted-foreground">Vous serez redirigé vers PayPal pour finaliser votre paiement en toute sécurité.</p>
                   </div>
                 )}
 

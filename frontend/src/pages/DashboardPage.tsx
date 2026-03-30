@@ -781,7 +781,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       <div className="flex flex-wrap gap-1.5 text-[10px]">
         {order.payment_method && (
           <span className="px-2 py-0.5 rounded-full bg-muted font-medium">
-            Paiement : {order.payment_method === "stripe" ? "Carte bancaire" : order.payment_method === "mobile_money" ? "Mobile Money" : order.payment_method === "cod" ? "Cash à la livraison" : order.payment_method === "off_platform" ? "Hors plateforme" : order.payment_method}
+            Paiement : {order.payment_method === "stripe" || order.payment_method === "card" ? "Carte bancaire" : order.payment_method === "paypal" ? "PayPal" : order.payment_method === "mobile_money" ? "Mobile Money" : order.payment_method === "cod" ? "Cash à la livraison" : order.payment_method === "off_platform" ? "Hors plateforme" : order.payment_method}
           </span>
         )}
         {order.shipping_payment_status && (

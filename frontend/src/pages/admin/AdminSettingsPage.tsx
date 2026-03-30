@@ -254,7 +254,8 @@ export default function AdminSettingsPage() {
           <p className="text-xs text-muted-foreground mb-3">Activez ou désactivez les moyens de paiement disponibles pour les clients.</p>
           <div className="space-y-3">
             {([
-              { key: "stripe" as const, label: "Carte bancaire (Visa, Mastercard)" },
+              { key: "stripe" as const, label: "Carte bancaire (Visa/Mastercard via Keccel)" },
+              { key: "paypal" as const, label: "PayPal" },
               { key: "mobile_money" as const, label: "Mobile Money (Orange, M-Pesa, Airtel)" },
               { key: "cod" as const, label: "Paiement à la livraison (COD)" },
               { key: "off_platform" as const, label: "Paiement hors plateforme (preuve + validation)" },

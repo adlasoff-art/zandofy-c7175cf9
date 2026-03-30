@@ -40,6 +40,7 @@ export function usePaymentMethods() {
           stripe: v.stripe === true,
           cod: v.cod === true,
           off_platform: v.off_platform === true,
+          paypal: v.paypal !== false,
           stripe_notice_enabled: !!v.stripe_notice_enabled,
           stripe_notice_text: v.stripe_notice_text || DEFAULT_CONFIG.stripe_notice_text,
         };
