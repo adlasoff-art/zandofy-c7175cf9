@@ -140,7 +140,7 @@ function CitiesTab() {
 
   const fetch = useCallback(async () => {
     setLoading(true);
-    let q = supabase.from("cities").select("id, name, country_code, province_id, latitude, longitude, population").order("name").limit(500);
+    let q: any = (supabase as any).from("cities").select("id, name, country_code, province_id, latitude, longitude, population").order("name").limit(500);
     q = q.eq("country_code", filterCountry);
     if (filterProvince) q = q.eq("province_id", filterProvince);
     const { data } = await q;
