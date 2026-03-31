@@ -2000,9 +2000,11 @@ function AddressesTab({ userId }: { userId: string }) {
               <button onClick={() => handleEdit(addr)} className="p-1.5 text-muted-foreground hover:text-primary">
                 <Edit2 size={14} />
               </button>
-              <button onClick={() => handleDelete(addr.id)} className="p-1.5 text-muted-foreground hover:text-destructive">
-                <Trash2 size={14} />
-              </button>
+              {!(addr as any).is_first_address && (
+                <button onClick={() => handleDelete(addr.id)} className="p-1.5 text-muted-foreground hover:text-destructive">
+                  <Trash2 size={14} />
+                </button>
+              )}
             </div>
           </div>
         </div>
