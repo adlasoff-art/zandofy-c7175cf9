@@ -176,6 +176,7 @@ const App = () => (
                 <Route path="/store/:id" element={<StorePage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/onboarding" element={<OnboardingPage />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
                 <Route path="/payment/return" element={<PaymentReturnPage />} />
                 <Route path="/account" element={<AccountPage />} />
