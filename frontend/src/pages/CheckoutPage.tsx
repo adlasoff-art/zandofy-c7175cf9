@@ -306,6 +306,7 @@ export default function CheckoutPage() {
       commune: addr.commune || "",
       city: addr.city,
       province: addr.province || "",
+      province_id: "",
       country: addr.country,
       postalCode: addr.postal_code || "",
     });
