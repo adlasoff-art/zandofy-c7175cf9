@@ -200,6 +200,51 @@ export type Database = {
         }
         Relationships: []
       }
+      analytics_sessions: {
+        Row: {
+          city: string | null
+          country_code: string | null
+          device_type: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          entry_page: string | null
+          exit_page: string | null
+          id: string
+          pages_visited: string[] | null
+          session_id: string
+          started_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          city?: string | null
+          country_code?: string | null
+          device_type?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          entry_page?: string | null
+          exit_page?: string | null
+          id?: string
+          pages_visited?: string[] | null
+          session_id: string
+          started_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          city?: string | null
+          country_code?: string | null
+          device_type?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          entry_page?: string | null
+          exit_page?: string | null
+          id?: string
+          pages_visited?: string[] | null
+          session_id?: string
+          started_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       badge_requests: {
         Row: {
           created_at: string
@@ -685,6 +730,7 @@ export type Database = {
           longitude: number
           name: string
           population: number | null
+          province_id: string | null
           zone_id: string | null
         }
         Insert: {
@@ -696,6 +742,7 @@ export type Database = {
           longitude: number
           name: string
           population?: number | null
+          province_id?: string | null
           zone_id?: string | null
         }
         Update: {
@@ -707,6 +754,7 @@ export type Database = {
           longitude?: number
           name?: string
           population?: number | null
+          province_id?: string | null
           zone_id?: string | null
         }
         Relationships: [
@@ -715,6 +763,13 @@ export type Database = {
             columns: ["logistic_zone_id"]
             isOneToOne: false
             referencedRelation: "logistic_zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cities_province_id_fkey"
+            columns: ["province_id"]
+            isOneToOne: false
+            referencedRelation: "provinces"
             referencedColumns: ["id"]
           },
           {
@@ -2317,6 +2372,39 @@ export type Database = {
           },
         ]
       }
+      page_views: {
+        Row: {
+          id: string
+          page_path: string
+          product_id: string | null
+          session_id: string
+          store_id: string | null
+          time_on_page_seconds: number | null
+          user_id: string | null
+          viewed_at: string | null
+        }
+        Insert: {
+          id?: string
+          page_path: string
+          product_id?: string | null
+          session_id: string
+          store_id?: string | null
+          time_on_page_seconds?: number | null
+          user_id?: string | null
+          viewed_at?: string | null
+        }
+        Update: {
+          id?: string
+          page_path?: string
+          product_id?: string | null
+          session_id?: string
+          store_id?: string | null
+          time_on_page_seconds?: number | null
+          user_id?: string | null
+          viewed_at?: string | null
+        }
+        Relationships: []
+      }
       payment_methods: {
         Row: {
           created_at: string
@@ -3091,6 +3179,30 @@ export type Database = {
           residence_address?: string | null
           residence_city?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      provinces: {
+        Row: {
+          country_code: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+        }
+        Insert: {
+          country_code?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+        }
+        Update: {
+          country_code?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
         }
         Relationships: []
       }
@@ -3962,6 +4074,56 @@ export type Database = {
           },
           {
             foreignKeyName: "store_reviews_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_transfer_requests: {
+        Row: {
+          admin_notes: string | null
+          cooldown_until: string | null
+          created_at: string | null
+          from_user_id: string
+          id: string
+          kyc_verified_from: boolean | null
+          kyc_verified_to: boolean | null
+          status: string
+          store_id: string
+          to_user_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          cooldown_until?: string | null
+          created_at?: string | null
+          from_user_id: string
+          id?: string
+          kyc_verified_from?: boolean | null
+          kyc_verified_to?: boolean | null
+          status?: string
+          store_id: string
+          to_user_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          cooldown_until?: string | null
+          created_at?: string | null
+          from_user_id?: string
+          id?: string
+          kyc_verified_from?: boolean | null
+          kyc_verified_to?: boolean | null
+          status?: string
+          store_id?: string
+          to_user_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_transfer_requests_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
