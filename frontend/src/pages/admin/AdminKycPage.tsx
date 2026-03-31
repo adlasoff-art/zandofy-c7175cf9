@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { LocationHierarchyFilter, type LocationFilters } from "@/components/admin/LocationHierarchyFilter";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdminLayout } from "@/components/admin/AdminLayout";
