@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckoutShippingCalculator } from "@/components/CheckoutShippingCalculator";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
+import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
 import { useI18n } from "@/contexts/I18nContext";
 import {
   CreditCard, Smartphone, Truck, ChevronRight, Check, ShieldCheck,
