@@ -882,12 +882,14 @@ export default function CheckoutPage() {
                           <p className="text-xs text-muted-foreground">{addr.first_name} {addr.last_name}</p>
                           <p className="text-xs text-muted-foreground line-clamp-1">{addr.address}, {addr.city}</p>
                           <p className="text-xs text-muted-foreground">{addr.phone}</p>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteAddress(addr.id); }}
-                            className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
-                          >
-                            <X size={14} />
-                          </button>
+                          {!(addr as any).is_first_address && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteAddress(addr.id); }}
+                              className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
                         </button>
                       ))}
                     </div>
