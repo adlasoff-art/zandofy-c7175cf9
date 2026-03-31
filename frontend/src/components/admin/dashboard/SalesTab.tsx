@@ -6,23 +6,27 @@ import { BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { PIE_COLORS, TOOLTIP_STYLE, statusLabels } from "./shared";
 import type { PeriodKey } from "./DashboardPeriodSelector";
 import { getPeriodDate } from "./DashboardPeriodSelector";
+import type { GlobalFilters } from "./DashboardGlobalFilters";
 
-interface Props { period: PeriodKey; }
+interface Props { period: PeriodKey; geoFilters?: GlobalFilters; }
 
-export function SalesTab({ period }: Props) {
+export function SalesTab({ period, geoFilters }: Props) {
   const sinceDate = getPeriodDate(period) ?? new Date(new Date().getFullYear() - 5, 0, 1);
   const since = sinceDate.toISOString();
+  const country = geoFilters?.country !== "all" ? geoFilters?.country : undefined;
+  const city = geoFilters?.city !== "all" ? geoFilters?.city : undefined;
 
-  // Orders for the period
   const { data: orders = [] } = useQuery({
-    queryKey: ["admin-sales-orders", period],
+    queryKey: ["admin-sales-orders", period, country, city],
     queryFn: async () => {
-      const { data } = await supabase.from("orders").select("total, status, created_at, payment_method").gte("created_at", since);
+      let q = (supabase as any).from("orders").select("total, status, created_at, payment_method, shipping_country, shipping_city").gte("created_at", since);
+      if (country) q = q.eq("shipping_country", country);
+      if (city) q = q.eq("shipping_city", city);
+      const { data } = await q;
       return data ?? [];
     },
   });
 
-  // Daily sales histogram
   const dailySales = (() => {
     const days = eachDayOfInterval({ start: sinceDate, end: new Date() });
     const map: Record<string, { date: string; revenue: number; count: number }> = {};
@@ -30,7 +34,7 @@ export function SalesTab({ period }: Props) {
       const key = format(d, "yyyy-MM-dd");
       map[key] = { date: format(d, days.length > 60 ? "d/MM" : "d MMM", { locale: fr }), revenue: 0, count: 0 };
     });
-    orders.forEach((o) => {
+    orders.forEach((o: any) => {
       const key = format(new Date(o.created_at), "yyyy-MM-dd");
       if (map[key]) {
         map[key].count++;
@@ -40,35 +44,31 @@ export function SalesTab({ period }: Props) {
     return Object.values(map);
   })();
 
-  // Cumulative revenue curve
   const cumulativeRevenue = (() => {
     let cum = 0;
     return dailySales.map((d) => { cum += d.revenue; return { ...d, cumulative: Math.round(cum) }; });
   })();
 
-  // Status pie
   const statusPie = (() => {
     const map: Record<string, number> = {};
-    orders.forEach((o) => { map[o.status] = (map[o.status] || 0) + 1; });
+    orders.forEach((o: any) => { map[o.status] = (map[o.status] || 0) + 1; });
     return Object.entries(map).map(([name, value]) => ({ name: statusLabels[name] || name, value }));
   })();
 
-  // Payment method pie
   const paymentPie = (() => {
     const map: Record<string, number> = {};
-    orders.forEach((o) => {
+    orders.forEach((o: any) => {
       const method = o.payment_method || "Non spécifié";
       map[method] = (map[method] || 0) + 1;
     });
     return Object.entries(map).map(([name, value]) => ({
-      name: name === "stripe" ? "Carte (Stripe)" : name === "mobile_money" ? "Mobile Money" : name === "cod" ? "Paiement à la livraison" : name,
+      name: name === "stripe" ? "Carte (Stripe)" : name === "mobile_money" ? "Mobile Money" : name === "cod" ? "Paiement à la livraison" : name === "off_platform" ? "Hors plateforme" : name === "paypal" ? "PayPal" : name,
       value,
     }));
   })();
 
   return (
     <div className="space-y-6">
-      {/* Daily sales histogram */}
       <div className="bg-card border border-border rounded-xl p-4">
         <h2 className="text-sm font-semibold text-foreground mb-4">Ventes par jour (revenu & nombre)</h2>
         <div className="h-[280px]">
@@ -87,7 +87,6 @@ export function SalesTab({ period }: Props) {
         </div>
       </div>
 
-      {/* Cumulative revenue */}
       <div className="bg-card border border-border rounded-xl p-4">
         <h2 className="text-sm font-semibold text-foreground mb-4">Évolution du chiffre d'affaires (cumulatif)</h2>
         <div className="h-[250px]">
@@ -109,7 +108,6 @@ export function SalesTab({ period }: Props) {
         </div>
       </div>
 
-      {/* Pies */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-card border border-border rounded-xl p-4">
           <h2 className="text-sm font-semibold text-foreground mb-4">Répartition par statut</h2>

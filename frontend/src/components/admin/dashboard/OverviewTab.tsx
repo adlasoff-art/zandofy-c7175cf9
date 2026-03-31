@@ -7,12 +7,15 @@ import { KpiCard, KpiCardRow, statusColor, statusLabels } from "./shared";
 import { NON_REVENUE_ORDER_STATUSES, REAL_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
 import type { PeriodKey } from "./DashboardPeriodSelector";
 import { getPeriodDate } from "./DashboardPeriodSelector";
+import type { GlobalFilters } from "./DashboardGlobalFilters";
 
-interface Props { period: PeriodKey; }
+interface Props { period: PeriodKey; geoFilters?: GlobalFilters; }
 
-export function OverviewTab({ period }: Props) {
+export function OverviewTab({ period, geoFilters }: Props) {
   const sinceDate = getPeriodDate(period);
   const since = sinceDate?.toISOString() ?? new Date(0).toISOString();
+  const country = geoFilters?.country !== "all" ? geoFilters?.country : undefined;
+  const city = geoFilters?.city !== "all" ? geoFilters?.city : undefined;
 
   const { data: profileCount = 0, isLoading: lp } = useQuery({
     queryKey: ["admin-profiles-count"],
@@ -23,14 +26,17 @@ export function OverviewTab({ period }: Props) {
   });
 
   const { data: orderStats, isLoading: lo } = useQuery({
-    queryKey: ["admin-order-stats", period],
+    queryKey: ["admin-order-stats", period, country, city],
     queryFn: async () => {
-      const { data } = await (supabase as any).from("orders").select("total, status, shipping_payment_status, last_mile_payment_status, shipping_cost, last_mile_fee, shipping_payment_proof_url, last_mile_payment_proof_url").gte("created_at", since);
+      let q = (supabase as any).from("orders").select("total, status, shipping_payment_status, last_mile_payment_status, shipping_cost, last_mile_fee, shipping_payment_proof_url, last_mile_payment_proof_url, shipping_country, shipping_city").gte("created_at", since);
+      if (country) q = q.eq("shipping_country", country);
+      if (city) q = q.eq("shipping_city", city);
+      const { data } = await q;
       if (!data) return { count: 0, revenue: 0, currentRevenue: 0, cancelledRevenue: 0, cancelledCount: 0, deliveredCount: 0, pendingCount: 0, failedAmount: 0, failedCount: 0, byStatus: {} as Record<string, number>, proofShippingPaid: 0, proofLastMilePaid: 0 };
       const byStatus: Record<string, number> = {};
       let revenue = 0, currentRevenue = 0, cancelledRevenue = 0, cancelledCount = 0, deliveredCount = 0, pendingCount = 0, failedAmount = 0, failedCount = 0, opCount = 0;
       let proofShippingPaid = 0, proofLastMilePaid = 0;
-      data.forEach((o) => {
+      data.forEach((o: any) => {
         byStatus[o.status] = (byStatus[o.status] || 0) + 1;
         if (o.status === "cancelled" || o.status === "returned") { cancelledRevenue += Number(o.total); cancelledCount++; }
         if (!NON_REVENUE_ORDER_STATUSES.includes(o.status as never)) { opCount++; currentRevenue += Number(o.total); }
@@ -73,7 +79,6 @@ export function OverviewTab({ period }: Props) {
     },
   });
 
-  // Enhanced payment stats with payment_type breakdown
   const { data: paymentStats } = useQuery({
     queryKey: ["admin-payment-stats-v2", period],
     queryFn: async () => {
@@ -93,7 +98,6 @@ export function OverviewTab({ period }: Props) {
       });
 
       const mobileMoneyGross = mobileMoneySuccessful.reduce((s: number, p: any) => s + Number(p.amount), 0);
-      // Read fee pct from settings will be done client-side, default 2.5%
       const gatewayFeePct = 2.5;
       const gatewayFees = Math.round(mobileMoneyGross * gatewayFeePct) / 100;
       const netRevenue = mobileMoneyGross - gatewayFees;
@@ -103,17 +107,11 @@ export function OverviewTab({ period }: Props) {
         pending: data.filter((p: any) => p.status === "pending").length,
         failed: data.filter((p: any) => p.status === "failed").length,
         totalAmount: successful.reduce((s: number, p: any) => s + Number(p.amount), 0),
-        orderAmount,
-        shippingAmount,
-        lastMileAmount,
-        mobileMoneyGross,
-        gatewayFees,
-        netRevenue,
+        orderAmount, shippingAmount, lastMileAmount, mobileMoneyGross, gatewayFees, netRevenue,
       };
     },
   });
 
-  // Load gateway fee setting
   const { data: gatewayFeePct = 2.5 } = useQuery({
     queryKey: ["admin-gateway-fee-pct"],
     queryFn: async () => {
@@ -122,7 +120,6 @@ export function OverviewTab({ period }: Props) {
     },
   });
 
-  // Recalculate with actual fee pct
   const mobileMoneyGross = paymentStats?.mobileMoneyGross ?? 0;
   const actualGatewayFees = Math.round(mobileMoneyGross * gatewayFeePct) / 100;
   const actualNetRevenue = mobileMoneyGross - actualGatewayFees;
@@ -153,7 +150,6 @@ export function OverviewTab({ period }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Commerce */}
       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Commerce</h2>
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <KpiCard icon={Users} label="Utilisateurs" value={loading ? "..." : profileCount.toLocaleString()} />
@@ -164,7 +160,6 @@ export function OverviewTab({ period }: Props) {
         <KpiCard icon={StoreIcon} label="Boutiques" value={storeCount.toLocaleString()} />
       </div>
 
-      {/* Santé */}
       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Santé des commandes</h2>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCardRow icon={CheckCircle2} label="Livrées" value={(orderStats?.deliveredCount ?? 0).toString()} />
@@ -173,7 +168,6 @@ export function OverviewTab({ period }: Props) {
         <KpiCardRow icon={Ban} label="Montant cmd échouées" value={`$${(orderStats?.failedAmount ?? 0).toLocaleString()}`} color="text-destructive" />
       </div>
 
-      {/* Revenus & Passerelle */}
       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Revenus & Passerelle Mobile Money</h2>
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <KpiCard icon={CreditCard} label="Paiements commandes" value={`$${(paymentStats?.orderAmount ?? 0).toFixed(2)}`} sub="Mobile Money réussis" />
@@ -187,7 +181,6 @@ export function OverviewTab({ period }: Props) {
         <KpiCard icon={CheckCircle2} label="Preuves validées" value={`$${((orderStats?.proofShippingPaid ?? 0) + (orderStats?.proofLastMilePaid ?? 0)).toFixed(2)}`} sub={`Expéd: $${(orderStats?.proofShippingPaid ?? 0).toFixed(2)} | Livr: $${(orderStats?.proofLastMilePaid ?? 0).toFixed(2)}`} />
       </div>
 
-      {/* Après-vente */}
       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Après-vente & Paiements</h2>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard icon={ShieldAlert} label="Litiges" value={(disputeStats?.total ?? 0).toString()} color="text-destructive" sub={`${disputeStats?.open ?? 0} ouvert(s)`} />
@@ -196,7 +189,6 @@ export function OverviewTab({ period }: Props) {
         <KpiCard icon={AlertTriangle} label="Paiements échoués" value={(paymentStats?.failed ?? 0).toString()} color="text-destructive" sub={`${paymentStats?.pending ?? 0} transaction(s) en attente`} />
       </div>
 
-      {/* Bottom: Recent orders + sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2">
         <div className="lg:col-span-2 bg-card border border-border rounded-xl p-4">
           <h2 className="text-sm font-semibold text-foreground mb-3">Commandes récentes</h2>
