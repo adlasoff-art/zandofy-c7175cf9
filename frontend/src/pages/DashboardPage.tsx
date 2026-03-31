@@ -56,6 +56,7 @@ import { useCertification } from "@/hooks/use-certification";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { Switch } from "@/components/ui/switch";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
+import { CascadingAddressFields, type AddressData } from "@/components/address/CascadingAddressFields";
 
 const TABS = [
   { key: "overview", label: "Aperçu", icon: Package },
@@ -1867,7 +1868,7 @@ function AddressesTab({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ label: "", first_name: "", last_name: "", phone: "", address: "", quartier: "", commune: "", city: "", province: "", country: "CD", postal_code: "" });
+  const [form, setForm] = useState({ label: "", first_name: "", last_name: "", phone: "", address: "", quartier: "", commune: "", city: "", province: "", province_id: "", country: "CD", postal_code: "" });
   const [saving, setSaving] = useState(false);
   const [isKycVerified, setIsKycVerified] = useState(false);
 
@@ -1890,7 +1891,7 @@ function AddressesTab({ userId }: { userId: string }) {
   }, [userId]);
 
   const resetForm = () => {
-    setForm({ label: "", first_name: "", last_name: "", phone: "", address: "", quartier: "", commune: "", city: "", province: "", country: "CD", postal_code: "" });
+    setForm({ label: "", first_name: "", last_name: "", phone: "", address: "", quartier: "", commune: "", city: "", province: "", province_id: "", country: "CD", postal_code: "" });
     setEditId(null);
     setShowForm(false);
   };
@@ -1906,6 +1907,7 @@ function AddressesTab({ userId }: { userId: string }) {
       commune: addr.commune || "",
       city: addr.city,
       province: (addr as any).province || "",
+      province_id: "",
       country: addr.country,
       postal_code: addr.postal_code || "",
     });
@@ -2017,39 +2019,19 @@ function AddressesTab({ userId }: { userId: string }) {
             <Label className="text-xs">Adresse *</Label>
             <Input className="mt-1" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="N° parcelle, N° appartement, Avenue/Rue" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Quartier / Bloc</Label>
-              <Input className="mt-1" value={form.quartier} onChange={e => setForm(f => ({ ...f, quartier: e.target.value }))} placeholder="Quartier" />
-            </div>
-            <div>
-              <Label className="text-xs">Commune / Département</Label>
-              <Input className="mt-1" value={form.commune} onChange={e => setForm(f => ({ ...f, commune: e.target.value }))} placeholder="Commune" />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label className="text-xs">Ville *</Label>
-              <Input className="mt-1" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
-            </div>
-            <div>
-              <Label className="text-xs">Province / État</Label>
-              <Input className="mt-1" value={form.province} onChange={e => setForm(f => ({ ...f, province: e.target.value }))} />
-            </div>
-            <div>
-              <Label className="text-xs">Code postal</Label>
-              <Input className="mt-1" value={form.postal_code} onChange={e => setForm(f => ({ ...f, postal_code: e.target.value }))} />
-            </div>
-          </div>
-          <div>
-            <CountryCombobox
-              value={form.country}
-              onChange={(v) => setForm(f => ({ ...f, country: v }))}
-              label="Pays *"
-              placeholder="Sélectionner un pays..."
-              showNone={false}
-            />
-          </div>
+          <CascadingAddressFields
+            data={{
+              country: form.country,
+              province: form.province,
+              province_id: form.province_id,
+              city: form.city,
+              commune: form.commune,
+              quartier: form.quartier,
+              address: form.address,
+              postal_code: form.postal_code,
+            }}
+            onChange={(field, value) => setForm(f => ({ ...f, [field]: value }))}
+          />
           <Button onClick={handleSave} disabled={saving} size="sm">
             {saving ? <Loader2 className="animate-spin mr-2" size={14} /> : <Save size={14} className="mr-2" />}
             {editId ? "Modifier" : "Ajouter"}

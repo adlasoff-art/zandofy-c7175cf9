@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckoutShippingCalculator } from "@/components/CheckoutShippingCalculator";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
+import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
 import { useI18n } from "@/contexts/I18nContext";
 import {
   CreditCard, Smartphone, Truck, ChevronRight, Check, ShieldCheck,
@@ -35,6 +36,7 @@ interface ShippingInfo {
   commune: string;
   city: string;
   province: string;
+  province_id: string;
   country: string;
   postalCode: string;
 }
@@ -76,7 +78,7 @@ type LastMilePayment = "pay_with_shipping" | "pay_cash_on_delivery";
 
 const emptyShipping: ShippingInfo = {
   firstName: "", lastName: "", email: "", phone: "",
-  address: "", quartier: "", commune: "", city: "", province: "", country: "CD", postalCode: "",
+  address: "", quartier: "", commune: "", city: "", province: "", province_id: "", country: "CD", postalCode: "",
 };
 
 export default function CheckoutPage() {
@@ -305,6 +307,7 @@ export default function CheckoutPage() {
       commune: addr.commune || "",
       city: addr.city,
       province: addr.province || "",
+      province_id: "",
       country: addr.country,
       postalCode: addr.postal_code || "",
     });
@@ -930,44 +933,25 @@ export default function CheckoutPage() {
                           <Input id="phone" type="tel" value={shipping.phone} onChange={e => updateField("phone", e.target.value)} placeholder="+243 XXX XXX XXX" />
                         </div>
                       </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="addr">{t("checkout.address")} *</Label>
-                        <Input id="addr" value={shipping.address} onChange={e => updateField("address", e.target.value)} placeholder="N° parcelle, N° appartement, Avenue/Rue" />
-                      </div>
-                      <div className="grid sm:grid-cols-3 gap-4">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="quartier">Quartier / Bloc</Label>
-                          <Input id="quartier" value={shipping.quartier} onChange={e => updateField("quartier", e.target.value)} placeholder="Quartier" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="commune">Commune / Département</Label>
-                          <Input id="commune" value={shipping.commune} onChange={e => updateField("commune", e.target.value)} placeholder="Commune" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="city">{t("checkout.city")} *</Label>
-                          <Input id="city" value={shipping.city} onChange={e => updateField("city", e.target.value)} />
-                        </div>
-                      </div>
-                      <div className="grid sm:grid-cols-3 gap-4">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="province">Province / État</Label>
-                          <Input id="province" value={shipping.province} onChange={e => updateField("province", e.target.value)} />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label>{t("checkout.country")} *</Label>
-                          <CountryCombobox
-                            value={shipping.country}
-                            onChange={(v) => updateField("country", v)}
-                            label=""
-                            placeholder="Sélectionner un pays..."
-                            showNone={false}
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="zip">{t("checkout.postalCode")}</Label>
-                          <Input id="zip" value={shipping.postalCode} onChange={e => updateField("postalCode", e.target.value)} />
-                        </div>
-                      </div>
+                      <CascadingAddressFields
+                        data={{
+                          country: shipping.country,
+                          province: shipping.province,
+                          province_id: shipping.province_id,
+                          city: shipping.city,
+                          commune: shipping.commune,
+                          quartier: shipping.quartier,
+                          address: shipping.address,
+                          postal_code: shipping.postalCode,
+                        }}
+                        onChange={(field, value) => {
+                          if (field === "postal_code") {
+                            updateField("postalCode", value);
+                          } else {
+                            updateField(field as keyof ShippingInfo, value);
+                          }
+                        }}
+                      />
 
                       {/* Save address checkbox */}
                       <div className="flex items-center gap-3 pt-2 border-t border-border">
