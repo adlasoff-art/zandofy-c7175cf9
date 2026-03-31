@@ -1906,6 +1906,7 @@ function AddressesTab({ userId }: { userId: string }) {
       commune: addr.commune || "",
       city: addr.city,
       province: (addr as any).province || "",
+      province_id: "",
       country: addr.country,
       postal_code: addr.postal_code || "",
     });
