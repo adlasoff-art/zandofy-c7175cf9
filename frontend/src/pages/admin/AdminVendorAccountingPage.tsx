@@ -141,6 +141,16 @@ export default function AdminVendorAccountingPage() {
     const walletMap = new Map((wallets || []).map((w: any) => [w.store_id, w]));
     const defaultCommission = Number(globalDefaults?.platform_commission_default) || 10;
 
+    // Build order-to-payment-method map from payment_transactions
+    const orderPaymentMap = new Map<string, Record<string, number>>();
+    (paymentTxns || []).forEach((txn: any) => {
+      if (!txn.order_id || (txn.status !== "success" && txn.status !== "completed")) return;
+      if (!orderPaymentMap.has(txn.order_id)) orderPaymentMap.set(txn.order_id, {});
+      const m = orderPaymentMap.get(txn.order_id)!;
+      const method = txn.method || "unknown";
+      m[method] = (m[method] || 0) + Number(txn.amount);
+    });
+
     // Group items by store
     const storeItemsMap = new Map<string, any[]>();
     for (const item of orderItems as any[]) {
@@ -164,6 +174,7 @@ export default function AdminVendorAccountingPage() {
         let totalCost = 0;
         let totalVendorMargin = 0;
         const productDetails: any[] = [];
+        const revenueByMethod: Record<string, number> = {};
 
         for (const item of items) {
           const product = productMap.get(item.product_id);
@@ -175,6 +186,17 @@ export default function AdminVendorAccountingPage() {
           totalRevenue += revenue;
           totalCost += costReal;
           totalVendorMargin += vendorMargin;
+
+          // Aggregate payment method from order or payment_transactions
+          const orderPayMethod = item.orders?.payment_method || "unknown";
+          const txnMethods = orderPaymentMap.get(item.order_id);
+          if (txnMethods) {
+            Object.entries(txnMethods).forEach(([m, amt]) => {
+              revenueByMethod[m] = (revenueByMethod[m] || 0) + (amt as number) * (revenue / (item.orders?.subtotal || revenue));
+            });
+          } else {
+            revenueByMethod[orderPayMethod] = (revenueByMethod[orderPayMethod] || 0) + revenue;
+          }
 
           productDetails.push({
             productId: item.product_id,
@@ -192,8 +214,8 @@ export default function AdminVendorAccountingPage() {
         const platformCommission = totalRevenue * (commissionRate / 100);
         const platformMargin = totalRevenue - totalCost - totalVendorMargin;
         const netDueVendor = isPlatform
-          ? totalVendorMargin // Platform stores: only bonus
-          : totalRevenue - platformCommission; // Independent: CA - commission
+          ? totalVendorMargin
+          : totalRevenue - platformCommission;
 
         return {
           id: store.id,
@@ -210,10 +232,11 @@ export default function AdminVendorAccountingPage() {
           walletAvailable: wallet?.available_balance || 0,
           walletPending: wallet?.pending_balance || 0,
           productDetails,
+          revenueByMethod,
         };
       })
       .sort((a, b) => b.totalRevenue - a.totalRevenue);
-  }, [stores, orderItems, products, overrides, wallets, globalDefaults, search]);
+  }, [stores, orderItems, products, overrides, wallets, globalDefaults, search, paymentTxns]);
 
   // Top 10 chart data
   const top10Data = useMemo(() => {
