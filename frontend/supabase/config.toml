@@ -48,5 +48,8 @@ verify_jwt = false
 [functions.expire-pending-orders]
 verify_jwt = false
 
-[functions.verify-confirmation-code]
+[functions.keccel-cardpay]
+verify_jwt = false
+
+[functions.ai-recommendations]
 verify_jwt = false
