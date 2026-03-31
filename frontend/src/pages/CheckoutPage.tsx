@@ -319,6 +319,8 @@ export default function CheckoutPage() {
   };
 
   const handleDeleteAddress = async (id: string) => {
+    const addr = savedAddresses.find(a => a.id === id);
+    if (addr && (addr as any).is_first_address) return;
     await supabase.from("saved_addresses").delete().eq("id", id);
     setSavedAddresses(prev => prev.filter(a => a.id !== id));
     if (selectedAddressId === id) {
