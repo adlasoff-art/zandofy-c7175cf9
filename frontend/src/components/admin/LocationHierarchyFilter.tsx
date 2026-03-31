@@ -33,11 +33,14 @@ export function LocationHierarchyFilter({
   // Load provinces when country changes
   useEffect(() => {
     if (!value.country || !levels.includes("province")) { setProvinces([]); return; }
-    (supabase as any).from("provinces").select("id, name")
-      .eq("country_code", value.country)
-      .eq("is_active", true)
-      .order("name")
-      .then(({ data }: any) => setProvinces((data || []) as Option[]));
+    const fetchProvinces = async () => {
+      const { data } = await (supabase as any).from("provinces").select("id, name")
+        .eq("country_code", value.country)
+        .eq("is_active", true)
+        .order("name");
+      setProvinces((data || []) as Option[]);
+    };
+    fetchProvinces();
   }, [value.country]);
 
   // Load cities when province or country changes
