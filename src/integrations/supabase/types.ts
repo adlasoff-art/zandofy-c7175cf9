@@ -998,24 +998,30 @@ export type Database = {
           city: string
           country_code: string
           created_at: string | null
+          delivery_fee: number | null
           id: string
           is_active: boolean | null
+          is_deliverable: boolean | null
           name: string
         }
         Insert: {
           city: string
           country_code?: string
           created_at?: string | null
+          delivery_fee?: number | null
           id?: string
           is_active?: boolean | null
+          is_deliverable?: boolean | null
           name: string
         }
         Update: {
           city?: string
           country_code?: string
           created_at?: string | null
+          delivery_fee?: number | null
           id?: string
           is_active?: boolean | null
+          is_deliverable?: boolean | null
           name?: string
         }
         Relationships: []
@@ -3237,6 +3243,7 @@ export type Database = {
         Row: {
           commune_id: string
           created_at: string | null
+          delivery_surcharge: number | null
           id: string
           is_active: boolean | null
           is_restricted: boolean | null
@@ -3246,6 +3253,7 @@ export type Database = {
         Insert: {
           commune_id: string
           created_at?: string | null
+          delivery_surcharge?: number | null
           id?: string
           is_active?: boolean | null
           is_restricted?: boolean | null
@@ -3255,6 +3263,7 @@ export type Database = {
         Update: {
           commune_id?: string
           created_at?: string | null
+          delivery_surcharge?: number | null
           id?: string
           is_active?: boolean | null
           is_restricted?: boolean | null
@@ -3562,11 +3571,13 @@ export type Database = {
           first_name: string
           id: string
           is_default: boolean
+          is_first_address: boolean
           label: string
           last_name: string
           phone: string
           postal_code: string | null
           province: string | null
+          province_id: string | null
           quartier: string | null
           user_id: string
         }
@@ -3579,11 +3590,13 @@ export type Database = {
           first_name: string
           id?: string
           is_default?: boolean
+          is_first_address?: boolean
           label?: string
           last_name: string
           phone: string
           postal_code?: string | null
           province?: string | null
+          province_id?: string | null
           quartier?: string | null
           user_id: string
         }
@@ -3596,11 +3609,13 @@ export type Database = {
           first_name?: string
           id?: string
           is_default?: boolean
+          is_first_address?: boolean
           label?: string
           last_name?: string
           phone?: string
           postal_code?: string | null
           province?: string | null
+          province_id?: string | null
           quartier?: string | null
           user_id?: string
         }
