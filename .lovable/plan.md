@@ -1,188 +1,41 @@
 
 
-# Phase 1: Database + Admin Sidebar Reorganization
+# Fix: Keccel CardPay Reference Length (Max 25 Characters)
 
-## Summary
-Create new database tables (store transfers, analytics tracking, provinces), add missing period options to the dashboard selector, reorganize the admin sidebar into grouped sections by functional proximity, and add geographic filters to key admin pages.
+## Problem
 
----
-
-## Technical Details
-
-### A. SQL Migration (downloadable + Lovable Cloud migration)
-
-**1. `provinces` table** (new level in geography hierarchy)
-```sql
-CREATE TABLE IF NOT EXISTS public.provinces (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  country_code text NOT NULL DEFAULT 'CD',
-  is_active boolean DEFAULT true,
-  created_at timestamptz DEFAULT now()
-);
+The **deployed** edge function at `supabase/functions/keccel-cardpay/index.ts` (line 92) generates references like:
 ```
-- Add `province_id` FK to `cities` table
-- Update AdminGeographyPage with a Provinces tab
-
-**2. `store_transfer_requests` table**
-```sql
-CREATE TABLE IF NOT EXISTS public.store_transfer_requests (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_id uuid REFERENCES public.stores(id) ON DELETE CASCADE NOT NULL,
-  from_user_id uuid NOT NULL,
-  to_user_id uuid NOT NULL,
-  status text DEFAULT 'pending' CHECK (status IN ('pending','under_review','completed','rejected','cancelled')),
-  kyc_verified_from boolean DEFAULT false,
-  kyc_verified_to boolean DEFAULT false,
-  cooldown_until timestamptz,
-  admin_notes text,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
+keccel_card_a73e4c42-1504-4d99-a3f8-3d1b70eb0450_1774888637574
 ```
-- RLS: admin-only access + owner read
-- 48-72h cooldown enforced via validation trigger
+That's ~65 characters. Keccel's Visa gateway rejects anything over **25 characters**, blocking OTP delivery and payment completion.
 
-**3. `analytics_sessions` table** (advanced analytics)
-```sql
-CREATE TABLE IF NOT EXISTS public.analytics_sessions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid,
-  session_id text NOT NULL,
-  started_at timestamptz DEFAULT now(),
-  ended_at timestamptz,
-  duration_seconds integer,
-  pages_visited text[],
-  entry_page text,
-  exit_page text,
-  device_type text,
-  country_code text,
-  city text
-);
+There is also a duplicate at `frontend/supabase/functions/keccel-cardpay/index.ts` (line 84) with a partial fix that still lacks a hard length cap.
+
+## Root Cause
+
+The reference concatenates `method` + full UUID `order.id` + full timestamp — no truncation applied.
+
+## Fix (Both Files)
+
+Replace the reference generation in **both** edge function copies with a deterministic, hard-capped 25-character reference:
+
+```typescript
+// Exactly 25 chars: "KC" (2) + uuid-based hex (23), sliced to guarantee max
+const visaRef = `KC${crypto.randomUUID().replace(/-/g, "").toUpperCase().slice(0, 23)}`;
+const reference = visaRef; // always exactly 25 chars
 ```
 
-**4. `page_views` table** (for heatmap/journey tracking)
-```sql
-CREATE TABLE IF NOT EXISTS public.page_views (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id text NOT NULL,
-  user_id uuid,
-  page_path text NOT NULL,
-  store_id uuid,
-  product_id uuid,
-  viewed_at timestamptz DEFAULT now(),
-  time_on_page_seconds integer
-);
-```
+This uses `crypto.randomUUID()` (native in Deno), strips dashes, uppercases, and hard-slices to 23 chars after the `KC` prefix = **exactly 25 characters every time**.
 
-All migrations will be idempotent (`IF NOT EXISTS`, `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN NULL; END $$;`).
+## Files to Modify
 
-A downloadable `.sql` file will also be generated in `/mnt/documents/` for manual execution on supabase.com staging/production.
+1. **`supabase/functions/keccel-cardpay/index.ts`** (line 92) — the deployed version
+2. **`frontend/supabase/functions/keccel-cardpay/index.ts`** (line 84) — the frontend copy
 
----
+Both get the same fix. No migration needed — this is purely edge function logic.
 
-### B. Period Selector Enhancement
+## Verification
 
-Update `DashboardPeriodSelector.tsx`:
-- Add missing periods: `24h`, `48h`, `all-time`
-- Full list: Today, 24h, 48h, 7d, 14d, 30d, 3m, 6m, 9m, 12m, All-time
-- Reuse across Admin, Vendor, Driver, and Manager dashboards
-
----
-
-### C. Admin Sidebar Reorganization
-
-Regroup `adminItems` in `AdminSidebar.tsx` into labeled sections with `SidebarGroupLabel`:
-
-```text
-CORE OPERATIONS
-  Tableau de bord
-  Commandes
-  Modération produits
-  Modération avis
-
-VENTES & MARKETING
-  Coupons
-  Mises en avant
-  Ventes flash
-  Popups & Cookies
-
-LOGISTICS
-  Logistique
-  Tarification Fret
-  Zones géographiques
-  Pays actifs
-
-USERS & VENDORS
-  Utilisateurs
-  Demandes Vendeur
-  Noms de boutique
-  Abonnements
-  Tarification boutiques
-  Vérification KYC
-  Comptabilité vendeurs
-  Retraits
-
-FIDÉLITÉ & POINTS
-  Fidélité
-  Audit Points
-  Paliers affiliation
-
-FINANCE
-  Taux de change
-  Retours
-  Litiges
-
-CMS & CONTENU
-  Bannières & CMS
-  Catégories
-  Types de variations
-  Templates Email
-  Référencement SEO
-  Plateformes fournisseurs
-
-SYSTÈME
-  Support client
-  Journal d'audit
-  Notifications
-  Analytics
-  Paramètres
-```
-
-Each group gets a collapsible `SidebarGroup` with `defaultOpen` for the group containing the active route.
-
----
-
-### D. Geographic Filters on Admin Pages
-
-Add a location hierarchy filter bar (Country > Province > City > Commune > Quartier) as a reusable `<LocationHierarchyFilter />` component. Integrate it into:
-- AdminOrdersPage
-- AdminKycPage
-- AdminVendorSubscriptionsPage
-- AdminUsersPage
-
-The filter cascades: selecting a country loads its provinces, selecting a province loads its cities, etc. Queries append `.eq()` filters accordingly.
-
----
-
-### E. AdminGeographyPage Update
-
-Add a **Provinces** tab alongside Cities, Communes, Quartiers. The Provinces tab allows CRUD operations scoped by country. The Cities tab gets a `province_id` selector.
-
----
-
-## Files Modified/Created
-
-| File | Action |
-|------|--------|
-| `frontend/supabase/migrations/[new].sql` | New migration (all 4 tables + columns) |
-| `/mnt/documents/phase1_migration.sql` | Downloadable SQL for staging/prod |
-| `frontend/src/components/admin/AdminSidebar.tsx` | Reorganize into grouped sections |
-| `frontend/src/components/admin/dashboard/DashboardPeriodSelector.tsx` | Add 24h, 48h, all-time |
-| `frontend/src/components/admin/LocationHierarchyFilter.tsx` | New reusable filter component |
-| `frontend/src/pages/admin/AdminGeographyPage.tsx` | Add Provinces tab, link cities to provinces |
-| `frontend/src/pages/admin/AdminOrdersPage.tsx` | Add location filter |
-| `frontend/src/pages/admin/AdminKycPage.tsx` | Add location filter |
-| `frontend/src/pages/admin/AdminVendorSubscriptionsPage.tsx` | Add location filter |
-| `frontend/src/pages/admin/AdminUsersPage.tsx` | Add location filter |
+After deployment, every reference sent to `https://api.keccel.net/cardpay` will be exactly 25 alphanumeric characters (e.g., `KC8A3F7B1D2E4C6A9F0B3D5E7`), within Keccel's limit.
 
