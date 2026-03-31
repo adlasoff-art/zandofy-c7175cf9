@@ -442,9 +442,9 @@ function QuartiersTab() {
 
   // Load cities (filtered by province)
   useEffect(() => {
-    let q = supabase.from("cities").select("name").eq("country_code", filterCountry).order("name");
+    let q: any = (supabase as any).from("cities").select("name").eq("country_code", filterCountry).order("name");
     if (filterProvince) q = q.eq("province_id", filterProvince);
-    q.then(({ data }) => setCities((data || []).map((d: any) => d.name)));
+    q.then(({ data }: any) => setCities((data || []).map((d: any) => d.name)));
   }, [filterCountry, filterProvince]);
 
   // Load communes (filtered by city)
