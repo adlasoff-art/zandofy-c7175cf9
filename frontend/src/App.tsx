@@ -71,6 +71,7 @@ const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
 const ComparePage = lazy(() => import("./pages/ComparePage"));
 const AccountPage = lazy(() => import("./pages/AccountPage"));
 const PaymentReturnPage = lazy(() => import("./pages/PaymentReturnPage"));
+const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
