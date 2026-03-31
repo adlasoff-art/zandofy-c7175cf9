@@ -8,14 +8,16 @@ import { Users, UserCheck, TrendingUp, Gift } from "lucide-react";
 import { TOOLTIP_STYLE, KpiCardRow } from "./shared";
 import type { PeriodKey } from "./DashboardPeriodSelector";
 import { getPeriodDate } from "./DashboardPeriodSelector";
+import type { GlobalFilters } from "./DashboardGlobalFilters";
 
-interface Props { period: PeriodKey; }
+interface Props { period: PeriodKey; geoFilters?: GlobalFilters; }
 
-export function ClientsTab({ period }: Props) {
-  const sinceDate = getPeriodDate(period);
+export function ClientsTab({ period, geoFilters }: Props) {
+  const sinceDate = getPeriodDate(period) ?? new Date(new Date().getFullYear() - 5, 0, 1);
   const since = sinceDate.toISOString();
+  const country = geoFilters?.country !== "all" ? geoFilters?.country : undefined;
+  const city = geoFilters?.city !== "all" ? geoFilters?.city : undefined;
 
-  // Profiles for registration curve
   const { data: profiles = [] } = useQuery({
     queryKey: ["admin-clients-profiles", period],
     queryFn: async () => {
@@ -24,16 +26,17 @@ export function ClientsTab({ period }: Props) {
     },
   });
 
-  // Orders for top clients
   const { data: orders = [] } = useQuery({
-    queryKey: ["admin-clients-orders", period],
+    queryKey: ["admin-clients-orders", period, country, city],
     queryFn: async () => {
-      const { data } = await supabase.from("orders").select("user_id, total, status").gte("created_at", since);
+      let q = (supabase as any).from("orders").select("user_id, total, status, shipping_country, shipping_city").gte("created_at", since);
+      if (country) q = q.eq("shipping_country", country);
+      if (city) q = q.eq("shipping_city", city);
+      const { data } = await q;
       return data ?? [];
     },
   });
 
-  // Referrals for top referrers
   const { data: referrals = [] } = useQuery({
     queryKey: ["admin-clients-referrals", period],
     queryFn: async () => {
@@ -42,7 +45,6 @@ export function ClientsTab({ period }: Props) {
     },
   });
 
-  // All profiles for name lookup
   const { data: allProfiles = [] } = useQuery({
     queryKey: ["admin-clients-all-profiles"],
     queryFn: async () => {
@@ -53,7 +55,6 @@ export function ClientsTab({ period }: Props) {
 
   const profileMap = new Map(allProfiles.map(p => [p.id, p]));
 
-  // New registrations curve
   const regCurve = (() => {
     const days = eachDayOfInterval({ start: sinceDate, end: new Date() });
     const map: Record<string, { date: string; count: number }> = {};
@@ -68,10 +69,9 @@ export function ClientsTab({ period }: Props) {
     return Object.values(map);
   })();
 
-  // Top 10 clients by spending
   const topClients = (() => {
     const agg: Record<string, number> = {};
-    orders.forEach((o) => {
+    orders.forEach((o: any) => {
       if (o.status !== "cancelled" && o.status !== "returned") {
         agg[o.user_id] = (agg[o.user_id] || 0) + Number(o.total);
       }
@@ -85,12 +85,9 @@ export function ClientsTab({ period }: Props) {
       });
   })();
 
-  // Top 10 referrers
   const topReferrers = (() => {
     const agg: Record<string, number> = {};
-    referrals.forEach((r: any) => {
-      agg[r.referrer_id] = (agg[r.referrer_id] || 0) + 1;
-    });
+    referrals.forEach((r: any) => { agg[r.referrer_id] = (agg[r.referrer_id] || 0) + 1; });
     return Object.entries(agg)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 10)
@@ -100,14 +97,12 @@ export function ClientsTab({ period }: Props) {
       });
   })();
 
-  // KPIs
   const newClients = profiles.length;
-  const buyers = new Set(orders.filter(o => o.status !== "cancelled" && o.status !== "returned").map(o => o.user_id)).size;
+  const buyers = new Set(orders.filter((o: any) => o.status !== "cancelled" && o.status !== "returned").map((o: any) => o.user_id)).size;
   const conversionRate = newClients > 0 ? Math.round((buyers / newClients) * 100) : 0;
 
   return (
     <div className="space-y-6">
-      {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCardRow icon={Users} label="Nouveaux inscrits" value={newClients.toString()} />
         <KpiCardRow icon={UserCheck} label="Acheteurs" value={buyers.toString()} color="text-primary" />
@@ -115,7 +110,6 @@ export function ClientsTab({ period }: Props) {
         <KpiCardRow icon={Gift} label="Parrainages" value={referrals.length.toString()} color="text-amber-500" />
       </div>
 
-      {/* Registration curve */}
       <div className="bg-card border border-border rounded-xl p-4">
         <h2 className="text-sm font-semibold text-foreground mb-4">Nouveaux inscrits par jour</h2>
         <div className="h-[250px]">
@@ -137,7 +131,6 @@ export function ClientsTab({ period }: Props) {
         </div>
       </div>
 
-      {/* Top clients & referrers */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-card border border-border rounded-xl p-4">
           <h2 className="text-sm font-semibold text-foreground mb-4">Top 10 clients par dépenses</h2>

@@ -81,13 +81,13 @@ export default function AdminVendorAccountingPage() {
     },
   });
 
-  // Fetch delivered order items for the period
+  // Fetch delivered order items for the period (all payment methods)
   const { data: orderItems, isLoading } = useQuery({
     queryKey: ["accounting-items", period],
     queryFn: async () => {
-      let q = supabase
+      let q = (supabase as any)
         .from("order_items")
-        .select("id, order_id, product_id, product_name, price, quantity, orders!inner(id, status, store_id, created_at, subtotal, order_ref)")
+        .select("id, order_id, product_id, product_name, price, quantity, orders!inner(id, status, store_id, created_at, subtotal, order_ref, payment_method)")
         .eq("orders.status", "delivered");
 
       if (since) {
@@ -96,6 +96,17 @@ export default function AdminVendorAccountingPage() {
 
       const { data } = await q.limit(5000);
       return data || [];
+    },
+  });
+
+  // Fetch payment transactions for multi-channel breakdown
+  const { data: paymentTxns } = useQuery({
+    queryKey: ["accounting-payment-txns", period],
+    queryFn: async () => {
+      let q = (supabase as any).from("payment_transactions").select("order_id, method, amount, status, payment_type");
+      if (since) q = q.gte("created_at", since);
+      const { data } = await q;
+      return (data || []) as { order_id: string; method: string; amount: number; status: string; payment_type: string }[];
     },
   });
 
@@ -130,6 +141,16 @@ export default function AdminVendorAccountingPage() {
     const walletMap = new Map((wallets || []).map((w: any) => [w.store_id, w]));
     const defaultCommission = Number(globalDefaults?.platform_commission_default) || 10;
 
+    // Build order-to-payment-method map from payment_transactions
+    const orderPaymentMap = new Map<string, Record<string, number>>();
+    (paymentTxns || []).forEach((txn: any) => {
+      if (!txn.order_id || (txn.status !== "success" && txn.status !== "completed")) return;
+      if (!orderPaymentMap.has(txn.order_id)) orderPaymentMap.set(txn.order_id, {});
+      const m = orderPaymentMap.get(txn.order_id)!;
+      const method = txn.method || "unknown";
+      m[method] = (m[method] || 0) + Number(txn.amount);
+    });
+
     // Group items by store
     const storeItemsMap = new Map<string, any[]>();
     for (const item of orderItems as any[]) {
@@ -153,6 +174,7 @@ export default function AdminVendorAccountingPage() {
         let totalCost = 0;
         let totalVendorMargin = 0;
         const productDetails: any[] = [];
+        const revenueByMethod: Record<string, number> = {};
 
         for (const item of items) {
           const product = productMap.get(item.product_id);
@@ -164,6 +186,17 @@ export default function AdminVendorAccountingPage() {
           totalRevenue += revenue;
           totalCost += costReal;
           totalVendorMargin += vendorMargin;
+
+          // Aggregate payment method from order or payment_transactions
+          const orderPayMethod = item.orders?.payment_method || "unknown";
+          const txnMethods = orderPaymentMap.get(item.order_id);
+          if (txnMethods) {
+            Object.entries(txnMethods).forEach(([m, amt]) => {
+              revenueByMethod[m] = (revenueByMethod[m] || 0) + (amt as number) * (revenue / (item.orders?.subtotal || revenue));
+            });
+          } else {
+            revenueByMethod[orderPayMethod] = (revenueByMethod[orderPayMethod] || 0) + revenue;
+          }
 
           productDetails.push({
             productId: item.product_id,
@@ -181,8 +214,8 @@ export default function AdminVendorAccountingPage() {
         const platformCommission = totalRevenue * (commissionRate / 100);
         const platformMargin = totalRevenue - totalCost - totalVendorMargin;
         const netDueVendor = isPlatform
-          ? totalVendorMargin // Platform stores: only bonus
-          : totalRevenue - platformCommission; // Independent: CA - commission
+          ? totalVendorMargin
+          : totalRevenue - platformCommission;
 
         return {
           id: store.id,
@@ -199,10 +232,11 @@ export default function AdminVendorAccountingPage() {
           walletAvailable: wallet?.available_balance || 0,
           walletPending: wallet?.pending_balance || 0,
           productDetails,
+          revenueByMethod,
         };
       })
       .sort((a, b) => b.totalRevenue - a.totalRevenue);
-  }, [stores, orderItems, products, overrides, wallets, globalDefaults, search]);
+  }, [stores, orderItems, products, overrides, wallets, globalDefaults, search, paymentTxns]);
 
   // Top 10 chart data
   const top10Data = useMemo(() => {
@@ -390,39 +424,62 @@ export default function AdminVendorAccountingPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                    {expandedStore === store.id && store.productDetails.length > 0 && (
+                    {expandedStore === store.id && (
                       <TableRow key={`${store.id}-details`}>
                         <TableCell colSpan={9} className="p-0">
-                          <div className="bg-muted/30 px-6 py-3">
-                            <p className="text-xs font-semibold text-muted-foreground mb-2">
-                              Détail produits — {store.name} ({store.productDetails.length} lignes)
-                            </p>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-xs">
-                                <thead>
-                                  <tr className="border-b border-border">
-                                    <th className="text-left py-1 pr-3">Produit</th>
-                                    <th className="text-right py-1 px-2">Qté</th>
-                                    <th className="text-right py-1 px-2">Prix unit.</th>
-                                    <th className="text-right py-1 px-2">Coût unit.</th>
-                                    <th className="text-right py-1 px-2">Bonus unit.</th>
-                                    <th className="text-right py-1 px-2">Total</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {store.productDetails.map((p: any, i: number) => (
-                                    <tr key={i} className="border-b border-border/50">
-                                      <td className="py-1 pr-3 max-w-[200px] truncate">{p.productName}</td>
-                                      <td className="text-right py-1 px-2">{p.quantity}</td>
-                                      <td className="text-right py-1 px-2">${fmt(p.unitPrice)}</td>
-                                      <td className="text-right py-1 px-2">${fmt(p.unitCost)}</td>
-                                      <td className="text-right py-1 px-2">${fmt(p.unitVendorMargin)}</td>
-                                      <td className="text-right py-1 px-2 font-medium">${fmt(p.revenue)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
+                          <div className="bg-muted/30 px-6 py-3 space-y-3">
+                            {/* Revenue by Payment Method */}
+                            {Object.keys(store.revenueByMethod || {}).length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground mb-1.5">Répartition par méthode de paiement</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {Object.entries(store.revenueByMethod).map(([method, amount]) => {
+                                    const labels: Record<string, string> = { mobile_money: "Mobile Money", cod: "Contre remboursement", stripe: "Carte", off_platform: "Hors plateforme", paypal: "PayPal", unknown: "Non spécifié" };
+                                    return (
+                                      <div key={method} className="px-2.5 py-1.5 bg-background border border-border rounded-md text-xs">
+                                        <span className="text-muted-foreground">{labels[method] || method}:</span>{" "}
+                                        <span className="font-semibold">${fmt(amount as number)}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Product Details */}
+                            {store.productDetails.length > 0 && (
+                              <>
+                                <p className="text-xs font-semibold text-muted-foreground mb-2">
+                                  Détail produits — {store.name} ({store.productDetails.length} lignes)
+                                </p>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="border-b border-border">
+                                        <th className="text-left py-1 pr-3">Produit</th>
+                                        <th className="text-right py-1 px-2">Qté</th>
+                                        <th className="text-right py-1 px-2">Prix unit.</th>
+                                        <th className="text-right py-1 px-2">Coût unit.</th>
+                                        <th className="text-right py-1 px-2">Bonus unit.</th>
+                                        <th className="text-right py-1 px-2">Total</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {store.productDetails.map((p: any, i: number) => (
+                                        <tr key={i} className="border-b border-border/50">
+                                          <td className="py-1 pr-3 max-w-[200px] truncate">{p.productName}</td>
+                                          <td className="text-right py-1 px-2">{p.quantity}</td>
+                                          <td className="text-right py-1 px-2">${fmt(p.unitPrice)}</td>
+                                          <td className="text-right py-1 px-2">${fmt(p.unitCost)}</td>
+                                          <td className="text-right py-1 px-2">${fmt(p.unitVendorMargin)}</td>
+                                          <td className="text-right py-1 px-2 font-medium">${fmt(p.revenue)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

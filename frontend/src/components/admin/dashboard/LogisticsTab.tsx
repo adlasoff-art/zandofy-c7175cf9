@@ -2,29 +2,34 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, eachDayOfInterval } from "date-fns";
 import { fr } from "date-fns/locale";
-import { BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Ship, Truck, TrendingUp, Bike } from "lucide-react";
 import { PIE_COLORS, TOOLTIP_STYLE, KpiCardRow } from "./shared";
 import type { PeriodKey } from "./DashboardPeriodSelector";
 import { getPeriodDate } from "./DashboardPeriodSelector";
+import type { GlobalFilters } from "./DashboardGlobalFilters";
 
-interface Props { period: PeriodKey; }
+interface Props { period: PeriodKey; geoFilters?: GlobalFilters; }
 
-export function LogisticsTab({ period }: Props) {
-  const sinceDate = getPeriodDate(period);
+export function LogisticsTab({ period, geoFilters }: Props) {
+  const sinceDate = getPeriodDate(period) ?? new Date(new Date().getFullYear() - 5, 0, 1);
   const since = sinceDate.toISOString();
   const sinceDay = format(sinceDate, "yyyy-MM-dd");
+  const country = geoFilters?.country !== "all" ? geoFilters?.country : undefined;
+  const city = geoFilters?.city !== "all" ? geoFilters?.city : undefined;
 
-  // Deliveries
   const { data: deliveries = [] } = useQuery({
-    queryKey: ["admin-log-deliveries", period],
+    queryKey: ["admin-log-deliveries", period, country, city],
     queryFn: async () => {
-      const { data } = await supabase.from("deliveries").select("delivery_date, status").gte("delivery_date", sinceDay);
+      let q = (supabase as any).from("deliveries").select("delivery_date, status, address").gte("delivery_date", sinceDay);
+      // Filter by address text if geo filters set
+      if (city) q = q.ilike("address", `%${city}%`);
+      else if (country) q = q.ilike("address", `%${country}%`);
+      const { data } = await q;
       return data ?? [];
     },
   });
 
-  // Shipments
   const { data: shipments = [] } = useQuery({
     queryKey: ["admin-log-shipments", period],
     queryFn: async () => {
@@ -33,14 +38,16 @@ export function LogisticsTab({ period }: Props) {
     },
   });
 
-  // Orders pipeline
   const { data: orderPipeline = [] } = useQuery({
-    queryKey: ["admin-log-pipeline", period],
+    queryKey: ["admin-log-pipeline", period, country, city],
     queryFn: async () => {
-      const { data } = await supabase.from("orders").select("status").gte("created_at", since);
+      let q = (supabase as any).from("orders").select("status, shipping_country, shipping_city").gte("created_at", since);
+      if (country) q = q.eq("shipping_country", country);
+      if (city) q = q.eq("shipping_city", city);
+      const { data } = await q;
       if (!data) return [];
       const map: Record<string, number> = {};
-      data.forEach((o) => { map[o.status] = (map[o.status] || 0) + 1; });
+      data.forEach((o: any) => { map[o.status] = (map[o.status] || 0) + 1; });
       const pipelineLabels: Record<string, string> = {
         pending: "Reçue", confirmed: "Confirmée", preparing: "Préparation", in_shipping: "Expédition",
         shipped: "Hub", assigning_rider: "Assign.", rider_assigned: "Livreur", out_for_delivery: "Livraison", delivered: "Livrée",
@@ -50,12 +57,9 @@ export function LogisticsTab({ period }: Props) {
     },
   });
 
-  // KPIs
-  const delivered = deliveries.filter(d => d.status === "delivered").length;
-  const inProgress = deliveries.filter(d => d.status === "in_progress").length;
-  const pending = deliveries.filter(d => d.status === "pending").length;
+  const delivered = deliveries.filter((d: any) => d.status === "delivered").length;
+  const inProgress = deliveries.filter((d: any) => d.status === "in_progress").length;
 
-  // Daily delivery chart
   const dailyDeliveries = (() => {
     const days = eachDayOfInterval({ start: sinceDate, end: new Date() });
     const map: Record<string, { date: string; delivered: number; pending: number; inProgress: number }> = {};
@@ -63,7 +67,7 @@ export function LogisticsTab({ period }: Props) {
       const key = format(d, "yyyy-MM-dd");
       map[key] = { date: format(d, days.length > 60 ? "d/MM" : "d MMM", { locale: fr }), delivered: 0, pending: 0, inProgress: 0 };
     });
-    deliveries.forEach((d) => {
+    deliveries.forEach((d: any) => {
       if (map[d.delivery_date]) {
         if (d.status === "delivered") map[d.delivery_date].delivered++;
         else if (d.status === "in_progress") map[d.delivery_date].inProgress++;
@@ -73,7 +77,6 @@ export function LogisticsTab({ period }: Props) {
     return Object.values(map);
   })();
 
-  // Shipment mode pie
   const modePie = (() => {
     const map: Record<string, number> = {};
     shipments.forEach((s) => { map[s.mode] = (map[s.mode] || 0) + 1; });
@@ -81,7 +84,6 @@ export function LogisticsTab({ period }: Props) {
     return Object.entries(map).map(([name, value]) => ({ name: labels[name] || name, value }));
   })();
 
-  // Shipment status bar
   const statusBar = (() => {
     const map: Record<string, number> = {};
     shipments.forEach((s) => { map[s.status] = (map[s.status] || 0) + 1; });
@@ -91,7 +93,6 @@ export function LogisticsTab({ period }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCardRow icon={Ship} label="Expéditions" value={shipments.length.toString()} />
         <KpiCardRow icon={Truck} label="Livraisons totales" value={deliveries.length.toString()} />
@@ -99,7 +100,6 @@ export function LogisticsTab({ period }: Props) {
         <KpiCardRow icon={Bike} label="En cours" value={inProgress.toString()} color="text-amber-500" />
       </div>
 
-      {/* Pipeline */}
       {orderPipeline.length > 0 && (
         <div className="bg-card border border-border rounded-xl p-4">
           <h2 className="text-sm font-semibold text-foreground mb-4">Pipeline des commandes (par étape)</h2>
@@ -117,7 +117,6 @@ export function LogisticsTab({ period }: Props) {
         </div>
       )}
 
-      {/* Daily deliveries */}
       <div className="bg-card border border-border rounded-xl p-4">
         <h2 className="text-sm font-semibold text-foreground mb-4">Livraisons par jour</h2>
         <div className="h-[250px]">
@@ -136,7 +135,6 @@ export function LogisticsTab({ period }: Props) {
         </div>
       </div>
 
-      {/* Shipment charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-card border border-border rounded-xl p-4">
           <h2 className="text-sm font-semibold text-foreground mb-4">Expéditions par mode</h2>
