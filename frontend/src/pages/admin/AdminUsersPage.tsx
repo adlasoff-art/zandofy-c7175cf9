@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { LocationHierarchyFilter, type LocationFilters } from "@/components/admin/LocationHierarchyFilter";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Search, UserCheck, ShieldCheck, Store, Truck, Bike, Loader2, Download, Ban, Filter, Users, Wifi } from "lucide-react";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
