@@ -295,9 +295,9 @@ function CommunesTab() {
 
   // Load cities (filtered by province if set)
   useEffect(() => {
-    let q = supabase.from("cities").select("name").eq("country_code", filterCountry).order("name");
+    let q: any = (supabase as any).from("cities").select("name").eq("country_code", filterCountry).order("name");
     if (filterProvince) q = q.eq("province_id", filterProvince);
-    q.then(({ data }) => setCities((data || []).map((d: any) => ({ name: d.name }))));
+    q.then(({ data }: any) => setCities((data || []).map((d: any) => ({ name: d.name }))));
   }, [filterCountry, filterProvince]);
 
   const fetch = useCallback(async () => {
