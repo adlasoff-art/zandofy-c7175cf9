@@ -1,41 +1,44 @@
 
 
-# Fix: Keccel CardPay Reference Length (Max 25 Characters)
+# Audit: Keccel CardPay Reference — Still Too Long
 
-## Problem
+## Finding
 
-The **deployed** edge function at `supabase/functions/keccel-cardpay/index.ts` (line 92) generates references like:
-```
-keccel_card_a73e4c42-1504-4d99-a3f8-3d1b70eb0450_1774888637574
-```
-That's ~65 characters. Keccel's Visa gateway rejects anything over **25 characters**, blocking OTP delivery and payment completion.
+The code in **both** files already contains the correct fix:
 
-There is also a duplicate at `frontend/supabase/functions/keccel-cardpay/index.ts` (line 84) with a partial fix that still lacks a hard length cap.
+- `supabase/functions/keccel-cardpay/index.ts` line 92: `KC${crypto.randomUUID()...}` ✅
+- `frontend/supabase/functions/keccel-cardpay/index.ts` line 84: `KC${crypto.randomUUID()...}` ✅
+
+The reference `keccel_card_28cd06cb-7e4d-4caa-8bed-527604b40ed5_1774968197285` uses the **old** format that no longer exists in the current codebase. This means the **deployed** Edge Function hasn't been updated — the old code is still running in production.
 
 ## Root Cause
 
-The reference concatenates `method` + full UUID `order.id` + full timestamp — no truncation applied.
+The fix was committed to the repository but **not redeployed**. The Supabase Edge Function running in production still uses the old code.
 
-## Fix (Both Files)
+## What You Need To Do (Manual Steps)
 
-Replace the reference generation in **both** edge function copies with a deterministic, hard-capped 25-character reference:
+Since the code is correct in GitHub, you need to **redeploy the Edge Function**:
 
-```typescript
-// Exactly 25 chars: "KC" (2) + uuid-based hex (23), sliced to guarantee max
-const visaRef = `KC${crypto.randomUUID().replace(/-/g, "").toUpperCase().slice(0, 23)}`;
-const reference = visaRef; // always exactly 25 chars
+### Option A — Via Supabase Dashboard (Vercel-linked project)
+1. Go to your **Supabase project dashboard** (the one linked to your Vercel deployment, not Lovable Cloud)
+2. Navigate to **Edge Functions**
+3. Find `keccel-cardpay`
+4. Redeploy it, or trigger a new deployment from the linked GitHub repo
+
+### Option B — Via Supabase CLI
+```bash
+supabase functions deploy keccel-cardpay --project-ref YOUR_PROJECT_REF
 ```
+Run this from the `frontend/` directory (where `frontend/supabase/functions/keccel-cardpay/` lives).
 
-This uses `crypto.randomUUID()` (native in Deno), strips dashes, uppercases, and hard-slices to 23 chars after the `KC` prefix = **exactly 25 characters every time**.
-
-## Files to Modify
-
-1. **`supabase/functions/keccel-cardpay/index.ts`** (line 92) — the deployed version
-2. **`frontend/supabase/functions/keccel-cardpay/index.ts`** (line 84) — the frontend copy
-
-Both get the same fix. No migration needed — this is purely edge function logic.
+### Option C — Trigger via Git
+If your Supabase project auto-deploys edge functions from GitHub pushes, make a small commit (e.g., add a comment) to `frontend/supabase/functions/keccel-cardpay/index.ts` and push to the branch that triggers deployment.
 
 ## Verification
 
-After deployment, every reference sent to `https://api.keccel.net/cardpay` will be exactly 25 alphanumeric characters (e.g., `KC8A3F7B1D2E4C6A9F0B3D5E7`), within Keccel's limit.
+After redeployment, test a card payment. The reference in the Keccel API request should look like `KC8A3F7B1D2E4C6A9F0B3D5E7` (exactly 25 characters), not the old `keccel_card_...` format.
+
+## No Code Changes Needed
+
+The fix is already in the codebase. This is purely a deployment issue.
 
