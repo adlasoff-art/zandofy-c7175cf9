@@ -80,13 +80,14 @@ export default function OnboardingPage() {
   // Check KYC status
   useEffect(() => {
     if (!user?.id) return;
-    supabase.from("kyc_verifications").select("id, status").eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => {
-        if (data) setKycExists(true);
-        // Check if KYC is required
-        supabase.rpc("check_kyc_required", { p_user_id: user.id })
-          .then(({ data: needed }) => setKycNeeded(!!needed));
-      });
+    const checkKyc = async () => {
+      const { data } = await (supabase as any).from("kyc_verifications")
+        .select("id, status").eq("user_id", user.id).maybeSingle();
+      if (data) setKycExists(true);
+      const { data: needed } = await (supabase as any).rpc("check_kyc_required", { p_user_id: user.id });
+      setKycNeeded(!!needed);
+    };
+    checkKyc();
   }, [user?.id]);
 
   const stepIndex = STEPS.findIndex((s) => s.key === step);
