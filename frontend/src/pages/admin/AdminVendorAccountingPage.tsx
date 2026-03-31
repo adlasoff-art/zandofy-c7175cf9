@@ -476,8 +476,10 @@ export default function AdminVendorAccountingPage() {
                                         </tr>
                                       ))}
                                     </tbody>
-                              </table>
-                            </div>
+                                  </table>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
