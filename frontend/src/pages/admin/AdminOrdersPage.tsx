@@ -92,6 +92,9 @@ export default function AdminOrdersPage() {
   const filtered = orders.filter((o: any) => {
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
     if (!matchStatus) return false;
+    // Location filters
+    if (locationFilters.country && o.shipping_country !== locationFilters.country) return false;
+    if (locationFilters.city && o.shipping_city !== locationFilters.city) return false;
     if (!search.trim()) return true;
 
     const q = search.toLowerCase().trim();
