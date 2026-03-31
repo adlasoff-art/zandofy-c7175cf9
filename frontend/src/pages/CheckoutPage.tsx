@@ -35,6 +35,7 @@ interface ShippingInfo {
   commune: string;
   city: string;
   province: string;
+  province_id: string;
   country: string;
   postalCode: string;
 }
