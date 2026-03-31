@@ -46,9 +46,13 @@ export function LocationHierarchyFilter({
   // Load cities when province or country changes
   useEffect(() => {
     if (!value.country || !levels.includes("city")) { setCities([]); return; }
-    let q = supabase.from("cities").select("id, name").eq("country_code", value.country).order("name").limit(500);
-    if (value.province) q = q.eq("province_id" as any, value.province);
-    q.then(({ data }) => setCities((data || []).map((d: any) => ({ id: d.name, name: d.name }))));
+    const fetchCities = async () => {
+      let q = supabase.from("cities").select("id, name").eq("country_code", value.country!).order("name").limit(500);
+      if (value.province) q = q.eq("province_id" as any, value.province);
+      const { data } = await q;
+      setCities((data || []).map((d: any) => ({ id: d.name, name: d.name })));
+    };
+    fetchCities();
   }, [value.country, value.province]);
 
   // Load communes when city changes
