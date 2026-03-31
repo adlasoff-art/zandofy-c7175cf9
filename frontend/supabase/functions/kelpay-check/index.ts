@@ -25,6 +25,7 @@ const KELPAY_CHECK_URL = "https://pay.keccel.com/kelpay/v1/checktransaction.asp"
 const KECCEL_CARD_CHECK_URL = "https://pay.keccel.com/kelpay/v1/checktransaction.asp";
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
