@@ -262,6 +262,15 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
+      {/* Location filters */}
+      <div className="mb-4">
+        <LocationHierarchyFilter
+          value={locationFilters}
+          onChange={setLocationFilters}
+          levels={["country", "city"]}
+        />
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
