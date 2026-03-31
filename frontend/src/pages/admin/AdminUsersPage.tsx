@@ -67,6 +67,7 @@ export default function AdminUsersPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const [locationFilters, setLocationFilters] = useState<LocationFilters>({});
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
