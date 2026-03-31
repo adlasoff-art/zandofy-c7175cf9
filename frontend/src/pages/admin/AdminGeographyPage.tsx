@@ -420,6 +420,108 @@ function QuartiersTab() {
   );
 }
 
+// ── Provinces Tab ──
+function ProvincesTab() {
+  const [provinces, setProvinces] = useState<{ id: string; name: string; country_code: string; is_active: boolean }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filterCountry, setFilterCountry] = useState("CD");
+  const [form, setForm] = useState({ name: "", country_code: "CD" });
+  const [editId, setEditId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    const { data } = await (supabase as any).from("provinces").select("*")
+      .eq("country_code", filterCountry).order("name").limit(500);
+    setProvinces((data || []) as any[]);
+    setLoading(false);
+  }, [filterCountry]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  const handleSave = async () => {
+    if (!form.name) { toast.error("Nom requis"); return; }
+    const payload = { name: form.name, country_code: form.country_code };
+    if (editId) {
+      await (supabase as any).from("provinces").update(payload).eq("id", editId);
+    } else {
+      await (supabase as any).from("provinces").insert(payload);
+    }
+    setShowForm(false); setEditId(null);
+    setForm({ name: "", country_code: filterCountry });
+    fetch();
+    toast.success(editId ? "Province modifiée" : "Province ajoutée");
+  };
+
+  const handleEdit = (p: any) => {
+    setForm({ name: p.name, country_code: p.country_code });
+    setEditId(p.id);
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    await (supabase as any).from("provinces").delete().eq("id", id);
+    fetch();
+    toast.success("Province supprimée");
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="w-48">
+          <CountryCombobox value={filterCountry} onChange={setFilterCountry} label="Filtrer par pays" showNone={false} />
+        </div>
+        <Button size="sm" onClick={() => { setShowForm(true); setEditId(null); setForm({ name: "", country_code: filterCountry }); }}>
+          <Plus size={14} className="mr-1" /> Ajouter une province
+        </Button>
+      </div>
+
+      {showForm && (
+        <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+          <div className="flex justify-between items-center">
+            <h4 className="text-sm font-bold">{editId ? "Modifier" : "Nouvelle province"}</h4>
+            <button onClick={() => { setShowForm(false); setEditId(null); }}><X size={16} className="text-muted-foreground" /></button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label className="text-xs">Nom *</Label><Input className="mt-1" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+            <div><CountryCombobox value={form.country_code} onChange={v => setForm(f => ({ ...f, country_code: v }))} label="Pays" showNone={false} /></div>
+          </div>
+          <Button size="sm" onClick={handleSave}><Save size={14} className="mr-1" /> {editId ? "Modifier" : "Ajouter"}</Button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary" size={20} /></div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Province / État</TableHead>
+              <TableHead>Pays</TableHead>
+              <TableHead className="w-20">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {provinces.map(p => (
+              <TableRow key={p.id}>
+                <TableCell className="font-medium">{p.name}</TableCell>
+                <TableCell>{getCountryName(p.country_code)} ({p.country_code})</TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    <button onClick={() => handleEdit(p)} className="p-1 text-muted-foreground hover:text-primary"><Edit2 size={14} /></button>
+                    <button onClick={() => handleDelete(p.id)} className="p-1 text-muted-foreground hover:text-destructive"><Trash2 size={14} /></button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {provinces.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">Aucune province</TableCell></TableRow>}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ──
 const AdminGeographyPage: React.FC = () => {
   return (
@@ -427,15 +529,17 @@ const AdminGeographyPage: React.FC = () => {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2"><Globe size={24} /> Zones géographiques</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gérez les villes, communes/départements et quartiers/blocs par pays</p>
+          <p className="text-sm text-muted-foreground mt-1">Gérez les provinces, villes, communes/départements et quartiers/blocs par pays</p>
         </div>
 
-        <Tabs defaultValue="cities">
+        <Tabs defaultValue="provinces">
           <TabsList>
+            <TabsTrigger value="provinces" className="gap-1.5"><Globe size={14} /> Provinces</TabsTrigger>
             <TabsTrigger value="cities" className="gap-1.5"><Map size={14} /> Villes</TabsTrigger>
             <TabsTrigger value="communes" className="gap-1.5"><Building size={14} /> Communes / Départements</TabsTrigger>
             <TabsTrigger value="quartiers" className="gap-1.5"><MapPin size={14} /> Quartiers / Blocs</TabsTrigger>
           </TabsList>
+          <TabsContent value="provinces"><ProvincesTab /></TabsContent>
           <TabsContent value="cities"><CitiesTab /></TabsContent>
           <TabsContent value="communes"><CommunesTab /></TabsContent>
           <TabsContent value="quartiers"><QuartiersTab /></TabsContent>

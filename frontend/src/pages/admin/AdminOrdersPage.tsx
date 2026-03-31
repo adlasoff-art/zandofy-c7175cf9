@@ -28,6 +28,7 @@ export default function AdminOrdersPage() {
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [adminOrderPage, setAdminOrderPage] = useState(1);
+  const [locationFilters, setLocationFilters] = useState<LocationFilters>({});
   const [adminOrderPageSize, setAdminOrderPageSize] = useState(25);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [logisticsInfo, setLogisticsInfo] = useState<Record<string, { zones: DeliveryZoneMatch[]; usePlatform: boolean; riderAvailable: boolean; riderCount: number } | null>>({});
