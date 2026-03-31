@@ -197,6 +197,10 @@ export default function AdminUsersPage() {
 
   return (
     <AdminLayout title="Gestion des utilisateurs">
+      {/* Location filters */}
+      <div className="mb-4">
+        <LocationHierarchyFilter value={locationFilters} onChange={setLocationFilters} levels={["country", "city"]} />
+      </div>
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
         <div className="bg-card border border-border rounded-xl p-3">
