@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ShieldCheck } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ShieldCheck, Globe } from "lucide-react";
 import { useEffect } from "react";
 import { useI18n } from "@/contexts/I18nContext";
+import { useGeoDetection } from "@/hooks/use-geo-detection";
+import { LegalModal } from "@/components/auth/LegalModal";
 import {
   signInWithGoogle,
   checkRateLimit,
@@ -26,10 +28,12 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [lockoutMsg, setLockoutMsg] = useState<string | null>(null);
+  const [legalModal, setLegalModal] = useState<"privacy" | "terms" | "cookies" | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useI18n();
+  const geo = useGeoDetection();
 
   const searchParams = new URLSearchParams(window.location.search);
   const refCode = searchParams.get("ref") || "";
@@ -43,7 +47,6 @@ export default function AuthPage() {
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Rate-limit check
     const rl = checkRateLimit();
     if (!rl.allowed) {
       const mins = Math.ceil(rl.remainingSeconds / 60);
@@ -55,7 +58,6 @@ export default function AuthPage() {
 
     try {
       if (mode === "signup") {
-        // Enforce password strength
         if (getPasswordStrength(password).score < 3) {
           toast({
             title: "Mot de passe trop faible",
@@ -71,7 +73,13 @@ export default function AuthPage() {
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { first_name: firstName, last_name: lastName, referral_code: refCode },
+            data: {
+              first_name: firstName,
+              last_name: lastName,
+              referral_code: refCode,
+              detected_country: geo.country_code,
+              detected_city: geo.city,
+            },
           },
         });
         if (error) throw error;
@@ -177,6 +185,13 @@ export default function AuthPage() {
               {mode === "signup" && t("auth.signupDesc")}
               {mode === "forgot" && t("auth.forgotDesc")}
             </p>
+            {/* Geo-detection badge */}
+            {!geo.loading && geo.country_name && mode === "signup" && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-xs text-muted-foreground">
+                <Globe size={12} />
+                <span>{geo.country_name}{geo.city ? ` · ${geo.city}` : ""}</span>
+              </div>
+            )}
           </div>
 
           {lockoutMsg && (
@@ -245,7 +260,6 @@ export default function AuthPage() {
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
-                {/* Password strength indicator for signup */}
                 {mode === "signup" && password.length > 0 && pwStrength && (
                   <div className="space-y-1">
                     <div className="flex gap-1 h-1.5">
@@ -263,6 +277,25 @@ export default function AuthPage() {
               <button type="button" onClick={() => setMode("forgot")} className="text-xs text-primary hover:underline">
                 {t("auth.forgotLink")}
               </button>
+            )}
+
+            {/* Legal consent for signup */}
+            {mode === "signup" && (
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                En créant un compte, vous acceptez nos{" "}
+                <button type="button" onClick={() => setLegalModal("terms")} className="text-primary hover:underline font-medium">
+                  Conditions d'utilisation
+                </button>
+                , notre{" "}
+                <button type="button" onClick={() => setLegalModal("privacy")} className="text-primary hover:underline font-medium">
+                  Politique de confidentialité
+                </button>
+                {" "}et notre{" "}
+                <button type="button" onClick={() => setLegalModal("cookies")} className="text-primary hover:underline font-medium">
+                  Politique de cookies
+                </button>
+                .
+              </p>
             )}
 
             <Button type="submit" className="w-full h-12 font-bold" disabled={loading || !!lockoutMsg}>
@@ -287,6 +320,13 @@ export default function AuthPage() {
           </p>
         </div>
       </main>
+
+      {/* Legal modals */}
+      <LegalModal
+        open={legalModal !== null}
+        onOpenChange={(open) => !open && setLegalModal(null)}
+        type={legalModal || "privacy"}
+      />
     </div>
   );
 }
