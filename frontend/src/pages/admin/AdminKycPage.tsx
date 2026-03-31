@@ -83,6 +83,7 @@ export default function AdminKycPage() {
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<KycRow | null>(null);
+  const [locationFilters, setLocationFilters] = useState<LocationFilters>({});
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
 
