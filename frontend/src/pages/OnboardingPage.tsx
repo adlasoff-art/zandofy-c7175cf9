@@ -117,8 +117,8 @@ export default function OnboardingPage() {
 
       if (error) throw error;
 
-      // Also update profile country if empty
-      await supabase.from("profiles").update({ country }).eq("id", user.id);
+      // Update profile with detected country
+      await (supabase as any).from("profiles").update({ country }).eq("id", user.id);
 
       toast.success("Adresse enregistrée !");
       setStep(kycNeeded && !kycExists ? "kyc" : "done");
