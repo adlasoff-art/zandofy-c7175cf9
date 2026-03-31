@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { LocationHierarchyFilter, type LocationFilters } from "@/components/admin/LocationHierarchyFilter";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdminLayout } from "@/components/admin/AdminLayout";
@@ -82,6 +83,7 @@ export default function AdminKycPage() {
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<KycRow | null>(null);
+  const [locationFilters, setLocationFilters] = useState<LocationFilters>({});
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -534,6 +536,7 @@ export default function AdminKycPage() {
   return (
     <AdminLayout title="Vérification KYC">
       <div className="space-y-6">
+        <LocationHierarchyFilter value={locationFilters} onChange={setLocationFilters} levels={["country", "city"]} />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="relative">

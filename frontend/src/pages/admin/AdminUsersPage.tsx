@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { LocationHierarchyFilter, type LocationFilters } from "@/components/admin/LocationHierarchyFilter";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Search, UserCheck, ShieldCheck, Store, Truck, Bike, Loader2, Download, Ban, Filter, Users, Wifi } from "lucide-react";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
@@ -66,6 +67,7 @@ export default function AdminUsersPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const [locationFilters, setLocationFilters] = useState<LocationFilters>({});
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
@@ -195,6 +197,10 @@ export default function AdminUsersPage() {
 
   return (
     <AdminLayout title="Gestion des utilisateurs">
+      {/* Location filters */}
+      <div className="mb-4">
+        <LocationHierarchyFilter value={locationFilters} onChange={setLocationFilters} levels={["country", "city"]} />
+      </div>
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
         <div className="bg-card border border-border rounded-xl p-3">

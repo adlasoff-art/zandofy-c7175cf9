@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { LocationHierarchyFilter, type LocationFilters } from "@/components/admin/LocationHierarchyFilter";
 import { Search, Loader2, ChevronDown, ChevronUp, MapPin, Truck, AlertTriangle, Download, Hash, Bike, DollarSign } from "lucide-react";
 import { useState } from "react";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
@@ -27,6 +28,7 @@ export default function AdminOrdersPage() {
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [adminOrderPage, setAdminOrderPage] = useState(1);
+  const [locationFilters, setLocationFilters] = useState<LocationFilters>({});
   const [adminOrderPageSize, setAdminOrderPageSize] = useState(25);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [logisticsInfo, setLogisticsInfo] = useState<Record<string, { zones: DeliveryZoneMatch[]; usePlatform: boolean; riderAvailable: boolean; riderCount: number } | null>>({});
@@ -90,6 +92,9 @@ export default function AdminOrdersPage() {
   const filtered = orders.filter((o: any) => {
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
     if (!matchStatus) return false;
+    // Location filters
+    if (locationFilters.country && o.shipping_country !== locationFilters.country) return false;
+    if (locationFilters.city && o.shipping_city !== locationFilters.city) return false;
     if (!search.trim()) return true;
 
     const q = search.toLowerCase().trim();
@@ -256,6 +261,15 @@ export default function AdminOrdersPage() {
           })}
         </div>
       )}
+
+      {/* Location filters */}
+      <div className="mb-4">
+        <LocationHierarchyFilter
+          value={locationFilters}
+          onChange={setLocationFilters}
+          levels={["country", "city"]}
+        />
+      </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1">
