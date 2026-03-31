@@ -424,37 +424,58 @@ export default function AdminVendorAccountingPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                    {expandedStore === store.id && store.productDetails.length > 0 && (
+                    {expandedStore === store.id && (
                       <TableRow key={`${store.id}-details`}>
                         <TableCell colSpan={9} className="p-0">
-                          <div className="bg-muted/30 px-6 py-3">
-                            <p className="text-xs font-semibold text-muted-foreground mb-2">
-                              Détail produits — {store.name} ({store.productDetails.length} lignes)
-                            </p>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-xs">
-                                <thead>
-                                  <tr className="border-b border-border">
-                                    <th className="text-left py-1 pr-3">Produit</th>
-                                    <th className="text-right py-1 px-2">Qté</th>
-                                    <th className="text-right py-1 px-2">Prix unit.</th>
-                                    <th className="text-right py-1 px-2">Coût unit.</th>
-                                    <th className="text-right py-1 px-2">Bonus unit.</th>
-                                    <th className="text-right py-1 px-2">Total</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {store.productDetails.map((p: any, i: number) => (
-                                    <tr key={i} className="border-b border-border/50">
-                                      <td className="py-1 pr-3 max-w-[200px] truncate">{p.productName}</td>
-                                      <td className="text-right py-1 px-2">{p.quantity}</td>
-                                      <td className="text-right py-1 px-2">${fmt(p.unitPrice)}</td>
-                                      <td className="text-right py-1 px-2">${fmt(p.unitCost)}</td>
-                                      <td className="text-right py-1 px-2">${fmt(p.unitVendorMargin)}</td>
-                                      <td className="text-right py-1 px-2 font-medium">${fmt(p.revenue)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
+                          <div className="bg-muted/30 px-6 py-3 space-y-3">
+                            {/* Revenue by Payment Method */}
+                            {Object.keys(store.revenueByMethod || {}).length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground mb-1.5">Répartition par méthode de paiement</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {Object.entries(store.revenueByMethod).map(([method, amount]) => {
+                                    const labels: Record<string, string> = { mobile_money: "Mobile Money", cod: "Contre remboursement", stripe: "Carte", off_platform: "Hors plateforme", paypal: "PayPal", unknown: "Non spécifié" };
+                                    return (
+                                      <div key={method} className="px-2.5 py-1.5 bg-background border border-border rounded-md text-xs">
+                                        <span className="text-muted-foreground">{labels[method] || method}:</span>{" "}
+                                        <span className="font-semibold">${fmt(amount as number)}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Product Details */}
+                            {store.productDetails.length > 0 && (
+                              <>
+                                <p className="text-xs font-semibold text-muted-foreground mb-2">
+                                  Détail produits — {store.name} ({store.productDetails.length} lignes)
+                                </p>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="border-b border-border">
+                                        <th className="text-left py-1 pr-3">Produit</th>
+                                        <th className="text-right py-1 px-2">Qté</th>
+                                        <th className="text-right py-1 px-2">Prix unit.</th>
+                                        <th className="text-right py-1 px-2">Coût unit.</th>
+                                        <th className="text-right py-1 px-2">Bonus unit.</th>
+                                        <th className="text-right py-1 px-2">Total</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {store.productDetails.map((p: any, i: number) => (
+                                        <tr key={i} className="border-b border-border/50">
+                                          <td className="py-1 pr-3 max-w-[200px] truncate">{p.productName}</td>
+                                          <td className="text-right py-1 px-2">{p.quantity}</td>
+                                          <td className="text-right py-1 px-2">${fmt(p.unitPrice)}</td>
+                                          <td className="text-right py-1 px-2">${fmt(p.unitCost)}</td>
+                                          <td className="text-right py-1 px-2">${fmt(p.unitVendorMargin)}</td>
+                                          <td className="text-right py-1 px-2 font-medium">${fmt(p.revenue)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
                               </table>
                             </div>
                           </div>
