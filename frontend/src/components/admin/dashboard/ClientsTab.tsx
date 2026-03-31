@@ -12,7 +12,7 @@ import { getPeriodDate } from "./DashboardPeriodSelector";
 interface Props { period: PeriodKey; }
 
 export function ClientsTab({ period }: Props) {
-  const sinceDate = getPeriodDate(period);
+  const sinceDate = getPeriodDate(period) ?? new Date(new Date().getFullYear() - 5, 0, 1);
   const since = sinceDate.toISOString();
 
   // Profiles for registration curve

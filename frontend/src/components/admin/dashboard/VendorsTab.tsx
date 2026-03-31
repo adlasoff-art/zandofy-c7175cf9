@@ -10,7 +10,8 @@ import { getPeriodDate } from "./DashboardPeriodSelector";
 interface Props { period: PeriodKey; }
 
 export function VendorsTab({ period }: Props) {
-  const since = getPeriodDate(period).toISOString();
+  const sinceDate = getPeriodDate(period);
+  const since = sinceDate?.toISOString() ?? new Date(0).toISOString();
 
   // Fetch orders with store info
   const { data: vendorData } = useQuery({

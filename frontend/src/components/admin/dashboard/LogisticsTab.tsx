@@ -11,7 +11,7 @@ import { getPeriodDate } from "./DashboardPeriodSelector";
 interface Props { period: PeriodKey; }
 
 export function LogisticsTab({ period }: Props) {
-  const sinceDate = getPeriodDate(period);
+  const sinceDate = getPeriodDate(period) ?? new Date(new Date().getFullYear() - 5, 0, 1);
   const since = sinceDate.toISOString();
   const sinceDay = format(sinceDate, "yyyy-MM-dd");
 
