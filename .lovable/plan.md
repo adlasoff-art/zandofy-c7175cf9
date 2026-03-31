@@ -1,44 +1,45 @@
 
 
-# Audit: Keccel CardPay Reference — Still Too Long
+# Fix: GitHub Actions Edge Function Deployment Failure
 
-## Finding
+## Problem Identified
 
-The code in **both** files already contains the correct fix:
+Your GitHub Actions workflow fails at the **deploy step** (`exit code 1`) every time. The Node.js 20 message is just a warning — it's not the cause.
 
-- `supabase/functions/keccel-cardpay/index.ts` line 92: `KC${crypto.randomUUID()...}` ✅
-- `frontend/supabase/functions/keccel-cardpay/index.ts` line 84: `KC${crypto.randomUUID()...}` ✅
+The **real cause** is a mismatch in `frontend/supabase/config.toml`: it declares a function `[functions.verify-confirmation-code]` (line 51-52), but **no directory `frontend/supabase/functions/verify-confirmation-code/` exists**. When `supabase functions deploy` runs, it tries to deploy all functions listed in config.toml, finds a missing one, and crashes with exit code 1 — blocking **all** deployments (including `keccel-cardpay`).
 
-The reference `keccel_card_28cd06cb-7e4d-4caa-8bed-527604b40ed5_1774968197285` uses the **old** format that no longer exists in the current codebase. This means the **deployed** Edge Function hasn't been updated — the old code is still running in production.
+Additionally, the function `ai-recommendations` exists as a directory but has no config entry in `config.toml` — it won't deploy but won't cause a crash either.
 
-## Root Cause
+## Fix (2 changes)
 
-The fix was committed to the repository but **not redeployed**. The Supabase Edge Function running in production still uses the old code.
+### 1. Remove phantom function from config.toml
 
-## What You Need To Do (Manual Steps)
-
-Since the code is correct in GitHub, you need to **redeploy the Edge Function**:
-
-### Option A — Via Supabase Dashboard (Vercel-linked project)
-1. Go to your **Supabase project dashboard** (the one linked to your Vercel deployment, not Lovable Cloud)
-2. Navigate to **Edge Functions**
-3. Find `keccel-cardpay`
-4. Redeploy it, or trigger a new deployment from the linked GitHub repo
-
-### Option B — Via Supabase CLI
-```bash
-supabase functions deploy keccel-cardpay --project-ref YOUR_PROJECT_REF
+Remove lines 51-52 from `frontend/supabase/config.toml`:
+```toml
+# DELETE these two lines:
+[functions.verify-confirmation-code]
+verify_jwt = false
 ```
-Run this from the `frontend/` directory (where `frontend/supabase/functions/keccel-cardpay/` lives).
 
-### Option C — Trigger via Git
-If your Supabase project auto-deploys edge functions from GitHub pushes, make a small commit (e.g., add a comment) to `frontend/supabase/functions/keccel-cardpay/index.ts` and push to the branch that triggers deployment.
+### 2. Add missing config entries
 
-## Verification
+Add config blocks for functions that exist as directories but aren't in config.toml:
 
-After redeployment, test a card payment. The reference in the Keccel API request should look like `KC8A3F7B1D2E4C6A9F0B3D5E7` (exactly 25 characters), not the old `keccel_card_...` format.
+```toml
+[functions.keccel-cardpay]
+verify_jwt = false
 
-## No Code Changes Needed
+[functions.ai-recommendations]
+verify_jwt = false
+```
 
-The fix is already in the codebase. This is purely a deployment issue.
+## Result
+
+After these changes are pushed to GitHub, the workflow will:
+- Link to your Supabase project successfully (assuming `SUPABASE_PROJECT_ID` and `SUPABASE_ACCESS_TOKEN` secrets are correct in GitHub)
+- Deploy **all 18 edge functions** including `keccel-cardpay` with the fixed 25-char reference
+
+## Files to Modify
+
+- `frontend/supabase/config.toml` — remove `verify-confirmation-code` block, add `keccel-cardpay` and `ai-recommendations` blocks
 
