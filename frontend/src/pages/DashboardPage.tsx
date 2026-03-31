@@ -1921,32 +1921,51 @@ function AddressesTab({ userId }: { userId: string }) {
       return;
     }
     setSaving(true);
-    const payload = { ...form, postal_code: form.postal_code || null, commune: form.commune || null, quartier: form.quartier || null, province: form.province || null };
+    // Exclude province_id from DB payload (used only for cascading UI)
+    const { province_id, ...rest } = form;
+    const payload = { ...rest, postal_code: rest.postal_code || null, commune: rest.commune || null, quartier: rest.quartier || null, province: rest.province || null };
+    let error: any = null;
     if (editId) {
-      await supabase.from("saved_addresses").update(payload as any).eq("id", editId);
+      const res = await supabase.from("saved_addresses").update(payload as any).eq("id", editId);
+      error = res.error;
     } else {
-      await supabase.from("saved_addresses").insert({
+      const res = await supabase.from("saved_addresses").insert({
         user_id: userId,
         ...payload,
         is_default: addresses.length === 0,
       } as any);
+      error = res.error;
     }
     setSaving(false);
+    if (error) {
+      console.error("[AddressesTab] save error:", error);
+      toast({ title: "Erreur", description: "Impossible d'enregistrer l'adresse. Réessayez.", variant: "destructive" });
+      return;
+    }
     resetForm();
-    fetchAddresses();
+    await fetchAddresses();
     toast({ title: editId ? "Adresse modifiée !" : "Adresse ajoutée !" });
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("saved_addresses").delete().eq("id", id);
-    fetchAddresses();
+    const addr = addresses.find(a => a.id === id);
+    if (addr && (addr as any).is_first_address) {
+      toast({ title: "Action impossible", description: "Votre première adresse ne peut pas être supprimée, uniquement modifiée.", variant: "destructive" });
+      return;
+    }
+    const { error } = await supabase.from("saved_addresses").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Erreur", description: "Impossible de supprimer cette adresse.", variant: "destructive" });
+      return;
+    }
+    await fetchAddresses();
     toast({ title: "Adresse supprimée" });
   };
 
   const handleSetDefault = async (id: string) => {
-    await supabase.from("saved_addresses").update({ is_default: false }).eq("user_id", userId);
-    await supabase.from("saved_addresses").update({ is_default: true }).eq("id", id);
-    fetchAddresses();
+    // Trigger handles unsetting other defaults automatically
+    await supabase.from("saved_addresses").update({ is_default: true } as any).eq("id", id);
+    await fetchAddresses();
     toast({ title: "Adresse par défaut mise à jour" });
   };
 
