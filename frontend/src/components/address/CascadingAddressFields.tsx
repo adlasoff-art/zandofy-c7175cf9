@@ -2,7 +2,7 @@
  * Cascading address fields that pull from admin-managed geographic data.
  * Order: Pays → Province → Ville → Commune → Quartier → Adresse manuelle
  */
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
@@ -27,17 +27,27 @@ interface CascadingAddressFieldsProps {
 }
 
 export function CascadingAddressFields({ data, onChange, showPostalCode = true }: CascadingAddressFieldsProps) {
+  // Track commune UUID internally for quartier lookup
+  const [communeUuid, setCommuneUuid] = useState("");
+
   const { provinces, cities, communes, quartiers } = useGeoData(
     data.country,
     data.province_id,
     data.city,
-    data.commune
+    communeUuid
   );
 
-  // Reset dependent fields when parent changes
+  // When commune name changes externally (e.g. loading saved address), resolve UUID
   useEffect(() => {
-    // When country changes, reset province and below
-  }, [data.country]);
+    if (data.commune && communes.length > 0) {
+      const match = communes.find(c => c.label === data.commune || c.value === data.commune);
+      if (match?.id && match.id !== communeUuid) {
+        setCommuneUuid(match.id);
+      }
+    } else if (!data.commune) {
+      setCommuneUuid("");
+    }
+  }, [data.commune, communes]);
 
   const handleCountryChange = (v: string) => {
     onChange("country", v);
@@ -46,6 +56,7 @@ export function CascadingAddressFields({ data, onChange, showPostalCode = true }
     onChange("city", "");
     onChange("commune", "");
     onChange("quartier", "");
+    setCommuneUuid("");
   };
 
   const handleProvinceChange = (v: string) => {
@@ -55,17 +66,22 @@ export function CascadingAddressFields({ data, onChange, showPostalCode = true }
     onChange("city", "");
     onChange("commune", "");
     onChange("quartier", "");
+    setCommuneUuid("");
   };
 
   const handleCityChange = (v: string) => {
     onChange("city", v);
     onChange("commune", "");
     onChange("quartier", "");
+    setCommuneUuid("");
   };
 
   const handleCommuneChange = (v: string) => {
     onChange("commune", v);
     onChange("quartier", "");
+    // Resolve commune UUID from the fetched list
+    const match = communes.find(c => c.value === v);
+    setCommuneUuid(match?.id || "");
   };
 
   return (
@@ -115,7 +131,7 @@ export function CascadingAddressFields({ data, onChange, showPostalCode = true }
           onChange={(v) => onChange("quartier", v)}
           label="Quartier / Bloc"
           placeholder="Quartier..."
-          disabled={!data.commune || quartiers.length === 0}
+          disabled={!communeUuid || quartiers.length === 0}
         />
       </div>
 
