@@ -81,13 +81,13 @@ export default function AdminVendorAccountingPage() {
     },
   });
 
-  // Fetch delivered order items for the period
+  // Fetch delivered order items for the period (all payment methods)
   const { data: orderItems, isLoading } = useQuery({
     queryKey: ["accounting-items", period],
     queryFn: async () => {
-      let q = supabase
+      let q = (supabase as any)
         .from("order_items")
-        .select("id, order_id, product_id, product_name, price, quantity, orders!inner(id, status, store_id, created_at, subtotal, order_ref)")
+        .select("id, order_id, product_id, product_name, price, quantity, orders!inner(id, status, store_id, created_at, subtotal, order_ref, payment_method)")
         .eq("orders.status", "delivered");
 
       if (since) {
@@ -96,6 +96,17 @@ export default function AdminVendorAccountingPage() {
 
       const { data } = await q.limit(5000);
       return data || [];
+    },
+  });
+
+  // Fetch payment transactions for multi-channel breakdown
+  const { data: paymentTxns } = useQuery({
+    queryKey: ["accounting-payment-txns", period],
+    queryFn: async () => {
+      let q = (supabase as any).from("payment_transactions").select("order_id, method, amount, status, payment_type");
+      if (since) q = q.gte("created_at", since);
+      const { data } = await q;
+      return (data || []) as { order_id: string; method: string; amount: number; status: string; payment_type: string }[];
     },
   });
 
