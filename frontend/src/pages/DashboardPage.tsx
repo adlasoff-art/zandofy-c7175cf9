@@ -56,6 +56,7 @@ import { useCertification } from "@/hooks/use-certification";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { Switch } from "@/components/ui/switch";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
+import { CascadingAddressFields, type AddressData } from "@/components/address/CascadingAddressFields";
 
 const TABS = [
   { key: "overview", label: "Aperçu", icon: Package },
