@@ -71,6 +71,7 @@ const BlogPostPage = lazy(() => import("./pages/BlogPostPage"));
 const ComparePage = lazy(() => import("./pages/ComparePage"));
 const AccountPage = lazy(() => import("./pages/AccountPage"));
 const PaymentReturnPage = lazy(() => import("./pages/PaymentReturnPage"));
+const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -175,6 +176,7 @@ const App = () => (
                 <Route path="/store/:id" element={<StorePage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/onboarding" element={<OnboardingPage />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
                 <Route path="/payment/return" element={<PaymentReturnPage />} />
                 <Route path="/account" element={<AccountPage />} />
