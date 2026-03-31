@@ -46,7 +46,7 @@ export function VendorsTab({ period, geoFilters }: Props) {
 
       const entries = Object.entries(agg).map(([id, d]) => {
         const store = storeMap.get(id);
-        const wallet = walletMap.get(id);
+        const wallet = walletMap.get(id) as any;
         return {
           id, name: store?.name || "Boutique inconnue",
           revenue: Math.round(d.revenue), count: d.count,
