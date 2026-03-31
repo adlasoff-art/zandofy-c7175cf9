@@ -100,25 +100,23 @@ export default function OnboardingPage() {
     }
     setSaving(true);
     try {
-      const communeName = communes.find((c) => c.id === commune)?.name || "";
-      const quartierName = quartiers.find((q) => q.id === quartier)?.name || "";
+      // Get user's name from profile
+      const { data: profile } = await supabase.from("profiles")
+        .select("first_name, last_name").eq("id", user.id).maybeSingle();
 
-      const { error } = await (supabase as any).from("delivery_addresses").insert({
+      const { error } = await supabase.from("saved_addresses").insert({
         user_id: user.id,
         label: addressLabel,
         country,
         city,
-        commune: communeName,
-        quartier: quartierName,
         address,
         phone,
+        first_name: profile?.first_name || "—",
+        last_name: profile?.last_name || "—",
         is_default: true,
       });
 
       if (error) throw error;
-
-      // Update profile with detected country
-      await (supabase as any).from("profiles").update({ country }).eq("id", user.id);
 
       toast.success("Adresse enregistrée !");
       setStep(kycNeeded && !kycExists ? "kyc" : "done");
