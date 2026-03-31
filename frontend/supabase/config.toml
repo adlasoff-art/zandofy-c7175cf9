@@ -1,13 +1,13 @@
 project_id = "uogkklwfvwoxkifpkzpu"
 
 [functions.send-email]
-verify_jwt = false
+verify_jwt = true
 
 [functions.notify-order-status]
 verify_jwt = false
 
 [functions.admin-users]
-verify_jwt = false
+verify_jwt = true
 
 [functions.notify-expiring-points]
 verify_jwt = false
@@ -34,16 +34,16 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.push-notifications]
-verify_jwt = false
+verify_jwt = true
 
 [functions.visual-search]
 verify_jwt = false
 
 [functions.impersonate-user]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-user-analysis]
-verify_jwt = false
+verify_jwt = true
 
 [functions.expire-pending-orders]
 verify_jwt = false
@@ -52,4 +52,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.ai-recommendations]
-verify_jwt = false
+verify_jwt = true

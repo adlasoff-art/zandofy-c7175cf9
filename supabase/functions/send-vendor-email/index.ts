@@ -6,10 +6,26 @@ const SMTP_USER = Deno.env.get("SMTP_USER")!;
 const SMTP_PASS = Deno.env.get("SMTP_PASS")!;
 const SMTP_FROM = Deno.env.get("SMTP_FROM_EMAIL") || "noreply@zandofy.com";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_HEADERS =
+  "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowed = [
+    "https://studio.zandofy.com",
+    "https://zandofy.com",
+    "https://www.zandofy.com",
+  ];
+  const isAllowed =
+    allowed.includes(origin) ||
+    origin.endsWith(".lovable.app") ||
+    origin.endsWith(".lovableproject.com") ||
+    origin.startsWith("http://localhost");
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowed[0],
+    "Access-Control-Allow-Headers": ALLOWED_HEADERS,
+  };
+}
 
 async function sendEmail(to: string, subject: string, html: string) {
   // Use SMTP via fetch to a mail relay, or construct raw SMTP
@@ -40,6 +56,7 @@ async function sendEmail(to: string, subject: string, html: string) {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

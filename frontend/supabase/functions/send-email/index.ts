@@ -4,11 +4,19 @@ const ALLOWED_HEADERS =
   "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
 
 function getCorsHeaders(req: Request) {
-  const siteBase = Deno.env.get("SITE_BASE_URL") || "*";
   const origin = req.headers.get("Origin") || "";
-  const allowed = siteBase === "*" || origin === siteBase;
+  const allowed = [
+    "https://studio.zandofy.com",
+    "https://zandofy.com",
+    "https://www.zandofy.com",
+  ];
+  const isAllowed =
+    allowed.includes(origin) ||
+    origin.endsWith(".lovable.app") ||
+    origin.endsWith(".lovableproject.com") ||
+    origin.startsWith("http://localhost");
   return {
-    "Access-Control-Allow-Origin": allowed ? origin || "*" : siteBase,
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowed[0],
     "Access-Control-Allow-Headers": ALLOWED_HEADERS,
   };
 }
