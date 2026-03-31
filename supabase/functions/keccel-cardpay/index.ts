@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const reference = `keccel_${method}_${order.id}_${Date.now()}`;
+    const reference = `KC${crypto.randomUUID().replace(/-/g, "").toUpperCase().slice(0, 23)}`;
     const returnUrl = `${siteBaseUrl}/payment/return?ref=${encodeURIComponent(reference)}&order_id=${order.id}`;
     const callbackUrl = `${supabaseUrl}/functions/v1/kelpay-webhook`;
 
