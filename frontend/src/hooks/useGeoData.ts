@@ -10,6 +10,10 @@ interface GeoOption {
   label: string;
 }
 
+interface GeoOptionWithId extends GeoOption {
+  id?: string; // underlying UUID when value is a name
+}
+
 interface UseGeoDataReturn {
   provinces: GeoOption[];
   cities: GeoOption[];
