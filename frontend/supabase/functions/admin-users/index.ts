@@ -4,23 +4,31 @@ const ALLOWED_HEADERS =
   "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
 
 function getCorsHeaders(req: Request) {
-  const siteBase = Deno.env.get("SITE_BASE_URL") || "*";
   const origin = req.headers.get("Origin") || "";
-  const allowed = siteBase === "*" || origin === siteBase;
+  const allowed = [
+    "https://studio.zandofy.com",
+    "https://zandofy.com",
+    "https://www.zandofy.com",
+  ];
+  const isAllowed =
+    allowed.includes(origin) ||
+    origin.endsWith(".lovable.app") ||
+    origin.endsWith(".lovableproject.com") ||
+    origin.startsWith("http://localhost");
   return {
-    "Access-Control-Allow-Origin": allowed ? origin || "*" : siteBase,
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowed[0],
     "Access-Control-Allow-Headers": ALLOWED_HEADERS,
   };
 }
 
-const jsonResponse = (body: Record<string, unknown>, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
+
+  const jsonResponse = (body: Record<string, unknown>, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
 
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -77,13 +85,11 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: linkErr.message }, 500);
         }
 
-        // Build the redirect URL from the generated link
         const actionLink = linkData?.properties?.action_link;
         if (!actionLink) {
           return jsonResponse({ error: "Could not generate recovery link" }, 500);
         }
 
-        // Send the email via SMTP (same as send-email function)
         const smtpHost = Deno.env.get("SMTP_HOST");
         const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "465");
         const smtpUser = Deno.env.get("SMTP_USER");
@@ -99,10 +105,7 @@ Deno.serve(async (req) => {
           host: smtpHost,
           port: smtpPort,
           secure: smtpPort === 465,
-          auth: {
-            user: smtpUser,
-            pass: smtpPass,
-          },
+          auth: { user: smtpUser, pass: smtpPass },
         });
 
         const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "noreply@zandofy.com";
@@ -135,14 +138,12 @@ Deno.serve(async (req) => {
 
       case "ban_user": {
         const { reason } = params;
-        // Disable auth account
         const { error: banErr } = await adminClient.auth.admin.updateUserById(userId, {
-          ban_duration: "876600h", // ~100 years
+          ban_duration: "876600h",
         });
         if (banErr) {
           return jsonResponse({ error: banErr.message }, 500);
         }
-        // Update profile
         await adminClient.from("profiles").update({
           is_banned: true,
           ban_reason: reason || "Violation des conditions d'utilisation",
@@ -154,14 +155,12 @@ Deno.serve(async (req) => {
       }
 
       case "unban_user": {
-        // Re-enable auth account
         const { error: unbanErr } = await adminClient.auth.admin.updateUserById(userId, {
           ban_duration: "none",
         });
         if (unbanErr) {
           return jsonResponse({ error: unbanErr.message }, 500);
         }
-        // Update profile
         await adminClient.from("profiles").update({
           is_banned: false,
           ban_reason: null,
@@ -173,7 +172,6 @@ Deno.serve(async (req) => {
       }
 
       case "get_user_details": {
-        // Get auth user details (last sign in, created at, etc.)
         const { data: authUser, error: authErr } = await adminClient.auth.admin.getUserById(userId);
         if (authErr) {
           return jsonResponse({ error: authErr.message }, 500);

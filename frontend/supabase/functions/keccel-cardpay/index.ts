@@ -1,22 +1,38 @@
-// Keccel CardPay — reference capped at 25 chars for Visa compatibility (deployed 2026-03-31)
+// Keccel CardPay — reference capped at 25 chars for Visa compatibility
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_HEADERS =
+  "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
 
-const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
-
-function errorResponse(error: string, details?: any) {
-  return new Response(
-    JSON.stringify({ success: false, error, ...(details ? { details } : {}) }),
-    { status: 200, headers: jsonHeaders }
-  );
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowed = [
+    "https://studio.zandofy.com",
+    "https://zandofy.com",
+    "https://www.zandofy.com",
+  ];
+  const isAllowed =
+    allowed.includes(origin) ||
+    origin.endsWith(".lovable.app") ||
+    origin.endsWith(".lovableproject.com") ||
+    origin.startsWith("http://localhost");
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowed[0],
+    "Access-Control-Allow-Headers": ALLOWED_HEADERS,
+  };
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
+  function errorResponse(error: string, details?: any) {
+    return new Response(
+      JSON.stringify({ success: false, error, ...(details ? { details } : {}) }),
+      { status: 200, headers: jsonHeaders }
+    );
+  }
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -24,9 +40,14 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const siteBaseUrl = Deno.env.get("SITE_BASE_URL") || "https://studio.zandofy.com";
+    const siteBaseUrl = Deno.env.get("SITE_BASE_URL");
     const keccelToken = Deno.env.get("KELPAY_TOKEN");
     const keccelMerchantCode = Deno.env.get("KECCEL_CARD_MERCHANT_CODE") || "jam";
+
+    if (!siteBaseUrl) {
+      console.error("SITE_BASE_URL is not configured");
+      return errorResponse("Configuration serveur incomplète (SITE_BASE_URL)");
+    }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
@@ -49,7 +70,7 @@ Deno.serve(async (req) => {
       return errorResponse("order_id requis");
     }
 
-    const method = payment_method || "card"; // card or paypal
+    const method = payment_method || "card";
 
     // Fetch order
     const { data: order, error: orderError } = await supabase
@@ -81,12 +102,11 @@ Deno.serve(async (req) => {
       return errorResponse("Montant invalide");
     }
 
-    // Max 25 chars for Keccel compatibility: "KC-" (3) + base36 timestamp (8) + "-" (1) + random (13) = 25 chars
+    // Max 25 chars for Keccel compatibility
     const reference = `KC${crypto.randomUUID().replace(/-/g, "").toUpperCase().slice(0, 23)}`;
     const returnUrl = `${siteBaseUrl}/payment/return?ref=${encodeURIComponent(reference)}&order_id=${order.id}`;
     const callbackUrl = `${supabaseUrl}/functions/v1/kelpay-webhook`;
 
-    // Payload conforme à la doc officielle Keccel CardPay API
     const keccelPayload = {
       merchantcode: keccelMerchantCode,
       reference: reference,
@@ -113,7 +133,6 @@ Deno.serve(async (req) => {
       keccelResponse = await resp.json();
       console.log("Keccel cardpay response:", JSON.stringify(keccelResponse));
 
-      // Vérifier code === "0" (succès selon la doc)
       if (String(keccelResponse?.code) !== "0") {
         console.error("Keccel API returned error:", keccelResponse);
         return errorResponse(
@@ -122,7 +141,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // checkoutUrl est le champ de redirection selon la doc officielle
       redirectUrl = keccelResponse?.checkoutUrl || null;
     } catch (apiError) {
       console.error("Keccel API error:", apiError);
@@ -174,6 +192,9 @@ Deno.serve(async (req) => {
     );
   } catch (error) {
     console.error("keccel-cardpay error:", error);
-    return errorResponse("Erreur serveur");
+    return new Response(
+      JSON.stringify({ success: false, error: "Erreur serveur" }),
+      { status: 200, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+    );
   }
 });

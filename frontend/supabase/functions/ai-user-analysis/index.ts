@@ -1,12 +1,29 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_HEADERS =
+  "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowed = [
+    "https://studio.zandofy.com",
+    "https://zandofy.com",
+    "https://www.zandofy.com",
+  ];
+  const isAllowed =
+    allowed.includes(origin) ||
+    origin.endsWith(".lovable.app") ||
+    origin.endsWith(".lovableproject.com") ||
+    origin.startsWith("http://localhost");
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowed[0],
+    "Access-Control-Allow-Headers": ALLOWED_HEADERS,
+  };
+}
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -175,7 +192,6 @@ ${activities.slice(0, 20).map((a: any) => `- ${a.action} @ ${a.created_at}`).joi
         });
       }
 
-      // Fallback to stats only
       return new Response(JSON.stringify({
         analysis_type: "stats_only",
         stats: {
@@ -217,7 +233,7 @@ ${activities.slice(0, 20).map((a: any) => `- ${a.action} @ ${a.created_at}`).joi
     console.error("ai-user-analysis error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });
