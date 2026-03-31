@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DashboardPeriodSelector, type PeriodKey } from "@/components/admin/dashboard/DashboardPeriodSelector";
+import { DashboardGlobalFilters, type GlobalFilters } from "@/components/admin/dashboard/DashboardGlobalFilters";
 import { OverviewTab } from "@/components/admin/dashboard/OverviewTab";
 import { SalesTab } from "@/components/admin/dashboard/SalesTab";
 import { LogisticsTab } from "@/components/admin/dashboard/LogisticsTab";
@@ -13,6 +14,7 @@ import { LayoutDashboard, BarChart3, Truck, Store, Users } from "lucide-react";
 
 export default function AdminDashboard() {
   const [period, setPeriod] = useState<PeriodKey>("30d");
+  const [geoFilters, setGeoFilters] = useState<GlobalFilters>({ country: "all", city: "all" });
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -49,14 +51,17 @@ export default function AdminDashboard() {
                 <Users size={14} /> Clients & Parrainage
               </TabsTrigger>
             </TabsList>
-            <DashboardPeriodSelector value={period} onChange={setPeriod} />
+            <div className="flex items-center gap-3 flex-wrap">
+              <DashboardGlobalFilters value={geoFilters} onChange={setGeoFilters} />
+              <DashboardPeriodSelector value={period} onChange={setPeriod} />
+            </div>
           </div>
 
-          <TabsContent value="overview"><OverviewTab period={period} /></TabsContent>
-          <TabsContent value="sales"><SalesTab period={period} /></TabsContent>
-          <TabsContent value="logistics"><LogisticsTab period={period} /></TabsContent>
-          <TabsContent value="vendors"><VendorsTab period={period} /></TabsContent>
-          <TabsContent value="clients"><ClientsTab period={period} /></TabsContent>
+          <TabsContent value="overview"><OverviewTab period={period} geoFilters={geoFilters} /></TabsContent>
+          <TabsContent value="sales"><SalesTab period={period} geoFilters={geoFilters} /></TabsContent>
+          <TabsContent value="logistics"><LogisticsTab period={period} geoFilters={geoFilters} /></TabsContent>
+          <TabsContent value="vendors"><VendorsTab period={period} geoFilters={geoFilters} /></TabsContent>
+          <TabsContent value="clients"><ClientsTab period={period} geoFilters={geoFilters} /></TabsContent>
         </Tabs>
       </div>
     </AdminLayout>
