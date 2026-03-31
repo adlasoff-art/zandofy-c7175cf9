@@ -17,7 +17,7 @@ interface GeoOptionWithId extends GeoOption {
 interface UseGeoDataReturn {
   provinces: GeoOption[];
   cities: GeoOption[];
-  communes: GeoOption[];
+  communes: GeoOptionWithId[];
   quartiers: GeoOption[];
   loading: boolean;
 }
