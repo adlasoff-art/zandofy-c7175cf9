@@ -18,6 +18,8 @@ interface UseGeoDataReturn {
   loading: boolean;
 }
 
+const db = supabase as any;
+
 export function useGeoData(
   countryCode: string,
   provinceId: string,
@@ -34,12 +36,11 @@ export function useGeoData(
   useEffect(() => {
     if (!countryCode) { setProvinces([]); return; }
     setLoading(true);
-    supabase
-      .from("provinces")
+    db.from("provinces")
       .select("id, name")
       .eq("country_code", countryCode)
       .order("name")
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         setProvinces((data || []).map((p: any) => ({ value: p.id, label: p.name })));
         setLoading(false);
       });
@@ -48,11 +49,11 @@ export function useGeoData(
   // Fetch cities for selected province (or country if no province)
   useEffect(() => {
     if (!countryCode) { setCities([]); return; }
-    let q = supabase.from("cities").select("id, name").eq("country_code", countryCode).order("name").limit(500);
+    let q = db.from("cities").select("id, name").eq("country_code", countryCode).order("name").limit(500);
     if (provinceId) {
       q = q.eq("province_id", provinceId);
     }
-    q.then(({ data }) => {
+    q.then(({ data }: any) => {
       setCities((data || []).map((c: any) => ({ value: c.name, label: c.name })));
     });
   }, [countryCode, provinceId]);
@@ -60,14 +61,13 @@ export function useGeoData(
   // Fetch communes for selected city
   useEffect(() => {
     if (!cityName || !countryCode) { setCommunes([]); return; }
-    supabase
-      .from("communes")
+    db.from("communes")
       .select("id, name")
       .eq("city", cityName)
       .eq("country_code", countryCode)
       .eq("is_active", true)
       .order("name")
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         setCommunes((data || []).map((c: any) => ({ value: c.name, label: c.name })));
       });
   }, [cityName, countryCode]);
@@ -75,8 +75,7 @@ export function useGeoData(
   // Fetch quartiers for selected commune+city
   useEffect(() => {
     if (!communeName || !cityName) { setQuartiers([]); return; }
-    (supabase as any)
-      .from("quartiers")
+    db.from("quartiers")
       .select("id, name, is_restricted")
       .eq("commune", communeName)
       .eq("city", cityName)
