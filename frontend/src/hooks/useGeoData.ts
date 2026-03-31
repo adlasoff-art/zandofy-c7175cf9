@@ -28,11 +28,11 @@ export function useGeoData(
   countryCode: string,
   provinceId: string,
   cityName: string,
-  communeName: string
+  communeId: string
 ): UseGeoDataReturn {
   const [provinces, setProvinces] = useState<GeoOption[]>([]);
   const [cities, setCities] = useState<GeoOption[]>([]);
-  const [communes, setCommunes] = useState<GeoOption[]>([]);
+  const [communes, setCommunes] = useState<GeoOptionWithId[]>([]);
   const [quartiers, setQuartiers] = useState<GeoOption[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -72,17 +72,16 @@ export function useGeoData(
       .eq("is_active", true)
       .order("name")
       .then(({ data }: any) => {
-        setCommunes((data || []).map((c: any) => ({ value: c.name, label: c.name })));
+        setCommunes((data || []).map((c: any) => ({ value: c.name, label: c.name, id: c.id })));
       });
   }, [cityName, countryCode]);
 
-  // Fetch quartiers for selected commune+city
+  // Fetch quartiers for selected commune (by commune UUID)
   useEffect(() => {
-    if (!communeName || !cityName) { setQuartiers([]); return; }
+    if (!communeId) { setQuartiers([]); return; }
     db.from("quartiers")
       .select("id, name, is_restricted")
-      .eq("commune", communeName)
-      .eq("city", cityName)
+      .eq("commune_id", communeId)
       .eq("is_active", true)
       .order("name")
       .then(({ data }: any) => {
@@ -92,7 +91,7 @@ export function useGeoData(
             .map((q: any) => ({ value: q.name, label: q.name }))
         );
       });
-  }, [communeName, cityName]);
+  }, [communeId]);
 
   return { provinces, cities, communes, quartiers, loading };
 }
