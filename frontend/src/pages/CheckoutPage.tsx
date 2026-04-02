@@ -1200,6 +1200,9 @@ export default function CheckoutPage() {
                     <Button variant="outline" onClick={handleCheckPaymentStatus} className="w-full">
                       <ShieldCheck size={14} className="mr-2" /> Vérifier le statut du paiement
                     </Button>
+                    <Button variant="destructive" onClick={handleCancelPaymentWait} className="w-full">
+                      <X size={14} className="mr-2" /> Annuler l'attente
+                    </Button>
 
                     {/* Retry with different number */}
                     {!showRetryForm ? (
