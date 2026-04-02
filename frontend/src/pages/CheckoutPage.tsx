@@ -694,18 +694,34 @@ export default function CheckoutPage() {
 
         paymentChannelRef.current = channel;
 
-        // Auto-check after 60 seconds if callback hasn't arrived
-        setTimeout(async () => {
-          if (paymentChannelRef.current) {
-            try {
-              await supabase.functions.invoke("kelpay-check", {
-                body: { transaction_id: data.transaction_id },
-              });
-            } catch (e) {
-              console.error("Auto-check failed:", e);
+        // Auto-timeout after 3 minutes
+        const paymentTimeoutId = setTimeout(async () => {
+          if (!paymentChannelRef.current) return;
+          try {
+            const { data: checkData } = await supabase.functions.invoke("kelpay-check", {
+              body: { transaction_id: data.transaction_id, reference: data.reference },
+            });
+            if (checkData?.status === "success") {
+              await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
+              setPaymentPending(false);
+              await removeSelectedItems();
+              setStep("confirmation");
+              toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
+            } else {
+              // Timeout reached — mark as failed
+              await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", orderIds).eq("status", "awaiting_payment");
+              setPaymentPending(false);
+              toast({ title: "Délai expiré", description: "Le paiement n'a pas été confirmé dans les 3 minutes. Veuillez réessayer.", variant: "destructive" });
             }
+          } catch {
+            setPaymentPending(false);
+            toast({ title: "Délai expiré", description: "Impossible de vérifier le paiement. Veuillez réessayer.", variant: "destructive" });
           }
-        }, 60000);
+          if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
+        }, 180000); // 3 minutes
+
+        // Store timeout for cleanup
+        (paymentChannelRef as any)._timeoutId = paymentTimeoutId;
 
       } catch (err: any) {
         toast({ title: "Erreur", description: err.message || "Erreur inattendue.", variant: "destructive" });
@@ -789,12 +805,13 @@ export default function CheckoutPage() {
   };
 
   const handleCheckPaymentStatus = async () => {
-    if (!paymentTransactionId) return;
+    if (!paymentTransactionId && !paymentReference) return;
     try {
       const { data } = await supabase.functions.invoke("kelpay-check", {
-        body: { transaction_id: paymentTransactionId },
+        body: { transaction_id: paymentTransactionId, reference: paymentReference },
       });
-      if (data?.transactionstatus === "SUCCESS") {
+      if (data?.status === "success") {
+        if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
         if (paymentOrderIds.length > 0) {
           await supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
         }
@@ -802,7 +819,8 @@ export default function CheckoutPage() {
         await removeSelectedItems();
         setStep("confirmation");
         toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderId}` });
-      } else if (data?.transactionstatus === "FAILED") {
+      } else if (data?.status === "failed") {
+        if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
         if (paymentOrderIds.length > 0) {
           await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds);
         }
@@ -814,6 +832,17 @@ export default function CheckoutPage() {
     } catch {
       toast({ title: "Erreur", description: "Impossible de vérifier le statut.", variant: "destructive" });
     }
+  };
+
+  const handleCancelPaymentWait = async () => {
+    if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
+    if (paymentOrderIds.length > 0) {
+      await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
+    }
+    setPaymentPending(false);
+    setPaymentTransactionId(null);
+    setPaymentReference(null);
+    toast({ title: "Paiement annulé", description: "Vous pouvez réessayer avec un autre moyen de paiement.", variant: "destructive" });
   };
 
   const updateField = (field: keyof ShippingInfo, value: string) =>
@@ -1170,6 +1199,9 @@ export default function CheckoutPage() {
                     </div>
                     <Button variant="outline" onClick={handleCheckPaymentStatus} className="w-full">
                       <ShieldCheck size={14} className="mr-2" /> Vérifier le statut du paiement
+                    </Button>
+                    <Button variant="destructive" onClick={handleCancelPaymentWait} className="w-full">
+                      <X size={14} className="mr-2" /> Annuler l'attente
                     </Button>
 
                     {/* Retry with different number */}
