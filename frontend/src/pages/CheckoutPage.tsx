@@ -789,12 +789,13 @@ export default function CheckoutPage() {
   };
 
   const handleCheckPaymentStatus = async () => {
-    if (!paymentTransactionId) return;
+    if (!paymentTransactionId && !paymentReference) return;
     try {
       const { data } = await supabase.functions.invoke("kelpay-check", {
-        body: { transaction_id: paymentTransactionId },
+        body: { transaction_id: paymentTransactionId, reference: paymentReference },
       });
-      if (data?.transactionstatus === "SUCCESS") {
+      if (data?.status === "success") {
+        if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
         if (paymentOrderIds.length > 0) {
           await supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
         }
@@ -802,7 +803,8 @@ export default function CheckoutPage() {
         await removeSelectedItems();
         setStep("confirmation");
         toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderId}` });
-      } else if (data?.transactionstatus === "FAILED") {
+      } else if (data?.status === "failed") {
+        if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
         if (paymentOrderIds.length > 0) {
           await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds);
         }
@@ -814,6 +816,17 @@ export default function CheckoutPage() {
     } catch {
       toast({ title: "Erreur", description: "Impossible de vérifier le statut.", variant: "destructive" });
     }
+  };
+
+  const handleCancelPaymentWait = async () => {
+    if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
+    if (paymentOrderIds.length > 0) {
+      await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
+    }
+    setPaymentPending(false);
+    setPaymentTransactionId(null);
+    setPaymentReference(null);
+    toast({ title: "Paiement annulé", description: "Vous pouvez réessayer avec un autre moyen de paiement.", variant: "destructive" });
   };
 
   const updateField = (field: keyof ShippingInfo, value: string) =>
