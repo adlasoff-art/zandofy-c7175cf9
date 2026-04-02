@@ -1,25 +1,29 @@
 
 
-# Fix: Régénérer le script de schéma production
+# Plan de corrections critiques — Zandofy
 
-## Problème identifié
+## Corrections à appliquer
 
-Le script `zandofy_production_schema.sql` a été généré en extrayant les définitions de politiques RLS depuis les vues système de PostgreSQL (`pg_policies`). Ces vues retournent les rôles au format tableau `{public}` ou `{authenticated}`, ce qui n'est pas du SQL valide.
+### 1. Suppression du fallback `studio.zandofy.com` dans Keccel CardPay (legacy)
 
-**Erreur** : `TO {public}` → doit être `TO public`  
-Cela affecte potentiellement **toutes les 309 politiques RLS** du fichier.
+**Fichier** : `supabase/functions/keccel-cardpay/index.ts` (version racine)
 
-## Correction
+Le fichier contient probablement un fallback hardcodé vers `studio.zandofy.com` pour `SITE_BASE_URL`. Ce fallback doit être supprimé — si `SITE_BASE_URL` n'est pas configuré, la fonction doit retourner une erreur explicite (comme le fait déjà la version dans `frontend/supabase/functions/`).
 
-Régénérer le fichier `zandofy_production_schema.sql` en corrigeant la requête d'extraction des politiques pour :
+### 2. Mise à jour de `docs/SAFETY_POLICY.md` vers v2.0
 
-1. Remplacer `roles::text` par un `array_to_string` ou `unnest` qui produit `TO public` / `TO authenticated` sans accolades
-2. Vérifier que toutes les clauses `USING(...)` et `WITH CHECK(...)` sont correctement échappées
-3. Produire un nouveau fichier `zandofy_production_schema_v2.sql`
+Remplacement complet par la version fournie couvrant :
+- Protocoles de déploiement (interdiction push direct sur `main`)
+- Gestion des secrets (standard Bearer)
+- Protocoles de paiement (validation domaines)
+- Protection des données et RLS
+- Maintenance des archives
 
-## Scope
+### 3. Fix React `useContext` — déduplication dans `vite.config.ts`
 
-- Un seul fichier artifact à régénérer : `/mnt/documents/zandofy_production_schema_v2.sql`
-- Aucune modification au code du projet
-- Même structure logique (Extensions → Enums → Tables → FK → Functions → Triggers → RLS → Realtime)
+Ajout de `resolve.dedupe` pour `react` et `react-dom` afin d'éviter les erreurs de double-instance React qui causent le crash `Cannot read properties of null (reading 'useContext')`.
+
+---
+
+**Note** : Le fichier `.github/workflows/deploy-edge-functions.yml` est déjà à jour (confirmé dans le message précédent).
 
