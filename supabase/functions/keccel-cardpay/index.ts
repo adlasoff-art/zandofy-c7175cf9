@@ -14,7 +14,15 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const siteBaseUrl = Deno.env.get("SITE_BASE_URL") || "https://studio.zandofy.com";
+    const siteBaseUrl = Deno.env.get("SITE_BASE_URL");
+
+    if (!siteBaseUrl) {
+      console.error("SITE_BASE_URL is not configured");
+      return new Response(
+        JSON.stringify({ error: "Configuration serveur incomplète (SITE_BASE_URL)" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     const keccelToken = Deno.env.get("KELPAY_TOKEN");
     const keccelMerchantCode = Deno.env.get("KECCEL_CARD_MERCHANT_CODE") || "jam";
 
