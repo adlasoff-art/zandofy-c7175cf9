@@ -694,18 +694,34 @@ export default function CheckoutPage() {
 
         paymentChannelRef.current = channel;
 
-        // Auto-check after 60 seconds if callback hasn't arrived
-        setTimeout(async () => {
-          if (paymentChannelRef.current) {
-            try {
-              await supabase.functions.invoke("kelpay-check", {
-                body: { transaction_id: data.transaction_id },
-              });
-            } catch (e) {
-              console.error("Auto-check failed:", e);
+        // Auto-timeout after 3 minutes
+        const paymentTimeoutId = setTimeout(async () => {
+          if (!paymentChannelRef.current) return;
+          try {
+            const { data: checkData } = await supabase.functions.invoke("kelpay-check", {
+              body: { transaction_id: data.transaction_id, reference: data.reference },
+            });
+            if (checkData?.status === "success") {
+              await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
+              setPaymentPending(false);
+              await removeSelectedItems();
+              setStep("confirmation");
+              toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
+            } else {
+              // Timeout reached — mark as failed
+              await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", orderIds).eq("status", "awaiting_payment");
+              setPaymentPending(false);
+              toast({ title: "Délai expiré", description: "Le paiement n'a pas été confirmé dans les 3 minutes. Veuillez réessayer.", variant: "destructive" });
             }
+          } catch {
+            setPaymentPending(false);
+            toast({ title: "Délai expiré", description: "Impossible de vérifier le paiement. Veuillez réessayer.", variant: "destructive" });
           }
-        }, 60000);
+          if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
+        }, 180000); // 3 minutes
+
+        // Store timeout for cleanup
+        (paymentChannelRef as any)._timeoutId = paymentTimeoutId;
 
       } catch (err: any) {
         toast({ title: "Erreur", description: err.message || "Erreur inattendue.", variant: "destructive" });
