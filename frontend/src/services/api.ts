@@ -1,6 +1,7 @@
 // Supabase-powered API service layer
 import { supabase } from "@/integrations/supabase/client";
 import { fromTable } from "@/lib/supabase-helpers";
+import { computeStoreYears } from "@/lib/store-years";
 
 export interface Product {
   id: string;
