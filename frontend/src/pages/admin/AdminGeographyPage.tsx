@@ -485,7 +485,7 @@ function QuartiersTab() {
 
   const handleSave = async () => {
     if (!form.name || !form.commune_id) { toast.error("Nom et commune requis"); return; }
-    const payload = { name: form.name, commune_id: form.commune_id, is_restricted: form.is_restricted, restriction_reason: form.restriction_reason || null };
+    const payload = { name: form.name, commune_id: form.commune_id, is_restricted: form.is_restricted, restriction_reason: form.restriction_reason || null, delivery_surcharge: parseFloat(form.delivery_surcharge) || 0 };
     if (editId) {
       await (supabase as any).from("quartiers").update(payload).eq("id", editId);
     } else {
@@ -493,7 +493,7 @@ function QuartiersTab() {
     }
     setShowForm(false);
     setEditId(null);
-    setForm({ name: "", commune_id: filterCommune, is_restricted: false, restriction_reason: "" });
+    setForm({ name: "", commune_id: filterCommune, is_restricted: false, restriction_reason: "", delivery_surcharge: "0" });
     fetch();
     toast.success(editId ? "Quartier modifié" : "Quartier ajouté");
   };
