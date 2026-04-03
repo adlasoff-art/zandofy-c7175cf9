@@ -15,6 +15,8 @@ interface VendorProfileCardProps {
     logo_url?: string | null;
     is_verified?: boolean | null;
     verified_years?: number | null;
+    verified_years_override?: number | null;
+    created_at?: string | null;
     followers_count?: number | null;
     followers_override?: number | null;
     products_count?: number | null;
@@ -24,6 +26,7 @@ interface VendorProfileCardProps {
     sales_trend?: string | null;
     is_online?: boolean | null;
     whatsapp_number?: string | null;
+    is_certified?: boolean | null;
   };
   productName: string;
   productId: string;
@@ -90,9 +93,9 @@ export function VendorProfileCard({ store, productName, productId, originCountry
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-semibold text-foreground text-sm truncate">{store.name}</span>
             {store.is_verified && (
-              <VerificationBadge variant="icon-only" verifiedYears={store.verified_years} />
+              <VerificationBadge variant="icon-only" verifiedYears={store.verified_years_override ?? store.verified_years} storeCreatedAt={store.created_at} />
             )}
-            {(store as any).is_certified && (
+            {store.is_certified && (
               <CertificationBadge type="vendor" variant="icon-only" />
             )}
           </div>

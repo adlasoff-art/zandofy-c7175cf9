@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchProducts, type Product } from "@/services/api";
+import { computeStoreYears, formatStoreYears } from "@/lib/store-years";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
@@ -32,6 +33,8 @@ interface StoreData {
   banner_url: string | null;
   is_verified: boolean | null;
   verified_years: number | null;
+  verified_years_override: number | null;
+  created_at: string | null;
   followers_count: number | null;
   products_count: number | null;
   repurchase_rate: string | null;
@@ -45,6 +48,7 @@ interface StoreData {
   max_products_limit: number | null;
   followers_override: number | null;
   sales_override: number | null;
+  is_certified: boolean | null;
 }
 
 interface StoreReview {
@@ -82,7 +86,7 @@ export default function StorePage() {
         .eq("id", id!)
         .maybeSingle();
       if (error || !data) return null;
-      return data as StoreData;
+      return data as unknown as StoreData;
     },
     enabled: !!id,
   });
@@ -319,9 +323,9 @@ export default function StorePage() {
                         {store.name}
                       </h1>
                       {store.is_verified && (
-                        <VerificationBadge variant="icon-only" verifiedYears={store.verified_years} />
+                        <VerificationBadge variant="icon-only" verifiedYears={store.verified_years_override ?? store.verified_years} storeCreatedAt={store.created_at} />
                       )}
-                      {(store as any).is_certified && (
+                      {store.is_certified && (
                         <CertificationBadge type="vendor" variant="icon-only" />
                       )}
                     </div>
@@ -329,9 +333,9 @@ export default function StorePage() {
                       {store.is_online ? (
                         <span className="text-emerald-600 font-medium">En ligne</span>
                       ) : <span className="text-amber-600">Hors ligne</span>}
-                      {store.verified_years != null && store.verified_years > 0 && (
+                      {store.is_verified && (
                         <span className="ml-2">
-                          · <ShieldCheck size={12} className="inline" /> Vérifié depuis {store.verified_years} ans
+                          · <ShieldCheck size={12} className="inline" /> Vérifié · {formatStoreYears(computeStoreYears(store.verified_years_override, store.verified_years, store.created_at))}
                         </span>
                       )}
                     </p>
