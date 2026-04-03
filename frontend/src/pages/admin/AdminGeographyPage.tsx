@@ -499,7 +499,7 @@ function QuartiersTab() {
   };
 
   const handleEdit = (q: QuartierRow) => {
-    setForm({ name: q.name, commune_id: q.commune_id, is_restricted: q.is_restricted, restriction_reason: q.restriction_reason || "" });
+    setForm({ name: q.name, commune_id: q.commune_id, is_restricted: q.is_restricted, restriction_reason: q.restriction_reason || "", delivery_surcharge: String(q.delivery_surcharge || 0) });
     setEditId(q.id);
     setShowForm(true);
   };
