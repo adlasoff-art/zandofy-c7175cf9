@@ -224,6 +224,23 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
           </div>
         )}
 
+        {/* Color swatches — small dots showing available colors */}
+        {product.colors && product.colors.length > 1 && (
+          <div className="flex items-center gap-0.5 mt-1 flex-wrap">
+            {product.colors.slice(0, 6).map((color, idx) => (
+              <span
+                key={idx}
+                className="w-2.5 h-2.5 rounded-full border border-border/60 shrink-0"
+                style={{ backgroundColor: color.toLowerCase() }}
+                title={color}
+              />
+            ))}
+            {product.colors.length > 6 && (
+              <span className="text-[8px] text-muted-foreground ml-0.5">+{product.colors.length - 6}</span>
+            )}
+          </div>
+        )}
+
         {/* Spacer pushes footer to bottom */}
         <div className="flex-1" />
 
