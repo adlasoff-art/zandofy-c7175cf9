@@ -282,7 +282,7 @@ function CommunesTab() {
   const [filterCity, setFilterCity] = useState("");
   const [provinces, setProvinces] = useState<ProvinceRow[]>([]);
   const [cities, setCities] = useState<{ name: string }[]>([]);
-  const [form, setForm] = useState({ name: "", city: "", country_code: "CD" });
+  const [form, setForm] = useState({ name: "", city: "", country_code: "CD", delivery_fee: "0", is_deliverable: true });
   const [editId, setEditId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
 
