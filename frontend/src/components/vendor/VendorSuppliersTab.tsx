@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2, Truck, Globe, Mail, Phone, Clock, User } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Truck, Globe, Mail, Phone, Clock, User, ImageIcon } from "lucide-react";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { Button } from "@/components/ui/button";
+import { MediaUploader } from "@/components/vendor/MediaUploader";
 import {
   Dialog,
   DialogContent,
@@ -16,22 +17,39 @@ interface Supplier {
   id: string;
   agent_name: string;
   platform_name: string;
+  platform_id: string | null;
   store_url: string | null;
   direct_contact: string | null;
   email: string;
   seniority: string | null;
   average_processing_time: string | null;
+  product_image_url: string | null;
   created_at: string;
+}
+
+interface SupplierPlatform {
+  id: string;
+  name: string;
+  logo_url: string | null;
+}
+
+interface MediaItem {
+  id?: string;
+  url: string;
+  type: "image" | "video";
+  position: number;
 }
 
 const EMPTY_FORM = {
   agent_name: "",
   platform_name: "",
+  platform_id: "",
   store_url: "",
   direct_contact: "",
   email: "",
   seniority: "",
   average_processing_time: "",
+  product_image_url: "",
 };
 
 type SupplierForm = typeof EMPTY_FORM;
@@ -39,19 +57,33 @@ type SupplierForm = typeof EMPTY_FORM;
 export function VendorSuppliersTab({ storeId }: { storeId: string }) {
   const { user } = useAuth();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [platforms, setPlatforms] = useState<SupplierPlatform[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState<SupplierForm>(EMPTY_FORM);
+  const [productImage, setProductImage] = useState<MediaItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [supplierPage, setSupplierPage] = useState(1);
+
+  // Load platforms
+  useEffect(() => {
+    (supabase as any)
+      .from("supplier_platforms")
+      .select("id, name, logo_url")
+      .eq("is_active", true)
+      .order("sort_order")
+      .then(({ data }: any) => {
+        if (data) setPlatforms(data);
+      });
+  }, []);
 
   const loadSuppliers = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     const { data } = await (supabase as any)
       .from("suppliers")
-      .select("id, agent_name, platform_name, store_url, direct_contact, email, seniority, average_processing_time, created_at")
+      .select("id, agent_name, platform_name, platform_id, store_url, direct_contact, email, seniority, average_processing_time, product_image_url, created_at")
       .eq("vendor_id", user.id)
       .order("created_at", { ascending: false });
     setSuppliers(data || []);
@@ -62,9 +94,18 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
     loadSuppliers();
   }, [loadSuppliers]);
 
+  const getPlatformName = (s: Supplier): string => {
+    if (s.platform_id) {
+      const p = platforms.find(pl => pl.id === s.platform_id);
+      if (p) return p.name;
+    }
+    return s.platform_name || "";
+  };
+
   const openCreate = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setProductImage([]);
     setModalOpen(true);
   };
 
@@ -73,12 +114,19 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
     setForm({
       agent_name: s.agent_name,
       platform_name: s.platform_name,
+      platform_id: s.platform_id || "",
       store_url: s.store_url || "",
       direct_contact: s.direct_contact || "",
       email: s.email,
       seniority: s.seniority || "",
       average_processing_time: s.average_processing_time || "",
+      product_image_url: s.product_image_url || "",
     });
+    setProductImage(
+      s.product_image_url
+        ? [{ url: s.product_image_url, type: "image" as const, position: 0 }]
+        : []
+    );
     setModalOpen(true);
   };
 
@@ -90,14 +138,18 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
     if (!user) return;
     setSaving(true);
 
-    const payload = {
+    const selectedPlatform = platforms.find(p => p.id === form.platform_id);
+
+    const payload: any = {
       agent_name: form.agent_name.trim(),
-      platform_name: form.platform_name.trim(),
+      platform_name: selectedPlatform?.name || form.platform_name.trim(),
+      platform_id: form.platform_id || null,
       store_url: form.store_url.trim() || null,
       direct_contact: form.direct_contact.trim() || null,
       email: form.email.trim(),
       seniority: form.seniority.trim() || null,
       average_processing_time: form.average_processing_time.trim() || null,
+      product_image_url: productImage.length > 0 ? productImage[0].url : null,
     };
 
     if (editing) {
@@ -172,14 +224,18 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
             const paginatedSuppliers = suppliers.slice((safeSuppPage - 1) * suppPageSize, safeSuppPage * suppPageSize);
             return paginatedSuppliers.map((s) => (
             <div key={s.id} className="bg-card border border-border rounded-lg p-4 flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <User size={18} className="text-primary" />
+              <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                {s.product_image_url ? (
+                  <img src={s.product_image_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <User size={18} className="text-primary" />
+                )}
               </div>
               <div className="flex-1 min-w-0 space-y-1">
                 <p className="text-sm font-semibold text-foreground">{s.agent_name}</p>
-                {s.platform_name && (
+                {getPlatformName(s) && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Globe size={11} /> {s.platform_name}
+                    <Globe size={11} /> {getPlatformName(s)}
                   </p>
                 )}
                 {s.email && (
@@ -222,18 +278,43 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
 
       {/* Modal Add/Edit */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Modifier le fournisseur" : "Ajouter un fournisseur"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 mt-2">
             <FormField label="Nom de l'agent / contact *" value={form.agent_name} onChange={(v) => setForm({ ...form, agent_name: v })} />
-            <FormField label="Plateforme (ex: Alibaba, Shein…)" value={form.platform_name} onChange={(v) => setForm({ ...form, platform_name: v })} />
+
+            {/* Platform combobox */}
+            <div>
+              <label className="text-xs text-muted-foreground">Plateforme</label>
+              <select
+                className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md focus:ring-1 focus:ring-primary outline-none"
+                value={form.platform_id}
+                onChange={(e) => setForm({ ...form, platform_id: e.target.value })}
+              >
+                <option value="">— Sélectionner une plateforme —</option>
+                {platforms.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
             <FormField label="URL de la boutique" value={form.store_url} onChange={(v) => setForm({ ...form, store_url: v })} type="url" />
             <FormField label="Contact direct (téléphone/WeChat)" value={form.direct_contact} onChange={(v) => setForm({ ...form, direct_contact: v })} />
             <FormField label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} type="email" />
             <FormField label="Ancienneté (ex: 3 ans, depuis 2020)" value={form.seniority} onChange={(v) => setForm({ ...form, seniority: v })} />
             <FormField label="Délai moyen de traitement (ex: 3-5 jours / 100 pcs)" value={form.average_processing_time} onChange={(v) => setForm({ ...form, average_processing_time: v })} />
+
+            {/* Product image upload */}
+            <MediaUploader
+              label="📷 Image du produit fournisseur"
+              items={productImage}
+              onChange={setProductImage}
+              multiple={false}
+              storeId={storeId}
+              acceptVideo={false}
+            />
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" size="sm" onClick={() => setModalOpen(false)} disabled={saving}>
