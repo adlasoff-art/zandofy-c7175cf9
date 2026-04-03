@@ -189,7 +189,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       if (data) setTrendTags(data);
     });
     if (user) {
-      (supabase as any).from("suppliers").select("id, agent_name, platform_name").eq("vendor_id", user.id).order("agent_name").then(({ data }: any) => {
+      (supabase as any).from("suppliers").select("id, agent_name, platform_name, product_image_url").eq("vendor_id", user.id).order("agent_name").then(({ data }: any) => {
         if (data) setSuppliers(data);
       });
     }
