@@ -5,14 +5,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { computeStoreYears, formatStoreYears } from "@/lib/store-years";
 
 interface VerificationBadgeProps {
   variant: "icon-only" | "full";
-  verifiedYears?: number;
+  verifiedYears?: number | null;
+  storeCreatedAt?: string | null;
 }
 
-export function VerificationBadge({ variant, verifiedYears }: VerificationBadgeProps) {
-  if (!verifiedYears || verifiedYears <= 0) return null;
+export function VerificationBadge({ variant, verifiedYears, storeCreatedAt }: VerificationBadgeProps) {
+  const years = computeStoreYears(verifiedYears, null, storeCreatedAt);
+  const label = formatStoreYears(years);
 
   if (variant === "icon-only") {
     return (
@@ -24,7 +27,7 @@ export function VerificationBadge({ variant, verifiedYears }: VerificationBadgeP
             </div>
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">
-            Fournisseur certifié par Zandofy
+            Fournisseur certifié par Zandofy · {label}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -37,7 +40,7 @@ export function VerificationBadge({ variant, verifiedYears }: VerificationBadgeP
         <Trophy size={13} className="text-certified-foreground" />
       </div>
       <span className="text-xs font-semibold text-certified">
-        Certifié Zandofy · Vérifié {verifiedYears} ans
+        Certifié Zandofy · {label}
       </span>
     </div>
   );

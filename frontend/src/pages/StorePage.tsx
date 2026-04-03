@@ -32,6 +32,8 @@ interface StoreData {
   banner_url: string | null;
   is_verified: boolean | null;
   verified_years: number | null;
+  verified_years_override: number | null;
+  created_at: string | null;
   followers_count: number | null;
   products_count: number | null;
   repurchase_rate: string | null;
@@ -45,6 +47,7 @@ interface StoreData {
   max_products_limit: number | null;
   followers_override: number | null;
   sales_override: number | null;
+  is_certified: boolean | null;
 }
 
 interface StoreReview {
