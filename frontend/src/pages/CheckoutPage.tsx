@@ -278,11 +278,26 @@ export default function CheckoutPage() {
 
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
-  // Last-mile fee removed from checkout — calculated at hub arrival stage
-  const lastMileFee = 0;
-  const effectiveLastMile = 0;
+  // Last-mile fee calculation
+  const lastMileFee = deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
+  const effectiveLastMile = deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping" ? lastMileFee : 0;
   
-  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping);
+  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping + effectiveLastMile);
+
+  // Recalculate last-mile fee when address or delivery option changes
+  useEffect(() => {
+    if (deliveryOption !== "home_delivery" || !shipping.commune || !shipping.city) {
+      setLastMileResult(null);
+      return;
+    }
+    setLastMileLoading(true);
+    calculateLastMileFee(shipping.commune, shipping.quartier, shipping.city, shipping.country)
+      .then(result => {
+        setLastMileResult(result);
+        setLastMileLoading(false);
+      })
+      .catch(() => setLastMileLoading(false));
+  }, [deliveryOption, shipping.commune, shipping.quartier, shipping.city, shipping.country]);
 
   // Load saved addresses
   useEffect(() => {
