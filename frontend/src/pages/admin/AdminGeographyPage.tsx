@@ -327,7 +327,7 @@ function CommunesTab() {
   };
 
   const handleEdit = (c: CommuneRow) => {
-    setForm({ name: c.name, city: c.city, country_code: c.country_code });
+    setForm({ name: c.name, city: c.city, country_code: c.country_code, delivery_fee: String(c.delivery_fee || 0), is_deliverable: c.is_deliverable !== false });
     setEditId(c.id);
     setShowForm(true);
   };
