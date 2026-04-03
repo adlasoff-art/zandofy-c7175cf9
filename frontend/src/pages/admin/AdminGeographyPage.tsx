@@ -582,6 +582,7 @@ function QuartiersTab() {
             <TableRow>
               <TableHead>Quartier / Bloc</TableHead>
               <TableHead>Commune</TableHead>
+              <TableHead>Surcharge ($)</TableHead>
               <TableHead>Restreint</TableHead>
               <TableHead className="w-20">Actions</TableHead>
             </TableRow>
@@ -591,6 +592,7 @@ function QuartiersTab() {
               <TableRow key={q.id}>
                 <TableCell className="font-medium">{q.name}</TableCell>
                 <TableCell>{getCommuneName(q.commune_id)}</TableCell>
+                <TableCell>{(q.delivery_surcharge || 0).toFixed(2)}</TableCell>
                 <TableCell>
                   {q.is_restricted ? (
                     <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded">{q.restriction_reason || "Oui"}</span>
@@ -604,7 +606,7 @@ function QuartiersTab() {
                 </TableCell>
               </TableRow>
             ))}
-            {quartiers.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Aucun quartier</TableCell></TableRow>}
+            {quartiers.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Aucun quartier</TableCell></TableRow>}
           </TableBody>
         </Table>
       )}
