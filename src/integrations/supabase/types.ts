@@ -102,6 +102,13 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "affiliate_links_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       affiliate_tiers: {
@@ -535,6 +542,13 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bundle_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       cancellation_requests: {
@@ -634,6 +648,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cart_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
         ]
@@ -1060,6 +1081,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
           {
@@ -1666,6 +1694,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "featured_placements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "featured_placements_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
@@ -1717,6 +1752,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flash_sales_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
         ]
@@ -2152,6 +2194,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
         ]
@@ -2715,6 +2764,13 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "product_colors_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       product_images: {
@@ -2742,6 +2798,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_images_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
         ]
@@ -2782,6 +2845,13 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "product_pricing_tiers_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       product_sizes: {
@@ -2820,6 +2890,13 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "product_sizes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       product_variant_selections: {
@@ -2850,6 +2927,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_variant_selections_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
           {
@@ -3461,6 +3545,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
           {
@@ -5119,6 +5210,13 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "wishlists_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       withdrawal_requests: {
@@ -5203,7 +5301,191 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      products_public: {
+        Row: {
+          auto_pricing_enabled: boolean | null
+          care_instructions: string | null
+          category_id: string | null
+          created_at: string | null
+          currency: string | null
+          description: string | null
+          discount: number | null
+          flash_timer_duration_hours: number | null
+          flash_timer_enabled: boolean | null
+          height_cm: number | null
+          id: string | null
+          is_new: boolean | null
+          is_sale: boolean | null
+          length_cm: number | null
+          material: string | null
+          meta_description: string | null
+          meta_title: string | null
+          model_size: string | null
+          moq: number | null
+          name: string | null
+          name_fr: string | null
+          origin_country: string | null
+          original_price: number | null
+          prep_days_max: number | null
+          prep_days_min: number | null
+          price: number | null
+          promo_end_date: string | null
+          promo_start_date: string | null
+          publish_status: string | null
+          rating: number | null
+          review_count: number | null
+          review_count_override: number | null
+          sales_count: number | null
+          sales_count_override: number | null
+          season: string | null
+          seo_keywords: string[] | null
+          short_description: string | null
+          sku: string | null
+          slug: string | null
+          stock_quantity: number | null
+          store_id: string | null
+          style: string | null
+          supplier_id: string | null
+          trend_tag_id: string | null
+          updated_at: string | null
+          verified_years: number | null
+          verified_years_override: number | null
+          weight_grams: number | null
+          width_cm: number | null
+        }
+        Insert: {
+          auto_pricing_enabled?: boolean | null
+          care_instructions?: string | null
+          category_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          discount?: number | null
+          flash_timer_duration_hours?: number | null
+          flash_timer_enabled?: boolean | null
+          height_cm?: number | null
+          id?: string | null
+          is_new?: boolean | null
+          is_sale?: boolean | null
+          length_cm?: number | null
+          material?: string | null
+          meta_description?: string | null
+          meta_title?: string | null
+          model_size?: string | null
+          moq?: number | null
+          name?: string | null
+          name_fr?: string | null
+          origin_country?: string | null
+          original_price?: number | null
+          prep_days_max?: number | null
+          prep_days_min?: number | null
+          price?: number | null
+          promo_end_date?: string | null
+          promo_start_date?: string | null
+          publish_status?: string | null
+          rating?: number | null
+          review_count?: number | null
+          review_count_override?: number | null
+          sales_count?: number | null
+          sales_count_override?: number | null
+          season?: string | null
+          seo_keywords?: string[] | null
+          short_description?: string | null
+          sku?: string | null
+          slug?: string | null
+          stock_quantity?: number | null
+          store_id?: string | null
+          style?: string | null
+          supplier_id?: string | null
+          trend_tag_id?: string | null
+          updated_at?: string | null
+          verified_years?: number | null
+          verified_years_override?: number | null
+          weight_grams?: number | null
+          width_cm?: number | null
+        }
+        Update: {
+          auto_pricing_enabled?: boolean | null
+          care_instructions?: string | null
+          category_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          discount?: number | null
+          flash_timer_duration_hours?: number | null
+          flash_timer_enabled?: boolean | null
+          height_cm?: number | null
+          id?: string | null
+          is_new?: boolean | null
+          is_sale?: boolean | null
+          length_cm?: number | null
+          material?: string | null
+          meta_description?: string | null
+          meta_title?: string | null
+          model_size?: string | null
+          moq?: number | null
+          name?: string | null
+          name_fr?: string | null
+          origin_country?: string | null
+          original_price?: number | null
+          prep_days_max?: number | null
+          prep_days_min?: number | null
+          price?: number | null
+          promo_end_date?: string | null
+          promo_start_date?: string | null
+          publish_status?: string | null
+          rating?: number | null
+          review_count?: number | null
+          review_count_override?: number | null
+          sales_count?: number | null
+          sales_count_override?: number | null
+          season?: string | null
+          seo_keywords?: string[] | null
+          short_description?: string | null
+          sku?: string | null
+          slug?: string | null
+          stock_quantity?: number | null
+          store_id?: string | null
+          style?: string | null
+          supplier_id?: string | null
+          trend_tag_id?: string | null
+          updated_at?: string | null
+          verified_years?: number | null
+          verified_years_override?: number | null
+          weight_grams?: number | null
+          width_cm?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_trend_tag_id_fkey"
+            columns: ["trend_tag_id"]
+            isOneToOne: false
+            referencedRelation: "trend_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       add_guest_support_message: {
