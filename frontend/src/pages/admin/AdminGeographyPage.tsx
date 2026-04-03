@@ -539,7 +539,7 @@ function QuartiersTab() {
             {communes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.city})</option>)}
           </select>
         </div>
-        <Button size="sm" className="mt-5" onClick={() => { setShowForm(true); setEditId(null); setForm({ name: "", commune_id: filterCommune, is_restricted: false, restriction_reason: "" }); }}>
+        <Button size="sm" className="mt-5" onClick={() => { setShowForm(true); setEditId(null); setForm({ name: "", commune_id: filterCommune, is_restricted: false, restriction_reason: "", delivery_surcharge: "0" }); }}>
           <Plus size={14} className="mr-1" /> Ajouter
         </Button>
       </div>
