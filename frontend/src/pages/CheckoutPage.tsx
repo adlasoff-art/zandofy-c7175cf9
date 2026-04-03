@@ -578,9 +578,9 @@ export default function CheckoutPage() {
           discount_amount: orderDiscount,
           shipping_payment_status: shippingPaymentChoice === "pay_on_arrival" ? "deferred" : "paid",
           delivery_choice: deliveryOption !== "none" ? deliveryOption : null,
-          last_mile_fee: 0,
-          last_mile_payment_method: null,
-          last_mile_payment_status: null,
+          last_mile_fee: deliveryOption === "home_delivery" ? lastMileFee : 0,
+          last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod") : null,
+          last_mile_payment_status: deliveryOption === "home_delivery" && lastMileFee > 0 ? (lastMilePayment === "pay_with_shipping" ? "paid" : "deferred") : null,
         } as any)
         .select("id")
         .single();
