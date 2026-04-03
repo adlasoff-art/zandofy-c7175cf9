@@ -60,7 +60,7 @@ export function CertificationBadge({ type, variant = "icon-only", className = ""
         <Tooltip>
           <TooltipTrigger asChild>
             <div className={`w-5 h-5 rounded-full ${cfg.bgClass} flex items-center justify-center shrink-0 cursor-default ${className}`}>
-              <Icon size={10} className={cfg.iconClass} />
+              <Icon size={10} className={cfg.iconClass} strokeWidth={cfg.strokeWidth ?? 2} />
             </div>
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">
