@@ -400,6 +400,8 @@ function CommunesTab() {
               <TableHead>Commune / Département</TableHead>
               <TableHead>Ville</TableHead>
               <TableHead>Pays</TableHead>
+              <TableHead>Frais ($)</TableHead>
+              <TableHead>Livrable</TableHead>
               <TableHead className="w-20">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -409,6 +411,14 @@ function CommunesTab() {
                 <TableCell className="font-medium">{c.name}</TableCell>
                 <TableCell>{c.city}</TableCell>
                 <TableCell>{getCountryName(c.country_code)}</TableCell>
+                <TableCell>{(c.delivery_fee || 0).toFixed(2)}</TableCell>
+                <TableCell>
+                  {c.is_deliverable !== false ? (
+                    <span className="text-xs text-primary">Oui</span>
+                  ) : (
+                    <span className="text-xs text-destructive">Non</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   <div className="flex gap-1">
                     <button onClick={() => handleEdit(c)} className="p-1 text-muted-foreground hover:text-primary"><Edit2 size={14} /></button>
@@ -417,7 +427,7 @@ function CommunesTab() {
                 </TableCell>
               </TableRow>
             ))}
-            {communes.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Aucune commune</TableCell></TableRow>}
+            {communes.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Aucune commune</TableCell></TableRow>}
           </TableBody>
         </Table>
       )}
