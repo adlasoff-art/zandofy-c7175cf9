@@ -27,6 +27,7 @@ import { Link } from "react-router-dom";
 import { DeliveryChat } from "@/components/delivery/DeliveryChat";
 import { RiderRatingModal } from "@/components/delivery/RiderRatingModal";
 import { fromTable } from "@/lib/supabase-helpers";
+import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
 
 // ── Types ──
 interface ShipmentResult {
