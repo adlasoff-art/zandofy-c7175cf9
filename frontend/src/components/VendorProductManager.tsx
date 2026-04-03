@@ -20,6 +20,7 @@ interface Supplier {
   id: string;
   agent_name: string;
   platform_name: string;
+  product_image_url: string | null;
 }
 
 interface Product {
