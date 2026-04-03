@@ -25,7 +25,7 @@ const CERT_CONFIG: Record<CertificationType, {
   vendor: {
     label: "Vendeur Certifié",
     tooltipFr: "Vendeur certifié par Zandofy",
-    icon: Store,
+    icon: Trophy,
     bgClass: "bg-[hsl(var(--cert-vendor))]",
     textClass: "text-[hsl(var(--cert-vendor))]",
     iconClass: "text-[hsl(var(--cert-vendor-foreground))]",
