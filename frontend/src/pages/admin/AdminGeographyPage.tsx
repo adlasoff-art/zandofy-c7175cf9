@@ -13,8 +13,8 @@ import { toast } from "sonner";
 // Types
 interface ProvinceRow { id: string; name: string; country_code: string; is_active: boolean }
 interface CityRow { id: string; name: string; country_code: string; province_id: string | null; latitude: number; longitude: number; population: number | null }
-interface CommuneRow { id: string; city: string; country_code: string; name: string; is_active: boolean }
-interface QuartierRow { id: string; commune_id: string; name: string; is_active: boolean; is_restricted: boolean; restriction_reason: string | null }
+interface CommuneRow { id: string; city: string; country_code: string; name: string; is_active: boolean; delivery_fee: number; is_deliverable: boolean }
+interface QuartierRow { id: string; commune_id: string; name: string; is_active: boolean; is_restricted: boolean; restriction_reason: string | null; delivery_surcharge: number }
 
 const selectClass = "mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-card";
 
