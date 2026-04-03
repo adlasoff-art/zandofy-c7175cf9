@@ -37,7 +37,7 @@ export function VerificationBadge({ variant, verifiedYears, storeCreatedAt }: Ve
   return (
     <div className="flex items-center gap-2">
       <div className="w-6 h-6 rounded-full bg-certified flex items-center justify-center shrink-0">
-        <Trophy size={13} className="text-certified-foreground" />
+        <Trophy size={13} strokeWidth={2.5} className="text-certified-foreground" />
       </div>
       <span className="text-xs font-semibold text-certified">
         Certifié Zandofy · {label}
