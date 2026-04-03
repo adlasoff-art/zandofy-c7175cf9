@@ -1,4 +1,4 @@
-import { Store, Truck, UserCheck } from "lucide-react";
+import { Trophy, Truck, UserCheck } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
