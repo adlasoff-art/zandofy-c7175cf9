@@ -181,12 +181,10 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
 
         {/* Badges row: seniority + MOQ + origin */}
         <div className="flex items-center gap-2 flex-wrap min-h-[1.25rem] mt-1">
-          {(product as any).storeIsVerified && (
-            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-certified bg-certified/10 px-1.5 py-0.5 rounded">
-              <Trophy size={9} />
-              {formatStoreYears(product.verifiedYears ?? 0)}
-            </span>
-          )}
+          <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-certified bg-certified/10 px-1.5 py-0.5 rounded">
+            <Trophy size={9} strokeWidth={2.5} />
+            {formatStoreYears(product.verifiedYears ?? 0)}
+          </span>
           {product.moq && product.moq > 1 && (
             <span className="text-[9px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
               MOQ: {product.moq}
