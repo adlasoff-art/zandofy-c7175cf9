@@ -83,6 +83,7 @@ export default function VendorDashboardPage() {
   useStorePresence(store?.id);
 
   // Realtime channel ref for cleanup
+  const hasLoadedRef = useRef(false);
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
@@ -92,6 +93,10 @@ export default function VendorDashboardPage() {
 
     if (!user) {
       navigate("/auth");
+      return;
+    }
+
+    if (hasLoadedRef.current && store) {
       return;
     }
 
@@ -111,7 +116,9 @@ export default function VendorDashboardPage() {
     }
 
     async function loadVendorData() {
-      setLoading(true);
+      if (!hasLoadedRef.current) {
+        setLoading(true);
+      }
 
       // Find store owned by user
       const { data: storeData } = await (supabase as any)
@@ -150,6 +157,7 @@ export default function VendorDashboardPage() {
       if (!convs || convs.length === 0) {
         setConversations([]);
         setLoading(false);
+        hasLoadedRef.current = true;
         setupRealtime(storeData.id);
         return;
       }
@@ -203,6 +211,7 @@ export default function VendorDashboardPage() {
 
       setConversations(items);
       setLoading(false);
+      hasLoadedRef.current = true;
       setupRealtime(storeData.id);
     }
 
@@ -289,7 +298,8 @@ export default function VendorDashboardPage() {
         realtimeChannelRef.current = null;
       }
     };
-  }, [authLoading, user, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user?.id, navigate]);
 
   const openChat = (conv: VendorConversation) => {
     setSelectedConv(conv);

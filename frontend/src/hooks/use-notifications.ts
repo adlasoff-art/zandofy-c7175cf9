@@ -30,7 +30,8 @@ export function useNotifications() {
     setNotifications(items);
     setUnreadCount(items.filter((n) => !n.is_read).length);
     setLoading(false);
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user) {
@@ -58,7 +59,8 @@ export function useNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchNotifications]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, fetchNotifications]);
 
   const markAsRead = async (id: string) => {
     await supabase.from("notifications").update({ is_read: true }).eq("id", id);

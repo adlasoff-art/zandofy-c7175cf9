@@ -146,7 +146,8 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   }, [draftStorageKey]);
 
   const loadProducts = useCallback(async () => {
-    setLoading(true);
+    // Only show loading spinner on first load to avoid flash on tab refocus
+    setLoading(prev => products.length === 0 ? true : prev);
     const { data } = await (supabase
       .from("products")
       .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max") as any)
@@ -193,7 +194,8 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
         if (data) setSuppliers(data);
       });
     }
-  }, [loadProducts, user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadProducts, user?.id]);
 
   useEffect(() => {
     if (hasRestoredDraftRef.current || loading || showForm) return;
@@ -225,10 +227,12 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     } catch {
       localStorage.removeItem(draftStorageKey);
     }
-  }, [draftStorageKey, loading, products, showForm, user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftStorageKey, loading, products, showForm, user?.id]);
 
   useEffect(() => {
     if (!user || !showForm || typeof localStorage === "undefined") return;
+    // Use stable user id ref to avoid re-running on auth refresh
 
     const timeout = window.setTimeout(() => {
       const snapshot: ProductDraftSnapshot = {
@@ -255,7 +259,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     showForm,
     sizes,
     colors,
-    user,
+    user?.id,
     variationMedia,
   ]);
 
