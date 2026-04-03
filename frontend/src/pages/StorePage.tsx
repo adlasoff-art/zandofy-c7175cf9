@@ -322,12 +322,19 @@ export default function StorePage() {
                       <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">
                         {store.name}
                       </h1>
-                      {store.is_verified && (
-                        <VerificationBadge variant="icon-only" verifiedYears={store.verified_years_override ?? store.verified_years} storeCreatedAt={store.created_at} />
-                      )}
                       {store.is_certified && (
                         <CertificationBadge type="vendor" variant="icon-only" />
                       )}
+                      {(() => {
+                        const years = computeStoreYears(store.verified_years_override, store.verified_years, store.created_at);
+                        const label = formatStoreYears(years);
+                        return (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                            <ShieldCheck size={12} />
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {store.is_online ? (
