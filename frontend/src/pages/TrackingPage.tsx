@@ -227,15 +227,44 @@ function OrderTimeline({ currentStatus, history }: { currentStatus: string; hist
 // ── Delivery Choice Panel ──
 function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResult; onChoiceMade: () => void }) {
   const [choosing, setChoosing] = useState(false);
+  const [lastMileResult, setLastMileResult] = useState<LastMileFeeResult | null>(null);
+  const [lmLoading, setLmLoading] = useState(true);
+
+  // Calculate last-mile fee from order address
+  useEffect(() => {
+    const fetchFee = async () => {
+      setLmLoading(true);
+      // Get full address from order
+      const { data: orderData } = await supabase
+        .from("orders")
+        .select("shipping_commune, shipping_quartier, shipping_city, shipping_country")
+        .eq("id", order.id)
+        .single();
+
+      if (orderData?.shipping_commune && orderData?.shipping_city) {
+        const result = await calculateLastMileFee(
+          orderData.shipping_commune,
+          orderData.shipping_quartier || "",
+          orderData.shipping_city,
+          orderData.shipping_country || "CD"
+        );
+        setLastMileResult(result);
+      }
+      setLmLoading(false);
+    };
+    fetchFee();
+  }, [order.id]);
+
+  const lastMileFee = lastMileResult?.fee || 0;
 
   const handleChoice = async (choice: "home" | "pickup") => {
     setChoosing(true);
     try {
-      const updates: any = { delivery_choice: choice };
-      if (choice === "pickup") {
-        // Skip to assigning_rider step isn't needed — vendor will handle
-        // Just set choice
-      }
+      const updates: any = {
+        delivery_choice: choice,
+        last_mile_fee: choice === "home" ? lastMileFee : 0,
+        last_mile_payment_status: choice === "home" && lastMileFee > 0 ? "deferred" : null,
+      };
       const { error } = await supabase
         .from("orders")
         .update(updates)
@@ -250,6 +279,8 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
     }
   };
 
+  const homeDisabled = lastMileResult ? !lastMileResult.deliverable : false;
+
   return (
     <div className="border border-primary/30 bg-primary/5 rounded-xl p-4 space-y-3">
       <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -259,19 +290,30 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
         Votre commande est arrivée au Hub ! Comment souhaitez-vous la récupérer ?
       </p>
 
+      {/* Zone not deliverable warning */}
+      {lastMileResult && !lastMileResult.deliverable && (
+        <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded">
+          ⚠️ Livraison à domicile non disponible dans votre zone{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}. Veuillez récupérer au Hub.
+        </p>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
           onClick={() => handleChoice("home")}
-          disabled={choosing}
-          className="flex items-center gap-3 p-3 border border-border rounded-xl hover:border-primary transition-colors bg-card text-left active:scale-[0.98]"
+          disabled={choosing || homeDisabled || lmLoading}
+          className={`flex items-center gap-3 p-3 border rounded-xl transition-colors bg-card text-left active:scale-[0.98] ${
+            homeDisabled ? "border-border opacity-50 cursor-not-allowed" : "border-border hover:border-primary"
+          }`}
         >
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
             <Home size={18} className="text-primary" />
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">Livraison à domicile</p>
-            {order.last_mile_fee && order.last_mile_fee > 0 ? (
-              <p className="text-xs text-muted-foreground">Frais : ${order.last_mile_fee.toFixed(2)}</p>
+            {lmLoading ? (
+              <p className="text-xs text-muted-foreground">Calcul des frais...</p>
+            ) : lastMileFee > 0 ? (
+              <p className="text-xs text-muted-foreground">Frais : ${lastMileFee.toFixed(2)} — à payer à la réception</p>
             ) : (
               <p className="text-xs text-muted-foreground">Un livreur sera assigné</p>
             )}
