@@ -23,7 +23,7 @@ export function VerificationBadge({ variant, verifiedYears, storeCreatedAt }: Ve
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="w-5 h-5 rounded-full bg-certified flex items-center justify-center shrink-0 cursor-default">
-              <Trophy size={10} className="text-certified-foreground" />
+              <Trophy size={10} strokeWidth={2.5} className="text-certified-foreground" />
             </div>
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">
