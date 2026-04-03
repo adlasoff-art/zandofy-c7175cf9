@@ -1,69 +1,63 @@
 
 
-# Plan : Image produit fournisseur + Plateformes en upload/combobox + Affichage dans commandes
+# Plan : Tarification last-mile par commune/quartier — Checkout + Tracking + Admin
 
 ## Résumé
 
-Ajouter une image produit au formulaire fournisseur, convertir le champ plateforme en combobox dynamique alimenté par les plateformes admin, remplacer l'URL logo par un upload dans l'admin des plateformes, et afficher l'image fournisseur dans le sélecteur produit et les commandes.
+Intégrer le calcul automatique des frais de livraison à domicile (last-mile) basé sur la commune et le quartier du client, à deux niveaux : dès le checkout (le client peut payer d'avance) ET au moment du choix différé sur la tracking page (changement d'avis). Ajouter les champs de tarification dans l'interface admin Géographie.
 
 ---
 
-## 1. Migration SQL — Ajouter `product_image_url` à `suppliers` + `platform_id`
+## 1. Admin Géographie — Champs tarification commune/quartier
 
-- Ajouter `product_image_url text` à la table `suppliers`
-- Ajouter `platform_id uuid REFERENCES supplier_platforms(id)` à la table `suppliers` (nullable, pour remplacer le champ texte `platform_name` à terme)
-- Créer un bucket de stockage `supplier-images` (public) avec policies pour upload/read
+**Fichier** : `AdminGeographyPage.tsx`
 
-## 2. Admin — Plateformes fournisseurs : upload logo + édition
+- Étendre `CommuneRow` avec `delivery_fee: number`, `is_deliverable: boolean`
+- Étendre `QuartierRow` avec `delivery_surcharge: number`
+- Ajouter dans le formulaire Communes : champ "Frais livraison ($)" + toggle "Livrable"
+- Ajouter dans le formulaire Quartiers : champ "Surcharge ($)"
+- Ajouter les colonnes correspondantes dans les tableaux
+- Les SELECT et INSERT/UPDATE incluront ces champs (ils existent déjà en DB)
 
-**Fichier** : `AdminSupplierPlatformsPage.tsx`
+## 2. Utilitaire de calcul last-mile
 
-- Remplacer le champ `Input` "URL du logo" par le composant `MediaUploader` existant pour uploader le logo dans le bucket `product-media` (ou un bucket dédié)
-- Ajouter un mode **édition inline** : cliquer sur une plateforme permet de modifier son nom et son logo (bouton crayon → formulaire inline ou modal)
-- Permettre le re-upload du logo pour les plateformes existantes
+**Nouveau fichier** : `src/lib/last-mile-fee.ts`
 
-## 3. Formulaire fournisseur (vendeur) — Image produit + plateforme en combobox
+- Fonction `calculateLastMileFee(commune: string, quartier: string, city: string)` :
+  - Lookup dans `communes` par nom + ville → récupère `delivery_fee`, `is_deliverable`
+  - Lookup dans `quartiers` par nom + `commune_id` → récupère `delivery_surcharge`, `is_restricted`
+  - Retourne `{ fee: commune.delivery_fee + quartier.delivery_surcharge, deliverable: boolean, restricted: boolean }`
+- Fonction `checkDeliveryAvailability(...)` retourne si la zone est livrable
 
-**Fichier** : `VendorSuppliersTab.tsx`
+## 3. Checkout — Calcul et affichage du last-mile fee
 
-- Ajouter le composant `MediaUploader` au formulaire (modal) pour uploader l'image produit du fournisseur dans le bucket `supplier-images`
-- Remplacer le champ texte "Plateforme" par un **combobox/select** alimenté dynamiquement par la table `supplier_platforms` (fetch des plateformes actives au chargement)
-- Stocker `platform_id` dans `suppliers` au lieu de `platform_name` en texte libre
-- Garder la rétro-compatibilité : afficher `platform_name` si `platform_id` est null (données existantes)
+**Fichier** : `CheckoutPage.tsx`
 
-## 4. Formulaire produit — Afficher l'image fournisseur dans le sélecteur
+État actuel : `lastMileFee = 0` en dur, pas de calcul.
 
-**Fichier** : `VendorProductManager.tsx`
+Modifications :
+- Quand le client choisit "Livraison à domicile", appeler `calculateLastMileFee()` avec la commune et le quartier de l'adresse sélectionnée
+- Afficher le montant estimé sous l'option : "Frais de livraison locale : $X.XX"
+- Si la zone n'est pas livrable (`is_deliverable = false` ou quartier restreint), désactiver le bouton avec message "Non disponible dans votre zone"
+- Recalculer à chaque changement d'adresse
+- Intégrer `lastMileFee` dans le total de la commande (si `deliveryOption === "home_delivery"`)
+- Écrire `last_mile_fee` réel dans l'order INSERT (au lieu de 0)
+- Ajouter le choix de paiement last-mile : "Payer maintenant" ou "Payer à la réception"
+- Si "Payer maintenant" → inclus dans le total ; si "Payer à la réception" → `last_mile_payment_status: "deferred"`
 
-- Modifier l'interface `Supplier` pour inclure `product_image_url`
-- Modifier le fetch des suppliers pour inclure `product_image_url`
-- Remplacer le `<select>` fournisseur par un **combobox custom** avec recherche qui affiche pour chaque option :
-  - À gauche : la miniature de l'image produit (ou une icône par défaut)
-  - Au centre : le nom de l'agent + la plateforme
-- Cela permet au vendeur de visuellement matcher le bon fournisseur au bon produit
+## 4. Tracking Page — Calcul au changement d'avis
 
-## 5. Commandes — Icône fournisseur visible avant expansion
+**Fichier** : `TrackingPage.tsx` (composant `DeliveryChoicePanel`)
 
-**Fichier** : `VendorOrderManager.tsx`
+- Quand le client choisit "Livraison à domicile" au stade hub (il avait choisi hub_pickup ou n'avait pas choisi), appeler `calculateLastMileFee()` avec l'adresse de la commande
+- Afficher le montant estimé avant confirmation
+- Permettre au client de choisir/modifier son adresse de livraison (sélection parmi ses adresses enregistrées)
+- Enregistrer le `last_mile_fee` calculé sur la commande
 
-- Dans la **ligne résumée** (non dépliée) de chaque commande, si `suppliersEnabled`, ajouter une icône 🚛 cliquable à côté du numéro de commande
-- Au clic, afficher un **popover/modal** listant pour chaque produit de la commande :
-  - Image produit du fournisseur (miniature)
-  - Nom de l'agent / plateforme
-  - Informations clés du fournisseur
+## 5. Récapitulatif checkout — Ligne last-mile visible
 
-**Fichier** : `SupplierPopover.tsx`
-
-- Modifier le fetch pour inclure `product_image_url`
-- Afficher l'image en miniature en haut du popover
-- Créer un nouveau composant `OrderSuppliersPopover` qui prend la liste des items de la commande et affiche les fournisseurs groupés par produit
-
-## 6. Affichage dans la liste fournisseurs (vendeur)
-
-**Fichier** : `VendorSuppliersTab.tsx`
-
-- Dans la liste des fournisseurs, afficher la miniature de l'image produit à la place de l'icône `User` générique
-- Afficher le nom de la plateforme résolu depuis `platform_id` (ou le champ texte legacy)
+Dans le récapitulatif de commande (étape confirmation), ajouter une ligne :
+- "Livraison locale : $X.XX" (ou "Gratuit" si hub_pickup, ou "À payer à réception" si déféré)
 
 ---
 
@@ -71,19 +65,16 @@ Ajouter une image produit au formulaire fournisseur, convertir le champ platefor
 
 | Fichier | Modification |
 |---------|-------------|
-| Migration SQL | `product_image_url` + `platform_id` sur `suppliers`, bucket `supplier-images` |
-| `AdminSupplierPlatformsPage.tsx` | Upload logo + mode édition |
-| `VendorSuppliersTab.tsx` | Upload image produit + plateforme en combobox |
-| `VendorProductManager.tsx` | Combobox fournisseur avec miniature image |
-| `VendorOrderManager.tsx` | Icône fournisseur en vue résumée commande |
-| `SupplierPopover.tsx` | Afficher image produit dans le popover |
-
----
+| `AdminGeographyPage.tsx` | Champs `delivery_fee`, `is_deliverable`, `delivery_surcharge` dans formulaires et tableaux |
+| `src/lib/last-mile-fee.ts` | Nouveau — utilitaire de calcul commune + quartier |
+| `CheckoutPage.tsx` | Calcul dynamique last-mile, intégration dans le total, choix paiement |
+| `TrackingPage.tsx` | Calcul last-mile au changement d'avis, sélection adresse |
 
 ## Section technique
 
-- Le bucket `supplier-images` sera public avec policy INSERT pour authenticated users et SELECT public
-- Le `MediaUploader` existant sera réutilisé tel quel (il gère déjà compression + upload vers Supabase Storage)
-- Le combobox plateforme dans le formulaire fournisseur fera un fetch `supplier_platforms` WHERE `is_active = true`
-- La migration conserve `platform_name` pour la rétro-compatibilité mais le code priorisera `platform_id` → nom résolu
+- Aucune migration SQL requise : les colonnes `communes.delivery_fee`, `communes.is_deliverable`, `quartiers.delivery_surcharge` existent déjà
+- Le calcul se fait côté client via des requêtes Supabase simples (lookup par nom de commune/quartier)
+- Le `lastMileFee` est recalculé à chaque changement d'adresse ou de `deliveryOption`
+- La formule : `total_last_mile = commune.delivery_fee + quartier.delivery_surcharge`
+- Rétro-compatibilité : si aucun montant n'est défini (0), la livraison locale reste gratuite
 
