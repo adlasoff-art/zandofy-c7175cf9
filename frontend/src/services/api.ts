@@ -41,6 +41,7 @@ export interface Product {
   trendTagId?: string;
   // Extended properties set by mapProduct
   storeIsVerified?: boolean;
+  storeIsCertified?: boolean;
   galleryImages?: Array<{ image_url: string; position: number }>;
   promoEndDate?: string | null;
   promoStartDate?: string | null;
