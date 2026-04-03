@@ -105,7 +105,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       selected: row.selected ?? true,
     })));
     setLoading(false);
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   useEffect(() => { fetchCart(); }, [fetchCart]);
 

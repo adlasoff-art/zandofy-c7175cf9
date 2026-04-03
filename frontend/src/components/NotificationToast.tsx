@@ -51,7 +51,8 @@ export function NotificationListener() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Listen for new notifications → play sound + update app badge
   useEffect(() => {
@@ -90,7 +91,8 @@ export function NotificationListener() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   return null;
 }
