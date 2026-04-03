@@ -335,6 +335,9 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${config.badgeClass}`}>
                     {config.label}
                   </span>
+                  {suppliersEnabled && (
+                    <OrderSuppliersPopover items={order.items.map(i => ({ product_id: i.product_id, product_name: i.product_name, product_image: i.product_image }))} />
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {order.shipping_first_name} {order.shipping_last_name} · {order.items.length} article(s) · ${Number(order.total).toFixed(2)}
