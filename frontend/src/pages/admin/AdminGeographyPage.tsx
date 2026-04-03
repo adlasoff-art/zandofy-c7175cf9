@@ -550,7 +550,7 @@ function QuartiersTab() {
             <h4 className="text-sm font-bold">{editId ? "Modifier" : "Nouveau quartier / bloc"}</h4>
             <button onClick={() => { setShowForm(false); setEditId(null); }}><X size={16} className="text-muted-foreground" /></button>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div><Label className="text-xs">Nom *</Label><Input className="mt-1" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
             <div>
               <Label className="text-xs">Commune *</Label>
@@ -559,6 +559,7 @@ function QuartiersTab() {
                 {communes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.city})</option>)}
               </select>
             </div>
+            <div><Label className="text-xs">Surcharge ($)</Label><Input className="mt-1" type="number" step="0.01" min="0" value={form.delivery_surcharge} onChange={e => setForm(f => ({ ...f, delivery_surcharge: e.target.value }))} /></div>
           </div>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-sm">
