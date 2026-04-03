@@ -85,7 +85,7 @@ export default function StorePage() {
         .eq("id", id!)
         .maybeSingle();
       if (error || !data) return null;
-      return data as StoreData;
+      return data as unknown as StoreData;
     },
     enabled: !!id,
   });
