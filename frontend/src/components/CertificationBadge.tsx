@@ -21,6 +21,7 @@ const CERT_CONFIG: Record<CertificationType, {
   bgClass: string;
   textClass: string;
   iconClass: string;
+  strokeWidth?: number;
 }> = {
   vendor: {
     label: "Vendeur Certifié",
@@ -29,6 +30,7 @@ const CERT_CONFIG: Record<CertificationType, {
     bgClass: "bg-[hsl(var(--cert-vendor))]",
     textClass: "text-[hsl(var(--cert-vendor))]",
     iconClass: "text-[hsl(var(--cert-vendor-foreground))]",
+    strokeWidth: 2.5,
   },
   rider: {
     label: "Livreur Certifié",
@@ -58,7 +60,7 @@ export function CertificationBadge({ type, variant = "icon-only", className = ""
         <Tooltip>
           <TooltipTrigger asChild>
             <div className={`w-5 h-5 rounded-full ${cfg.bgClass} flex items-center justify-center shrink-0 cursor-default ${className}`}>
-              <Icon size={10} className={cfg.iconClass} />
+              <Icon size={10} className={cfg.iconClass} strokeWidth={cfg.strokeWidth ?? 2} />
             </div>
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">
@@ -72,7 +74,7 @@ export function CertificationBadge({ type, variant = "icon-only", className = ""
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <div className={`w-6 h-6 rounded-full ${cfg.bgClass} flex items-center justify-center shrink-0`}>
-        <Icon size={13} className={cfg.iconClass} />
+        <Icon size={13} className={cfg.iconClass} strokeWidth={cfg.strokeWidth ?? 2} />
       </div>
       <span className={`text-xs font-semibold ${cfg.textClass}`}>
         {cfg.label}

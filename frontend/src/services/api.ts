@@ -114,7 +114,7 @@ export function mapProduct(row: any): Product {
     colors: row.product_colors?.map((c: any) => c.color_hex) || [],
     sizes: row.product_sizes?.map((s: any) => s.size_label) || [],
     moq: row.moq || 1,
-    verifiedYears: storeIsVerified ? storeVerifiedYears : 0,
+    verifiedYears: storeVerifiedYears,
     originCountry: row.origin_country || "",
     sku: row.sku || "",
     material: row.material || "",
