@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { SupplierPopover } from "@/components/vendor/SupplierPopover";
+import { SupplierPopover, OrderSuppliersPopover } from "@/components/vendor/SupplierPopover";
 import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send, Edit2, Truck, Search, Check, X } from "lucide-react";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { Button } from "@/components/ui/button";
