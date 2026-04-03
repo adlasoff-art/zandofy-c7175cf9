@@ -358,7 +358,7 @@ function CommunesTab() {
             {cities.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
           </select>
         </div>
-        <Button size="sm" className="mt-5" onClick={() => { setShowForm(true); setEditId(null); setForm({ name: "", city: filterCity, country_code: filterCountry }); }}>
+        <Button size="sm" className="mt-5" onClick={() => { setShowForm(true); setEditId(null); setForm({ name: "", city: filterCity, country_code: filterCountry, delivery_fee: "0", is_deliverable: true }); }}>
           <Plus size={14} className="mr-1" /> Ajouter
         </Button>
       </div>
