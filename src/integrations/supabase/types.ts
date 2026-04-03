@@ -5633,6 +5633,24 @@ export type Database = {
           updated_at: string
         }[]
       }
+      update_own_profile: {
+        Args: {
+          p_allowed_channels?: string[]
+          p_avatar_url?: string
+          p_date_of_birth?: string
+          p_first_name?: string
+          p_gender?: string
+          p_last_name?: string
+          p_nationality?: string
+          p_notifications_enabled?: boolean
+          p_phone?: string
+          p_preferred_contact_channel?: string
+          p_preferred_language?: string
+          p_residence_address?: string
+          p_residence_city?: string
+        }
+        Returns: undefined
+      }
       update_store_presence: {
         Args: { p_store_id: string }
         Returns: undefined
