@@ -214,13 +214,10 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
           <span className="text-[10px] text-muted-foreground">| {(product as any).salesCount ?? product.reviewCount} {t("product.sold")}</span>
         </div>
 
-        {/* Certification badge below rating — only if store is verified */}
-        {(product as any).storeIsVerified && product.verifiedYears > 0 && (
+        {/* Certification badge — only if store is certified */}
+        {(product as any).storeIsCertified && (
           <div className="mt-1 flex items-center gap-1">
-            <VerificationBadge variant="icon-only" verifiedYears={product.verifiedYears} />
-            {(product as any).storeIsCertified && (
-              <CertificationBadge type="vendor" variant="icon-only" />
-            )}
+            <CertificationBadge type="vendor" variant="icon-only" />
           </div>
         )}
 

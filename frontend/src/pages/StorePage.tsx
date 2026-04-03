@@ -319,7 +319,7 @@ export default function StorePage() {
                         {store.name}
                       </h1>
                       {store.is_verified && (
-                        <VerificationBadge variant="icon-only" verifiedYears={store.verified_years} />
+                        <VerificationBadge variant="icon-only" verifiedYears={store.verified_years_override ?? store.verified_years} storeCreatedAt={(store as any).created_at} />
                       )}
                       {(store as any).is_certified && (
                         <CertificationBadge type="vendor" variant="icon-only" />
@@ -329,9 +329,12 @@ export default function StorePage() {
                       {store.is_online ? (
                         <span className="text-emerald-600 font-medium">En ligne</span>
                       ) : <span className="text-amber-600">Hors ligne</span>}
-                      {store.verified_years != null && store.verified_years > 0 && (
+                      {store.is_verified && (
                         <span className="ml-2">
-                          · <ShieldCheck size={12} className="inline" /> Vérifié depuis {store.verified_years} ans
+                          · <ShieldCheck size={12} className="inline" /> {(() => {
+                            const { computeStoreYears, formatStoreYears } = require("@/lib/store-years");
+                            return `Vérifié · ${formatStoreYears(computeStoreYears(store.verified_years_override, store.verified_years, (store as any).created_at))}`;
+                          })()}
                         </span>
                       )}
                     </p>

@@ -891,7 +891,7 @@ export default function ProductPage() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-foreground">{(product as any).store.name}</span>
-                            <VerificationBadge variant="icon-only" verifiedYears={(product as any).store.verified_years} />
+                            <VerificationBadge variant="icon-only" verifiedYears={(product as any).store.verified_years_override ?? (product as any).store.verified_years} storeCreatedAt={(product as any).store.created_at} />
                             {(product as any).store.is_certified && (
                               <CertificationBadge type="vendor" variant="icon-only" />
                             )}
