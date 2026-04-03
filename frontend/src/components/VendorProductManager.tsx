@@ -20,6 +20,7 @@ interface Supplier {
   id: string;
   agent_name: string;
   platform_name: string;
+  product_image_url: string | null;
 }
 
 interface Product {
@@ -188,7 +189,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       if (data) setTrendTags(data);
     });
     if (user) {
-      (supabase as any).from("suppliers").select("id, agent_name, platform_name").eq("vendor_id", user.id).order("agent_name").then(({ data }: any) => {
+      (supabase as any).from("suppliers").select("id, agent_name, platform_name, product_image_url").eq("vendor_id", user.id).order("agent_name").then(({ data }: any) => {
         if (data) setSuppliers(data);
       });
     }
@@ -661,16 +662,28 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
           {suppliersEnabled && (
           <div>
             <label className="text-xs text-muted-foreground">🏭 Fournisseur</label>
-            <select
-              className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md"
-              value={form.supplier_id}
-              onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
-            >
-              <option value="">— Aucun —</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>{s.agent_name}{s.platform_name ? ` (${s.platform_name})` : ""}</option>
-              ))}
-            </select>
+            <div className="relative mt-1">
+              <select
+                className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md"
+                value={form.supplier_id}
+                onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
+              >
+                <option value="">— Aucun —</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>{s.agent_name}{s.platform_name ? ` (${s.platform_name})` : ""}</option>
+                ))}
+              </select>
+              {/* Supplier thumbnail preview */}
+              {form.supplier_id && (() => {
+                const sel = suppliers.find(s => s.id === form.supplier_id);
+                return sel?.product_image_url ? (
+                  <div className="mt-2 flex items-center gap-2 bg-muted/30 rounded-md p-2">
+                    <img src={sel.product_image_url} alt="" className="w-10 h-10 rounded object-cover border border-border" />
+                    <span className="text-xs text-muted-foreground">{sel.agent_name}</span>
+                  </div>
+                ) : null;
+              })()}
+            </div>
             {suppliers.length === 0 && (
               <p className="text-[10px] text-muted-foreground mt-1">Ajoutez vos fournisseurs dans l'onglet "Fournisseurs"</p>
             )}

@@ -4422,7 +4422,9 @@ export type Database = {
           direct_contact: string | null
           email: string
           id: string
+          platform_id: string | null
           platform_name: string
+          product_image_url: string | null
           seniority: string | null
           store_url: string | null
           updated_at: string
@@ -4435,7 +4437,9 @@ export type Database = {
           direct_contact?: string | null
           email?: string
           id?: string
+          platform_id?: string | null
           platform_name?: string
+          product_image_url?: string | null
           seniority?: string | null
           store_url?: string | null
           updated_at?: string
@@ -4448,13 +4452,23 @@ export type Database = {
           direct_contact?: string | null
           email?: string
           id?: string
+          platform_id?: string | null
           platform_name?: string
+          product_image_url?: string | null
           seniority?: string | null
           store_url?: string | null
           updated_at?: string
           vendor_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       support_messages: {
         Row: {
