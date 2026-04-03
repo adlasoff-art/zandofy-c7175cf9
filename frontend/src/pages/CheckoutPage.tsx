@@ -103,6 +103,8 @@ export default function CheckoutPage() {
   // Delivery option (home vs hub)
   const [deliveryOption, setDeliveryOption] = useState<DeliveryOption>("none");
   const [lastMilePayment, setLastMilePayment] = useState<LastMilePayment>("pay_with_shipping");
+  const [lastMileResult, setLastMileResult] = useState<LastMileFeeResult | null>(null);
+  const [lastMileLoading, setLastMileLoading] = useState(false);
 
   // Deferred payment retry state
   const [retryPhone, setRetryPhone] = useState("");
