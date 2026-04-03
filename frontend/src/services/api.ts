@@ -85,7 +85,6 @@ export function mapProduct(row: any): Product {
   const storeIsCertified = storeData?.is_certified ?? false;
 
   // Compute seniority: override > auto DB value > computed from created_at
-  const { computeStoreYears } = require("@/lib/store-years");
   const storeVerifiedYears = computeStoreYears(
     storeData?.verified_years_override,
     storeData?.verified_years,
