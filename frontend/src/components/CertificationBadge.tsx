@@ -29,6 +29,7 @@ const CERT_CONFIG: Record<CertificationType, {
     bgClass: "bg-[hsl(var(--cert-vendor))]",
     textClass: "text-[hsl(var(--cert-vendor))]",
     iconClass: "text-[hsl(var(--cert-vendor-foreground))]",
+    strokeWidth: 2.5,
   },
   rider: {
     label: "Livreur Certifié",
