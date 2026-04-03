@@ -340,11 +340,6 @@ export default function StorePage() {
                       {store.is_online ? (
                         <span className="text-emerald-600 font-medium">En ligne</span>
                       ) : <span className="text-amber-600">Hors ligne</span>}
-                      {store.is_verified && (
-                        <span className="ml-2">
-                          · <ShieldCheck size={12} className="inline" /> Vérifié · {formatStoreYears(computeStoreYears(store.verified_years_override, store.verified_years, store.created_at))}
-                        </span>
-                      )}
                     </p>
                     {store.description && (
                       <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 mt-1">{store.description}</p>
