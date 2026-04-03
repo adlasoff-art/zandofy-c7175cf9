@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckoutShippingCalculator } from "@/components/CheckoutShippingCalculator";
+import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
 import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
 import { useI18n } from "@/contexts/I18nContext";
@@ -102,6 +103,8 @@ export default function CheckoutPage() {
   // Delivery option (home vs hub)
   const [deliveryOption, setDeliveryOption] = useState<DeliveryOption>("none");
   const [lastMilePayment, setLastMilePayment] = useState<LastMilePayment>("pay_with_shipping");
+  const [lastMileResult, setLastMileResult] = useState<LastMileFeeResult | null>(null);
+  const [lastMileLoading, setLastMileLoading] = useState(false);
 
   // Deferred payment retry state
   const [retryPhone, setRetryPhone] = useState("");
@@ -275,11 +278,26 @@ export default function CheckoutPage() {
 
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
-  // Last-mile fee removed from checkout — calculated at hub arrival stage
-  const lastMileFee = 0;
-  const effectiveLastMile = 0;
+  // Last-mile fee calculation
+  const lastMileFee = deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
+  const effectiveLastMile = deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping" ? lastMileFee : 0;
   
-  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping);
+  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping + effectiveLastMile);
+
+  // Recalculate last-mile fee when address or delivery option changes
+  useEffect(() => {
+    if (deliveryOption !== "home_delivery" || !shipping.commune || !shipping.city) {
+      setLastMileResult(null);
+      return;
+    }
+    setLastMileLoading(true);
+    calculateLastMileFee(shipping.commune, shipping.quartier, shipping.city, shipping.country)
+      .then(result => {
+        setLastMileResult(result);
+        setLastMileLoading(false);
+      })
+      .catch(() => setLastMileLoading(false));
+  }, [deliveryOption, shipping.commune, shipping.quartier, shipping.city, shipping.country]);
 
   // Load saved addresses
   useEffect(() => {
@@ -560,9 +578,9 @@ export default function CheckoutPage() {
           discount_amount: orderDiscount,
           shipping_payment_status: shippingPaymentChoice === "pay_on_arrival" ? "deferred" : "paid",
           delivery_choice: deliveryOption !== "none" ? deliveryOption : null,
-          last_mile_fee: 0,
-          last_mile_payment_method: null,
-          last_mile_payment_status: null,
+          last_mile_fee: deliveryOption === "home_delivery" ? lastMileFee : 0,
+          last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod") : null,
+          last_mile_payment_status: deliveryOption === "home_delivery" && lastMileFee > 0 ? (lastMilePayment === "pay_with_shipping" ? "paid" : "deferred") : null,
         } as any)
         .select("id")
         .single();
@@ -1045,23 +1063,26 @@ export default function CheckoutPage() {
                   )}
 
                   {/* Delivery option: home vs hub */}
-                  <div className="pt-3 border-t border-border space-y-2">
+                   <div className="pt-3 border-t border-border space-y-2">
                     <p className="text-sm font-medium text-foreground flex items-center gap-2">
                       <Home size={14} className="text-primary" /> Option de livraison
                     </p>
                     <div className="space-y-2">
                       {[
-                        { key: "home_delivery" as DeliveryOption, label: "🚚 Livraison à domicile", desc: "Recevez votre colis directement chez vous — rapide et sans effort !" },
-                        { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait au Hub", desc: "Récupérez votre colis au point de collecte (gratuit)" },
+                        { key: "home_delivery" as DeliveryOption, label: "🚚 Livraison à domicile", desc: lastMileLoading ? "Calcul en cours..." : lastMileResult && lastMileResult.fee > 0 ? `Frais estimés : $${lastMileResult.fee.toFixed(2)}` : "Recevez votre colis directement chez vous", disabled: lastMileResult ? !lastMileResult.deliverable : false },
+                        { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait au Hub", desc: "Récupérez votre colis au point de collecte (gratuit)", disabled: false },
                       ].map(opt => (
                         <button
                           key={opt.key}
                           type="button"
-                          onClick={() => setDeliveryOption(opt.key)}
+                          disabled={opt.disabled}
+                          onClick={() => !opt.disabled && setDeliveryOption(opt.key)}
                           className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${
-                            deliveryOption === opt.key
-                              ? "border-primary bg-secondary"
-                              : "border-border hover:border-primary/50"
+                            opt.disabled
+                              ? "border-border bg-muted/40 opacity-60 cursor-not-allowed"
+                              : deliveryOption === opt.key
+                                ? "border-primary bg-secondary"
+                                : "border-border hover:border-primary/50"
                           }`}
                         >
                           <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
@@ -1077,7 +1098,46 @@ export default function CheckoutPage() {
                       ))}
                     </div>
 
-                    {/* Last-mile choice deferred to hub arrival — no payment option at checkout */}
+                    {/* Zone not deliverable warning */}
+                    {lastMileResult && !lastMileResult.deliverable && deliveryOption === "home_delivery" && (
+                      <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded">
+                        ⚠️ Livraison non disponible dans votre zone{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}. Veuillez choisir le retrait au Hub.
+                      </p>
+                    )}
+
+                    {/* Last-mile payment choice */}
+                    {deliveryOption === "home_delivery" && lastMileResult?.deliverable && lastMileFee > 0 && (
+                      <div className="bg-muted/50 rounded-lg p-3 space-y-2 mt-2">
+                        <p className="text-xs font-medium text-foreground">Paiement de la livraison locale : ${lastMileFee.toFixed(2)}</p>
+                        <div className="space-y-1.5">
+                          {[
+                            { key: "pay_with_shipping" as LastMilePayment, label: "Inclure dans le total", desc: `Ajouter $${lastMileFee.toFixed(2)} au paiement` },
+                            { key: "pay_cash_on_delivery" as LastMilePayment, label: "Payer à la réception", desc: "Régler au livreur à la livraison" },
+                          ].map(opt => (
+                            <button
+                              key={opt.key}
+                              type="button"
+                              onClick={() => setLastMilePayment(opt.key)}
+                              className={`w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left ${
+                                lastMilePayment === opt.key
+                                  ? "border-primary bg-secondary"
+                                  : "border-border hover:border-primary/50"
+                              }`}
+                            >
+                              <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                lastMilePayment === opt.key ? "border-primary" : "border-border"
+                              }`}>
+                                {lastMilePayment === opt.key && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-foreground">{opt.label}</p>
+                                <p className="text-[10px] text-muted-foreground">{opt.desc}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <Button type="submit" className="w-full h-12 font-bold mt-2">
@@ -1559,7 +1619,16 @@ export default function CheckoutPage() {
                       </span>
                     )}
                   </div>
-                  {/* Last-mile fee shown at hub arrival, not checkout */}
+                  {deliveryOption === "home_delivery" && lastMileFee > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Livraison locale</span>
+                      {lastMilePayment === "pay_cash_on_delivery" ? (
+                        <span className="text-amber-600 font-medium text-xs">${lastMileFee.toFixed(2)} — à la réception</span>
+                      ) : (
+                        <span className="text-foreground">${lastMileFee.toFixed(2)}</span>
+                      )}
+                    </div>
+                  )}
                   {deliveryOption === "hub_pickup" && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Livraison</span>

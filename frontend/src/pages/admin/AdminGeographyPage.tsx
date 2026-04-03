@@ -13,8 +13,8 @@ import { toast } from "sonner";
 // Types
 interface ProvinceRow { id: string; name: string; country_code: string; is_active: boolean }
 interface CityRow { id: string; name: string; country_code: string; province_id: string | null; latitude: number; longitude: number; population: number | null }
-interface CommuneRow { id: string; city: string; country_code: string; name: string; is_active: boolean }
-interface QuartierRow { id: string; commune_id: string; name: string; is_active: boolean; is_restricted: boolean; restriction_reason: string | null }
+interface CommuneRow { id: string; city: string; country_code: string; name: string; is_active: boolean; delivery_fee: number; is_deliverable: boolean }
+interface QuartierRow { id: string; commune_id: string; name: string; is_active: boolean; is_restricted: boolean; restriction_reason: string | null; delivery_surcharge: number }
 
 const selectClass = "mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-card";
 
@@ -282,7 +282,7 @@ function CommunesTab() {
   const [filterCity, setFilterCity] = useState("");
   const [provinces, setProvinces] = useState<ProvinceRow[]>([]);
   const [cities, setCities] = useState<{ name: string }[]>([]);
-  const [form, setForm] = useState({ name: "", city: "", country_code: "CD" });
+  const [form, setForm] = useState({ name: "", city: "", country_code: "CD", delivery_fee: "0", is_deliverable: true });
   const [editId, setEditId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
 
@@ -313,7 +313,7 @@ function CommunesTab() {
 
   const handleSave = async () => {
     if (!form.name || !form.city) { toast.error("Nom et ville requis"); return; }
-    const payload = { name: form.name, city: form.city, country_code: form.country_code };
+    const payload = { name: form.name, city: form.city, country_code: form.country_code, delivery_fee: parseFloat(form.delivery_fee) || 0, is_deliverable: form.is_deliverable };
     if (editId) {
       await (supabase as any).from("communes").update(payload).eq("id", editId);
     } else {
@@ -321,13 +321,13 @@ function CommunesTab() {
     }
     setShowForm(false);
     setEditId(null);
-    setForm({ name: "", city: filterCity || "", country_code: filterCountry });
+    setForm({ name: "", city: filterCity || "", country_code: filterCountry, delivery_fee: "0", is_deliverable: true });
     fetch();
     toast.success(editId ? "Commune modifiée" : "Commune ajoutée");
   };
 
   const handleEdit = (c: CommuneRow) => {
-    setForm({ name: c.name, city: c.city, country_code: c.country_code });
+    setForm({ name: c.name, city: c.city, country_code: c.country_code, delivery_fee: String(c.delivery_fee || 0), is_deliverable: c.is_deliverable !== false });
     setEditId(c.id);
     setShowForm(true);
   };
@@ -358,7 +358,7 @@ function CommunesTab() {
             {cities.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
           </select>
         </div>
-        <Button size="sm" className="mt-5" onClick={() => { setShowForm(true); setEditId(null); setForm({ name: "", city: filterCity, country_code: filterCountry }); }}>
+        <Button size="sm" className="mt-5" onClick={() => { setShowForm(true); setEditId(null); setForm({ name: "", city: filterCity, country_code: filterCountry, delivery_fee: "0", is_deliverable: true }); }}>
           <Plus size={14} className="mr-1" /> Ajouter
         </Button>
       </div>
@@ -369,7 +369,7 @@ function CommunesTab() {
             <h4 className="text-sm font-bold">{editId ? "Modifier" : "Nouvelle commune / département"}</h4>
             <button onClick={() => { setShowForm(false); setEditId(null); }}><X size={16} className="text-muted-foreground" /></button>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div><Label className="text-xs">Nom *</Label><Input className="mt-1" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
             <div>
               <Label className="text-xs">Ville *</Label>
@@ -379,6 +379,13 @@ function CommunesTab() {
               </select>
             </div>
             <div><CountryCombobox value={form.country_code} onChange={v => setForm(f => ({ ...f, country_code: v }))} label="Pays" showNone={false} /></div>
+            <div><Label className="text-xs">Frais livraison ($)</Label><Input className="mt-1" type="number" step="0.01" min="0" value={form.delivery_fee} onChange={e => setForm(f => ({ ...f, delivery_fee: e.target.value }))} /></div>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.is_deliverable} onChange={e => setForm(f => ({ ...f, is_deliverable: e.target.checked }))} className="rounded border-border" />
+              Zone livrable
+            </label>
           </div>
           <Button size="sm" onClick={handleSave}><Save size={14} className="mr-1" /> {editId ? "Modifier" : "Ajouter"}</Button>
         </div>
@@ -393,6 +400,8 @@ function CommunesTab() {
               <TableHead>Commune / Département</TableHead>
               <TableHead>Ville</TableHead>
               <TableHead>Pays</TableHead>
+              <TableHead>Frais ($)</TableHead>
+              <TableHead>Livrable</TableHead>
               <TableHead className="w-20">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -402,6 +411,14 @@ function CommunesTab() {
                 <TableCell className="font-medium">{c.name}</TableCell>
                 <TableCell>{c.city}</TableCell>
                 <TableCell>{getCountryName(c.country_code)}</TableCell>
+                <TableCell>{(c.delivery_fee || 0).toFixed(2)}</TableCell>
+                <TableCell>
+                  {c.is_deliverable !== false ? (
+                    <span className="text-xs text-primary">Oui</span>
+                  ) : (
+                    <span className="text-xs text-destructive">Non</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   <div className="flex gap-1">
                     <button onClick={() => handleEdit(c)} className="p-1 text-muted-foreground hover:text-primary"><Edit2 size={14} /></button>
@@ -410,7 +427,7 @@ function CommunesTab() {
                 </TableCell>
               </TableRow>
             ))}
-            {communes.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Aucune commune</TableCell></TableRow>}
+            {communes.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Aucune commune</TableCell></TableRow>}
           </TableBody>
         </Table>
       )}
@@ -429,7 +446,7 @@ function QuartiersTab() {
   const [filterCommune, setFilterCommune] = useState("");
   const [provinces, setProvinces] = useState<ProvinceRow[]>([]);
   const [cities, setCities] = useState<string[]>([]);
-  const [form, setForm] = useState({ name: "", commune_id: "", is_restricted: false, restriction_reason: "" });
+  const [form, setForm] = useState({ name: "", commune_id: "", is_restricted: false, restriction_reason: "", delivery_surcharge: "0" });
   const [editId, setEditId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
 
@@ -468,7 +485,7 @@ function QuartiersTab() {
 
   const handleSave = async () => {
     if (!form.name || !form.commune_id) { toast.error("Nom et commune requis"); return; }
-    const payload = { name: form.name, commune_id: form.commune_id, is_restricted: form.is_restricted, restriction_reason: form.restriction_reason || null };
+    const payload = { name: form.name, commune_id: form.commune_id, is_restricted: form.is_restricted, restriction_reason: form.restriction_reason || null, delivery_surcharge: parseFloat(form.delivery_surcharge) || 0 };
     if (editId) {
       await (supabase as any).from("quartiers").update(payload).eq("id", editId);
     } else {
@@ -476,13 +493,13 @@ function QuartiersTab() {
     }
     setShowForm(false);
     setEditId(null);
-    setForm({ name: "", commune_id: filterCommune, is_restricted: false, restriction_reason: "" });
+    setForm({ name: "", commune_id: filterCommune, is_restricted: false, restriction_reason: "", delivery_surcharge: "0" });
     fetch();
     toast.success(editId ? "Quartier modifié" : "Quartier ajouté");
   };
 
   const handleEdit = (q: QuartierRow) => {
-    setForm({ name: q.name, commune_id: q.commune_id, is_restricted: q.is_restricted, restriction_reason: q.restriction_reason || "" });
+    setForm({ name: q.name, commune_id: q.commune_id, is_restricted: q.is_restricted, restriction_reason: q.restriction_reason || "", delivery_surcharge: String(q.delivery_surcharge || 0) });
     setEditId(q.id);
     setShowForm(true);
   };
@@ -522,7 +539,7 @@ function QuartiersTab() {
             {communes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.city})</option>)}
           </select>
         </div>
-        <Button size="sm" className="mt-5" onClick={() => { setShowForm(true); setEditId(null); setForm({ name: "", commune_id: filterCommune, is_restricted: false, restriction_reason: "" }); }}>
+        <Button size="sm" className="mt-5" onClick={() => { setShowForm(true); setEditId(null); setForm({ name: "", commune_id: filterCommune, is_restricted: false, restriction_reason: "", delivery_surcharge: "0" }); }}>
           <Plus size={14} className="mr-1" /> Ajouter
         </Button>
       </div>
@@ -533,7 +550,7 @@ function QuartiersTab() {
             <h4 className="text-sm font-bold">{editId ? "Modifier" : "Nouveau quartier / bloc"}</h4>
             <button onClick={() => { setShowForm(false); setEditId(null); }}><X size={16} className="text-muted-foreground" /></button>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div><Label className="text-xs">Nom *</Label><Input className="mt-1" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
             <div>
               <Label className="text-xs">Commune *</Label>
@@ -542,6 +559,7 @@ function QuartiersTab() {
                 {communes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.city})</option>)}
               </select>
             </div>
+            <div><Label className="text-xs">Surcharge ($)</Label><Input className="mt-1" type="number" step="0.01" min="0" value={form.delivery_surcharge} onChange={e => setForm(f => ({ ...f, delivery_surcharge: e.target.value }))} /></div>
           </div>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-sm">
@@ -564,6 +582,7 @@ function QuartiersTab() {
             <TableRow>
               <TableHead>Quartier / Bloc</TableHead>
               <TableHead>Commune</TableHead>
+              <TableHead>Surcharge ($)</TableHead>
               <TableHead>Restreint</TableHead>
               <TableHead className="w-20">Actions</TableHead>
             </TableRow>
@@ -573,6 +592,7 @@ function QuartiersTab() {
               <TableRow key={q.id}>
                 <TableCell className="font-medium">{q.name}</TableCell>
                 <TableCell>{getCommuneName(q.commune_id)}</TableCell>
+                <TableCell>{(q.delivery_surcharge || 0).toFixed(2)}</TableCell>
                 <TableCell>
                   {q.is_restricted ? (
                     <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded">{q.restriction_reason || "Oui"}</span>
@@ -586,7 +606,7 @@ function QuartiersTab() {
                 </TableCell>
               </TableRow>
             ))}
-            {quartiers.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Aucun quartier</TableCell></TableRow>}
+            {quartiers.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Aucun quartier</TableCell></TableRow>}
           </TableBody>
         </Table>
       )}
