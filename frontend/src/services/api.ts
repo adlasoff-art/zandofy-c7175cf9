@@ -81,7 +81,15 @@ export interface Category {
 export function mapProduct(row: any): Product {
   const storeData = row.stores;
   const storeIsVerified = storeData?.is_verified ?? false;
-  const storeVerifiedYears = storeData?.verified_years_override ?? storeData?.verified_years ?? 0;
+  const storeIsCertified = storeData?.is_certified ?? false;
+
+  // Compute seniority: override > auto DB value > computed from created_at
+  const { computeStoreYears } = require("@/lib/store-years");
+  const storeVerifiedYears = computeStoreYears(
+    storeData?.verified_years_override,
+    storeData?.verified_years,
+    storeData?.created_at
+  );
 
   const realReviewCount = row.review_count_override ?? row.review_count ?? 0;
   const realRating = Number(row.rating) || 0;
