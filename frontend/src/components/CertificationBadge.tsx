@@ -74,7 +74,7 @@ export function CertificationBadge({ type, variant = "icon-only", className = ""
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <div className={`w-6 h-6 rounded-full ${cfg.bgClass} flex items-center justify-center shrink-0`}>
-        <Icon size={13} className={cfg.iconClass} />
+        <Icon size={13} className={cfg.iconClass} strokeWidth={cfg.strokeWidth ?? 2} />
       </div>
       <span className={`text-xs font-semibold ${cfg.textClass}`}>
         {cfg.label}
