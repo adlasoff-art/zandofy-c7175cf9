@@ -446,7 +446,7 @@ function QuartiersTab() {
   const [filterCommune, setFilterCommune] = useState("");
   const [provinces, setProvinces] = useState<ProvinceRow[]>([]);
   const [cities, setCities] = useState<string[]>([]);
-  const [form, setForm] = useState({ name: "", commune_id: "", is_restricted: false, restriction_reason: "" });
+  const [form, setForm] = useState({ name: "", commune_id: "", is_restricted: false, restriction_reason: "", delivery_surcharge: "0" });
   const [editId, setEditId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
 
