@@ -132,6 +132,7 @@ export function mapProduct(row: any): Product {
     prepDaysMax: row.prep_days_max ?? 5,
     trendTagId: row.trend_tag_id || undefined,
     storeIsVerified,
+    storeIsCertified,
     galleryImages: row.product_images || [],
     promoEndDate: row.promo_end_date || null,
     promoStartDate: row.promo_start_date || null,
