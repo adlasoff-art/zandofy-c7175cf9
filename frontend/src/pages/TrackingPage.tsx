@@ -234,8 +234,7 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
   useEffect(() => {
     const fetchFee = async () => {
       setLmLoading(true);
-      // Get full address from order
-      const { data: orderData } = await supabase
+      const { data: orderData } = await (supabase as any)
         .from("orders")
         .select("shipping_commune, shipping_quartier, shipping_city, shipping_country")
         .eq("id", order.id)
