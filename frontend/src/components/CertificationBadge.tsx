@@ -21,6 +21,7 @@ const CERT_CONFIG: Record<CertificationType, {
   bgClass: string;
   textClass: string;
   iconClass: string;
+  strokeWidth?: number;
 }> = {
   vendor: {
     label: "Vendeur Certifié",
