@@ -189,13 +189,25 @@ export function OrderSuppliersPopover({ items }: { items: { product_id: string |
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground truncate">{item.product_name}</p>
                     {sup ? (
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-start gap-2 mt-0.5">
                         {sup.product_image_url && (
                           <img src={sup.product_image_url} alt="" className="w-6 h-6 rounded object-cover shrink-0 border border-border" />
                         )}
-                        <div>
+                        <div className="flex-1 min-w-0">
                           <p className="text-muted-foreground">{sup.agent_name}{sup.platform_name ? ` · ${sup.platform_name}` : ""}</p>
                           {sup.direct_contact && <p className="text-muted-foreground">{sup.direct_contact}</p>}
+                          {sup.store_url && (
+                            <a
+                              href={sup.store_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-primary hover:underline mt-0.5"
+                              title={sup.store_url}
+                            >
+                              <ExternalLink size={10} className="shrink-0" />
+                              <span>Boutique fournisseur</span>
+                            </a>
+                          )}
                         </div>
                       </div>
                     ) : (
