@@ -80,7 +80,7 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
 
   const loadSuppliers = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    setLoading(prev => suppliers.length === 0 ? true : prev);
     const { data } = await (supabase as any)
       .from("suppliers")
       .select("id, agent_name, platform_name, platform_id, store_url, direct_contact, email, seniority, average_processing_time, product_image_url, created_at")
@@ -88,11 +88,13 @@ export function VendorSuppliersTab({ storeId }: { storeId: string }) {
       .order("created_at", { ascending: false });
     setSuppliers(data || []);
     setLoading(false);
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   useEffect(() => {
     loadSuppliers();
-  }, [loadSuppliers]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getPlatformName = (s: Supplier): string => {
     if (s.platform_id) {
