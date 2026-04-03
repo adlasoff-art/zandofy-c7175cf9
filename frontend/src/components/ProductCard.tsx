@@ -6,8 +6,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useCompare } from "@/contexts/CompareContext";
 import { useI18n } from "@/contexts/I18nContext";
-import { VerificationBadge } from "@/components/VerificationBadge";
 import { CertificationBadge } from "@/components/CertificationBadge";
+import { formatStoreYears } from "@/lib/store-years";
 import type { Product } from "@/services/api";
 
 interface ProductCardProps {
