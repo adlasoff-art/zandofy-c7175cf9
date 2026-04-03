@@ -369,7 +369,7 @@ function CommunesTab() {
             <h4 className="text-sm font-bold">{editId ? "Modifier" : "Nouvelle commune / département"}</h4>
             <button onClick={() => { setShowForm(false); setEditId(null); }}><X size={16} className="text-muted-foreground" /></button>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div><Label className="text-xs">Nom *</Label><Input className="mt-1" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
             <div>
               <Label className="text-xs">Ville *</Label>
@@ -379,6 +379,13 @@ function CommunesTab() {
               </select>
             </div>
             <div><CountryCombobox value={form.country_code} onChange={v => setForm(f => ({ ...f, country_code: v }))} label="Pays" showNone={false} /></div>
+            <div><Label className="text-xs">Frais livraison ($)</Label><Input className="mt-1" type="number" step="0.01" min="0" value={form.delivery_fee} onChange={e => setForm(f => ({ ...f, delivery_fee: e.target.value }))} /></div>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.is_deliverable} onChange={e => setForm(f => ({ ...f, is_deliverable: e.target.checked }))} className="rounded border-border" />
+              Zone livrable
+            </label>
           </div>
           <Button size="sm" onClick={handleSave}><Save size={14} className="mr-1" /> {editId ? "Modifier" : "Ajouter"}</Button>
         </div>
