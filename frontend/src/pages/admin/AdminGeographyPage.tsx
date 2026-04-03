@@ -313,7 +313,7 @@ function CommunesTab() {
 
   const handleSave = async () => {
     if (!form.name || !form.city) { toast.error("Nom et ville requis"); return; }
-    const payload = { name: form.name, city: form.city, country_code: form.country_code };
+    const payload = { name: form.name, city: form.city, country_code: form.country_code, delivery_fee: parseFloat(form.delivery_fee) || 0, is_deliverable: form.is_deliverable };
     if (editId) {
       await (supabase as any).from("communes").update(payload).eq("id", editId);
     } else {
@@ -321,7 +321,7 @@ function CommunesTab() {
     }
     setShowForm(false);
     setEditId(null);
-    setForm({ name: "", city: filterCity || "", country_code: filterCountry });
+    setForm({ name: "", city: filterCity || "", country_code: filterCountry, delivery_fee: "0", is_deliverable: true });
     fetch();
     toast.success(editId ? "Commune modifiée" : "Commune ajoutée");
   };
