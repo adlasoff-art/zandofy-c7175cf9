@@ -15,6 +15,8 @@ interface VendorProfileCardProps {
     logo_url?: string | null;
     is_verified?: boolean | null;
     verified_years?: number | null;
+    verified_years_override?: number | null;
+    created_at?: string | null;
     followers_count?: number | null;
     followers_override?: number | null;
     products_count?: number | null;
@@ -24,6 +26,7 @@ interface VendorProfileCardProps {
     sales_trend?: string | null;
     is_online?: boolean | null;
     whatsapp_number?: string | null;
+    is_certified?: boolean | null;
   };
   productName: string;
   productId: string;
