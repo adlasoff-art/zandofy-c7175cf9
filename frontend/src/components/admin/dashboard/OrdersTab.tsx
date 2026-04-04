@@ -111,15 +111,15 @@ export function OrdersTab({ period, geoFilters }: Props) {
 
         let revenue = 0, costReal = 0, costCalc = 0;
         const enrichedItems = items.map((item: any) => {
-          const product = productMap.get(item.product_id);
+          const product = productMap.get(item.product_id) as any;
           const qty = item.quantity || 1;
           const rev = (item.price || 0) * qty;
-          const cr = (product?.cost_real || 0) * qty;
-          const cc = (product?.cost_calc || 0) * qty;
+          const cr = Number(product?.cost_real || 0) * qty;
+          const cc = Number(product?.cost_calc || 0) * qty;
           revenue += rev;
           costReal += cr;
           costCalc += cc;
-          return { ...item, costReal: product?.cost_real || 0, costCalc: product?.cost_calc || 0, revenue: rev };
+          return { ...item, costReal: Number(product?.cost_real || 0), costCalc: Number(product?.cost_calc || 0), revenue: rev };
         });
 
         const gatewayFee = revenue * (gatewayPct / 100);
