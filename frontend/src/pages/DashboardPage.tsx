@@ -203,6 +203,8 @@ export default function DashboardPage() {
       "shipping_payment_proof_url",
       "last_mile_payment_proof_url",
       "hub_pickup_proof_url",
+      "delivery_date_requested",
+      "delivery_time_requested",
     ]);
     setOrders(ordersWithOptionalFields);
     setLoading(false);
