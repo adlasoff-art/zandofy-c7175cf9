@@ -420,8 +420,8 @@ export default function ProductPage() {
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-48 p-1">
                   {(() => {
-                    const shareProxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-proxy?product=${product.id}`;
-                    const shareText = `${product.nameFr}${product.sku ? `\nSKU : ${product.sku}` : ""}${product.price ? `\nPrix : $${product.price.toFixed(2)}` : ""}\n${shareProxyUrl}`;
+                    const productUrl = `${window.location.origin}/product/${product.slug || product.id}`;
+                    const shareText = `${product.nameFr}${product.sku ? `\nSKU : ${product.sku}` : ""}${product.price ? `\nPrix : $${product.price.toFixed(2)}` : ""}\n${productUrl}`;
                     return (
                       <>
                         <a
