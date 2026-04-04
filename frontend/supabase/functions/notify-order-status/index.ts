@@ -103,7 +103,7 @@ function buildEmailHtml(heading: string, body: string, orderRef: string, emoji: 
               <p style="margin:4px 0 0;font-size:16px;font-weight:bold;color:#1a1a1a;font-family:monospace;">${orderRef}</p>
             </td></tr>
           </table>
-          <a href="https://zandofy.lovable.app/tracking" style="display:inline-block;padding:12px 28px;background:#000;color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Suivre ma commande</a>
+          <a href="${Deno.env.get("SITE_BASE_URL") || "https://zandofy.com"}/tracking" style="display:inline-block;padding:12px 28px;background:#000;color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Suivre ma commande</a>
         </td></tr>
         <tr><td style="padding:24px 32px 32px;">
           <p style="margin:0;font-size:12px;color:#aaa;">Zandofy — Votre marketplace de confiance</p>
