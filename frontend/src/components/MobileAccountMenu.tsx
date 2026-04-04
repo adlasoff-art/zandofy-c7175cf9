@@ -86,6 +86,12 @@ export function MobileAccountMenu() {
         { to: "/dashboard?tab=returns", icon: RotateCcw, label: "Retours" },
       ],
     },
+    ...(!isVendor ? [{
+      title: "Opportunités",
+      items: [
+        { to: "/become-vendor", icon: Store, label: "Devenir vendeur" },
+      ],
+    }] : []),
     {
       title: "Paramètres du compte",
       items: [
