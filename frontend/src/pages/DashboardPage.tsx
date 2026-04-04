@@ -112,6 +112,8 @@ interface OrderRow {
   last_mile_payment_proof_url: string | null;
   hub_pickup_proof_url: string | null;
   store_id: string | null;
+  delivery_date_requested: string | null;
+  delivery_time_requested: string | null;
 }
 
 interface OrderItemRow {
