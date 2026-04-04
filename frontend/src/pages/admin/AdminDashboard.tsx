@@ -5,12 +5,13 @@ import { DashboardPeriodSelector, type PeriodKey } from "@/components/admin/dash
 import { DashboardGlobalFilters, type GlobalFilters } from "@/components/admin/dashboard/DashboardGlobalFilters";
 import { OverviewTab } from "@/components/admin/dashboard/OverviewTab";
 import { SalesTab } from "@/components/admin/dashboard/SalesTab";
+import { OrdersTab } from "@/components/admin/dashboard/OrdersTab";
 import { LogisticsTab } from "@/components/admin/dashboard/LogisticsTab";
 import { VendorsTab } from "@/components/admin/dashboard/VendorsTab";
 import { ClientsTab } from "@/components/admin/dashboard/ClientsTab";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, BarChart3, Truck, Store, Users } from "lucide-react";
+import { LayoutDashboard, BarChart3, Truck, Store, Users, Receipt } from "lucide-react";
 
 export default function AdminDashboard() {
   const [period, setPeriod] = useState<PeriodKey>("30d");
@@ -24,6 +25,7 @@ export default function AdminDashboard() {
         queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] });
         queryClient.invalidateQueries({ queryKey: ["admin-recent-orders"] });
         queryClient.invalidateQueries({ queryKey: ["admin-sales-orders"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard-orders-detail"] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -40,6 +42,9 @@ export default function AdminDashboard() {
               </TabsTrigger>
               <TabsTrigger value="sales" className="gap-1.5 text-xs sm:text-sm">
                 <BarChart3 size={14} /> Ventes
+              </TabsTrigger>
+              <TabsTrigger value="orders" className="gap-1.5 text-xs sm:text-sm">
+                <Receipt size={14} /> Commandes
               </TabsTrigger>
               <TabsTrigger value="logistics" className="gap-1.5 text-xs sm:text-sm">
                 <Truck size={14} /> Logistique
@@ -59,6 +64,7 @@ export default function AdminDashboard() {
 
           <TabsContent value="overview"><OverviewTab period={period} geoFilters={geoFilters} /></TabsContent>
           <TabsContent value="sales"><SalesTab period={period} geoFilters={geoFilters} /></TabsContent>
+          <TabsContent value="orders"><OrdersTab period={period} geoFilters={geoFilters} /></TabsContent>
           <TabsContent value="logistics"><LogisticsTab period={period} geoFilters={geoFilters} /></TabsContent>
           <TabsContent value="vendors"><VendorsTab period={period} geoFilters={geoFilters} /></TabsContent>
           <TabsContent value="clients"><ClientsTab period={period} geoFilters={geoFilters} /></TabsContent>
