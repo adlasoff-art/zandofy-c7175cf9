@@ -26,7 +26,7 @@ import { ReferralDashboard } from "@/components/ReferralDashboard";
 import { AffiliateDashboard } from "@/components/AffiliateDashboard";
 import { ReturnsList } from "@/components/returns/ReturnsList";
 import { PaymentProofUpload } from "@/components/PaymentProofUpload";
-import { ShippingPaymentModal } from "@/components/payments/ShippingPaymentModal";
+import { DeferredPaymentModal } from "@/components/payments/DeferredPaymentModal";
 import { ReturnRequestForm } from "@/components/returns/ReturnRequestForm";
 import { DisputesList } from "@/components/disputes/DisputesList";
 import { DisputeForm } from "@/components/disputes/DisputeForm";
