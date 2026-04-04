@@ -101,14 +101,14 @@ export function SalesTab({ period, geoFilters }: Props) {
 
   // Revenue by vendor daily (top 5 for stacked chart)
   const vendorDailyData = useMemo(() => {
-    const storeMap = new Map(stores.map((s: any) => [s.id, s.name]));
+    const storeMap = new Map<string, string>(stores.map((s: any) => [s.id as string, s.name as string]));
     const storeRevByDay: Record<string, Record<string, number>> = {};
     const storeNames = new Set<string>();
 
     orders.forEach((o: any) => {
       if (!o.store_id || o.status === "cancelled" || o.status === "returned") return;
       const day = format(new Date(o.created_at), "yyyy-MM-dd");
-      const name = storeMap.get(o.store_id) || "Inconnu";
+      const name = storeMap.get(o.store_id as string) || "Inconnu";
       storeNames.add(name);
       if (!storeRevByDay[day]) storeRevByDay[day] = {};
       storeRevByDay[day][name] = (storeRevByDay[day][name] || 0) + Number(o.total);
