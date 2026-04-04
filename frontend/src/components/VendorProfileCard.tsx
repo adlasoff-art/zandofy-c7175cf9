@@ -57,11 +57,11 @@ export function VendorProfileCard({ store, productName, productId, originCountry
   const [expanded, setExpanded] = useState(false);
   const isOnline = store.is_online ?? false;
 
-  // WhatsApp Business URL (uses api.whatsapp.com for Business)
-  const productUrl = `${window.location.origin}/product/${productId}`;
+  // WhatsApp Business URL — uses share-proxy so link preview shows product image
+  const shareProxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-proxy?product=${productId}`;
   const whatsappUrl = store.whatsapp_number
     ? `https://wa.me/${store.whatsapp_number.replace(/\D/g, "")}?text=${encodeURIComponent(
-        `Bonjour, je suis intéressé par votre produit "${productName}"${productSku ? `\nSKU : ${productSku}` : ""}${productPrice ? `\nPrix : ${productPrice}` : ""}\n${productUrl}`
+        `Bonjour, je suis intéressé par votre produit "${productName}"${productSku ? `\nSKU : ${productSku}` : ""}${productPrice ? `\nPrix : ${productPrice}` : ""}\n${shareProxyUrl}`
       )}`
     : null;
 
