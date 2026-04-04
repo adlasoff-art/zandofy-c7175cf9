@@ -5519,6 +5519,7 @@ export type Database = {
         Returns: boolean
       }
       check_kyc_required: { Args: { p_user_id: string }; Returns: boolean }
+      cleanup_old_activity_logs: { Args: never; Returns: undefined }
       create_guest_support_ticket: {
         Args: {
           p_category: string

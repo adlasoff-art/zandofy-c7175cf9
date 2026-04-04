@@ -12,14 +12,17 @@ import { toast } from "sonner";
 import type { Product } from "@/services/api";
 
 function mapWishlistProduct(row: any): Product {
+  const sortedImages = (row.product_images || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
   return {
     id: row.id,
+    slug: row.slug || "",
     name: row.name,
     nameFr: row.name_fr,
     price: Number(row.price),
     originalPrice: row.original_price ? Number(row.original_price) : undefined,
     currency: row.currency,
-    image: row.product_images?.[0]?.image_url || "/placeholder.svg",
+    image: sortedImages[0]?.image_url || "/placeholder.svg",
+    galleryImages: sortedImages,
     category: row.categories?.name || "",
     categoryFr: row.categories?.name_fr || "",
     rating: Number(row.rating) || 0,
@@ -118,7 +121,9 @@ export default function WishlistPage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {products.map((p) => (
-              <ProductCard key={p.id} product={p} />
+              <Link key={p.id} to={`/product/${p.slug || p.id}`} className="cursor-pointer">
+                <ProductCard product={p} />
+              </Link>
             ))}
           </div>
         )}
