@@ -1472,6 +1472,55 @@ function DeliveryChoicePanel({ order }: { order: OrderRow }) {
   );
 }
 
+/** Client picks delivery date & time after paying last-mile */
+function DeliveryDatePicker({ orderId, onSaved }: { orderId: string; onSaved: () => void }) {
+  const { toast } = useToast();
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const minDate = new Date(Date.now() + 86400000).toISOString().split("T")[0]; // tomorrow
+
+  const handleSave = async () => {
+    if (!date) { toast({ title: "Date requise", variant: "destructive" }); return; }
+    setSaving(true);
+    const { error } = await supabase.from("orders").update({
+      delivery_date_requested: date,
+      delivery_time_requested: time || null,
+    } as any).eq("id", orderId);
+    setSaving(false);
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Date de livraison enregistrée !" });
+      onSaved();
+    }
+  };
+
+  return (
+    <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3">
+      <p className="text-sm font-bold text-foreground">📅 Définir la date de livraison</p>
+      <p className="text-xs text-muted-foreground">Choisissez quand vous souhaitez être livré. Le livreur sera assigné en fonction de cette date.</p>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Date</label>
+          <input type="date" min={minDate} value={date} onChange={e => setDate(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg" style={{ fontSize: "16px" }} />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Heure (optionnel)</label>
+          <input type="time" value={time} onChange={e => setTime(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg" style={{ fontSize: "16px" }} />
+        </div>
+      </div>
+      <Button size="sm" className="w-full gap-2" onClick={handleSave} disabled={saving || !date}>
+        {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+        Confirmer la date
+      </Button>
+    </div>
+  );
+}
+
 /** Client enters confirmation code for hub pickup */
 function ConfirmationCodeEntry({ orderId, onSuccess }: { orderId: string; onSuccess: () => void }) {
   const { toast } = useToast();
