@@ -16,7 +16,7 @@ import { CascadingAddressFields } from "@/components/address/CascadingAddressFie
 import { useI18n } from "@/contexts/I18nContext";
 import {
   CreditCard, Smartphone, Truck, ChevronRight, Check, ShieldCheck,
-  ArrowLeft, Package, MapPin, Banknote, Tag, Plus, Trash2, Home, Briefcase, X, Loader2, Coins
+  ArrowLeft, Package, MapPin, Banknote, Tag, Plus, Trash2, Home, Briefcase, X, Loader2, Coins, Upload
 } from "lucide-react";
 import { usePaymentMethods } from "@/hooks/use-payment-methods";
 import { useKycStatus } from "@/hooks/use-kyc";
