@@ -109,7 +109,7 @@ export default function CategoryPage() {
 
       let query = supabase
         .from("products")
-        .select(`*, categories(name, name_fr), product_images(image_url, position), product_colors(color_hex, color_name), product_sizes(size_label)`)
+        .select(`*, categories(name, name_fr), product_images(image_url, position), product_colors(color_hex, color_name), product_sizes(size_label), stores!products_store_id_fkey(is_certified, is_verified)`)
         .eq("publish_status", "published");
 
       if (slug?.toLowerCase() === "nouveautes") {
