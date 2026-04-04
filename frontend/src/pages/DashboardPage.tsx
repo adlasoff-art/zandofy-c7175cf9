@@ -856,15 +856,33 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         </div>
       )}
 
-      {order.status === "shipped" && !order.delivery_choice && order.last_mile_fee != null && Number(order.last_mile_fee) > 0 && (
-        <DeliveryChoicePanel order={order} />
+      {/* Order payment proof for off-platform orders */}
+      {order.payment_method === "off_platform" && order.status === "awaiting_payment" && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
+            <span className="text-amber-700 dark:text-amber-400 font-medium">
+              ⏳ Commande en attente — Uploadez votre preuve de paiement du produit : <strong>${Number(order.subtotal).toFixed(2)}</strong>
+            </span>
+          </div>
+          <PaymentProofUpload
+            orderId={order.id}
+            field="shipping_payment_proof_url"
+            label="Preuve de paiement de la commande"
+            existingUrl={order.shipping_payment_proof_url}
+          />
+          <p className="text-[10px] text-muted-foreground">
+            Le vendeur validera votre paiement pour confirmer la commande. Les frais d'expédition et livraison seront à régler séparément.
+          </p>
+        </div>
       )}
-      {order.status === "shipped" && !order.delivery_choice && (order.last_mile_fee == null || Number(order.last_mile_fee) === 0) && (
+
+      {/* Delivery choice panel — shown when product arrives at hub */}
+      {order.status === "shipped" && (
         <DeliveryChoicePanel order={order} />
       )}
 
-      {/* Deferred shipping payment notice */}
-      {order.shipping_payment_status === "deferred" && order.status !== "delivered" && order.status !== "cancelled" && (
+      {/* Deferred shipping payment */}
+      {order.shipping_payment_status === "deferred" && order.status !== "delivered" && order.status !== "cancelled" && order.status !== "awaiting_payment" && (
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
             <span className="text-amber-700 dark:text-amber-400 font-medium">
@@ -878,12 +896,6 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           >
             <CreditCard size={14} /> Payer l'expédition (${Number(order.shipping_cost || 0).toFixed(2)})
           </Button>
-          <PaymentProofUpload
-            orderId={order.id}
-            field="shipping_payment_proof_url"
-            label="Preuve de paiement expédition"
-            existingUrl={order.shipping_payment_proof_url}
-          />
         </div>
       )}
 
@@ -892,7 +904,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-2.5">
             <span className="text-blue-700 dark:text-blue-400 font-medium">
-              🚚 Frais de livraison à domicile à payer : <strong>${Number(order.last_mile_fee).toFixed(2)}</strong>
+              🚚 Frais de livraison à domicile : <strong>${Number(order.last_mile_fee).toFixed(2)}</strong>
             </span>
           </div>
           <Button
@@ -902,14 +914,21 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           >
             <CreditCard size={14} /> Payer la livraison (${Number(order.last_mile_fee).toFixed(2)})
           </Button>
-          {order.last_mile_payment_method === "cash" && (
-            <PaymentProofUpload
-              orderId={order.id}
-              field="last_mile_payment_proof_url"
-              label="Preuve de paiement livraison (cash)"
-              existingUrl={order.last_mile_payment_proof_url}
-            />
-          )}
+        </div>
+      )}
+
+      {/* Delivery date/time picker — shown after last mile payment is done */}
+      {order.delivery_choice === "home_delivery" && (order.last_mile_payment_status === "paid" || order.last_mile_payment_status === "paid_online") && !order.delivery_date_requested && order.status !== "delivered" && order.status !== "cancelled" && (
+        <DeliveryDatePicker orderId={order.id} onSaved={() => onCancelSuccess()} />
+      )}
+
+      {/* Show scheduled delivery info */}
+      {order.delivery_date_requested && (
+        <div className="flex items-center gap-2 text-xs bg-primary/5 border border-primary/20 rounded-md p-2.5">
+          <span className="text-primary font-medium">
+            📅 Livraison prévue : <strong>{new Date(order.delivery_date_requested).toLocaleDateString("fr-FR")}</strong>
+            {order.delivery_time_requested && <> à <strong>{order.delivery_time_requested}</strong></>}
+          </span>
         </div>
       )}
 
