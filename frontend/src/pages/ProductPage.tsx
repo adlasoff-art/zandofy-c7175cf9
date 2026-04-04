@@ -420,8 +420,8 @@ export default function ProductPage() {
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-48 p-1">
                   {(() => {
-                    const shareProxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-proxy?product=${product.id}`;
-                    const shareText = `${product.nameFr}${product.sku ? `\nSKU : ${product.sku}` : ""}${product.price ? `\nPrix : $${product.price.toFixed(2)}` : ""}\n${shareProxyUrl}`;
+                    const productUrl = `${window.location.origin}/product/${product.slug || product.id}`;
+                    const shareText = `${product.nameFr}${product.sku ? `\nSKU : ${product.sku}` : ""}${product.price ? `\nPrix : $${product.price.toFixed(2)}` : ""}\n${productUrl}`;
                     return (
                       <>
                         <a
@@ -436,7 +436,7 @@ export default function ProductPage() {
                           WhatsApp
                         </a>
                         <a
-                          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareProxyUrl)}`}
+                          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(productUrl)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors w-full"
@@ -448,7 +448,7 @@ export default function ProductPage() {
                         </a>
                         <button
                           onClick={() => {
-                            navigator.clipboard.writeText(shareProxyUrl);
+                            navigator.clipboard.writeText(productUrl);
                             toast({ title: "Lien copié !", description: "Le lien du produit a été copié dans le presse-papiers." });
                           }}
                           className="flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors w-full"
