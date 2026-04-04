@@ -408,7 +408,9 @@ export default function CategoryPage() {
         ) : filteredProducts && filteredProducts.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filteredProducts.map((p: any) => (
-              <ProductCard key={p.id} product={p} />
+              <Link key={p.id} to={`/product/${p.slug || p.id}`} className="cursor-pointer">
+                <ProductCard product={p} />
+              </Link>
             ))}
           </div>
         ) : (
