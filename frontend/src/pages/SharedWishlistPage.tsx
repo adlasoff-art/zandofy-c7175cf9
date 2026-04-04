@@ -10,14 +10,17 @@ import { toast } from "sonner";
 import type { Product } from "@/services/api";
 
 function mapProduct(row: any): Product {
+  const sortedImages = (row.product_images || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
   return {
     id: row.id,
+    slug: row.slug || "",
     name: row.name,
     nameFr: row.name_fr,
     price: Number(row.price),
     originalPrice: row.original_price ? Number(row.original_price) : undefined,
     currency: row.currency,
-    image: row.product_images?.[0]?.image_url || "/placeholder.svg",
+    image: sortedImages[0]?.image_url || "/placeholder.svg",
+    galleryImages: sortedImages,
     category: row.categories?.name || "",
     categoryFr: row.categories?.name_fr || "",
     rating: Number(row.rating) || 0,
