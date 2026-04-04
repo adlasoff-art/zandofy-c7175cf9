@@ -1,80 +1,112 @@
 
 
-# Plan : Tarification last-mile par commune/quartier — Checkout + Tracking + Admin
+# Plan d'implémentation — Corrections et améliorations
 
-## Résumé
+## Résumé des changements
 
-Intégrer le calcul automatique des frais de livraison à domicile (last-mile) basé sur la commune et le quartier du client, à deux niveaux : dès le checkout (le client peut payer d'avance) ET au moment du choix différé sur la tracking page (changement d'avis). Ajouter les champs de tarification dans l'interface admin Géographie.
+Quatre chantiers principaux :
+1. Cartes produits non-cliquables dans les pages catégories
+2. Journal d'audit élargi (activité utilisateurs + pagination + nettoyage auto)
+3. Emails de confirmation de commande non délivrés + testeur de délivrabilité
+4. Réflexion sur les push notifications (pas d'action)
 
 ---
 
-## 1. Admin Géographie — Champs tarification commune/quartier
+## 1. Cartes produits non-cliquables dans les catégories
 
-**Fichier** : `AdminGeographyPage.tsx`
+**Problème identifié** : Dans `CategoryPage.tsx`, le composant `<ProductCard>` n'est PAS enveloppé dans un `<Link>`, contrairement à `StorePage`, `SearchPage` et `ProductPage` (produits similaires) où il l'est. De plus, le `mapProduct` local ne remonte ni `galleryImages` ni `slug`, ce qui empêche le hover d'image et le lien vers le produit.
 
-- Étendre `CommuneRow` avec `delivery_fee: number`, `is_deliverable: boolean`
-- Étendre `QuartierRow` avec `delivery_surcharge: number`
-- Ajouter dans le formulaire Communes : champ "Frais livraison ($)" + toggle "Livrable"
-- Ajouter dans le formulaire Quartiers : champ "Surcharge ($)"
-- Ajouter les colonnes correspondantes dans les tableaux
-- Les SELECT et INSERT/UPDATE incluront ces champs (ils existent déjà en DB)
+**Corrections** :
+- **`CategoryPage.tsx`** : Envelopper chaque `<ProductCard>` dans un `<Link to={/product/${p.slug || p.id}}>` avec `cursor-pointer`
+- **`CategoryPage.tsx` — `mapProduct`** : Ajouter les champs manquants : `slug`, `galleryImages`, `storeIsCertified`, `storeIsVerified` depuis la requête (le select inclut déjà `product_images`)
+- Appliquer la même correction à `WishlistPage.tsx` et `SharedWishlistPage.tsx` si même problème
 
-## 2. Utilitaire de calcul last-mile
+---
 
-**Nouveau fichier** : `src/lib/last-mile-fee.ts`
+## 2. Journal d'audit élargi
 
-- Fonction `calculateLastMileFee(commune: string, quartier: string, city: string)` :
-  - Lookup dans `communes` par nom + ville → récupère `delivery_fee`, `is_deliverable`
-  - Lookup dans `quartiers` par nom + `commune_id` → récupère `delivery_surcharge`, `is_restricted`
-  - Retourne `{ fee: commune.delivery_fee + quartier.delivery_surcharge, deliverable: boolean, restricted: boolean }`
-- Fonction `checkDeliveryAvailability(...)` retourne si la zone est livrable
+**Situation actuelle** : La table `admin_audit_logs` ne trace que les actions admin (ban, rôle, warning). La table `user_activity_logs` existe (hook `use-activity-logger.ts`) mais n'est pas exploitée dans le journal d'audit admin.
 
-## 3. Checkout — Calcul et affichage du last-mile fee
+**Changements** :
 
-**Fichier** : `CheckoutPage.tsx`
+### Base de données (migration SQL)
+- Créer une table `user_activity_logs` si elle n'existe pas encore (vérification nécessaire), avec colonnes : `id`, `user_id`, `action`, `metadata` (jsonb), `created_at`
+- Ajouter les RLS appropriées (lecture admin/manager uniquement)
+- Créer une fonction `cleanup_old_activity_logs()` en PL/pgSQL avec la logique de rétention :
+  - Après 6 mois : supprimer les entrées de plus de 6 mois
+  - Après 1 an : garder seulement les 6 derniers mois (juin-décembre)
+- Planifier un job `pg_cron` mensuel pour le nettoyage automatique
 
-État actuel : `lastMileFee = 0` en dur, pas de calcul.
+### Actions utilisateurs tracées (ajout au hook existant)
+- `login`, `logout`, `profile_update`, `search`, `page_view`
+- `address_add/delete`, `payment_method_add/delete`
+- `order_placed`, `order_cancelled`
+- `product_add`, `product_update`, `product_delete` (vendeurs)
+- `kyc_submitted`, `password_changed`, `settings_changed`
 
-Modifications :
-- Quand le client choisit "Livraison à domicile", appeler `calculateLastMileFee()` avec la commune et le quartier de l'adresse sélectionnée
-- Afficher le montant estimé sous l'option : "Frais de livraison locale : $X.XX"
-- Si la zone n'est pas livrable (`is_deliverable = false` ou quartier restreint), désactiver le bouton avec message "Non disponible dans votre zone"
-- Recalculer à chaque changement d'adresse
-- Intégrer `lastMileFee` dans le total de la commande (si `deliveryOption === "home_delivery"`)
-- Écrire `last_mile_fee` réel dans l'order INSERT (au lieu de 0)
-- Ajouter le choix de paiement last-mile : "Payer maintenant" ou "Payer à la réception"
-- Si "Payer maintenant" → inclus dans le total ; si "Payer à la réception" → `last_mile_payment_status: "deferred"`
+### Interface admin (`AdminAuditPage.tsx`)
+- **Onglets** : "Actions admin" (existant) + "Activité utilisateurs" (nouveau)
+- **Pagination** : Limiter à 50 par page avec navigation
+- **Filtres** :
+  - Par utilisateur (recherche par nom/email)
+  - Par type d'action (chips existants étendus)
+  - Par période (date de début / date de fin)
+- **Nettoyage manuel** : Bouton pour purger les logs de plus de X mois (admin uniquement)
 
-## 4. Tracking Page — Calcul au changement d'avis
+---
 
-**Fichier** : `TrackingPage.tsx` (composant `DeliveryChoicePanel`)
+## 3. Emails de confirmation de commande
 
-- Quand le client choisit "Livraison à domicile" au stade hub (il avait choisi hub_pickup ou n'avait pas choisi), appeler `calculateLastMileFee()` avec l'adresse de la commande
-- Afficher le montant estimé avant confirmation
-- Permettre au client de choisir/modifier son adresse de livraison (sélection parmi ses adresses enregistrées)
-- Enregistrer le `last_mile_fee` calculé sur la commande
+### Diagnostic
+Les secrets SMTP sont configurés (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM_EMAIL`, `SMTP_PORT`). La fonction `notify-order-status` est censée envoyer les emails via SMTP/nodemailer. Aucun log n'est trouvé, ce qui suggère que la fonction n'est pas invoquée correctement ou pas déployée.
 
-## 5. Récapitulatif checkout — Ligne last-mile visible
+### Problèmes identifiés
+1. **`order-notifications.ts`** : Le service client utilise `supabase.functions.invoke("notify-order-status")` mais la liste des statuts notifiables ne contient PAS `"pending"` — or c'est le statut défini après paiement Mobile Money réussi (`kelpay-callback` met le statut à `"pending"`)
+2. **Paiement hors plateforme** : Quand le vendeur confirme le paiement, il faut aussi déclencher la notification
 
-Dans le récapitulatif de commande (étape confirmation), ajouter une ligne :
-- "Livraison locale : $X.XX" (ou "Gratuit" si hub_pickup, ou "À payer à réception" si déféré)
+### Corrections
+- **`order-notifications.ts`** : Ajouter `"pending"` à la liste `NOTIFIABLE_STATUSES`
+- **`VendorOrderManager.tsx`** : S'assurer que lorsqu'un vendeur confirme un paiement hors plateforme (passage de `awaiting_payment` → `confirmed`), `triggerOrderStatusNotification` est bien appelé
+- **Redéployer** la fonction `notify-order-status` pour s'assurer qu'elle est active
+- **Vérifier** que le lien de suivi dans l'email pointe vers le bon domaine (actuellement `zandofy.lovable.app` — devrait utiliser `SITE_BASE_URL`)
+
+### Testeur de délivrabilité email (admin)
+- **`AdminNotificationsPage.tsx`** : Ajouter une section "Test de délivrabilité" avec :
+  - Un champ email libre
+  - Un bouton "Envoyer un email test"
+  - Appel à `send-email` edge function avec un message par défaut
+  - Affichage du résultat (succès/échec avec détail de l'erreur)
+
+### Emails via le centre de notifications admin
+- Le canal "Email" dans le centre de notifications insère seulement dans la table `notifications` (in-app) — il n'envoie PAS réellement d'emails SMTP
+- **Correction** : Quand le canal est "email", appeler aussi la fonction `send-email` pour chaque destinataire (avec un template générique contenant titre + message)
+
+---
+
+## 4. Push notifications (réflexion uniquement)
+Les VAPID keys sont configurées. Le service worker `sw-push.js` existe. La table `push_subscriptions` existe. Pour que les push fonctionnent sur mobile (PWA) :
+- L'utilisateur doit avoir autorisé les notifications dans le navigateur
+- Le service worker doit être enregistré et actif
+- Le `notify-order-status` tente déjà d'envoyer des push mais marque seulement "attempted" sans réellement utiliser web-push
+
+Pas d'action immédiate — juste un constat pour plus tard.
 
 ---
 
 ## Fichiers impactés
 
-| Fichier | Modification |
-|---------|-------------|
-| `AdminGeographyPage.tsx` | Champs `delivery_fee`, `is_deliverable`, `delivery_surcharge` dans formulaires et tableaux |
-| `src/lib/last-mile-fee.ts` | Nouveau — utilitaire de calcul commune + quartier |
-| `CheckoutPage.tsx` | Calcul dynamique last-mile, intégration dans le total, choix paiement |
-| `TrackingPage.tsx` | Calcul last-mile au changement d'avis, sélection adresse |
+| Fichier | Type de changement |
+|---|---|
+| `frontend/src/pages/CategoryPage.tsx` | Link + mapProduct enrichi |
+| `frontend/src/pages/WishlistPage.tsx` | Link wrapper |
+| `frontend/src/pages/SharedWishlistPage.tsx` | Link wrapper |
+| `frontend/src/pages/admin/AdminAuditPage.tsx` | Refonte complète (onglets, pagination, filtres) |
+| `frontend/src/services/order-notifications.ts` | Ajout "pending" aux statuts |
+| `frontend/src/pages/admin/AdminNotificationsPage.tsx` | Testeur email + envoi SMTP réel |
+| `frontend/supabase/functions/notify-order-status/index.ts` | URL dynamique via SITE_BASE_URL |
+| Migration SQL | Table user_activity_logs + cleanup cron |
 
-## Section technique
-
-- Aucune migration SQL requise : les colonnes `communes.delivery_fee`, `communes.is_deliverable`, `quartiers.delivery_surcharge` existent déjà
-- Le calcul se fait côté client via des requêtes Supabase simples (lookup par nom de commune/quartier)
-- Le `lastMileFee` est recalculé à chaque changement d'adresse ou de `deliveryOption`
-- La formule : `total_last_mile = commune.delivery_fee + quartier.delivery_surcharge`
-- Rétro-compatibilité : si aucun montant n'est défini (0), la livraison locale reste gratuite
+## Migrations SQL (fichier téléchargeable fourni après implémentation)
+- `user_activity_logs` : table + RLS + index
+- Fonction et cron de nettoyage automatique des logs
 
