@@ -83,11 +83,11 @@ export function SalesTab({ period, geoFilters }: Props) {
 
   // Cumulative revenue by vendor (top 10)
   const vendorCumulatives = useMemo(() => {
-    const storeMap = new Map(stores.map((s: any) => [s.id, s.name]));
+    const storeMap = new Map<string, string>(stores.map((s: any) => [s.id as string, s.name as string]));
     const storeRevenues: Record<string, number> = {};
     orders.forEach((o: any) => {
       if (!o.store_id || o.status === "cancelled" || o.status === "returned") return;
-      const name = storeMap.get(o.store_id) || "Inconnu";
+      const name = storeMap.get(o.store_id as string) || "Inconnu";
       storeRevenues[name] = (storeRevenues[name] || 0) + Number(o.total);
     });
     return Object.entries(storeRevenues)
