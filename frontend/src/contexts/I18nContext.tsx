@@ -481,7 +481,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "footer.manageCookies": "Manage Cookies",
     "footer.terms": "Terms & Conditions",
     "footer.weAccept": "We accept:",
-    "footer.copyright": "© 2026 Zandofy. All rights reserved.",
+    "footer.copyright": `© ${new Date().getFullYear()} Zandofy. All rights reserved.`,
     "footer.description": "General e-commerce — fashion, electronics, home, beauty and more. Thousands of products updated daily.",
     "footer.worldwide": "Service available worldwide",
     "footer.freeShippingFrom": "Free Shipping from",
