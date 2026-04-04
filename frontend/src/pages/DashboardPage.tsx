@@ -1212,9 +1212,9 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         />
       )}
 
-      {/* Shipping / Last-Mile Payment Modal (USSD) */}
+      {/* Deferred Shipping / Last-Mile Payment Modal */}
       {showShippingPayment && (
-        <ShippingPaymentModal
+        <DeferredPaymentModal
           orderId={order.id}
           orderRef={order.order_ref}
           amount={showShippingPayment === "shipping" ? Number(order.shipping_cost || 0) : Number(order.last_mile_fee || 0)}
