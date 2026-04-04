@@ -128,7 +128,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "footer.manageCookies": "Gérer les Cookies",
     "footer.terms": "Conditions Générales",
     "footer.weAccept": "Nous acceptons :",
-    "footer.copyright": "© 2026 Zandofy. Tous droits réservés.",
+    "footer.copyright": `© ${new Date().getFullYear()} Zandofy. Tous droits réservés.`,
     "footer.description": "E-commerce généraliste — mode, électronique, maison, beauté et bien plus. Des milliers de produits mis à jour quotidiennement.",
     "footer.worldwide": "Service disponible dans le monde entier",
     "footer.freeShippingFrom": "Livraison Gratuite dès",
