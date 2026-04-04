@@ -546,7 +546,9 @@ export default function CheckoutPage() {
       const orderDiscount = preciseRound(discountAmount * ratio, 2);
       const orderPointsDiscount = preciseRound(pointsDiscount * ratio, 2);
       
-      const effectiveShip = shippingPaymentChoice === "pay_on_arrival" ? 0 : orderShippingCost;
+      // Off-platform: ONLY product amount is charged. Shipping & delivery are always deferred.
+      const isOffPlatform = paymentMethod === "off_platform";
+      const effectiveShip = (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform) ? 0 : orderShippingCost;
       const orderTotal = Math.max(0, preciseRound(orderSubtotal - orderDiscount - orderPointsDiscount + effectiveShip, 2));
       
       // Unique order_ref per sub-order (suffix A, B, C...)
@@ -576,11 +578,12 @@ export default function CheckoutPage() {
           order_ref: orderRef,
           coupon_code: appliedCoupon?.code || null,
           discount_amount: orderDiscount,
-          shipping_payment_status: shippingPaymentChoice === "pay_on_arrival" ? "deferred" : "paid",
+          // Off-platform: force all logistics payments to deferred
+          shipping_payment_status: (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform) ? "deferred" : "paid",
           delivery_choice: deliveryOption !== "none" ? deliveryOption : null,
           last_mile_fee: deliveryOption === "home_delivery" ? lastMileFee : 0,
-          last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod") : null,
-          last_mile_payment_status: deliveryOption === "home_delivery" && lastMileFee > 0 ? (lastMilePayment === "pay_with_shipping" ? "paid" : "deferred") : null,
+          last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
+          last_mile_payment_status: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? "deferred" : (lastMilePayment === "pay_with_shipping" ? "paid" : "deferred")) : null,
         } as any)
         .select("id")
         .single();
