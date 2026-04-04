@@ -128,7 +128,7 @@ export function OrdersTab({ period, geoFilters }: Props) {
 
         return {
           ...o,
-          storeName: storeMap.get(o.store_id)?.name || "—",
+          storeName: (storeMap.get(o.store_id) as any)?.name || "—",
           items: enrichedItems,
           revenue,
           costReal,
