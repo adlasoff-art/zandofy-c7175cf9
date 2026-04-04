@@ -436,7 +436,7 @@ export default function ProductPage() {
                           WhatsApp
                         </a>
                         <a
-                          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareProxyUrl)}`}
+                          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(productUrl)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors w-full"
