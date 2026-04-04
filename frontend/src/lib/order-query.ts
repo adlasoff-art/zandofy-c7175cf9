@@ -5,7 +5,9 @@ type OptionalOrderField =
   | "last_mile_payment_proof_url"
   | "hub_pickup_proof_url"
   | "deferred_payment_provider"
-  | "deferred_payment_phone";
+  | "deferred_payment_phone"
+  | "delivery_date_requested"
+  | "delivery_time_requested";
 
 type OptionalOrderValues = Record<OptionalOrderField, string | null>;
 
@@ -15,6 +17,8 @@ const EMPTY_OPTIONAL_ORDER_VALUES: OptionalOrderValues = {
   hub_pickup_proof_url: null,
   deferred_payment_provider: null,
   deferred_payment_phone: null,
+  delivery_date_requested: null,
+  delivery_time_requested: null,
 };
 
 export async function withOptionalOrderFields<T extends { id: string }>(

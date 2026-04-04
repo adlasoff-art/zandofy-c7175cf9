@@ -129,6 +129,14 @@ export default function AdminNotificationsPage() {
   const testEmailMutation = useMutation({
     mutationFn: async () => {
       if (!testEmail.trim()) throw new Error("Email requis");
+      // Refresh session before calling edge function
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const expiresAt = session.expires_at ?? 0;
+        if (expiresAt - Math.floor(Date.now() / 1000) < 60) {
+          await supabase.auth.refreshSession();
+        }
+      }
       const { data, error } = await supabase.functions.invoke("send-email", {
         body: {
           to: testEmail.trim(),
@@ -142,10 +150,23 @@ export default function AdminNotificationsPage() {
           </div>`,
         },
       });
-      if (error) throw error;
+      if (error) {
+        // Try to extract real error message from edge function response
+        let msg = error.message || "Erreur lors de l'envoi";
+        if (error.context?.body) {
+          try {
+            const reader = error.context.body.getReader();
+            const { value } = await reader.read();
+            const text = new TextDecoder().decode(value);
+            const json = JSON.parse(text);
+            msg = json.error || json.message || text;
+          } catch { /* use default msg */ }
+        }
+        throw new Error(msg);
+      }
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       setTestResult({ ok: true, detail: "Email envoyé avec succès. Vérifiez la boîte de réception." });
     },
     onError: (e: any) => {

@@ -26,7 +26,7 @@ import { ReferralDashboard } from "@/components/ReferralDashboard";
 import { AffiliateDashboard } from "@/components/AffiliateDashboard";
 import { ReturnsList } from "@/components/returns/ReturnsList";
 import { PaymentProofUpload } from "@/components/PaymentProofUpload";
-import { ShippingPaymentModal } from "@/components/payments/ShippingPaymentModal";
+import { DeferredPaymentModal } from "@/components/payments/DeferredPaymentModal";
 import { ReturnRequestForm } from "@/components/returns/ReturnRequestForm";
 import { DisputesList } from "@/components/disputes/DisputesList";
 import { DisputeForm } from "@/components/disputes/DisputeForm";
@@ -112,6 +112,8 @@ interface OrderRow {
   last_mile_payment_proof_url: string | null;
   hub_pickup_proof_url: string | null;
   store_id: string | null;
+  delivery_date_requested: string | null;
+  delivery_time_requested: string | null;
 }
 
 interface OrderItemRow {
@@ -201,6 +203,8 @@ export default function DashboardPage() {
       "shipping_payment_proof_url",
       "last_mile_payment_proof_url",
       "hub_pickup_proof_url",
+      "delivery_date_requested",
+      "delivery_time_requested",
     ]);
     setOrders(ordersWithOptionalFields);
     setLoading(false);
@@ -856,15 +860,33 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         </div>
       )}
 
-      {order.status === "shipped" && !order.delivery_choice && order.last_mile_fee != null && Number(order.last_mile_fee) > 0 && (
-        <DeliveryChoicePanel order={order} />
+      {/* Order payment proof for off-platform orders */}
+      {order.payment_method === "off_platform" && order.status === "awaiting_payment" && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
+            <span className="text-amber-700 dark:text-amber-400 font-medium">
+              ⏳ Commande en attente — Uploadez votre preuve de paiement du produit : <strong>${Number(order.subtotal).toFixed(2)}</strong>
+            </span>
+          </div>
+          <PaymentProofUpload
+            orderId={order.id}
+            field="shipping_payment_proof_url"
+            label="Preuve de paiement de la commande"
+            existingUrl={order.shipping_payment_proof_url}
+          />
+          <p className="text-[10px] text-muted-foreground">
+            Le vendeur validera votre paiement pour confirmer la commande. Les frais d'expédition et livraison seront à régler séparément.
+          </p>
+        </div>
       )}
-      {order.status === "shipped" && !order.delivery_choice && (order.last_mile_fee == null || Number(order.last_mile_fee) === 0) && (
+
+      {/* Delivery choice panel — shown when product arrives at hub */}
+      {order.status === "shipped" && (
         <DeliveryChoicePanel order={order} />
       )}
 
-      {/* Deferred shipping payment notice */}
-      {order.shipping_payment_status === "deferred" && order.status !== "delivered" && order.status !== "cancelled" && (
+      {/* Deferred shipping payment */}
+      {order.shipping_payment_status === "deferred" && order.status !== "delivered" && order.status !== "cancelled" && order.status !== "awaiting_payment" && (
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
             <span className="text-amber-700 dark:text-amber-400 font-medium">
@@ -878,12 +900,6 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           >
             <CreditCard size={14} /> Payer l'expédition (${Number(order.shipping_cost || 0).toFixed(2)})
           </Button>
-          <PaymentProofUpload
-            orderId={order.id}
-            field="shipping_payment_proof_url"
-            label="Preuve de paiement expédition"
-            existingUrl={order.shipping_payment_proof_url}
-          />
         </div>
       )}
 
@@ -892,7 +908,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-2.5">
             <span className="text-blue-700 dark:text-blue-400 font-medium">
-              🚚 Frais de livraison à domicile à payer : <strong>${Number(order.last_mile_fee).toFixed(2)}</strong>
+              🚚 Frais de livraison à domicile : <strong>${Number(order.last_mile_fee).toFixed(2)}</strong>
             </span>
           </div>
           <Button
@@ -902,14 +918,21 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           >
             <CreditCard size={14} /> Payer la livraison (${Number(order.last_mile_fee).toFixed(2)})
           </Button>
-          {order.last_mile_payment_method === "cash" && (
-            <PaymentProofUpload
-              orderId={order.id}
-              field="last_mile_payment_proof_url"
-              label="Preuve de paiement livraison (cash)"
-              existingUrl={order.last_mile_payment_proof_url}
-            />
-          )}
+        </div>
+      )}
+
+      {/* Delivery date/time picker — shown after last mile payment is done */}
+      {order.delivery_choice === "home_delivery" && (order.last_mile_payment_status === "paid" || order.last_mile_payment_status === "paid_online") && !order.delivery_date_requested && order.status !== "delivered" && order.status !== "cancelled" && (
+        <DeliveryDatePicker orderId={order.id} onSaved={() => onCancelSuccess()} />
+      )}
+
+      {/* Show scheduled delivery info */}
+      {order.delivery_date_requested && (
+        <div className="flex items-center gap-2 text-xs bg-primary/5 border border-primary/20 rounded-md p-2.5">
+          <span className="text-primary font-medium">
+            📅 Livraison prévue : <strong>{new Date(order.delivery_date_requested).toLocaleDateString("fr-FR")}</strong>
+            {order.delivery_time_requested && <> à <strong>{order.delivery_time_requested}</strong></>}
+          </span>
         </div>
       )}
 
@@ -1212,9 +1235,9 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         />
       )}
 
-      {/* Shipping / Last-Mile Payment Modal (USSD) */}
+      {/* Deferred Shipping / Last-Mile Payment Modal */}
       {showShippingPayment && (
-        <ShippingPaymentModal
+        <DeferredPaymentModal
           orderId={order.id}
           orderRef={order.order_ref}
           amount={showShippingPayment === "shipping" ? Number(order.shipping_cost || 0) : Number(order.last_mile_fee || 0)}
@@ -1398,17 +1421,24 @@ function DeliveryChoicePanel({ order }: { order: OrderRow }) {
   const { toast } = useToast();
   const [choosing, setChoosing] = useState(false);
 
+  // Already chosen — don't show again
+  if (order.delivery_choice) return null;
+
   const handleChoice = async (choice: "home_delivery" | "hub_pickup") => {
     setChoosing(true);
-    const { error } = await supabase
-      .from("orders")
-      .update({ delivery_choice: choice })
-      .eq("id", order.id);
+    const updates: any = { delivery_choice: choice };
+    if (choice === "hub_pickup") {
+      // Void delivery fees
+      updates.last_mile_fee = 0;
+      updates.last_mile_payment_status = null;
+      updates.last_mile_payment_method = null;
+    }
+    const { error } = await supabase.from("orders").update(updates).eq("id", order.id);
     setChoosing(false);
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: choice === "home_delivery" ? "Livraison à domicile sélectionnée" : "Retrait au Hub sélectionné" });
+      toast({ title: choice === "home_delivery" ? "Livraison à domicile sélectionnée — Payez les frais pour définir la date de livraison." : "Retrait au Hub sélectionné — Aucun frais de livraison." });
       window.location.reload();
     }
   };
@@ -1416,6 +1446,9 @@ function DeliveryChoicePanel({ order }: { order: OrderRow }) {
   return (
     <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3">
       <p className="text-sm font-bold text-foreground">🏠 Choisissez votre mode de réception</p>
+      <p className="text-xs text-muted-foreground">
+        Votre commande est arrivée au Hub ! Vous pouvez la récupérer gratuitement ou opter pour une livraison à domicile.
+      </p>
       {order.last_mile_fee != null && Number(order.last_mile_fee) > 0 && (
         <p className="text-xs text-muted-foreground">
           Frais de livraison à domicile : <strong className="text-foreground">${Number(order.last_mile_fee).toFixed(2)}</strong>
@@ -1434,12 +1467,58 @@ function DeliveryChoicePanel({ order }: { order: OrderRow }) {
           disabled={choosing}
           className="flex-1 px-3 py-2.5 text-xs font-medium bg-card text-foreground border border-border rounded-lg hover:bg-muted disabled:opacity-50"
         >
-          🏪 Retrait au Hub
+          🏪 Retrait au Hub (gratuit)
         </button>
       </div>
-      <p className="text-[10px] text-muted-foreground">
-        🚀 Profitez d'une livraison rapide et sans effort directement chez vous !
-      </p>
+    </div>
+  );
+}
+
+/** Client picks delivery date & time after paying last-mile */
+function DeliveryDatePicker({ orderId, onSaved }: { orderId: string; onSaved: () => void }) {
+  const { toast } = useToast();
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const minDate = new Date(Date.now() + 86400000).toISOString().split("T")[0]; // tomorrow
+
+  const handleSave = async () => {
+    if (!date) { toast({ title: "Date requise", variant: "destructive" }); return; }
+    setSaving(true);
+    const { error } = await supabase.from("orders").update({
+      delivery_date_requested: date,
+      delivery_time_requested: time || null,
+    } as any).eq("id", orderId);
+    setSaving(false);
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Date de livraison enregistrée !" });
+      onSaved();
+    }
+  };
+
+  return (
+    <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3">
+      <p className="text-sm font-bold text-foreground">📅 Définir la date de livraison</p>
+      <p className="text-xs text-muted-foreground">Choisissez quand vous souhaitez être livré. Le livreur sera assigné en fonction de cette date.</p>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Date</label>
+          <input type="date" min={minDate} value={date} onChange={e => setDate(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg" style={{ fontSize: "16px" }} />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Heure (optionnel)</label>
+          <input type="time" value={time} onChange={e => setTime(e.target.value)}
+            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg" style={{ fontSize: "16px" }} />
+        </div>
+      </div>
+      <Button size="sm" className="w-full gap-2" onClick={handleSave} disabled={saving || !date}>
+        {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+        Confirmer la date
+      </Button>
     </div>
   );
 }

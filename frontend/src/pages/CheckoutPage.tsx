@@ -16,7 +16,7 @@ import { CascadingAddressFields } from "@/components/address/CascadingAddressFie
 import { useI18n } from "@/contexts/I18nContext";
 import {
   CreditCard, Smartphone, Truck, ChevronRight, Check, ShieldCheck,
-  ArrowLeft, Package, MapPin, Banknote, Tag, Plus, Trash2, Home, Briefcase, X, Loader2, Coins
+  ArrowLeft, Package, MapPin, Banknote, Tag, Plus, Trash2, Home, Briefcase, X, Loader2, Coins, Upload
 } from "lucide-react";
 import { usePaymentMethods } from "@/hooks/use-payment-methods";
 import { useKycStatus } from "@/hooks/use-kyc";
@@ -546,7 +546,9 @@ export default function CheckoutPage() {
       const orderDiscount = preciseRound(discountAmount * ratio, 2);
       const orderPointsDiscount = preciseRound(pointsDiscount * ratio, 2);
       
-      const effectiveShip = shippingPaymentChoice === "pay_on_arrival" ? 0 : orderShippingCost;
+      // Off-platform: ONLY product amount is charged. Shipping & delivery are always deferred.
+      const isOffPlatform = paymentMethod === "off_platform";
+      const effectiveShip = (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform) ? 0 : orderShippingCost;
       const orderTotal = Math.max(0, preciseRound(orderSubtotal - orderDiscount - orderPointsDiscount + effectiveShip, 2));
       
       // Unique order_ref per sub-order (suffix A, B, C...)
@@ -576,11 +578,12 @@ export default function CheckoutPage() {
           order_ref: orderRef,
           coupon_code: appliedCoupon?.code || null,
           discount_amount: orderDiscount,
-          shipping_payment_status: shippingPaymentChoice === "pay_on_arrival" ? "deferred" : "paid",
+          // Off-platform: force all logistics payments to deferred
+          shipping_payment_status: (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform) ? "deferred" : "paid",
           delivery_choice: deliveryOption !== "none" ? deliveryOption : null,
           last_mile_fee: deliveryOption === "home_delivery" ? lastMileFee : 0,
-          last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod") : null,
-          last_mile_payment_status: deliveryOption === "home_delivery" && lastMileFee > 0 ? (lastMilePayment === "pay_with_shipping" ? "paid" : "deferred") : null,
+          last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
+          last_mile_payment_status: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? "deferred" : (lastMilePayment === "pay_with_shipping" ? "paid" : "deferred")) : null,
         } as any)
         .select("id")
         .single();
@@ -1446,17 +1449,35 @@ export default function CheckoutPage() {
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
                   <Check size={32} className="text-primary" />
                 </div>
-                <h2 className="text-2xl font-bold text-foreground">{t("checkout.orderConfirmed")}</h2>
+                <h2 className="text-2xl font-bold text-foreground">
+                  {paymentMethod === "off_platform" ? "Commande enregistrée" : t("checkout.orderConfirmed")}
+                </h2>
                 <p className="text-muted-foreground">
                   {t("checkout.orderRef")} : <span className="font-bold text-foreground">{orderId}</span>
                 </p>
+                {paymentMethod === "off_platform" && (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4 text-left space-y-2">
+                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">⏳ Paiement en attente</p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      Votre commande est enregistrée mais en attente de preuve de paiement. 
+                      Rendez-vous dans votre espace client pour uploader la preuve de paiement du produit.
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      <strong>Note :</strong> Les frais d'expédition et de livraison seront à régler séparément depuis votre espace commande.
+                    </p>
+                  </div>
+                )}
                 {appliedCoupon && (
                   <p className="text-sm text-primary font-medium">
                     {t("checkout.promoCode")} {appliedCoupon.code} — -${discountAmount.toFixed(2)}
                   </p>
                 )}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-                  <Link to="/"><Button>{t("checkout.backHome")}</Button></Link>
+                  {paymentMethod === "off_platform" ? (
+                    <Link to="/dashboard"><Button className="gap-2"><Upload size={14} /> Terminer ma commande</Button></Link>
+                  ) : (
+                    <Link to="/"><Button>{t("checkout.backHome")}</Button></Link>
+                  )}
                   <Link to="/dashboard"><Button variant="outline">{t("checkout.trackOrder")}</Button></Link>
                 </div>
               </div>
