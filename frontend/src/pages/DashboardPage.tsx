@@ -1419,17 +1419,24 @@ function DeliveryChoicePanel({ order }: { order: OrderRow }) {
   const { toast } = useToast();
   const [choosing, setChoosing] = useState(false);
 
+  // Already chosen — don't show again
+  if (order.delivery_choice) return null;
+
   const handleChoice = async (choice: "home_delivery" | "hub_pickup") => {
     setChoosing(true);
-    const { error } = await supabase
-      .from("orders")
-      .update({ delivery_choice: choice })
-      .eq("id", order.id);
+    const updates: any = { delivery_choice: choice };
+    if (choice === "hub_pickup") {
+      // Void delivery fees
+      updates.last_mile_fee = 0;
+      updates.last_mile_payment_status = null;
+      updates.last_mile_payment_method = null;
+    }
+    const { error } = await supabase.from("orders").update(updates).eq("id", order.id);
     setChoosing(false);
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: choice === "home_delivery" ? "Livraison à domicile sélectionnée" : "Retrait au Hub sélectionné" });
+      toast({ title: choice === "home_delivery" ? "Livraison à domicile sélectionnée — Payez les frais pour définir la date de livraison." : "Retrait au Hub sélectionné — Aucun frais de livraison." });
       window.location.reload();
     }
   };
@@ -1437,6 +1444,9 @@ function DeliveryChoicePanel({ order }: { order: OrderRow }) {
   return (
     <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3">
       <p className="text-sm font-bold text-foreground">🏠 Choisissez votre mode de réception</p>
+      <p className="text-xs text-muted-foreground">
+        Votre commande est arrivée au Hub ! Vous pouvez la récupérer gratuitement ou opter pour une livraison à domicile.
+      </p>
       {order.last_mile_fee != null && Number(order.last_mile_fee) > 0 && (
         <p className="text-xs text-muted-foreground">
           Frais de livraison à domicile : <strong className="text-foreground">${Number(order.last_mile_fee).toFixed(2)}</strong>
@@ -1455,12 +1465,9 @@ function DeliveryChoicePanel({ order }: { order: OrderRow }) {
           disabled={choosing}
           className="flex-1 px-3 py-2.5 text-xs font-medium bg-card text-foreground border border-border rounded-lg hover:bg-muted disabled:opacity-50"
         >
-          🏪 Retrait au Hub
+          🏪 Retrait au Hub (gratuit)
         </button>
       </div>
-      <p className="text-[10px] text-muted-foreground">
-        🚀 Profitez d'une livraison rapide et sans effort directement chez vous !
-      </p>
     </div>
   );
 }
