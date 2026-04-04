@@ -89,7 +89,7 @@ export function OrdersTab({ period, geoFilters }: Props) {
 
   const enrichedOrders = useMemo(() => {
     const productMap = new Map(products.map((p: any) => [p.id, p]));
-    const storeMap = new Map(stores.map((s: any) => [s.id, s]));
+    const storeMap = new Map<string, { id: string; name: string }>(stores.map((s: any) => [s.id, s]));
     const itemsByOrder = new Map<string, any[]>();
     allItems.forEach((item: any) => {
       if (!itemsByOrder.has(item.order_id)) itemsByOrder.set(item.order_id, []);
