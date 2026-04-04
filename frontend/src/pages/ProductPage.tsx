@@ -448,7 +448,7 @@ export default function ProductPage() {
                         </a>
                         <button
                           onClick={() => {
-                            navigator.clipboard.writeText(shareProxyUrl);
+                            navigator.clipboard.writeText(productUrl);
                             toast({ title: "Lien copié !", description: "Le lien du produit a été copié dans le presse-papiers." });
                           }}
                           className="flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors w-full"
