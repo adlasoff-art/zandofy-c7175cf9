@@ -491,6 +491,19 @@ export default function VendorDashboardPage() {
                     <VendorTierBadge storeId={store!.id} />
                   </div>
 
+                  {/* Store Switcher */}
+                  <VendorStoreSwitcher
+                    stores={allStores}
+                    activeStoreId={store!.id}
+                    onSwitch={(storeId) => {
+                      const target = allStores.find(s => s.id === storeId);
+                      if (target) {
+                        setStore(target);
+                        hasLoadedRef.current = false;
+                      }
+                    }}
+                  />
+
                   {/* Navigation items */}
                   <div className="bg-card border border-border rounded-lg py-1">
                     <button
