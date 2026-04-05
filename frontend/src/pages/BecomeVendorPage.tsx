@@ -291,15 +291,33 @@ export default function BecomeVendorPage() {
               <p className="text-muted-foreground">{t("vendor.approvedDesc")}</p>
               <Button onClick={() => navigate("/vendor")}>{t("vendor.goToVendor")}</Button>
               <div className="pt-4 border-t border-border">
-                <p className="text-xs text-muted-foreground mb-2">Vous souhaitez ouvrir une nouvelle boutique ?</p>
-                <Button variant="outline" onClick={() => {
-                  setForm(initialData);
-                  setDocs([]);
-                  setStep(1);
-                  setExistingApp(false);
-                }}>
-                  <Store size={14} className="mr-2" /> Nouvelle demande de boutique
-                </Button>
+                {multiStoreEligibility && !multiStoreEligibility.eligible && multiStoreEligibility.hasStores && !multiStoreEligibility.isPlatformAgent ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground mb-2">Vous souhaitez ouvrir une nouvelle boutique ?</p>
+                    <div className="bg-muted/50 border border-border rounded-lg p-3 text-left">
+                      <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 mb-1">
+                        <Clock size={14} />
+                        <span className="text-xs font-semibold">Non éligible pour le moment</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{multiStoreEligibility.reason}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Ancienneté : {multiStoreEligibility.monthsActive} mois • Ventes : {multiStoreEligibility.salesCount}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs text-muted-foreground mb-2">Vous souhaitez ouvrir une nouvelle boutique ?</p>
+                    <Button variant="outline" onClick={() => {
+                      setForm(initialData);
+                      setDocs([]);
+                      setStep(1);
+                      setExistingApp(false);
+                    }}>
+                      <Store size={14} className="mr-2" /> Nouvelle demande de boutique
+                    </Button>
+                  </>
+                )}
               </div>
             </>
           )}
