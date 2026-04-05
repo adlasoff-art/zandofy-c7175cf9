@@ -117,7 +117,7 @@ export default function AdminServicePlansPage() {
   };
 
   return (
-    <AdminLayout title="Tarification des services" icon={<DollarSign size={20} />}>
+    <AdminLayout title="Tarification des services">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">Gérez les tarifs mensuels/annuels des services payants pour les vendeurs.</p>

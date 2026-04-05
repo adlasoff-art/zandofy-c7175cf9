@@ -55,7 +55,7 @@ export default function AdminDeliveryPlansPage() {
   const penaltyItems = hubItems.filter((h: any) => h.is_penalty_active).length;
 
   return (
-    <AdminLayout title="Plans de livraison & Hub" icon={<Truck size={20} />}>
+    <AdminLayout title="Plans de livraison & Hub">
       <div className="space-y-4">
         {/* KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

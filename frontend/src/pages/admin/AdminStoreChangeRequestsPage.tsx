@@ -48,7 +48,7 @@ export default function AdminStoreChangeRequestsPage() {
     },
   });
 
-  const storeIds = [...new Set(requests.map((r: any) => r.store_id))];
+  const storeIds = [...new Set(requests.map((r: any) => r.store_id))] as string[];
   const { data: stores = [] } = useQuery({
     queryKey: ["change-req-stores", storeIds.join(",")],
     queryFn: async () => {
@@ -114,7 +114,7 @@ export default function AdminStoreChangeRequestsPage() {
   const pendingCount = requests.filter((r: any) => r.status === "pending").length;
 
   return (
-    <AdminLayout title="Demandes de modification boutique" icon={<PenLine size={20} />}>
+    <AdminLayout title="Demandes de modification boutique">
       <div className="space-y-4">
         <div className="flex items-center gap-3 flex-wrap">
           <Badge variant="outline" className="text-yellow-700 border-yellow-300">{pendingCount} en attente</Badge>

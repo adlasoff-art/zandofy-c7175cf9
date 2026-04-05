@@ -51,12 +51,11 @@ export function StoreTransferSection({ storeId }: Props) {
       // Filter only KYC verified users
       if (!data?.length) return [];
       const ids = data.map((u) => u.id);
-      const { data: kycData } = await supabase
-        .from("kyc_verifications")
+      const { data: kycData } = await fromTable("kyc_verifications")
         .select("user_id")
         .in("user_id", ids)
         .eq("status", "approved");
-      const verifiedIds = new Set(kycData?.map((k) => k.user_id) || []);
+      const verifiedIds = new Set((kycData || []).map((k: any) => k.user_id));
       return data.filter((u) => verifiedIds.has(u.id));
     },
     enabled: searchTerm.length >= 2,
@@ -190,7 +189,7 @@ export function StoreTransferSection({ storeId }: Props) {
                         <p className="font-medium truncate">{u.first_name} {u.last_name}</p>
                         <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                       </div>
-                      <CheckCircle size={14} className="text-green-500 ml-auto shrink-0" title="KYC vérifié" />
+                      <CheckCircle size={14} className="text-green-500 ml-auto shrink-0" />
                     </button>
                   ))}
                 </div>

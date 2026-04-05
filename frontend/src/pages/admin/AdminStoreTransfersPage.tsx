@@ -59,8 +59,8 @@ export default function AdminStoreTransfersPage() {
   });
 
   // Fetch profiles & stores for display
-  const userIds = [...new Set(requests.flatMap((r: any) => [r.from_user_id, r.to_user_id]))];
-  const storeIds = [...new Set(requests.map((r: any) => r.store_id))];
+  const userIds = [...new Set(requests.flatMap((r: any) => [r.from_user_id, r.to_user_id]))] as string[];
+  const storeIds = [...new Set(requests.map((r: any) => r.store_id))] as string[];
 
   const { data: profiles = [] } = useQuery({
     queryKey: ["transfer-profiles", userIds.join(",")],
@@ -179,7 +179,7 @@ export default function AdminStoreTransfersPage() {
   };
 
   return (
-    <AdminLayout title="Transferts de boutiques" icon={<ArrowLeftRight size={20} />}>
+    <AdminLayout title="Transferts de boutiques">
       <div className="space-y-4">
         {/* KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
