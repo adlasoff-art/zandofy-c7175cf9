@@ -4881,6 +4881,77 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_payments: {
+        Row: {
+          amount: number
+          billing_cycle: string
+          callback_payload: Json | null
+          created_at: string
+          currency: string
+          id: string
+          package_id: string | null
+          payment_method: string
+          phone_number: string | null
+          provider: string | null
+          reference: string
+          service_key: string | null
+          status: string
+          store_id: string | null
+          subscription_type: string
+          transaction_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          billing_cycle?: string
+          callback_payload?: Json | null
+          created_at?: string
+          currency?: string
+          id?: string
+          package_id?: string | null
+          payment_method?: string
+          phone_number?: string | null
+          provider?: string | null
+          reference: string
+          service_key?: string | null
+          status?: string
+          store_id?: string | null
+          subscription_type?: string
+          transaction_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          billing_cycle?: string
+          callback_payload?: Json | null
+          created_at?: string
+          currency?: string
+          id?: string
+          package_id?: string | null
+          payment_method?: string
+          phone_number?: string | null
+          provider?: string | null
+          reference?: string
+          service_key?: string | null
+          status?: string
+          store_id?: string | null
+          subscription_type?: string
+          transaction_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_payments_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_platforms: {
         Row: {
           created_at: string
