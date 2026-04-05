@@ -569,6 +569,27 @@ export default function VendorDashboardPage() {
               {/* Platform claim banner */}
               <VendorPlatformClaimBanner storeId={store!.id} userId={user!.id} storeName={store!.name} />
 
+              {/* Store suspension/ban banner (mobile) */}
+              {store?.is_banned && (
+                <div className="p-4 rounded-lg border border-destructive bg-destructive/5">
+                  <div className="flex items-center gap-2 text-destructive font-semibold text-sm mb-1">
+                    <Ban size={16} /> Boutique bannie
+                  </div>
+                  <p className="text-xs text-muted-foreground">{store.ban_reason || "Votre boutique a été bannie pour violation des conditions d'utilisation."}</p>
+                </div>
+              )}
+              {store?.is_suspended && !store?.is_banned && (
+                <div className="p-4 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/10">
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-semibold text-sm mb-1">
+                    <AlertTriangle size={16} /> Boutique suspendue
+                  </div>
+                  <p className="text-xs text-muted-foreground">{store.suspension_reason || "Certaines activités sont temporairement suspendues."}</p>
+                  {store.suspended_activities && store.suspended_activities.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">Bloquées : {store.suspended_activities.join(", ")}</p>
+                  )}
+                </div>
+              )}
+
               {/* Horizontal scrollable tabs */}
               <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide">
                 {VENDOR_TABS.map((tab) => (
