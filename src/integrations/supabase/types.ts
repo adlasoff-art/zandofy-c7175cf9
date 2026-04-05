@@ -5485,6 +5485,7 @@ export type Database = {
           margin_pct: number | null
           max_extra_margin: number | null
           max_multiplier: number | null
+          max_products_override: number | null
           multiplier: number | null
           notes: string | null
           store_id: string
@@ -5502,6 +5503,7 @@ export type Database = {
           margin_pct?: number | null
           max_extra_margin?: number | null
           max_multiplier?: number | null
+          max_products_override?: number | null
           multiplier?: number | null
           notes?: string | null
           store_id: string
@@ -5519,6 +5521,7 @@ export type Database = {
           margin_pct?: number | null
           max_extra_margin?: number | null
           max_multiplier?: number | null
+          max_products_override?: number | null
           multiplier?: number | null
           notes?: string | null
           store_id?: string
