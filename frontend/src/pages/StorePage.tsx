@@ -271,6 +271,15 @@ export default function StorePage() {
               Retour à l'accueil
             </Link>
           </div>
+        ) : isBannedStore ? (
+          <div className="text-center py-20 container">
+            <Store size={48} className="mx-auto text-destructive/30 mb-4" />
+            <h1 className="text-2xl font-bold text-foreground">Boutique indisponible</h1>
+            <p className="text-muted-foreground mt-2">Cette boutique a été suspendue pour non-respect des règles de la plateforme.</p>
+            <Link to="/stores" className="text-primary underline mt-4 inline-block">
+              Voir d'autres boutiques
+            </Link>
+          </div>
         ) : (
           <>
             {/* ═══ HERO BANNER ═══ */}
