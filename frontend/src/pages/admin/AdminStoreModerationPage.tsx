@@ -83,7 +83,7 @@ export default function AdminStoreModerationPage() {
         .order("created_at", { ascending: false });
       if (error) throw error;
 
-      const ownerIds = [...new Set((data || []).map((s: any) => s.owner_id).filter(Boolean))];
+      const ownerIds = [...new Set((data || []).map((s: any) => s.owner_id).filter(Boolean))] as string[];
       let ownerMap: Record<string, { email: string | null; first_name: string | null; last_name: string | null }> = {};
       if (ownerIds.length > 0) {
         const { data: profiles } = await supabase.from("profiles").select("id, email, first_name, last_name").in("id", ownerIds);
