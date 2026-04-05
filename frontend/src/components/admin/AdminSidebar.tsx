@@ -53,6 +53,7 @@ const sidebarSections: SidebarSection[] = [
     items: [
       { title: "Logistique", url: "/admin/logistics", icon: Truck },
       { title: "Tarification Fret", url: "/admin/shipping", icon: DollarSign },
+      { title: "Plans de livraison", url: "/admin/delivery-plans", icon: Truck },
       { title: "Zones géographiques", url: "/admin/geography", icon: MapPin },
       { title: "Pays actifs", url: "/admin/countries", icon: Globe },
     ],
@@ -65,7 +66,10 @@ const sidebarSections: SidebarSection[] = [
       { title: "Demandes Vendeur", url: "/admin/vendor-applications", icon: Store },
       { title: "Noms de boutique", url: "/admin/store-names", icon: PenLine },
       { title: "Modération boutiques", url: "/admin/store-moderation", icon: ShieldCheck },
+      { title: "Transferts boutiques", url: "/admin/store-transfers", icon: ArrowLeftRight },
+      { title: "Modifications boutiques", url: "/admin/store-change-requests", icon: PenLine },
       { title: "Abonnements", url: "/admin/vendor-subscriptions", icon: Crown },
+      { title: "Plans de services", url: "/admin/service-plans", icon: DollarSign },
       { title: "Tarification boutiques", url: "/admin/vendor-pricing", icon: DollarSign },
       { title: "Vérification KYC", url: "/admin/kyc", icon: ShieldCheck },
       { title: "Comptabilité vendeurs", url: "/admin/vendor-accounting", icon: Receipt },

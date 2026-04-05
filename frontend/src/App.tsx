@@ -112,6 +112,10 @@ const AdminVendorAccountingPage = lazy(() => import("./pages/admin/AdminVendorAc
 const AdminFlashSalesPage = lazy(() => import("./pages/admin/AdminFlashSalesPage"));
 const AdminSupplierPlatformsPage = lazy(() => import("./pages/admin/AdminSupplierPlatformsPage"));
 const AdminStoreModerationPage = lazy(() => import("./pages/admin/AdminStoreModerationPage"));
+const AdminStoreTransfersPage = lazy(() => import("./pages/admin/AdminStoreTransfersPage"));
+const AdminStoreChangeRequestsPage = lazy(() => import("./pages/admin/AdminStoreChangeRequestsPage"));
+const AdminServicePlansPage = lazy(() => import("./pages/admin/AdminServicePlansPage"));
+const AdminDeliveryPlansPage = lazy(() => import("./pages/admin/AdminDeliveryPlansPage"));
 const ImpersonatePage = lazy(() => import("./pages/ImpersonatePage"));
 
 const queryClient = new QueryClient({
@@ -243,6 +247,10 @@ const App = () => (
                 <Route path="/admin/flash-sales" element={<RoleGuard allowedRoles={["admin"]}><AdminFlashSalesPage /></RoleGuard>} />
                 <Route path="/admin/supplier-platforms" element={<RoleGuard allowedRoles={["admin"]}><AdminSupplierPlatformsPage /></RoleGuard>} />
                 <Route path="/admin/store-moderation" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminStoreModerationPage /></RoleGuard>} />
+                <Route path="/admin/store-transfers" element={<RoleGuard allowedRoles={["admin"]}><AdminStoreTransfersPage /></RoleGuard>} />
+                <Route path="/admin/store-change-requests" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminStoreChangeRequestsPage /></RoleGuard>} />
+                <Route path="/admin/service-plans" element={<RoleGuard allowedRoles={["admin"]}><AdminServicePlansPage /></RoleGuard>} />
+                <Route path="/admin/delivery-plans" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDeliveryPlansPage /></RoleGuard>} />
                 <Route path="/impersonate" element={<ImpersonatePage />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
