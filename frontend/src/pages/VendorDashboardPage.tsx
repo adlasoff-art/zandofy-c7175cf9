@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { compressImage } from "@/utils/image-compress";
 import { InternalChat } from "@/components/InternalChat";
 import { VendorPlatformClaimBanner } from "@/components/vendor/VendorPlatformClaimBanner";
+import { VendorStoreSwitcher } from "@/components/vendor/VendorStoreSwitcher";
 import { VendorProductManager } from "@/components/VendorProductManager";
 import { VendorFeaturedRequestTab } from "@/components/vendor/VendorFeaturedRequestTab";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -75,6 +76,7 @@ interface OrderCounters {
 export default function VendorDashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [allStores, setAllStores] = useState<VendorStore[]>([]);
   const [store, setStore] = useState<VendorStore | null>(null);
   const [conversations, setConversations] = useState<VendorConversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,45 +128,48 @@ export default function VendorDashboardPage() {
         setLoading(true);
       }
 
-      // Find store owned by user
-      const { data: storeData } = await (supabase as any)
+      // Find all stores owned by user
+      const { data: storesData } = await (supabase as any)
         .from("stores")
         .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, suspension_reason, ban_reason, suspended_activities")
         .eq("owner_id", user!.id)
-        .maybeSingle();
+        .order("created_at", { ascending: true });
 
-      if (!storeData) {
+      if (!storesData || storesData.length === 0) {
         setNoStore(true);
         setLoading(false);
         return;
       }
 
-      setStore(storeData);
-      storeIdForRealtime = storeData.id;
+      setAllStores(storesData);
+      // Use first store as default active store
+      const activeStore = storesData[0];
+      setStore(activeStore);
+      storeIdForRealtime = activeStore.id;
 
       // Load suppliers_enabled from vendor_pricing_overrides
       const { data: overrideData } = await (supabase as any)
         .from("vendor_pricing_overrides")
         .select("suppliers_enabled")
-        .eq("store_id", storeData.id)
+        .eq("store_id", activeStore.id)
         .maybeSingle();
       setSuppliersEnabled(overrideData?.suppliers_enabled ?? false);
 
       // Load order counters
-      await fetchOrderCounters(storeData.id);
+      await fetchOrderCounters(activeStore.id);
 
       // Load conversations for this store
       const { data: convs } = await supabase
         .from("conversations")
         .select("id, user_id, product_id, updated_at")
-        .eq("store_id", storeData.id)
+        .eq("store_id", activeStore.id)
         .order("updated_at", { ascending: false });
 
       if (!convs || convs.length === 0) {
         setConversations([]);
         setLoading(false);
         hasLoadedRef.current = true;
-        setupRealtime(storeData.id);
+        setupRealtime(activeStore.id);
         return;
       }
 
