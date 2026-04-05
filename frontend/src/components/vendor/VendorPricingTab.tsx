@@ -52,7 +52,7 @@ export function VendorPricingTab({ storeId }: Props) {
     queryKey: ["kyc-status-vendor", user?.id],
     queryFn: async () => {
       if (!user) return false;
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("kyc_verifications")
         .select("id")
         .eq("user_id", user.id)

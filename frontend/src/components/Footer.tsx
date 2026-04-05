@@ -58,6 +58,7 @@ export function Footer() {
         { label: t("footer.socialResponsibility"), to: "/social-responsibility" },
         { label: t("footer.careers"), to: "/careers" },
         { label: t("footer.blog"), to: "/blog" },
+        { label: "Tarification", to: "/pricing" },
         { label: t("footer.affiliates"), to: "/affiliate-program" },
       ],
     },
