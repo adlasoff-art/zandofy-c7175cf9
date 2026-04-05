@@ -1,5 +1,6 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Search, Store, Save, Loader2, ShieldAlert, Settings } from "lucide-react";
+import { AdminCreateStoreDialog } from "@/components/admin/AdminCreateStoreDialog";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -320,6 +321,10 @@ export default function AdminVendorPricingPage() {
         {/* Global defaults section */}
         <GlobalPricingDefaults defaults={globalDefaults} />
 
+        {/* Admin create store */}
+        <div className="flex justify-end">
+          <AdminCreateStoreDialog />
+        </div>
         <p className="text-sm text-muted-foreground">
           Configurez la marge (%), le multiplicateur et l'accès à la marge vendeur pour chaque boutique.
           Les champs vides utilisent les valeurs globales par défaut
