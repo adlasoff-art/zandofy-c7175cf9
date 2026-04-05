@@ -1,13 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fromTable } from "@/lib/supabase-helpers";
-import { Check, Crown, Truck, Package, Warehouse, Percent, Shield, Star, Zap, Loader2, ShoppingBag } from "lucide-react";
+import { Crown, Truck, Package, Warehouse, Percent, Shield, Star, Zap, ShoppingBag } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
 import { VENDOR_TIERS, PACKAGE_TIER_MAP } from "@/lib/vendor-tiers";
 import { VendorIndividualServices } from "./VendorIndividualServices";
+import { SubscriptionCheckoutDialog } from "@/components/payments/SubscriptionCheckoutDialog";
 
 interface Props {
   storeId: string;
@@ -22,10 +22,9 @@ const visibilityLabels: Record<string, string> = {
 
 export function VendorPricingTab({ storeId }: Props) {
   const { user } = useAuth();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
-  const [subscribingId, setSubscribingId] = useState<string | null>(null);
+  const [checkoutPkg, setCheckoutPkg] = useState<any>(null);
 
   // Fetch service packages
   const { data: packages = [], isLoading } = useQuery({
@@ -41,7 +40,7 @@ export function VendorPricingTab({ storeId }: Props) {
   });
 
   // Fetch current subscription
-  const { data: currentSub, refetch: refetchSub } = useQuery({
+  const { data: currentSub } = useQuery({
     queryKey: ["store-package-sub", storeId],
     queryFn: async () => {
       const { data } = await fromTable("store_package_subscriptions")
@@ -53,7 +52,7 @@ export function VendorPricingTab({ storeId }: Props) {
     },
   });
 
-  // Fetch current vendor tier info
+  // Fetch current vendor tier
   const { data: vendorSub } = useQuery({
     queryKey: ["vendor-subscription-tier", storeId],
     queryFn: async () => {
@@ -119,69 +118,16 @@ export function VendorPricingTab({ storeId }: Props) {
   const tierConfig = VENDOR_TIERS[currentTier as keyof typeof VENDOR_TIERS] || VENDOR_TIERS.beginner;
   const effectiveMaxProducts = productOverride ?? (vendorSub as any)?.max_products ?? tierConfig.maxProducts;
 
-  const handleSubscribe = async (pkg: any) => {
-    if (!kycVerified || subscribingId) return;
-    setSubscribingId(pkg.id);
-
-    try {
-      const paidUntil = new Date();
-      if (billingCycle === "yearly") {
-        paidUntil.setFullYear(paidUntil.getFullYear() + 1);
-      } else {
-        paidUntil.setMonth(paidUntil.getMonth() + 1);
-      }
-
-      // Deactivate existing subscription
-      if (currentSub?.id) {
-        await fromTable("store_package_subscriptions")
-          .update({ is_active: false, updated_at: new Date().toISOString() } as any)
-          .eq("id", currentSub.id);
-      }
-
-      // Create new subscription
-      await fromTable("store_package_subscriptions")
-        .insert({
-          store_id: storeId,
-          package_id: pkg.id,
-          billing_cycle: billingCycle,
-          paid_until: paidUntil.toISOString(),
-          is_active: true,
-          subscribed_at: new Date().toISOString(),
-        } as any);
-
-      // Update vendor_subscriptions tier + max_products based on package
-      const newTier = PACKAGE_TIER_MAP[pkg.slug] || "beginner";
-      const newMaxProducts = VENDOR_TIERS[newTier]?.maxProducts || 10;
-
-      if (vendorSub?.id) {
-        await supabase
-          .from("vendor_subscriptions")
-          .update({
-            tier: newTier as any,
-            max_products: newMaxProducts,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", vendorSub.id);
-      } else {
-        await supabase
-          .from("vendor_subscriptions")
-          .insert({
-            store_id: storeId,
-            tier: newTier as any,
-            max_products: newMaxProducts,
-          } as any);
-      }
-
-      toast({ title: "Abonnement activé", description: `Package "${pkg.name}" souscrit avec succès.` });
-      queryClient.invalidateQueries({ queryKey: ["store-package-sub", storeId] });
-      queryClient.invalidateQueries({ queryKey: ["vendor-subscription-tier", storeId] });
-      queryClient.invalidateQueries({ queryKey: ["vendor-sub-services", storeId] });
-    } catch (err: any) {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
-    } finally {
-      setSubscribingId(null);
-    }
+  const handleSubscriptionSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["store-package-sub", storeId] });
+    queryClient.invalidateQueries({ queryKey: ["vendor-subscription-tier", storeId] });
+    queryClient.invalidateQueries({ queryKey: ["vendor-sub-services", storeId] });
+    setCheckoutPkg(null);
   };
+
+  const checkoutPrice = checkoutPkg
+    ? (billingCycle === "yearly" ? checkoutPkg.price_yearly : checkoutPkg.price_monthly)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -333,11 +279,10 @@ export function VendorPricingTab({ storeId }: Props) {
                 </ul>
 
                 <button
-                  onClick={() => handleSubscribe(pkg)}
-                  disabled={!kycVerified || isCurrent || subscribingId === pkg.id}
-                  className="w-full mt-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity flex items-center justify-center gap-1.5"
+                  onClick={() => setCheckoutPkg(pkg)}
+                  disabled={!kycVerified || isCurrent}
+                  className="w-full mt-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                 >
-                  {subscribingId === pkg.id && <Loader2 size={12} className="animate-spin" />}
                   {isCurrent ? "Package actuel" : !kycVerified ? "KYC requis" : isUpgrade ? "Passer au supérieur" : "Souscrire"}
                 </button>
               </div>
@@ -375,6 +320,21 @@ export function VendorPricingTab({ storeId }: Props) {
         <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-300 dark:border-amber-700 rounded-lg p-4 text-xs text-amber-800 dark:text-amber-300">
           ⚠️ Vous devez compléter votre vérification d'identité (KYC) pour souscrire à un package ou service.
         </div>
+      )}
+
+      {/* Subscription checkout dialog */}
+      {checkoutPkg && (
+        <SubscriptionCheckoutDialog
+          open={!!checkoutPkg}
+          onOpenChange={(open) => { if (!open) setCheckoutPkg(null); }}
+          itemName={checkoutPkg.name}
+          price={checkoutPrice}
+          billingCycle={billingCycle}
+          subscriptionType="package"
+          packageId={checkoutPkg.id}
+          storeId={storeId}
+          onSuccess={handleSubscriptionSuccess}
+        />
       )}
     </div>
   );
