@@ -123,7 +123,7 @@ export default function VendorDashboardPage() {
       // Find store owned by user
       const { data: storeData } = await (supabase as any)
         .from("stores")
-        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled")
+        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, suspension_reason, ban_reason, suspended_activities")
         .eq("owner_id", user!.id)
         .maybeSingle();
 
