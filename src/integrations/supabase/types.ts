@@ -4367,6 +4367,9 @@ export type Database = {
       }
       stores: {
         Row: {
+          ban_reason: string | null
+          banned_at: string | null
+          banned_by: string | null
           banner_url: string | null
           can_create_coupons: boolean
           chat_links_allowed: boolean
@@ -4384,9 +4387,11 @@ export type Database = {
           followers_override: number | null
           fulfillment_type: string
           id: string
+          is_banned: boolean
           is_certified: boolean
           is_online: boolean | null
           is_platform_owned: boolean
+          is_suspended: boolean
           is_verified: boolean | null
           last_seen_at: string | null
           logo_url: string | null
@@ -4411,11 +4416,18 @@ export type Database = {
           sales_trend: string | null
           seo_keywords: string[] | null
           shop_type: string
+          suspended_activities: string[] | null
+          suspended_at: string | null
+          suspended_by: string | null
+          suspension_reason: string | null
           verified_years: number | null
           verified_years_override: number | null
           whatsapp_number: string | null
         }
         Insert: {
+          ban_reason?: string | null
+          banned_at?: string | null
+          banned_by?: string | null
           banner_url?: string | null
           can_create_coupons?: boolean
           chat_links_allowed?: boolean
@@ -4433,9 +4445,11 @@ export type Database = {
           followers_override?: number | null
           fulfillment_type?: string
           id?: string
+          is_banned?: boolean
           is_certified?: boolean
           is_online?: boolean | null
           is_platform_owned?: boolean
+          is_suspended?: boolean
           is_verified?: boolean | null
           last_seen_at?: string | null
           logo_url?: string | null
@@ -4460,11 +4474,18 @@ export type Database = {
           sales_trend?: string | null
           seo_keywords?: string[] | null
           shop_type?: string
+          suspended_activities?: string[] | null
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspension_reason?: string | null
           verified_years?: number | null
           verified_years_override?: number | null
           whatsapp_number?: string | null
         }
         Update: {
+          ban_reason?: string | null
+          banned_at?: string | null
+          banned_by?: string | null
           banner_url?: string | null
           can_create_coupons?: boolean
           chat_links_allowed?: boolean
@@ -4482,9 +4503,11 @@ export type Database = {
           followers_override?: number | null
           fulfillment_type?: string
           id?: string
+          is_banned?: boolean
           is_certified?: boolean
           is_online?: boolean | null
           is_platform_owned?: boolean
+          is_suspended?: boolean
           is_verified?: boolean | null
           last_seen_at?: string | null
           logo_url?: string | null
@@ -4509,6 +4532,10 @@ export type Database = {
           sales_trend?: string | null
           seo_keywords?: string[] | null
           shop_type?: string
+          suspended_activities?: string[] | null
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspension_reason?: string | null
           verified_years?: number | null
           verified_years_override?: number | null
           whatsapp_number?: string | null

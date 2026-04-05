@@ -26,7 +26,7 @@ import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
-  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck,
+  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { ACTIVE_ORDER_STATUSES, NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
@@ -58,6 +58,11 @@ interface VendorStore {
   name_change_status: string | null;
   can_create_coupons: boolean;
   collaborators_enabled: boolean;
+  is_suspended?: boolean;
+  is_banned?: boolean;
+  suspension_reason?: string | null;
+  ban_reason?: string | null;
+  suspended_activities?: string[];
 }
 
 interface OrderCounters {
@@ -123,7 +128,7 @@ export default function VendorDashboardPage() {
       // Find store owned by user
       const { data: storeData } = await (supabase as any)
         .from("stores")
-        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled")
+        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, suspension_reason, ban_reason, suspended_activities")
         .eq("owner_id", user!.id)
         .maybeSingle();
 
@@ -519,6 +524,28 @@ export default function VendorDashboardPage() {
                 {/* Platform claim banner */}
                 <VendorPlatformClaimBanner storeId={store!.id} userId={user!.id} storeName={store!.name} />
 
+                {/* Store suspension/ban banner */}
+                {store?.is_banned && (
+                  <div className="p-4 rounded-lg border border-destructive bg-destructive/5">
+                    <div className="flex items-center gap-2 text-destructive font-semibold text-sm mb-1">
+                      <Ban size={16} /> Boutique bannie
+                    </div>
+                    <p className="text-xs text-muted-foreground">{store.ban_reason || "Votre boutique a été bannie pour violation des conditions d'utilisation."}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Contactez le support pour plus d'informations.</p>
+                  </div>
+                )}
+                {store?.is_suspended && !store?.is_banned && (
+                  <div className="p-4 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/10">
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-semibold text-sm mb-1">
+                      <AlertTriangle size={16} /> Boutique suspendue
+                    </div>
+                    <p className="text-xs text-muted-foreground">{store.suspension_reason || "Certaines activités de votre boutique sont temporairement suspendues."}</p>
+                    {store.suspended_activities && store.suspended_activities.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">Activités bloquées : {store.suspended_activities.join(", ")}</p>
+                    )}
+                  </div>
+                )}
+
                 {/* KPI Widgets — always visible */}
                 <VendorSummaryWidgets store={store!} orderCounters={orderCounters} totalUnread={totalUnread} storeId={store!.id} />
 
@@ -541,6 +568,27 @@ export default function VendorDashboardPage() {
 
               {/* Platform claim banner */}
               <VendorPlatformClaimBanner storeId={store!.id} userId={user!.id} storeName={store!.name} />
+
+              {/* Store suspension/ban banner (mobile) */}
+              {store?.is_banned && (
+                <div className="p-4 rounded-lg border border-destructive bg-destructive/5">
+                  <div className="flex items-center gap-2 text-destructive font-semibold text-sm mb-1">
+                    <Ban size={16} /> Boutique bannie
+                  </div>
+                  <p className="text-xs text-muted-foreground">{store.ban_reason || "Votre boutique a été bannie pour violation des conditions d'utilisation."}</p>
+                </div>
+              )}
+              {store?.is_suspended && !store?.is_banned && (
+                <div className="p-4 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/10">
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-semibold text-sm mb-1">
+                    <AlertTriangle size={16} /> Boutique suspendue
+                  </div>
+                  <p className="text-xs text-muted-foreground">{store.suspension_reason || "Certaines activités sont temporairement suspendues."}</p>
+                  {store.suspended_activities && store.suspended_activities.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">Bloquées : {store.suspended_activities.join(", ")}</p>
+                  )}
+                </div>
+              )}
 
               {/* Horizontal scrollable tabs */}
               <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide">

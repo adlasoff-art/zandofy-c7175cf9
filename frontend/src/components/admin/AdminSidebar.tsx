@@ -64,6 +64,7 @@ const sidebarSections: SidebarSection[] = [
       { title: "Utilisateurs", url: "/admin/users", icon: Users },
       { title: "Demandes Vendeur", url: "/admin/vendor-applications", icon: Store },
       { title: "Noms de boutique", url: "/admin/store-names", icon: PenLine },
+      { title: "Modération boutiques", url: "/admin/store-moderation", icon: ShieldCheck },
       { title: "Abonnements", url: "/admin/vendor-subscriptions", icon: Crown },
       { title: "Tarification boutiques", url: "/admin/vendor-pricing", icon: DollarSign },
       { title: "Vérification KYC", url: "/admin/kyc", icon: ShieldCheck },
