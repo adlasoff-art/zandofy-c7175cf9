@@ -562,7 +562,24 @@ export default function AdminVendorPricingPage() {
                   </div>
                 )}
 
-                {isDirty && (
+                {/* Max products override */}
+                <div className="pt-2 border-t border-border">
+                  <label className="text-xs text-muted-foreground block mb-1">
+                    Limite de produits (override) <span className="text-[10px] opacity-60">vide = selon le tier</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={9999}
+                    step={1}
+                    value={edit.max_products_override}
+                    onChange={(e) => updateEdit(store.id, "max_products_override", e.target.value)}
+                    className={inputClass + " max-w-[200px]"}
+                    placeholder="Automatique (tier)"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Remplace la limite produits définie par le tier d'abonnement du vendeur.</p>
+                </div>
+
                   <p className="text-[10px] text-destructive/70">Modifications non enregistrées</p>
                 )}
               </div>
