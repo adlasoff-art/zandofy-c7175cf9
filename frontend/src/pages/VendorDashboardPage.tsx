@@ -58,6 +58,11 @@ interface VendorStore {
   name_change_status: string | null;
   can_create_coupons: boolean;
   collaborators_enabled: boolean;
+  is_suspended?: boolean;
+  is_banned?: boolean;
+  suspension_reason?: string | null;
+  ban_reason?: string | null;
+  suspended_activities?: string[];
 }
 
 interface OrderCounters {
@@ -518,6 +523,28 @@ export default function VendorDashboardPage() {
               <div className="flex-1 min-w-0 space-y-4">
                 {/* Platform claim banner */}
                 <VendorPlatformClaimBanner storeId={store!.id} userId={user!.id} storeName={store!.name} />
+
+                {/* Store suspension/ban banner */}
+                {store?.is_banned && (
+                  <div className="p-4 rounded-lg border border-destructive bg-destructive/5">
+                    <div className="flex items-center gap-2 text-destructive font-semibold text-sm mb-1">
+                      <Ban size={16} /> Boutique bannie
+                    </div>
+                    <p className="text-xs text-muted-foreground">{store.ban_reason || "Votre boutique a été bannie pour violation des conditions d'utilisation."}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Contactez le support pour plus d'informations.</p>
+                  </div>
+                )}
+                {store?.is_suspended && !store?.is_banned && (
+                  <div className="p-4 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/10">
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-semibold text-sm mb-1">
+                      <AlertTriangle size={16} /> Boutique suspendue
+                    </div>
+                    <p className="text-xs text-muted-foreground">{store.suspension_reason || "Certaines activités de votre boutique sont temporairement suspendues."}</p>
+                    {store.suspended_activities && store.suspended_activities.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">Activités bloquées : {store.suspended_activities.join(", ")}</p>
+                    )}
+                  </div>
+                )}
 
                 {/* KPI Widgets — always visible */}
                 <VendorSummaryWidgets store={store!} orderCounters={orderCounters} totalUnread={totalUnread} storeId={store!.id} />
