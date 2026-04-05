@@ -91,6 +91,9 @@ export default function StorePage() {
     enabled: !!id,
   });
 
+  // Check if store is banned — show unavailable message
+  const isBannedStore = !!(store as any)?.is_banned;
+
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ["store-products", id],
     queryFn: async () => {
