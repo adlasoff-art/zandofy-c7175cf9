@@ -223,7 +223,7 @@ export default function VendorDashboardPage() {
       setConversations(items);
       setLoading(false);
       hasLoadedRef.current = true;
-      setupRealtime(storeData.id);
+      setupRealtime(activeStore.id);
     }
 
     function setupRealtime(storeId: string) {
