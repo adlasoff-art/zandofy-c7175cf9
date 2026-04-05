@@ -89,6 +89,7 @@ interface StoreWithOverride {
     max_extra_margin: number | null;
     vendor_extra_margin_enabled: boolean;
     commission_rate: number | null;
+    max_products_override: number | null;
   } | null;
 }
 
@@ -107,6 +108,7 @@ export default function AdminVendorPricingPage() {
     vendor_custom_payment_numbers_enabled: boolean;
     returns_enabled: boolean;
     suppliers_enabled: boolean;
+    max_products_override: string;
   }>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -203,6 +205,7 @@ export default function AdminVendorPricingPage() {
       vendor_custom_payment_numbers_enabled: (o as any)?.vendor_custom_payment_numbers_enabled ?? false,
       returns_enabled: (store as any).returns_enabled ?? false,
       suppliers_enabled: (o as any)?.suppliers_enabled ?? false,
+      max_products_override: o?.max_products_override != null ? String(o.max_products_override) : "",
     };
   };
 
@@ -215,7 +218,7 @@ export default function AdminVendorPricingPage() {
 
   const getEditForId = (storeId: string) => {
     const store = stores?.find((s) => s.id === storeId);
-    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, returns_enabled: false, suppliers_enabled: false };
+    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, returns_enabled: false, suppliers_enabled: false, max_products_override: "" };
     return getEdit(store);
   };
 
@@ -279,6 +282,7 @@ export default function AdminVendorPricingPage() {
       vendor_off_platform_enabled: edit.vendor_off_platform_enabled,
       vendor_custom_payment_numbers_enabled: edit.vendor_custom_payment_numbers_enabled,
       suppliers_enabled: edit.suppliers_enabled,
+      max_products_override: edit.max_products_override ? Number(edit.max_products_override) : null,
       updated_at: new Date().toISOString(),
     };
 
@@ -557,6 +561,24 @@ export default function AdminVendorPricingPage() {
                     />
                   </div>
                 )}
+
+                {/* Max products override */}
+                <div className="pt-2 border-t border-border">
+                  <label className="text-xs text-muted-foreground block mb-1">
+                    Limite de produits (override) <span className="text-[10px] opacity-60">vide = selon le tier</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={9999}
+                    step={1}
+                    value={edit.max_products_override}
+                    onChange={(e) => updateEdit(store.id, "max_products_override", e.target.value)}
+                    className={inputClass + " max-w-[200px]"}
+                    placeholder="Automatique (tier)"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Remplace la limite produits définie par le tier d'abonnement du vendeur.</p>
+                </div>
 
                 {isDirty && (
                   <p className="text-[10px] text-destructive/70">Modifications non enregistrées</p>

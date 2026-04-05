@@ -5485,6 +5485,7 @@ export type Database = {
           margin_pct: number | null
           max_extra_margin: number | null
           max_multiplier: number | null
+          max_products_override: number | null
           multiplier: number | null
           notes: string | null
           store_id: string
@@ -5502,6 +5503,7 @@ export type Database = {
           margin_pct?: number | null
           max_extra_margin?: number | null
           max_multiplier?: number | null
+          max_products_override?: number | null
           multiplier?: number | null
           notes?: string | null
           store_id: string
@@ -5519,6 +5521,7 @@ export type Database = {
           margin_pct?: number | null
           max_extra_margin?: number | null
           max_multiplier?: number | null
+          max_products_override?: number | null
           multiplier?: number | null
           notes?: string | null
           store_id?: string
@@ -6186,7 +6189,12 @@ export type Database = {
         | "rejected"
         | "resubmission_required"
       product_status: "draft" | "pending_approval" | "published" | "rejected"
-      vendor_tier: "beginner" | "pro" | "grand_supplier"
+      vendor_tier:
+        | "beginner"
+        | "intermediate"
+        | "pro"
+        | "grand_supplier"
+        | "factory"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -6329,7 +6337,13 @@ export const Constants = {
         "resubmission_required",
       ],
       product_status: ["draft", "pending_approval", "published", "rejected"],
-      vendor_tier: ["beginner", "pro", "grand_supplier"],
+      vendor_tier: [
+        "beginner",
+        "intermediate",
+        "pro",
+        "grand_supplier",
+        "factory",
+      ],
     },
   },
 } as const
