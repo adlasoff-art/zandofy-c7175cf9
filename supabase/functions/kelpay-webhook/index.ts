@@ -63,6 +63,115 @@ Deno.serve(async (req) => {
       return new Response("OK", { status: 200, headers: corsHeaders });
     }
 
+    // Check if this is a subscription payment (reference starts with SUB)
+    const isSubscription = reference.startsWith("SUB");
+
+    if (isSubscription) {
+      // Handle subscription payment
+      const { data: subTx, error: subErr } = await supabase
+        .from("subscription_payments")
+        .select("id, user_id, status, subscription_type, package_id, service_key, store_id, billing_cycle, amount")
+        .eq("reference", reference)
+        .maybeSingle();
+
+      if (subErr || !subTx) {
+        console.error("Subscription payment not found for ref:", reference, subErr);
+        return new Response("OK", { status: 200, headers: corsHeaders });
+      }
+
+      if (subTx.status === "success") {
+        return new Response("OK", { status: 200, headers: corsHeaders });
+      }
+
+      const subIsSuccess = code === "0" || code === 0 || transactionstatus === "SUCCESS" || transactionstatus === "Successful";
+      const subFailedStatuses = ["FAILED", "Failed", "Cancelled", "CANCELLED", "Expired", "EXPIRED", "Declined", "DECLINED", "Rejected", "REJECTED"];
+      const subIsFailed = subFailedStatuses.includes(transactionstatus) || (code !== "0" && code !== 0 && code !== "1" && code !== undefined && code !== null);
+
+      if (!subIsSuccess && !subIsFailed) {
+        return new Response("OK", { status: 200, headers: corsHeaders });
+      }
+
+      const subNewStatus = subIsSuccess ? "success" : "failed";
+      await supabase.from("subscription_payments").update({
+        status: subNewStatus,
+        transaction_id: transactionid || undefined,
+        callback_payload: payload,
+      }).eq("id", subTx.id);
+
+      if (subIsSuccess) {
+        // Activate the subscription
+        const paidUntil = new Date();
+        if (subTx.billing_cycle === "yearly") {
+          paidUntil.setFullYear(paidUntil.getFullYear() + 1);
+        } else {
+          paidUntil.setMonth(paidUntil.getMonth() + 1);
+        }
+
+        if (subTx.subscription_type === "package" && subTx.package_id && subTx.store_id) {
+          // Deactivate old subscription
+          await supabase.from("store_package_subscriptions")
+            .update({ is_active: false, updated_at: new Date().toISOString() })
+            .eq("store_id", subTx.store_id)
+            .eq("is_active", true);
+
+          // Create new subscription
+          await supabase.from("store_package_subscriptions").insert({
+            store_id: subTx.store_id,
+            package_id: subTx.package_id,
+            billing_cycle: subTx.billing_cycle,
+            paid_until: paidUntil.toISOString(),
+            is_active: true,
+            subscribed_at: new Date().toISOString(),
+          });
+        } else if (subTx.subscription_type === "service" && subTx.service_key && subTx.store_id) {
+          // Activate individual service
+          const { data: vs } = await supabase.from("vendor_subscriptions")
+            .select("id, active_services")
+            .eq("store_id", subTx.store_id)
+            .maybeSingle();
+
+          const newServices = { ...(vs?.active_services as Record<string, boolean> || {}), [subTx.service_key]: true };
+
+          if (vs?.id) {
+            await supabase.from("vendor_subscriptions").update({
+              active_services: newServices,
+              service_paid_until: paidUntil.toISOString(),
+              updated_at: new Date().toISOString(),
+            }).eq("id", vs.id);
+          } else {
+            await supabase.from("vendor_subscriptions").insert({
+              store_id: subTx.store_id,
+              active_services: newServices,
+              service_paid_until: paidUntil.toISOString(),
+            });
+          }
+        }
+
+        // Notification
+        if (subTx.user_id) {
+          await supabase.from("notifications").insert({
+            user_id: subTx.user_id,
+            type: "payment",
+            title: "Abonnement activé",
+            message: `Votre abonnement a été activé avec succès. Montant : $${subTx.amount}.`,
+            link: "/vendor",
+          });
+        }
+      } else if (subIsFailed && subTx.user_id) {
+        await supabase.from("notifications").insert({
+          user_id: subTx.user_id,
+          type: "payment",
+          title: "Paiement abonnement échoué",
+          message: `Votre paiement d'abonnement a échoué. ${description || "Veuillez réessayer."}`,
+          link: "/vendor",
+        });
+      }
+
+      return new Response("OK", { status: 200, headers: corsHeaders });
+    }
+
+    // === Regular order payment flow ===
+
     // Find the payment transaction by reference
     const { data: tx, error: txErr } = await supabase
       .from("payment_transactions")
