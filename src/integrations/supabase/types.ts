@@ -1414,6 +1414,59 @@ export type Database = {
           },
         ]
       }
+      delivery_subscriptions: {
+        Row: {
+          created_at: string
+          hub_storage: boolean
+          id: string
+          is_active: boolean
+          max_riders: number
+          paid_until: string | null
+          plan_type: string
+          price: number
+          store_id: string | null
+          tier: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          hub_storage?: boolean
+          id?: string
+          is_active?: boolean
+          max_riders?: number
+          paid_until?: string | null
+          plan_type: string
+          price?: number
+          store_id?: string | null
+          tier?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          hub_storage?: boolean
+          id?: string
+          is_active?: boolean
+          max_riders?: number
+          paid_until?: string | null
+          plan_type?: string
+          price?: number
+          store_id?: string | null
+          tier?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_subscriptions_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_zones: {
         Row: {
           city: string
@@ -1836,6 +1889,59 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      hub_storage_tracking: {
+        Row: {
+          arrived_at: string
+          created_at: string
+          daily_rate: number
+          free_until: string
+          id: string
+          is_penalty_active: boolean
+          last_penalty_at: string | null
+          product_id: string | null
+          store_id: string
+          total_penalty: number
+          updated_at: string
+          weight_kg: number
+        }
+        Insert: {
+          arrived_at?: string
+          created_at?: string
+          daily_rate?: number
+          free_until?: string
+          id?: string
+          is_penalty_active?: boolean
+          last_penalty_at?: string | null
+          product_id?: string | null
+          store_id: string
+          total_penalty?: number
+          updated_at?: string
+          weight_kg?: number
+        }
+        Update: {
+          arrived_at?: string
+          created_at?: string
+          daily_rate?: number
+          free_until?: string
+          id?: string
+          is_penalty_active?: boolean
+          last_penalty_at?: string | null
+          product_id?: string | null
+          store_id?: string
+          total_penalty?: number
+          updated_at?: string
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hub_storage_tracking_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       impersonation_tokens: {
         Row: {
@@ -2634,6 +2740,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_service_plans: {
+        Row: {
+          created_at: string
+          description: string | null
+          features: Json | null
+          id: string
+          is_active: boolean
+          label: string
+          price_monthly: number
+          price_yearly: number
+          service_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          features?: Json | null
+          id?: string
+          is_active?: boolean
+          label: string
+          price_monthly?: number
+          price_yearly?: number
+          service_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          features?: Json | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          price_monthly?: number
+          price_yearly?: number
+          service_key?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       platform_settings: {
         Row: {
@@ -4056,6 +4201,56 @@ export type Database = {
         }
         Relationships: []
       }
+      store_change_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          field_name: string
+          id: string
+          new_value: string
+          old_value: string | null
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          store_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          field_name: string
+          id?: string
+          new_value: string
+          old_value?: string | null
+          requested_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          store_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          field_name?: string
+          id?: string
+          new_value?: string
+          old_value?: string | null
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_change_requests_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_collaborators: {
         Row: {
           created_at: string
@@ -4318,41 +4513,59 @@ export type Database = {
       store_transfer_requests: {
         Row: {
           admin_notes: string | null
+          claim_warning_accepted: boolean | null
           cooldown_until: string | null
           created_at: string | null
+          documents: string[] | null
           from_user_id: string
           id: string
           kyc_verified_from: boolean | null
           kyc_verified_to: boolean | null
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           status: string
           store_id: string
           to_user_id: string
+          transfer_type: string | null
           updated_at: string | null
         }
         Insert: {
           admin_notes?: string | null
+          claim_warning_accepted?: boolean | null
           cooldown_until?: string | null
           created_at?: string | null
+          documents?: string[] | null
           from_user_id: string
           id?: string
           kyc_verified_from?: boolean | null
           kyc_verified_to?: boolean | null
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
           store_id: string
           to_user_id: string
+          transfer_type?: string | null
           updated_at?: string | null
         }
         Update: {
           admin_notes?: string | null
+          claim_warning_accepted?: boolean | null
           cooldown_until?: string | null
           created_at?: string | null
+          documents?: string[] | null
           from_user_id?: string
           id?: string
           kyc_verified_from?: boolean | null
           kyc_verified_to?: boolean | null
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
           store_id?: string
           to_user_id?: string
+          transfer_type?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -5202,6 +5415,7 @@ export type Database = {
       }
       vendor_subscriptions: {
         Row: {
+          active_services: Json | null
           can_self_deliver: boolean
           created_at: string
           id: string
@@ -5209,11 +5423,13 @@ export type Database = {
           max_products: number
           paid_until: string | null
           payment_method: string | null
+          service_paid_until: string | null
           store_id: string
           tier: Database["public"]["Enums"]["vendor_tier"]
           updated_at: string
         }
         Insert: {
+          active_services?: Json | null
           can_self_deliver?: boolean
           created_at?: string
           id?: string
@@ -5221,11 +5437,13 @@ export type Database = {
           max_products?: number
           paid_until?: string | null
           payment_method?: string | null
+          service_paid_until?: string | null
           store_id: string
           tier?: Database["public"]["Enums"]["vendor_tier"]
           updated_at?: string
         }
         Update: {
+          active_services?: Json | null
           can_self_deliver?: boolean
           created_at?: string
           id?: string
@@ -5233,6 +5451,7 @@ export type Database = {
           max_products?: number
           paid_until?: string | null
           payment_method?: string | null
+          service_paid_until?: string | null
           store_id?: string
           tier?: Database["public"]["Enums"]["vendor_tier"]
           updated_at?: string
