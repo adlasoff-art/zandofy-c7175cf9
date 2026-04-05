@@ -33,12 +33,12 @@ export function VendorIndividualServices({ storeId, billingCycle, kycVerified }:
   const { data: vendorSub } = useQuery({
     queryKey: ["vendor-sub-services", storeId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("vendor_subscriptions")
         .select("id, active_services, service_paid_until")
         .eq("store_id", storeId)
         .maybeSingle();
-      return data;
+      return data as { id: string; active_services: Record<string, boolean> | null; service_paid_until: string | null } | null;
     },
   });
 
