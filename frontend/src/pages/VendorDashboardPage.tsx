@@ -23,10 +23,11 @@ import { VendorRiderTracking } from "@/components/vendor/VendorRiderTracking";
 import { VendorTeamTab } from "@/components/vendor/VendorTeamTab";
 import { VendorPaymentNumbers } from "@/components/vendor/VendorPaymentNumbers";
 import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
+import { VendorPricingTab } from "@/components/vendor/VendorPricingTab";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
-  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban,
+  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { ACTIVE_ORDER_STATUSES, NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
@@ -80,7 +81,7 @@ export default function VendorDashboardPage() {
   const [noStore, setNoStore] = useState(false);
   const [selectedConv, setSelectedConv] = useState<VendorConversation | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "team" | "suppliers" | "settings">("catalogue");
+  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "team" | "suppliers" | "pricing" | "settings">("catalogue");
   const [orderCounters, setOrderCounters] = useState<OrderCounters>({ total: 0, in_progress: 0, delivered: 0 });
   const [suppliersEnabled, setSuppliersEnabled] = useState(false);
 
@@ -347,6 +348,7 @@ export default function VendorDashboardPage() {
     { key: "disputes" as const, label: "Litiges", icon: AlertTriangle },
     { key: "featured" as const, label: "Mise en avant", icon: Sparkles },
     ...(suppliersEnabled ? [{ key: "suppliers" as const, label: "Fournisseurs", icon: Truck }] : []),
+    { key: "pricing" as const, label: "Tarification", icon: DollarSign },
     { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
     ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
     { key: "messages" as const, label: "Messages", icon: MessageCircle },
@@ -383,6 +385,7 @@ export default function VendorDashboardPage() {
       {activeTab === "disputes" && <VendorDisputesTab storeId={store!.id} />}
       {activeTab === "featured" && <VendorFeaturedRequestTab storeId={store!.id} />}
       {activeTab === "suppliers" && <VendorSuppliersTab storeId={store!.id} />}
+      {activeTab === "pricing" && <VendorPricingTab storeId={store!.id} />}
       {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
       {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
       {activeTab === "messages" && (
@@ -467,7 +470,7 @@ export default function VendorDashboardPage() {
             <div className="hidden lg:flex gap-6">
               {/* Sidebar */}
               <nav className="w-56 shrink-0">
-                <div className="sticky top-20 space-y-4">
+                <div className="sticky top-20 max-h-[calc(100vh-5rem)] overflow-y-auto space-y-4 scrollbar-thin">
                   {/* Store identity */}
                   <div className="bg-card border border-border rounded-lg p-4 text-center">
                     <div className="w-14 h-14 rounded-full bg-muted mx-auto mb-2 overflow-hidden border-2 border-border">

@@ -72,6 +72,7 @@ const ComparePage = lazy(() => import("./pages/ComparePage"));
 const AccountPage = lazy(() => import("./pages/AccountPage"));
 const PaymentReturnPage = lazy(() => import("./pages/PaymentReturnPage"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
+const PricingPage = lazy(() => import("./pages/PricingPage"));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -208,6 +209,7 @@ const App = () => (
                 <Route path="/blog" element={<BlogPage />} />
                 <Route path="/blog/:slug" element={<BlogPostPage />} />
                 <Route path="/compare" element={<ComparePage />} />
+                <Route path="/pricing" element={<PricingPage />} />
                 {/* Admin routes */}
                 <Route path="/admin" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDashboard /></RoleGuard>} />
                 <Route path="/admin/users" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminUsersPage /></RoleGuard>} />
