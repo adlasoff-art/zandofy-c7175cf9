@@ -1,112 +1,126 @@
 
 
-# Plan d'implémentation — Corrections et améliorations
+# Plan d'implémentation — Transfert de propriété, Modifications admin, Tarification & Abonnements
 
-## Résumé des changements
-
-Quatre chantiers principaux :
-1. Cartes produits non-cliquables dans les pages catégories
-2. Journal d'audit élargi (activité utilisateurs + pagination + nettoyage auto)
-3. Emails de confirmation de commande non délivrés + testeur de délivrabilité
-4. Réflexion sur les push notifications (pas d'action)
+Ce plan est découpé en **4 lots** pour éviter de tout chambouler.
 
 ---
 
-## 1. Cartes produits non-cliquables dans les catégories
+## LOT 1 — Transfert de propriété enrichi
 
-**Problème identifié** : Dans `CategoryPage.tsx`, le composant `<ProductCard>` n'est PAS enveloppé dans un `<Link>`, contrairement à `StorePage`, `SearchPage` et `ProductPage` (produits similaires) où il l'est. De plus, le `mapProduct` local ne remonte ni `galleryImages` ni `slug`, ce qui empêche le hover d'image et le lien vers le produit.
+### Contexte actuel
+- Table `store_transfer_requests` existe déjà (store_id, from_user_id, to_user_id, status, admin_notes, cooldown_until, kyc_verified_from/to).
+- Trigger `validate_store_transfer` gère les transitions de statut et le cooldown 72h.
+- RLS : admins/managers full access, owners read-only.
 
-**Corrections** :
-- **`CategoryPage.tsx`** : Envelopper chaque `<ProductCard>` dans un `<Link to={/product/${p.slug || p.id}}>` avec `cursor-pointer`
-- **`CategoryPage.tsx` — `mapProduct`** : Ajouter les champs manquants : `slug`, `galleryImages`, `storeIsCertified`, `storeIsVerified` depuis la requête (le select inclut déjà `product_images`)
-- Appliquer la même correction à `WishlistPage.tsx` et `SharedWishlistPage.tsx` si même problème
+### Modifications DB (migration)
+- Ajouter colonnes à `store_transfer_requests` :
+  - `transfer_type` text ('owner_initiated' | 'claim') — qui initie
+  - `reason` text — motif du transfert
+  - `documents` text[] — URLs des pièces jointes (KYB du nouveau proprio)
+  - `claim_warning_accepted` boolean — le demandeur accepte le risque de sanction
+  - `reviewed_by` uuid — admin qui traite
+  - `reviewed_at` timestamptz
+- RLS : ajouter politique INSERT pour les utilisateurs authentifiés (from_user_id = auth.uid() OR to_user_id = auth.uid())
 
----
+### Logique métier
+**Cas 1 — Réclamation (claim)** : Le prétendant passe par le KYB, à l'étape "nom de boutique" il clique "Réclamer une boutique", recherche par nom, sélectionne, accepte l'avertissement (sanction si infondé). Notification envoyée au propriétaire actuel + admin.
 
-## 2. Journal d'audit élargi
+**Cas 2 — Transfert par le propriétaire** : Section "Transférer ma boutique" dans l'espace vendeur. Recherche utilisateur (photo + nom), description du motif, upload documents KYB du nouveau proprio. Seuls les utilisateurs KYC vérifiés sont sélectionnables.
 
-**Situation actuelle** : La table `admin_audit_logs` ne trace que les actions admin (ban, rôle, warning). La table `user_activity_logs` existe (hook `use-activity-logger.ts`) mais n'est pas exploitée dans le journal d'audit admin.
+**Post-approbation admin** : Reset des avantages du nouveau proprio :
+- Rétention retrait → 30 jours strict
+- Désactiver : coupons, collaborateurs, self-delivery, WhatsApp
+- Transférer owner_id sur la table stores
 
-**Changements** :
-
-### Base de données (migration SQL)
-- Créer une table `user_activity_logs` si elle n'existe pas encore (vérification nécessaire), avec colonnes : `id`, `user_id`, `action`, `metadata` (jsonb), `created_at`
-- Ajouter les RLS appropriées (lecture admin/manager uniquement)
-- Créer une fonction `cleanup_old_activity_logs()` en PL/pgSQL avec la logique de rétention :
-  - Après 6 mois : supprimer les entrées de plus de 6 mois
-  - Après 1 an : garder seulement les 6 derniers mois (juin-décembre)
-- Planifier un job `pg_cron` mensuel pour le nettoyage automatique
-
-### Actions utilisateurs tracées (ajout au hook existant)
-- `login`, `logout`, `profile_update`, `search`, `page_view`
-- `address_add/delete`, `payment_method_add/delete`
-- `order_placed`, `order_cancelled`
-- `product_add`, `product_update`, `product_delete` (vendeurs)
-- `kyc_submitted`, `password_changed`, `settings_changed`
-
-### Interface admin (`AdminAuditPage.tsx`)
-- **Onglets** : "Actions admin" (existant) + "Activité utilisateurs" (nouveau)
-- **Pagination** : Limiter à 50 par page avec navigation
-- **Filtres** :
-  - Par utilisateur (recherche par nom/email)
-  - Par type d'action (chips existants étendus)
-  - Par période (date de début / date de fin)
-- **Nettoyage manuel** : Bouton pour purger les logs de plus de X mois (admin uniquement)
+### Pages UI
+- **Admin** : Page `/admin/store-transfers` — liste des demandes, filtres par statut, actions (approuver/rejeter/demander révision), notes admin
+- **Vendeur** : Section transfert dans le dashboard vendeur
+- **KYB** : Ajout bouton "Réclamer une boutique" dans le flux KYB
 
 ---
 
-## 3. Emails de confirmation de commande
+## LOT 2 — Modifications admin contrôlées (email, téléphone, nom boutique)
 
-### Diagnostic
-Les secrets SMTP sont configurés (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM_EMAIL`, `SMTP_PORT`). La fonction `notify-order-status` est censée envoyer les emails via SMTP/nodemailer. Aucun log n'est trouvé, ce qui suggère que la fonction n'est pas invoquée correctement ou pas déployée.
+### Logique
+- Post-KYB validé, toute modification de : nom boutique, WhatsApp, email boutique, gérant contact → passe par une **demande de modification** soumise à validation admin.
+- Nouvelle table `store_change_requests` :
+  - id, store_id, requested_by, field_name (name | whatsapp | email | contact_person), old_value, new_value, status (pending | approved | rejected), admin_notes, reviewed_by, reviewed_at, created_at
 
-### Problèmes identifiés
-1. **`order-notifications.ts`** : Le service client utilise `supabase.functions.invoke("notify-order-status")` mais la liste des statuts notifiables ne contient PAS `"pending"` — or c'est le statut défini après paiement Mobile Money réussi (`kelpay-callback` met le statut à `"pending"`)
-2. **Paiement hors plateforme** : Quand le vendeur confirme le paiement, il faut aussi déclencher la notification
-
-### Corrections
-- **`order-notifications.ts`** : Ajouter `"pending"` à la liste `NOTIFIABLE_STATUSES`
-- **`VendorOrderManager.tsx`** : S'assurer que lorsqu'un vendeur confirme un paiement hors plateforme (passage de `awaiting_payment` → `confirmed`), `triggerOrderStatusNotification` est bien appelé
-- **Redéployer** la fonction `notify-order-status` pour s'assurer qu'elle est active
-- **Vérifier** que le lien de suivi dans l'email pointe vers le bon domaine (actuellement `zandofy.lovable.app` — devrait utiliser `SITE_BASE_URL`)
-
-### Testeur de délivrabilité email (admin)
-- **`AdminNotificationsPage.tsx`** : Ajouter une section "Test de délivrabilité" avec :
-  - Un champ email libre
-  - Un bouton "Envoyer un email test"
-  - Appel à `send-email` edge function avec un message par défaut
-  - Affichage du résultat (succès/échec avec détail de l'erreur)
-
-### Emails via le centre de notifications admin
-- Le canal "Email" dans le centre de notifications insère seulement dans la table `notifications` (in-app) — il n'envoie PAS réellement d'emails SMTP
-- **Correction** : Quand le canal est "email", appeler aussi la fonction `send-email` pour chaque destinataire (avec un template générique contenant titre + message)
+### Admin
+- Changement d'email d'un compte client vérifié : uniquement par l'admin via la page utilisateurs existante (Edge Function `admin-users` déjà en place)
+- Page `/admin/store-change-requests` pour traiter les demandes
 
 ---
 
-## 4. Push notifications (réflexion uniquement)
-Les VAPID keys sont configurées. Le service worker `sw-push.js` existe. La table `push_subscriptions` existe. Pour que les push fonctionnent sur mobile (PWA) :
-- L'utilisateur doit avoir autorisé les notifications dans le navigateur
-- Le service worker doit être enregistré et actif
-- Le `notify-order-status` tente déjà d'envoyer des push mais marque seulement "attempted" sans réellement utiliser web-push
+## LOT 3 — Tarification services vendeurs
 
-Pas d'action immédiate — juste un constat pour plus tard.
+### Nouvelle table `platform_service_plans`
+- id, service_key (text unique), label, description, price_monthly, price_yearly, is_active, features (jsonb), created_at
+
+Services couverts : gestion fournisseurs, COD, paiement hors plateforme, numéros personnalisés, retours autorisés, calcul marge auto, marge vendeur, coupons, collaborateurs, self-delivery, WhatsApp boutique.
+
+### Page admin `/admin/vendor-pricing`
+- CRUD des plans de service, activation/désactivation, tarifs mensuels/annuels
+- Liaison avec `vendor_subscriptions` existante enrichie de colonnes jsonb `active_services` et `service_paid_until`
 
 ---
 
-## Fichiers impactés
+## LOT 4 — Abonnements livraison (clients & vendeurs)
 
-| Fichier | Type de changement |
-|---|---|
-| `frontend/src/pages/CategoryPage.tsx` | Link + mapProduct enrichi |
-| `frontend/src/pages/WishlistPage.tsx` | Link wrapper |
-| `frontend/src/pages/SharedWishlistPage.tsx` | Link wrapper |
-| `frontend/src/pages/admin/AdminAuditPage.tsx` | Refonte complète (onglets, pagination, filtres) |
-| `frontend/src/services/order-notifications.ts` | Ajout "pending" aux statuts |
-| `frontend/src/pages/admin/AdminNotificationsPage.tsx` | Testeur email + envoi SMTP réel |
-| `frontend/supabase/functions/notify-order-status/index.ts` | URL dynamique via SITE_BASE_URL |
-| Migration SQL | Table user_activity_logs + cleanup cron |
+### Table `delivery_subscriptions`
+- id, user_id (nullable), store_id (nullable), plan_type ('client_monthly' | 'client_yearly' | 'vendor_5' | 'vendor_10' | 'vendor_20' | 'vendor_50' | 'vendor_100'), tier ('standard' | 'professional' | 'premium'), max_riders int, hub_storage boolean, price, paid_until, is_active, created_at
 
-## Migrations SQL (fichier téléchargeable fourni après implémentation)
-- `user_activity_logs` : table + RLS + index
-- Fonction et cron de nettoyage automatique des logs
+### Table `hub_storage_tracking`
+- id, store_id, product_id (nullable), weight_kg numeric, arrived_at timestamptz, free_until timestamptz (arrived_at + 14 jours), daily_rate numeric default 0.59, is_penalty_active boolean, total_penalty numeric, last_penalty_at
+
+### Grille livreurs (hardcodée en config, éditable par admin) :
+
+```text
+Plan         | Std | Pro | Premium
+-------------|-----|-----|--------
+5/jour       |  1  |  2  | 2 + Hub
+10/jour      |  1  |  2  | 2 + Hub
+20/jour      |  2  |  3  | 4 + Hub
+50/jour      |  2  |  3  | 5 + Hub
+100/jour     |  4  |  5  | 10 + Hub
+```
+
+### Stockage Hub
+- Gratuit 14 jours, 0.59$/jour à partir du 15e jour si poids ≥ 1kg
+- Semaine = lundi-samedi (hors jours fériés sauf livraison effectuée)
+- Pénalité retenue à la source si impayée (via `vendor_wallets`)
+- Concerne uniquement les boutiques indépendantes (`is_platform_owned = false`)
+
+### Pages UI
+- **Admin** : `/admin/delivery-plans` — gestion des plans et tarifs
+- **Client** : section abonnement livraison dans le dashboard
+- **Vendeur** : section abonnement livraison dans l'espace vendeur
+
+---
+
+## Fichier SQL de migration
+
+Un seul fichier SQL idempotent sera généré couvrant :
+1. Colonnes ajoutées à `store_transfer_requests`
+2. Table `store_change_requests` + RLS
+3. Table `platform_service_plans` + RLS
+4. Table `delivery_subscriptions` + RLS
+5. Table `hub_storage_tracking` + RLS
+6. Politiques INSERT pour les transferts par utilisateurs
+7. Seed data pour les plans de livraison
+
+Le fichier sera fourni en téléchargement dans `/mnt/documents/`.
+
+---
+
+## Sécurité
+- Toutes les approbations (transfert, changement, abonnement) passent par l'admin uniquement
+- RLS strict : les vendeurs ne peuvent que soumettre et lire leurs propres demandes
+- Les managers ont accès en lecture, seul l'admin peut approuver
+- Audit log sur chaque action admin (table `admin_audit_logs` existante)
+- Validation KYC obligatoire pour tout nouveau propriétaire de boutique
+
+## Ordre d'implémentation
+LOT 1 → LOT 2 → LOT 3 → LOT 4 (chaque lot est indépendant mais s'appuie sur la migration commune)
 
