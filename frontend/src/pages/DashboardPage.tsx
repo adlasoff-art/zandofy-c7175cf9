@@ -57,10 +57,12 @@ import { CertificationBadge } from "@/components/CertificationBadge";
 import { Switch } from "@/components/ui/switch";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
 import { CascadingAddressFields, type AddressData } from "@/components/address/CascadingAddressFields";
+import { CustomerPricingTab } from "@/components/customer/CustomerPricingTab";
 
 const TABS = [
   { key: "overview", label: "Aperçu", icon: Package },
   { key: "orders", label: "Commandes", icon: Package },
+  { key: "subscriptions", label: "Abonnements", icon: CreditCard },
   { key: "tracking", label: "Suivi", icon: Truck },
   { key: "returns", label: "Retours", icon: RotateCcw },
   { key: "disputes", label: "Litiges", icon: AlertTriangle },
@@ -313,6 +315,7 @@ export default function DashboardPage() {
             onCancelSuccess={loadOrders}
           />
         )}
+        {activeTab === "subscriptions" && <CustomerPricingTab />}
         {activeTab === "tracking" && <TrackingTab orders={orders} />}
         {activeTab === "returns" && <ReturnsList />}
         {activeTab === "disputes" && <DisputesList />}
