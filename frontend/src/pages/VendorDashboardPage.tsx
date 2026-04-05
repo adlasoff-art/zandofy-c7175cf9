@@ -584,6 +584,19 @@ export default function VendorDashboardPage() {
                 <h1 className="text-xl font-bold text-foreground">Tableau de bord vendeur</h1>
               </div>
 
+              {/* Mobile Store Switcher */}
+              <VendorStoreSwitcher
+                stores={allStores}
+                activeStoreId={store!.id}
+                onSwitch={(storeId) => {
+                  const target = allStores.find(s => s.id === storeId);
+                  if (target) {
+                    setStore(target);
+                    hasLoadedRef.current = false;
+                  }
+                }}
+              />
+
               {/* Summary widgets */}
               <VendorSummaryWidgets store={store!} orderCounters={orderCounters} totalUnread={totalUnread} storeId={store!.id} />
 
