@@ -111,6 +111,7 @@ const AdminFeaturedPlacementsPage = lazy(() => import("./pages/admin/AdminFeatur
 const AdminVendorAccountingPage = lazy(() => import("./pages/admin/AdminVendorAccountingPage"));
 const AdminFlashSalesPage = lazy(() => import("./pages/admin/AdminFlashSalesPage"));
 const AdminSupplierPlatformsPage = lazy(() => import("./pages/admin/AdminSupplierPlatformsPage"));
+const AdminStoreModerationPage = lazy(() => import("./pages/admin/AdminStoreModerationPage"));
 const ImpersonatePage = lazy(() => import("./pages/ImpersonatePage"));
 
 const queryClient = new QueryClient({
@@ -241,6 +242,7 @@ const App = () => (
                 <Route path="/admin/vendor-accounting" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminVendorAccountingPage /></RoleGuard>} />
                 <Route path="/admin/flash-sales" element={<RoleGuard allowedRoles={["admin"]}><AdminFlashSalesPage /></RoleGuard>} />
                 <Route path="/admin/supplier-platforms" element={<RoleGuard allowedRoles={["admin"]}><AdminSupplierPlatformsPage /></RoleGuard>} />
+                <Route path="/admin/store-moderation" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminStoreModerationPage /></RoleGuard>} />
                 <Route path="/impersonate" element={<ImpersonatePage />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
