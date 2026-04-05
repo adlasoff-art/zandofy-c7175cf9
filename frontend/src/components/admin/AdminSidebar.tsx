@@ -70,6 +70,7 @@ const sidebarSections: SidebarSection[] = [
       { title: "Modifications boutiques", url: "/admin/store-change-requests", icon: PenLine },
       { title: "Abonnements", url: "/admin/vendor-subscriptions", icon: Crown },
       { title: "Plans de services", url: "/admin/service-plans", icon: DollarSign },
+      { title: "Packages services", url: "/admin/service-packages", icon: Package },
       { title: "Tarification boutiques", url: "/admin/vendor-pricing", icon: DollarSign },
       { title: "Vérification KYC", url: "/admin/kyc", icon: ShieldCheck },
       { title: "Comptabilité vendeurs", url: "/admin/vendor-accounting", icon: Receipt },

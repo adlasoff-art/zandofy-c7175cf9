@@ -4003,6 +4003,75 @@ export type Database = {
         }
         Relationships: []
       }
+      service_packages: {
+        Row: {
+          created_at: string
+          description: string | null
+          features: Json | null
+          hub_storage_free_kg: number
+          id: string
+          included_services: string[]
+          is_active: boolean
+          max_deliveries_per_day: number
+          max_riders: number
+          name: string
+          price_monthly: number
+          price_yearly: number
+          rank: number
+          slug: string
+          target: string
+          trust_threshold_months: number | null
+          trust_threshold_sales: number | null
+          updated_at: string
+          visibility_level: string
+          withdrawal_delay_days: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          features?: Json | null
+          hub_storage_free_kg?: number
+          id?: string
+          included_services?: string[]
+          is_active?: boolean
+          max_deliveries_per_day?: number
+          max_riders?: number
+          name: string
+          price_monthly?: number
+          price_yearly?: number
+          rank?: number
+          slug: string
+          target?: string
+          trust_threshold_months?: number | null
+          trust_threshold_sales?: number | null
+          updated_at?: string
+          visibility_level?: string
+          withdrawal_delay_days?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          features?: Json | null
+          hub_storage_free_kg?: number
+          id?: string
+          included_services?: string[]
+          is_active?: boolean
+          max_deliveries_per_day?: number
+          max_riders?: number
+          name?: string
+          price_monthly?: number
+          price_yearly?: number
+          rank?: number
+          slug?: string
+          target?: string
+          trust_threshold_months?: number | null
+          trust_threshold_sales?: number | null
+          updated_at?: string
+          visibility_level?: string
+          withdrawal_delay_days?: number
+        }
+        Relationships: []
+      }
       shipments: {
         Row: {
           awb_bl: string
@@ -4367,6 +4436,63 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "store_followers_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_package_subscriptions: {
+        Row: {
+          billing_cycle: string
+          created_at: string
+          id: string
+          is_active: boolean
+          package_id: string
+          paid_until: string | null
+          store_id: string
+          subscribed_at: string
+          trust_unlocked: boolean
+          trust_unlocked_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          billing_cycle?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          package_id: string
+          paid_until?: string | null
+          store_id: string
+          subscribed_at?: string
+          trust_unlocked?: boolean
+          trust_unlocked_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          billing_cycle?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          package_id?: string
+          paid_until?: string | null
+          store_id?: string
+          subscribed_at?: string
+          trust_unlocked?: boolean
+          trust_unlocked_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_package_subscriptions_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "service_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_package_subscriptions_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
