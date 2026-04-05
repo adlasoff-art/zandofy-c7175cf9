@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import {
-  User, Store, FileCheck, Send, CheckCircle2, Upload, Trash2, Loader2, AlertCircle,
+  User, Store, FileCheck, Send, CheckCircle2, Upload, Trash2, Loader2, AlertCircle, Clock,
 } from "lucide-react";
 
 interface ApplicationData {
@@ -83,6 +83,14 @@ export default function BecomeVendorPage() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [existingApp, setExistingApp] = useState(false);
   const [appLoading, setAppLoading] = useState(true);
+  const [multiStoreEligibility, setMultiStoreEligibility] = useState<{
+    hasStores: boolean;
+    isPlatformAgent: boolean;
+    eligible: boolean;
+    reason: string | null;
+    monthsActive: number;
+    salesCount: number;
+  } | null>(null);
   const localDraftKey = useMemo(() => (user ? `zandofy_vendor_application_draft:${user.id}` : null), [user?.id]);
   const hasRestoredLocalDraftRef = useRef(false);
 
@@ -90,6 +98,36 @@ export default function BecomeVendorPage() {
   useEffect(() => {
     hasRestoredLocalDraftRef.current = false;
     if (!user) { setAppLoading(false); return; }
+
+    // Check existing stores for multi-store eligibility
+    (async () => {
+      const { data: existingStores } = await (supabase as any)
+        .from("stores")
+        .select("id, created_at, sales_count, is_platform_owned")
+        .eq("owner_id", user.id);
+
+      if (existingStores && existingStores.length > 0) {
+        const hasPlatformStore = existingStores.some((s: any) => s.is_platform_owned);
+        if (hasPlatformStore) {
+          setMultiStoreEligibility({ hasStores: true, isPlatformAgent: true, eligible: true, reason: null, monthsActive: 0, salesCount: 0 });
+        } else {
+          const oldest = existingStores.reduce((a: any, b: any) => new Date(a.created_at) < new Date(b.created_at) ? a : b);
+          const monthsActive = Math.floor((Date.now() - new Date(oldest.created_at).getTime()) / (1000 * 60 * 60 * 24 * 30));
+          const totalSales = existingStores.reduce((sum: number, s: any) => sum + (s.sales_count || 0), 0);
+          const MIN_MONTHS = 3;
+          const MIN_SALES = 10;
+          const eligible = monthsActive >= MIN_MONTHS && totalSales >= MIN_SALES;
+          const reason = !eligible
+            ? monthsActive < MIN_MONTHS
+              ? `Vous devez avoir au moins ${MIN_MONTHS} mois d'ancienneté (actuellement ${monthsActive} mois)`
+              : `Vous devez avoir atteint au moins ${MIN_SALES} ventes (actuellement ${totalSales})`
+            : null;
+          setMultiStoreEligibility({ hasStores: true, isPlatformAgent: false, eligible, reason, monthsActive, salesCount: totalSales });
+        }
+      } else {
+        setMultiStoreEligibility({ hasStores: false, isPlatformAgent: false, eligible: true, reason: null, monthsActive: 0, salesCount: 0 });
+      }
+    })();
 
     (async () => {
       const { data } = await supabase
@@ -253,15 +291,33 @@ export default function BecomeVendorPage() {
               <p className="text-muted-foreground">{t("vendor.approvedDesc")}</p>
               <Button onClick={() => navigate("/vendor")}>{t("vendor.goToVendor")}</Button>
               <div className="pt-4 border-t border-border">
-                <p className="text-xs text-muted-foreground mb-2">Vous souhaitez ouvrir une nouvelle boutique ?</p>
-                <Button variant="outline" onClick={() => {
-                  setForm(initialData);
-                  setDocs([]);
-                  setStep(1);
-                  setExistingApp(false);
-                }}>
-                  <Store size={14} className="mr-2" /> Nouvelle demande de boutique
-                </Button>
+                {multiStoreEligibility && !multiStoreEligibility.eligible && multiStoreEligibility.hasStores && !multiStoreEligibility.isPlatformAgent ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground mb-2">Vous souhaitez ouvrir une nouvelle boutique ?</p>
+                    <div className="bg-muted/50 border border-border rounded-lg p-3 text-left">
+                      <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 mb-1">
+                        <Clock size={14} />
+                        <span className="text-xs font-semibold">Non éligible pour le moment</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{multiStoreEligibility.reason}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Ancienneté : {multiStoreEligibility.monthsActive} mois • Ventes : {multiStoreEligibility.salesCount}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs text-muted-foreground mb-2">Vous souhaitez ouvrir une nouvelle boutique ?</p>
+                    <Button variant="outline" onClick={() => {
+                      setForm(initialData);
+                      setDocs([]);
+                      setStep(1);
+                      setExistingApp(false);
+                    }}>
+                      <Store size={14} className="mr-2" /> Nouvelle demande de boutique
+                    </Button>
+                  </>
+                )}
               </div>
             </>
           )}

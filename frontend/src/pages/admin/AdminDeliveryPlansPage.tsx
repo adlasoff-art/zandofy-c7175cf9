@@ -48,7 +48,7 @@ export default function AdminDeliveryPlansPage() {
     },
   });
 
-  const hubConfig = config?.hub_storage || { free_days: 14, daily_rate: 0.59, min_weight_kg: 1 };
+  const hubConfig = config?.hub_storage || { free_days: 14, daily_rate: 0.25, min_weight_kg: 1 };
 
   const activeVendorSubs = subscriptions.filter((s: any) => s.store_id && s.is_active).length;
   const activeClientSubs = subscriptions.filter((s: any) => s.user_id && !s.store_id && s.is_active).length;

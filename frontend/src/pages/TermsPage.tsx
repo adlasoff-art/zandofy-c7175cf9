@@ -14,10 +14,11 @@ const defaultSectionsFr = [
   { title: "6. Livraison", content: "Les délais de livraison sont indiqués à titre informatif et peuvent varier selon la destination. Zandofy ne saurait être tenue responsable des retards imputables au transporteur." },
   { title: "7. Retours & Remboursements", content: "Vous disposez de 30 jours calendaires à compter de la réception pour retourner un produit non utilisé dans son emballage d'origine. Le remboursement est effectué sous 5 à 7 jours ouvrés après réception et vérification du retour." },
   { title: "8. Garanties", content: "Les produits bénéficient de la garantie légale de conformité et de la garantie des vices cachés. En cas de produit défectueux, contactez notre service client pour obtenir un échange ou un remboursement." },
-  { title: "9. Responsabilité", content: "Zandofy agit en qualité d'intermédiaire entre acheteurs et vendeurs. La responsabilité de Zandofy ne saurait être engagée en cas de manquement du vendeur à ses obligations." },
-  { title: "10. Propriété Intellectuelle", content: "L'ensemble du contenu du site (textes, images, logos, marques) est protégé par le droit de la propriété intellectuelle. Toute reproduction non autorisée constitue une contrefaçon." },
-  { title: "11. Données Personnelles", content: "Le traitement de vos données personnelles est régi par notre Politique de Confidentialité, accessible depuis le lien en bas de page." },
-  { title: "12. Droit Applicable", content: "Les présentes CGV sont soumises au droit applicable dans le pays de résidence de l'utilisateur. En cas de litige, une solution amiable sera recherchée avant toute action judiciaire." },
+  { title: "9. Stockage Hub & Pénalités", content: "Les boutiques bénéficient de 14 jours de stockage gratuit au Hub (du lundi au samedi, hors jours fériés). À partir du 15ᵉ jour, une pénalité de $0,25 par jour et par kilogramme est appliquée pour tout stock supérieur à 1 kg. Le quota de stockage gratuit dépend du package souscrit. Les pénalités sont prélevées automatiquement sur le solde de la boutique." },
+  { title: "10. Responsabilité", content: "Zandofy agit en qualité d'intermédiaire entre acheteurs et vendeurs. La responsabilité de Zandofy ne saurait être engagée en cas de manquement du vendeur à ses obligations." },
+  { title: "11. Propriété Intellectuelle", content: "L'ensemble du contenu du site (textes, images, logos, marques) est protégé par le droit de la propriété intellectuelle. Toute reproduction non autorisée constitue une contrefaçon." },
+  { title: "12. Données Personnelles", content: "Le traitement de vos données personnelles est régi par notre Politique de Confidentialité, accessible depuis le lien en bas de page." },
+  { title: "13. Droit Applicable", content: "Les présentes CGV sont soumises au droit applicable dans le pays de résidence de l'utilisateur. En cas de litige, une solution amiable sera recherchée avant toute action judiciaire." },
 ];
 
 const defaultSectionsEn = [
@@ -29,10 +30,11 @@ const defaultSectionsEn = [
   { title: "6. Delivery", content: "Delivery times are provided for informational purposes and may vary depending on the destination. Zandofy cannot be held responsible for delays attributable to the carrier." },
   { title: "7. Returns & Refunds", content: "You have 30 calendar days from receipt to return an unused product in its original packaging. Refunds are processed within 5 to 7 business days after receipt and verification of the return." },
   { title: "8. Warranties", content: "Products benefit from the legal warranty of conformity and the warranty against hidden defects. In case of a defective product, contact our customer service for an exchange or refund." },
-  { title: "9. Liability", content: "Zandofy acts as an intermediary between buyers and sellers. Zandofy's liability cannot be engaged in case of failure by the seller to meet their obligations." },
-  { title: "10. Intellectual Property", content: "All site content (texts, images, logos, trademarks) is protected by intellectual property law. Any unauthorized reproduction constitutes infringement." },
-  { title: "11. Personal Data", content: "The processing of your personal data is governed by our Privacy Policy, accessible from the link at the bottom of the page." },
-  { title: "12. Applicable Law", content: "These Terms are subject to the law applicable in the user's country of residence. In case of dispute, an amicable solution will be sought before any legal action." },
+  { title: "9. Hub Storage & Penalties", content: "Stores benefit from 14 days of free Hub storage (Monday to Saturday, excluding public holidays). From the 15th day onward, a penalty of $0.25 per day per kilogram is applied for any stock exceeding 1 kg. The free storage quota depends on the subscribed package. Penalties are automatically deducted from the store balance." },
+  { title: "10. Liability", content: "Zandofy acts as an intermediary between buyers and sellers. Zandofy's liability cannot be engaged in case of failure by the seller to meet their obligations." },
+  { title: "11. Intellectual Property", content: "All site content (texts, images, logos, trademarks) is protected by intellectual property law. Any unauthorized reproduction constitutes infringement." },
+  { title: "12. Personal Data", content: "The processing of your personal data is governed by our Privacy Policy, accessible from the link at the bottom of the page." },
+  { title: "13. Applicable Law", content: "These Terms are subject to the law applicable in the user's country of residence. In case of dispute, an amicable solution will be sought before any legal action." },
 ];
 
 export default function TermsPage() {

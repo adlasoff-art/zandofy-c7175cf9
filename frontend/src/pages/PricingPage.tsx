@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { Check, Crown, Truck, Warehouse, Percent, ArrowRight, Package, Shield, Star, Zap, X } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 
 const visibilityLabels: Record<string, string> = {
   standard: "Standard",
@@ -64,7 +65,7 @@ export default function PricingPage() {
             <div>
               <h2 className="text-lg font-bold text-foreground">Commission plateforme</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Une commission de <span className="font-bold text-foreground">10%</span> est appliquée par défaut sur chaque vente livrée pour les boutiques indépendantes.
+                Une commission de <span className="font-bold text-foreground">10%</span> est appliquée par défaut sur chaque vente livrée pour les boutiques.
                 Ce taux peut être ajusté individuellement selon le volume de ventes.
               </p>
             </div>
@@ -78,19 +79,13 @@ export default function PricingPage() {
               <Crown size={22} className="text-primary" />
               <h2 className="text-xl font-bold text-foreground">Packages vendeur</h2>
             </div>
-            <div className="flex items-center gap-1 bg-muted rounded-full p-0.5 text-sm">
-              <button
-                onClick={() => setBillingCycle("monthly")}
-                className={`px-4 py-1.5 rounded-full transition-colors ${billingCycle === "monthly" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-              >
-                Mensuel
-              </button>
-              <button
-                onClick={() => setBillingCycle("yearly")}
-                className={`px-4 py-1.5 rounded-full transition-colors ${billingCycle === "yearly" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-              >
-                Annuel
-              </button>
+            <div className="flex items-center gap-2 text-sm">
+              <span className={`font-medium transition-colors ${billingCycle === "monthly" ? "text-foreground" : "text-muted-foreground"}`}>Mensuel</span>
+              <Switch
+                checked={billingCycle === "yearly"}
+                onCheckedChange={(checked) => setBillingCycle(checked ? "yearly" : "monthly")}
+              />
+              <span className={`font-medium transition-colors ${billingCycle === "yearly" ? "text-foreground" : "text-muted-foreground"}`}>Annuel</span>
             </div>
           </div>
 
@@ -203,9 +198,8 @@ export default function PricingPage() {
             </div>
             <div className="text-sm text-muted-foreground space-y-2">
               <p>• <span className="font-semibold text-foreground">14 jours</span> de stockage gratuit (lundi – samedi, hors jours fériés)</p>
-              <p>• À partir du 15ᵉ jour : <span className="font-semibold text-foreground">$0,59/jour par kg</span> pour tout stock ≥ 1 kg</p>
+              <p>• À partir du 15ᵉ jour : <span className="font-semibold text-foreground">$0,25/jour par kg</span> pour tout stock ≥ 1 kg</p>
               <p>• Le quota gratuit dépend du package souscrit (0 kg pour Standard, jusqu'à 250 kg pour Entreprise)</p>
-              <p>• Pénalités prélevées automatiquement sur le solde de la boutique</p>
             </div>
           </div>
         </section>
