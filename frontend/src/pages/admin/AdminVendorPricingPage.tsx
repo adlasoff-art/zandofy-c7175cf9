@@ -580,6 +580,7 @@ export default function AdminVendorPricingPage() {
                   <p className="text-[10px] text-muted-foreground mt-1">Remplace la limite produits définie par le tier d'abonnement du vendeur.</p>
                 </div>
 
+                {isDirty && (
                   <p className="text-[10px] text-destructive/70">Modifications non enregistrées</p>
                 )}
               </div>
