@@ -6186,7 +6186,12 @@ export type Database = {
         | "rejected"
         | "resubmission_required"
       product_status: "draft" | "pending_approval" | "published" | "rejected"
-      vendor_tier: "beginner" | "pro" | "grand_supplier"
+      vendor_tier:
+        | "beginner"
+        | "intermediate"
+        | "pro"
+        | "grand_supplier"
+        | "factory"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -6329,7 +6334,13 @@ export const Constants = {
         "resubmission_required",
       ],
       product_status: ["draft", "pending_approval", "published", "rejected"],
-      vendor_tier: ["beginner", "pro", "grand_supplier"],
+      vendor_tier: [
+        "beginner",
+        "intermediate",
+        "pro",
+        "grand_supplier",
+        "factory",
+      ],
     },
   },
 } as const
