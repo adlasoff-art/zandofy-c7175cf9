@@ -551,6 +551,41 @@ export type Database = {
           },
         ]
       }
+      campaign_send_log: {
+        Row: {
+          campaign_id: string
+          error_message: string | null
+          id: string
+          sent_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          campaign_id: string
+          error_message?: string | null
+          id?: string
+          sent_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          campaign_id?: string
+          error_message?: string | null
+          id?: string
+          sent_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_send_log_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cancellation_requests: {
         Row: {
           admin_notes: string | null
@@ -3196,6 +3231,10 @@ export type Database = {
           referral_code: string | null
           residence_address: string | null
           residence_city: string | null
+          residence_commune: string | null
+          residence_country: string | null
+          residence_province: string | null
+          residence_quartier: string | null
           updated_at: string
         }
         Insert: {
@@ -3232,6 +3271,10 @@ export type Database = {
           referral_code?: string | null
           residence_address?: string | null
           residence_city?: string | null
+          residence_commune?: string | null
+          residence_country?: string | null
+          residence_province?: string | null
+          residence_quartier?: string | null
           updated_at?: string
         }
         Update: {
@@ -3268,6 +3311,10 @@ export type Database = {
           referral_code?: string | null
           residence_address?: string | null
           residence_city?: string | null
+          residence_commune?: string | null
+          residence_country?: string | null
+          residence_province?: string | null
+          residence_quartier?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -3757,6 +3804,60 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_campaigns: {
+        Row: {
+          batch_interval_minutes: number
+          batch_size: number
+          campaign_type: string
+          created_at: string
+          days_before: number | null
+          html_content: string
+          id: string
+          is_active: boolean
+          last_run_at: string | null
+          name: string
+          promo_code: string | null
+          schedule_day: number | null
+          schedule_month: number | null
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          batch_interval_minutes?: number
+          batch_size?: number
+          campaign_type: string
+          created_at?: string
+          days_before?: number | null
+          html_content?: string
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          name: string
+          promo_code?: string | null
+          schedule_day?: number | null
+          schedule_month?: number | null
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          batch_interval_minutes?: number
+          batch_size?: number
+          campaign_type?: string
+          created_at?: string
+          days_before?: number | null
+          html_content?: string
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          name?: string
+          promo_code?: string | null
+          schedule_day?: number | null
+          schedule_month?: number | null
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shipments: {
         Row: {
           awb_bl: string
@@ -3925,6 +4026,33 @@ export type Database = {
           id?: string
           name?: string
           zone_type?: string
+        }
+        Relationships: []
+      }
+      sms_provider_config: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          provider: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          provider?: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          provider?: string
+          updated_at?: string
         }
         Relationships: []
       }
