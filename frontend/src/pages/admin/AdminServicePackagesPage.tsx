@@ -82,7 +82,8 @@ export default function AdminServicePackagesPage() {
         max_riders: pkg.max_riders, hub_storage_free_kg: pkg.hub_storage_free_kg,
         withdrawal_delay_days: pkg.withdrawal_delay_days, trust_threshold_months: pkg.trust_threshold_months,
         trust_threshold_sales: pkg.trust_threshold_sales, visibility_level: pkg.visibility_level,
-        rank: pkg.rank, is_active: pkg.is_active, updated_at: new Date().toISOString(),
+        rank: pkg.rank, is_active: pkg.is_active, max_collaborators: pkg.max_collaborators,
+        updated_at: new Date().toISOString(),
       };
       if (pkg.id) {
         const { error } = await fromTable("service_packages").update(payload).eq("id", pkg.id);
@@ -125,6 +126,7 @@ export default function AdminServicePackagesPage() {
       trust_threshold_months: pkg.trust_threshold_months ?? 0,
       trust_threshold_sales: pkg.trust_threshold_sales ?? 0,
       visibility_level: pkg.visibility_level, rank: pkg.rank, is_active: pkg.is_active,
+      max_collaborators: pkg.max_collaborators ?? 2,
     });
     setEditDialog(true);
   };
