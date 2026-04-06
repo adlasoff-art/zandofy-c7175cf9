@@ -29,6 +29,7 @@ interface PackageForm {
   visibility_level: string;
   rank: number;
   is_active: boolean;
+  max_collaborators: number;
 }
 
 const emptyForm: PackageForm = {
@@ -36,7 +37,7 @@ const emptyForm: PackageForm = {
   price_monthly: 0, price_yearly: 0, included_services: [],
   max_deliveries_per_day: 5, max_riders: 1, hub_storage_free_kg: 0,
   withdrawal_delay_days: 30, trust_threshold_months: 0, trust_threshold_sales: 0,
-  visibility_level: "standard", rank: 0, is_active: true,
+  visibility_level: "standard", rank: 0, is_active: true, max_collaborators: 2,
 };
 
 const visibilityOptions = [
