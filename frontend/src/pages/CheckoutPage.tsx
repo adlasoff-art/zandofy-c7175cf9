@@ -1134,8 +1134,17 @@ export default function CheckoutPage() {
                       </p>
                     )}
 
+                    {/* Active delivery subscription banner */}
+                    {deliveryOption === "home_delivery" && hasActiveDeliverySub && lastMileResult?.deliverable && (
+                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mt-2">
+                        <p className="text-xs font-medium text-primary">
+                          ✅ Votre forfait <strong>{deliverySubName}</strong> est actif jusqu'au {deliverySubExpiry}. Livraison à domicile sans frais supplémentaires.
+                        </p>
+                      </div>
+                    )}
+
                     {/* Last-mile payment choice */}
-                    {deliveryOption === "home_delivery" && lastMileResult?.deliverable && lastMileFee > 0 && (
+                    {deliveryOption === "home_delivery" && lastMileResult?.deliverable && lastMileFee > 0 && !hasActiveDeliverySub && (
                       <div className="bg-muted/50 rounded-lg p-3 space-y-2 mt-2">
                         <p className="text-xs font-medium text-foreground">Paiement de la livraison locale : ${lastMileFee.toFixed(2)}</p>
                         <div className="space-y-1.5">
