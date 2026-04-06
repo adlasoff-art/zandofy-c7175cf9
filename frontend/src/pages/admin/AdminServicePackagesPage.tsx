@@ -276,7 +276,7 @@ export default function AdminServicePackagesPage() {
             </div>
 
             {/* Logistics */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <div>
                 <label className="text-sm font-medium">Courses/jour max</label>
                 <Input type="number" value={form.max_deliveries_per_day} onChange={e => setForm({ ...form, max_deliveries_per_day: Number(e.target.value) })} />
@@ -288,6 +288,10 @@ export default function AdminServicePackagesPage() {
               <div>
                 <label className="text-sm font-medium">Hub gratuit (kg)</label>
                 <Input type="number" value={form.hub_storage_free_kg} onChange={e => setForm({ ...form, hub_storage_free_kg: Number(e.target.value) })} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Collaborateurs max</label>
+                <Input type="number" value={form.max_collaborators} onChange={e => setForm({ ...form, max_collaborators: Number(e.target.value) })} />
               </div>
             </div>
 
