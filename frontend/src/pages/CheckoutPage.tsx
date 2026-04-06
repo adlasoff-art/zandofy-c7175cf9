@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { fromTable } from "@/lib/supabase-helpers";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -160,6 +162,29 @@ export default function CheckoutPage() {
   const [maxPointsDiscountPct, setMaxPointsDiscountPct] = useState(10);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  // Client delivery subscription check
+  const { data: clientDeliverySub } = useQuery({
+    queryKey: ["client-delivery-sub-checkout", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data } = await fromTable("store_package_subscriptions")
+        .select("*, service_packages(name)")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .gt("paid_until", new Date().toISOString())
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 60 * 1000,
+  });
+
+  const hasActiveDeliverySub = !!clientDeliverySub;
+  const deliverySubName = (clientDeliverySub as any)?.service_packages?.name || "Livraison";
+  const deliverySubExpiry = clientDeliverySub?.paid_until
+    ? new Date(clientDeliverySub.paid_until as string).toLocaleDateString("fr-FR")
+    : "";
+
   useEffect(() => {
     if (!user) return;
     // Fetch loyalty tier
@@ -278,8 +303,9 @@ export default function CheckoutPage() {
 
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
-  // Last-mile fee calculation
-  const lastMileFee = deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
+  // Last-mile fee calculation — waived if client has active delivery subscription
+  const rawLastMileFee = deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
+  const lastMileFee = hasActiveDeliverySub ? 0 : rawLastMileFee;
   const effectiveLastMile = deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping" ? lastMileFee : 0;
   
   const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping + effectiveLastMile);
@@ -1108,8 +1134,17 @@ export default function CheckoutPage() {
                       </p>
                     )}
 
+                    {/* Active delivery subscription banner */}
+                    {deliveryOption === "home_delivery" && hasActiveDeliverySub && lastMileResult?.deliverable && (
+                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mt-2">
+                        <p className="text-xs font-medium text-primary">
+                          ✅ Votre forfait <strong>{deliverySubName}</strong> est actif jusqu'au {deliverySubExpiry}. Livraison à domicile sans frais supplémentaires.
+                        </p>
+                      </div>
+                    )}
+
                     {/* Last-mile payment choice */}
-                    {deliveryOption === "home_delivery" && lastMileResult?.deliverable && lastMileFee > 0 && (
+                    {deliveryOption === "home_delivery" && lastMileResult?.deliverable && lastMileFee > 0 && !hasActiveDeliverySub && (
                       <div className="bg-muted/50 rounded-lg p-3 space-y-2 mt-2">
                         <p className="text-xs font-medium text-foreground">Paiement de la livraison locale : ${lastMileFee.toFixed(2)}</p>
                         <div className="space-y-1.5">
@@ -1640,7 +1675,13 @@ export default function CheckoutPage() {
                       </span>
                     )}
                   </div>
-                  {deliveryOption === "home_delivery" && lastMileFee > 0 && (
+                  {deliveryOption === "home_delivery" && hasActiveDeliverySub && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Livraison locale</span>
+                      <span className="text-primary font-medium text-xs">Incluse (forfait {deliverySubName})</span>
+                    </div>
+                  )}
+                  {deliveryOption === "home_delivery" && lastMileFee > 0 && !hasActiveDeliverySub && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Livraison locale</span>
                       {lastMilePayment === "pay_cash_on_delivery" ? (
