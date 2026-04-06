@@ -221,6 +221,53 @@ export default function AdminOrdersPage() {
     toast.success(`${filtered.length} commandes exportées`);
   };
 
+  const exportJSON = async () => {
+    // Fetch order_items for all filtered orders
+    const orderIds = filtered.map((o: any) => o.id);
+    let itemsMap: Record<string, any[]> = {};
+    if (orderIds.length > 0) {
+      const { data: items } = await supabase
+        .from("order_items")
+        .select("*")
+        .in("order_id", orderIds);
+      (items || []).forEach((item: any) => {
+        if (!itemsMap[item.order_id]) itemsMap[item.order_id] = [];
+        itemsMap[item.order_id].push(item);
+      });
+    }
+    const exportData = filtered.map((o: any) => ({
+      ...o,
+      order_items: itemsMap[o.id] || [],
+    }));
+    // Remove internal UI fields
+    exportData.forEach((o: any) => delete o._itemNames);
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `commandes-${format(new Date(), "yyyy-MM-dd")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${filtered.length} commandes exportées (JSON)`);
+  };
+
+  const deleteOrder = async (orderId: string) => {
+    setUpdatingId(orderId);
+    // Delete order_items first, then order_status_history, then the order
+    await supabase.from("order_items").delete().eq("order_id", orderId);
+    await supabase.from("order_status_history").delete().eq("order_id", orderId);
+    const { error } = await supabase.from("orders").delete().eq("id", orderId);
+    if (error) {
+      toast.error("Erreur lors de la suppression : " + error.message);
+    } else {
+      toast.success("Commande supprimée définitivement");
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+    }
+    setUpdatingId(null);
+    setExpandedId(null);
+  };
+
   const filterTabs: (OrderStatus | "all" | "payment_failed")[] = ["all", ...STATUS_FLOW, "cancelled", "returned", "payment_failed"];
 
   return (
@@ -281,9 +328,14 @@ export default function AdminOrdersPage() {
             className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
-        <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-2 text-xs bg-card border border-border rounded-lg hover:bg-muted transition-colors shrink-0">
-          <Download size={14} /> Export CSV
-        </button>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={exportCSV} className="flex items-center gap-1.5 px-3 py-2 text-xs bg-card border border-border rounded-lg hover:bg-muted transition-colors">
+            <Download size={14} /> CSV
+          </button>
+          <button onClick={exportJSON} className="flex items-center gap-1.5 px-3 py-2 text-xs bg-card border border-border rounded-lg hover:bg-muted transition-colors">
+            <Download size={14} /> JSON
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-1 overflow-x-auto pb-2 mb-4">
