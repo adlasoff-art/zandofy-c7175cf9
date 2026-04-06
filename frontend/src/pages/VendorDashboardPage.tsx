@@ -974,7 +974,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
           <div className="relative h-32 rounded-lg overflow-hidden border border-border bg-muted group">
             {bannerPreview ? (
               <>
-                <img src={bannerPreview} alt="Bannière" className="w-full h-full object-cover" />
+                <img src={bannerPreview} alt="Bannière" className="w-full h-full object-contain" />
                 <div className="absolute inset-0 bg-gradient-to-t from-card/60 via-transparent to-transparent" />
               </>
             ) : (

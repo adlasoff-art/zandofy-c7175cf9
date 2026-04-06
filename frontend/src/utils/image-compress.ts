@@ -17,8 +17,8 @@ function supportsWebP(): boolean {
 
 export async function compressImage(
   file: File,
-  maxSize = 1600,
-  quality = 0.85
+  maxSize = 2000,
+  quality = 0.92
 ): Promise<File> {
   // Skip non-image files (e.g. videos)
   if (!file.type.startsWith("image/")) return file;
