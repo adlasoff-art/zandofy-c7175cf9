@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fromTable } from "@/lib/supabase-helpers";
 import { Check, Package, Truck, Crown, Warehouse } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,10 +6,13 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { SubscriptionCheckoutDialog } from "@/components/payments/SubscriptionCheckoutDialog";
 
 export function CustomerPricingTab() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
+  const [checkoutPkg, setCheckoutPkg] = useState<any>(null);
 
   // Fetch client-targeted service packages
   const { data: packages = [], isLoading } = useQuery({
@@ -40,6 +43,16 @@ export function CustomerPricingTab() {
   });
 
   const currentPackageId = currentSub?.package_id;
+
+  const handleSubscribe = (pkg: any) => {
+    setCheckoutPkg(pkg);
+  };
+
+  const handleSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["client-package-sub", user?.id] });
+    queryClient.invalidateQueries({ queryKey: ["service-packages-client"] });
+    setCheckoutPkg(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -146,6 +159,7 @@ export function CustomerPricingTab() {
 
                 <button
                   disabled={isCurrent}
+                  onClick={() => !isCurrent && handleSubscribe(pkg)}
                   className="w-full mt-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                 >
                   {isCurrent ? "Forfait actuel" : "Souscrire"}
@@ -154,6 +168,20 @@ export function CustomerPricingTab() {
             );
           })}
         </div>
+      )}
+
+      {/* Subscription checkout dialog */}
+      {checkoutPkg && (
+        <SubscriptionCheckoutDialog
+          open={!!checkoutPkg}
+          onOpenChange={(open) => { if (!open) setCheckoutPkg(null); }}
+          itemName={checkoutPkg.name}
+          price={billingCycle === "yearly" ? checkoutPkg.price_yearly : checkoutPkg.price_monthly}
+          billingCycle={billingCycle}
+          subscriptionType="package"
+          packageId={checkoutPkg.id}
+          onSuccess={handleSuccess}
+        />
       )}
     </div>
   );
