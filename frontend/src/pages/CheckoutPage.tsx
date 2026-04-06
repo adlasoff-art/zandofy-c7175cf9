@@ -162,6 +162,29 @@ export default function CheckoutPage() {
   const [maxPointsDiscountPct, setMaxPointsDiscountPct] = useState(10);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  // Client delivery subscription check
+  const { data: clientDeliverySub } = useQuery({
+    queryKey: ["client-delivery-sub-checkout", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data } = await fromTable("store_package_subscriptions")
+        .select("*, service_packages(name)")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .gt("paid_until", new Date().toISOString())
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 60 * 1000,
+  });
+
+  const hasActiveDeliverySub = !!clientDeliverySub;
+  const deliverySubName = (clientDeliverySub as any)?.service_packages?.name || "Livraison";
+  const deliverySubExpiry = clientDeliverySub?.paid_until
+    ? new Date(clientDeliverySub.paid_until as string).toLocaleDateString("fr-FR")
+    : "";
+
   useEffect(() => {
     if (!user) return;
     // Fetch loyalty tier
