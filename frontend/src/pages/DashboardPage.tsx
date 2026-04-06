@@ -1044,7 +1044,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       )}
 
       {/* Stepper with dates */}
-      <TrackingStepper status={order.status} statusHistory={statusHistory} />
+      <TrackingStepper status={order.status} statusHistory={statusHistory} orderRef={order.order_ref} trackingNumber={order.tracking_number} />
 
       {/* Status History Timeline */}
       {statusHistory.length > 0 && (
@@ -1310,10 +1310,10 @@ function CancelOrderButton({ orderId, orderRef, onSuccess, small }: {
   );
 }
 
-function TrackingStepper({ status, statusHistory }: { status: string; statusHistory?: StatusHistoryRow[] }) {
+function TrackingStepper({ status, statusHistory, orderRef, trackingNumber }: { status: string; statusHistory?: StatusHistoryRow[]; orderRef?: string; trackingNumber?: string | null }) {
+  const navigate = useNavigate();
   const currentIdx = getStepIndex(status);
   const isCancelled = status === "cancelled" || status === "returned";
-  const historyMap = new Map((statusHistory || []).map((h) => [h.status, h.created_at]));
 
   if (isCancelled) {
     const cfg = STATUS_CONFIG[status];
@@ -1326,25 +1326,46 @@ function TrackingStepper({ status, statusHistory }: { status: string; statusHist
   }
 
   // 3 rows of 3 steps — snake flow: Row1 L→R, Row2 R→L (reversed display), Row3 L→R
-  const ROW1 = CUSTOMER_TRACKING_STEPS.slice(0, 3); // Reçue, Confirmée, En préparation
-  const ROW2 = CUSTOMER_TRACKING_STEPS.slice(3, 6); // En expédition, Arrivée hub, Assignation livreur
-  const ROW3 = CUSTOMER_TRACKING_STEPS.slice(6, 9); // Livreur assigné, En livraison, Livrée
+  const ROW1 = CUSTOMER_TRACKING_STEPS.slice(0, 3);
+  const ROW2 = CUSTOMER_TRACKING_STEPS.slice(3, 6);
+  const ROW3 = CUSTOMER_TRACKING_STEPS.slice(6, 9);
+  const historyMap = new Map((statusHistory || []).map((h) => [h.status, h.created_at]));
+
+  const handleStepClick = (stepKey: string) => {
+    if (!orderRef) return;
+    if (stepKey === "out_for_delivery") {
+      navigate(`/tracking?order=${orderRef}`);
+    } else if (stepKey === "in_shipping") {
+      const ref = trackingNumber || orderRef;
+      navigate(`/tracking?ref=${ref}`);
+    }
+  };
+
+  const isClickable = (stepKey: string, done: boolean) => {
+    return done && orderRef && (stepKey === "out_for_delivery" || stepKey === "in_shipping");
+  };
 
   const renderStep = (step: typeof CUSTOMER_TRACKING_STEPS[0], globalIdx: number, isCurrent: boolean, done: boolean) => {
     const Icon = step.icon;
     const ts = historyMap.get(step.key);
+    const clickable = isClickable(step.key, done || isCurrent);
     return (
-      <div key={step.key} className="flex flex-col items-center gap-1 flex-1 min-w-0">
+      <div
+        key={step.key}
+        className={`flex flex-col items-center gap-1 flex-1 min-w-0 ${clickable ? "cursor-pointer group" : ""}`}
+        onClick={clickable ? () => handleStepClick(step.key) : undefined}
+        title={clickable ? (step.key === "out_for_delivery" ? "Suivre le livreur sur la carte" : "Suivre l'expédition") : undefined}
+      >
         <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all ${
           isCurrent ? "bg-primary text-primary-foreground ring-2 ring-primary/30 scale-110"
             : done ? "bg-primary text-primary-foreground"
             : "bg-muted text-muted-foreground"
-        }`}>
+        } ${clickable ? "group-hover:ring-2 group-hover:ring-primary/50 group-hover:scale-110" : ""}`}>
           <Icon size={18} />
         </div>
         <span className={`text-xs font-semibold text-center leading-tight px-0.5 ${
           isCurrent ? "text-primary" : done ? "text-foreground" : "text-muted-foreground"
-        }`}>
+        } ${clickable ? "group-hover:text-primary underline decoration-dotted underline-offset-2" : ""}`}>
           {step.label}
         </span>
         {ts && (
@@ -1597,7 +1618,7 @@ function TrackingTab({ orders }: { orders: OrderRow[] }) {
           <div className="flex items-center justify-between mb-4">
             <span className="font-bold text-sm text-foreground">{order.order_ref}</span>
           </div>
-          <TrackingStepper status={order.status} />
+          <TrackingStepper status={order.status} orderRef={order.order_ref} trackingNumber={order.tracking_number} />
         </div>
       ))}
     </div>
