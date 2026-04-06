@@ -355,6 +355,7 @@ export default function AdminUsersPage() {
                    <th className="text-left p-3 font-medium">Rôle(s)</th>
                    <th className="text-left p-3 font-medium hidden sm:table-cell">Statut</th>
                    <th className="text-left p-3 font-medium hidden md:table-cell">Inscrit le</th>
+                   <th className="text-left p-3 font-medium hidden lg:table-cell">Dernière connexion</th>
                    <th className="text-right p-3 font-medium">Détails</th>
                  </tr>
               </thead>
@@ -419,6 +420,12 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="p-3 text-muted-foreground text-xs hidden md:table-cell">
                       {format(new Date(u.created_at), "d MMM yyyy", { locale: fr })}
+                    </td>
+                    <td className="p-3 text-muted-foreground text-xs hidden lg:table-cell">
+                      {u.last_login_at
+                        ? format(new Date(u.last_login_at), "d MMM yyyy HH:mm", { locale: fr })
+                        : <span className="text-muted-foreground/50 italic">Jamais</span>
+                      }
                     </td>
                     <td className="p-3 text-right">
                       <button className="px-3 py-1.5 text-xs bg-muted rounded-lg hover:bg-muted/80 text-foreground transition-colors">
