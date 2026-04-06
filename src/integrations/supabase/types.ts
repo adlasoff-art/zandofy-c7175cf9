@@ -4012,6 +4012,7 @@ export type Database = {
           id: string
           included_services: string[]
           is_active: boolean
+          max_collaborators: number | null
           max_deliveries_per_day: number
           max_riders: number
           name: string
@@ -4034,6 +4035,7 @@ export type Database = {
           id?: string
           included_services?: string[]
           is_active?: boolean
+          max_collaborators?: number | null
           max_deliveries_per_day?: number
           max_riders?: number
           name: string
@@ -4056,6 +4058,7 @@ export type Database = {
           id?: string
           included_services?: string[]
           is_active?: boolean
+          max_collaborators?: number | null
           max_deliveries_per_day?: number
           max_riders?: number
           name?: string
@@ -4325,9 +4328,11 @@ export type Database = {
           created_at: string
           id: string
           invited_email: string | null
+          permissions: string[] | null
           role: string
           status: string
           store_id: string
+          sub_role: string | null
           updated_at: string
           user_id: string
         }
@@ -4335,9 +4340,11 @@ export type Database = {
           created_at?: string
           id?: string
           invited_email?: string | null
+          permissions?: string[] | null
           role?: string
           status?: string
           store_id: string
+          sub_role?: string | null
           updated_at?: string
           user_id: string
         }
@@ -4345,9 +4352,11 @@ export type Database = {
           created_at?: string
           id?: string
           invited_email?: string | null
+          permissions?: string[] | null
           role?: string
           status?: string
           store_id?: string
+          sub_role?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -5550,6 +5559,7 @@ export type Database = {
       }
       vendor_pricing_overrides: {
         Row: {
+          collaborator_limit_override: number | null
           commission_rate: number | null
           created_at: string
           id: string
@@ -5568,6 +5578,7 @@ export type Database = {
           vendor_off_platform_enabled: boolean
         }
         Insert: {
+          collaborator_limit_override?: number | null
           commission_rate?: number | null
           created_at?: string
           id?: string
@@ -5586,6 +5597,7 @@ export type Database = {
           vendor_off_platform_enabled?: boolean
         }
         Update: {
+          collaborator_limit_override?: number | null
           commission_rate?: number | null
           created_at?: string
           id?: string

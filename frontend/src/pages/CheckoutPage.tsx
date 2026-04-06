@@ -162,7 +162,39 @@ export default function CheckoutPage() {
   const [maxPointsDiscountPct, setMaxPointsDiscountPct] = useState(10);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
-  // Client delivery subscription check
+  // Country/city eligibility state
+  const [countryBlocked, setCountryBlocked] = useState(false);
+  const [countryBlockMessage, setCountryBlockMessage] = useState("");
+
+  // Validate country+city against active_countries
+  const validateCountryCity = useCallback(async (country: string, city: string) => {
+    if (!country) { setCountryBlocked(false); return; }
+    const { data } = await supabase.from("platform_settings").select("value").eq("key", "active_countries").maybeSingle();
+    if (!data?.value) { setCountryBlocked(false); return; }
+    const v = data.value as any;
+    const disabled = Array.isArray(v.disabled) ? v.disabled : [];
+    const cities = v.cities || {};
+    if (disabled.includes(country)) {
+      setCountryBlocked(true);
+      setCountryBlockMessage("Ce pays n'est pas encore desservi. Nous travaillons à étendre notre couverture.");
+      return;
+    }
+    const allowedCities = cities[country];
+    if (allowedCities && Array.isArray(allowedCities) && allowedCities.length > 0 && city) {
+      const cityNorm = city.toLowerCase().trim();
+      if (!allowedCities.some((c: string) => c.toLowerCase().trim() === cityNorm)) {
+        setCountryBlocked(true);
+        setCountryBlockMessage(`La ville "${city}" n'est pas encore desservie dans ce pays. Nous travaillons à étendre notre couverture.`);
+        return;
+      }
+    }
+    setCountryBlocked(false);
+  }, []);
+
+  useEffect(() => {
+    validateCountryCity(shipping.country, shipping.city);
+  }, [shipping.country, shipping.city, validateCountryCity]);
+
   const { data: clientDeliverySub } = useQuery({
     queryKey: ["client-delivery-sub-checkout", user?.id],
     queryFn: async () => {
@@ -501,6 +533,7 @@ export default function CheckoutPage() {
     );
   }
 
+
   const handleShippingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const required = ["firstName", "lastName", "phone", "address", "city", "country"] as const;
@@ -509,6 +542,11 @@ export default function CheckoutPage() {
         toast({ title: t("checkout.requiredField"), description: t("checkout.fillRequired"), variant: "destructive" });
         return;
       }
+    }
+
+    if (countryBlocked) {
+      toast({ title: "Zone non desservie", description: countryBlockMessage, variant: "destructive" });
+      return;
     }
 
     // Save address if checked
@@ -1033,7 +1071,14 @@ export default function CheckoutPage() {
                         }}
                       />
 
-                      {/* Save address checkbox */}
+                      {/* Country/city blocked warning */}
+                      {countryBlocked && (
+                        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+                          <p className="font-medium">⚠️ Zone non desservie</p>
+                          <p className="text-xs mt-1">{countryBlockMessage}</p>
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-3 pt-2 border-t border-border">
                         <input
                           type="checkbox"

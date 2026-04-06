@@ -29,6 +29,7 @@ interface PackageForm {
   visibility_level: string;
   rank: number;
   is_active: boolean;
+  max_collaborators: number;
 }
 
 const emptyForm: PackageForm = {
@@ -36,7 +37,7 @@ const emptyForm: PackageForm = {
   price_monthly: 0, price_yearly: 0, included_services: [],
   max_deliveries_per_day: 5, max_riders: 1, hub_storage_free_kg: 0,
   withdrawal_delay_days: 30, trust_threshold_months: 0, trust_threshold_sales: 0,
-  visibility_level: "standard", rank: 0, is_active: true,
+  visibility_level: "standard", rank: 0, is_active: true, max_collaborators: 2,
 };
 
 const visibilityOptions = [
@@ -81,7 +82,8 @@ export default function AdminServicePackagesPage() {
         max_riders: pkg.max_riders, hub_storage_free_kg: pkg.hub_storage_free_kg,
         withdrawal_delay_days: pkg.withdrawal_delay_days, trust_threshold_months: pkg.trust_threshold_months,
         trust_threshold_sales: pkg.trust_threshold_sales, visibility_level: pkg.visibility_level,
-        rank: pkg.rank, is_active: pkg.is_active, updated_at: new Date().toISOString(),
+        rank: pkg.rank, is_active: pkg.is_active, max_collaborators: pkg.max_collaborators,
+        updated_at: new Date().toISOString(),
       };
       if (pkg.id) {
         const { error } = await fromTable("service_packages").update(payload).eq("id", pkg.id);
@@ -124,6 +126,7 @@ export default function AdminServicePackagesPage() {
       trust_threshold_months: pkg.trust_threshold_months ?? 0,
       trust_threshold_sales: pkg.trust_threshold_sales ?? 0,
       visibility_level: pkg.visibility_level, rank: pkg.rank, is_active: pkg.is_active,
+      max_collaborators: pkg.max_collaborators ?? 2,
     });
     setEditDialog(true);
   };
@@ -170,6 +173,7 @@ export default function AdminServicePackagesPage() {
                       <span className="text-primary font-medium">${pkg.price_yearly}/an</span>
                       <span>{pkg.max_deliveries_per_day} courses/jour</span>
                       <span>{pkg.max_riders} livreurs</span>
+                      <span>{pkg.max_collaborators ?? 0} collaborateurs</span>
                       <span>Hub: {pkg.hub_storage_free_kg > 0 ? `${pkg.hub_storage_free_kg} kg gratuit` : "Payant"}</span>
                       <span>Retrait: {pkg.withdrawal_delay_days}j</span>
                     </div>
@@ -272,7 +276,7 @@ export default function AdminServicePackagesPage() {
             </div>
 
             {/* Logistics */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <div>
                 <label className="text-sm font-medium">Courses/jour max</label>
                 <Input type="number" value={form.max_deliveries_per_day} onChange={e => setForm({ ...form, max_deliveries_per_day: Number(e.target.value) })} />
@@ -284,6 +288,10 @@ export default function AdminServicePackagesPage() {
               <div>
                 <label className="text-sm font-medium">Hub gratuit (kg)</label>
                 <Input type="number" value={form.hub_storage_free_kg} onChange={e => setForm({ ...form, hub_storage_free_kg: Number(e.target.value) })} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Collaborateurs max</label>
+                <Input type="number" value={form.max_collaborators} onChange={e => setForm({ ...form, max_collaborators: Number(e.target.value) })} />
               </div>
             </div>
 
