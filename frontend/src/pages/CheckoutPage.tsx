@@ -1675,7 +1675,13 @@ export default function CheckoutPage() {
                       </span>
                     )}
                   </div>
-                  {deliveryOption === "home_delivery" && lastMileFee > 0 && (
+                  {deliveryOption === "home_delivery" && hasActiveDeliverySub && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Livraison locale</span>
+                      <span className="text-primary font-medium text-xs">Incluse (forfait {deliverySubName})</span>
+                    </div>
+                  )}
+                  {deliveryOption === "home_delivery" && lastMileFee > 0 && !hasActiveDeliverySub && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Livraison locale</span>
                       {lastMilePayment === "pay_cash_on_delivery" ? (
