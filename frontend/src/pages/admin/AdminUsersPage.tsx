@@ -355,6 +355,7 @@ export default function AdminUsersPage() {
                    <th className="text-left p-3 font-medium">Rôle(s)</th>
                    <th className="text-left p-3 font-medium hidden sm:table-cell">Statut</th>
                    <th className="text-left p-3 font-medium hidden md:table-cell">Inscrit le</th>
+                   <th className="text-left p-3 font-medium hidden lg:table-cell">Dernière connexion</th>
                    <th className="text-right p-3 font-medium">Détails</th>
                  </tr>
               </thead>

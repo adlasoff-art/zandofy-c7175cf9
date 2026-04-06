@@ -174,19 +174,15 @@ export function AdminSidebar() {
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
       <SidebarContent>
-        {/* User avatar section */}
-        <div className={cn("flex items-center gap-3 px-3 py-3 border-b border-border", collapsed && "justify-center")}>
-          {profile?.avatar_url ? (
-            <img src={profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 border border-border" />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <User size={16} className="text-primary" />
-            </div>
-          )}
+        {/* Logo + version */}
+        <div className={cn("flex items-center gap-2.5 px-3 py-3 border-b border-border", collapsed && "justify-center")}>
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+            <span className="text-primary-foreground font-bold text-sm">Z</span>
+          </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
-              <p className="text-[10px] text-muted-foreground truncate">{user?.email}</p>
+              <p className="text-sm font-bold text-foreground">Zandofy</p>
+              <p className="text-[10px] text-muted-foreground">v1.0.0-beta</p>
             </div>
           )}
         </div>
