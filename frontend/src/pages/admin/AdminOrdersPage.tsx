@@ -528,6 +528,17 @@ export default function AdminOrdersPage() {
                         >
                           Retourner
                         </button>
+                        <button
+                          disabled={updatingId === o.id}
+                          onClick={() => {
+                            if (confirm(`Supprimer définitivement la commande ${o.order_ref} ? Cette action est irréversible.`)) {
+                              deleteOrder(o.id);
+                            }
+                          }}
+                          className="px-2.5 py-1 text-[10px] font-medium rounded-full border border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground disabled:opacity-40 flex items-center gap-1"
+                        >
+                          <Trash2 size={10} /> Supprimer
+                        </button>
                       </div>
 
                       {updatingId === o.id && (
