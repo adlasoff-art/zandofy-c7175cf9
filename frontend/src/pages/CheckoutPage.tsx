@@ -1071,7 +1071,14 @@ export default function CheckoutPage() {
                         }}
                       />
 
-                      {/* Save address checkbox */}
+                      {/* Country/city blocked warning */}
+                      {countryBlocked && (
+                        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+                          <p className="font-medium">⚠️ Zone non desservie</p>
+                          <p className="text-xs mt-1">{countryBlockMessage}</p>
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-3 pt-2 border-t border-border">
                         <input
                           type="checkbox"
