@@ -682,16 +682,45 @@ export default function RiderDashboardPage() {
                   <span className="text-xs text-muted-foreground">{(items as any[]).length} livr. · ${dayTotal.toFixed(2)}</span>
                 </div>
                 <div className="space-y-2">
-                  {(items as any[]).map((d) => (
-                    <div key={d.id} className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
-                      <CheckCircle size={16} className="text-primary shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground">{d.customer_name}</p>
-                        <p className="text-[11px] text-muted-foreground truncate">{d.address}</p>
+                  {(items as any[]).map((d) => {
+                    // Calculate duration
+                    const startTime = new Date(d.created_at);
+                    const endTime = d.delivered_at ? new Date(d.delivered_at) : null;
+                    const durationMin = endTime ? Math.round((endTime.getTime() - startTime.getTime()) / 60000) : null;
+                    const durationStr = durationMin !== null
+                      ? durationMin >= 60 ? `${Math.floor(durationMin / 60)}h${String(durationMin % 60).padStart(2, "0")}` : `${durationMin} min`
+                      : "—";
+
+                    // Find matching order to get payment info
+                    const matchingOrder = assignedOrders.find((o: any) => o.id === d.order_id);
+                    const paymentLabel = matchingOrder?.last_mile_payment_method === "cash"
+                      ? "Cash"
+                      : matchingOrder?.last_mile_payment_method === "mobile_money"
+                      ? "Mobile Money"
+                      : matchingOrder?.last_mile_payment_method === "subscription"
+                      ? "Abonnement"
+                      : matchingOrder?.last_mile_payment_method || "—";
+
+                    return (
+                      <div key={d.id} className="bg-card border border-border rounded-xl p-3 space-y-2">
+                        <div className="flex items-center gap-3">
+                          <CheckCircle size={16} className="text-primary shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground">{d.customer_name}</p>
+                            <p className="text-[11px] text-muted-foreground truncate">{d.address}</p>
+                          </div>
+                          <span className="text-sm font-semibold text-foreground">${Number(d.amount).toFixed(2)}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-[10px]">
+                          <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground">⏱ {durationStr}</span>
+                          <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground">💳 {paymentLabel}</span>
+                          {d.order_ref && (
+                            <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">{d.order_ref}</span>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-sm font-semibold text-foreground">${Number(d.amount).toFixed(2)}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
