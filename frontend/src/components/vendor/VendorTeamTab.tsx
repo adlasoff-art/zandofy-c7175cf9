@@ -74,7 +74,7 @@ export function VendorTeamTab({ storeId }: Props) {
 
       // Check KYC status via kyc_verifications table
       const { data: kycData } = userIds.length
-        ? await supabase.from("kyc_verifications").select("user_id, status").in("user_id", userIds).eq("status", "approved")
+        ? await (supabase as any).from("kyc_verifications").select("user_id, status").in("user_id", userIds).eq("status", "approved")
         : { data: [] };
       const kycSet = new Set((kycData || []).map((k: any) => k.user_id));
 
@@ -101,13 +101,21 @@ export function VendorTeamTab({ storeId }: Props) {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id, is_kyc_verified")
+        .select("id")
         .eq("email", inviteEmail.toLowerCase().trim())
         .maybeSingle();
 
       if (!profile) throw new Error("Aucun utilisateur trouvé avec cet email.");
       if (profile.id === user?.id) throw new Error("Vous ne pouvez pas vous ajouter vous-même.");
-      if (!profile.is_kyc_verified) throw new Error("Ce collaborateur doit d'abord compléter sa vérification d'identité (KYC).");
+
+      // Check KYC via kyc_verifications
+      const { data: kycCheck } = await (supabase as any)
+        .from("kyc_verifications")
+        .select("id")
+        .eq("user_id", profile.id)
+        .eq("status", "approved")
+        .maybeSingle();
+      if (!kycCheck) throw new Error("Ce collaborateur doit d'abord compléter sa vérification d'identité (KYC).");
 
       if (selectedPermissions.length === 0) throw new Error("Sélectionnez au moins une permission.");
 
