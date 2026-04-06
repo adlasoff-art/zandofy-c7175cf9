@@ -69,8 +69,14 @@ export function VendorTeamTab({ storeId }: Props) {
 
       const userIds = data.map((c: any) => c.user_id).filter(Boolean);
       const { data: profiles } = userIds.length
-        ? await supabase.from("profiles").select("id, email, first_name, last_name, is_kyc_verified").in("id", userIds)
+        ? await supabase.from("profiles").select("id, email, first_name, last_name").in("id", userIds)
         : { data: [] };
+
+      // Check KYC status via kyc_verifications table
+      const { data: kycData } = userIds.length
+        ? await supabase.from("kyc_verifications").select("user_id, status").in("user_id", userIds).eq("status", "approved")
+        : { data: [] };
+      const kycSet = new Set((kycData || []).map((k: any) => k.user_id));
 
       const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
@@ -80,7 +86,7 @@ export function VendorTeamTab({ storeId }: Props) {
           ...c,
           profile_email: profile?.email || c.invited_email,
           profile_name: profile ? [profile.first_name, profile.last_name].filter(Boolean).join(" ") : null,
-          is_kyc_verified: profile?.is_kyc_verified ?? false,
+          is_kyc_verified: kycSet.has(c.user_id),
         } as Collaborator;
       });
     },
