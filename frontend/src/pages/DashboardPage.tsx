@@ -727,6 +727,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       comment: reviewComment.trim(),
       images: reviewImages.length > 0 ? reviewImages : null,
       is_verified_purchase: true,
+      is_approved: false,
     });
     if (error) {
       toast({ title: "Erreur", description: "Impossible de soumettre l'avis.", variant: "destructive" });
