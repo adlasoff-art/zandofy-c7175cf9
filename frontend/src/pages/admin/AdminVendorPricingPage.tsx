@@ -109,6 +109,7 @@ export default function AdminVendorPricingPage() {
     returns_enabled: boolean;
     suppliers_enabled: boolean;
     max_products_override: string;
+    collaborator_limit_override: string;
   }>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -206,6 +207,7 @@ export default function AdminVendorPricingPage() {
       returns_enabled: (store as any).returns_enabled ?? false,
       suppliers_enabled: (o as any)?.suppliers_enabled ?? false,
       max_products_override: o?.max_products_override != null ? String(o.max_products_override) : "",
+      collaborator_limit_override: (o as any)?.collaborator_limit_override != null ? String((o as any).collaborator_limit_override) : "",
     };
   };
 
@@ -218,7 +220,7 @@ export default function AdminVendorPricingPage() {
 
   const getEditForId = (storeId: string) => {
     const store = stores?.find((s) => s.id === storeId);
-    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, returns_enabled: false, suppliers_enabled: false, max_products_override: "" };
+    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, returns_enabled: false, suppliers_enabled: false, max_products_override: "", collaborator_limit_override: "" };
     return getEdit(store);
   };
 
@@ -283,6 +285,7 @@ export default function AdminVendorPricingPage() {
       vendor_custom_payment_numbers_enabled: edit.vendor_custom_payment_numbers_enabled,
       suppliers_enabled: edit.suppliers_enabled,
       max_products_override: edit.max_products_override ? Number(edit.max_products_override) : null,
+      collaborator_limit_override: edit.collaborator_limit_override ? Number(edit.collaborator_limit_override) : null,
       updated_at: new Date().toISOString(),
     };
 
