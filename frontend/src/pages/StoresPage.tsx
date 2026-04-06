@@ -109,7 +109,7 @@ function StoreCard({ store }: { store: StoreRow }) {
             <img
               src={store.banner_url}
               alt=""
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className="w-full h-full object-contain"
             />
             <div className="absolute inset-0 bg-card/60 backdrop-blur-[1px]" />
           </>

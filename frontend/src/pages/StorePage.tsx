@@ -283,12 +283,12 @@ export default function StorePage() {
         ) : (
           <>
             {/* ═══ HERO BANNER ═══ */}
-            <div className="relative">
+            <div className="relative bg-muted">
               {store.banner_url ? (
                 <img
                   src={store.banner_url}
                   alt={`Bannière ${store.name}`}
-                  className="w-full h-44 md:h-64 object-cover"
+                  className="w-full h-44 md:h-64 object-contain"
                 />
               ) : (
                 <div className="w-full h-44 md:h-64 bg-brand-gradient opacity-90" />
