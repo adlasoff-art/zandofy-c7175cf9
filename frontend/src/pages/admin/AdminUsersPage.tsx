@@ -421,6 +421,12 @@ export default function AdminUsersPage() {
                     <td className="p-3 text-muted-foreground text-xs hidden md:table-cell">
                       {format(new Date(u.created_at), "d MMM yyyy", { locale: fr })}
                     </td>
+                    <td className="p-3 text-muted-foreground text-xs hidden lg:table-cell">
+                      {u.last_login_at
+                        ? format(new Date(u.last_login_at), "d MMM yyyy HH:mm", { locale: fr })
+                        : <span className="text-muted-foreground/50 italic">Jamais</span>
+                      }
+                    </td>
                     <td className="p-3 text-right">
                       <button className="px-3 py-1.5 text-xs bg-muted rounded-lg hover:bg-muted/80 text-foreground transition-colors">
                         Voir
