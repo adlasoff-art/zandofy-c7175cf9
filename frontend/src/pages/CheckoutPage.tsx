@@ -303,8 +303,9 @@ export default function CheckoutPage() {
 
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
-  // Last-mile fee calculation
-  const lastMileFee = deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
+  // Last-mile fee calculation — waived if client has active delivery subscription
+  const rawLastMileFee = deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
+  const lastMileFee = hasActiveDeliverySub ? 0 : rawLastMileFee;
   const effectiveLastMile = deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping" ? lastMileFee : 0;
   
   const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping + effectiveLastMile);
