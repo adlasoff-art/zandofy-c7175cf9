@@ -691,15 +691,12 @@ export default function RiderDashboardPage() {
                       ? durationMin >= 60 ? `${Math.floor(durationMin / 60)}h${String(durationMin % 60).padStart(2, "0")}` : `${durationMin} min`
                       : "—";
 
-                    // Find matching order to get payment info
-                    const matchingOrder = assignedOrders.find((o: any) => o.id === d.order_id);
-                    const paymentLabel = matchingOrder?.last_mile_payment_method === "cash"
-                      ? "Cash"
-                      : matchingOrder?.last_mile_payment_method === "mobile_money"
-                      ? "Mobile Money"
-                      : matchingOrder?.last_mile_payment_method === "subscription"
-                      ? "Abonnement"
-                      : matchingOrder?.last_mile_payment_method || "—";
+                    const matchingOrder = assignedOrders.find((o: any) => o.id === d.order_id) as any;
+                    const pm = matchingOrder?.last_mile_payment_method;
+                    const paymentLabel = pm === "cash" ? "Cash"
+                      : pm === "mobile_money" ? "Mobile Money"
+                      : pm === "subscription" ? "Abonnement"
+                      : pm || "—";
 
                     return (
                       <div key={d.id} className="bg-card border border-border rounded-xl p-3 space-y-2">
