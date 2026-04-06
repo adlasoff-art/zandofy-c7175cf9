@@ -162,6 +162,10 @@ export default function CheckoutPage() {
   const [maxPointsDiscountPct, setMaxPointsDiscountPct] = useState(10);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  // Country/city eligibility state
+  const [countryBlocked, setCountryBlocked] = useState(false);
+  const [countryBlockMessage, setCountryBlockMessage] = useState("");
+
   // Client delivery subscription check
   const { data: clientDeliverySub } = useQuery({
     queryKey: ["client-delivery-sub-checkout", user?.id],
