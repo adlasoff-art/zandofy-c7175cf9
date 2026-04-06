@@ -5,7 +5,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { VENDOR_TIERS } from "@/lib/vendor-tiers";
 import { toast } from "sonner";
-import { Users, UserPlus, Trash2, Loader2, Mail, Shield, Clock } from "lucide-react";
+import { Users, UserPlus, Trash2, Loader2, Mail, Shield, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+
+const AVAILABLE_PERMISSIONS = [
+  { value: "orders", label: "Commandes", description: "Voir et gérer les commandes" },
+  { value: "products", label: "Catalogue", description: "Ajouter/modifier les produits" },
+  { value: "messages", label: "Messages", description: "Chat avec les clients" },
+  { value: "analytics", label: "Statistiques", description: "Voir les stats de la boutique" },
+] as const;
 
 interface Collaborator {
   id: string;
@@ -13,9 +21,12 @@ interface Collaborator {
   role: string;
   invited_email: string | null;
   status: string;
+  permissions: string[] | null;
+  sub_role: string | null;
   created_at: string;
   profile_email?: string;
   profile_name?: string;
+  is_kyc_verified?: boolean;
 }
 
 interface Props {
@@ -27,8 +38,8 @@ export function VendorTeamTab({ storeId }: Props) {
   const queryClient = useQueryClient();
   const { subscription } = useVendorSubscription(storeId);
   const [email, setEmail] = useState("");
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(["orders"]);
 
-  // Get store max_collaborators_override
   const { data: storeData } = useQuery({
     queryKey: ["store-collab-limit", storeId],
     queryFn: async () => {
@@ -56,10 +67,9 @@ export function VendorTeamTab({ storeId }: Props) {
 
       if (!data) return [];
 
-      // Enrich with profile info
       const userIds = data.map((c: any) => c.user_id).filter(Boolean);
       const { data: profiles } = userIds.length
-        ? await supabase.from("profiles").select("id, email, first_name, last_name").in("id", userIds)
+        ? await supabase.from("profiles").select("id, email, first_name, last_name, is_kyc_verified").in("id", userIds)
         : { data: [] };
 
       const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
@@ -70,6 +80,7 @@ export function VendorTeamTab({ storeId }: Props) {
           ...c,
           profile_email: profile?.email || c.invited_email,
           profile_name: profile ? [profile.first_name, profile.last_name].filter(Boolean).join(" ") : null,
+          is_kyc_verified: profile?.is_kyc_verified ?? false,
         } as Collaborator;
       });
     },
@@ -77,26 +88,22 @@ export function VendorTeamTab({ storeId }: Props) {
 
   const addCollaborator = useMutation({
     mutationFn: async (inviteEmail: string) => {
-      // Check limit
       const activeCount = collaborators.filter((c) => c.status !== "removed").length;
       if (activeCount >= maxCollaborators) {
         throw new Error(`Limite de ${maxCollaborators} collaborateurs atteinte.`);
       }
 
-      // Find user by email
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id")
+        .select("id, is_kyc_verified")
         .eq("email", inviteEmail.toLowerCase().trim())
         .maybeSingle();
 
-      if (!profile) {
-        throw new Error("Aucun utilisateur trouvé avec cet email.");
-      }
+      if (!profile) throw new Error("Aucun utilisateur trouvé avec cet email.");
+      if (profile.id === user?.id) throw new Error("Vous ne pouvez pas vous ajouter vous-même.");
+      if (!profile.is_kyc_verified) throw new Error("Ce collaborateur doit d'abord compléter sa vérification d'identité (KYC).");
 
-      if (profile.id === user?.id) {
-        throw new Error("Vous ne pouvez pas vous ajouter vous-même.");
-      }
+      if (selectedPermissions.length === 0) throw new Error("Sélectionnez au moins une permission.");
 
       const { error } = await (supabase as any).from("store_collaborators").insert({
         store_id: storeId,
@@ -104,6 +111,8 @@ export function VendorTeamTab({ storeId }: Props) {
         invited_email: inviteEmail.toLowerCase().trim(),
         status: "active",
         role: "member",
+        sub_role: selectedPermissions[0],
+        permissions: selectedPermissions,
       } as any);
 
       if (error) {
@@ -115,8 +124,25 @@ export function VendorTeamTab({ storeId }: Props) {
       queryClient.invalidateQueries({ queryKey: ["store-collaborators", storeId] });
       toast.success("Collaborateur ajouté !");
       setEmail("");
+      setSelectedPermissions(["orders"]);
     },
     onError: (err: any) => toast.error(err.message || "Erreur"),
+  });
+
+  const updatePermissions = useMutation({
+    mutationFn: async ({ collabId, permissions }: { collabId: string; permissions: string[] }) => {
+      const { error } = await (supabase as any)
+        .from("store_collaborators")
+        .update({ permissions, sub_role: permissions[0] || "orders" } as any)
+        .eq("id", collabId)
+        .eq("store_id", storeId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["store-collaborators", storeId] });
+      toast.success("Permissions mises à jour");
+    },
+    onError: () => toast.error("Erreur lors de la mise à jour"),
   });
 
   const removeCollaborator = useMutation({
@@ -135,11 +161,28 @@ export function VendorTeamTab({ storeId }: Props) {
     onError: () => toast.error("Erreur lors de la suppression"),
   });
 
+  const togglePermission = (value: string) => {
+    setSelectedPermissions((prev) =>
+      prev.includes(value) ? prev.filter((p) => p !== value) : [...prev, value]
+    );
+  };
+
+  const toggleCollabPermission = (collab: Collaborator, perm: string) => {
+    const current = collab.permissions || ["orders"];
+    const updated = current.includes(perm)
+      ? current.filter((p) => p !== perm)
+      : [...current, perm];
+    if (updated.length === 0) {
+      toast.error("Au moins une permission requise");
+      return;
+    }
+    updatePermissions.mutate({ collabId: collab.id, permissions: updated });
+  };
+
   const activeCollabs = collaborators.filter((c) => c.status !== "removed");
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-foreground flex items-center gap-2">
@@ -164,9 +207,7 @@ export function VendorTeamTab({ storeId }: Props) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && email.trim()) {
-                  addCollaborator.mutate(email);
-                }
+                if (e.key === "Enter" && email.trim()) addCollaborator.mutate(email);
               }}
               className="w-full pl-9 pr-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
             />
@@ -176,14 +217,34 @@ export function VendorTeamTab({ storeId }: Props) {
             disabled={!email.trim() || addCollaborator.isPending || activeCollabs.length >= maxCollaborators}
             className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
-            {addCollaborator.isPending ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <UserPlus size={14} />
-            )}
+            {addCollaborator.isPending ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
             Ajouter
           </button>
         </div>
+
+        {/* Permission selection for new collaborator */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Permissions du nouveau membre :</p>
+          <div className="grid grid-cols-2 gap-2">
+            {AVAILABLE_PERMISSIONS.map((perm) => (
+              <label
+                key={perm.value}
+                className="flex items-start gap-2 p-2 rounded-md border border-border bg-background cursor-pointer hover:bg-muted/50 transition-colors"
+              >
+                <Checkbox
+                  checked={selectedPermissions.includes(perm.value)}
+                  onCheckedChange={() => togglePermission(perm.value)}
+                  className="mt-0.5"
+                />
+                <div>
+                  <span className="text-xs font-medium text-foreground">{perm.label}</span>
+                  <p className="text-[10px] text-muted-foreground">{perm.description}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
         {activeCollabs.length >= maxCollaborators && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
             Limite atteinte. Contactez l'administration pour augmenter votre quota.
@@ -203,40 +264,69 @@ export function VendorTeamTab({ storeId }: Props) {
           <p className="text-xs text-muted-foreground">Invitez des membres pour gérer votre boutique ensemble.</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {activeCollabs.map((collab) => (
-            <div
-              key={collab.id}
-              className="bg-card border border-border rounded-lg p-3 flex items-center gap-3"
-            >
-              <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0">
-                <Shield size={14} className="text-muted-foreground" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
-                  {collab.profile_name || collab.profile_email || "Utilisateur"}
-                </p>
-                <div className="flex items-center gap-2">
-                  {collab.profile_email && (
-                    <span className="text-xs text-muted-foreground truncate">{collab.profile_email}</span>
+            <div key={collab.id} className="bg-card border border-border rounded-lg p-3 space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  {collab.is_kyc_verified ? (
+                    <ShieldCheck size={14} className="text-emerald-500" />
+                  ) : (
+                    <AlertTriangle size={14} className="text-amber-500" />
                   )}
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                    collab.status === "active"
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                      : "bg-muted text-muted-foreground"
-                  }`}>
-                    {collab.status === "active" ? "Actif" : collab.status === "pending" ? "En attente" : collab.status}
-                  </span>
                 </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {collab.profile_name || collab.profile_email || "Utilisateur"}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {collab.profile_email && (
+                      <span className="text-xs text-muted-foreground truncate">{collab.profile_email}</span>
+                    )}
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                      collab.status === "active"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                        : "bg-muted text-muted-foreground"
+                    }`}>
+                      {collab.status === "active" ? "Actif" : collab.status === "pending" ? "En attente" : collab.status}
+                    </span>
+                    {!collab.is_kyc_verified && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        KYC manquant
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => removeCollaborator.mutate(collab.id)}
+                  disabled={removeCollaborator.isPending}
+                  className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  title="Retirer"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
-              <button
-                onClick={() => removeCollaborator.mutate(collab.id)}
-                disabled={removeCollaborator.isPending}
-                className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                title="Retirer"
-              >
-                <Trash2 size={14} />
-              </button>
+
+              {/* Inline permissions */}
+              <div className="flex flex-wrap gap-1.5 pl-12">
+                {AVAILABLE_PERMISSIONS.map((perm) => {
+                  const active = (collab.permissions || ["orders"]).includes(perm.value);
+                  return (
+                    <button
+                      key={perm.value}
+                      onClick={() => toggleCollabPermission(collab, perm.value)}
+                      disabled={updatePermissions.isPending}
+                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full border transition-colors ${
+                        active
+                          ? "bg-primary/10 text-primary border-primary/30"
+                          : "bg-muted text-muted-foreground border-border hover:border-primary/30"
+                      }`}
+                    >
+                      {perm.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
