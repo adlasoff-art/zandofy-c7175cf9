@@ -173,6 +173,7 @@ export default function AdminServicePackagesPage() {
                       <span className="text-primary font-medium">${pkg.price_yearly}/an</span>
                       <span>{pkg.max_deliveries_per_day} courses/jour</span>
                       <span>{pkg.max_riders} livreurs</span>
+                      <span>{pkg.max_collaborators ?? 0} collaborateurs</span>
                       <span>Hub: {pkg.hub_storage_free_kg > 0 ? `${pkg.hub_storage_free_kg} kg gratuit` : "Payant"}</span>
                       <span>Retrait: {pkg.withdrawal_delay_days}j</span>
                     </div>
