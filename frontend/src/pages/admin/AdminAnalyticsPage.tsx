@@ -117,7 +117,7 @@ function OverviewTab({ events, period, persistentPwaCount }: { events: Analytics
         <StatCard icon={Users} label="Connectés" value={uniqueUsers} />
         <StatCard icon={Globe} label="Anonymes" value={anonymousVisitors} />
         <StatCard icon={Clock} label="Durée moy." value={formatDuration(avgSessionDuration)} />
-        <StatCard icon={Download} label="PWA installées" value={pwaInstalls.length} />
+        <StatCard icon={Download} label="PWA installées" value={persistentPwaCount} sub={`(période: ${pwaInstalls.length})`} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
