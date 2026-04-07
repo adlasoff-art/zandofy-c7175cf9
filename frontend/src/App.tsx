@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -132,9 +133,15 @@ function SupportDrawerWrapper() {
 function CmsThemeInjector() { useCmsTheme(); return null; }
 
 // Analytics is injected inside Router via a lazy component
-import { useAnalyticsTracker } from "@/hooks/use-analytics";
+import { useAnalyticsTracker, trackPWAPresence } from "@/hooks/use-analytics";
+import { useAuth } from "@/contexts/AuthContext";
 function AnalyticsTrackerInjector() {
   useAnalyticsTracker();
+  const { user } = useAuth();
+  // Track PWA presence on every session (persists across updates)
+  useEffect(() => {
+    trackPWAPresence(user?.id);
+  }, [user?.id]);
   return null;
 }
 

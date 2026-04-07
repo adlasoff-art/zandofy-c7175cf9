@@ -47,7 +47,7 @@ function StatCard({ icon: Icon, label, value, sub }: { icon: any; label: string;
   );
 }
 
-function OverviewTab({ events, period }: { events: AnalyticsEvent[]; period: string }) {
+function OverviewTab({ events, period, persistentPwaCount }: { events: AnalyticsEvent[]; period: string; persistentPwaCount: number }) {
   const allEvents = events;
   const pageViews = allEvents.filter((e) => e.event_type === "page_view");
   const productClicks = allEvents.filter((e) => e.event_type === "product_click");
@@ -117,7 +117,7 @@ function OverviewTab({ events, period }: { events: AnalyticsEvent[]; period: str
         <StatCard icon={Users} label="Connectés" value={uniqueUsers} />
         <StatCard icon={Globe} label="Anonymes" value={anonymousVisitors} />
         <StatCard icon={Clock} label="Durée moy." value={formatDuration(avgSessionDuration)} />
-        <StatCard icon={Download} label="PWA installées" value={pwaInstalls.length} />
+        <StatCard icon={Download} label="PWA installées" value={persistentPwaCount} sub={`(période: ${pwaInstalls.length})`} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -548,7 +548,7 @@ export default function AdminAnalyticsPage() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="overview">
-              <OverviewTab events={events || []} period={period} />
+              <OverviewTab events={events || []} period={period} persistentPwaCount={0} />
             </TabsContent>
             <TabsContent value="products">
               <ProductTrackingTab period={period} since={since} />
