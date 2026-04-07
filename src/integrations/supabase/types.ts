@@ -1608,6 +1608,72 @@ export type Database = {
           },
         ]
       }
+      error_reports: {
+        Row: {
+          admin_notes: string | null
+          browser: string | null
+          component_stack: string | null
+          created_at: string
+          error_message: string
+          error_stack: string | null
+          id: string
+          is_pwa: boolean | null
+          os: string | null
+          page_path: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          screen_height: number | null
+          screen_width: number | null
+          severity: string | null
+          status: string | null
+          user_email: string | null
+          user_id: string | null
+          user_role: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          browser?: string | null
+          component_stack?: string | null
+          created_at?: string
+          error_message: string
+          error_stack?: string | null
+          id?: string
+          is_pwa?: boolean | null
+          os?: string | null
+          page_path?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          screen_height?: number | null
+          screen_width?: number | null
+          severity?: string | null
+          status?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_role?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          browser?: string | null
+          component_stack?: string | null
+          created_at?: string
+          error_message?: string
+          error_stack?: string | null
+          id?: string
+          is_pwa?: boolean | null
+          os?: string | null
+          page_path?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          screen_height?: number | null
+          screen_width?: number | null
+          severity?: string | null
+          status?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_role?: string | null
+        }
+        Relationships: []
+      }
       exchange_rates: {
         Row: {
           base_currency: string
