@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Truck, Globe, Mail, Phone, Clock, User, ExternalLink, Loader2, ImageIcon } from "lucide-react";
+import { Store, Globe, Mail, Phone, Clock, User, ExternalLink, Loader2, ImageIcon, Link } from "lucide-react";
 
 interface SupplierInfo {
   id: string;

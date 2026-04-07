@@ -23,6 +23,13 @@ interface Supplier {
   product_image_url: string | null;
 }
 
+interface SupplierProductOption {
+  id: string;
+  label: string;
+  product_url: string | null;
+  image_url: string | null;
+}
+
 interface Product {
   id: string;
   name: string;
