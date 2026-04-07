@@ -23,6 +23,13 @@ interface Supplier {
   product_image_url: string | null;
 }
 
+interface SupplierProductOption {
+  id: string;
+  label: string;
+  product_url: string | null;
+  image_url: string | null;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -82,6 +89,7 @@ const EMPTY_FORM = {
   category_id: "" as string,
   trend_tag_id: "" as string,
   supplier_id: "" as string,
+  supplier_product_id: "" as string,
   flash_timer_enabled: false,
   promo_start_date: "",
   promo_end_date: "",
@@ -120,6 +128,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierProductOptions, setSupplierProductOptions] = useState<SupplierProductOption[]>([]);
   const [trendTags, setTrendTags] = useState<{ id: string; name_fr: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -150,7 +159,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     setLoading(prev => products.length === 0 ? true : prev);
     const { data } = await (supabase
       .from("products")
-      .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max") as any)
+      .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max") as any)
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
 
@@ -344,6 +353,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       category_id: product.category_id || "",
       trend_tag_id: (product as any).trend_tag_id || "",
       supplier_id: (product as any).supplier_id || "",
+      supplier_product_id: (product as any).supplier_product_id || "",
       flash_timer_enabled: product.flash_timer_enabled || false,
       promo_start_date: toLocalDatetime(product.promo_start_date),
       promo_end_date: toLocalDatetime(product.promo_end_date),
@@ -371,7 +381,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     setMainImage(main);
     setVariationMedia(variations);
 
-    // Load existing sizes & colors
+    // Load existing sizes, colors & supplier products
     const [sizesRes, colorsRes, dynRes] = await Promise.all([
       supabase.from("product_sizes").select("id, size_label, region, bust_cm, waist_cm, hips_cm").eq("product_id", product.id),
       supabase.from("product_colors").select("id, color_name, color_hex, image_url").eq("product_id", product.id),
@@ -380,6 +390,18 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     setSizes(sizesRes.data || []);
     setColors(colorsRes.data || []);
     setDynamicSelections((dynRes.data || []) as DynamicVariantSelection[]);
+
+    // Load supplier product options if supplier is set
+    if ((product as any).supplier_id) {
+      const { data: spData } = await (supabase as any)
+        .from("supplier_products")
+        .select("id, label, product_url, image_url")
+        .eq("supplier_id", (product as any).supplier_id)
+        .order("position");
+      setSupplierProductOptions(spData || []);
+    } else {
+      setSupplierProductOptions([]);
+    }
   };
 
   const cancelForm = () => {
@@ -416,6 +438,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       category_id: form.category_id && form.category_id.trim() !== '' ? form.category_id : null,
       trend_tag_id: form.trend_tag_id && form.trend_tag_id.trim() !== '' ? form.trend_tag_id : null,
       supplier_id: form.supplier_id && form.supplier_id.trim() !== '' ? form.supplier_id : null,
+      supplier_product_id: form.supplier_product_id && form.supplier_product_id.trim() !== '' ? form.supplier_product_id : null,
       store_id: storeId,
       flash_timer_enabled: form.flash_timer_enabled,
       promo_start_date: form.promo_start_date ? new Date(form.promo_start_date).toISOString() : null,
@@ -664,13 +687,27 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             </select>
           </div>
           {suppliersEnabled && (
-          <div>
+          <div className="space-y-2">
             <label className="text-xs text-muted-foreground">🏭 Fournisseur</label>
             <div className="relative mt-1">
               <select
                 className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md"
                 value={form.supplier_id}
-                onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
+                onChange={(e) => {
+                  const newSupplierId = e.target.value;
+                  setForm({ ...form, supplier_id: newSupplierId, supplier_product_id: "" });
+                  // Load supplier products
+                  if (newSupplierId) {
+                    (supabase as any)
+                      .from("supplier_products")
+                      .select("id, label, product_url, image_url")
+                      .eq("supplier_id", newSupplierId)
+                      .order("position")
+                      .then(({ data }: any) => setSupplierProductOptions(data || []));
+                  } else {
+                    setSupplierProductOptions([]);
+                  }
+                }}
               >
                 <option value="">— Aucun —</option>
                 {suppliers.map((s) => (
@@ -688,6 +725,31 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
                 ) : null;
               })()}
             </div>
+            {/* Supplier product selector */}
+            {form.supplier_id && supplierProductOptions.length > 0 && (
+              <div>
+                <label className="text-xs text-muted-foreground">📦 Produit du fournisseur</label>
+                <select
+                  className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md"
+                  value={form.supplier_product_id}
+                  onChange={(e) => setForm({ ...form, supplier_product_id: e.target.value })}
+                >
+                  <option value="">— Aucun —</option>
+                  {supplierProductOptions.map((sp) => (
+                    <option key={sp.id} value={sp.id}>{sp.label || "Produit sans nom"}</option>
+                  ))}
+                </select>
+                {form.supplier_product_id && (() => {
+                  const sel = supplierProductOptions.find(sp => sp.id === form.supplier_product_id);
+                  return sel?.image_url ? (
+                    <div className="mt-2 flex items-center gap-2 bg-muted/30 rounded-md p-2">
+                      <img src={sel.image_url} alt="" className="w-10 h-10 rounded object-cover border border-border" />
+                      <span className="text-xs text-muted-foreground truncate">{sel.label}</span>
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+            )}
             {suppliers.length === 0 && (
               <p className="text-[10px] text-muted-foreground mt-1">Ajoutez vos fournisseurs dans l'onglet "Fournisseurs"</p>
             )}

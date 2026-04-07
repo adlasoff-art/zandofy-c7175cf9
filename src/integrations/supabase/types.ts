@@ -3183,6 +3183,7 @@ export type Database = {
           store_id: string | null
           style: string | null
           supplier_id: string | null
+          supplier_product_id: string | null
           transaction_fee_pct: number | null
           trend_tag_id: string | null
           updated_at: string
@@ -3242,6 +3243,7 @@ export type Database = {
           store_id?: string | null
           style?: string | null
           supplier_id?: string | null
+          supplier_product_id?: string | null
           transaction_fee_pct?: number | null
           trend_tag_id?: string | null
           updated_at?: string
@@ -3301,6 +3303,7 @@ export type Database = {
           store_id?: string | null
           style?: string | null
           supplier_id?: string | null
+          supplier_product_id?: string | null
           transaction_fee_pct?: number | null
           trend_tag_id?: string | null
           updated_at?: string
@@ -3330,6 +3333,13 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_supplier_product_id_fkey"
+            columns: ["supplier_product_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_products"
             referencedColumns: ["id"]
           },
           {
@@ -4987,6 +4997,44 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
+      }
+      supplier_products: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string | null
+          label: string
+          position: number
+          product_url: string | null
+          supplier_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          label?: string
+          position?: number
+          product_url?: string | null
+          supplier_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          label?: string
+          position?: number
+          product_url?: string | null
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       suppliers: {
         Row: {
