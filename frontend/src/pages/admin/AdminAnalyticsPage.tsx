@@ -47,7 +47,7 @@ function StatCard({ icon: Icon, label, value, sub }: { icon: any; label: string;
   );
 }
 
-function OverviewTab({ events, period }: { events: AnalyticsEvent[]; period: string }) {
+function OverviewTab({ events, period, persistentPwaCount }: { events: AnalyticsEvent[]; period: string; persistentPwaCount: number }) {
   const allEvents = events;
   const pageViews = allEvents.filter((e) => e.event_type === "page_view");
   const productClicks = allEvents.filter((e) => e.event_type === "product_click");
