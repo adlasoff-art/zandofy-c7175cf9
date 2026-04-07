@@ -32,10 +32,17 @@ interface DynamicVariant {
 }
 
 interface VariantRow {
-  key: string; // e.g. "Red-M"
+  key: string;
   colorIndex: number;
-  sizeLabel: string;
+  displayLabel: string;
+  cartSize: string | null;
   quantity: number;
+}
+
+interface VariantSection {
+  id: string;
+  title: string;
+  rows: VariantRow[];
 }
 
 interface VariantOrderDrawerProps {
@@ -105,7 +112,6 @@ export function VariantOrderDrawer({
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
   const [variantQtys, setVariantQtys] = useState<Record<string, number>>({});
   const [subtotalExpanded, setSubtotalExpanded] = useState(false);
-  const [selectedDynamicOptions, setSelectedDynamicOptions] = useState<Record<string, string>>({});
 
   // Reset when drawer opens
   useEffect(() => {
@@ -116,29 +122,67 @@ export function VariantOrderDrawer({
     }
   }, [open]);
 
-  // ── Build variant rows for current color ──
+  // ── Build variant sections for current color ──
   const currentColorName = colors[selectedColorIdx]?.name || colors[selectedColorIdx]?.hex || "default";
 
-  const variantRows: VariantRow[] = useMemo(() => {
-    if (sizes.length === 0) {
-      // No sizes, just one row per color
-      return [{
-        key: currentColorName,
-        colorIndex: selectedColorIdx,
-        sizeLabel: "",
-        quantity: variantQtys[currentColorName] || 0,
-      }];
+  const variantSections: VariantSection[] = useMemo(() => {
+    const sections: VariantSection[] = [];
+
+    if (sizes.length > 0) {
+      sections.push({
+        id: "sizes",
+        title: "Tailles & Quantités",
+        rows: sizes.map((s) => {
+          const key = `${currentColorName}|||size|||${s.label}`;
+          return {
+            key,
+            colorIndex: selectedColorIdx,
+            displayLabel: s.label,
+            cartSize: s.label,
+            quantity: variantQtys[key] || 0,
+          };
+        }),
+      });
     }
-    return sizes.map((s) => {
-      const key = `${currentColorName}-${s.label}`;
-      return {
-        key,
-        colorIndex: selectedColorIdx,
-        sizeLabel: s.label,
-        quantity: variantQtys[key] || 0,
-      };
+
+    dynamicVariants.forEach((dv) => {
+      sections.push({
+        id: `dynamic-${dv.typeId}`,
+        title: `${dv.icon ? `${dv.icon} ` : ""}${dv.typeName} & Quantités`,
+        rows: dv.options.map((opt) => {
+          const key = `${currentColorName}|||dynamic|||${dv.typeId}|||${opt.id}`;
+          return {
+            key,
+            colorIndex: selectedColorIdx,
+            displayLabel: opt.label,
+            cartSize: `${dv.typeName}: ${opt.label}`,
+            quantity: variantQtys[key] || 0,
+          };
+        }),
+      });
     });
-  }, [sizes, currentColorName, selectedColorIdx, variantQtys]);
+
+    if (sections.length === 0) {
+      sections.push({
+        id: "default",
+        title: "Quantité",
+        rows: [{
+          key: `${currentColorName}|||default`,
+          colorIndex: selectedColorIdx,
+          displayLabel: "",
+          cartSize: null,
+          quantity: variantQtys[currentColorName] || 0,
+        }],
+      });
+    }
+
+    return sections;
+  }, [sizes, dynamicVariants, currentColorName, selectedColorIdx, variantQtys]);
+
+  const flattenedVariantRows = useMemo(
+    () => variantSections.flatMap((section) => section.rows),
+    [variantSections]
+  );
 
   // ── Total quantity across ALL colors/sizes ──
   const totalQty = useMemo(
