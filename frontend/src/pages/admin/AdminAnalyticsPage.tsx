@@ -393,16 +393,16 @@ function ProductTrackingTab({ period, since }: { period: string; since: string |
               <tr className="border-b border-border bg-muted/30">
                 <th className="text-left p-2 w-8 text-muted-foreground font-medium">#</th>
                 <th className="text-left p-2 text-muted-foreground font-medium">Produit</th>
-                <th className="p-2 text-right">
+                <th className="p-2 text-left">
                   <SortHeader field="clicks" label="Clics" icon={MousePointer} />
                 </th>
-                <th className="p-2 text-right">
+                <th className="p-2 text-left">
                   <SortHeader field="favorites" label="Favoris" icon={Heart} />
                 </th>
-                <th className="p-2 text-right">
+                <th className="p-2 text-left">
                   <SortHeader field="cart_adds" label="Paniers" icon={ShoppingCart} />
                 </th>
-                <th className="p-2 text-right">
+                <th className="p-2 text-left">
                   <SortHeader field="orders" label="Commandés" icon={Package} />
                 </th>
               </tr>
@@ -423,10 +423,10 @@ function ProductTrackingTab({ period, since }: { period: string; since: string |
                       <span className="truncate text-foreground font-medium max-w-[200px]">{p.name}</span>
                     </div>
                   </td>
-                  <td className="p-2 text-right font-medium text-foreground">{p.clicks}</td>
-                  <td className="p-2 text-right font-medium text-foreground">{p.favorites}</td>
-                  <td className="p-2 text-right font-medium text-foreground">{p.cart_adds}</td>
-                  <td className="p-2 text-right font-medium text-foreground">{p.orders}</td>
+                  <td className="p-2 text-left font-medium text-foreground">{p.clicks}</td>
+                  <td className="p-2 text-left font-medium text-foreground">{p.favorites}</td>
+                  <td className="p-2 text-left font-medium text-foreground">{p.cart_adds}</td>
+                  <td className="p-2 text-left font-medium text-foreground">{p.orders}</td>
                 </tr>
               ))}
               {pageItems.length === 0 && (
