@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { fromTable } from "@/lib/supabase-helpers";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 function getSessionId(): string {
@@ -99,11 +100,6 @@ export function useAnalyticsTracker() {
       };
       if (user?.id) row.user_id = user.id;
       const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/analytics_events`;
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-      };
       navigator.sendBeacon(
         url + "?" + new URLSearchParams({ apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY }).toString(),
         new Blob([JSON.stringify(row)], { type: "application/json" })
@@ -138,6 +134,11 @@ export function useAnalyticsTracker() {
     if (storeMatch) extra.store_id = storeMatch[1];
 
     trackEvent("page_view", extra, user?.id);
+
+    // Auto-track store_view when visiting a store page
+    if (storeMatch) {
+      trackEvent("store_view", { store_id: storeMatch[1] }, user?.id);
+    }
   }, [location.pathname, user?.id]);
 }
 
@@ -164,8 +165,49 @@ export function useTrackStoreView() {
   );
 }
 
+/**
+ * Track PWA install persistently — writes to both analytics_events AND pwa_installs table.
+ * The pwa_installs table uses session_id as unique key so it won't duplicate on updates.
+ */
 export function trackPWAInstall(userId?: string) {
+  const sessionId = getSessionId();
+  
+  // Track in analytics_events (existing behavior)
   trackEvent("pwa_install", {
     metadata: { standalone: isPWA(), os: getOS(), device: getDeviceType() },
   }, userId);
+
+  // Also persist in dedicated pwa_installs table (won't duplicate thanks to unique index)
+  try {
+    supabase.from("pwa_installs" as any).upsert({
+      session_id: sessionId,
+      user_id: userId || null,
+      device_type: getDeviceType(),
+      os: getOS(),
+      browser: getBrowser(),
+    }, { onConflict: "session_id" }).then(() => {});
+  } catch {
+    // Silent fail
+  }
+}
+
+/**
+ * Track PWA presence on every session start (for accurate active PWA user counts).
+ * This ensures PWA installs persist across platform updates.
+ */
+export function trackPWAPresence(userId?: string) {
+  if (!isPWA()) return;
+  
+  const sessionId = getSessionId();
+  try {
+    supabase.from("pwa_installs" as any).upsert({
+      session_id: sessionId,
+      user_id: userId || null,
+      device_type: getDeviceType(),
+      os: getOS(),
+      browser: getBrowser(),
+    }, { onConflict: "session_id" }).then(() => {});
+  } catch {
+    // Silent fail
+  }
 }
