@@ -381,7 +381,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     setMainImage(main);
     setVariationMedia(variations);
 
-    // Load existing sizes & colors
+    // Load existing sizes, colors & supplier products
     const [sizesRes, colorsRes, dynRes] = await Promise.all([
       supabase.from("product_sizes").select("id, size_label, region, bust_cm, waist_cm, hips_cm").eq("product_id", product.id),
       supabase.from("product_colors").select("id, color_name, color_hex, image_url").eq("product_id", product.id),
@@ -390,6 +390,18 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     setSizes(sizesRes.data || []);
     setColors(colorsRes.data || []);
     setDynamicSelections((dynRes.data || []) as DynamicVariantSelection[]);
+
+    // Load supplier product options if supplier is set
+    if ((product as any).supplier_id) {
+      const { data: spData } = await (supabase as any)
+        .from("supplier_products")
+        .select("id, label, product_url, image_url")
+        .eq("supplier_id", (product as any).supplier_id)
+        .order("position");
+      setSupplierProductOptions(spData || []);
+    } else {
+      setSupplierProductOptions([]);
+    }
   };
 
   const cancelForm = () => {
