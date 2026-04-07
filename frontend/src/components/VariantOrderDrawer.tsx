@@ -264,33 +264,51 @@ export function VariantOrderDrawer({
 
   const addUpsellQty = useCallback(() => {
     if (!upsellInfo) return;
-    // Distribute remaining qty to the first variant row that has qty > 0, or the first row
     const firstActiveKey = Object.keys(variantQtys).find((k) => variantQtys[k] > 0);
-    const targetKey = firstActiveKey || variantRows[0]?.key;
+    const targetKey = firstActiveKey || flattenedVariantRows[0]?.key;
     if (!targetKey) return;
     setVariantQtys((prev) => ({
       ...prev,
       [targetKey]: (prev[targetKey] || 0) + upsellInfo.remaining,
     }));
-  }, [upsellInfo, variantQtys, variantRows]);
+  }, [upsellInfo, variantQtys, flattenedVariantRows]);
 
   // ── Get all selected items for cart ──
   const getSelectedItems = useCallback(() => {
     return Object.entries(variantQtys)
       .filter(([, qty]) => qty > 0)
       .map(([key, qty]) => {
-        const parts = key.split("-");
-        const colorName = sizes.length > 0 ? parts.slice(0, -1).join("-") : key;
-        const size = sizes.length > 0 ? parts[parts.length - 1] : null;
+        const [colorName, kind, a, b] = key.split("|||");
         const colorObj = colors.find((c) => (c.name || c.hex) === colorName);
+
+        if (kind === "size") {
+          return {
+            colorHex: colorObj?.hex || null,
+            colorName,
+            size: a || null,
+            quantity: qty,
+          };
+        }
+
+        if (kind === "dynamic") {
+          const dynamicVariant = dynamicVariants.find((dv) => dv.typeId === a);
+          const option = dynamicVariant?.options.find((opt) => opt.id === b);
+          return {
+            colorHex: colorObj?.hex || null,
+            colorName,
+            size: dynamicVariant && option ? `${dynamicVariant.typeName}: ${option.label}` : null,
+            quantity: qty,
+          };
+        }
+
         return {
           colorHex: colorObj?.hex || null,
           colorName,
-          size,
+          size: null,
           quantity: qty,
         };
       });
-  }, [variantQtys, sizes, colors]);
+  }, [variantQtys, colors, dynamicVariants]);
 
   const handleAddToCart = useCallback(async () => {
     const items = getSelectedItems();
@@ -488,39 +506,38 @@ export function VariantOrderDrawer({
               </div>
             )}
 
-            {/* Dynamic Variants (Pointure, Volume, Écran, etc.) */}
-            {dynamicVariants.map((dv) => (
-              <div key={dv.typeId} className="mb-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  {dv.icon ? `${dv.icon} ` : ""}{dv.typeName}{dv.unit ? ` (${dv.unit})` : ""}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {dv.options.map((opt) => {
-                    const isSelected = selectedDynamicOptions[dv.typeId] === opt.id;
-                    return (
-                      <button
-                        key={opt.id}
-                        onClick={() => setSelectedDynamicOptions(prev => ({ ...prev, [dv.typeId]: isSelected ? "" : opt.id }))}
-                        className={`min-w-[44px] h-9 px-3 rounded-lg border text-sm font-medium transition-all ${
-                          isSelected
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border text-foreground hover:border-primary/40"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
+            {/* Variant Tables */}
+            <div className="space-y-4">
+              {variantSections.map((section) => (
+                <div key={section.id} className="space-y-1">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    {section.title}
+                  </p>
+                  {section.rows.map((row) => (
+                    <div
+                      key={row.key}
+                      className={`flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
+                        row.quantity > 0 ? "bg-primary/5" : "hover:bg-muted/50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {row.displayLabel && (
+                          <span className="text-sm font-medium text-foreground min-w-[40px]">
+                            {row.displayLabel}
+                          </span>
+                        )}
+                        <span className="text-sm text-muted-foreground">${unitPrice.toFixed(2)}</span>
+                      </div>
+                      <MiniQty
+                        value={row.quantity}
+                        onChange={(v) => updateQty(row.key, v)}
+                        min={0}
+                      />
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
-
-            {/* Variant Table */}
-            <div className="space-y-1">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                {sizes.length > 0 ? "Tailles & Quantités" : "Quantité"}
-              </p>
-              {variantRows.map((row) => (
+              ))}
+            </div>
                 <div
                   key={row.key}
                   className={`flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
