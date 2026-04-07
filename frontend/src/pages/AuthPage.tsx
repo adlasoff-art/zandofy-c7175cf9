@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ShieldCheck, Globe } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ShieldCheck, Globe, AlertTriangle } from "lucide-react";
 import { useEffect } from "react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useGeoDetection } from "@/hooks/use-geo-detection";
@@ -14,9 +14,12 @@ import { LegalModal } from "@/components/auth/LegalModal";
 import {
   signInWithGoogle,
   checkRateLimit,
-  recordFailedLogin,
+  recordFailedLoginWithEmail,
   resetLoginAttempts,
   getPasswordStrength,
+  checkResetAllowed,
+  recordPasswordReset,
+  getResetsRemaining,
 } from "@/lib/auth-helpers";
 
 export default function AuthPage() {
@@ -28,6 +31,7 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [lockoutMsg, setLockoutMsg] = useState<string | null>(null);
+  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
   const [legalModal, setLegalModal] = useState<"privacy" | "terms" | "cookies" | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -50,7 +54,8 @@ export default function AuthPage() {
     const rl = checkRateLimit();
     if (!rl.allowed) {
       const mins = Math.ceil(rl.remainingSeconds / 60);
-      setLockoutMsg(`Trop de tentatives. Réessayez dans ${mins} minute(s).`);
+      setLockoutMsg(`Compte temporairement verrouillé. Réessayez dans ${mins} minute(s).`);
+      setAttemptsLeft(0);
       return;
     }
     setLockoutMsg(null);
@@ -112,24 +117,42 @@ export default function AuthPage() {
           }
         }
         resetLoginAttempts();
+        setAttemptsLeft(null);
         toast({ title: t("auth.signupSuccess"), description: t("auth.signupSuccessDesc") });
       } else if (mode === "forgot") {
+        // Check password reset rate limit
+        const resetCheck = checkResetAllowed();
+        if (!resetCheck.allowed) {
+          toast({ title: "Limite atteinte", description: resetCheck.message, variant: "destructive" });
+          setLoading(false);
+          return;
+        }
+
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/reset-password`,
         });
         if (error) throw error;
-        toast({ title: t("auth.emailSent"), description: t("auth.emailSentDesc") });
+
+        recordPasswordReset();
+        const remaining = getResetsRemaining();
+
+        toast({
+          title: t("auth.emailSent"),
+          description: `${t("auth.emailSentDesc")}${remaining > 0 ? ` (${remaining} réinitialisation(s) restante(s) aujourd'hui)` : " (Quota du jour atteint)"}`,
+        });
         setMode("login");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
-          const result = recordFailedLogin();
+          const result = recordFailedLoginWithEmail(email);
+          setAttemptsLeft(result.attemptsLeft);
           if (result.locked) {
-            setLockoutMsg(`Compte temporairement verrouillé. Réessayez dans ${Math.ceil(result.remainingSeconds / 60)} minutes.`);
+            setLockoutMsg(`Compte temporairement verrouillé. Réessayez dans 60 minutes.`);
           }
           throw error;
         }
         resetLoginAttempts();
+        setAttemptsLeft(null);
       }
     } catch (err: any) {
       toast({
@@ -185,7 +208,6 @@ export default function AuthPage() {
               {mode === "signup" && t("auth.signupDesc")}
               {mode === "forgot" && t("auth.forgotDesc")}
             </p>
-            {/* Geo-detection badge */}
             {!geo.loading && geo.country_name && mode === "signup" && (
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-xs text-muted-foreground">
                 <Globe size={12} />
@@ -196,8 +218,23 @@ export default function AuthPage() {
 
           {lockoutMsg && (
             <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-              <ShieldCheck size={16} />
-              {lockoutMsg}
+              <ShieldCheck size={16} className="shrink-0" />
+              <div>
+                <p>{lockoutMsg}</p>
+                <p className="text-xs mt-1 opacity-75">Vous pouvez réinitialiser votre mot de passe si nécessaire.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Show remaining attempts warning */}
+          {mode === "login" && attemptsLeft !== null && attemptsLeft > 0 && attemptsLeft <= 3 && !lockoutMsg && (
+            <div className="flex items-center gap-2 rounded-md border border-orange-300 bg-orange-50 dark:bg-orange-950/20 p-3 text-sm text-orange-700 dark:text-orange-400">
+              <AlertTriangle size={16} className="shrink-0" />
+              <span>
+                {attemptsLeft === 1
+                  ? "Dernière tentative avant verrouillage du compte."
+                  : `Il vous reste ${attemptsLeft} tentative(s) avant verrouillage.`}
+              </span>
             </div>
           )}
 
@@ -279,7 +316,6 @@ export default function AuthPage() {
               </button>
             )}
 
-            {/* Legal consent for signup */}
             {mode === "signup" && (
               <p className="text-xs text-muted-foreground leading-relaxed">
                 En créant un compte, vous acceptez nos{" "}
@@ -313,7 +349,6 @@ export default function AuthPage() {
             )}
           </p>
 
-          {/* Security notice */}
           <p className="text-center text-[11px] text-muted-foreground/60 flex items-center justify-center gap-1">
             <ShieldCheck size={12} />
             Connexion sécurisée · Données chiffrées
@@ -321,7 +356,6 @@ export default function AuthPage() {
         </div>
       </main>
 
-      {/* Legal modals */}
       <LegalModal
         open={legalModal !== null}
         onOpenChange={(open) => !open && setLegalModal(null)}

@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchProducts, type Product } from "@/services/api";
+import { computeStoreYears, formatStoreYears } from "@/lib/store-years";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
@@ -32,6 +33,8 @@ interface StoreData {
   banner_url: string | null;
   is_verified: boolean | null;
   verified_years: number | null;
+  verified_years_override: number | null;
+  created_at: string | null;
   followers_count: number | null;
   products_count: number | null;
   repurchase_rate: string | null;
@@ -45,6 +48,7 @@ interface StoreData {
   max_products_limit: number | null;
   followers_override: number | null;
   sales_override: number | null;
+  is_certified: boolean | null;
 }
 
 interface StoreReview {
@@ -82,10 +86,13 @@ export default function StorePage() {
         .eq("id", id!)
         .maybeSingle();
       if (error || !data) return null;
-      return data as StoreData;
+      return data as unknown as StoreData;
     },
     enabled: !!id,
   });
+
+  // Check if store is banned — show unavailable message
+  const isBannedStore = !!(store as any)?.is_banned;
 
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ["store-products", id],
@@ -264,15 +271,24 @@ export default function StorePage() {
               Retour à l'accueil
             </Link>
           </div>
+        ) : isBannedStore ? (
+          <div className="text-center py-20 container">
+            <Store size={48} className="mx-auto text-destructive/30 mb-4" />
+            <h1 className="text-2xl font-bold text-foreground">Boutique indisponible</h1>
+            <p className="text-muted-foreground mt-2">Cette boutique a été suspendue pour non-respect des règles de la plateforme.</p>
+            <Link to="/stores" className="text-primary underline mt-4 inline-block">
+              Voir d'autres boutiques
+            </Link>
+          </div>
         ) : (
           <>
             {/* ═══ HERO BANNER ═══ */}
-            <div className="relative">
+            <div className="relative bg-muted">
               {store.banner_url ? (
                 <img
                   src={store.banner_url}
                   alt={`Bannière ${store.name}`}
-                  className="w-full h-44 md:h-64 object-cover"
+                  className="w-full h-44 md:h-64 object-contain"
                 />
               ) : (
                 <div className="w-full h-44 md:h-64 bg-brand-gradient opacity-90" />
@@ -318,22 +334,24 @@ export default function StorePage() {
                       <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">
                         {store.name}
                       </h1>
-                      {store.is_verified && (
-                        <VerificationBadge variant="icon-only" verifiedYears={store.verified_years} />
-                      )}
-                      {(store as any).is_certified && (
+                      {store.is_certified && (
                         <CertificationBadge type="vendor" variant="icon-only" />
                       )}
+                      {(() => {
+                        const years = computeStoreYears(store.verified_years_override, store.verified_years, store.created_at);
+                        const label = formatStoreYears(years);
+                        return (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                            <ShieldCheck size={12} />
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {store.is_online ? (
                         <span className="text-emerald-600 font-medium">En ligne</span>
                       ) : <span className="text-amber-600">Hors ligne</span>}
-                      {store.verified_years != null && store.verified_years > 0 && (
-                        <span className="ml-2">
-                          · <ShieldCheck size={12} className="inline" /> Vérifié depuis {store.verified_years} ans
-                        </span>
-                      )}
                     </p>
                     {store.description && (
                       <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 mt-1">{store.description}</p>

@@ -15,6 +15,8 @@ interface VendorProfileCardProps {
     logo_url?: string | null;
     is_verified?: boolean | null;
     verified_years?: number | null;
+    verified_years_override?: number | null;
+    created_at?: string | null;
     followers_count?: number | null;
     followers_override?: number | null;
     products_count?: number | null;
@@ -24,6 +26,7 @@ interface VendorProfileCardProps {
     sales_trend?: string | null;
     is_online?: boolean | null;
     whatsapp_number?: string | null;
+    is_certified?: boolean | null;
   };
   productName: string;
   productId: string;
@@ -54,8 +57,8 @@ export function VendorProfileCard({ store, productName, productId, originCountry
   const [expanded, setExpanded] = useState(false);
   const isOnline = store.is_online ?? false;
 
-  // WhatsApp Business URL (uses api.whatsapp.com for Business)
-  const productUrl = `${window.location.origin}/product/${productId}`;
+  // WhatsApp Business URL — uses direct product link
+  const productUrl = typeof window !== "undefined" ? `${window.location.origin}/product/${productId}` : "";
   const whatsappUrl = store.whatsapp_number
     ? `https://wa.me/${store.whatsapp_number.replace(/\D/g, "")}?text=${encodeURIComponent(
         `Bonjour, je suis intéressé par votre produit "${productName}"${productSku ? `\nSKU : ${productSku}` : ""}${productPrice ? `\nPrix : ${productPrice}` : ""}\n${productUrl}`
@@ -90,9 +93,9 @@ export function VendorProfileCard({ store, productName, productId, originCountry
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-semibold text-foreground text-sm truncate">{store.name}</span>
             {store.is_verified && (
-              <VerificationBadge variant="icon-only" verifiedYears={store.verified_years} />
+              <VerificationBadge variant="icon-only" verifiedYears={store.verified_years_override ?? store.verified_years} storeCreatedAt={store.created_at} />
             )}
-            {(store as any).is_certified && (
+            {store.is_certified && (
               <CertificationBadge type="vendor" variant="icon-only" />
             )}
           </div>

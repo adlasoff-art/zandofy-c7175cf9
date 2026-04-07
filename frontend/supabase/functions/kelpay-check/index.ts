@@ -141,9 +141,14 @@ Deno.serve(async (req) => {
       checkData.code === "0" ||
       checkData.transactionstatus === "SUCCESS" ||
       checkData.transactionstatus === "Successful";
+
+    const failedStatuses = [
+      "FAILED", "Failed", "Cancelled", "CANCELLED", "Expired", "EXPIRED",
+      "Declined", "DECLINED", "Rejected", "REJECTED",
+    ];
     const isFailed =
-      (checkData.code === "1" && checkData.transactionstatus === "FAILED") ||
-      checkData.transactionstatus === "Failed";
+      failedStatuses.includes(checkData.transactionstatus) ||
+      (checkData.code !== "0" && checkData.code !== 0 && checkData.code !== "1" && checkData.code !== undefined);
 
     const normalizedStatus = isSuccess ? "success" : isFailed ? "failed" : "pending";
 

@@ -53,6 +53,7 @@ const sidebarSections: SidebarSection[] = [
     items: [
       { title: "Logistique", url: "/admin/logistics", icon: Truck },
       { title: "Tarification Fret", url: "/admin/shipping", icon: DollarSign },
+      { title: "Plans de livraison", url: "/admin/delivery-plans", icon: Truck },
       { title: "Zones géographiques", url: "/admin/geography", icon: MapPin },
       { title: "Pays actifs", url: "/admin/countries", icon: Globe },
     ],
@@ -64,7 +65,12 @@ const sidebarSections: SidebarSection[] = [
       { title: "Utilisateurs", url: "/admin/users", icon: Users },
       { title: "Demandes Vendeur", url: "/admin/vendor-applications", icon: Store },
       { title: "Noms de boutique", url: "/admin/store-names", icon: PenLine },
+      { title: "Modération boutiques", url: "/admin/store-moderation", icon: ShieldCheck },
+      { title: "Transferts boutiques", url: "/admin/store-transfers", icon: ArrowLeftRight },
+      { title: "Modifications boutiques", url: "/admin/store-change-requests", icon: PenLine },
       { title: "Abonnements", url: "/admin/vendor-subscriptions", icon: Crown },
+      { title: "Plans de services", url: "/admin/service-plans", icon: DollarSign },
+      { title: "Packages services", url: "/admin/service-packages", icon: Package },
       { title: "Tarification boutiques", url: "/admin/vendor-pricing", icon: DollarSign },
       { title: "Vérification KYC", url: "/admin/kyc", icon: ShieldCheck },
       { title: "Comptabilité vendeurs", url: "/admin/vendor-accounting", icon: Receipt },
@@ -168,19 +174,15 @@ export function AdminSidebar() {
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
       <SidebarContent>
-        {/* User avatar section */}
-        <div className={cn("flex items-center gap-3 px-3 py-3 border-b border-border", collapsed && "justify-center")}>
-          {profile?.avatar_url ? (
-            <img src={profile.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 border border-border" />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <User size={16} className="text-primary" />
-            </div>
-          )}
+        {/* Logo + version */}
+        <div className={cn("flex items-center gap-2.5 px-3 py-3 border-b border-border", collapsed && "justify-center")}>
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+            <span className="text-primary-foreground font-bold text-sm">Z</span>
+          </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
-              <p className="text-[10px] text-muted-foreground truncate">{user?.email}</p>
+              <p className="text-sm font-bold text-foreground">Zandofy</p>
+              <p className="text-[10px] text-muted-foreground">v1.0.0-beta</p>
             </div>
           )}
         </div>

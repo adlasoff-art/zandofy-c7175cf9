@@ -58,6 +58,7 @@ export function Footer() {
         { label: t("footer.socialResponsibility"), to: "/social-responsibility" },
         { label: t("footer.careers"), to: "/careers" },
         { label: t("footer.blog"), to: "/blog" },
+        { label: "Tarification", to: "/pricing" },
         { label: t("footer.affiliates"), to: "/affiliate-program" },
       ],
     },
@@ -221,7 +222,7 @@ export function Footer() {
                 ))}
               </div>
             </div>
-            <p className="text-[10px]" style={{ color: ft.text_color || undefined }}>{t("footer.copyright")}</p>
+            <p className="text-[10px]" style={{ color: ft.text_color || undefined }}>{t("footer.copyright").replace(/©\s*\d{4}/, `© ${new Date().getFullYear()}`)}</p>
           </div>
         </div>
       </div>

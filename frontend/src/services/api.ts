@@ -1,6 +1,7 @@
 // Supabase-powered API service layer
 import { supabase } from "@/integrations/supabase/client";
 import { fromTable } from "@/lib/supabase-helpers";
+import { computeStoreYears } from "@/lib/store-years";
 
 export interface Product {
   id: string;
@@ -41,6 +42,7 @@ export interface Product {
   trendTagId?: string;
   // Extended properties set by mapProduct
   storeIsVerified?: boolean;
+  storeIsCertified?: boolean;
   galleryImages?: Array<{ image_url: string; position: number }>;
   promoEndDate?: string | null;
   promoStartDate?: string | null;
@@ -80,7 +82,14 @@ export interface Category {
 export function mapProduct(row: any): Product {
   const storeData = row.stores;
   const storeIsVerified = storeData?.is_verified ?? false;
-  const storeVerifiedYears = storeData?.verified_years_override ?? storeData?.verified_years ?? 0;
+  const storeIsCertified = storeData?.is_certified ?? false;
+
+  // Compute seniority: override > auto DB value > computed from created_at
+  const storeVerifiedYears = computeStoreYears(
+    storeData?.verified_years_override,
+    storeData?.verified_years,
+    storeData?.created_at
+  );
 
   const realReviewCount = row.review_count_override ?? row.review_count ?? 0;
   const realRating = Number(row.rating) || 0;
@@ -105,7 +114,7 @@ export function mapProduct(row: any): Product {
     colors: row.product_colors?.map((c: any) => c.color_hex) || [],
     sizes: row.product_sizes?.map((s: any) => s.size_label) || [],
     moq: row.moq || 1,
-    verifiedYears: storeIsVerified ? storeVerifiedYears : 0,
+    verifiedYears: storeVerifiedYears,
     originCountry: row.origin_country || "",
     sku: row.sku || "",
     material: row.material || "",
@@ -123,6 +132,7 @@ export function mapProduct(row: any): Product {
     prepDaysMax: row.prep_days_max ?? 5,
     trendTagId: row.trend_tag_id || undefined,
     storeIsVerified,
+    storeIsCertified,
     galleryImages: row.product_images || [],
     promoEndDate: row.promo_end_date || null,
     promoStartDate: row.promo_start_date || null,
@@ -141,7 +151,7 @@ const PRODUCT_SELECT = `
   product_images(image_url, position),
   product_colors(color_hex, color_name, image_url),
   product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
-  stores!products_store_id_fkey(id, name, is_verified, verified_years, verified_years_override, is_online, sales_count, sales_override, followers_count, followers_override, shop_type)
+  stores!products_store_id_fkey(id, name, is_verified, is_certified, verified_years, verified_years_override, created_at, is_online, sales_count, sales_override, followers_count, followers_override, shop_type)
 `;
 
 export async function fetchProducts(params?: {
@@ -308,7 +318,7 @@ export async function fetchProductBySlug(
     product_images(image_url, position),
     product_colors(color_hex, color_name, image_url),
     product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
-    stores!products_store_id_fkey(id, name, logo_url, is_verified, verified_years, verified_years_override, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, whatsapp_number, rating, response_rate, response_time)
+    stores!products_store_id_fkey(id, name, logo_url, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, whatsapp_number, rating, response_rate, response_time)
   `;
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);

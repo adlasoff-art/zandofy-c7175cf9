@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { compressImage } from "@/utils/image-compress";
 import { InternalChat } from "@/components/InternalChat";
 import { VendorPlatformClaimBanner } from "@/components/vendor/VendorPlatformClaimBanner";
+import { VendorStoreSwitcher } from "@/components/vendor/VendorStoreSwitcher";
 import { VendorProductManager } from "@/components/VendorProductManager";
 import { VendorFeaturedRequestTab } from "@/components/vendor/VendorFeaturedRequestTab";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -23,10 +24,11 @@ import { VendorRiderTracking } from "@/components/vendor/VendorRiderTracking";
 import { VendorTeamTab } from "@/components/vendor/VendorTeamTab";
 import { VendorPaymentNumbers } from "@/components/vendor/VendorPaymentNumbers";
 import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
+import { VendorPricingTab } from "@/components/vendor/VendorPricingTab";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
-  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck,
+  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { ACTIVE_ORDER_STATUSES, NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
@@ -58,6 +60,11 @@ interface VendorStore {
   name_change_status: string | null;
   can_create_coupons: boolean;
   collaborators_enabled: boolean;
+  is_suspended?: boolean;
+  is_banned?: boolean;
+  suspension_reason?: string | null;
+  ban_reason?: string | null;
+  suspended_activities?: string[];
 }
 
 interface OrderCounters {
@@ -69,13 +76,14 @@ interface OrderCounters {
 export default function VendorDashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [allStores, setAllStores] = useState<VendorStore[]>([]);
   const [store, setStore] = useState<VendorStore | null>(null);
   const [conversations, setConversations] = useState<VendorConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [noStore, setNoStore] = useState(false);
   const [selectedConv, setSelectedConv] = useState<VendorConversation | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "team" | "suppliers" | "settings">("catalogue");
+  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "team" | "suppliers" | "pricing" | "settings">("catalogue");
   const [orderCounters, setOrderCounters] = useState<OrderCounters>({ total: 0, in_progress: 0, delivered: 0 });
   const [suppliersEnabled, setSuppliersEnabled] = useState(false);
 
@@ -83,6 +91,7 @@ export default function VendorDashboardPage() {
   useStorePresence(store?.id);
 
   // Realtime channel ref for cleanup
+  const hasLoadedRef = useRef(false);
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
@@ -92,6 +101,10 @@ export default function VendorDashboardPage() {
 
     if (!user) {
       navigate("/auth");
+      return;
+    }
+
+    if (hasLoadedRef.current && store) {
       return;
     }
 
@@ -111,46 +124,52 @@ export default function VendorDashboardPage() {
     }
 
     async function loadVendorData() {
-      setLoading(true);
+      if (!hasLoadedRef.current) {
+        setLoading(true);
+      }
 
-      // Find store owned by user
-      const { data: storeData } = await (supabase as any)
+      // Find all stores owned by user
+      const { data: storesData } = await (supabase as any)
         .from("stores")
-        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled")
+        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, suspension_reason, ban_reason, suspended_activities")
         .eq("owner_id", user!.id)
-        .maybeSingle();
+        .order("created_at", { ascending: true });
 
-      if (!storeData) {
+      if (!storesData || storesData.length === 0) {
         setNoStore(true);
         setLoading(false);
         return;
       }
 
-      setStore(storeData);
-      storeIdForRealtime = storeData.id;
+      setAllStores(storesData);
+      // Use first store as default active store
+      const activeStore = storesData[0];
+      setStore(activeStore);
+      storeIdForRealtime = activeStore.id;
 
       // Load suppliers_enabled from vendor_pricing_overrides
       const { data: overrideData } = await (supabase as any)
         .from("vendor_pricing_overrides")
         .select("suppliers_enabled")
-        .eq("store_id", storeData.id)
+        .eq("store_id", activeStore.id)
         .maybeSingle();
       setSuppliersEnabled(overrideData?.suppliers_enabled ?? false);
 
       // Load order counters
-      await fetchOrderCounters(storeData.id);
+      await fetchOrderCounters(activeStore.id);
 
       // Load conversations for this store
       const { data: convs } = await supabase
         .from("conversations")
         .select("id, user_id, product_id, updated_at")
-        .eq("store_id", storeData.id)
+        .eq("store_id", activeStore.id)
         .order("updated_at", { ascending: false });
 
       if (!convs || convs.length === 0) {
         setConversations([]);
         setLoading(false);
-        setupRealtime(storeData.id);
+        hasLoadedRef.current = true;
+        setupRealtime(activeStore.id);
         return;
       }
 
@@ -203,7 +222,8 @@ export default function VendorDashboardPage() {
 
       setConversations(items);
       setLoading(false);
-      setupRealtime(storeData.id);
+      hasLoadedRef.current = true;
+      setupRealtime(activeStore.id);
     }
 
     function setupRealtime(storeId: string) {
@@ -289,7 +309,8 @@ export default function VendorDashboardPage() {
         realtimeChannelRef.current = null;
       }
     };
-  }, [authLoading, user, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user?.id, navigate]);
 
   const openChat = (conv: VendorConversation) => {
     setSelectedConv(conv);
@@ -332,6 +353,7 @@ export default function VendorDashboardPage() {
     { key: "disputes" as const, label: "Litiges", icon: AlertTriangle },
     { key: "featured" as const, label: "Mise en avant", icon: Sparkles },
     ...(suppliersEnabled ? [{ key: "suppliers" as const, label: "Fournisseurs", icon: Truck }] : []),
+    { key: "pricing" as const, label: "Tarification", icon: DollarSign },
     { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
     ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
     { key: "messages" as const, label: "Messages", icon: MessageCircle },
@@ -368,6 +390,7 @@ export default function VendorDashboardPage() {
       {activeTab === "disputes" && <VendorDisputesTab storeId={store!.id} />}
       {activeTab === "featured" && <VendorFeaturedRequestTab storeId={store!.id} />}
       {activeTab === "suppliers" && <VendorSuppliersTab storeId={store!.id} />}
+      {activeTab === "pricing" && <VendorPricingTab storeId={store!.id} />}
       {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
       {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
       {activeTab === "messages" && (
@@ -452,7 +475,7 @@ export default function VendorDashboardPage() {
             <div className="hidden lg:flex gap-6">
               {/* Sidebar */}
               <nav className="w-56 shrink-0">
-                <div className="sticky top-20 space-y-4">
+                <div className="sticky top-20 max-h-[calc(100vh-5rem)] overflow-y-auto space-y-4 scrollbar-thin">
                   {/* Store identity */}
                   <div className="bg-card border border-border rounded-lg p-4 text-center">
                     <div className="w-14 h-14 rounded-full bg-muted mx-auto mb-2 overflow-hidden border-2 border-border">
@@ -467,6 +490,19 @@ export default function VendorDashboardPage() {
                     <p className="text-sm font-bold text-foreground truncate">{store?.name}</p>
                     <VendorTierBadge storeId={store!.id} />
                   </div>
+
+                  {/* Store Switcher */}
+                  <VendorStoreSwitcher
+                    stores={allStores}
+                    activeStoreId={store!.id}
+                    onSwitch={(storeId) => {
+                      const target = allStores.find(s => s.id === storeId);
+                      if (target) {
+                        setStore(target);
+                        hasLoadedRef.current = false;
+                      }
+                    }}
+                  />
 
                   {/* Navigation items */}
                   <div className="bg-card border border-border rounded-lg py-1">
@@ -509,6 +545,28 @@ export default function VendorDashboardPage() {
                 {/* Platform claim banner */}
                 <VendorPlatformClaimBanner storeId={store!.id} userId={user!.id} storeName={store!.name} />
 
+                {/* Store suspension/ban banner */}
+                {store?.is_banned && (
+                  <div className="p-4 rounded-lg border border-destructive bg-destructive/5">
+                    <div className="flex items-center gap-2 text-destructive font-semibold text-sm mb-1">
+                      <Ban size={16} /> Boutique bannie
+                    </div>
+                    <p className="text-xs text-muted-foreground">{store.ban_reason || "Votre boutique a été bannie pour violation des conditions d'utilisation."}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Contactez le support pour plus d'informations.</p>
+                  </div>
+                )}
+                {store?.is_suspended && !store?.is_banned && (
+                  <div className="p-4 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/10">
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-semibold text-sm mb-1">
+                      <AlertTriangle size={16} /> Boutique suspendue
+                    </div>
+                    <p className="text-xs text-muted-foreground">{store.suspension_reason || "Certaines activités de votre boutique sont temporairement suspendues."}</p>
+                    {store.suspended_activities && store.suspended_activities.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">Activités bloquées : {store.suspended_activities.join(", ")}</p>
+                    )}
+                  </div>
+                )}
+
                 {/* KPI Widgets — always visible */}
                 <VendorSummaryWidgets store={store!} orderCounters={orderCounters} totalUnread={totalUnread} storeId={store!.id} />
 
@@ -526,11 +584,45 @@ export default function VendorDashboardPage() {
                 <h1 className="text-xl font-bold text-foreground">Tableau de bord vendeur</h1>
               </div>
 
+              {/* Mobile Store Switcher */}
+              <VendorStoreSwitcher
+                stores={allStores}
+                activeStoreId={store!.id}
+                onSwitch={(storeId) => {
+                  const target = allStores.find(s => s.id === storeId);
+                  if (target) {
+                    setStore(target);
+                    hasLoadedRef.current = false;
+                  }
+                }}
+              />
+
               {/* Summary widgets */}
               <VendorSummaryWidgets store={store!} orderCounters={orderCounters} totalUnread={totalUnread} storeId={store!.id} />
 
               {/* Platform claim banner */}
               <VendorPlatformClaimBanner storeId={store!.id} userId={user!.id} storeName={store!.name} />
+
+              {/* Store suspension/ban banner (mobile) */}
+              {store?.is_banned && (
+                <div className="p-4 rounded-lg border border-destructive bg-destructive/5">
+                  <div className="flex items-center gap-2 text-destructive font-semibold text-sm mb-1">
+                    <Ban size={16} /> Boutique bannie
+                  </div>
+                  <p className="text-xs text-muted-foreground">{store.ban_reason || "Votre boutique a été bannie pour violation des conditions d'utilisation."}</p>
+                </div>
+              )}
+              {store?.is_suspended && !store?.is_banned && (
+                <div className="p-4 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/10">
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-semibold text-sm mb-1">
+                    <AlertTriangle size={16} /> Boutique suspendue
+                  </div>
+                  <p className="text-xs text-muted-foreground">{store.suspension_reason || "Certaines activités sont temporairement suspendues."}</p>
+                  {store.suspended_activities && store.suspended_activities.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">Bloquées : {store.suspended_activities.join(", ")}</p>
+                  )}
+                </div>
+              )}
 
               {/* Horizontal scrollable tabs */}
               <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide">
@@ -882,7 +974,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
           <div className="relative h-32 rounded-lg overflow-hidden border border-border bg-muted group">
             {bannerPreview ? (
               <>
-                <img src={bannerPreview} alt="Bannière" className="w-full h-full object-cover" />
+                <img src={bannerPreview} alt="Bannière" className="w-full h-full object-contain" />
                 <div className="absolute inset-0 bg-gradient-to-t from-card/60 via-transparent to-transparent" />
               </>
             ) : (

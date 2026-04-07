@@ -12,6 +12,15 @@ export const VENDOR_TIERS = {
     color: "text-muted-foreground",
     badgeClass: "bg-muted text-muted-foreground",
   },
+  intermediate: {
+    label: "Intermediate",
+    maxProducts: 50,
+    maxCollaborators: 2,
+    maxPromos: 10,
+    features: ["Catalogue étendu (50 produits)", "Statistiques basiques", "Coupons"],
+    color: "text-emerald-500",
+    badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  },
   pro: {
     label: "Pro",
     maxProducts: 100,
@@ -23,16 +32,33 @@ export const VENDOR_TIERS = {
   },
   grand_supplier: {
     label: "Grand Supplier",
-    maxProducts: Infinity,
+    maxProducts: 1000,
     maxCollaborators: 5,
     maxPromos: 50,
-    features: ["Catalogue illimité", "Analytics avancés", "Support VIP", "Badge vérifié"],
+    features: ["Catalogue large (1000 produits)", "Analytics avancés", "Support VIP", "Badge vérifié"],
     color: "text-amber-500",
     badgeClass: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  },
+  factory: {
+    label: "Factory",
+    maxProducts: 1999,
+    maxCollaborators: 10,
+    maxPromos: 100,
+    features: ["Catalogue illimité (1999 produits)", "Analytics premium", "Support dédié", "Badge vérifié", "API access"],
+    color: "text-purple-500",
+    badgeClass: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
   },
 } as const;
 
 export type VendorTier = keyof typeof VENDOR_TIERS;
+
+/** Maps service_packages slug → vendor tier */
+export const PACKAGE_TIER_MAP: Record<string, VendorTier> = {
+  standard: "beginner",
+  pro: "intermediate",
+  premium: "pro",
+  enterprise: "grand_supplier",
+};
 
 export const PUBLISH_STATUS_CONFIG: Record<string, { label: string; badgeClass: string }> = {
   draft: { label: "Brouillon", badgeClass: "bg-muted text-muted-foreground" },

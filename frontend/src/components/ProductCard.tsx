@@ -6,8 +6,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useCompare } from "@/contexts/CompareContext";
 import { useI18n } from "@/contexts/I18nContext";
-import { VerificationBadge } from "@/components/VerificationBadge";
 import { CertificationBadge } from "@/components/CertificationBadge";
+import { formatStoreYears } from "@/lib/store-years";
 import type { Product } from "@/services/api";
 
 interface ProductCardProps {
@@ -179,14 +179,12 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
           )}
         </div>
 
-        {/* Badges row: verified + MOQ + origin */}
+        {/* Badges row: seniority + MOQ + origin */}
         <div className="flex items-center gap-2 flex-wrap min-h-[1.25rem] mt-1">
-          {(product as any).storeIsVerified && product.verifiedYears > 0 && (
-            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-certified bg-certified/10 px-1.5 py-0.5 rounded">
-              <Trophy size={9} />
-              {product.verifiedYears} {t("product.years")}
-            </span>
-          )}
+          <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-certified bg-certified/10 px-1.5 py-0.5 rounded">
+            <Trophy size={9} strokeWidth={2.5} />
+            {formatStoreYears(product.verifiedYears ?? 0)}
+          </span>
           {product.moq && product.moq > 1 && (
             <span className="text-[9px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
               MOQ: {product.moq}
@@ -214,12 +212,26 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
           <span className="text-[10px] text-muted-foreground">| {(product as any).salesCount ?? product.reviewCount} {t("product.sold")}</span>
         </div>
 
-        {/* Certification badge below rating — only if store is verified */}
-        {(product as any).storeIsVerified && product.verifiedYears > 0 && (
+        {/* Certification badge — only if store is certified */}
+        {(product as any).storeIsCertified && (
           <div className="mt-1 flex items-center gap-1">
-            <VerificationBadge variant="icon-only" verifiedYears={product.verifiedYears} />
-            {(product as any).storeIsCertified && (
-              <CertificationBadge type="vendor" variant="icon-only" />
+            <CertificationBadge type="vendor" variant="icon-only" />
+          </div>
+        )}
+
+        {/* Color swatches — small dots showing available colors */}
+        {product.colors && product.colors.length > 1 && (
+          <div className="flex items-center gap-0.5 mt-1 flex-wrap">
+            {product.colors.slice(0, 6).map((color, idx) => (
+              <span
+                key={idx}
+                className="w-2.5 h-2.5 rounded-full border border-border/60 shrink-0"
+                style={{ backgroundColor: color.toLowerCase() }}
+                title={color}
+              />
+            ))}
+            {product.colors.length > 6 && (
+              <span className="text-[8px] text-muted-foreground ml-0.5">+{product.colors.length - 6}</span>
             )}
           </div>
         )}

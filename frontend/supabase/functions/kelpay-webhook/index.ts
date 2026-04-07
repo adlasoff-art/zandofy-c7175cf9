@@ -106,10 +106,14 @@ Deno.serve(async (req) => {
       code === "0" || code === 0 ||
       transactionstatus === "SUCCESS" ||
       transactionstatus === "Successful";
+
+    const failedStatuses = [
+      "FAILED", "Failed", "Cancelled", "CANCELLED", "Expired", "EXPIRED",
+      "Declined", "DECLINED", "Rejected", "REJECTED",
+    ];
     const isFailed =
-      transactionstatus === "FAILED" ||
-      transactionstatus === "Failed" ||
-      (code !== "0" && code !== 0 && code !== "1");
+      failedStatuses.includes(transactionstatus) ||
+      (code !== "0" && code !== 0 && code !== "1" && code !== undefined && code !== null);
 
     const newStatus = isSuccess ? "success" : isFailed ? "failed" : "pending";
 

@@ -53,6 +53,9 @@ export default defineConfig(({ mode }) => {
       dedupe: [
         "react",
         "react-dom",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+        "react-dom/client",
         "react-router-dom",
         "@tanstack/react-query",
         "@radix-ui/react-context",

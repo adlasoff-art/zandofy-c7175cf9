@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { fromTable } from "@/lib/supabase-helpers";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -10,12 +12,13 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckoutShippingCalculator } from "@/components/CheckoutShippingCalculator";
+import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
 import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
 import { useI18n } from "@/contexts/I18nContext";
 import {
   CreditCard, Smartphone, Truck, ChevronRight, Check, ShieldCheck,
-  ArrowLeft, Package, MapPin, Banknote, Tag, Plus, Trash2, Home, Briefcase, X, Loader2, Coins
+  ArrowLeft, Package, MapPin, Banknote, Tag, Plus, Trash2, Home, Briefcase, X, Loader2, Coins, Upload
 } from "lucide-react";
 import { usePaymentMethods } from "@/hooks/use-payment-methods";
 import { useKycStatus } from "@/hooks/use-kyc";
@@ -102,6 +105,8 @@ export default function CheckoutPage() {
   // Delivery option (home vs hub)
   const [deliveryOption, setDeliveryOption] = useState<DeliveryOption>("none");
   const [lastMilePayment, setLastMilePayment] = useState<LastMilePayment>("pay_with_shipping");
+  const [lastMileResult, setLastMileResult] = useState<LastMileFeeResult | null>(null);
+  const [lastMileLoading, setLastMileLoading] = useState(false);
 
   // Deferred payment retry state
   const [retryPhone, setRetryPhone] = useState("");
@@ -156,6 +161,61 @@ export default function CheckoutPage() {
   const [maxTotalDiscountPct, setMaxTotalDiscountPct] = useState(20);
   const [maxPointsDiscountPct, setMaxPointsDiscountPct] = useState(10);
   const [termsAccepted, setTermsAccepted] = useState(false);
+
+  // Country/city eligibility state
+  const [countryBlocked, setCountryBlocked] = useState(false);
+  const [countryBlockMessage, setCountryBlockMessage] = useState("");
+
+  // Validate country+city against active_countries
+  const validateCountryCity = useCallback(async (country: string, city: string) => {
+    if (!country) { setCountryBlocked(false); return; }
+    const { data } = await supabase.from("platform_settings").select("value").eq("key", "active_countries").maybeSingle();
+    if (!data?.value) { setCountryBlocked(false); return; }
+    const v = data.value as any;
+    const disabled = Array.isArray(v.disabled) ? v.disabled : [];
+    const cities = v.cities || {};
+    if (disabled.includes(country)) {
+      setCountryBlocked(true);
+      setCountryBlockMessage("Ce pays n'est pas encore desservi. Nous travaillons à étendre notre couverture.");
+      return;
+    }
+    const allowedCities = cities[country];
+    if (allowedCities && Array.isArray(allowedCities) && allowedCities.length > 0 && city) {
+      const cityNorm = city.toLowerCase().trim();
+      if (!allowedCities.some((c: string) => c.toLowerCase().trim() === cityNorm)) {
+        setCountryBlocked(true);
+        setCountryBlockMessage(`La ville "${city}" n'est pas encore desservie dans ce pays. Nous travaillons à étendre notre couverture.`);
+        return;
+      }
+    }
+    setCountryBlocked(false);
+  }, []);
+
+  useEffect(() => {
+    validateCountryCity(shipping.country, shipping.city);
+  }, [shipping.country, shipping.city, validateCountryCity]);
+
+  const { data: clientDeliverySub } = useQuery({
+    queryKey: ["client-delivery-sub-checkout", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data } = await fromTable("store_package_subscriptions")
+        .select("*, service_packages(name)")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .gt("paid_until", new Date().toISOString())
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 60 * 1000,
+  });
+
+  const hasActiveDeliverySub = !!clientDeliverySub;
+  const deliverySubName = (clientDeliverySub as any)?.service_packages?.name || "Livraison";
+  const deliverySubExpiry = clientDeliverySub?.paid_until
+    ? new Date(clientDeliverySub.paid_until as string).toLocaleDateString("fr-FR")
+    : "";
 
   useEffect(() => {
     if (!user) return;
@@ -275,11 +335,27 @@ export default function CheckoutPage() {
 
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
-  // Last-mile fee removed from checkout — calculated at hub arrival stage
-  const lastMileFee = 0;
-  const effectiveLastMile = 0;
+  // Last-mile fee calculation — waived if client has active delivery subscription
+  const rawLastMileFee = deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
+  const lastMileFee = hasActiveDeliverySub ? 0 : rawLastMileFee;
+  const effectiveLastMile = deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping" ? lastMileFee : 0;
   
-  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping);
+  const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping + effectiveLastMile);
+
+  // Recalculate last-mile fee when address or delivery option changes
+  useEffect(() => {
+    if (deliveryOption !== "home_delivery" || !shipping.commune || !shipping.city) {
+      setLastMileResult(null);
+      return;
+    }
+    setLastMileLoading(true);
+    calculateLastMileFee(shipping.commune, shipping.quartier, shipping.city, shipping.country)
+      .then(result => {
+        setLastMileResult(result);
+        setLastMileLoading(false);
+      })
+      .catch(() => setLastMileLoading(false));
+  }, [deliveryOption, shipping.commune, shipping.quartier, shipping.city, shipping.country]);
 
   // Load saved addresses
   useEffect(() => {
@@ -457,6 +533,7 @@ export default function CheckoutPage() {
     );
   }
 
+
   const handleShippingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const required = ["firstName", "lastName", "phone", "address", "city", "country"] as const;
@@ -465,6 +542,11 @@ export default function CheckoutPage() {
         toast({ title: t("checkout.requiredField"), description: t("checkout.fillRequired"), variant: "destructive" });
         return;
       }
+    }
+
+    if (countryBlocked) {
+      toast({ title: "Zone non desservie", description: countryBlockMessage, variant: "destructive" });
+      return;
     }
 
     // Save address if checked
@@ -528,7 +610,9 @@ export default function CheckoutPage() {
       const orderDiscount = preciseRound(discountAmount * ratio, 2);
       const orderPointsDiscount = preciseRound(pointsDiscount * ratio, 2);
       
-      const effectiveShip = shippingPaymentChoice === "pay_on_arrival" ? 0 : orderShippingCost;
+      // Off-platform: ONLY product amount is charged. Shipping & delivery are always deferred.
+      const isOffPlatform = paymentMethod === "off_platform";
+      const effectiveShip = (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform) ? 0 : orderShippingCost;
       const orderTotal = Math.max(0, preciseRound(orderSubtotal - orderDiscount - orderPointsDiscount + effectiveShip, 2));
       
       // Unique order_ref per sub-order (suffix A, B, C...)
@@ -558,11 +642,12 @@ export default function CheckoutPage() {
           order_ref: orderRef,
           coupon_code: appliedCoupon?.code || null,
           discount_amount: orderDiscount,
-          shipping_payment_status: shippingPaymentChoice === "pay_on_arrival" ? "deferred" : "paid",
+          // Off-platform: force all logistics payments to deferred
+          shipping_payment_status: (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform) ? "deferred" : "paid",
           delivery_choice: deliveryOption !== "none" ? deliveryOption : null,
-          last_mile_fee: 0,
-          last_mile_payment_method: null,
-          last_mile_payment_status: null,
+          last_mile_fee: deliveryOption === "home_delivery" ? lastMileFee : 0,
+          last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
+          last_mile_payment_status: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? "deferred" : (lastMilePayment === "pay_with_shipping" ? "paid" : "deferred")) : null,
         } as any)
         .select("id")
         .single();
@@ -694,18 +779,34 @@ export default function CheckoutPage() {
 
         paymentChannelRef.current = channel;
 
-        // Auto-check after 60 seconds if callback hasn't arrived
-        setTimeout(async () => {
-          if (paymentChannelRef.current) {
-            try {
-              await supabase.functions.invoke("kelpay-check", {
-                body: { transaction_id: data.transaction_id },
-              });
-            } catch (e) {
-              console.error("Auto-check failed:", e);
+        // Auto-timeout after 3 minutes
+        const paymentTimeoutId = setTimeout(async () => {
+          if (!paymentChannelRef.current) return;
+          try {
+            const { data: checkData } = await supabase.functions.invoke("kelpay-check", {
+              body: { transaction_id: data.transaction_id, reference: data.reference },
+            });
+            if (checkData?.status === "success") {
+              await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
+              setPaymentPending(false);
+              await removeSelectedItems();
+              setStep("confirmation");
+              toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
+            } else {
+              // Timeout reached — mark as failed
+              await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", orderIds).eq("status", "awaiting_payment");
+              setPaymentPending(false);
+              toast({ title: "Délai expiré", description: "Le paiement n'a pas été confirmé dans les 3 minutes. Veuillez réessayer.", variant: "destructive" });
             }
+          } catch {
+            setPaymentPending(false);
+            toast({ title: "Délai expiré", description: "Impossible de vérifier le paiement. Veuillez réessayer.", variant: "destructive" });
           }
-        }, 60000);
+          if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
+        }, 180000); // 3 minutes
+
+        // Store timeout for cleanup
+        (paymentChannelRef as any)._timeoutId = paymentTimeoutId;
 
       } catch (err: any) {
         toast({ title: "Erreur", description: err.message || "Erreur inattendue.", variant: "destructive" });
@@ -789,12 +890,13 @@ export default function CheckoutPage() {
   };
 
   const handleCheckPaymentStatus = async () => {
-    if (!paymentTransactionId) return;
+    if (!paymentTransactionId && !paymentReference) return;
     try {
       const { data } = await supabase.functions.invoke("kelpay-check", {
-        body: { transaction_id: paymentTransactionId },
+        body: { transaction_id: paymentTransactionId, reference: paymentReference },
       });
-      if (data?.transactionstatus === "SUCCESS") {
+      if (data?.status === "success") {
+        if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
         if (paymentOrderIds.length > 0) {
           await supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
         }
@@ -802,7 +904,8 @@ export default function CheckoutPage() {
         await removeSelectedItems();
         setStep("confirmation");
         toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderId}` });
-      } else if (data?.transactionstatus === "FAILED") {
+      } else if (data?.status === "failed") {
+        if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
         if (paymentOrderIds.length > 0) {
           await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds);
         }
@@ -814,6 +917,17 @@ export default function CheckoutPage() {
     } catch {
       toast({ title: "Erreur", description: "Impossible de vérifier le statut.", variant: "destructive" });
     }
+  };
+
+  const handleCancelPaymentWait = async () => {
+    if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
+    if (paymentOrderIds.length > 0) {
+      await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
+    }
+    setPaymentPending(false);
+    setPaymentTransactionId(null);
+    setPaymentReference(null);
+    toast({ title: "Paiement annulé", description: "Vous pouvez réessayer avec un autre moyen de paiement.", variant: "destructive" });
   };
 
   const updateField = (field: keyof ShippingInfo, value: string) =>
@@ -957,7 +1071,14 @@ export default function CheckoutPage() {
                         }}
                       />
 
-                      {/* Save address checkbox */}
+                      {/* Country/city blocked warning */}
+                      {countryBlocked && (
+                        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+                          <p className="font-medium">⚠️ Zone non desservie</p>
+                          <p className="text-xs mt-1">{countryBlockMessage}</p>
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-3 pt-2 border-t border-border">
                         <input
                           type="checkbox"
@@ -1016,23 +1137,26 @@ export default function CheckoutPage() {
                   )}
 
                   {/* Delivery option: home vs hub */}
-                  <div className="pt-3 border-t border-border space-y-2">
+                   <div className="pt-3 border-t border-border space-y-2">
                     <p className="text-sm font-medium text-foreground flex items-center gap-2">
                       <Home size={14} className="text-primary" /> Option de livraison
                     </p>
                     <div className="space-y-2">
                       {[
-                        { key: "home_delivery" as DeliveryOption, label: "🚚 Livraison à domicile", desc: "Recevez votre colis directement chez vous — rapide et sans effort !" },
-                        { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait au Hub", desc: "Récupérez votre colis au point de collecte (gratuit)" },
+                        { key: "home_delivery" as DeliveryOption, label: "🚚 Livraison à domicile", desc: lastMileLoading ? "Calcul en cours..." : lastMileResult && lastMileResult.fee > 0 ? `Frais estimés : $${lastMileResult.fee.toFixed(2)}` : "Recevez votre colis directement chez vous", disabled: lastMileResult ? !lastMileResult.deliverable : false },
+                        { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait au Hub", desc: "Récupérez votre colis au point de collecte (gratuit)", disabled: false },
                       ].map(opt => (
                         <button
                           key={opt.key}
                           type="button"
-                          onClick={() => setDeliveryOption(opt.key)}
+                          disabled={opt.disabled}
+                          onClick={() => !opt.disabled && setDeliveryOption(opt.key)}
                           className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${
-                            deliveryOption === opt.key
-                              ? "border-primary bg-secondary"
-                              : "border-border hover:border-primary/50"
+                            opt.disabled
+                              ? "border-border bg-muted/40 opacity-60 cursor-not-allowed"
+                              : deliveryOption === opt.key
+                                ? "border-primary bg-secondary"
+                                : "border-border hover:border-primary/50"
                           }`}
                         >
                           <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
@@ -1048,7 +1172,55 @@ export default function CheckoutPage() {
                       ))}
                     </div>
 
-                    {/* Last-mile choice deferred to hub arrival — no payment option at checkout */}
+                    {/* Zone not deliverable warning */}
+                    {lastMileResult && !lastMileResult.deliverable && deliveryOption === "home_delivery" && (
+                      <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded">
+                        ⚠️ Livraison non disponible dans votre zone{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}. Veuillez choisir le retrait au Hub.
+                      </p>
+                    )}
+
+                    {/* Active delivery subscription banner */}
+                    {deliveryOption === "home_delivery" && hasActiveDeliverySub && lastMileResult?.deliverable && (
+                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mt-2">
+                        <p className="text-xs font-medium text-primary">
+                          ✅ Votre forfait <strong>{deliverySubName}</strong> est actif jusqu'au {deliverySubExpiry}. Livraison à domicile sans frais supplémentaires.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Last-mile payment choice */}
+                    {deliveryOption === "home_delivery" && lastMileResult?.deliverable && lastMileFee > 0 && !hasActiveDeliverySub && (
+                      <div className="bg-muted/50 rounded-lg p-3 space-y-2 mt-2">
+                        <p className="text-xs font-medium text-foreground">Paiement de la livraison locale : ${lastMileFee.toFixed(2)}</p>
+                        <div className="space-y-1.5">
+                          {[
+                            { key: "pay_with_shipping" as LastMilePayment, label: "Inclure dans le total", desc: `Ajouter $${lastMileFee.toFixed(2)} au paiement` },
+                            { key: "pay_cash_on_delivery" as LastMilePayment, label: "Payer à la réception", desc: "Régler au livreur à la livraison" },
+                          ].map(opt => (
+                            <button
+                              key={opt.key}
+                              type="button"
+                              onClick={() => setLastMilePayment(opt.key)}
+                              className={`w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left ${
+                                lastMilePayment === opt.key
+                                  ? "border-primary bg-secondary"
+                                  : "border-border hover:border-primary/50"
+                              }`}
+                            >
+                              <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                lastMilePayment === opt.key ? "border-primary" : "border-border"
+                              }`}>
+                                {lastMilePayment === opt.key && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-foreground">{opt.label}</p>
+                                <p className="text-[10px] text-muted-foreground">{opt.desc}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <Button type="submit" className="w-full h-12 font-bold mt-2">
@@ -1170,6 +1342,9 @@ export default function CheckoutPage() {
                     </div>
                     <Button variant="outline" onClick={handleCheckPaymentStatus} className="w-full">
                       <ShieldCheck size={14} className="mr-2" /> Vérifier le statut du paiement
+                    </Button>
+                    <Button variant="destructive" onClick={handleCancelPaymentWait} className="w-full">
+                      <X size={14} className="mr-2" /> Annuler l'attente
                     </Button>
 
                     {/* Retry with different number */}
@@ -1354,17 +1529,35 @@ export default function CheckoutPage() {
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
                   <Check size={32} className="text-primary" />
                 </div>
-                <h2 className="text-2xl font-bold text-foreground">{t("checkout.orderConfirmed")}</h2>
+                <h2 className="text-2xl font-bold text-foreground">
+                  {paymentMethod === "off_platform" ? "Commande enregistrée" : t("checkout.orderConfirmed")}
+                </h2>
                 <p className="text-muted-foreground">
                   {t("checkout.orderRef")} : <span className="font-bold text-foreground">{orderId}</span>
                 </p>
+                {paymentMethod === "off_platform" && (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4 text-left space-y-2">
+                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">⏳ Paiement en attente</p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      Votre commande est enregistrée mais en attente de preuve de paiement. 
+                      Rendez-vous dans votre espace client pour uploader la preuve de paiement du produit.
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      <strong>Note :</strong> Les frais d'expédition et de livraison seront à régler séparément depuis votre espace commande.
+                    </p>
+                  </div>
+                )}
                 {appliedCoupon && (
                   <p className="text-sm text-primary font-medium">
                     {t("checkout.promoCode")} {appliedCoupon.code} — -${discountAmount.toFixed(2)}
                   </p>
                 )}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-                  <Link to="/"><Button>{t("checkout.backHome")}</Button></Link>
+                  {paymentMethod === "off_platform" ? (
+                    <Link to="/dashboard"><Button className="gap-2"><Upload size={14} /> Terminer ma commande</Button></Link>
+                  ) : (
+                    <Link to="/"><Button>{t("checkout.backHome")}</Button></Link>
+                  )}
                   <Link to="/dashboard"><Button variant="outline">{t("checkout.trackOrder")}</Button></Link>
                 </div>
               </div>
@@ -1527,7 +1720,22 @@ export default function CheckoutPage() {
                       </span>
                     )}
                   </div>
-                  {/* Last-mile fee shown at hub arrival, not checkout */}
+                  {deliveryOption === "home_delivery" && hasActiveDeliverySub && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Livraison locale</span>
+                      <span className="text-primary font-medium text-xs">Incluse (forfait {deliverySubName})</span>
+                    </div>
+                  )}
+                  {deliveryOption === "home_delivery" && lastMileFee > 0 && !hasActiveDeliverySub && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Livraison locale</span>
+                      {lastMilePayment === "pay_cash_on_delivery" ? (
+                        <span className="text-amber-600 font-medium text-xs">${lastMileFee.toFixed(2)} — à la réception</span>
+                      ) : (
+                        <span className="text-foreground">${lastMileFee.toFixed(2)}</span>
+                      )}
+                    </div>
+                  )}
                   {deliveryOption === "hub_pickup" && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Livraison</span>

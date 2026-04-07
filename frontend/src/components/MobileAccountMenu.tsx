@@ -68,6 +68,7 @@ export function MobileAccountMenu() {
       items: [
         { to: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
         { to: "/dashboard?tab=orders", icon: FileText, label: "Mes commandes" },
+        { to: "/dashboard?tab=subscriptions", icon: Award, label: "Mes abonnements" },
         { to: "/wishlist", icon: Heart, label: "Liste de souhaits" },
         { to: "/messages", icon: MessageSquare, label: "Messages" },
       ],
@@ -86,6 +87,12 @@ export function MobileAccountMenu() {
         { to: "/dashboard?tab=returns", icon: RotateCcw, label: "Retours" },
       ],
     },
+    ...(!isVendor ? [{
+      title: "Opportunités",
+      items: [
+        { to: "/become-vendor", icon: Store, label: "Devenir vendeur" },
+      ],
+    }] : []),
     {
       title: "Paramètres du compte",
       items: [
