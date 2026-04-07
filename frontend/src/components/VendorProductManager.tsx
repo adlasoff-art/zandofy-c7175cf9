@@ -89,6 +89,7 @@ const EMPTY_FORM = {
   category_id: "" as string,
   trend_tag_id: "" as string,
   supplier_id: "" as string,
+  supplier_product_id: "" as string,
   flash_timer_enabled: false,
   promo_start_date: "",
   promo_end_date: "",
@@ -127,6 +128,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierProductOptions, setSupplierProductOptions] = useState<SupplierProductOption[]>([]);
   const [trendTags, setTrendTags] = useState<{ id: string; name_fr: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Product | null>(null);
