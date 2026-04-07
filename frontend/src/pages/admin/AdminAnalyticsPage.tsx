@@ -253,17 +253,23 @@ function ProductTrackingTab({ period, since }: { period: string; since: string |
   const [page, setPage] = useState(0);
   const [sortBy, setSortBy] = useState<SortField>("clicks");
 
-  // 1) All products (name + image)
+  // 1) All products (name + first image)
   const { data: allProducts } = useQuery({
     queryKey: ["analytics-products-list"],
     queryFn: async () => {
       const { data } = await supabase
         .from("products")
-        .select("id, name, images, store_id")
-        .eq("status", "active")
+        .select("id, name, store_id, product_images(image_url, position)")
+        .eq("publish_status", "published")
         .order("created_at", { ascending: false })
         .limit(5000);
-      return data || [];
+      return (data || []).map((p: any) => ({
+        id: p.id as string,
+        name: p.name as string,
+        image: Array.isArray(p.product_images) && p.product_images.length > 0
+          ? (p.product_images as any[]).sort((a: any, b: any) => (a.position || 0) - (b.position || 0))[0]?.image_url || null
+          : null,
+      }));
     },
     staleTime: 5 * 60_000,
   });
