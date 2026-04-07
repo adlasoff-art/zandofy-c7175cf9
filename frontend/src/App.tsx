@@ -138,7 +138,7 @@ function AnalyticsTrackerInjector() {
   useAnalyticsTracker();
   const { user } = useAuth();
   // Track PWA presence on every session (persists across updates)
-  React.useEffect(() => {
+  useEffect(() => {
     trackPWAPresence(user?.id);
   }, [user?.id]);
   return null;
