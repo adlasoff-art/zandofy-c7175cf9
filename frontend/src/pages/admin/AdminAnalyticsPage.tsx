@@ -548,7 +548,7 @@ export default function AdminAnalyticsPage() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="overview">
-              <OverviewTab events={events || []} period={period} />
+              <OverviewTab events={events || []} period={period} persistentPwaCount={0} />
             </TabsContent>
             <TabsContent value="products">
               <ProductTrackingTab period={period} since={since} />
