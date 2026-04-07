@@ -347,7 +347,7 @@ function ProductTrackingTab({ period, since }: { period: string; since: string |
     return allProducts.map((p) => ({
       id: p.id,
       name: p.name,
-      image: Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null,
+      image: p.image,
       clicks: clickMap.get(p.id) || 0,
       favorites: wishMap.get(p.id) || 0,
       cart_adds: cartMap.get(p.id) || 0,
