@@ -69,13 +69,13 @@ export function useAutoStorePresence() {
 
     const heartbeatAll = async () => {
       for (const sid of storeIdsRef.current) {
-        (supabase.rpc as any)("update_store_presence", { p_store_id: sid }).catch(() => {});
+        (supabase.rpc as any)("update_store_presence", { p_store_id: sid }).then(() => {}, () => {});
       }
     };
 
     const goOfflineAll = () => {
       for (const sid of storeIdsRef.current) {
-        (supabase.rpc as any)("set_store_offline", { p_store_id: sid }).catch(() => {});
+        (supabase.rpc as any)("set_store_offline", { p_store_id: sid }).then(() => {}, () => {});
       }
     };
 

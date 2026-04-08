@@ -103,9 +103,34 @@ export default function ProductPage() {
   });
 
   const { data: relatedProducts } = useQuery({
-    queryKey: ["related-products"],
-    queryFn: () => fetchProducts({ limit: 20 }),
-    enabled: !!product,
+    queryKey: ["related-products", product?.categoryId],
+    queryFn: async () => {
+      if (!product?.categoryId) return [];
+      // First try: products in same subcategory
+      let results = await fetchProducts({ categoryId: product.categoryId, limit: 12 });
+      results = results.filter(p => p.id !== product.id);
+      // Fallback: if < 6 results, try parent category
+      if (results.length < 6 && product.categoryFr) {
+        // Get parent category id
+        const { data: cat } = await supabase
+          .from("categories")
+          .select("parent_id")
+          .eq("id", product.categoryId)
+          .maybeSingle();
+        if (cat?.parent_id) {
+          const parentResults = await fetchProducts({ categoryId: cat.parent_id, limit: 12 });
+          const existingIds = new Set(results.map(r => r.id));
+          existingIds.add(product.id);
+          for (const pr of parentResults) {
+            if (!existingIds.has(pr.id) && results.length < 6) {
+              results.push(pr);
+            }
+          }
+        }
+      }
+      return results.slice(0, 6);
+    },
+    enabled: !!product?.categoryId,
   });
 
   const { data: pricingTiersRaw } = useQuery({
@@ -388,19 +413,24 @@ export default function ProductPage() {
               </div>
 
               {/* Related products mini-grid (upsells) */}
-              {relatedProducts && relatedProducts.filter(p => p.id !== product.id).length > 0 && (
+              {relatedProducts && relatedProducts.length > 0 && (
                 <div className="border border-border rounded-sm p-4 space-y-2">
                   <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     💡 Articles similaires
                   </h3>
                   <div className="grid grid-cols-3 gap-2">
-                    {relatedProducts.filter(p => p.id !== product.id).slice(0, 6).map((p) => (
+                    {relatedProducts.slice(0, 6).map((p) => (
                       <Link to={`/product/${(p as any).slug || p.id}`} key={p.id} className="group">
                         <div className="aspect-square rounded-sm overflow-hidden bg-muted">
                           <img src={p.image} alt={p.nameFr} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                         </div>
                         <p className="text-xs text-foreground mt-1 truncate">{p.nameFr}</p>
-                        <p className="text-xs font-semibold text-primary">${p.price.toFixed(2)}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-semibold text-primary">${p.price.toFixed(2)}</p>
+                          {(p.salesCount ?? 0) > 0 && (
+                            <span className="text-[10px] text-muted-foreground">{p.salesCount} vendus</span>
+                          )}
+                        </div>
                       </Link>
                     ))}
                   </div>
