@@ -120,9 +120,11 @@ export default function CheckoutPage() {
   const [paymentTransactionId, setPaymentTransactionId] = useState<string | null>(null);
   const [paymentReference, setPaymentReference] = useState<string | null>(null);
   const [paymentOrderIds, setPaymentOrderIds] = useState<string[]>([]);
-  const [vendorCodAllowed, setVendorCodAllowed] = useState(false);
-  const [vendorOffPlatformAllowed, setVendorOffPlatformAllowed] = useState(false);
-  const [cartStoreIds, setCartStoreIds] = useState<string[]>([]);
+   const [vendorCodAllowed, setVendorCodAllowed] = useState(false);
+   const [vendorOffPlatformAllowed, setVendorOffPlatformAllowed] = useState(false);
+   const [vendorMobileMoneyAllowed, setVendorMobileMoneyAllowed] = useState(true);
+   const [vendorCardAllowed, setVendorCardAllowed] = useState(true);
+   const [cartStoreIds, setCartStoreIds] = useState<string[]>([]);
   const paymentChannelRef = useRef<any>(null);
   const { data: paymentNumbers = [] } = useStorePaymentNumbers(cartStoreIds);
 
@@ -274,7 +276,7 @@ export default function CheckoutPage() {
 
       const { data: overrides } = await (supabase as any)
         .from("vendor_pricing_overrides")
-        .select("store_id, vendor_cod_enabled, vendor_off_platform_enabled")
+        .select("store_id, vendor_cod_enabled, vendor_off_platform_enabled, vendor_mobile_money_enabled, vendor_card_enabled")
         .in("store_id", storeIds);
 
       const codMap = new Map((overrides || []).map((override: any) => [override.store_id, !!override.vendor_cod_enabled]));
@@ -282,6 +284,12 @@ export default function CheckoutPage() {
 
       const offPlatformMap = new Map((overrides || []).map((override: any) => [override.store_id, !!override.vendor_off_platform_enabled]));
       setVendorOffPlatformAllowed(storeIds.every((storeId) => offPlatformMap.get(storeId) === true));
+
+      const mobileMoneyMap = new Map((overrides || []).map((override: any) => [override.store_id, override.vendor_mobile_money_enabled !== false]));
+      setVendorMobileMoneyAllowed(storeIds.every((storeId) => mobileMoneyMap.get(storeId) !== false));
+
+      const cardMap = new Map((overrides || []).map((override: any) => [override.store_id, override.vendor_card_enabled !== false]));
+      setVendorCardAllowed(storeIds.every((storeId) => cardMap.get(storeId) !== false));
     };
 
     void loadVendorCodEligibility();
