@@ -101,19 +101,28 @@ export function CheckoutShippingCalculator({
         const maxPrepMax = Math.max(...data.map((d: any) => d.prep_days_max ?? 5));
         setPrepDays({ min: maxPrepMin, max: maxPrepMax });
 
-        // Check if first product's store is local
+        // Check if first product's store is local (by shop_type or vendor_mode override)
         const firstStoreId = data[0]?.store_id;
         if (firstStoreId) {
-          supabase
-            .from("stores")
-            .select("shop_type, default_transit_days_min, default_transit_days_max")
-            .eq("id", firstStoreId)
-            .maybeSingle()
-            .then(({ data: store }) => {
-              if (store) {
-                setIsLocalStore((store as any).shop_type === "local");
-              }
-            });
+          Promise.all([
+            supabase
+              .from("stores")
+              .select("shop_type, default_transit_days_min, default_transit_days_max")
+              .eq("id", firstStoreId)
+              .maybeSingle(),
+            (supabase as any)
+              .from("vendor_pricing_overrides")
+              .select("vendor_mode")
+              .eq("store_id", firstStoreId)
+              .maybeSingle(),
+          ]).then(([storeRes, overrideRes]: any[]) => {
+            const store = storeRes.data;
+            const override = overrideRes.data;
+            if (store) {
+              const isLocal = (store as any).shop_type === "local" || override?.vendor_mode === "local_only";
+              setIsLocalStore(isLocal);
+            }
+          });
         }
       });
   }, [cartItems]);
