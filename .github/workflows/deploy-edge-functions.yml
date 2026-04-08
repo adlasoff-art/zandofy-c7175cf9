@@ -20,18 +20,34 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy
+      # ── Develop ──
+      - name: Deploy to Staging (develop)
+        if: github.ref == 'refs/heads/develop'
         working-directory: frontend
         env:
-          # Ici, on choisit les bonnes valeurs selon la branche
-          PROJECT_ID: ${{ github.ref == 'refs/heads/main' && secrets.PRODUCTION_PROJECT_ID || secrets.SUPABASE_PROJECT_ID }}
-          DB_PASS: ${{ github.ref == 'refs/heads/main' && secrets.PRODUCTION_DB_PASSWORD || secrets.SUPABASE_DB_PASSWORD }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
+          DB_PASS: ${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          if [ -z "$PROJECT_ID" ]; then
-            echo "ERREUR : L'ID du projet est vide. Vérifiez vos Secrets GitHub."
-            exit 1
-          fi
-          # On lie le projet et on déploie
-          supabase link --project-ref "$PROJECT_ID" --password "$DB_PASS" --yes
+          echo "▶ Environnement : STAGING (develop)"
+          if [ -z "$PROJECT_REF" ]; then echo "❌ SUPABASE_PROJECT_ID est vide"; exit 1; fi
+          if [ -z "$DB_PASS" ]; then echo "❌ SUPABASE_DB_PASSWORD est vide"; exit 1; fi
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then echo "❌ SUPABASE_ACCESS_TOKEN est vide"; exit 1; fi
+          supabase link --project-ref "$PROJECT_REF" --password "$DB_PASS" --yes
+          supabase functions deploy --all --no-verify-jwt
+
+      # ── Main ──
+      - name: Deploy to Production (main)
+        if: github.ref == 'refs/heads/main'
+        working-directory: frontend
+        env:
+          PROJECT_REF: ${{ secrets.PRODUCTION_PROJECT_ID }}
+          DB_PASS: ${{ secrets.PRODUCTION_DB_PASSWORD }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          echo "▶ Environnement : PRODUCTION (main)"
+          if [ -z "$PROJECT_REF" ]; then echo "❌ PRODUCTION_PROJECT_ID est vide"; exit 1; fi
+          if [ -z "$DB_PASS" ]; then echo "❌ PRODUCTION_DB_PASSWORD est vide"; exit 1; fi
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then echo "❌ SUPABASE_ACCESS_TOKEN est vide"; exit 1; fi
+          supabase link --project-ref "$PROJECT_REF" --password "$DB_PASS" --yes
           supabase functions deploy --all --no-verify-jwt
