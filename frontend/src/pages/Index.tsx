@@ -12,6 +12,7 @@ import { Footer } from "@/components/Footer";
 import { FloatingActions } from "@/components/FloatingActions";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { SEOHead } from "@/components/SEOHead";
+import { useSeoConfig } from "@/hooks/use-seo-config";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
