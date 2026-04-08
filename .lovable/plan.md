@@ -1,40 +1,50 @@
 
+Plan de correction rapide
 
-# Diagnostic : Sélecteur de produit fournisseur
+1. Ce que j’ai vérifié
+- Le workflow actif est `.github/workflows/deploy-edge-functions.yml`.
+- Il déploie depuis `frontend/` et utilise `frontend/supabase/config.toml`.
+- Le repo contient aussi un deuxième dossier `supabase/` à la racine, différent de `frontend/supabase/`.
 
-## Constat
+2. Diagnostic le plus probable
+- L’erreur actuelle arrive avant le vrai déploiement, au moment de `supabase link`, parce que `--project-ref` reçoit une valeur vide.
+- Le problème n’est probablement pas la casse des noms de secrets : GitHub normalise les noms en majuscules et les références sont tolérantes à la casse.
+- Le point fragile est surtout l’expression inline actuelle dans le YAML pour choisir les secrets selon la branche.
+- Le mot de passe DB n’est pas la cause de cette erreur précise : si `project-ref` est vide, l’échec se produit avant même que le mot de passe serve réellement.
 
-Le code dans `VendorProductManager.tsx` (lignes 728-751) contient **déjà** un sélecteur "📦 Produit du fournisseur" qui :
-- Se charge quand un fournisseur est sélectionné
-- Affiche les produits du fournisseur dans un dropdown
-- Sauvegarde le `supplier_product_id` dans la table `products`
-- Affiche une preview avec image et label du produit sélectionné
+3. Correctif que je propose
+- Modifier uniquement `.github/workflows/deploy-edge-functions.yml`.
+- Remplacer le step unique actuel par 2 steps explicites, un pour `develop`, un pour `main`, avec les secrets appelés directement sans logique compacte `&& ||`.
 
-## Hypothèse du bug
+```text
+develop -> SUPABASE_PROJECT_ID + SUPABASE_DB_PASSWORD
+main    -> PRODUCTION_PROJECT_ID + PRODUCTION_DB_PASSWORD
+```
 
-Le sélecteur est conditionné par `supplierProductOptions.length > 0` (ligne 729). Si les produits fournisseur ne sont pas correctement enregistrés dans la table `supplier_products`, le dropdown ne s'affiche jamais — ce qui donne l'impression que la fonctionnalité n'existe pas.
+- Ajouter un pré-contrôle non sensible dans le workflow :
+  - vérifier que `PROJECT_REF` existe
+  - vérifier que `DB_PASS` existe
+  - vérifier que `SUPABASE_ACCESS_TOKEN` existe
+  - afficher seulement la branche cible et l’environnement choisi, jamais les secrets
 
-## Actions prévues
+4. Pourquoi cette approche est la bonne
+- Elle supprime l’ambiguïté de l’expression actuelle.
+- Elle rend le log GitHub beaucoup plus clair : on saura immédiatement si le run est “develop” ou “main”.
+- Elle respecte votre architecture actuelle sans toucher aux variables, à Docker, ni au reste du déploiement.
 
-### 1. Améliorer la visibilité du sélecteur produit
-- Toujours afficher la section "📦 Produit du fournisseur" quand un fournisseur est sélectionné, même si aucun produit n'existe
-- Si aucun produit : afficher un message "Ce fournisseur n'a aucun produit enregistré — ajoutez-en depuis l'onglet Fournisseurs"
-- Ajouter un indicateur de chargement pendant le fetch des produits
+5. Point important que je corrigerai aussi mentalement dans le repo
+- Le workflow déploie `frontend/supabase/**`, pas `supabase/**` à la racine.
+- Donc pour les prochains tests automatiques, les changements de fonctions doivent être faits dans `frontend/supabase/functions/`, sinon cela crée de la confusion.
 
-### 2. Améliorer le rendu du sélecteur
-- Remplacer le `<select>` basique par un sélecteur enrichi montrant pour chaque produit : **image miniature + label + lien**
-- Afficher les produits sous forme de cartes cliquables au lieu d'un simple dropdown, pour une meilleure expérience visuelle
+6. Validation prévue après patch
+- Lancer un `workflow_dispatch` sur `develop`
+- Vérifier que le job passe le pré-contrôle et ne tombe plus sur `flag needs an argument: --project-ref`
+- Faire ensuite un mini changement sans impact dans `frontend/supabase/functions/**` pour confirmer le déclenchement automatique
+- Si un échec subsiste après ça, on saura que ce ne sera plus un problème de `project-ref`, mais possiblement de mot de passe DB, de lien projet, ou d’une fonction spécifique
 
-### 3. Vérifier la sauvegarde des produits fournisseur
-- Auditer que les produits ajoutés dans `VendorSuppliersTab` sont correctement persistés dans `supplier_products` avec le bon `supplier_id`
-
-## Fichiers impactés
-
-| Fichier | Modification |
-|---|---|
-| `frontend/src/components/VendorProductManager.tsx` | Améliorer le sélecteur de produit fournisseur : toujours visible, cartes visuelles, message si vide, loader |
-
-## Résumé technique
-
-Pas de migration SQL nécessaire — les tables et colonnes (`supplier_products`, `products.supplier_product_id`) existent déjà. C'est une amélioration purement UI/UX du formulaire produit.
-
+Détails techniques
+- Fichier à modifier : `.github/workflows/deploy-edge-functions.yml`
+- Aucun changement DB
+- Aucun changement frontend
+- Aucun renommage de secret requis
+- Nettoyage optionnel ensuite : harmoniser à terme `supabase/` racine vs `frontend/supabase/` pour éviter les faux diagnostics
