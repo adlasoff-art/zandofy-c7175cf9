@@ -163,6 +163,7 @@ interface ProfileData {
   residence_city: string;
   residence_country: string;
   residence_province: string;
+  residence_province_id: string;
   residence_commune: string;
   residence_quartier: string;
   preferred_language: string;
