@@ -1677,6 +1677,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           residence_quartier: d.residence_quartier || "",
           preferred_language: d.preferred_language || "fr",
           preferred_contact_channel: d.preferred_contact_channel || "chat",
+          allowed_channels: d.allowed_channels || ["chat", "email"],
         });
       }
       setLoading(false);
