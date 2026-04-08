@@ -2174,15 +2174,15 @@ function AddressesTab({ userId }: { userId: string }) {
               <p className="text-xs text-muted-foreground">{addr.phone}</p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              {!addr.is_default && (
+              {!addr.is_default && !hasActiveOrders && (
                 <button onClick={() => handleSetDefault(addr.id)} className="text-[11px] text-primary font-medium hover:underline">
                   Par défaut
                 </button>
               )}
-              <button onClick={() => handleEdit(addr)} className="p-1.5 text-muted-foreground hover:text-primary">
+              <button onClick={() => handleEdit(addr)} disabled={hasActiveOrders} className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed">
                 <Edit2 size={14} />
               </button>
-              {!(addr as any).is_first_address && (
+              {!(addr as any).is_first_address && !addr.is_default && !hasActiveOrders && (
                 <button onClick={() => handleDelete(addr.id)} className="p-1.5 text-muted-foreground hover:text-destructive">
                   <Trash2 size={14} />
                 </button>
