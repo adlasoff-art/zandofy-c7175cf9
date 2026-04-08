@@ -1,78 +1,61 @@
 
 
-# Système multi-produits par fournisseur
+# Plan : Toggles de paiement par boutique (Lot 1)
 
-## Contexte actuel
+## Contexte
 
-Aujourd'hui, un fournisseur a **une seule image produit** (`product_image_url`) et **une seule URL boutique** (`store_url`). Quand un vendeur crée un produit dans son catalogue, il choisit un fournisseur, mais ne peut pas préciser **quel produit** de ce fournisseur correspond.
+La plateforme dispose de 4 moyens de paiement actifs :
+- **Mobile Money** (KelPay) — identifié comme `mobile_money`
+- **Carte bancaire** (KelPay/Keccel → redirection MasterCard) — identifié comme `card` dans le code, contrôlé par le toggle global `stripe` dans `use-payment-methods.ts`
+- **Paiement à la livraison (COD)** — déjà configurable par boutique
+- **Paiement hors plateforme** — déjà configurable par boutique
+- **PayPal** — toggle global existant
+
+Actuellement, seuls COD et Off-platform ont des toggles par boutique (dans `vendor_pricing_overrides`). Mobile Money et Carte sont uniquement contrôlés globalement.
+
+Le checkout filtre déjà COD/Off-platform via la logique "toutes les boutiques du panier doivent autoriser" (lignes 275-284 de CheckoutPage.tsx).
 
 ## Ce qui va changer
 
-### 1. Nouvelle table `supplier_products`
+### 1. Migration SQL
+Ajouter 2 colonnes à `vendor_pricing_overrides` :
+- `vendor_mobile_money_enabled BOOLEAN DEFAULT true`
+- `vendor_card_enabled BOOLEAN DEFAULT true`
 
-Chaque fournisseur pourra avoir **plusieurs produits**, chacun avec :
-- Un **nom/label** (ex: "Robe rouge modèle X")
-- Un **lien produit** (URL directe vers le produit chez le fournisseur)
-- Une **image produit** (uploadée via le même système MediaUploader)
+Par défaut `true` : aucun impact sur les boutiques existantes — tout reste activé comme avant.
 
-```text
-supplier_products
-├── id (uuid, PK)
-├── supplier_id (FK → suppliers)
-├── label (text, nom du produit fournisseur)
-├── product_url (text, lien direct vers le produit)
-├── image_url (text, image du produit)
-├── position (int, ordre d'affichage)
-└── created_at (timestamptz)
-```
+### 2. Admin UI (AdminVendorPricingPage.tsx)
+Ajouter 2 toggles dans la fiche de chaque boutique, à côté des toggles COD/Off-platform existants :
+- "Mobile Money" → contrôle `vendor_mobile_money_enabled`
+- "Carte bancaire" → contrôle `vendor_card_enabled`
 
-La colonne `product_image_url` existante sur `suppliers` sera conservée comme image principale/avatar du fournisseur.
+### 3. Checkout (CheckoutPage.tsx)
+Étendre la requête existante (ligne 277) pour lire aussi `vendor_mobile_money_enabled` et `vendor_card_enabled`. Appliquer la même logique d'intersection : un moyen de paiement n'apparaît que si **toutes** les boutiques du panier l'autorisent.
 
-### 2. Nouveau champ `supplier_product_id` sur `products`
+### 4. Renommage interne (optionnel mais recommandé)
+Renommer la clé `stripe` en `card` dans `use-payment-methods.ts` pour refléter la réalité (KelPay, pas Stripe). Cela reste un changement cosmétique interne sans impact fonctionnel.
 
-Quand un vendeur crée un produit catalogue, en plus de choisir le fournisseur, il pourra **sélectionner le produit fournisseur** correspondant. Cela crée un lien direct produit Zandofy ↔ produit fournisseur.
+## Garde-fous
 
-```text
-products (existant)
-├── supplier_id (FK → suppliers) ← déjà existant
-└── supplier_product_id (FK → supplier_products) ← NOUVEAU
-```
+| Risque | Mitigation |
+|--------|-----------|
+| Boutique sans aucun paiement actif | Validation : au moins 1 méthode doit rester active (off_platform en dernier recours) |
+| Panier multi-boutique | Même logique d'intersection que COD — déjà prouvée |
+| Migration destructive | Colonnes ajoutées avec `DEFAULT true` — zéro régression |
 
-### 3. Formulaire fournisseurs (`VendorSuppliersTab`)
+## Fichiers impactés
 
-- L'URL boutique reste en haut (une seule par fournisseur)
-- **Nouvelle section** "Produits du fournisseur" avec un bouton **[+ Ajouter un produit]**
-- Chaque produit = un bloc avec : label, URL produit, image (MediaUploader)
-- Ajout illimité de produits
-- Suppression individuelle possible
-- Les produits existants sont chargés/sauvegardés via `supplier_products`
+- `supabase/migrations/` — nouvelle migration (2 colonnes)
+- `frontend/src/pages/admin/AdminVendorPricingPage.tsx` — 2 toggles
+- `frontend/src/pages/CheckoutPage.tsx` — filtrage étendu
+- `frontend/src/hooks/use-payment-methods.ts` — renommage `stripe` → `card`
 
-### 4. Formulaire produit catalogue (`VendorProductManager`)
+## Estimation
+1 session de travail.
 
-- Le sélecteur de fournisseur reste identique
-- **Nouveau** : quand un fournisseur est sélectionné, un second sélecteur apparaît listant ses produits (avec miniature)
-- Le vendeur choisit le produit fournisseur correspondant → stocké dans `supplier_product_id`
+---
 
-### 5. Popover fournisseur dans les commandes (`SupplierPopover`)
-
-- **Icône changée** : `Store` (boutique) au lieu de `Truck` (camion)
-- Le popover affiche maintenant **par produit de la commande** :
-  - L'image du produit Zandofy + l'image du produit fournisseur (côte à côte)
-  - Le lien **Boutique fournisseur** (store_url du supplier)
-  - Le lien **Produit fournisseur** (product_url du supplier_product) ← NOUVEAU
-  - Le nom de l'agent et la plateforme
-- Si plusieurs produits dans la commande, chacun affiche son propre fournisseur/produit
-
-## Étapes d'implémentation
-
-1. **Migration SQL** : créer `supplier_products`, ajouter `supplier_product_id` à `products` avec FK, RLS policies
-2. **`VendorSuppliersTab`** : refondre le formulaire pour gérer N produits par fournisseur (ajout/suppression dynamique)
-3. **`VendorProductManager`** : ajouter le sélecteur de produit fournisseur (dépendant du fournisseur choisi)
-4. **`SupplierPopover`** : charger `supplier_products` au lieu de `product_image_url`, afficher le lien produit, changer l'icône en `Store`
-
-## Section technique
-
-- RLS sur `supplier_products` : lecture/écriture limitée au `vendor_id` du supplier parent
-- Les données existantes (`product_image_url` sur suppliers) restent compatibles — le popover les utilise en fallback si aucun `supplier_product` n'est lié
-- Le bucket `supplier-images` existant est réutilisé pour les images des nouveaux produits fournisseur
+**Lots suivants (non inclus dans cette implémentation) :**
+- **Lot 2** : Mode "Vendeur Local" (restrictions logistiques, pas de maritime)
+- **Lot 3** : Package "Vendeur Autonome" (abonnement dédié, paiements plateforme désactivés par défaut mais réactivables par le vendeur, webhooks API)
 
