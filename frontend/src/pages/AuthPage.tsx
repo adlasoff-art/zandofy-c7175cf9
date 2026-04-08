@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ShieldCheck, Globe, AlertTriangle } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ShieldCheck, Globe, AlertTriangle, Bell } from "lucide-react";
 import { useEffect } from "react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useGeoDetection } from "@/hooks/use-geo-detection";
+import { useActiveGeo } from "@/hooks/useActiveGeo";
 import { LegalModal } from "@/components/auth/LegalModal";
 import {
   signInWithGoogle,
