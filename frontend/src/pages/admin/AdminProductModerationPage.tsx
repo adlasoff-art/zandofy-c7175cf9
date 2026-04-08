@@ -154,7 +154,7 @@ export default function AdminProductModerationPage() {
             type: "moderation",
             title: notifTitle,
             message: notifMessage,
-            link: "/vendor/products",
+            link: "/vendor?tab=catalog",
           });
 
           // 4. Send email notification
@@ -182,7 +182,7 @@ export default function AdminProductModerationPage() {
                   : "Veuillez corriger votre produit et le resoumettre pour validation."
                 }</p>
                 <p style="margin-top:24px;">
-                  <a href="https://zandofy.com/vendor/products" style="display:inline-block;padding:10px 24px;background:${isRejection ? '#dc2626' : '#ea580c'};color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
+                  <a href="https://zandofy.com/vendor?tab=catalog" style="display:inline-block;padding:10px 24px;background:${isRejection ? '#dc2626' : '#ea580c'};color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
                     Accéder à mes produits
                   </a>
                 </p>
