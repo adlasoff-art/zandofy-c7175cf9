@@ -103,9 +103,34 @@ export default function ProductPage() {
   });
 
   const { data: relatedProducts } = useQuery({
-    queryKey: ["related-products"],
-    queryFn: () => fetchProducts({ limit: 20 }),
-    enabled: !!product,
+    queryKey: ["related-products", product?.categoryId],
+    queryFn: async () => {
+      if (!product?.categoryId) return [];
+      // First try: products in same subcategory
+      let results = await fetchProducts({ categoryId: product.categoryId, limit: 12 });
+      results = results.filter(p => p.id !== product.id);
+      // Fallback: if < 6 results, try parent category
+      if (results.length < 6 && product.categoryFr) {
+        // Get parent category id
+        const { data: cat } = await supabase
+          .from("categories")
+          .select("parent_id")
+          .eq("id", product.categoryId)
+          .maybeSingle();
+        if (cat?.parent_id) {
+          const parentResults = await fetchProducts({ categoryId: cat.parent_id, limit: 12 });
+          const existingIds = new Set(results.map(r => r.id));
+          existingIds.add(product.id);
+          for (const pr of parentResults) {
+            if (!existingIds.has(pr.id) && results.length < 6) {
+              results.push(pr);
+            }
+          }
+        }
+      }
+      return results.slice(0, 6);
+    },
+    enabled: !!product?.categoryId,
   });
 
   const { data: pricingTiersRaw } = useQuery({
