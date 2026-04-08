@@ -2052,11 +2052,14 @@ function AddressesTab({ userId }: { userId: string }) {
 
   useEffect(() => { fetchAddresses(); }, [fetchAddresses]);
 
-  // Check KYC status
+  // Check KYC status + active orders
   useEffect(() => {
     (supabase as any).from("kyc_verifications").select("id").eq("user_id", userId).eq("status", "approved").limit(1).then(({ data }: any) => {
       setIsKycVerified((data ?? []).length > 0);
     });
+    supabase.from("orders").select("id").eq("user_id", userId)
+      .in("status", ["pending", "confirmed", "processing", "shipped", "ready_for_pickup"])
+      .limit(1).then(({ data }) => setHasActiveOrders((data ?? []).length > 0));
   }, [userId]);
 
   const resetForm = () => {
