@@ -113,6 +113,7 @@ export default function AdminVendorPricingPage() {
     suppliers_enabled: boolean;
     max_products_override: string;
     collaborator_limit_override: string;
+    vendor_webhook_url: string;
   }>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
