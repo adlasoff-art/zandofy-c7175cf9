@@ -89,13 +89,14 @@ export function CascadingAddressFields({ data, onChange, showPostalCode = true }
 
   return (
     <div className="space-y-3">
-      {/* 1. Country */}
+      {/* 1. Country — only active countries */}
       <CountryCombobox
         value={data.country}
         onChange={handleCountryChange}
         label="Pays *"
         placeholder="Sélectionner un pays..."
         showNone={false}
+        allowedCodes={activeCountryCodes}
       />
 
       {/* 2. Province + City */}
