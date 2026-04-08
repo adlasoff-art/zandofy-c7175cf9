@@ -67,6 +67,16 @@ export default function AuthPage() {
 
     try {
       if (mode === "signup") {
+        // Block signup if country is not active
+        if (geo.country_code && !isCountryActive(geo.country_code)) {
+          toast({
+            title: "Service indisponible",
+            description: `Zandofy n'est pas encore disponible en ${geo.country_name}. Utilisez l'option "Me notifier" ci-dessus.`,
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
         if (getPasswordStrength(password).score < 3) {
           toast({
             title: "Mot de passe trop faible",
