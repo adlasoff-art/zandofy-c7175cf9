@@ -501,6 +501,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                               if (!error) {
                                 setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "pending", shipping_payment_status: "paid" } : o));
                                 toast.success("Paiement validé — la commande passe en statut confirmé.");
+                                triggerOrderStatusNotification(order.id, "off_platform_validated");
                               }
                             }}
                           >

@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Trash2, Image, Monitor, Smartphone, Info } from "lucide-react";
+import { Upload, Trash2, Image, Monitor, Smartphone, Info, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface BrandingConfig {
@@ -12,6 +15,13 @@ interface BrandingConfig {
   favicon_url: string | null;
   pwa_icon_192_url: string | null;
   pwa_icon_512_url: string | null;
+  email_logo_url: string | null;
+  email_signature_name: string;
+  email_signature_address: string;
+  email_signature_phone: string;
+  email_signature_email: string;
+  email_signature_website: string;
+  email_signature_extra: string;
 }
 
 const DEFAULT: BrandingConfig = {
@@ -21,6 +31,13 @@ const DEFAULT: BrandingConfig = {
   favicon_url: null,
   pwa_icon_192_url: null,
   pwa_icon_512_url: null,
+  email_logo_url: null,
+  email_signature_name: "Zandofy",
+  email_signature_address: "",
+  email_signature_phone: "",
+  email_signature_email: "",
+  email_signature_website: "https://zandofy.com",
+  email_signature_extra: "",
 };
 
 function BrandingTab() {
@@ -78,6 +95,10 @@ function BrandingTab() {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (file) uploadFile(file, field);
+  };
+
+  const updateField = (field: keyof BrandingConfig, value: string) => {
+    setConfig((prev) => ({ ...prev, [field]: value }));
   };
 
   const FileUploadZone = ({
@@ -252,6 +273,112 @@ function BrandingTab() {
           <div><strong>Formats :</strong> SVG, WebP, PNG</div>
         </div>
       </div>
+
+      {/* ═══════════════ EMAIL BRANDING SECTION ═══════════════ */}
+      <div className="border-t border-border" />
+
+      <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+        <Mail size={16} /> Branding Emails
+      </h3>
+      <p className="text-xs text-muted-foreground -mt-4">
+        Logo et signature intégrés dans tous les emails transactionnels (confirmations de commande, notifications, etc.)
+      </p>
+
+      {/* Email Logo */}
+      <FileUploadZone
+        field="email_logo_url"
+        label="Logo Email (PNG)"
+        hint="Format PNG recommandé · Taille conseillée : 200×60 px · Affiché en en-tête de chaque email · Max 500 Ko"
+        accept=".png,.jpg,.jpeg,.webp"
+      />
+
+      {/* Email Signature */}
+      <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+        <h4 className="text-sm font-semibold text-foreground">Signature Email</h4>
+        <p className="text-[10px] text-muted-foreground">
+          Ces informations apparaissent en pied de page de chaque email envoyé par la plateforme.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Nom de l'entreprise</Label>
+            <Input
+              value={config.email_signature_name}
+              onChange={(e) => updateField("email_signature_name", e.target.value)}
+              placeholder="Zandofy"
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Email de contact</Label>
+            <Input
+              value={config.email_signature_email}
+              onChange={(e) => updateField("email_signature_email", e.target.value)}
+              placeholder="support@zandofy.com"
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Téléphone</Label>
+            <Input
+              value={config.email_signature_phone}
+              onChange={(e) => updateField("email_signature_phone", e.target.value)}
+              placeholder="+243 XXX XXX XXX"
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Site web</Label>
+            <Input
+              value={config.email_signature_website}
+              onChange={(e) => updateField("email_signature_website", e.target.value)}
+              placeholder="https://zandofy.com"
+              className="h-9 text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Adresse postale</Label>
+          <Input
+            value={config.email_signature_address}
+            onChange={(e) => updateField("email_signature_address", e.target.value)}
+            placeholder="123 Avenue de la Paix, Kinshasa, RDC"
+            className="h-9 text-sm"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Informations supplémentaires</Label>
+          <Textarea
+            value={config.email_signature_extra}
+            onChange={(e) => updateField("email_signature_extra", e.target.value)}
+            placeholder="Ex: RCCM, numéro d'identification fiscale, slogan…"
+            rows={2}
+            className="text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Preview */}
+      {(config.email_logo_url || config.email_signature_name) && (
+        <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+          <h4 className="text-sm font-semibold text-foreground">Aperçu signature email</h4>
+          <div className="bg-muted/20 rounded-lg p-4 text-center space-y-2">
+            {config.email_logo_url && (
+              <img src={config.email_logo_url} alt="Logo email" className="h-10 mx-auto object-contain" />
+            )}
+            <div className="text-[11px] text-muted-foreground space-y-0.5">
+              {config.email_signature_name && <p className="font-semibold text-foreground text-xs">{config.email_signature_name}</p>}
+              {config.email_signature_address && <p>{config.email_signature_address}</p>}
+              {config.email_signature_phone && <p>Tél : {config.email_signature_phone}</p>}
+              {config.email_signature_email && <p>{config.email_signature_email}</p>}
+              {config.email_signature_website && <p>{config.email_signature_website}</p>}
+              {config.email_signature_extra && <p className="italic">{config.email_signature_extra}</p>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
