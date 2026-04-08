@@ -39,6 +39,9 @@ export default function AuthPage() {
   const { toast } = useToast();
   const { t } = useI18n();
   const geo = useGeoDetection();
+  const { isCountryActive, loading: geoLoading } = useActiveGeo();
+  const [notifyMeSent, setNotifyMeSent] = useState(false);
+  const [notifyMeLoading, setNotifyMeLoading] = useState(false);
 
   const searchParams = new URLSearchParams(window.location.search);
   const refCode = searchParams.get("ref") || "";
