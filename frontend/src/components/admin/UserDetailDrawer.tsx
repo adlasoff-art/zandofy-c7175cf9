@@ -498,8 +498,12 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
                 <p className="font-medium text-foreground">{user.preferred_language === "fr" ? "Français" : user.preferred_language === "en" ? "English" : user.preferred_language || "fr"}</p>
               </div>
               <div>
-                <span className="text-muted-foreground">Canal préféré</span>
-                <p className="font-medium text-foreground capitalize">{user.preferred_contact_channel || "chat"}</p>
+                <span className="text-muted-foreground">Canaux de contact</span>
+                <p className="font-medium text-foreground capitalize">
+                  {(user as any).allowed_channels?.length > 0
+                    ? (user as any).allowed_channels.join(", ")
+                    : user.preferred_contact_channel || "chat"}
+                </p>
               </div>
             </div>
           </div>
