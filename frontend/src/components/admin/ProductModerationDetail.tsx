@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
-import { Loader2, Package, Store, Tag, Ruler, Weight, MapPin, Star, Image as ImageIcon, Palette, LayoutGrid, DollarSign, AlertTriangle, Link as LinkIcon } from "lucide-react";
+import { Loader2, Package, Store, Tag, Ruler, Weight, MapPin, Star, Image as ImageIcon, Palette, LayoutGrid, DollarSign, AlertTriangle, Link as LinkIcon, Layers } from "lucide-react";
 
 interface Props {
   productId: string | null;
@@ -38,7 +38,56 @@ export function ProductModerationDetail({ productId, open, onOpenChange }: Props
         if (cat) categoryName = cat.name_fr;
       }
 
-      return { ...data, store_name: storeName, category_name: categoryName };
+      // Fetch dynamic variant selections with type/option labels
+      const { data: dynSelections } = await (supabase as any)
+        .from("product_variant_selections")
+        .select("variant_type_id, variant_option_id")
+        .eq("product_id", productId!);
+
+      // Fetch custom variant values
+      const { data: customValues } = await (supabase as any)
+        .from("product_custom_variant_values")
+        .select("variant_type_id, custom_label")
+        .eq("product_id", productId!);
+
+      // Fetch variant types and options for labeling
+      let variantMap: Record<string, { name: string; unit: string; options: { id: string; label: string }[] }> = {};
+      if ((dynSelections && dynSelections.length > 0) || (customValues && customValues.length > 0)) {
+        const { data: types } = await (supabase as any).from("variant_types").select("id, name, unit").order("sort_order");
+        if (types) {
+          const typeIds = types.map((t: any) => t.id);
+          const { data: opts } = await (supabase as any).from("variant_type_options").select("id, variant_type_id, label").in("variant_type_id", typeIds);
+          for (const t of types) {
+            variantMap[t.id] = { name: t.name, unit: t.unit || "", options: (opts || []).filter((o: any) => o.variant_type_id === t.id) };
+          }
+        }
+      }
+
+      // Build grouped dynamic variants for display
+      const dynamicVariants: { typeName: string; unit: string; values: string[] }[] = [];
+      const typeIds = new Set<string>();
+      (dynSelections || []).forEach((s: any) => typeIds.add(s.variant_type_id));
+      (customValues || []).forEach((c: any) => typeIds.add(c.variant_type_id));
+
+      for (const typeId of typeIds) {
+        const vt = variantMap[typeId];
+        if (!vt) continue;
+        const values: string[] = [];
+        // Admin-defined selections
+        (dynSelections || [])
+          .filter((s: any) => s.variant_type_id === typeId)
+          .forEach((s: any) => {
+            const opt = vt.options.find((o) => o.id === s.variant_option_id);
+            if (opt) values.push(opt.label);
+          });
+        // Custom vendor values
+        (customValues || [])
+          .filter((c: any) => c.variant_type_id === typeId)
+          .forEach((c: any) => values.push(c.custom_label + " ✱"));
+        dynamicVariants.push({ typeName: vt.name, unit: vt.unit, values });
+      }
+
+      return { ...data, store_name: storeName, category_name: categoryName, dynamic_variants: dynamicVariants };
     },
   });
 
@@ -174,6 +223,27 @@ export function ProductModerationDetail({ productId, open, onOpenChange }: Props
                     </Badge>
                   ))}
                 </div>
+              </Section>
+            )}
+
+            {/* Dynamic variants (Lot 7) */}
+            {product.dynamic_variants && product.dynamic_variants.length > 0 && (
+              <Section title="Variations" icon={<Layers size={14} />}>
+                {product.dynamic_variants.map((dv: any, i: number) => (
+                  <div key={i} className="mb-2">
+                    <p className="text-xs font-medium text-foreground mb-1">
+                      {dv.typeName} {dv.unit && <span className="text-muted-foreground">({dv.unit})</span>}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {dv.values.map((v: string, j: number) => (
+                        <Badge key={j} variant={v.endsWith(" ✱") ? "secondary" : "outline"} className="text-xs">
+                          {v}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <p className="text-[10px] text-muted-foreground mt-1">✱ = valeur personnalisée vendeur</p>
               </Section>
             )}
 

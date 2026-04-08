@@ -3076,6 +3076,52 @@ export type Database = {
           },
         ]
       }
+      product_custom_variant_values: {
+        Row: {
+          created_at: string
+          custom_label: string
+          id: string
+          product_id: string
+          variant_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          custom_label: string
+          id?: string
+          product_id: string
+          variant_type_id: string
+        }
+        Update: {
+          created_at?: string
+          custom_label?: string
+          id?: string
+          product_id?: string
+          variant_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_custom_variant_values_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_custom_variant_values_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_custom_variant_values_variant_type_id_fkey"
+            columns: ["variant_type_id"]
+            isOneToOne: false
+            referencedRelation: "variant_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_images: {
         Row: {
           id: string
