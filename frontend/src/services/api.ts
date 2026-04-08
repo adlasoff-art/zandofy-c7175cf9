@@ -123,6 +123,7 @@ export function mapProduct(row: any): Product {
     careInstructions: row.care_instructions || "",
     season: row.season || "",
     storeId: row.store_id || "",
+    categoryId: row.category_id || undefined,
     shortDescription: row.short_description || undefined,
     description: row.description || undefined,
     weightGrams: row.weight_grams || undefined,
