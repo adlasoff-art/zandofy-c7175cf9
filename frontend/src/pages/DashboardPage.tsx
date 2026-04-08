@@ -1730,9 +1730,10 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
         residence_province_id: updated.residence_province_id || "",
         residence_commune: updated.residence_commune || "",
         residence_quartier: updated.residence_quartier || "",
-        preferred_language: updated.preferred_language || "fr",
-        preferred_contact_channel: updated.preferred_contact_channel || "chat",
-      });
+          preferred_language: updated.preferred_language || "fr",
+          preferred_contact_channel: updated.preferred_contact_channel || "chat",
+          allowed_channels: updated.allowed_channels || ["chat", "email"],
+        });
       await supabase.auth.updateUser({
         data: {
           first_name: updated.first_name || null,
