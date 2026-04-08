@@ -5691,6 +5691,7 @@ export type Database = {
           vendor_custom_payment_numbers_enabled: boolean
           vendor_extra_margin_enabled: boolean
           vendor_mobile_money_enabled: boolean
+          vendor_mode: string
           vendor_off_platform_enabled: boolean
         }
         Insert: {
@@ -5712,6 +5713,7 @@ export type Database = {
           vendor_custom_payment_numbers_enabled?: boolean
           vendor_extra_margin_enabled?: boolean
           vendor_mobile_money_enabled?: boolean
+          vendor_mode?: string
           vendor_off_platform_enabled?: boolean
         }
         Update: {
@@ -5733,6 +5735,7 @@ export type Database = {
           vendor_custom_payment_numbers_enabled?: boolean
           vendor_extra_margin_enabled?: boolean
           vendor_mobile_money_enabled?: boolean
+          vendor_mode?: string
           vendor_off_platform_enabled?: boolean
         }
         Relationships: [

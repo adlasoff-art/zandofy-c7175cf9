@@ -108,6 +108,7 @@ export default function AdminVendorPricingPage() {
     vendor_custom_payment_numbers_enabled: boolean;
     vendor_mobile_money_enabled: boolean;
     vendor_card_enabled: boolean;
+    vendor_mode: string;
     returns_enabled: boolean;
     suppliers_enabled: boolean;
     max_products_override: string;
@@ -208,6 +209,7 @@ export default function AdminVendorPricingPage() {
       vendor_custom_payment_numbers_enabled: (o as any)?.vendor_custom_payment_numbers_enabled ?? false,
       vendor_mobile_money_enabled: (o as any)?.vendor_mobile_money_enabled ?? true,
       vendor_card_enabled: (o as any)?.vendor_card_enabled ?? true,
+      vendor_mode: (o as any)?.vendor_mode ?? "international",
       returns_enabled: (store as any).returns_enabled ?? false,
       suppliers_enabled: (o as any)?.suppliers_enabled ?? false,
       max_products_override: o?.max_products_override != null ? String(o.max_products_override) : "",
