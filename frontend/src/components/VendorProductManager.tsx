@@ -328,6 +328,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     setSizes([]);
     setColors([]);
     setDynamicSelections([]);
+    setCustomVariantValues([]);
     setCreating(true);
   };
 
