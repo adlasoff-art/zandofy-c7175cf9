@@ -127,7 +127,7 @@ function StoreCard({ store }: { store: StoreRow }) {
             )}
             <span className={`relative inline-flex h-2 w-2 rounded-full ${store.is_online ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
           </span>
-          En ligne
+          {store.is_online ? "En ligne" : "Hors ligne"}
         </span>
 
         {/* Verified badge */}
