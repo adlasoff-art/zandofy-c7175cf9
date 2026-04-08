@@ -1748,6 +1748,10 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
   };
 
   const handlePasswordChange = async () => {
+    if (!currentPassword) {
+      toast({ title: "Erreur", description: "Veuillez saisir votre mot de passe actuel.", variant: "destructive" });
+      return;
+    }
     if (newPassword.length < 8) {
       toast({ title: "Erreur", description: "Le mot de passe doit contenir au moins 8 caractères.", variant: "destructive" });
       return;
@@ -1757,6 +1761,19 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
       return;
     }
     setChangingPassword(true);
+    // Verify current password by re-authenticating
+    const email = user.email;
+    if (!email) {
+      toast({ title: "Erreur", description: "Adresse email introuvable.", variant: "destructive" });
+      setChangingPassword(false);
+      return;
+    }
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+    if (signInError) {
+      toast({ title: "Erreur", description: "Le mot de passe actuel est incorrect.", variant: "destructive" });
+      setChangingPassword(false);
+      return;
+    }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setChangingPassword(false);
     if (error) {
