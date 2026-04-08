@@ -129,6 +129,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierProductOptions, setSupplierProductOptions] = useState<SupplierProductOption[]>([]);
+  const [loadingSupplierProducts, setLoadingSupplierProducts] = useState(false);
   const [trendTags, setTrendTags] = useState<{ id: string; name_fr: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -696,14 +697,17 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
                 onChange={(e) => {
                   const newSupplierId = e.target.value;
                   setForm({ ...form, supplier_id: newSupplierId, supplier_product_id: "" });
-                  // Load supplier products
                   if (newSupplierId) {
+                    setLoadingSupplierProducts(true);
                     (supabase as any)
                       .from("supplier_products")
                       .select("id, label, product_url, image_url")
                       .eq("supplier_id", newSupplierId)
                       .order("position")
-                      .then(({ data }: any) => setSupplierProductOptions(data || []));
+                      .then(({ data }: any) => {
+                        setSupplierProductOptions(data || []);
+                        setLoadingSupplierProducts(false);
+                      });
                   } else {
                     setSupplierProductOptions([]);
                   }
@@ -725,29 +729,64 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
                 ) : null;
               })()}
             </div>
-            {/* Supplier product selector */}
-            {form.supplier_id && supplierProductOptions.length > 0 && (
+            {/* Supplier product selector — always visible when supplier is selected */}
+            {form.supplier_id && (
               <div>
-                <label className="text-xs text-muted-foreground">📦 Produit du fournisseur</label>
-                <select
-                  className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md"
-                  value={form.supplier_product_id}
-                  onChange={(e) => setForm({ ...form, supplier_product_id: e.target.value })}
-                >
-                  <option value="">— Aucun —</option>
-                  {supplierProductOptions.map((sp) => (
-                    <option key={sp.id} value={sp.id}>{sp.label || "Produit sans nom"}</option>
-                  ))}
-                </select>
-                {form.supplier_product_id && (() => {
-                  const sel = supplierProductOptions.find(sp => sp.id === form.supplier_product_id);
-                  return sel?.image_url ? (
-                    <div className="mt-2 flex items-center gap-2 bg-muted/30 rounded-md p-2">
-                      <img src={sel.image_url} alt="" className="w-10 h-10 rounded object-cover border border-border" />
-                      <span className="text-xs text-muted-foreground truncate">{sel.label}</span>
-                    </div>
-                  ) : null;
-                })()}
+                <label className="text-xs text-muted-foreground font-medium">📦 Produit du fournisseur</label>
+                {loadingSupplierProducts ? (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 size={14} className="animate-spin" />
+                    Chargement des produits…
+                  </div>
+                ) : supplierProductOptions.length === 0 ? (
+                  <div className="mt-2 rounded-md border border-dashed border-border bg-muted/20 p-3">
+                    <p className="text-xs text-muted-foreground text-center">
+                      Ce fournisseur n'a aucun produit enregistré.
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/60 text-center mt-1">
+                      Ajoutez des produits depuis l'onglet « Fournisseurs »
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-2 grid gap-2">
+                    {supplierProductOptions.map((sp) => {
+                      const isSelected = form.supplier_product_id === sp.id;
+                      return (
+                        <button
+                          key={sp.id}
+                          type="button"
+                          onClick={() => setForm({ ...form, supplier_product_id: isSelected ? "" : sp.id })}
+                          className={`flex items-center gap-3 w-full rounded-lg border p-2.5 text-left transition-all ${
+                            isSelected
+                              ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                              : "border-border bg-card hover:border-primary/40 hover:bg-muted/30"
+                          }`}
+                        >
+                          <div className="w-10 h-10 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0 border border-border">
+                            {sp.image_url ? (
+                              <img src={sp.image_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <Package size={14} className="text-muted-foreground/40" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium truncate ${isSelected ? "text-primary" : "text-foreground"}`}>
+                              {sp.label || "Produit sans nom"}
+                            </p>
+                            {sp.product_url && (
+                              <p className="text-[10px] text-muted-foreground truncate">{sp.product_url}</p>
+                            )}
+                          </div>
+                          {isSelected && (
+                            <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0">
+                              <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary-foreground"/></svg>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
             {suppliers.length === 0 && (
