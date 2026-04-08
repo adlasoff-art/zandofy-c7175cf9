@@ -4,33 +4,20 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
-import { type Product } from "@/services/api";
+import { mapProduct, type Product } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { Flame, Loader2 } from "lucide-react";
 
 const PAGE_SIZE = 24;
 
-function mapProduct(p: any): Product {
-  const imgs = (p.product_images || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
-  return {
-    id: p.id,
-    name: p.name_fr || p.name,
-    price: Number(p.price),
-    originalPrice: p.original_price ? Number(p.original_price) : undefined,
-    image: imgs[0]?.image_url || "/placeholder.svg",
-    images: imgs.map((img: any) => img.image_url),
-    category: p.categories?.name_fr || p.categories?.name || "",
-    rating: p.rating || 0,
-    reviewCount: p.review_count || 0,
-    isNew: p.is_new,
-    isSale: p.is_sale,
-    discount: p.discount,
-    slug: p.slug,
-    storeId: p.store_id,
-    storeName: p.stores?.name,
-    salesCount: p.sales_count || 0,
-  } as Product;
-}
+const PRODUCT_SELECT = `
+  *,
+  categories(name, name_fr),
+  product_images(image_url, position),
+  product_colors(color_hex, color_name, image_url),
+  product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
+  stores!products_store_id_fkey(id, name, is_verified, is_certified, verified_years, verified_years_override, created_at, is_online, sales_count, sales_override, followers_count, followers_override, shop_type)
+`;
 
 export default function PopularPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -41,7 +28,7 @@ export default function PopularPage() {
   const fetchPage = useCallback(async (offset: number) => {
     const { data } = await supabase
       .from("products")
-      .select(`*, categories(name, name_fr), product_images(image_url, position), stores!products_store_id_fkey(id, name)`)
+      .select(PRODUCT_SELECT)
       .eq("publish_status", "published")
       .order("sales_count", { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);
