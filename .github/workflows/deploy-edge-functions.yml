@@ -28,11 +28,9 @@ jobs:
           PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
           DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          if [ -z "$PROJECT_REF" ]; then
-            echo "::error::SUPABASE_PROJECT_ID secret is not set"
-            exit 1
-          fi
-          supabase link --project-ref "$PROJECT_REF" --password "$DB_PASSWORD" --yes
+          echo "Vérification du dossier courant..."
+          ls -R supabase/functions | head -n 5
+          supabase link --project-ref "$PROJECT_REF" --password '$DB_PASSWORD' --yes
           supabase functions deploy --no-verify-jwt
 
       - name: Deploy to Production
@@ -43,9 +41,7 @@ jobs:
           PROJECT_REF: ${{ secrets.PRODUCTION_PROJECT_ID }}
           DB_PASSWORD: ${{ secrets.PRODUCTION_DB_PASSWORD }}
         run: |
-          if [ -z "$PROJECT_REF" ]; then
-            echo "::error::PRODUCTION_PROJECT_ID secret is not set"
-            exit 1
-          fi
-          supabase link --project-ref "$PROJECT_REF" --password "$DB_PASSWORD" --yes
+          echo "Vérification du dossier courant..."
+          ls -R supabase/functions | head -n 5
+          supabase link --project-ref "$PROJECT_REF" --password '$DB_PASSWORD' --yes
           supabase functions deploy --no-verify-jwt
