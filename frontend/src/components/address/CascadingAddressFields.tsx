@@ -1,6 +1,7 @@
 /**
  * Cascading address fields that pull from admin-managed geographic data.
  * Order: Pays → Province → Ville → Commune → Quartier → Adresse manuelle
+ * Only active countries and active cities are shown.
  */
 import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
 import { GeoCombobox } from "./GeoCombobox";
 import { useGeoData } from "@/hooks/useGeoData";
+import { useActiveGeo } from "@/hooks/useActiveGeo";
 
 interface AddressData {
   country: string;
@@ -29,6 +31,7 @@ interface CascadingAddressFieldsProps {
 export function CascadingAddressFields({ data, onChange, showPostalCode = true }: CascadingAddressFieldsProps) {
   // Track commune UUID internally for quartier lookup
   const [communeUuid, setCommuneUuid] = useState("");
+  const { activeCountryCodes } = useActiveGeo();
 
   const { provinces, cities, communes, quartiers } = useGeoData(
     data.country,
