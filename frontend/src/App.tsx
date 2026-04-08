@@ -74,6 +74,8 @@ const AccountPage = lazy(() => import("./pages/AccountPage"));
 const PaymentReturnPage = lazy(() => import("./pages/PaymentReturnPage"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
+const TrendsPage = lazy(() => import("./pages/TrendsPage"));
+const PopularPage = lazy(() => import("./pages/PopularPage"));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -187,6 +189,8 @@ const App = () => (
                 <Route path="/product/:slug" element={<ProductPage />} />
                 <Route path="/category/:slug" element={<CategoryPage />} />
                 <Route path="/stores" element={<StoresPage />} />
+                <Route path="/trends" element={<TrendsPage />} />
+                <Route path="/popular" element={<PopularPage />} />
                 <Route path="/store/:id" element={<StorePage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
