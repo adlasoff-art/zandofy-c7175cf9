@@ -31,8 +31,8 @@ const Index = () => {
       {...handlers}
     >
       <SEOHead
-        title="Zandofy — Marketplace Mode, Électronique & Maison"
-        description="Découvrez des milliers de produits mode, électronique, maison et beauté sur Zandofy. Livraison gratuite, vendeurs vérifiés, prix compétitifs."
+        title={seoConfig.site_title}
+        description={seoConfig.site_description}
         canonical="/"
         jsonLd={{
           "@context": "https://schema.org",
