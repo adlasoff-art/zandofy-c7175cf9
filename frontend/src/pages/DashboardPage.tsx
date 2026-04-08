@@ -1920,17 +1920,38 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
             </div>
           </div>
           <div>
-            <Label className="text-xs text-muted-foreground">Canal de contact préféré</Label>
-            <select
-              className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-card"
-              value={profile.preferred_contact_channel}
-              onChange={e => setProfile(p => ({ ...p, preferred_contact_channel: e.target.value }))}
-            >
-              <option value="chat">Chat interne</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="sms">SMS</option>
-              <option value="email">Email</option>
-            </select>
+            <Label className="text-xs text-muted-foreground mb-2 block">Canaux de contact</Label>
+            <div className="space-y-2">
+              {[
+                { value: "chat", label: "Chat interne", mandatory: true },
+                { value: "email", label: "Email", mandatory: true },
+                { value: "whatsapp", label: "WhatsApp", mandatory: false },
+                { value: "sms", label: "SMS", mandatory: false },
+              ].map(ch => {
+                const checked = profile.allowed_channels.includes(ch.value);
+                return (
+                  <label key={ch.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={ch.mandatory}
+                      className="accent-primary h-4 w-4 rounded border-border"
+                      onChange={() => {
+                        if (ch.mandatory) return;
+                        setProfile(p => ({
+                          ...p,
+                          allowed_channels: checked
+                            ? p.allowed_channels.filter(c => c !== ch.value)
+                            : [...p.allowed_channels, ch.value],
+                        }));
+                      }}
+                    />
+                    <span className="text-foreground">{ch.label}</span>
+                    {ch.mandatory && <span className="text-[10px] text-muted-foreground">(obligatoire)</span>}
+                  </label>
+                );
+              })}
+            </div>
           </div>
           <Button onClick={handleSave} disabled={saving} className="mt-2">
             {saving ? <Loader2 className="animate-spin mr-2" size={14} /> : <Save size={14} className="mr-2" />}
