@@ -2037,8 +2037,9 @@ function AddressesTab({ userId }: { userId: string }) {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ label: "", first_name: "", last_name: "", phone: "", address: "", quartier: "", commune: "", city: "", province: "", province_id: "", country: "CD", postal_code: "" });
-  const [saving, setSaving] = useState(false);
+   const [saving, setSaving] = useState(false);
   const [isKycVerified, setIsKycVerified] = useState(false);
+  const [hasActiveOrders, setHasActiveOrders] = useState(false);
 
   const maxAddresses = isKycVerified ? 5 : 2;
 
