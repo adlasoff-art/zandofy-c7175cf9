@@ -220,6 +220,57 @@ export default function AuthPage() {
             )}
           </div>
 
+          {/* Country not active — block signup */}
+          {mode === "signup" && !geo.loading && !geoLoading && geo.country_code && !isCountryActive(geo.country_code) && (
+            <div className="rounded-lg border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30 p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={18} className="text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-orange-800 dark:text-orange-300">
+                    Service indisponible dans votre région
+                  </p>
+                  <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
+                    Zandofy n'est pas encore disponible en <strong>{geo.country_name}</strong>. Nous travaillons à étendre notre couverture.
+                  </p>
+                </div>
+              </div>
+              {!notifyMeSent ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-orange-300 text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-950/50"
+                  disabled={notifyMeLoading}
+                  onClick={async () => {
+                    setNotifyMeLoading(true);
+                    try {
+                      // Send notification email via edge function or simple insert
+                      await (supabase as any).from("notifications").insert({
+                        user_id: "00000000-0000-0000-0000-000000000000",
+                        type: "system",
+                        title: "Demande notify-me",
+                        message: `Pays: ${geo.country_name} (${geo.country_code}), Ville: ${geo.city || "N/A"}, Email: ${email || "non renseigné"}`,
+                        link: "/admin/geography",
+                      });
+                      setNotifyMeSent(true);
+                      toast({ title: "Demande enregistrée", description: "Vous serez notifié dès que le service sera disponible dans votre région." });
+                    } catch {
+                      toast({ title: "Erreur", description: "Impossible d'enregistrer la demande.", variant: "destructive" });
+                    } finally {
+                      setNotifyMeLoading(false);
+                    }
+                  }}
+                >
+                  <Bell size={14} className="mr-2" />
+                  {notifyMeLoading ? "Envoi..." : "Me notifier quand c'est disponible"}
+                </Button>
+              ) : (
+                <p className="text-xs text-center text-orange-600 dark:text-orange-400 font-medium">
+                  ✓ Demande enregistrée — nous vous contacterons dès que possible.
+                </p>
+              )}
+            </div>
+          )}
+
           {lockoutMsg && (
             <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
               <ShieldCheck size={16} className="shrink-0" />
