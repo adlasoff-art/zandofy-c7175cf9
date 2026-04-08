@@ -20,28 +20,18 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy to Staging
-        if: github.ref == 'refs/heads/develop'
+      - name: Deploy
         working-directory: frontend
         env:
+          # Ici, on choisit les bonnes valeurs selon la branche
+          PROJECT_ID: ${{ github.ref == 'refs/heads/main' && secrets.PRODUCTION_PROJECT_ID || secrets.SUPABASE_PROJECT_ID }}
+          DB_PASS: ${{ github.ref == 'refs/heads/main' && secrets.PRODUCTION_DB_PASSWORD || secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
-          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          echo "Vérification du dossier courant..."
-          ls -R supabase/functions | head -n 5
-          supabase link --project-ref "$PROJECT_REF" --password '$DB_PASSWORD' --yes
-          supabase functions deploy --no-verify-jwt
-
-      - name: Deploy to Production
-        if: github.ref == 'refs/heads/main'
-        working-directory: frontend
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROJECT_REF: ${{ secrets.PRODUCTION_PROJECT_ID }}
-          DB_PASSWORD: ${{ secrets.PRODUCTION_DB_PASSWORD }}
-        run: |
-          echo "Vérification du dossier courant..."
-          ls -R supabase/functions | head -n 5
-          supabase link --project-ref "$PROJECT_REF" --password '$DB_PASSWORD' --yes
-          supabase functions deploy --no-verify-jwt
+          if [ -z "$PROJECT_ID" ]; then
+            echo "ERREUR : L'ID du projet est vide. Vérifiez vos Secrets GitHub."
+            exit 1
+          fi
+          # On lie le projet et on déploie
+          supabase link --project-ref "$PROJECT_ID" --password "$DB_PASS" --yes
+          supabase functions deploy --all --no-verify-jwt
