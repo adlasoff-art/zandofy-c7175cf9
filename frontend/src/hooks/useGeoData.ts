@@ -50,10 +50,10 @@ export function useGeoData(
       });
   }, [countryCode]);
 
-  // Fetch cities for selected province (or country if no province)
+  // Fetch cities for selected province (or country if no province) — only active cities
   useEffect(() => {
     if (!countryCode) { setCities([]); return; }
-    let q = db.from("cities").select("id, name").eq("country_code", countryCode).order("name").limit(500);
+    let q = db.from("cities").select("id, name").eq("country_code", countryCode).eq("is_active", true).order("name").limit(500);
     if (provinceId) {
       q = q.eq("province_id", provinceId);
     }
