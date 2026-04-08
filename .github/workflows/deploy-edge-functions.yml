@@ -4,8 +4,8 @@ on:
   push:
     branches: [main, develop]
     paths:
-      - 'frontend/supabase/functions/**'
-      - 'frontend/supabase/config.toml'
+      - "frontend/supabase/functions/**"
+      - "frontend/supabase/config.toml"
   workflow_dispatch:
 
 jobs:
@@ -20,22 +20,28 @@ jobs:
         with:
           version: latest
 
-      # --- LOGIQUE POUR STAGING (Branche develop) ---
-      - name: Deploy to Staging
+      # ── Develop ──
+      - name: Deploy to Staging (develop)
         if: github.ref == 'refs/heads/develop'
-        run: |
-          supabase link --project-ref ${{ secrets.STAGING_PROJECT_ID }}
-          supabase functions deploy --no-verify-jwt
         working-directory: frontend
         env:
+          PROJECT_REF: ${{ secrets.STAGING_PROJECT_ID }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          echo "▶ Environnement : STAGING (develop)"
+          if [ -z "$PROJECT_REF" ]; then echo "❌ STAGING_PROJECT_ID est vide"; exit 1; fi
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then echo "❌ SUPABASE_ACCESS_TOKEN est vide"; exit 1; fi
+          supabase functions deploy --project-ref "$PROJECT_REF" --no-verify-jwt
 
-      # --- LOGIQUE POUR PRODUCTION (Branche main) ---
-      - name: Deploy to Production
+      # ── Main ──
+      - name: Deploy to Production (main)
         if: github.ref == 'refs/heads/main'
-        run: |
-          supabase link --project-ref ${{ secrets.PRODUCTION_PROJECT_ID }}
-          supabase functions deploy --no-verify-jwt
         working-directory: frontend
         env:
+          PROJECT_REF: ${{ secrets.PRODUCTION_PROJECT_ID }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          echo "▶ Environnement : PRODUCTION (main)"
+          if [ -z "$PROJECT_REF" ]; then echo "❌ PRODUCTION_PROJECT_ID est vide (ni variable ni secret)"; exit 1; fi
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then echo "❌ SUPABASE_ACCESS_TOKEN est vide"; exit 1; fi
+          supabase functions deploy --project-ref "$PROJECT_REF" --no-verify-jwt
