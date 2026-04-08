@@ -2,8 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Webhook, Save, Loader2, Package, ShieldCheck, ExternalLink } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
+import { Webhook, Loader2, Package, ShieldCheck, Send, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 
 interface Props {
   storeId: string;
@@ -13,15 +12,43 @@ export function VendorAutonomousTab({ storeId }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Fetch store info (is_platform_owned)
+  const { data: storeInfo } = useQuery({
+    queryKey: ["vendor-store-info", storeId],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("stores")
+        .select("is_platform_owned")
+        .eq("id", storeId)
+        .single();
+      return data;
+    },
+  });
+
+  // Fetch vendor overrides
   const { data: override, isLoading } = useQuery({
     queryKey: ["vendor-autonomous", storeId],
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("vendor_pricing_overrides")
-        .select("vendor_webhook_url, vendor_mode, vendor_mobile_money_enabled, vendor_card_enabled, vendor_cod_enabled, vendor_off_platform_enabled, vendor_custom_payment_numbers_enabled")
+        .select("vendor_webhook_url, vendor_mode, vendor_mobile_money_enabled, vendor_card_enabled, vendor_cod_enabled, vendor_off_platform_enabled, vendor_custom_payment_numbers_enabled, webhook_approved")
         .eq("store_id", storeId)
         .single();
       return data;
+    },
+  });
+
+  // Fetch webhook requests
+  const { data: webhookRequests } = useQuery({
+    queryKey: ["webhook-requests", storeId],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("webhook_api_requests")
+        .select("*")
+        .eq("store_id", storeId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      return data || [];
     },
   });
 
@@ -39,47 +66,29 @@ export function VendorAutonomousTab({ storeId }: Props) {
   });
 
   const [webhookUrl, setWebhookUrl] = useState("");
-  const [initialized, setInitialized] = useState(false);
 
-  if (override && !initialized) {
-    setWebhookUrl(override.vendor_webhook_url || "");
-    setInitialized(true);
-  }
-
-  const saveMutation = useMutation({
+  // Submit webhook request
+  const submitRequest = useMutation({
     mutationFn: async () => {
+      if (!webhookUrl.trim()) throw new Error("Veuillez renseigner une URL");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Non authentifié");
       const { error } = await (supabase as any)
-        .from("vendor_pricing_overrides")
-        .update({ vendor_webhook_url: webhookUrl || null, updated_at: new Date().toISOString() })
-        .eq("store_id", storeId);
+        .from("webhook_api_requests")
+        .insert({
+          store_id: storeId,
+          requested_by: user.id,
+          requested_url: webhookUrl.trim(),
+        });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Enregistré", description: "URL webhook mise à jour." });
-      queryClient.invalidateQueries({ queryKey: ["vendor-autonomous", storeId] });
+      toast({ title: "Demande envoyée", description: "Votre demande d'activation Webhook sera examinée par l'administrateur." });
+      setWebhookUrl("");
+      queryClient.invalidateQueries({ queryKey: ["webhook-requests", storeId] });
     },
     onError: (err: any) => {
       toast({ title: "Erreur", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const testWebhook = useMutation({
-    mutationFn: async () => {
-      if (!recentOrders?.length) throw new Error("Aucune commande à tester");
-      const { data, error } = await supabase.functions.invoke("vendor-order-webhook", {
-        body: { order_id: recentOrders[0].id },
-      });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data: any) => {
-      toast({
-        title: "Webhook envoyé",
-        description: `Statut: ${data?.webhook_status || "OK"}`,
-      });
-    },
-    onError: (err: any) => {
-      toast({ title: "Erreur webhook", description: err.message, variant: "destructive" });
     },
   });
 
@@ -91,13 +100,54 @@ export function VendorAutonomousTab({ storeId }: Props) {
     );
   }
 
+  // Platform-owned stores cannot use autonomous mode
+  const isPlatformOwned = storeInfo?.is_platform_owned === true;
+
+  if (isPlatformOwned) {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-xl border p-6 bg-muted/30 border-border text-center">
+          <AlertTriangle size={32} className="mx-auto text-muted-foreground mb-3" />
+          <h3 className="text-sm font-bold text-foreground mb-2">Mode non disponible</h3>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto">
+            Cette boutique appartient à la plateforme. Le mode Vendeur Autonome n'est pas disponible pour les boutiques de la plateforme.
+            Contactez l'administrateur si vous souhaitez que votre boutique devienne indépendante.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const isAutonomous = override?.vendor_mode === "local_only" || override?.vendor_off_platform_enabled;
+  const webhookApproved = override?.webhook_approved === true;
+  const activeWebhook = webhookApproved ? override?.vendor_webhook_url : null;
   const paymentConfig = {
-    mobile_money: override?.vendor_mobile_money_enabled !== false,
-    card: override?.vendor_card_enabled !== false,
-    cod: !!override?.vendor_cod_enabled,
-    off_platform: !!override?.vendor_off_platform_enabled,
-    custom_numbers: !!override?.vendor_custom_payment_numbers_enabled,
+    mobile_money: override?.vendor_mobile_money_enabled === true,
+    card: override?.vendor_card_enabled === true,
+    cod: override?.vendor_cod_enabled === true,
+    off_platform: override?.vendor_off_platform_enabled === true,
+    custom_numbers: override?.vendor_custom_payment_numbers_enabled === true,
+  };
+
+  const latestPendingRequest = webhookRequests?.find((r: any) => r.status === "pending");
+  const latestRejected = webhookRequests?.find((r: any) => r.status === "rejected");
+
+  const statusIcon = (status: string) => {
+    switch (status) {
+      case "pending": return <Clock size={12} className="text-yellow-500" />;
+      case "approved": return <CheckCircle2 size={12} className="text-green-500" />;
+      case "rejected": return <XCircle size={12} className="text-destructive" />;
+      default: return null;
+    }
+  };
+
+  const statusLabel = (status: string) => {
+    switch (status) {
+      case "pending": return "En attente";
+      case "approved": return "Approuvée";
+      case "rejected": return "Rejetée";
+      default: return status;
+    }
   };
 
   return (
@@ -112,17 +162,20 @@ export function VendorAutonomousTab({ storeId }: Props) {
         </div>
         <p className="text-xs text-muted-foreground">
           {isAutonomous
-            ? "Vous gérez vos propres paiements et logistique. Les commandes sont relayées via webhook vers votre système."
+            ? "Vous gérez vos propres paiements et logistique. Seul le paiement hors plateforme avec vos numéros personnalisés est actif."
             : "Contactez l'administrateur pour activer le mode vendeur autonome sur votre boutique."}
         </p>
       </div>
 
-      {/* Payment config summary */}
+      {/* Payment config summary (read-only) */}
       <div className="bg-card border border-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <ShieldCheck size={16} className="text-primary" />
           <h4 className="text-sm font-semibold text-foreground">Configuration paiements</h4>
         </div>
+        <p className="text-[10px] text-muted-foreground">
+          Ces options sont gérées par l'administrateur selon votre package.
+        </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {[
             { label: "Mobile Money", active: paymentConfig.mobile_money },
@@ -139,45 +192,102 @@ export function VendorAutonomousTab({ storeId }: Props) {
         </div>
       </div>
 
-      {/* Webhook configuration */}
+      {/* Webhook API — Request-based */}
       <div className="bg-card border border-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Webhook size={16} className="text-primary" />
           <h4 className="text-sm font-semibold text-foreground">Webhook API</h4>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Recevez automatiquement les détails de chaque commande sur votre système (ERP, logistique, etc.)
-        </p>
-        <div className="flex gap-2">
-          <input
-            type="url"
-            placeholder="https://votre-systeme.com/api/orders"
-            value={webhookUrl}
-            onChange={(e) => setWebhookUrl(e.target.value)}
-            className="flex-1 px-3 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-          />
-          <button
-            onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-          >
-            {saveMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-            Sauvegarder
-          </button>
-        </div>
-        {webhookUrl && (
-          <button
-            onClick={() => testWebhook.mutate()}
-            disabled={testWebhook.isPending || !recentOrders?.length}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent text-accent-foreground rounded-lg hover:bg-accent/80 disabled:opacity-50 transition-colors"
-          >
-            {testWebhook.isPending ? <Loader2 size={12} className="animate-spin" /> : <ExternalLink size={12} />}
-            Tester avec la dernière commande
-          </button>
+
+        {webhookApproved && activeWebhook ? (
+          <>
+            <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+              <CheckCircle2 size={14} className="text-green-600 dark:text-green-400 shrink-0" />
+              <div>
+                <p className="text-xs font-medium text-green-700 dark:text-green-300">Webhook actif</p>
+                <p className="text-[10px] text-green-600 dark:text-green-400 break-all">{activeWebhook}</p>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Pour modifier l'URL, veuillez soumettre une nouvelle demande ci-dessous.
+            </p>
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Recevez automatiquement les détails de chaque commande sur votre système (ERP, logistique, etc.). 
+            Soumettez une demande pour activer cette fonctionnalité.
+          </p>
+        )}
+
+        {/* Show pending request if any */}
+        {latestPendingRequest && (
+          <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+            <Clock size={14} className="text-yellow-600 dark:text-yellow-400 shrink-0" />
+            <div>
+              <p className="text-xs font-medium text-yellow-700 dark:text-yellow-300">Demande en cours d'examen</p>
+              <p className="text-[10px] text-yellow-600 dark:text-yellow-400 break-all">{latestPendingRequest.requested_url}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Show rejection if latest was rejected */}
+        {!latestPendingRequest && latestRejected && (
+          <div className="flex items-start gap-2 p-3 bg-destructive/5 rounded-lg border border-destructive/20">
+            <XCircle size={14} className="text-destructive shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-medium text-destructive">Dernière demande rejetée</p>
+              {latestRejected.admin_notes && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">{latestRejected.admin_notes}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* New request form (only if no pending request) */}
+        {!latestPendingRequest && (
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">URL de votre API</label>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                placeholder="https://votre-systeme.com/api/orders"
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <button
+                onClick={() => submitRequest.mutate()}
+                disabled={submitRequest.isPending || !webhookUrl.trim()}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {submitRequest.isPending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                Soumettre
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Request history */}
+        {webhookRequests && webhookRequests.length > 0 && (
+          <div className="space-y-1.5 pt-2 border-t border-border">
+            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Historique des demandes</p>
+            {webhookRequests.map((req: any) => (
+              <div key={req.id} className="flex items-center justify-between p-2 bg-muted/20 rounded-lg">
+                <div className="flex items-center gap-2 min-w-0">
+                  {statusIcon(req.status)}
+                  <span className="text-[10px] text-foreground truncate">{req.requested_url}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[10px] text-muted-foreground">{statusLabel(req.status)}</span>
+                  <span className="text-[10px] text-muted-foreground">{new Date(req.created_at).toLocaleDateString("fr-FR")}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Recent orders (no platform payment metrics) */}
+      {/* Recent orders */}
       <div className="bg-card border border-border rounded-xl p-4 space-y-3">
         <h4 className="text-sm font-semibold text-foreground">Commandes récentes</h4>
         {!recentOrders?.length ? (
