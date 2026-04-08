@@ -30,6 +30,7 @@ export interface Product {
   careInstructions?: string;
   season?: string;
   salesCount?: number;
+  categoryId?: string;
   storeId?: string;
   shortDescription?: string;
   description?: string;
