@@ -1,61 +1,78 @@
 
 
-# Plan : Toggles de paiement par boutique (Lot 1)
+# Correction du workflow : remplacement ciblé
 
-## Contexte
+## Le problème
+Ligne 27 : `secrets.STAGING_PROJECT_ID` → ce secret **n'existe pas** dans votre GitHub. Votre secret s'appelle `SUPABASE_PROJECT_ID`.
 
-La plateforme dispose de 4 moyens de paiement actifs :
-- **Mobile Money** (KelPay) — identifié comme `mobile_money`
-- **Carte bancaire** (KelPay/Keccel → redirection MasterCard) — identifié comme `card` dans le code, contrôlé par le toggle global `stripe` dans `use-payment-methods.ts`
-- **Paiement à la livraison (COD)** — déjà configurable par boutique
-- **Paiement hors plateforme** — déjà configurable par boutique
-- **PayPal** — toggle global existant
+## La solution : remplacement complet du fichier
 
-Actuellement, seuls COD et Off-platform ont des toggles par boutique (dans `vendor_pricing_overrides`). Mobile Money et Carte sont uniquement contrôlés globalement.
+Je remplace le contenu entier car les deux steps (Staging + Production) doivent être mis à jour avec les vérifications défensives. Le fichier est court, un remplacement complet est plus propre qu'un patch partiel.
 
-Le checkout filtre déjà COD/Off-platform via la logique "toutes les boutiques du panier doivent autoriser" (lignes 275-284 de CheckoutPage.tsx).
+## Nouveau contenu
 
-## Ce qui va changer
+```yaml
+name: Deploy Edge Functions (Multi-Env)
 
-### 1. Migration SQL
-Ajouter 2 colonnes à `vendor_pricing_overrides` :
-- `vendor_mobile_money_enabled BOOLEAN DEFAULT true`
-- `vendor_card_enabled BOOLEAN DEFAULT true`
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'frontend/supabase/functions/**'
+      - 'frontend/supabase/config.toml'
+  workflow_dispatch:
 
-Par défaut `true` : aucun impact sur les boutiques existantes — tout reste activé comme avant.
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-### 2. Admin UI (AdminVendorPricingPage.tsx)
-Ajouter 2 toggles dans la fiche de chaque boutique, à côté des toggles COD/Off-platform existants :
-- "Mobile Money" → contrôle `vendor_mobile_money_enabled`
-- "Carte bancaire" → contrôle `vendor_card_enabled`
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
-### 3. Checkout (CheckoutPage.tsx)
-Étendre la requête existante (ligne 277) pour lire aussi `vendor_mobile_money_enabled` et `vendor_card_enabled`. Appliquer la même logique d'intersection : un moyen de paiement n'apparaît que si **toutes** les boutiques du panier l'autorisent.
+      - name: Deploy to Staging
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          if [ -z "$PROJECT_REF" ]; then
+            echo "::error::SUPABASE_PROJECT_ID secret is not set"
+            exit 1
+          fi
+          supabase link --project-ref "$PROJECT_REF"
+          supabase functions deploy --no-verify-jwt
+        working-directory: frontend
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
 
-### 4. Renommage interne (optionnel mais recommandé)
-Renommer la clé `stripe` en `card` dans `use-payment-methods.ts` pour refléter la réalité (KelPay, pas Stripe). Cela reste un changement cosmétique interne sans impact fonctionnel.
+      - name: Deploy to Production
+        if: github.ref == 'refs/heads/main'
+        run: |
+          if [ -z "$PROJECT_REF" ]; then
+            echo "::error::PRODUCTION_PROJECT_ID secret is not set"
+            exit 1
+          fi
+          supabase link --project-ref "$PROJECT_REF"
+          supabase functions deploy --no-verify-jwt
+        working-directory: frontend
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.PRODUCTION_PROJECT_ID }}
+```
 
-## Garde-fous
+## Ce qui change concrètement
 
-| Risque | Mitigation |
-|--------|-----------|
-| Boutique sans aucun paiement actif | Validation : au moins 1 méthode doit rester active (off_platform en dernier recours) |
-| Panier multi-boutique | Même logique d'intersection que COD — déjà prouvée |
-| Migration destructive | Colonnes ajoutées avec `DEFAULT true` — zéro régression |
+| Avant | Après |
+|---|---|
+| `secrets.STAGING_PROJECT_ID` (inexistant) | `secrets.SUPABASE_PROJECT_ID` (votre vrai secret) |
+| Crash silencieux si secret vide | Message d'erreur explicite + arrêt propre |
+| Variable injectée directement dans la commande | Variable passée via `env:` puis référencée avec `"$PROJECT_REF"` (plus sûr) |
 
-## Fichiers impactés
+`PRODUCTION_PROJECT_ID` reste inchangé car il correspond déjà à votre secret GitHub.
 
-- `supabase/migrations/` — nouvelle migration (2 colonnes)
-- `frontend/src/pages/admin/AdminVendorPricingPage.tsx` — 2 toggles
-- `frontend/src/pages/CheckoutPage.tsx` — filtrage étendu
-- `frontend/src/hooks/use-payment-methods.ts` — renommage `stripe` → `card`
-
-## Estimation
-1 session de travail.
-
----
-
-**Lots suivants (non inclus dans cette implémentation) :**
-- **Lot 2** : Mode "Vendeur Local" (restrictions logistiques, pas de maritime)
-- **Lot 3** : Package "Vendeur Autonome" (abonnement dédié, paiements plateforme désactivés par défaut mais réactivables par le vendeur, webhooks API)
+## Fichier impacté
+- `.github/workflows/deploy-edge-functions.yml` — remplacement complet
 
