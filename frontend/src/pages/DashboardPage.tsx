@@ -1984,6 +1984,10 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
         </h3>
         <div className="space-y-4">
           <div>
+            <Label className="text-xs text-muted-foreground">Mot de passe actuel</Label>
+            <Input type="password" className="mt-1" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Entrez votre mot de passe actuel" />
+          </div>
+          <div>
             <Label className="text-xs text-muted-foreground">Nouveau mot de passe</Label>
             <Input type="password" className="mt-1" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Min. 8 caractères" />
           </div>
@@ -1994,7 +1998,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           {newPassword && confirmPassword && newPassword !== confirmPassword && (
             <p className="text-xs text-destructive">Les mots de passe ne correspondent pas.</p>
           )}
-          <Button onClick={handlePasswordChange} disabled={changingPassword || !newPassword || !confirmPassword} variant="outline" className="mt-2">
+          <Button onClick={handlePasswordChange} disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword} variant="outline" className="mt-2">
             {changingPassword ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
             Changer le mot de passe
           </Button>
