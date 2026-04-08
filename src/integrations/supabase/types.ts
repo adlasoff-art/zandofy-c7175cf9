@@ -5736,6 +5736,7 @@ export type Database = {
           vendor_mode: string
           vendor_off_platform_enabled: boolean
           vendor_webhook_url: string | null
+          webhook_approved: boolean
         }
         Insert: {
           collaborator_limit_override?: number | null
@@ -5759,6 +5760,7 @@ export type Database = {
           vendor_mode?: string
           vendor_off_platform_enabled?: boolean
           vendor_webhook_url?: string | null
+          webhook_approved?: boolean
         }
         Update: {
           collaborator_limit_override?: number | null
@@ -5782,6 +5784,7 @@ export type Database = {
           vendor_mode?: string
           vendor_off_platform_enabled?: boolean
           vendor_webhook_url?: string | null
+          webhook_approved?: boolean
         }
         Relationships: [
           {
@@ -5946,6 +5949,53 @@ export type Database = {
             foreignKeyName: "vendor_wallets_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: true
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_api_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          id: string
+          requested_by: string
+          requested_url: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          requested_by: string
+          requested_url: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          requested_by?: string
+          requested_url?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_api_requests_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
             referencedRelation: "stores"
             referencedColumns: ["id"]
           },
