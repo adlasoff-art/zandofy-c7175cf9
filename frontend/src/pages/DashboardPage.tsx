@@ -1703,6 +1703,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
       residence_quartier: profile.residence_quartier || null,
       preferred_language: profile.preferred_language || 'fr',
       preferred_contact_channel: profile.preferred_contact_channel || 'chat',
+      allowed_channels: profile.allowed_channels.length > 0 ? profile.allowed_channels : ["chat", "email"],
     };
     const { data, error } = await supabase
       .from("profiles")
