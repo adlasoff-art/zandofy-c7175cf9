@@ -835,6 +835,7 @@ export type Database = {
           country_code: string
           created_at: string
           id: string
+          is_active: boolean
           latitude: number
           logistic_zone_id: string | null
           longitude: number
@@ -847,6 +848,7 @@ export type Database = {
           country_code: string
           created_at?: string
           id?: string
+          is_active?: boolean
           latitude: number
           logistic_zone_id?: string | null
           longitude: number
@@ -859,6 +861,7 @@ export type Database = {
           country_code?: string
           created_at?: string
           id?: string
+          is_active?: boolean
           latitude?: number
           logistic_zone_id?: string | null
           longitude?: number
