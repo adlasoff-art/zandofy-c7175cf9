@@ -161,6 +161,10 @@ interface ProfileData {
   nationality: string;
   residence_address: string;
   residence_city: string;
+  residence_country: string;
+  residence_province: string;
+  residence_commune: string;
+  residence_quartier: string;
   preferred_language: string;
   preferred_contact_channel: string;
 }
@@ -1630,7 +1634,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "", nationality: "", residence_address: "", residence_city: "", preferred_language: "fr", preferred_contact_channel: "chat" });
+  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "", nationality: "", residence_address: "", residence_city: "", residence_country: "", residence_province: "", residence_commune: "", residence_quartier: "", preferred_language: "fr", preferred_contact_channel: "chat" });
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -1652,6 +1656,10 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           nationality: d.nationality || "",
           residence_address: d.residence_address || "",
           residence_city: d.residence_city || "",
+          residence_country: d.residence_country || "",
+          residence_province: d.residence_province || "",
+          residence_commune: d.residence_commune || "",
+          residence_quartier: d.residence_quartier || "",
           preferred_language: d.preferred_language || "fr",
           preferred_contact_channel: d.preferred_contact_channel || "chat",
         });
@@ -1672,6 +1680,10 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
       nationality: profile.nationality || null,
       residence_address: profile.residence_address || null,
       residence_city: profile.residence_city || null,
+      residence_country: profile.residence_country || null,
+      residence_province: profile.residence_province || null,
+      residence_commune: profile.residence_commune || null,
+      residence_quartier: profile.residence_quartier || null,
       preferred_language: profile.preferred_language || 'fr',
       preferred_contact_channel: profile.preferred_contact_channel || 'chat',
     };
