@@ -26,6 +26,12 @@ export interface DynamicVariantSelection {
   variant_option_id: string;
 }
 
+/* ── Custom vendor variant value ── */
+export interface CustomVariantValue {
+  variant_type_id: string;
+  custom_label: string;
+}
+
 interface VariantType {
   id: string;
   name: string;
@@ -55,16 +61,19 @@ interface Props {
   sizes: SizeVariant[];
   colors: ColorVariant[];
   dynamicSelections: DynamicVariantSelection[];
+  customVariantValues: CustomVariantValue[];
   onSizesChange: (sizes: SizeVariant[]) => void;
   onColorsChange: (colors: ColorVariant[]) => void;
   onDynamicSelectionsChange: (selections: DynamicVariantSelection[]) => void;
+  onCustomVariantValuesChange: (values: CustomVariantValue[]) => void;
 }
 
-export function ProductVariantsEditor({ sizes, colors, dynamicSelections, onSizesChange, onColorsChange, onDynamicSelectionsChange }: Props) {
+export function ProductVariantsEditor({ sizes, colors, dynamicSelections, customVariantValues, onSizesChange, onColorsChange, onDynamicSelectionsChange, onCustomVariantValuesChange }: Props) {
   const [customSize, setCustomSize] = useState("");
   const [customColorName, setCustomColorName] = useState("");
   const [customColorHex, setCustomColorHex] = useState("#000000");
   const [variantTypes, setVariantTypes] = useState<VariantType[]>([]);
+  const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
 
   // Load dynamic variant types
   useEffect(() => {
@@ -299,13 +308,15 @@ export function ProductVariantsEditor({ sizes, colors, dynamicSelections, onSize
       {/* ── Dynamic variant types ── */}
       {variantTypes.map((vt) => {
         const selectedForType = dynamicSelections.filter((s) => s.variant_type_id === vt.id);
+        const customForType = customVariantValues.filter((c) => c.variant_type_id === vt.id);
         return (
           <div key={vt.id} className="border-t border-border pt-3">
             <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-2">
               <Layers size={14} /> {vt.name} {vt.unit && <span className="text-muted-foreground font-normal">({vt.unit})</span>}
             </label>
+            {/* Admin-defined options */}
             {vt.options.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">Aucune option disponible pour ce type.</p>
+              <p className="text-xs text-muted-foreground italic">Aucune option prédéfinie.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {vt.options.map((opt) => {
@@ -327,6 +338,67 @@ export function ProductVariantsEditor({ sizes, colors, dynamicSelections, onSize
                 })}
               </div>
             )}
+
+            {/* Custom vendor values */}
+            {customForType.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {customForType.map((cv) => (
+                  <span
+                    key={cv.custom_label}
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md bg-accent text-accent-foreground border border-border"
+                  >
+                    {cv.custom_label}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onCustomVariantValuesChange(
+                          customVariantValues.filter(
+                            (c) => !(c.variant_type_id === vt.id && c.custom_label === cv.custom_label)
+                          )
+                        )
+                      }
+                      className="text-muted-foreground hover:text-destructive ml-0.5"
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Add custom value */}
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                placeholder={`Valeur personnalisée${vt.unit ? ` (${vt.unit})` : ""}…`}
+                value={customInputs[vt.id] || ""}
+                onChange={(e) => setCustomInputs({ ...customInputs, [vt.id]: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const val = (customInputs[vt.id] || "").trim();
+                    if (val && !customForType.some((c) => c.custom_label === val)) {
+                      onCustomVariantValuesChange([...customVariantValues, { variant_type_id: vt.id, custom_label: val }]);
+                      setCustomInputs({ ...customInputs, [vt.id]: "" });
+                    }
+                  }
+                }}
+                className="flex-1 px-3 py-1.5 text-xs bg-card border border-border rounded-md"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const val = (customInputs[vt.id] || "").trim();
+                  if (val && !customForType.some((c) => c.custom_label === val)) {
+                    onCustomVariantValuesChange([...customVariantValues, { variant_type_id: vt.id, custom_label: val }]);
+                    setCustomInputs({ ...customInputs, [vt.id]: "" });
+                  }
+                }}
+                className="px-3 py-1.5 text-xs font-medium bg-muted text-foreground rounded-md hover:bg-muted/80 flex items-center gap-1"
+              >
+                <Plus size={12} /> Ajouter
+              </button>
+            </div>
           </div>
         );
       })}

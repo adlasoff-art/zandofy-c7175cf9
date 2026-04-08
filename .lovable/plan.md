@@ -1,45 +1,53 @@
 
-# Plan de changements — Zandofy
+# Plan d'implémentation — Lots pré-lancement (8-12 avril)
 
-## Lot 1 — Titre de page d'accueil configurable par l'admin
-- Connecter le champ `site_title` de la page SEO admin (`platform_settings.seo_config`) au composant `SEOHead` de la page d'accueil
-- Le titre affiché dans l'onglet du navigateur sera celui défini par l'admin dans **Référencement (SEO) → Métadonnées globales → Titre du site**
-- Appliquer aussi la meta description configurée
+## Lot 1 — Vendeur Autonome & Webhook API
+- Bloquer l'activation du mode autonome pour les boutiques `is_platform_owned = true`
+- Quand une boutique quitte le mode plateforme → attribution automatique du package "Beginner"
+- Configuration paiement par défaut : **off_platform = ON**, **custom_numbers = ON**, Mobile Money/Carte/COD = **OFF**
+- Webhook API : transformer en système de **demande/approbation** (table `webhook_api_requests`) au lieu du self-service actuel
+- Le vendeur remplit l'URL dans sa demande → admin valide → URL pré-remplie mais inactive tant que non approuvée
 
-## Lot 2 — Section "Pour vous" intelligente
-- Personnaliser les recommandations selon le profil utilisateur :
-  - **Femme** → produits féminins prioritaires
-  - **Homme** → produits masculins selon tranche d'âge
-  - **Non renseigné** → mix équilibré (femmes, hommes, gadgets)
-- Intégrer l'historique de navigation : produits cliqués/vus restent dans "Pour vous" tant qu'ils ne sont pas achetés
-- Actualiser dynamiquement selon les interactions récentes
-- Limiter à 8 produits (2 lignes de 4)
+## Lot 2 — Profil géographique (combo boxes)
+- Remplacer les champs texte libres (Pays, Province, Ville, Commune, Quartier) par des **combo boxes chaînées** alimentées depuis les tables géographiques existantes (`cities`, `provinces`, `communes`)
+- Seul le champ "Adresse de résidence" (avenue, numéro, appartement) reste en saisie libre
+- Verrouillage de l'adresse de résidence si commandes en cours → nécessite une demande de modification
+- Adresses de livraison modifiables seulement si aucune commande en cours
+- L'adresse par défaut ne peut pas être supprimée (modifiable uniquement)
 
-## Lot 3 — Top Tendances administrables
-- Permettre à l'admin de sélectionner manuellement les 12 produits affichés en page d'accueil
-- Rendre le titre "Top Tendances >" cliquable → redirige vers une page `/trends` dédiée
-- Page `/trends` : afficher plus de produits tendances, filtrables par catégorie, gérés par l'admin
+## Lot 3 — Canal de contact & Mot de passe
+- Canal de contact préféré → **multi-sélection** : Chat interne (obligatoire), Email (obligatoire), WhatsApp (optionnel), SMS (optionnel)
+- Modification de mot de passe → exiger le **mot de passe actuel** + nouveau + confirmation
 
-## Lot 4 — Section "Plus populaires" automatisée
-- Auto-alimenter avec : 8 produits les plus vendus + 2 les plus mis en favoris + 2 les plus ajoutés au panier
-- Créer une page dédiée `/popular` avec tous les produits triés du plus vendu au moins vendu
-- Bouton "Voir plus" pour charger progressivement
+## Lot 4 — Présence boutique (voyants en ligne)
+- Corriger le système de présence pour refléter la **connexion réelle** du propriétaire OU d'un collaborateur actif
+- Voyant vert animé = au moins un membre connecté + `presence_visible = true`
+- Voyant gris = personne connecté ou masqué
+- Appliquer partout : page Stores, cartes boutique, chat, profil boutique
 
-## Lot 5 — Page Fournisseurs (Stores)
-- Limiter l'affichage initial à 10 stores avec bouton "Voir plus"
-- Indicateur de présence réel :
-  - **Vert animé** = propriétaire ou collaborateur connecté ET toggle activé
-  - **Gris statique** = personne connectée OU toggle désactivé
-- Ajouter un toggle dans l'espace vendeur pour activer/désactiver la présence en ligne (activé par défaut)
+## Lot 5 — Articles similaires
+- Filtrer par **sous-catégorie** du produit actuel, puis catégorie parente en repli
+- Afficher 6 produits max
+- Ajouter le **nombre de ventes** à côté du prix dans les cartes produit de cette section
 
-## Lot 6 — Vérification suppression commandes
-- Confirmer que la suppression admin cascade bien sur : order_items, order_status_history, deliveries, delivery_chats, notifications, vendor_transactions, point_transactions, statistiques (sales_count sur products et stores)
+## Lot 6 — Restrictions géographiques (Checkout & Inscription)
+- Inscription : détecter le pays sélectionné → si non actif, bloquer avec message + option "notifiez-moi" (email envoyé à notification@zandofy.com)
+- Profil & Adresses : n'afficher que les **pays actifs** et **villes actives** dans les sélecteurs
+- Checkout : idem, seuls pays/villes actifs disponibles
+- Message d'indisponibilité si ville non éligible
 
-## Lot 7 — Profil utilisateur — adresse géographique
-- Ajouter dans "Mon profil" les champs : pays, province, ville, commune, quartier
-- Distinguer clairement "Adresse de résidence" (profil) vs "Adresses de livraison" (section dédiée)
-- Renommer la section existante en "Adresses de livraison" pour clarifier
+## Lot 7 — Variations produit
+- Afficher **toutes** les variations (pointures, volumes, écrans, etc.) dans la modération admin
+- Permettre aux vendeurs d'ajouter des **valeurs personnalisées** pour chaque type de variation (au-delà des options admin par défaut)
+- Les options par défaut de l'admin ne sont pas supprimables par le vendeur
+
+## Lot 8 — Branding emails & Notifications commandes
+- Section admin pour uploader le **logo PNG** de l'entreprise (avec taille recommandée)
+- Section admin pour la **signature email** (adresse, contact, etc.)
+- Intégrer logo + signature dans **tous** les emails transactionnels
+- Email de confirmation de commande détaillé (articles, frais, total, n° commande)
+- Email envoyé aussi lors de la validation d'un paiement hors plateforme
 
 ---
 
-**Approche** : Traiter lot par lot, en commençant par le Lot 1 (le plus simple et immédiatement utile).
+**Rappel** : Audit complet prévu après tous les lots, avant le 12 avril.

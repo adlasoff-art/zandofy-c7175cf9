@@ -30,6 +30,7 @@ export interface Product {
   careInstructions?: string;
   season?: string;
   salesCount?: number;
+  categoryId?: string;
   storeId?: string;
   shortDescription?: string;
   description?: string;
@@ -122,6 +123,7 @@ export function mapProduct(row: any): Product {
     careInstructions: row.care_instructions || "",
     season: row.season || "",
     storeId: row.store_id || "",
+    categoryId: row.category_id || undefined,
     shortDescription: row.short_description || undefined,
     description: row.description || undefined,
     weightGrams: row.weight_grams || undefined,
@@ -147,7 +149,7 @@ export function mapProduct(row: any): Product {
 
 const PRODUCT_SELECT = `
   *,
-  categories(name, name_fr),
+  categories(name, name_fr, parent_id),
   product_images(image_url, position),
   product_colors(color_hex, color_name, image_url),
   product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),

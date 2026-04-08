@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      address_change_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          id: string
+          new_address: string | null
+          new_city: string | null
+          new_commune: string | null
+          new_country: string | null
+          new_province: string | null
+          new_province_id: string | null
+          new_quartier: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          new_address?: string | null
+          new_city?: string | null
+          new_commune?: string | null
+          new_country?: string | null
+          new_province?: string | null
+          new_province_id?: string | null
+          new_quartier?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          new_address?: string | null
+          new_city?: string | null
+          new_commune?: string | null
+          new_country?: string | null
+          new_province?: string | null
+          new_province_id?: string | null
+          new_quartier?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_audit_logs: {
         Row: {
           action: string
@@ -781,6 +835,7 @@ export type Database = {
           country_code: string
           created_at: string
           id: string
+          is_active: boolean
           latitude: number
           logistic_zone_id: string | null
           longitude: number
@@ -793,6 +848,7 @@ export type Database = {
           country_code: string
           created_at?: string
           id?: string
+          is_active?: boolean
           latitude: number
           logistic_zone_id?: string | null
           longitude: number
@@ -805,6 +861,7 @@ export type Database = {
           country_code?: string
           created_at?: string
           id?: string
+          is_active?: boolean
           latitude?: number
           logistic_zone_id?: string | null
           longitude?: number
@@ -3019,6 +3076,52 @@ export type Database = {
           },
         ]
       }
+      product_custom_variant_values: {
+        Row: {
+          created_at: string
+          custom_label: string
+          id: string
+          product_id: string
+          variant_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          custom_label: string
+          id?: string
+          product_id: string
+          variant_type_id: string
+        }
+        Update: {
+          created_at?: string
+          custom_label?: string
+          id?: string
+          product_id?: string
+          variant_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_custom_variant_values_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_custom_variant_values_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_custom_variant_values_variant_type_id_fkey"
+            columns: ["variant_type_id"]
+            isOneToOne: false
+            referencedRelation: "variant_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_images: {
         Row: {
           id: string
@@ -3458,6 +3561,7 @@ export type Database = {
           residence_commune: string | null
           residence_country: string | null
           residence_province: string | null
+          residence_province_id: string | null
           residence_quartier: string | null
           updated_at: string
         }
@@ -3498,6 +3602,7 @@ export type Database = {
           residence_commune?: string | null
           residence_country?: string | null
           residence_province?: string | null
+          residence_province_id?: string | null
           residence_quartier?: string | null
           updated_at?: string
         }
@@ -3538,6 +3643,7 @@ export type Database = {
           residence_commune?: string | null
           residence_country?: string | null
           residence_province?: string | null
+          residence_province_id?: string | null
           residence_quartier?: string | null
           updated_at?: string
         }
@@ -5736,6 +5842,7 @@ export type Database = {
           vendor_mode: string
           vendor_off_platform_enabled: boolean
           vendor_webhook_url: string | null
+          webhook_approved: boolean
         }
         Insert: {
           collaborator_limit_override?: number | null
@@ -5759,6 +5866,7 @@ export type Database = {
           vendor_mode?: string
           vendor_off_platform_enabled?: boolean
           vendor_webhook_url?: string | null
+          webhook_approved?: boolean
         }
         Update: {
           collaborator_limit_override?: number | null
@@ -5782,6 +5890,7 @@ export type Database = {
           vendor_mode?: string
           vendor_off_platform_enabled?: boolean
           vendor_webhook_url?: string | null
+          webhook_approved?: boolean
         }
         Relationships: [
           {
@@ -5946,6 +6055,53 @@ export type Database = {
             foreignKeyName: "vendor_wallets_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: true
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_api_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          id: string
+          requested_by: string
+          requested_url: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          requested_by: string
+          requested_url: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          requested_by?: string
+          requested_url?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_api_requests_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
             referencedRelation: "stores"
             referencedColumns: ["id"]
           },
@@ -6274,6 +6430,10 @@ export type Database = {
       }
       check_kyc_required: { Args: { p_user_id: string }; Returns: boolean }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
+      compute_store_online_status: {
+        Args: { p_store_id: string }
+        Returns: boolean
+      }
       create_guest_support_ticket: {
         Args: {
           p_category: string
@@ -6367,6 +6527,10 @@ export type Database = {
       increment_helpful: { Args: { review_id: string }; Returns: undefined }
       is_kyc_order_blocked: { Args: { p_user_id: string }; Returns: boolean }
       is_kyc_verified: { Args: { p_user_id: string }; Returns: boolean }
+      refresh_store_online_status: {
+        Args: { p_store_id: string }
+        Returns: undefined
+      }
       release_pending_wallet_funds: {
         Args: { p_store_id: string }
         Returns: undefined
