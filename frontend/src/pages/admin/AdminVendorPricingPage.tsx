@@ -540,6 +540,19 @@ export default function AdminVendorPricingPage() {
                   />
                 </div>
 
+                {/* Webhook URL */}
+                <div className="p-2 bg-muted/30 rounded-lg space-y-1">
+                  <p className="text-xs font-medium text-foreground">Webhook URL (vendeur autonome)</p>
+                  <p className="text-[10px] text-muted-foreground">URL de notification automatique des commandes vers le système du vendeur.</p>
+                  <input
+                    type="url"
+                    placeholder="https://example.com/api/orders"
+                    value={edit.vendor_webhook_url}
+                    onChange={(e) => updateEdit(store.id, "vendor_webhook_url", e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
                     <label className="text-xs text-muted-foreground block mb-1">
