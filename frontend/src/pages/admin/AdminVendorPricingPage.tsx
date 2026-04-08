@@ -108,6 +108,7 @@ export default function AdminVendorPricingPage() {
     vendor_custom_payment_numbers_enabled: boolean;
     vendor_mobile_money_enabled: boolean;
     vendor_card_enabled: boolean;
+    vendor_mode: string;
     returns_enabled: boolean;
     suppliers_enabled: boolean;
     max_products_override: string;
@@ -208,6 +209,7 @@ export default function AdminVendorPricingPage() {
       vendor_custom_payment_numbers_enabled: (o as any)?.vendor_custom_payment_numbers_enabled ?? false,
       vendor_mobile_money_enabled: (o as any)?.vendor_mobile_money_enabled ?? true,
       vendor_card_enabled: (o as any)?.vendor_card_enabled ?? true,
+      vendor_mode: (o as any)?.vendor_mode ?? "international",
       returns_enabled: (store as any).returns_enabled ?? false,
       suppliers_enabled: (o as any)?.suppliers_enabled ?? false,
       max_products_override: o?.max_products_override != null ? String(o.max_products_override) : "",
@@ -224,7 +226,7 @@ export default function AdminVendorPricingPage() {
 
   const getEditForId = (storeId: string) => {
     const store = stores?.find((s) => s.id === storeId);
-    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, vendor_mobile_money_enabled: true, vendor_card_enabled: true, returns_enabled: false, suppliers_enabled: false, max_products_override: "", collaborator_limit_override: "" };
+    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, vendor_mobile_money_enabled: true, vendor_card_enabled: true, vendor_mode: "international", returns_enabled: false, suppliers_enabled: false, max_products_override: "", collaborator_limit_override: "" };
     return getEdit(store);
   };
 
@@ -289,6 +291,7 @@ export default function AdminVendorPricingPage() {
       vendor_custom_payment_numbers_enabled: edit.vendor_custom_payment_numbers_enabled,
       vendor_mobile_money_enabled: edit.vendor_mobile_money_enabled,
       vendor_card_enabled: edit.vendor_card_enabled,
+      vendor_mode: edit.vendor_mode,
       suppliers_enabled: edit.suppliers_enabled,
       max_products_override: edit.max_products_override ? Number(edit.max_products_override) : null,
       collaborator_limit_override: edit.collaborator_limit_override ? Number(edit.collaborator_limit_override) : null,
@@ -424,6 +427,26 @@ export default function AdminVendorPricingPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Vendor mode selector */}
+                <div className="flex items-center justify-between p-2 bg-accent/30 rounded-lg border border-accent/50">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Mode vendeur</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {edit.vendor_mode === "local_only"
+                        ? "Local uniquement : pas de maritime, shipping local (inter-villes, communes)"
+                        : "International : tous les modes de transport disponibles"}
+                    </p>
+                  </div>
+                  <select
+                    value={edit.vendor_mode}
+                    onChange={(e) => updateEdit(store.id, "vendor_mode", e.target.value)}
+                    className="text-xs px-2 py-1.5 bg-muted border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    <option value="international">🌍 International</option>
+                    <option value="local_only">📍 Local uniquement</option>
+                  </select>
+                </div>
 
                 {/* Platform toggle */}
                 <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
