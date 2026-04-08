@@ -1708,6 +1708,10 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
         nationality: updated.nationality || "",
         residence_address: updated.residence_address || "",
         residence_city: updated.residence_city || "",
+        residence_country: updated.residence_country || "",
+        residence_province: updated.residence_province || "",
+        residence_commune: updated.residence_commune || "",
+        residence_quartier: updated.residence_quartier || "",
         preferred_language: updated.preferred_language || "fr",
         preferred_contact_channel: updated.preferred_contact_channel || "chat",
       });
