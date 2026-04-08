@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      address_change_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          id: string
+          new_address: string | null
+          new_city: string | null
+          new_commune: string | null
+          new_country: string | null
+          new_province: string | null
+          new_province_id: string | null
+          new_quartier: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          new_address?: string | null
+          new_city?: string | null
+          new_commune?: string | null
+          new_country?: string | null
+          new_province?: string | null
+          new_province_id?: string | null
+          new_quartier?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          new_address?: string | null
+          new_city?: string | null
+          new_commune?: string | null
+          new_country?: string | null
+          new_province?: string | null
+          new_province_id?: string | null
+          new_quartier?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_audit_logs: {
         Row: {
           action: string
@@ -3458,6 +3512,7 @@ export type Database = {
           residence_commune: string | null
           residence_country: string | null
           residence_province: string | null
+          residence_province_id: string | null
           residence_quartier: string | null
           updated_at: string
         }
@@ -3498,6 +3553,7 @@ export type Database = {
           residence_commune?: string | null
           residence_country?: string | null
           residence_province?: string | null
+          residence_province_id?: string | null
           residence_quartier?: string | null
           updated_at?: string
         }
@@ -3538,6 +3594,7 @@ export type Database = {
           residence_commune?: string | null
           residence_country?: string | null
           residence_province?: string | null
+          residence_province_id?: string | null
           residence_quartier?: string | null
           updated_at?: string
         }
