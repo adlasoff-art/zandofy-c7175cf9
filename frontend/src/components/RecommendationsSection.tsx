@@ -21,27 +21,71 @@ export function RecommendationsSection() {
     async function load() {
       setLoading(true);
       try {
+        // Get user profile for gender/age-based filtering
+        let userGender: string | null = null;
+        let userAge: number | null = null;
+
         if (user) {
-          const { data, error } = await supabase.functions.invoke("ai-recommendations", {
-            body: { userId: user.id },
-          });
-          if (!error && data?.products?.length) {
-            setProducts(data.products.slice(0, 8));
-            setLoading(false);
-            return;
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("gender, date_of_birth")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          if (profile) {
+            userGender = (profile as any).gender || null;
+            const dob = (profile as any).date_of_birth;
+            if (dob) {
+              const birth = new Date(dob);
+              userAge = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+            }
           }
         }
 
-        // Fallback: popular products
-        const { data: popular } = await supabase
+        // Build query based on gender/profile
+        let query = supabase
           .from("products")
-          .select("id, name, price, rating, product_images(image_url, position)")
+          .select("id, name, price, rating, product_images(image_url, position), gender_target")
           .eq("publish_status", "published")
           .order("rating", { ascending: false })
-          .limit(8);
+          .limit(30);
+
+        const { data: allProducts } = await query;
+        const products_list = (allProducts || []) as any[];
+
+        let filtered: any[];
+
+        if (userGender === "female" || userGender === "femme") {
+          // Prioritize female products
+          const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
+          const unisex = products_list.filter(p => p.gender_target === "unisex" && !female.includes(p));
+          filtered = [...female, ...unisex].slice(0, 8);
+        } else if (userGender === "male" || userGender === "homme") {
+          // Prioritize male products
+          const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
+          const unisex = products_list.filter(p => p.gender_target === "unisex" && !male.includes(p));
+          filtered = [...male, ...unisex].slice(0, 8);
+        } else {
+          // Mixed: some female, some male, some unisex/gadgets
+          const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
+          const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
+          const unisex = products_list.filter(p => !["female", "femme", "male", "homme"].includes(p.gender_target || ""));
+          filtered = [
+            ...female.slice(0, 3),
+            ...male.slice(0, 3),
+            ...unisex.slice(0, 2),
+          ].slice(0, 8);
+        }
+
+        // If not enough products, fill with whatever is available
+        if (filtered.length < 8) {
+          const existingIds = new Set(filtered.map(p => p.id));
+          const remaining = products_list.filter(p => !existingIds.has(p.id));
+          filtered = [...filtered, ...remaining].slice(0, 8);
+        }
 
         setProducts(
-          (popular || []).map((p: any) => ({
+          filtered.map((p: any) => ({
             id: p.id,
             name: p.name,
             price: Number(p.price),

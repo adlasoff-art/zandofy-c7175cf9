@@ -72,7 +72,7 @@ const TABS = [
   { key: "messages", label: "Messages", icon: MessageCircle },
   { key: "profile", label: "Profil", icon: UserIcon },
   { key: "kyc", label: "Vérification", icon: ShieldCheck },
-  { key: "addresses", label: "Adresses", icon: MapPin },
+  { key: "addresses", label: "Adresses de livraison", icon: MapPin },
 ];
 
 const ORDERS_PER_PAGE = 10;
@@ -161,6 +161,10 @@ interface ProfileData {
   nationality: string;
   residence_address: string;
   residence_city: string;
+  residence_country: string;
+  residence_province: string;
+  residence_commune: string;
+  residence_quartier: string;
   preferred_language: string;
   preferred_contact_channel: string;
 }
@@ -1630,7 +1634,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "", nationality: "", residence_address: "", residence_city: "", preferred_language: "fr", preferred_contact_channel: "chat" });
+  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "", nationality: "", residence_address: "", residence_city: "", residence_country: "", residence_province: "", residence_commune: "", residence_quartier: "", preferred_language: "fr", preferred_contact_channel: "chat" });
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -1652,6 +1656,10 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           nationality: d.nationality || "",
           residence_address: d.residence_address || "",
           residence_city: d.residence_city || "",
+          residence_country: d.residence_country || "",
+          residence_province: d.residence_province || "",
+          residence_commune: d.residence_commune || "",
+          residence_quartier: d.residence_quartier || "",
           preferred_language: d.preferred_language || "fr",
           preferred_contact_channel: d.preferred_contact_channel || "chat",
         });
@@ -1672,6 +1680,10 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
       nationality: profile.nationality || null,
       residence_address: profile.residence_address || null,
       residence_city: profile.residence_city || null,
+      residence_country: profile.residence_country || null,
+      residence_province: profile.residence_province || null,
+      residence_commune: profile.residence_commune || null,
+      residence_quartier: profile.residence_quartier || null,
       preferred_language: profile.preferred_language || 'fr',
       preferred_contact_channel: profile.preferred_contact_channel || 'chat',
     };
@@ -1696,6 +1708,10 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
         nationality: updated.nationality || "",
         residence_address: updated.residence_address || "",
         residence_city: updated.residence_city || "",
+        residence_country: updated.residence_country || "",
+        residence_province: updated.residence_province || "",
+        residence_commune: updated.residence_commune || "",
+        residence_quartier: updated.residence_quartier || "",
         preferred_language: updated.preferred_language || "fr",
         preferred_contact_channel: updated.preferred_contact_channel || "chat",
       });
@@ -1834,8 +1850,28 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs text-muted-foreground">Ville de résidence</Label>
+              <Label className="text-xs text-muted-foreground">Pays</Label>
+              <Input className="mt-1" value={profile.residence_country} onChange={e => setProfile(p => ({ ...p, residence_country: e.target.value }))} placeholder="Ex: RD Congo" />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Province</Label>
+              <Input className="mt-1" value={profile.residence_province} onChange={e => setProfile(p => ({ ...p, residence_province: e.target.value }))} placeholder="Ex: Kinshasa" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Ville</Label>
               <Input className="mt-1" value={profile.residence_city} onChange={e => setProfile(p => ({ ...p, residence_city: e.target.value }))} placeholder="Votre ville" />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Commune</Label>
+              <Input className="mt-1" value={profile.residence_commune} onChange={e => setProfile(p => ({ ...p, residence_commune: e.target.value }))} placeholder="Ex: Gombe" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">Quartier</Label>
+              <Input className="mt-1" value={profile.residence_quartier} onChange={e => setProfile(p => ({ ...p, residence_quartier: e.target.value }))} placeholder="Ex: Socimat" />
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">Langue préférée</Label>

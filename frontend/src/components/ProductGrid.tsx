@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { fetchProducts, fetchTrendTags, fetchCategories, type Product, type TrendTag } from "@/services/api";
+import { supabase } from "@/integrations/supabase/client";
 import { ChevronRight, TrendingUp, Flame, Users } from "lucide-react";
 
 const PAGE_SIZE = 24;
@@ -37,13 +38,62 @@ export function ProductGrid() {
     fetchTrendTags().then(setTrendTags);
   }, []);
 
-  // Load popular products on mount
+  // Load popular products: 8 most sold + 2 most favorited + 2 most in cart
   useEffect(() => {
     setPopularLoading(true);
-    fetchProducts({ limit: 12, orderBy: "popular" }).then((data) => {
-      setPopularProducts(data);
+    (async () => {
+      // 8 most sold
+      const topSold = await fetchProducts({ limit: 8, orderBy: "popular" });
+
+      // 2 most favorited (by wishlist count)
+      const { data: topWishlisted } = await supabase
+        .from("wishlists")
+        .select("product_id")
+        .limit(100);
+      const wishCounts: Record<string, number> = {};
+      (topWishlisted || []).forEach((w: any) => {
+        wishCounts[w.product_id] = (wishCounts[w.product_id] || 0) + 1;
+      });
+      const topWishIds = Object.entries(wishCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+        .map(([id]) => id);
+
+      // 2 most added to cart
+      const { data: topCarted } = await supabase
+        .from("cart_items")
+        .select("product_id")
+        .limit(100);
+      const cartCounts: Record<string, number> = {};
+      (topCarted || []).forEach((c: any) => {
+        cartCounts[c.product_id] = (cartCounts[c.product_id] || 0) + 1;
+      });
+      const topCartIds = Object.entries(cartCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+        .map(([id]) => id);
+
+      // Fetch extra products for favorites and cart
+      const existingIds = new Set(topSold.map(p => p.id));
+      const extraIds = [...topWishIds, ...topCartIds].filter(id => !existingIds.has(id));
+
+      let extraProducts: typeof topSold = [];
+      if (extraIds.length > 0) {
+        const allExtra = await fetchProducts({ limit: 50 });
+        const wishProducts = topWishIds
+          .filter(id => !existingIds.has(id))
+          .map(id => allExtra.find(p => p.id === id))
+          .filter(Boolean) as typeof topSold;
+        const cartProducts = topCartIds
+          .filter(id => !existingIds.has(id) && !wishProducts.some(p => p.id === id))
+          .map(id => allExtra.find(p => p.id === id))
+          .filter(Boolean) as typeof topSold;
+        extraProducts = [...wishProducts.slice(0, 2), ...cartProducts.slice(0, 2)];
+      }
+
+      setPopularProducts([...topSold, ...extraProducts].slice(0, 12));
       setPopularLoading(false);
-    });
+    })();
   }, []);
 
   // Load category sections on mount
@@ -127,13 +177,13 @@ export function ProductGrid() {
         {/* ═══════════════════════════════════════════ */}
         {popularProducts.length > 0 && (
           <div className="mb-10">
-            <div className="flex items-center gap-2 mb-4">
+          <Link to="/popular" className="flex items-center gap-2 mb-4 group cursor-pointer">
               <Flame size={18} className="text-orange-500" />
-              <h2 className="text-base md:text-lg font-bold text-foreground">
+              <h2 className="text-base md:text-lg font-bold text-foreground group-hover:text-primary transition-colors">
                 Les Plus Populaires
               </h2>
-              <ChevronRight size={16} className="text-muted-foreground" />
-            </div>
+              <ChevronRight size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
+            </Link>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 md:gap-2">
               {popularLoading
                 ? Array.from({ length: 12 }).map((_, i) => <ProductCardSkeleton key={i} />)

@@ -3211,6 +3211,7 @@ export type Database = {
           discount: number | null
           flash_timer_duration_hours: number | null
           flash_timer_enabled: boolean | null
+          gender_target: string | null
           height_cm: number | null
           id: string
           is_new: boolean | null
@@ -3271,6 +3272,7 @@ export type Database = {
           discount?: number | null
           flash_timer_duration_hours?: number | null
           flash_timer_enabled?: boolean | null
+          gender_target?: string | null
           height_cm?: number | null
           id?: string
           is_new?: boolean | null
@@ -3331,6 +3333,7 @@ export type Database = {
           discount?: number | null
           flash_timer_duration_hours?: number | null
           flash_timer_enabled?: boolean | null
+          gender_target?: string | null
           height_cm?: number | null
           id?: string
           is_new?: boolean | null
@@ -4828,6 +4831,7 @@ export type Database = {
           name_change_status: string | null
           owner_id: string | null
           pending_name: string | null
+          presence_visible: boolean
           products_count: number | null
           rating: number | null
           repurchase_rate: string | null
@@ -4886,6 +4890,7 @@ export type Database = {
           name_change_status?: string | null
           owner_id?: string | null
           pending_name?: string | null
+          presence_visible?: boolean
           products_count?: number | null
           rating?: number | null
           repurchase_rate?: string | null
@@ -4944,6 +4949,7 @@ export type Database = {
           name_change_status?: string | null
           owner_id?: string | null
           pending_name?: string | null
+          presence_visible?: boolean
           products_count?: number | null
           rating?: number | null
           repurchase_rate?: string | null
@@ -5284,6 +5290,42 @@ export type Database = {
           sort_order?: number | null
         }
         Relationships: []
+      }
+      trending_products: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trending_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trending_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products_public"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_activity_logs: {
         Row: {

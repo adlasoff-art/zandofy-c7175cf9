@@ -254,7 +254,12 @@ export default function AdminOrdersPage() {
 
   const deleteOrder = async (orderId: string) => {
     setUpdatingId(orderId);
-    // Delete order_items first, then order_status_history, then the order
+    // Cascade delete all related records
+    await (supabase.from("delivery_chats" as any) as any).delete().eq("order_id", orderId);
+    await (supabase.from("deliveries" as any) as any).delete().eq("order_id", orderId);
+    await (supabase.from("vendor_transactions" as any) as any).delete().eq("order_id", orderId);
+    await (supabase.from("point_transactions" as any) as any).delete().eq("order_id", orderId);
+    await supabase.from("order_items").delete().eq("order_id", orderId);
     await supabase.from("order_items").delete().eq("order_id", orderId);
     await supabase.from("order_status_history").delete().eq("order_id", orderId);
     const { error } = await supabase.from("orders").delete().eq("id", orderId);
