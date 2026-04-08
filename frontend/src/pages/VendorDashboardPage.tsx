@@ -355,6 +355,7 @@ export default function VendorDashboardPage() {
     { key: "featured" as const, label: "Mise en avant", icon: Sparkles },
     ...(suppliersEnabled ? [{ key: "suppliers" as const, label: "Fournisseurs", icon: Truck }] : []),
     { key: "pricing" as const, label: "Tarification", icon: DollarSign },
+    { key: "autonomous" as const, label: "Autonome", icon: Globe },
     { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
     ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
     { key: "messages" as const, label: "Messages", icon: MessageCircle },
@@ -392,6 +393,7 @@ export default function VendorDashboardPage() {
       {activeTab === "featured" && <VendorFeaturedRequestTab storeId={store!.id} />}
       {activeTab === "suppliers" && <VendorSuppliersTab storeId={store!.id} />}
       {activeTab === "pricing" && <VendorPricingTab storeId={store!.id} />}
+      {activeTab === "autonomous" && <VendorAutonomousTab storeId={store!.id} />}
       {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
       {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
       {activeTab === "messages" && (
