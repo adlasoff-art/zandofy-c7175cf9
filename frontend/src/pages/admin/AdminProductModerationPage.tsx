@@ -115,6 +115,7 @@ export default function AdminProductModerationPage() {
   // Reject or revision with reason
   const moderateWithReason = useMutation({
     mutationFn: async ({ productId, status, reason, link }: { productId: string; status: string; reason: string; link: string | null }) => {
+      // 1. Update product status
       const { data: updated, error } = await (supabase as any)
         .from("products")
         .update({
@@ -124,15 +125,92 @@ export default function AdminProductModerationPage() {
           moderated_at: new Date().toISOString(),
         })
         .eq("id", productId)
-        .select("id, publish_status");
+        .select("id, publish_status, name_fr, name, store_id");
 
       if (error) throw error;
       if (!updated || updated.length === 0) throw new Error("Mise à jour bloquée — vérifiez vos permissions.");
+
+      const product = updated[0];
+      const productName = product.name_fr || product.name || "Produit";
+
+      // 2. Fetch store owner
+      if (product.store_id) {
+        const { data: store } = await supabase
+          .from("stores")
+          .select("owner_id, name")
+          .eq("id", product.store_id)
+          .maybeSingle();
+
+        if (store?.owner_id) {
+          const isRejection = status === "rejected";
+          const notifTitle = isRejection
+            ? `Produit rejeté : ${productName}`
+            : `Révision requise : ${productName}`;
+          const notifMessage = reason;
+
+          // 3. In-app notification
+          await (supabase as any).from("notifications").insert({
+            user_id: store.owner_id,
+            type: "moderation",
+            title: notifTitle,
+            message: notifMessage,
+            link: "/vendor/products",
+          });
+
+          // 4. Send email notification
+          const { data: ownerProfile } = await supabase
+            .from("profiles")
+            .select("email, first_name")
+            .eq("id", store.owner_id)
+            .maybeSingle();
+
+          if (ownerProfile?.email) {
+            const statusLabel = isRejection ? "rejeté" : "renvoyé pour révision";
+            const linkHtml = link ? `<p style="margin-top:12px;"><a href="${link}" style="color:#2563eb;">Consulter le règlement</a></p>` : "";
+            const emailHtml = `
+              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <h2 style="color:${isRejection ? '#dc2626' : '#ea580c'};">Produit ${statusLabel}</h2>
+                <p>Bonjour ${ownerProfile.first_name || ""},</p>
+                <p>Votre produit <strong>${productName}</strong> a été <strong>${statusLabel}</strong> par l'équipe de modération.</p>
+                <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">
+                  <p style="margin:0 0 4px;font-weight:600;color:#374151;">Raison :</p>
+                  <p style="margin:0;color:#4b5563;white-space:pre-line;">${reason}</p>
+                </div>
+                ${linkHtml}
+                <p style="margin-top:20px;">${isRejection
+                  ? "Vous pouvez soumettre un nouveau produit en tenant compte des remarques ci-dessus."
+                  : "Veuillez corriger votre produit et le resoumettre pour validation."
+                }</p>
+                <p style="margin-top:24px;">
+                  <a href="https://zandofy.com/vendor/products" style="display:inline-block;padding:10px 24px;background:${isRejection ? '#dc2626' : '#ea580c'};color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
+                    Accéder à mes produits
+                  </a>
+                </p>
+                <p style="margin-top:24px;font-size:12px;color:#9ca3af;">— L'équipe Zandofy</p>
+              </div>
+            `;
+
+            try {
+              await supabase.functions.invoke("send-email", {
+                body: {
+                  to: ownerProfile.email,
+                  subject: isRejection
+                    ? `❌ Produit rejeté : ${productName}`
+                    : `⚠️ Révision requise : ${productName}`,
+                  html: emailHtml,
+                },
+              });
+            } catch (emailErr) {
+              console.error("Email notification failed:", emailErr);
+            }
+          }
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-product-moderation"] });
       setActionOpen(false);
-      toast.success(actionType === "rejected" ? "Produit rejeté" : "Produit renvoyé pour révision");
+      toast.success(actionType === "rejected" ? "Produit rejeté — vendeur notifié" : "Produit renvoyé pour révision — vendeur notifié");
     },
     onError: (err: Error) => toast.error(err.message || "Erreur"),
   });
