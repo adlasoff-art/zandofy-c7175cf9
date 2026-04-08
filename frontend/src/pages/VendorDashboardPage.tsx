@@ -834,6 +834,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(store.logo_url || null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [presenceVisible, setPresenceVisible] = useState(true);
 
   // SEO fields
   const [seoTitle, setSeoTitle] = useState("");
@@ -842,10 +843,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   const [seoLoading, setSeoLoading] = useState(true);
 
   useEffect(() => {
-    // Load banner_url + SEO
+    // Load banner_url + SEO + presence
     (supabase as any)
       .from("stores")
-      .select("meta_title, meta_description, seo_keywords, banner_url")
+      .select("meta_title, meta_description, seo_keywords, banner_url, presence_visible")
       .eq("id", store.id)
       .single()
       .then(({ data }: any) => {
@@ -854,6 +855,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
           setSeoDesc(data.meta_description || "");
           setSeoKeywords((data.seo_keywords || []).join(", "));
           setBannerPreview(data.banner_url || null);
+          setPresenceVisible(data.presence_visible !== false);
         }
         setSeoLoading(false);
       });
