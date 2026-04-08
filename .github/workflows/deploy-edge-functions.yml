@@ -25,7 +25,7 @@ jobs:
         if: github.ref == 'refs/heads/develop'
         working-directory: frontend
         env:
-          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_ID || secrets.SUPABASE_PROJECT_ID }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           echo "▶ Environnement : STAGING (develop)"
@@ -38,7 +38,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         working-directory: frontend
         env:
-          PROJECT_REF: ${{ vars.PRODUCTION_PROJECT_ID || secrets.PRODUCTION_PROJECT_ID }}
+          PROJECT_REF: ${{ secrets.PRODUCTION_PROJECT_ID }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           echo "▶ Environnement : PRODUCTION (main)"
