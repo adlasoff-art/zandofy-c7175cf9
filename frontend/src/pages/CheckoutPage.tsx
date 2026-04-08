@@ -120,9 +120,11 @@ export default function CheckoutPage() {
   const [paymentTransactionId, setPaymentTransactionId] = useState<string | null>(null);
   const [paymentReference, setPaymentReference] = useState<string | null>(null);
   const [paymentOrderIds, setPaymentOrderIds] = useState<string[]>([]);
-  const [vendorCodAllowed, setVendorCodAllowed] = useState(false);
-  const [vendorOffPlatformAllowed, setVendorOffPlatformAllowed] = useState(false);
-  const [cartStoreIds, setCartStoreIds] = useState<string[]>([]);
+   const [vendorCodAllowed, setVendorCodAllowed] = useState(false);
+   const [vendorOffPlatformAllowed, setVendorOffPlatformAllowed] = useState(false);
+   const [vendorMobileMoneyAllowed, setVendorMobileMoneyAllowed] = useState(true);
+   const [vendorCardAllowed, setVendorCardAllowed] = useState(true);
+   const [cartStoreIds, setCartStoreIds] = useState<string[]>([]);
   const paymentChannelRef = useRef<any>(null);
   const { data: paymentNumbers = [] } = useStorePaymentNumbers(cartStoreIds);
 
@@ -274,7 +276,7 @@ export default function CheckoutPage() {
 
       const { data: overrides } = await (supabase as any)
         .from("vendor_pricing_overrides")
-        .select("store_id, vendor_cod_enabled, vendor_off_platform_enabled")
+        .select("store_id, vendor_cod_enabled, vendor_off_platform_enabled, vendor_mobile_money_enabled, vendor_card_enabled")
         .in("store_id", storeIds);
 
       const codMap = new Map((overrides || []).map((override: any) => [override.store_id, !!override.vendor_cod_enabled]));
@@ -282,6 +284,12 @@ export default function CheckoutPage() {
 
       const offPlatformMap = new Map((overrides || []).map((override: any) => [override.store_id, !!override.vendor_off_platform_enabled]));
       setVendorOffPlatformAllowed(storeIds.every((storeId) => offPlatformMap.get(storeId) === true));
+
+      const mobileMoneyMap = new Map((overrides || []).map((override: any) => [override.store_id, override.vendor_mobile_money_enabled !== false]));
+      setVendorMobileMoneyAllowed(storeIds.every((storeId) => mobileMoneyMap.get(storeId) !== false));
+
+      const cardMap = new Map((overrides || []).map((override: any) => [override.store_id, override.vendor_card_enabled !== false]));
+      setVendorCardAllowed(storeIds.every((storeId) => cardMap.get(storeId) !== false));
     };
 
     void loadVendorCodEligibility();
@@ -1256,7 +1264,7 @@ export default function CheckoutPage() {
                     { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, M-Pesa, Airtel Money, AfriMoney", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
                     { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
                     { id: "off_platform" as const, label: "Paiement hors plateforme", sub: "Transfert direct, puis envoyez la preuve", icon: <Banknote size={20} />, configKey: "off_platform" as const },
-                  ]).filter(m => (m.id === "card" ? paymentConfig?.stripe !== false : m.id === "paypal" ? (paymentConfig as any)?.paypal !== false : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).filter(m => m.id !== "off_platform" || vendorOffPlatformAllowed).map(method => (
+                  ]).filter(m => (m.id === "card" ? paymentConfig?.stripe !== false : m.id === "paypal" ? (paymentConfig as any)?.paypal !== false : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).filter(m => m.id !== "off_platform" || vendorOffPlatformAllowed).filter(m => m.id !== "mobile_money" || vendorMobileMoneyAllowed).filter(m => m.id !== "card" || vendorCardAllowed).map(method => (
                     <button
                       key={method.id}
                       disabled={method.id === "card" && paymentConfig?.stripe === false}

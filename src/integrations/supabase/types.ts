@@ -5686,9 +5686,11 @@ export type Database = {
           store_id: string
           suppliers_enabled: boolean
           updated_at: string
+          vendor_card_enabled: boolean
           vendor_cod_enabled: boolean
           vendor_custom_payment_numbers_enabled: boolean
           vendor_extra_margin_enabled: boolean
+          vendor_mobile_money_enabled: boolean
           vendor_off_platform_enabled: boolean
         }
         Insert: {
@@ -5705,9 +5707,11 @@ export type Database = {
           store_id: string
           suppliers_enabled?: boolean
           updated_at?: string
+          vendor_card_enabled?: boolean
           vendor_cod_enabled?: boolean
           vendor_custom_payment_numbers_enabled?: boolean
           vendor_extra_margin_enabled?: boolean
+          vendor_mobile_money_enabled?: boolean
           vendor_off_platform_enabled?: boolean
         }
         Update: {
@@ -5724,9 +5728,11 @@ export type Database = {
           store_id?: string
           suppliers_enabled?: boolean
           updated_at?: string
+          vendor_card_enabled?: boolean
           vendor_cod_enabled?: boolean
           vendor_custom_payment_numbers_enabled?: boolean
           vendor_extra_margin_enabled?: boolean
+          vendor_mobile_money_enabled?: boolean
           vendor_off_platform_enabled?: boolean
         }
         Relationships: [

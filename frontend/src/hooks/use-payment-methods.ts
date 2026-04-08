@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface PaymentMethodsConfig {
   mobile_money: boolean;
+  card: boolean;
+  /** @deprecated Use `card` instead */
   stripe: boolean;
   cod: boolean;
   off_platform: boolean;
@@ -16,6 +18,7 @@ export interface PaymentMethodsConfig {
 
 const DEFAULT_CONFIG: PaymentMethodsConfig = {
   mobile_money: true,
+  card: true,
   stripe: true,
   cod: true,
   off_platform: true,
@@ -35,9 +38,11 @@ export function usePaymentMethods() {
         .single();
       if (data?.value && typeof data.value === "object") {
         const v = data.value as Record<string, any>;
+        const cardEnabled = v.card === true || v.stripe === true;
         return {
           mobile_money: v.mobile_money === true,
-          stripe: v.stripe === true,
+          card: cardEnabled,
+          stripe: cardEnabled,
           cod: v.cod === true,
           off_platform: v.off_platform === true,
           paypal: v.paypal !== false,
