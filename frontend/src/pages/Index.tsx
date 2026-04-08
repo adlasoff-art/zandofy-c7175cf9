@@ -17,7 +17,7 @@ import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const queryClient = useQueryClient();
-
+  const seoConfig = useSeoConfig();
   const handleRefresh = useCallback(async () => {
     await queryClient.invalidateQueries();
     await new Promise((resolve) => setTimeout(resolve, 400));
