@@ -5693,6 +5693,7 @@ export type Database = {
           vendor_mobile_money_enabled: boolean
           vendor_mode: string
           vendor_off_platform_enabled: boolean
+          vendor_webhook_url: string | null
         }
         Insert: {
           collaborator_limit_override?: number | null
@@ -5715,6 +5716,7 @@ export type Database = {
           vendor_mobile_money_enabled?: boolean
           vendor_mode?: string
           vendor_off_platform_enabled?: boolean
+          vendor_webhook_url?: string | null
         }
         Update: {
           collaborator_limit_override?: number | null
@@ -5737,6 +5739,7 @@ export type Database = {
           vendor_mobile_money_enabled?: boolean
           vendor_mode?: string
           vendor_off_platform_enabled?: boolean
+          vendor_webhook_url?: string | null
         }
         Relationships: [
           {

@@ -113,6 +113,7 @@ export default function AdminVendorPricingPage() {
     suppliers_enabled: boolean;
     max_products_override: string;
     collaborator_limit_override: string;
+    vendor_webhook_url: string;
   }>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -214,6 +215,7 @@ export default function AdminVendorPricingPage() {
       suppliers_enabled: (o as any)?.suppliers_enabled ?? false,
       max_products_override: o?.max_products_override != null ? String(o.max_products_override) : "",
       collaborator_limit_override: (o as any)?.collaborator_limit_override != null ? String((o as any).collaborator_limit_override) : "",
+      vendor_webhook_url: (o as any)?.vendor_webhook_url ?? "",
     };
   };
 
@@ -226,7 +228,7 @@ export default function AdminVendorPricingPage() {
 
   const getEditForId = (storeId: string) => {
     const store = stores?.find((s) => s.id === storeId);
-    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, vendor_mobile_money_enabled: true, vendor_card_enabled: true, vendor_mode: "international", returns_enabled: false, suppliers_enabled: false, max_products_override: "", collaborator_limit_override: "" };
+    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, vendor_mobile_money_enabled: true, vendor_card_enabled: true, vendor_mode: "international", returns_enabled: false, suppliers_enabled: false, max_products_override: "", collaborator_limit_override: "", vendor_webhook_url: "" };
     return getEdit(store);
   };
 
@@ -295,6 +297,7 @@ export default function AdminVendorPricingPage() {
       suppliers_enabled: edit.suppliers_enabled,
       max_products_override: edit.max_products_override ? Number(edit.max_products_override) : null,
       collaborator_limit_override: edit.collaborator_limit_override ? Number(edit.collaborator_limit_override) : null,
+      vendor_webhook_url: edit.vendor_webhook_url || null,
       updated_at: new Date().toISOString(),
     };
 
@@ -534,6 +537,19 @@ export default function AdminVendorPricingPage() {
                   <Switch
                     checked={edit.suppliers_enabled}
                     onCheckedChange={(v) => updateEdit(store.id, "suppliers_enabled", v)}
+                  />
+                </div>
+
+                {/* Webhook URL */}
+                <div className="p-2 bg-muted/30 rounded-lg space-y-1">
+                  <p className="text-xs font-medium text-foreground">Webhook URL (vendeur autonome)</p>
+                  <p className="text-[10px] text-muted-foreground">URL de notification automatique des commandes vers le système du vendeur.</p>
+                  <input
+                    type="url"
+                    placeholder="https://example.com/api/orders"
+                    value={edit.vendor_webhook_url}
+                    onChange={(e) => updateEdit(store.id, "vendor_webhook_url", e.target.value)}
+                    className={inputClass}
                   />
                 </div>
 
