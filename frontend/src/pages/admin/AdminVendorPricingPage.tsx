@@ -215,6 +215,7 @@ export default function AdminVendorPricingPage() {
       suppliers_enabled: (o as any)?.suppliers_enabled ?? false,
       max_products_override: o?.max_products_override != null ? String(o.max_products_override) : "",
       collaborator_limit_override: (o as any)?.collaborator_limit_override != null ? String((o as any).collaborator_limit_override) : "",
+      vendor_webhook_url: (o as any)?.vendor_webhook_url ?? "",
     };
   };
 
