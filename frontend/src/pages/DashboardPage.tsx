@@ -1860,35 +1860,47 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
             <Label className="text-xs text-muted-foreground">Nationalité</Label>
             <Input className="mt-1" value={profile.nationality} onChange={e => setProfile(p => ({ ...p, nationality: e.target.value }))} placeholder="Ex: Congolaise" />
           </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">Adresse de résidence</Label>
-            <Input className="mt-1" value={profile.residence_address} onChange={e => setProfile(p => ({ ...p, residence_address: e.target.value }))} placeholder="Votre adresse" />
-          </div>
+          {/* Residence address - cascading geo fields */}
+          {hasActiveOrders && (
+            <div className="bg-muted/50 border border-border rounded-lg p-3 text-xs text-muted-foreground flex items-center gap-2">
+              <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+              <span>Votre adresse de résidence est verrouillée car vous avez des commandes en cours. Vous pouvez soumettre une demande de modification.</span>
+            </div>
+          )}
+          {addressChangeRequestPending && (
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-xs text-primary flex items-center gap-2">
+              <Clock size={14} className="shrink-0" />
+              <span>Une demande de modification d'adresse est en attente de validation.</span>
+            </div>
+          )}
+          <CascadingAddressFields
+            data={{
+              country: profile.residence_country,
+              province: profile.residence_province,
+              province_id: profile.residence_province_id,
+              city: profile.residence_city,
+              commune: profile.residence_commune,
+              quartier: profile.residence_quartier,
+              address: profile.residence_address,
+              postal_code: "",
+            }}
+            onChange={(field, value) => {
+              if (hasActiveOrders) return; // locked
+              const fieldMap: Record<string, keyof ProfileData> = {
+                country: "residence_country",
+                province: "residence_province",
+                province_id: "residence_province_id",
+                city: "residence_city",
+                commune: "residence_commune",
+                quartier: "residence_quartier",
+                address: "residence_address",
+              };
+              const profileField = fieldMap[field];
+              if (profileField) setProfile(p => ({ ...p, [profileField]: value }));
+            }}
+            showPostalCode={false}
+          />
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs text-muted-foreground">Pays</Label>
-              <Input className="mt-1" value={profile.residence_country} onChange={e => setProfile(p => ({ ...p, residence_country: e.target.value }))} placeholder="Ex: RD Congo" />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Province</Label>
-              <Input className="mt-1" value={profile.residence_province} onChange={e => setProfile(p => ({ ...p, residence_province: e.target.value }))} placeholder="Ex: Kinshasa" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs text-muted-foreground">Ville</Label>
-              <Input className="mt-1" value={profile.residence_city} onChange={e => setProfile(p => ({ ...p, residence_city: e.target.value }))} placeholder="Votre ville" />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Commune</Label>
-              <Input className="mt-1" value={profile.residence_commune} onChange={e => setProfile(p => ({ ...p, residence_commune: e.target.value }))} placeholder="Ex: Gombe" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs text-muted-foreground">Quartier</Label>
-              <Input className="mt-1" value={profile.residence_quartier} onChange={e => setProfile(p => ({ ...p, residence_quartier: e.target.value }))} placeholder="Ex: Socimat" />
-            </div>
             <div>
               <Label className="text-xs text-muted-foreground">Langue préférée</Label>
               <select
