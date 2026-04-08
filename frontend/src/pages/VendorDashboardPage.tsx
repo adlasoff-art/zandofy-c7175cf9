@@ -834,6 +834,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(store.logo_url || null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [presenceVisible, setPresenceVisible] = useState(true);
 
   // SEO fields
   const [seoTitle, setSeoTitle] = useState("");
@@ -842,10 +843,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   const [seoLoading, setSeoLoading] = useState(true);
 
   useEffect(() => {
-    // Load banner_url + SEO
+    // Load banner_url + SEO + presence
     (supabase as any)
       .from("stores")
-      .select("meta_title, meta_description, seo_keywords, banner_url")
+      .select("meta_title, meta_description, seo_keywords, banner_url, presence_visible")
       .eq("id", store.id)
       .single()
       .then(({ data }: any) => {
@@ -854,6 +855,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
           setSeoDesc(data.meta_description || "");
           setSeoKeywords((data.seo_keywords || []).join(", "));
           setBannerPreview(data.banner_url || null);
+          setPresenceVisible(data.presence_visible !== false);
         }
         setSeoLoading(false);
       });
@@ -961,6 +963,33 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
       <h3 className="text-base font-bold text-foreground flex items-center gap-2">
         <Settings size={16} /> Paramètres de la boutique
       </h3>
+
+      {/* ═══ PRÉSENCE EN LIGNE ═══ */}
+      <div className="bg-card border border-border rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-foreground">Présence en ligne</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {presenceVisible ? "Les clients voient votre boutique comme \"En ligne\" quand vous êtes connecté." : "Votre statut en ligne est masqué."}
+            </p>
+          </div>
+          <button
+            onClick={async () => {
+              const next = !presenceVisible;
+              setPresenceVisible(next);
+              await (supabase as any).from("stores").update({ presence_visible: next }).eq("id", store.id);
+              if (!next) {
+                // Also set store offline immediately
+                await (supabase.rpc as any)("set_store_offline", { p_store_id: store.id });
+              }
+              toast.success(next ? "Présence activée" : "Présence masquée");
+            }}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${presenceVisible ? "bg-emerald-500" : "bg-muted-foreground/30"}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-card transition-transform ${presenceVisible ? "translate-x-6" : "translate-x-1"}`} />
+          </button>
+        </div>
+      </div>
 
       {/* ═══ PHOTO DE PROFIL & BANNIÈRE ═══ */}
       <div className="bg-card border border-border rounded-lg p-4 space-y-4">

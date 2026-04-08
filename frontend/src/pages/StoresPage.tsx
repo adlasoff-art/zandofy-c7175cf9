@@ -120,14 +120,14 @@ function StoreCard({ store }: { store: StoreRow }) {
         <div className="absolute inset-0 bg-gradient-to-t from-card via-card/30 to-transparent" />
 
         {/* Online indicator */}
-        <span className={`absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-card/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium shadow-sm border border-border ${store.is_online ? "text-emerald-600" : "text-amber-600"}`}>
+        <span className={`absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-card/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium shadow-sm border border-border ${store.is_online ? "text-emerald-600" : "text-muted-foreground"}`}>
           <span className="relative flex h-2 w-2">
             {store.is_online && (
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             )}
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${store.is_online ? "bg-emerald-500" : "bg-amber-500"}`} />
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${store.is_online ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
           </span>
-          {store.is_online ? "En ligne" : "Hors ligne"}
+          En ligne
         </span>
 
         {/* Verified badge */}
@@ -239,6 +239,7 @@ export default function StoresPage() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("popular");
   const [filter, setFilter] = useState("all");
+  const [visibleCount, setVisibleCount] = useState(10);
 
   const { data: stores, isLoading } = useQuery({
     queryKey: ["all-stores"],
@@ -436,11 +437,23 @@ export default function StoresPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filtered.map((store) => (
-                <StoreCard key={store.id} store={store} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filtered.slice(0, visibleCount).map((store) => (
+                  <StoreCard key={store.id} store={store} />
+                ))}
+              </div>
+              {visibleCount < filtered.length && (
+                <div className="text-center mt-8">
+                  <button
+                    onClick={() => setVisibleCount((prev) => prev + 10)}
+                    className="px-10 py-2.5 text-sm font-medium border border-foreground text-foreground bg-card hover:bg-foreground hover:text-card transition-colors"
+                  >
+                    Voir plus
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>

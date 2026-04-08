@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Package, MessageCircle, Tag, Info, Check, CheckCheck, Trash2, X, BellRing, Star } from "lucide-react";
+import { Bell, Package, MessageCircle, Tag, Info, Check, CheckCheck, Trash2, X, BellRing, Star, ShieldAlert } from "lucide-react";
 import { useNotifications, type Notification } from "@/hooks/use-notifications";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { useI18n } from "@/contexts/I18nContext";
@@ -14,6 +14,7 @@ const TYPE_CONFIG: Record<string, { icon: typeof Bell; color: string }> = {
   message: { icon: MessageCircle, color: "text-primary" },
   promo: { icon: Tag, color: "text-orange-500" },
   points: { icon: Star, color: "text-yellow-500" },
+  moderation: { icon: ShieldAlert, color: "text-orange-500" },
   info: { icon: Info, color: "text-muted-foreground" },
 };
 

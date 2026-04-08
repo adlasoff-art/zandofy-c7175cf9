@@ -12,11 +12,12 @@ import { Footer } from "@/components/Footer";
 import { FloatingActions } from "@/components/FloatingActions";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { SEOHead } from "@/components/SEOHead";
+import { useSeoConfig } from "@/hooks/use-seo-config";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const queryClient = useQueryClient();
-
+  const seoConfig = useSeoConfig();
   const handleRefresh = useCallback(async () => {
     await queryClient.invalidateQueries();
     await new Promise((resolve) => setTimeout(resolve, 400));
@@ -30,8 +31,8 @@ const Index = () => {
       {...handlers}
     >
       <SEOHead
-        title="Zandofy — Marketplace Mode, Électronique & Maison"
-        description="Découvrez des milliers de produits mode, électronique, maison et beauté sur Zandofy. Livraison gratuite, vendeurs vérifiés, prix compétitifs."
+        title={seoConfig.site_title}
+        description={seoConfig.site_description}
         canonical="/"
         jsonLd={{
           "@context": "https://schema.org",
