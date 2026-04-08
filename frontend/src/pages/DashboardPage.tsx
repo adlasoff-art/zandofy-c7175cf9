@@ -1696,6 +1696,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
       residence_city: profile.residence_city || null,
       residence_country: profile.residence_country || null,
       residence_province: profile.residence_province || null,
+      residence_province_id: profile.residence_province_id || null,
       residence_commune: profile.residence_commune || null,
       residence_quartier: profile.residence_quartier || null,
       preferred_language: profile.preferred_language || 'fr',
