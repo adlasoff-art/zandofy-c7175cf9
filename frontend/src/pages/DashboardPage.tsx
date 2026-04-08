@@ -1645,6 +1645,16 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // Check for active orders (locks residence address)
+  useEffect(() => {
+    supabase.from("orders").select("id").eq("user_id", user.id)
+      .in("status", ["pending", "confirmed", "processing", "shipped", "ready_for_pickup"])
+      .limit(1).then(({ data }) => setHasActiveOrders((data ?? []).length > 0));
+    // Check pending address change request
+    (supabase as any).from("address_change_requests").select("id").eq("user_id", user.id).eq("status", "pending")
+      .limit(1).then(({ data }: any) => setAddressChangeRequestPending((data ?? []).length > 0));
+  }, [user.id]);
+
   useEffect(() => {
     supabase.from("profiles").select("*").eq("id", user.id).maybeSingle().then(({ data }) => {
       if (data) {
@@ -1661,6 +1671,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           residence_city: d.residence_city || "",
           residence_country: d.residence_country || "",
           residence_province: d.residence_province || "",
+          residence_province_id: d.residence_province_id || "",
           residence_commune: d.residence_commune || "",
           residence_quartier: d.residence_quartier || "",
           preferred_language: d.preferred_language || "fr",
