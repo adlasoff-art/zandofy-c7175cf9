@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
-import { Loader2, Package, Store, Tag, Ruler, Weight, MapPin, Star, Image as ImageIcon, Palette, LayoutGrid, DollarSign, AlertTriangle, Link as LinkIcon } from "lucide-react";
+import { Loader2, Package, Store, Tag, Ruler, Weight, MapPin, Star, Image as ImageIcon, Palette, LayoutGrid, DollarSign, AlertTriangle, Link as LinkIcon, Layers } from "lucide-react";
 
 interface Props {
   productId: string | null;
