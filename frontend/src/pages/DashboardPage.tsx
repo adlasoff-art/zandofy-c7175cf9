@@ -1635,7 +1635,9 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "", nationality: "", residence_address: "", residence_city: "", residence_country: "", residence_province: "", residence_commune: "", residence_quartier: "", preferred_language: "fr", preferred_contact_channel: "chat" });
+  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "", nationality: "", residence_address: "", residence_city: "", residence_country: "", residence_province: "", residence_province_id: "", residence_commune: "", residence_quartier: "", preferred_language: "fr", preferred_contact_channel: "chat" });
+  const [hasActiveOrders, setHasActiveOrders] = useState(false);
+  const [addressChangeRequestPending, setAddressChangeRequestPending] = useState(false);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
