@@ -1,6 +1,7 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Search, Store, Save, Loader2, ShieldAlert, Settings } from "lucide-react";
 import { AdminCreateStoreDialog } from "@/components/admin/AdminCreateStoreDialog";
+import { AdminWebhookRequests } from "@/components/admin/AdminWebhookRequests";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -298,6 +299,7 @@ export default function AdminVendorPricingPage() {
       max_products_override: edit.max_products_override ? Number(edit.max_products_override) : null,
       collaborator_limit_override: edit.collaborator_limit_override ? Number(edit.collaborator_limit_override) : null,
       vendor_webhook_url: edit.vendor_webhook_url || null,
+      webhook_approved: !!(edit.vendor_webhook_url),
       updated_at: new Date().toISOString(),
     };
 
@@ -339,6 +341,9 @@ export default function AdminVendorPricingPage() {
       <div className="space-y-4 max-w-4xl">
         {/* Global defaults section */}
         <GlobalPricingDefaults defaults={globalDefaults} />
+
+        {/* Webhook API requests pending approval */}
+        <AdminWebhookRequests />
 
         {/* Admin create store */}
         <div className="flex justify-end">
