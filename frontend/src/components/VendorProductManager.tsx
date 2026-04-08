@@ -385,14 +385,16 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     setVariationMedia(variations);
 
     // Load existing sizes, colors & supplier products
-    const [sizesRes, colorsRes, dynRes] = await Promise.all([
+    const [sizesRes, colorsRes, dynRes, customRes] = await Promise.all([
       supabase.from("product_sizes").select("id, size_label, region, bust_cm, waist_cm, hips_cm").eq("product_id", product.id),
       supabase.from("product_colors").select("id, color_name, color_hex, image_url").eq("product_id", product.id),
       (supabase as any).from("product_variant_selections").select("variant_type_id, variant_option_id").eq("product_id", product.id),
+      (supabase as any).from("product_custom_variant_values").select("variant_type_id, custom_label").eq("product_id", product.id),
     ]);
     setSizes(sizesRes.data || []);
     setColors(colorsRes.data || []);
     setDynamicSelections((dynRes.data || []) as DynamicVariantSelection[]);
+    setCustomVariantValues((customRes.data || []) as CustomVariantValue[]);
 
     // Load supplier product options if supplier is set
     if ((product as any).supplier_id) {
@@ -530,6 +532,18 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             product_id: productId!,
             variant_type_id: s.variant_type_id,
             variant_option_id: s.variant_option_id,
+          }))
+        );
+      }
+
+      // Sync custom variant values
+      await (supabase as any).from("product_custom_variant_values").delete().eq("product_id", productId);
+      if (customVariantValues.length > 0) {
+        await (supabase as any).from("product_custom_variant_values").insert(
+          customVariantValues.map((c) => ({
+            product_id: productId!,
+            variant_type_id: c.variant_type_id,
+            custom_label: c.custom_label,
           }))
         );
       }
@@ -856,9 +870,11 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             sizes={sizes}
             colors={colors}
             dynamicSelections={dynamicSelections}
+            customVariantValues={customVariantValues}
             onSizesChange={setSizes}
             onColorsChange={setColors}
             onDynamicSelectionsChange={setDynamicSelections}
+            onCustomVariantValuesChange={setCustomVariantValues}
           />
 
           <button
