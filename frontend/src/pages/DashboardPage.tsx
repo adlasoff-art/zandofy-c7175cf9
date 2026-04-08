@@ -168,6 +168,7 @@ interface ProfileData {
   residence_quartier: string;
   preferred_language: string;
   preferred_contact_channel: string;
+  allowed_channels: string[];
 }
 
 export default function DashboardPage() {
