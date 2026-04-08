@@ -2154,6 +2154,13 @@ function AddressesTab({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-4 max-w-xl">
+      {hasActiveOrders && (
+        <div className="bg-muted/50 border border-border rounded-lg p-3 text-xs text-muted-foreground flex items-center gap-2">
+          <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+          <span>Vous avez des commandes en cours. La modification et la suppression des adresses de livraison sont temporairement bloquées.</span>
+        </div>
+      )}
+    <div className="space-y-4 max-w-xl">
       {addresses.map(addr => (
         <div key={addr.id} className={`bg-card border rounded-lg p-4 ${addr.is_default ? "border-primary" : "border-border"}`}>
           <div className="flex items-start gap-3">
