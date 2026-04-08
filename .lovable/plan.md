@@ -1,78 +1,40 @@
 
 
-# Correction du workflow : remplacement ciblé
+# Diagnostic : Sélecteur de produit fournisseur
 
-## Le problème
-Ligne 27 : `secrets.STAGING_PROJECT_ID` → ce secret **n'existe pas** dans votre GitHub. Votre secret s'appelle `SUPABASE_PROJECT_ID`.
+## Constat
 
-## La solution : remplacement complet du fichier
+Le code dans `VendorProductManager.tsx` (lignes 728-751) contient **déjà** un sélecteur "📦 Produit du fournisseur" qui :
+- Se charge quand un fournisseur est sélectionné
+- Affiche les produits du fournisseur dans un dropdown
+- Sauvegarde le `supplier_product_id` dans la table `products`
+- Affiche une preview avec image et label du produit sélectionné
 
-Je remplace le contenu entier car les deux steps (Staging + Production) doivent être mis à jour avec les vérifications défensives. Le fichier est court, un remplacement complet est plus propre qu'un patch partiel.
+## Hypothèse du bug
 
-## Nouveau contenu
+Le sélecteur est conditionné par `supplierProductOptions.length > 0` (ligne 729). Si les produits fournisseur ne sont pas correctement enregistrés dans la table `supplier_products`, le dropdown ne s'affiche jamais — ce qui donne l'impression que la fonctionnalité n'existe pas.
 
-```yaml
-name: Deploy Edge Functions (Multi-Env)
+## Actions prévues
 
-on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'frontend/supabase/functions/**'
-      - 'frontend/supabase/config.toml'
-  workflow_dispatch:
+### 1. Améliorer la visibilité du sélecteur produit
+- Toujours afficher la section "📦 Produit du fournisseur" quand un fournisseur est sélectionné, même si aucun produit n'existe
+- Si aucun produit : afficher un message "Ce fournisseur n'a aucun produit enregistré — ajoutez-en depuis l'onglet Fournisseurs"
+- Ajouter un indicateur de chargement pendant le fetch des produits
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+### 2. Améliorer le rendu du sélecteur
+- Remplacer le `<select>` basique par un sélecteur enrichi montrant pour chaque produit : **image miniature + label + lien**
+- Afficher les produits sous forme de cartes cliquables au lieu d'un simple dropdown, pour une meilleure expérience visuelle
 
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
+### 3. Vérifier la sauvegarde des produits fournisseur
+- Auditer que les produits ajoutés dans `VendorSuppliersTab` sont correctement persistés dans `supplier_products` avec le bon `supplier_id`
 
-      - name: Deploy to Staging
-        if: github.ref == 'refs/heads/develop'
-        run: |
-          if [ -z "$PROJECT_REF" ]; then
-            echo "::error::SUPABASE_PROJECT_ID secret is not set"
-            exit 1
-          fi
-          supabase link --project-ref "$PROJECT_REF"
-          supabase functions deploy --no-verify-jwt
-        working-directory: frontend
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
+## Fichiers impactés
 
-      - name: Deploy to Production
-        if: github.ref == 'refs/heads/main'
-        run: |
-          if [ -z "$PROJECT_REF" ]; then
-            echo "::error::PRODUCTION_PROJECT_ID secret is not set"
-            exit 1
-          fi
-          supabase link --project-ref "$PROJECT_REF"
-          supabase functions deploy --no-verify-jwt
-        working-directory: frontend
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROJECT_REF: ${{ secrets.PRODUCTION_PROJECT_ID }}
-```
-
-## Ce qui change concrètement
-
-| Avant | Après |
+| Fichier | Modification |
 |---|---|
-| `secrets.STAGING_PROJECT_ID` (inexistant) | `secrets.SUPABASE_PROJECT_ID` (votre vrai secret) |
-| Crash silencieux si secret vide | Message d'erreur explicite + arrêt propre |
-| Variable injectée directement dans la commande | Variable passée via `env:` puis référencée avec `"$PROJECT_REF"` (plus sûr) |
+| `frontend/src/components/VendorProductManager.tsx` | Améliorer le sélecteur de produit fournisseur : toujours visible, cartes visuelles, message si vide, loader |
 
-`PRODUCTION_PROJECT_ID` reste inchangé car il correspond déjà à votre secret GitHub.
+## Résumé technique
 
-## Fichier impacté
-- `.github/workflows/deploy-edge-functions.yml` — remplacement complet
+Pas de migration SQL nécessaire — les tables et colonnes (`supplier_products`, `products.supplier_product_id`) existent déjà. C'est une amélioration purement UI/UX du formulaire produit.
 
