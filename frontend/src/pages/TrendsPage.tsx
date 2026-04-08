@@ -24,10 +24,10 @@ export default function TrendsPage() {
     setLoading(true);
     // Fetch admin-selected trending products
     (async () => {
-      const { data: trending } = await supabase
-        .from("trending_products")
+      const { data: trending } = await (supabase
+        .from("trending_products" as any)
         .select("product_id")
-        .order("sort_order");
+        .order("sort_order") as any);
 
       const trendingIds = (trending || []).map((t: any) => t.product_id);
 
