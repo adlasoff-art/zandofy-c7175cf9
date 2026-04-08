@@ -287,6 +287,8 @@ export default function AdminVendorPricingPage() {
       vendor_cod_enabled: edit.vendor_cod_enabled,
       vendor_off_platform_enabled: edit.vendor_off_platform_enabled,
       vendor_custom_payment_numbers_enabled: edit.vendor_custom_payment_numbers_enabled,
+      vendor_mobile_money_enabled: edit.vendor_mobile_money_enabled,
+      vendor_card_enabled: edit.vendor_card_enabled,
       suppliers_enabled: edit.suppliers_enabled,
       max_products_override: edit.max_products_override ? Number(edit.max_products_override) : null,
       collaborator_limit_override: edit.collaborator_limit_override ? Number(edit.collaborator_limit_override) : null,
@@ -432,6 +434,28 @@ export default function AdminVendorPricingPage() {
                   <Switch
                     checked={edit.is_platform_owned}
                     onCheckedChange={(v) => updateEdit(store.id, "is_platform_owned", v)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Mobile Money</p>
+                    <p className="text-[10px] text-muted-foreground">Autorise cette boutique à accepter les paiements Mobile Money (KelPay).</p>
+                  </div>
+                  <Switch
+                    checked={edit.vendor_mobile_money_enabled}
+                    onCheckedChange={(v) => updateEdit(store.id, "vendor_mobile_money_enabled", v)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Carte bancaire (Keccel)</p>
+                    <p className="text-[10px] text-muted-foreground">Autorise cette boutique à accepter les paiements par carte Visa/Mastercard.</p>
+                  </div>
+                  <Switch
+                    checked={edit.vendor_card_enabled}
+                    onCheckedChange={(v) => updateEdit(store.id, "vendor_card_enabled", v)}
                   />
                 </div>
 
