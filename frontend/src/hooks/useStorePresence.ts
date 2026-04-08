@@ -11,7 +11,16 @@ export function useStorePresence(storeId: string | null | undefined) {
   useEffect(() => {
     if (!storeId) return;
 
-    const heartbeat = () => {
+    // Check if presence is visible before sending heartbeat
+    const heartbeat = async () => {
+      const { data } = await (supabase as any)
+        .from("stores")
+        .select("presence_visible")
+        .eq("id", storeId)
+        .single();
+
+      if (data?.presence_visible === false) return;
+
       (supabase.rpc as any)("update_store_presence", { p_store_id: storeId }).then(({ error }: any) => {
         if (error) console.warn("Presence heartbeat error:", error.message);
       });
