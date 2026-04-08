@@ -106,6 +106,8 @@ export default function AdminVendorPricingPage() {
     vendor_cod_enabled: boolean;
     vendor_off_platform_enabled: boolean;
     vendor_custom_payment_numbers_enabled: boolean;
+    vendor_mobile_money_enabled: boolean;
+    vendor_card_enabled: boolean;
     returns_enabled: boolean;
     suppliers_enabled: boolean;
     max_products_override: string;
@@ -204,6 +206,8 @@ export default function AdminVendorPricingPage() {
       vendor_cod_enabled: (o as any)?.vendor_cod_enabled ?? false,
       vendor_off_platform_enabled: (o as any)?.vendor_off_platform_enabled ?? false,
       vendor_custom_payment_numbers_enabled: (o as any)?.vendor_custom_payment_numbers_enabled ?? false,
+      vendor_mobile_money_enabled: (o as any)?.vendor_mobile_money_enabled ?? true,
+      vendor_card_enabled: (o as any)?.vendor_card_enabled ?? true,
       returns_enabled: (store as any).returns_enabled ?? false,
       suppliers_enabled: (o as any)?.suppliers_enabled ?? false,
       max_products_override: o?.max_products_override != null ? String(o.max_products_override) : "",
@@ -220,7 +224,7 @@ export default function AdminVendorPricingPage() {
 
   const getEditForId = (storeId: string) => {
     const store = stores?.find((s) => s.id === storeId);
-    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, returns_enabled: false, suppliers_enabled: false, max_products_override: "", collaborator_limit_override: "" };
+    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, vendor_mobile_money_enabled: true, vendor_card_enabled: true, returns_enabled: false, suppliers_enabled: false, max_products_override: "", collaborator_limit_override: "" };
     return getEdit(store);
   };
 
