@@ -1,3 +1,4 @@
+// Deploy trigger: 2026-04-08
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const ALLOWED_HEADERS =
