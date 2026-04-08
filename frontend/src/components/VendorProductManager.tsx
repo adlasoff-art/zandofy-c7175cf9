@@ -11,7 +11,7 @@ import { CountryCombobox } from "@/components/vendor/CountryCombobox";
 import { MediaUploader } from "@/components/vendor/MediaUploader";
 import { ShippingEstimator } from "@/components/vendor/ShippingEstimator";
 import { PromotionTimer } from "@/components/vendor/PromotionTimer";
-import { ProductVariantsEditor, type SizeVariant, type ColorVariant, type DynamicVariantSelection } from "@/components/vendor/ProductVariantsEditor";
+import { ProductVariantsEditor, type SizeVariant, type ColorVariant, type DynamicVariantSelection, type CustomVariantValue } from "@/components/vendor/ProductVariantsEditor";
 import { PricingCalculator } from "@/components/vendor/PricingCalculator";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
@@ -142,6 +142,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   const [sizes, setSizes] = useState<SizeVariant[]>([]);
   const [colors, setColors] = useState<ColorVariant[]>([]);
   const [dynamicSelections, setDynamicSelections] = useState<DynamicVariantSelection[]>([]);
+  const [customVariantValues, setCustomVariantValues] = useState<CustomVariantValue[]>([]);
 
   const showForm = creating || !!editing;
   const draftStorageKey = useMemo(
