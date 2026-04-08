@@ -297,6 +297,7 @@ export default function AdminVendorPricingPage() {
       suppliers_enabled: edit.suppliers_enabled,
       max_products_override: edit.max_products_override ? Number(edit.max_products_override) : null,
       collaborator_limit_override: edit.collaborator_limit_override ? Number(edit.collaborator_limit_override) : null,
+      vendor_webhook_url: edit.vendor_webhook_url || null,
       updated_at: new Date().toISOString(),
     };
 
