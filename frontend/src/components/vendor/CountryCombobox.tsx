@@ -12,7 +12,7 @@ export function getCountryName(code: string): string {
   return COUNTRY_MAP[code] || code;
 }
 
-export function CountryCombobox({ value, onChange, label = "Pays d'origine", placeholder = "Sélectionner un pays...", noneLabel = "— Aucun —", showNone = true }: { value: string; onChange: (v: string) => void; label?: string; placeholder?: string; noneLabel?: string; showNone?: boolean }) {
+export function CountryCombobox({ value, onChange, label = "Pays d'origine", placeholder = "Sélectionner un pays...", noneLabel = "— Aucun —", showNone = true, allowedCodes }: { value: string; onChange: (v: string) => void; label?: string; placeholder?: string; noneLabel?: string; showNone?: boolean; allowedCodes?: string[] }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -35,7 +35,8 @@ export function CountryCombobox({ value, onChange, label = "Pays d'origine", pla
     }
   }, [isMobile, open]);
 
-  const filtered = COUNTRIES.filter((c) => {
+  const baseCountries = allowedCodes ? COUNTRIES.filter(c => allowedCodes.includes(c)) : COUNTRIES;
+  const filtered = baseCountries.filter((c) => {
     const name = COUNTRY_MAP[c].toLowerCase();
     const q = search.toLowerCase();
     return c.toLowerCase().includes(q) || name.includes(q);
