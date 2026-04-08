@@ -149,7 +149,7 @@ export function mapProduct(row: any): Product {
 
 const PRODUCT_SELECT = `
   *,
-  categories(name, name_fr),
+  categories(name, name_fr, parent_id),
   product_images(image_url, position),
   product_colors(color_hex, color_name, image_url),
   product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
