@@ -163,6 +163,7 @@ interface ProfileData {
   residence_city: string;
   residence_country: string;
   residence_province: string;
+  residence_province_id: string;
   residence_commune: string;
   residence_quartier: string;
   preferred_language: string;
@@ -1634,13 +1635,25 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "", nationality: "", residence_address: "", residence_city: "", residence_country: "", residence_province: "", residence_commune: "", residence_quartier: "", preferred_language: "fr", preferred_contact_channel: "chat" });
+  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "", nationality: "", residence_address: "", residence_city: "", residence_country: "", residence_province: "", residence_province_id: "", residence_commune: "", residence_quartier: "", preferred_language: "fr", preferred_contact_channel: "chat" });
+  const [hasActiveOrders, setHasActiveOrders] = useState(false);
+  const [addressChangeRequestPending, setAddressChangeRequestPending] = useState(false);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+
+  // Check for active orders (locks residence address)
+  useEffect(() => {
+    supabase.from("orders").select("id").eq("user_id", user.id)
+      .in("status", ["pending", "confirmed", "processing", "shipped", "ready_for_pickup"])
+      .limit(1).then(({ data }) => setHasActiveOrders((data ?? []).length > 0));
+    // Check pending address change request
+    (supabase as any).from("address_change_requests").select("id").eq("user_id", user.id).eq("status", "pending")
+      .limit(1).then(({ data }: any) => setAddressChangeRequestPending((data ?? []).length > 0));
+  }, [user.id]);
 
   useEffect(() => {
     supabase.from("profiles").select("*").eq("id", user.id).maybeSingle().then(({ data }) => {
@@ -1658,6 +1671,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           residence_city: d.residence_city || "",
           residence_country: d.residence_country || "",
           residence_province: d.residence_province || "",
+          residence_province_id: d.residence_province_id || "",
           residence_commune: d.residence_commune || "",
           residence_quartier: d.residence_quartier || "",
           preferred_language: d.preferred_language || "fr",
@@ -1682,6 +1696,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
       residence_city: profile.residence_city || null,
       residence_country: profile.residence_country || null,
       residence_province: profile.residence_province || null,
+      residence_province_id: profile.residence_province_id || null,
       residence_commune: profile.residence_commune || null,
       residence_quartier: profile.residence_quartier || null,
       preferred_language: profile.preferred_language || 'fr',
@@ -1710,6 +1725,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
         residence_city: updated.residence_city || "",
         residence_country: updated.residence_country || "",
         residence_province: updated.residence_province || "",
+        residence_province_id: updated.residence_province_id || "",
         residence_commune: updated.residence_commune || "",
         residence_quartier: updated.residence_quartier || "",
         preferred_language: updated.preferred_language || "fr",
@@ -1844,35 +1860,47 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
             <Label className="text-xs text-muted-foreground">Nationalité</Label>
             <Input className="mt-1" value={profile.nationality} onChange={e => setProfile(p => ({ ...p, nationality: e.target.value }))} placeholder="Ex: Congolaise" />
           </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">Adresse de résidence</Label>
-            <Input className="mt-1" value={profile.residence_address} onChange={e => setProfile(p => ({ ...p, residence_address: e.target.value }))} placeholder="Votre adresse" />
-          </div>
+          {/* Residence address - cascading geo fields */}
+          {hasActiveOrders && (
+            <div className="bg-muted/50 border border-border rounded-lg p-3 text-xs text-muted-foreground flex items-center gap-2">
+              <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+              <span>Votre adresse de résidence est verrouillée car vous avez des commandes en cours. Vous pouvez soumettre une demande de modification.</span>
+            </div>
+          )}
+          {addressChangeRequestPending && (
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-xs text-primary flex items-center gap-2">
+              <Clock size={14} className="shrink-0" />
+              <span>Une demande de modification d'adresse est en attente de validation.</span>
+            </div>
+          )}
+          <CascadingAddressFields
+            data={{
+              country: profile.residence_country,
+              province: profile.residence_province,
+              province_id: profile.residence_province_id,
+              city: profile.residence_city,
+              commune: profile.residence_commune,
+              quartier: profile.residence_quartier,
+              address: profile.residence_address,
+              postal_code: "",
+            }}
+            onChange={(field, value) => {
+              if (hasActiveOrders) return; // locked
+              const fieldMap: Record<string, keyof ProfileData> = {
+                country: "residence_country",
+                province: "residence_province",
+                province_id: "residence_province_id",
+                city: "residence_city",
+                commune: "residence_commune",
+                quartier: "residence_quartier",
+                address: "residence_address",
+              };
+              const profileField = fieldMap[field];
+              if (profileField) setProfile(p => ({ ...p, [profileField]: value }));
+            }}
+            showPostalCode={false}
+          />
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs text-muted-foreground">Pays</Label>
-              <Input className="mt-1" value={profile.residence_country} onChange={e => setProfile(p => ({ ...p, residence_country: e.target.value }))} placeholder="Ex: RD Congo" />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Province</Label>
-              <Input className="mt-1" value={profile.residence_province} onChange={e => setProfile(p => ({ ...p, residence_province: e.target.value }))} placeholder="Ex: Kinshasa" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs text-muted-foreground">Ville</Label>
-              <Input className="mt-1" value={profile.residence_city} onChange={e => setProfile(p => ({ ...p, residence_city: e.target.value }))} placeholder="Votre ville" />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Commune</Label>
-              <Input className="mt-1" value={profile.residence_commune} onChange={e => setProfile(p => ({ ...p, residence_commune: e.target.value }))} placeholder="Ex: Gombe" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs text-muted-foreground">Quartier</Label>
-              <Input className="mt-1" value={profile.residence_quartier} onChange={e => setProfile(p => ({ ...p, residence_quartier: e.target.value }))} placeholder="Ex: Socimat" />
-            </div>
             <div>
               <Label className="text-xs text-muted-foreground">Langue préférée</Label>
               <select
@@ -2009,8 +2037,9 @@ function AddressesTab({ userId }: { userId: string }) {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ label: "", first_name: "", last_name: "", phone: "", address: "", quartier: "", commune: "", city: "", province: "", province_id: "", country: "CD", postal_code: "" });
-  const [saving, setSaving] = useState(false);
+   const [saving, setSaving] = useState(false);
   const [isKycVerified, setIsKycVerified] = useState(false);
+  const [hasActiveOrders, setHasActiveOrders] = useState(false);
 
   const maxAddresses = isKycVerified ? 5 : 2;
 
@@ -2023,11 +2052,14 @@ function AddressesTab({ userId }: { userId: string }) {
 
   useEffect(() => { fetchAddresses(); }, [fetchAddresses]);
 
-  // Check KYC status
+  // Check KYC status + active orders
   useEffect(() => {
     (supabase as any).from("kyc_verifications").select("id").eq("user_id", userId).eq("status", "approved").limit(1).then(({ data }: any) => {
       setIsKycVerified((data ?? []).length > 0);
     });
+    supabase.from("orders").select("id").eq("user_id", userId)
+      .in("status", ["pending", "confirmed", "processing", "shipped", "ready_for_pickup"])
+      .limit(1).then(({ data }) => setHasActiveOrders((data ?? []).length > 0));
   }, [userId]);
 
   const resetForm = () => {
@@ -2089,13 +2121,17 @@ function AddressesTab({ userId }: { userId: string }) {
 
   const handleDelete = async (id: string) => {
     const addr = addresses.find(a => a.id === id);
-    if (addr && (addr as any).is_first_address) {
-      toast({ title: "Action impossible", description: "Votre première adresse ne peut pas être supprimée, uniquement modifiée.", variant: "destructive" });
+    if (addr && ((addr as any).is_first_address || addr.is_default)) {
+      toast({ title: "Action impossible", description: "L'adresse par défaut ne peut pas être supprimée, uniquement modifiée.", variant: "destructive" });
+      return;
+    }
+    if (hasActiveOrders) {
+      toast({ title: "Action impossible", description: "Vous ne pouvez pas supprimer une adresse tant que vous avez des commandes en cours.", variant: "destructive" });
       return;
     }
     const { error } = await supabase.from("saved_addresses").delete().eq("id", id);
     if (error) {
-      toast({ title: "Erreur", description: "Impossible de supprimer cette adresse.", variant: "destructive" });
+      toast({ title: "Erreur", description: error.message?.includes("default") ? "Impossible de supprimer l'adresse par défaut." : "Impossible de supprimer cette adresse.", variant: "destructive" });
       return;
     }
     await fetchAddresses();
@@ -2118,6 +2154,12 @@ function AddressesTab({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-4 max-w-xl">
+      {hasActiveOrders && (
+        <div className="bg-muted/50 border border-border rounded-lg p-3 text-xs text-muted-foreground flex items-center gap-2">
+          <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+          <span>Vous avez des commandes en cours. La modification et la suppression des adresses de livraison sont temporairement bloquées.</span>
+        </div>
+      )}
       {addresses.map(addr => (
         <div key={addr.id} className={`bg-card border rounded-lg p-4 ${addr.is_default ? "border-primary" : "border-border"}`}>
           <div className="flex items-start gap-3">
@@ -2132,15 +2174,15 @@ function AddressesTab({ userId }: { userId: string }) {
               <p className="text-xs text-muted-foreground">{addr.phone}</p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              {!addr.is_default && (
+              {!addr.is_default && !hasActiveOrders && (
                 <button onClick={() => handleSetDefault(addr.id)} className="text-[11px] text-primary font-medium hover:underline">
                   Par défaut
                 </button>
               )}
-              <button onClick={() => handleEdit(addr)} className="p-1.5 text-muted-foreground hover:text-primary">
+              <button onClick={() => handleEdit(addr)} disabled={hasActiveOrders} className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed">
                 <Edit2 size={14} />
               </button>
-              {!(addr as any).is_first_address && (
+              {!(addr as any).is_first_address && !addr.is_default && !hasActiveOrders && (
                 <button onClick={() => handleDelete(addr.id)} className="p-1.5 text-muted-foreground hover:text-destructive">
                   <Trash2 size={14} />
                 </button>
