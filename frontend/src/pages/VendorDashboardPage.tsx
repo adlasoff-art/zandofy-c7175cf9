@@ -964,6 +964,33 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
         <Settings size={16} /> Paramètres de la boutique
       </h3>
 
+      {/* ═══ PRÉSENCE EN LIGNE ═══ */}
+      <div className="bg-card border border-border rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-foreground">Présence en ligne</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {presenceVisible ? "Les clients voient votre boutique comme \"En ligne\" quand vous êtes connecté." : "Votre statut en ligne est masqué."}
+            </p>
+          </div>
+          <button
+            onClick={async () => {
+              const next = !presenceVisible;
+              setPresenceVisible(next);
+              await (supabase as any).from("stores").update({ presence_visible: next }).eq("id", store.id);
+              if (!next) {
+                // Also set store offline immediately
+                await (supabase.rpc as any)("set_store_offline", { p_store_id: store.id });
+              }
+              toast.success(next ? "Présence activée" : "Présence masquée");
+            }}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${presenceVisible ? "bg-emerald-500" : "bg-muted-foreground/30"}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-card transition-transform ${presenceVisible ? "translate-x-6" : "translate-x-1"}`} />
+          </button>
+        </div>
+      </div>
+
       {/* ═══ PHOTO DE PROFIL & BANNIÈRE ═══ */}
       <div className="bg-card border border-border rounded-lg p-4 space-y-4">
         <label className="text-sm font-medium text-foreground flex items-center gap-2">
