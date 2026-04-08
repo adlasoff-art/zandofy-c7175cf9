@@ -168,6 +168,7 @@ interface ProfileData {
   residence_quartier: string;
   preferred_language: string;
   preferred_contact_channel: string;
+  allowed_channels: string[];
 }
 
 export default function DashboardPage() {
@@ -1635,7 +1636,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "", nationality: "", residence_address: "", residence_city: "", residence_country: "", residence_province: "", residence_province_id: "", residence_commune: "", residence_quartier: "", preferred_language: "fr", preferred_contact_channel: "chat" });
+  const [profile, setProfile] = useState<ProfileData>({ first_name: "", last_name: "", phone: "", avatar_url: "", gender: "", date_of_birth: "", nationality: "", residence_address: "", residence_city: "", residence_country: "", residence_province: "", residence_province_id: "", residence_commune: "", residence_quartier: "", preferred_language: "fr", preferred_contact_channel: "chat", allowed_channels: ["chat", "email"] });
   const [hasActiveOrders, setHasActiveOrders] = useState(false);
   const [addressChangeRequestPending, setAddressChangeRequestPending] = useState(false);
 
@@ -1676,6 +1677,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           residence_quartier: d.residence_quartier || "",
           preferred_language: d.preferred_language || "fr",
           preferred_contact_channel: d.preferred_contact_channel || "chat",
+          allowed_channels: d.allowed_channels || ["chat", "email"],
         });
       }
       setLoading(false);
@@ -1701,6 +1703,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
       residence_quartier: profile.residence_quartier || null,
       preferred_language: profile.preferred_language || 'fr',
       preferred_contact_channel: profile.preferred_contact_channel || 'chat',
+      allowed_channels: profile.allowed_channels.length > 0 ? profile.allowed_channels : ["chat", "email"],
     };
     const { data, error } = await supabase
       .from("profiles")
@@ -1728,9 +1731,10 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
         residence_province_id: updated.residence_province_id || "",
         residence_commune: updated.residence_commune || "",
         residence_quartier: updated.residence_quartier || "",
-        preferred_language: updated.preferred_language || "fr",
-        preferred_contact_channel: updated.preferred_contact_channel || "chat",
-      });
+          preferred_language: updated.preferred_language || "fr",
+          preferred_contact_channel: updated.preferred_contact_channel || "chat",
+          allowed_channels: updated.allowed_channels || ["chat", "email"],
+        });
       await supabase.auth.updateUser({
         data: {
           first_name: updated.first_name || null,
@@ -1744,6 +1748,10 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
   };
 
   const handlePasswordChange = async () => {
+    if (!currentPassword) {
+      toast({ title: "Erreur", description: "Veuillez saisir votre mot de passe actuel.", variant: "destructive" });
+      return;
+    }
     if (newPassword.length < 8) {
       toast({ title: "Erreur", description: "Le mot de passe doit contenir au moins 8 caractères.", variant: "destructive" });
       return;
@@ -1753,6 +1761,19 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
       return;
     }
     setChangingPassword(true);
+    // Verify current password by re-authenticating
+    const email = user.email;
+    if (!email) {
+      toast({ title: "Erreur", description: "Adresse email introuvable.", variant: "destructive" });
+      setChangingPassword(false);
+      return;
+    }
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+    if (signInError) {
+      toast({ title: "Erreur", description: "Le mot de passe actuel est incorrect.", variant: "destructive" });
+      setChangingPassword(false);
+      return;
+    }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setChangingPassword(false);
     if (error) {
@@ -1916,17 +1937,38 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
             </div>
           </div>
           <div>
-            <Label className="text-xs text-muted-foreground">Canal de contact préféré</Label>
-            <select
-              className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-card"
-              value={profile.preferred_contact_channel}
-              onChange={e => setProfile(p => ({ ...p, preferred_contact_channel: e.target.value }))}
-            >
-              <option value="chat">Chat interne</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="sms">SMS</option>
-              <option value="email">Email</option>
-            </select>
+            <Label className="text-xs text-muted-foreground mb-2 block">Canaux de contact</Label>
+            <div className="space-y-2">
+              {[
+                { value: "chat", label: "Chat interne", mandatory: true },
+                { value: "email", label: "Email", mandatory: true },
+                { value: "whatsapp", label: "WhatsApp", mandatory: false },
+                { value: "sms", label: "SMS", mandatory: false },
+              ].map(ch => {
+                const checked = profile.allowed_channels.includes(ch.value);
+                return (
+                  <label key={ch.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={ch.mandatory}
+                      className="accent-primary h-4 w-4 rounded border-border"
+                      onChange={() => {
+                        if (ch.mandatory) return;
+                        setProfile(p => ({
+                          ...p,
+                          allowed_channels: checked
+                            ? p.allowed_channels.filter(c => c !== ch.value)
+                            : [...p.allowed_channels, ch.value],
+                        }));
+                      }}
+                    />
+                    <span className="text-foreground">{ch.label}</span>
+                    {ch.mandatory && <span className="text-[10px] text-muted-foreground">(obligatoire)</span>}
+                  </label>
+                );
+              })}
+            </div>
           </div>
           <Button onClick={handleSave} disabled={saving} className="mt-2">
             {saving ? <Loader2 className="animate-spin mr-2" size={14} /> : <Save size={14} className="mr-2" />}
@@ -1942,6 +1984,10 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
         </h3>
         <div className="space-y-4">
           <div>
+            <Label className="text-xs text-muted-foreground">Mot de passe actuel</Label>
+            <Input type="password" className="mt-1" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Entrez votre mot de passe actuel" />
+          </div>
+          <div>
             <Label className="text-xs text-muted-foreground">Nouveau mot de passe</Label>
             <Input type="password" className="mt-1" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Min. 8 caractères" />
           </div>
@@ -1952,7 +1998,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           {newPassword && confirmPassword && newPassword !== confirmPassword && (
             <p className="text-xs text-destructive">Les mots de passe ne correspondent pas.</p>
           )}
-          <Button onClick={handlePasswordChange} disabled={changingPassword || !newPassword || !confirmPassword} variant="outline" className="mt-2">
+          <Button onClick={handlePasswordChange} disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword} variant="outline" className="mt-2">
             {changingPassword ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
             Changer le mot de passe
           </Button>
