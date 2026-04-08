@@ -26,6 +26,12 @@ export interface DynamicVariantSelection {
   variant_option_id: string;
 }
 
+/* ── Custom vendor variant value ── */
+export interface CustomVariantValue {
+  variant_type_id: string;
+  custom_label: string;
+}
+
 interface VariantType {
   id: string;
   name: string;
@@ -55,16 +61,19 @@ interface Props {
   sizes: SizeVariant[];
   colors: ColorVariant[];
   dynamicSelections: DynamicVariantSelection[];
+  customVariantValues: CustomVariantValue[];
   onSizesChange: (sizes: SizeVariant[]) => void;
   onColorsChange: (colors: ColorVariant[]) => void;
   onDynamicSelectionsChange: (selections: DynamicVariantSelection[]) => void;
+  onCustomVariantValuesChange: (values: CustomVariantValue[]) => void;
 }
 
-export function ProductVariantsEditor({ sizes, colors, dynamicSelections, onSizesChange, onColorsChange, onDynamicSelectionsChange }: Props) {
+export function ProductVariantsEditor({ sizes, colors, dynamicSelections, customVariantValues, onSizesChange, onColorsChange, onDynamicSelectionsChange, onCustomVariantValuesChange }: Props) {
   const [customSize, setCustomSize] = useState("");
   const [customColorName, setCustomColorName] = useState("");
   const [customColorHex, setCustomColorHex] = useState("#000000");
   const [variantTypes, setVariantTypes] = useState<VariantType[]>([]);
+  const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
 
   // Load dynamic variant types
   useEffect(() => {
