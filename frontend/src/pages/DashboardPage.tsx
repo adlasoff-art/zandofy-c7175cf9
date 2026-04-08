@@ -2121,13 +2121,17 @@ function AddressesTab({ userId }: { userId: string }) {
 
   const handleDelete = async (id: string) => {
     const addr = addresses.find(a => a.id === id);
-    if (addr && (addr as any).is_first_address) {
-      toast({ title: "Action impossible", description: "Votre première adresse ne peut pas être supprimée, uniquement modifiée.", variant: "destructive" });
+    if (addr && ((addr as any).is_first_address || addr.is_default)) {
+      toast({ title: "Action impossible", description: "L'adresse par défaut ne peut pas être supprimée, uniquement modifiée.", variant: "destructive" });
+      return;
+    }
+    if (hasActiveOrders) {
+      toast({ title: "Action impossible", description: "Vous ne pouvez pas supprimer une adresse tant que vous avez des commandes en cours.", variant: "destructive" });
       return;
     }
     const { error } = await supabase.from("saved_addresses").delete().eq("id", id);
     if (error) {
-      toast({ title: "Erreur", description: "Impossible de supprimer cette adresse.", variant: "destructive" });
+      toast({ title: "Erreur", description: error.message?.includes("default") ? "Impossible de supprimer l'adresse par défaut." : "Impossible de supprimer cette adresse.", variant: "destructive" });
       return;
     }
     await fetchAddresses();
