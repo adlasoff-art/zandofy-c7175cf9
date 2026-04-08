@@ -6381,6 +6381,10 @@ export type Database = {
       }
       check_kyc_required: { Args: { p_user_id: string }; Returns: boolean }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
+      compute_store_online_status: {
+        Args: { p_store_id: string }
+        Returns: boolean
+      }
       create_guest_support_ticket: {
         Args: {
           p_category: string
@@ -6474,6 +6478,10 @@ export type Database = {
       increment_helpful: { Args: { review_id: string }; Returns: undefined }
       is_kyc_order_blocked: { Args: { p_user_id: string }; Returns: boolean }
       is_kyc_verified: { Args: { p_user_id: string }; Returns: boolean }
+      refresh_store_online_status: {
+        Args: { p_store_id: string }
+        Returns: undefined
+      }
       release_pending_wallet_funds: {
         Args: { p_store_id: string }
         Returns: undefined
