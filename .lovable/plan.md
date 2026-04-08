@@ -1,50 +1,45 @@
 
-Plan de correction rapide
+# Plan de changements — Zandofy
 
-1. Ce que j’ai vérifié
-- Le workflow actif est `.github/workflows/deploy-edge-functions.yml`.
-- Il déploie depuis `frontend/` et utilise `frontend/supabase/config.toml`.
-- Le repo contient aussi un deuxième dossier `supabase/` à la racine, différent de `frontend/supabase/`.
+## Lot 1 — Titre de page d'accueil configurable par l'admin
+- Connecter le champ `site_title` de la page SEO admin (`platform_settings.seo_config`) au composant `SEOHead` de la page d'accueil
+- Le titre affiché dans l'onglet du navigateur sera celui défini par l'admin dans **Référencement (SEO) → Métadonnées globales → Titre du site**
+- Appliquer aussi la meta description configurée
 
-2. Diagnostic le plus probable
-- L’erreur actuelle arrive avant le vrai déploiement, au moment de `supabase link`, parce que `--project-ref` reçoit une valeur vide.
-- Le problème n’est probablement pas la casse des noms de secrets : GitHub normalise les noms en majuscules et les références sont tolérantes à la casse.
-- Le point fragile est surtout l’expression inline actuelle dans le YAML pour choisir les secrets selon la branche.
-- Le mot de passe DB n’est pas la cause de cette erreur précise : si `project-ref` est vide, l’échec se produit avant même que le mot de passe serve réellement.
+## Lot 2 — Section "Pour vous" intelligente
+- Personnaliser les recommandations selon le profil utilisateur :
+  - **Femme** → produits féminins prioritaires
+  - **Homme** → produits masculins selon tranche d'âge
+  - **Non renseigné** → mix équilibré (femmes, hommes, gadgets)
+- Intégrer l'historique de navigation : produits cliqués/vus restent dans "Pour vous" tant qu'ils ne sont pas achetés
+- Actualiser dynamiquement selon les interactions récentes
+- Limiter à 8 produits (2 lignes de 4)
 
-3. Correctif que je propose
-- Modifier uniquement `.github/workflows/deploy-edge-functions.yml`.
-- Remplacer le step unique actuel par 2 steps explicites, un pour `develop`, un pour `main`, avec les secrets appelés directement sans logique compacte `&& ||`.
+## Lot 3 — Top Tendances administrables
+- Permettre à l'admin de sélectionner manuellement les 12 produits affichés en page d'accueil
+- Rendre le titre "Top Tendances >" cliquable → redirige vers une page `/trends` dédiée
+- Page `/trends` : afficher plus de produits tendances, filtrables par catégorie, gérés par l'admin
 
-```text
-develop -> SUPABASE_PROJECT_ID + SUPABASE_DB_PASSWORD
-main    -> PRODUCTION_PROJECT_ID + PRODUCTION_DB_PASSWORD
-```
+## Lot 4 — Section "Plus populaires" automatisée
+- Auto-alimenter avec : 8 produits les plus vendus + 2 les plus mis en favoris + 2 les plus ajoutés au panier
+- Créer une page dédiée `/popular` avec tous les produits triés du plus vendu au moins vendu
+- Bouton "Voir plus" pour charger progressivement
 
-- Ajouter un pré-contrôle non sensible dans le workflow :
-  - vérifier que `PROJECT_REF` existe
-  - vérifier que `DB_PASS` existe
-  - vérifier que `SUPABASE_ACCESS_TOKEN` existe
-  - afficher seulement la branche cible et l’environnement choisi, jamais les secrets
+## Lot 5 — Page Fournisseurs (Stores)
+- Limiter l'affichage initial à 10 stores avec bouton "Voir plus"
+- Indicateur de présence réel :
+  - **Vert animé** = propriétaire ou collaborateur connecté ET toggle activé
+  - **Gris statique** = personne connectée OU toggle désactivé
+- Ajouter un toggle dans l'espace vendeur pour activer/désactiver la présence en ligne (activé par défaut)
 
-4. Pourquoi cette approche est la bonne
-- Elle supprime l’ambiguïté de l’expression actuelle.
-- Elle rend le log GitHub beaucoup plus clair : on saura immédiatement si le run est “develop” ou “main”.
-- Elle respecte votre architecture actuelle sans toucher aux variables, à Docker, ni au reste du déploiement.
+## Lot 6 — Vérification suppression commandes
+- Confirmer que la suppression admin cascade bien sur : order_items, order_status_history, deliveries, delivery_chats, notifications, vendor_transactions, point_transactions, statistiques (sales_count sur products et stores)
 
-5. Point important que je corrigerai aussi mentalement dans le repo
-- Le workflow déploie `frontend/supabase/**`, pas `supabase/**` à la racine.
-- Donc pour les prochains tests automatiques, les changements de fonctions doivent être faits dans `frontend/supabase/functions/`, sinon cela crée de la confusion.
+## Lot 7 — Profil utilisateur — adresse géographique
+- Ajouter dans "Mon profil" les champs : pays, province, ville, commune, quartier
+- Distinguer clairement "Adresse de résidence" (profil) vs "Adresses de livraison" (section dédiée)
+- Renommer la section existante en "Adresses de livraison" pour clarifier
 
-6. Validation prévue après patch
-- Lancer un `workflow_dispatch` sur `develop`
-- Vérifier que le job passe le pré-contrôle et ne tombe plus sur `flag needs an argument: --project-ref`
-- Faire ensuite un mini changement sans impact dans `frontend/supabase/functions/**` pour confirmer le déclenchement automatique
-- Si un échec subsiste après ça, on saura que ce ne sera plus un problème de `project-ref`, mais possiblement de mot de passe DB, de lien projet, ou d’une fonction spécifique
+---
 
-Détails techniques
-- Fichier à modifier : `.github/workflows/deploy-edge-functions.yml`
-- Aucun changement DB
-- Aucun changement frontend
-- Aucun renommage de secret requis
-- Nettoyage optionnel ensuite : harmoniser à terme `supabase/` racine vs `frontend/supabase/` pour éviter les faux diagnostics
+**Approche** : Traiter lot par lot, en commençant par le Lot 1 (le plus simple et immédiatement utile).
