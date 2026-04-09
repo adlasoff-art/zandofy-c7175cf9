@@ -70,6 +70,8 @@ export function Footer() {
         { label: t("footer.giftCard"), to: "/dashboard" },
         { label: t("footer.loyaltyProgram"), to: "/loyalty-program" },
         { label: t("footer.sellOnZandofy"), to: "/become-vendor" },
+        { label: "Top Tendances", to: "/trends" },
+        { label: "Plus Populaires", to: "/popular" },
       ],
     },
   ];
