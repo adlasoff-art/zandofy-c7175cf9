@@ -49,7 +49,7 @@ export class ErrorBoundary extends Component<Props, State> {
       this.props.onOpenSupport();
     } else {
       // Fallback: navigate to support page
-      window.location.href = "/support";
+      window.location.href = "/help-center";
     }
   };
 
