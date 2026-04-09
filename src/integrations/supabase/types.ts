@@ -3741,6 +3741,33 @@ export type Database = {
           },
         ]
       }
+      rate_limit_entries: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          identifier: string
+          request_count: number
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: string
+          identifier: string
+          request_count?: number
+          window_start?: string
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          identifier?: string
+          request_count?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
       referrals: {
         Row: {
           commission_pct: number
@@ -6429,7 +6456,17 @@ export type Database = {
         Returns: boolean
       }
       check_kyc_required: { Args: { p_user_id: string }; Returns: boolean }
+      check_rate_limit: {
+        Args: {
+          p_endpoint: string
+          p_identifier: string
+          p_max_requests: number
+          p_window_seconds?: number
+        }
+        Returns: boolean
+      }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
+      cleanup_rate_limit_entries: { Args: never; Returns: undefined }
       compute_store_online_status: {
         Args: { p_store_id: string }
         Returns: boolean
