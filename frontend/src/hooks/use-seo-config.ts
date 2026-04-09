@@ -1,17 +1,47 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-interface SeoConfig {
+interface SocialUrls {
+  facebook?: string;
+  instagram?: string;
+  twitter?: string;
+}
+
+export interface SeoConfig {
   site_title: string;
   site_description: string;
   default_keywords: string[];
+  default_og_image: string;
+  site_language: string;
+  brand_name: string;
+  tagline: string;
+  social_urls: SocialUrls;
+  google_site_verification: string;
+  google_analytics_id: string;
 }
 
 const DEFAULT_CONFIG: SeoConfig = {
-  site_title: "Zandofy — Marketplace Mode, Électronique & Maison",
+  site_title: "Zandofy — Achetez en Chine, livré en Afrique | Prix usine",
   site_description:
-    "Découvrez des milliers de produits mode, électronique, maison et beauté sur Zandofy. Livraison gratuite, vendeurs vérifiés, prix compétitifs.",
-  default_keywords: [],
+    "Achetez directement aux usines chinoises, turques et internationales. Zandofy gère fournisseurs, logistique et livraison en Afrique. Prix imbattables, support en français.",
+  default_keywords: [
+    "acheter en chine depuis l'afrique",
+    "importer de chine afrique",
+    "fournisseur chine afrique",
+    "transitaire chine afrique",
+    "marketplace sino-africaine",
+    "prix usine chine",
+    "zandofy",
+    "e-commerce afrique",
+    "logistique chine afrique",
+  ],
+  default_og_image: "",
+  site_language: "fr",
+  brand_name: "Zandofy",
+  tagline: "Première plateforme e-commerce sino-africaine d'achat et logistique en Chine et à l'international.",
+  social_urls: {},
+  google_site_verification: "",
+  google_analytics_id: "",
 };
 
 let cachedConfig: SeoConfig | null = null;
@@ -33,7 +63,14 @@ export function useSeoConfig() {
           const c: SeoConfig = {
             site_title: v.site_title || DEFAULT_CONFIG.site_title,
             site_description: v.site_description || DEFAULT_CONFIG.site_description,
-            default_keywords: v.default_keywords || [],
+            default_keywords: v.default_keywords || DEFAULT_CONFIG.default_keywords,
+            default_og_image: v.default_og_image || "",
+            site_language: v.site_language || "fr",
+            brand_name: v.brand_name || "Zandofy",
+            tagline: v.tagline || DEFAULT_CONFIG.tagline,
+            social_urls: v.social_urls || {},
+            google_site_verification: v.google_site_verification || "",
+            google_analytics_id: v.google_analytics_id || "",
           };
           cachedConfig = c;
           setConfig(c);

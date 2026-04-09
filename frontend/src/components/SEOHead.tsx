@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useSeoEnabled } from "@/hooks/use-seo-enabled";
+import { useSeoConfig } from "@/hooks/use-seo-config";
 
 interface SEOHeadProps {
   title: string;
@@ -15,6 +16,7 @@ const SITE_URL = import.meta.env.VITE_SITE_URL || "https://zandofy.com";
 
 export function SEOHead({ title, description, canonical, ogImage, ogType = "website", jsonLd }: SEOHeadProps) {
   const { seoEnabled } = useSeoEnabled();
+  const seoConfig = useSeoConfig();
 
   useEffect(() => {
     const fullTitle = title.includes(SITE_NAME) ? title : `${title} | ${SITE_NAME}`;
@@ -41,18 +43,28 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
     // SEO enabled — set all meta tags
     setMeta("robots", "index, follow");
     setMeta("description", description);
+
+    // Google Site Verification
+    if (seoConfig.google_site_verification) {
+      setMeta("google-site-verification", seoConfig.google_site_verification);
+    }
+
+    // Resolve OG image: prop > config default
+    const resolvedOgImage = ogImage || seoConfig.default_og_image || undefined;
+
+    // Open Graph
     setMeta("og:title", fullTitle, "property");
     setMeta("og:description", description, "property");
     setMeta("og:type", ogType, "property");
     setMeta("og:site_name", SITE_NAME, "property");
-    if (ogImage) setMeta("og:image", ogImage, "property");
+    if (resolvedOgImage) setMeta("og:image", resolvedOgImage, "property");
 
     // Twitter Card
-    setMeta("twitter:card", ogImage ? "summary_large_image" : "summary");
+    setMeta("twitter:card", resolvedOgImage ? "summary_large_image" : "summary");
     setMeta("twitter:title", fullTitle);
     setMeta("twitter:description", description);
     setMeta("twitter:site", "@Zandofy");
-    if (ogImage) setMeta("twitter:image", ogImage);
+    if (resolvedOgImage) setMeta("twitter:image", resolvedOgImage);
 
     // Canonical
     if (canonical) {
@@ -66,22 +78,23 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
       link.href = url;
     }
 
-    // hreflang tags (fr primary + x-default)
+    // hreflang tags
+    const lang = seoConfig.site_language || "fr";
     const currentUrl = canonical
       ? (canonical.startsWith("http") ? canonical : `${SITE_URL}${canonical}`)
       : `${SITE_URL}${window.location.pathname}`;
 
-    const setHreflang = (lang: string, href: string) => {
-      let link = document.querySelector(`link[rel="alternate"][hreflang="${lang}"]`) as HTMLLinkElement | null;
+    const setHreflang = (hrefLang: string, href: string) => {
+      let link = document.querySelector(`link[rel="alternate"][hreflang="${hrefLang}"]`) as HTMLLinkElement | null;
       if (!link) {
         link = document.createElement("link");
         link.rel = "alternate";
-        link.setAttribute("hreflang", lang);
+        link.setAttribute("hreflang", hrefLang);
         document.head.appendChild(link);
       }
       link.href = href;
     };
-    setHreflang("fr", currentUrl);
+    setHreflang(lang, currentUrl);
     setHreflang("x-default", currentUrl);
 
     // JSON-LD
@@ -96,10 +109,38 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
       script.textContent = JSON.stringify(jsonLd);
     }
 
+    // Google Analytics / GTM
+    if (seoConfig.google_analytics_id) {
+      const gaId = seoConfig.google_analytics_id;
+      const existingScript = document.querySelector(`script[src*="googletagmanager.com"][data-seo-ga]`);
+      if (!existingScript) {
+        // gtag.js loader
+        const gtagScript = document.createElement("script");
+        gtagScript.async = true;
+        gtagScript.src = gaId.startsWith("GTM-")
+          ? `https://www.googletagmanager.com/gtm.js?id=${gaId}`
+          : `https://www.googletagmanager.com/gtag/js?id=${gaId}`;
+        gtagScript.setAttribute("data-seo-ga", "true");
+        document.head.appendChild(gtagScript);
+
+        if (!gaId.startsWith("GTM-")) {
+          const inlineScript = document.createElement("script");
+          inlineScript.setAttribute("data-seo-ga-inline", "true");
+          inlineScript.textContent = `
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${gaId}');
+          `;
+          document.head.appendChild(inlineScript);
+        }
+      }
+    }
+
     return () => {
       document.querySelector('script[data-seo-jsonld]')?.remove();
     };
-  }, [title, description, canonical, ogImage, ogType, jsonLd, seoEnabled]);
+  }, [title, description, canonical, ogImage, ogType, jsonLd, seoEnabled, seoConfig]);
 
   return null;
 }

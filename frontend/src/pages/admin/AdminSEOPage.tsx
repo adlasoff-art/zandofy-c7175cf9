@@ -2,23 +2,56 @@ import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Switch } from "@/components/ui/switch";
-import { Globe, Search, Save, Loader2, Store, Package, Tag, AlertTriangle } from "lucide-react";
+import { Save, Loader2 } from "lucide-react";
+import { SeoToggleSection } from "@/components/admin/seo/SeoToggleSection";
+import { SeoMetadataSection } from "@/components/admin/seo/SeoMetadataSection";
+import { SeoBrandingSection } from "@/components/admin/seo/SeoBrandingSection";
+import { SeoSocialSection } from "@/components/admin/seo/SeoSocialSection";
+import { SeoVerificationSection } from "@/components/admin/seo/SeoVerificationSection";
+import { SeoSerpPreview } from "@/components/admin/seo/SeoSerpPreview";
+import { SeoStoresSection } from "@/components/admin/seo/SeoStoresSection";
 
-interface SeoConfig {
+interface SeoConfigState {
   site_title: string;
   site_description: string;
   default_keywords: string[];
+  default_og_image: string;
+  site_language: string;
+  brand_name: string;
+  tagline: string;
+  social_urls: { facebook?: string; instagram?: string; twitter?: string };
+  google_site_verification: string;
+  google_analytics_id: string;
 }
+
+const DEFAULT_STATE: SeoConfigState = {
+  site_title: "Zandofy — Achetez en Chine, livré en Afrique | Prix usine",
+  site_description:
+    "Achetez directement aux usines chinoises, turques et internationales. Zandofy gère fournisseurs, logistique et livraison en Afrique. Prix imbattables, support en français.",
+  default_keywords: [
+    "acheter en chine depuis l'afrique",
+    "importer de chine afrique",
+    "fournisseur chine afrique",
+    "transitaire chine afrique",
+    "marketplace sino-africaine",
+    "prix usine chine",
+    "zandofy",
+    "e-commerce afrique",
+    "logistique chine afrique",
+  ],
+  default_og_image: "",
+  site_language: "fr",
+  brand_name: "Zandofy",
+  tagline: "Première plateforme e-commerce sino-africaine d'achat et logistique en Chine et à l'international.",
+  social_urls: {},
+  google_site_verification: "",
+  google_analytics_id: "",
+};
 
 export default function AdminSEOPage() {
   const [seoEnabled, setSeoEnabled] = useState(false);
-  const [seoConfig, setSeoConfig] = useState<SeoConfig>({
-    site_title: "Zandofy",
-    site_description: "La marketplace africaine",
-    default_keywords: ["marketplace", "afrique", "shopping", "mode"],
-  });
-  const [keywordsInput, setKeywordsInput] = useState("");
+  const [config, setConfig] = useState<SeoConfigState>(DEFAULT_STATE);
+  const [keywordsInput, setKeywordsInput] = useState(DEFAULT_STATE.default_keywords.join(", "));
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -34,12 +67,20 @@ export default function AdminSEOPage() {
             setSeoEnabled(row.value === true);
           } else if (row.key === "seo_config") {
             const v = row.value as any;
-            setSeoConfig({
-              site_title: v.site_title || "Zandofy",
-              site_description: v.site_description || "",
-              default_keywords: v.default_keywords || [],
-            });
-            setKeywordsInput((v.default_keywords || []).join(", "));
+            const c: SeoConfigState = {
+              site_title: v.site_title || DEFAULT_STATE.site_title,
+              site_description: v.site_description || DEFAULT_STATE.site_description,
+              default_keywords: v.default_keywords || DEFAULT_STATE.default_keywords,
+              default_og_image: v.default_og_image || "",
+              site_language: v.site_language || "fr",
+              brand_name: v.brand_name || "Zandofy",
+              tagline: v.tagline || DEFAULT_STATE.tagline,
+              social_urls: v.social_urls || {},
+              google_site_verification: v.google_site_verification || "",
+              google_analytics_id: v.google_analytics_id || "",
+            };
+            setConfig(c);
+            setKeywordsInput((v.default_keywords || DEFAULT_STATE.default_keywords).join(", "));
           }
         });
         setLoading(false);
@@ -49,7 +90,12 @@ export default function AdminSEOPage() {
   const handleSave = async () => {
     setSaving(true);
     const now = new Date().toISOString();
-    const keywords = keywordsInput.split(",").map((k) => k.trim()).filter(Boolean);
+    const keywords = keywordsInput
+      .split(",")
+      .map((k) => k.trim())
+      .filter(Boolean);
+
+    const fullConfig = { ...config, default_keywords: keywords };
 
     const [r1, r2] = await Promise.all([
       supabase.from("platform_settings").upsert(
@@ -57,11 +103,7 @@ export default function AdminSEOPage() {
         { onConflict: "key" }
       ),
       supabase.from("platform_settings").upsert(
-        {
-          key: "seo_config",
-          value: { ...seoConfig, default_keywords: keywords } as any,
-          updated_at: now,
-        },
+        { key: "seo_config", value: fullConfig as any, updated_at: now },
         { onConflict: "key" }
       ),
     ]);
@@ -69,17 +111,25 @@ export default function AdminSEOPage() {
     if (r1.error || r2.error) {
       toast({ title: "Erreur", description: (r1.error || r2.error)?.message, variant: "destructive" });
     } else {
-      toast({ title: "SEO mis à jour", description: seoEnabled ? "Le référencement est activé." : "Le référencement reste désactivé." });
+      toast({
+        title: "SEO mis à jour",
+        description: seoEnabled
+          ? "Le référencement est activé."
+          : "Le référencement reste désactivé.",
+      });
     }
     setSaving(false);
   };
 
-  const inputClass = "w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20";
+  const inputClass =
+    "w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20";
 
   if (loading) {
     return (
       <AdminLayout title="Référencement (SEO)">
-        <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={24} /></div>
+        <div className="flex justify-center py-12">
+          <Loader2 className="animate-spin text-primary" size={24} />
+        </div>
       </AdminLayout>
     );
   }
@@ -87,111 +137,55 @@ export default function AdminSEOPage() {
   return (
     <AdminLayout title="Référencement (SEO)">
       <div className="space-y-6 max-w-2xl">
-        {/* Master toggle */}
-        <section className="bg-card border border-border rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Globe size={18} className="text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Contrôle global du SEO</h2>
-          </div>
+        <SeoToggleSection seoEnabled={seoEnabled} onToggle={setSeoEnabled} />
 
-          <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-            <div>
-              <p className="text-sm font-medium text-foreground">Activer le référencement</p>
-              <p className="text-xs text-muted-foreground">
-                {seoEnabled
-                  ? "Le site est indexable par les moteurs de recherche"
-                  : "Le site est masqué des moteurs de recherche (noindex, nofollow)"}
-              </p>
-            </div>
-            <Switch checked={seoEnabled} onCheckedChange={setSeoEnabled} />
-          </div>
+        <SeoMetadataSection
+          siteTitle={config.site_title}
+          siteDescription={config.site_description}
+          keywordsInput={keywordsInput}
+          onTitleChange={(v) => setConfig((p) => ({ ...p, site_title: v }))}
+          onDescriptionChange={(v) => setConfig((p) => ({ ...p, site_description: v }))}
+          onKeywordsChange={setKeywordsInput}
+          inputClass={inputClass}
+        />
 
-          {!seoEnabled && (
-            <div className="flex items-start gap-2 mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Mode privé actif</p>
-                <p className="text-xs text-amber-600 dark:text-amber-500">
-                  Les moteurs de recherche ne peuvent pas indexer le site. Activez le SEO quand vous êtes prêt pour le lancement.
-                </p>
-              </div>
-            </div>
-          )}
-        </section>
+        <SeoSerpPreview title={config.site_title} description={config.site_description} />
 
-        {/* Global SEO Config */}
-        <section className="bg-card border border-border rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Search size={18} className="text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">Métadonnées globales</h2>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Titre du site (balise title)</label>
-              <input
-                value={seoConfig.site_title}
-                onChange={(e) => setSeoConfig((p) => ({ ...p, site_title: e.target.value }))}
-                maxLength={60}
-                className={inputClass}
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">{seoConfig.site_title.length}/60 caractères</p>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Description (meta description)</label>
-              <textarea
-                value={seoConfig.site_description}
-                onChange={(e) => setSeoConfig((p) => ({ ...p, site_description: e.target.value }))}
-                maxLength={160}
-                rows={3}
-                className={inputClass}
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">{seoConfig.site_description.length}/160 caractères</p>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">
-                <Tag size={12} className="inline mr-1" />
-                Mots-clés par défaut (séparés par des virgules)
-              </label>
-              <input
-                value={keywordsInput}
-                onChange={(e) => setKeywordsInput(e.target.value)}
-                placeholder="marketplace, mode, afrique, shopping"
-                className={inputClass}
-              />
-              <div className="flex flex-wrap gap-1 mt-2">
-                {keywordsInput.split(",").map((k) => k.trim()).filter(Boolean).map((k, i) => (
-                  <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                    {k}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
+        <SeoBrandingSection
+          brandName={config.brand_name}
+          tagline={config.tagline}
+          defaultOgImage={config.default_og_image}
+          onBrandNameChange={(v) => setConfig((p) => ({ ...p, brand_name: v }))}
+          onTaglineChange={(v) => setConfig((p) => ({ ...p, tagline: v }))}
+          onOgImageChange={(v) => setConfig((p) => ({ ...p, default_og_image: v }))}
+          inputClass={inputClass}
+        />
 
-        {/* Info about store/product SEO */}
-        <section className="bg-card border border-border rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Store size={18} className="text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">SEO des boutiques & produits</h2>
-          </div>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-              <Store size={16} className="text-primary shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-foreground">Boutiques</p>
-                <p className="text-xs">Les vendeurs peuvent définir un titre SEO, une meta description et des mots-clés pour leur boutique depuis leur tableau de bord.</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-              <Package size={16} className="text-primary shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-foreground">Produits</p>
-                <p className="text-xs">Chaque produit dispose de champs SEO (titre, description, mots-clés) éditables par le vendeur lors de la création ou modification du produit.</p>
-              </div>
-            </div>
-          </div>
-        </section>
+        <SeoSocialSection
+          facebook={config.social_urls.facebook || ""}
+          instagram={config.social_urls.instagram || ""}
+          twitter={config.social_urls.twitter || ""}
+          onFacebookChange={(v) =>
+            setConfig((p) => ({ ...p, social_urls: { ...p.social_urls, facebook: v } }))
+          }
+          onInstagramChange={(v) =>
+            setConfig((p) => ({ ...p, social_urls: { ...p.social_urls, instagram: v } }))
+          }
+          onTwitterChange={(v) =>
+            setConfig((p) => ({ ...p, social_urls: { ...p.social_urls, twitter: v } }))
+          }
+          inputClass={inputClass}
+        />
+
+        <SeoVerificationSection
+          googleSiteVerification={config.google_site_verification}
+          googleAnalyticsId={config.google_analytics_id}
+          onVerificationChange={(v) => setConfig((p) => ({ ...p, google_site_verification: v }))}
+          onAnalyticsChange={(v) => setConfig((p) => ({ ...p, google_analytics_id: v }))}
+          inputClass={inputClass}
+        />
+
+        <SeoStoresSection />
 
         <button
           onClick={handleSave}

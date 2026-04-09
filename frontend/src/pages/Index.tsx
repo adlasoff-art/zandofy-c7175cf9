@@ -15,6 +15,8 @@ import { SEOHead } from "@/components/SEOHead";
 import { useSeoConfig } from "@/hooks/use-seo-config";
 import { Loader2 } from "lucide-react";
 
+const SITE_URL = import.meta.env.VITE_SITE_URL || "https://zandofy.com";
+
 const Index = () => {
   const queryClient = useQueryClient();
   const seoConfig = useSeoConfig();
@@ -25,6 +27,41 @@ const Index = () => {
 
   const { pulling, pullProgress, refreshing, handlers } = usePullToRefresh(handleRefresh);
 
+  // Build combined JSON-LD: WebSite + Organization
+  const sameAs = [
+    seoConfig.social_urls.facebook,
+    seoConfig.social_urls.instagram,
+    seoConfig.social_urls.twitter,
+  ].filter(Boolean);
+
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: seoConfig.brand_name || "Zandofy",
+      url: SITE_URL,
+      potentialAction: {
+        "@type": "SearchAction",
+        target: `${SITE_URL}/search?q={search_term_string}`,
+        "query-input": "required name=search_term_string",
+      },
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: seoConfig.brand_name || "Zandofy",
+      url: SITE_URL,
+      logo: seoConfig.default_og_image || `${SITE_URL}/logo.png`,
+      description: seoConfig.tagline || seoConfig.site_description,
+      ...(sameAs.length > 0 ? { sameAs } : {}),
+      contactPoint: {
+        "@type": "ContactPoint",
+        contactType: "customer service",
+        availableLanguage: ["French", "English"],
+      },
+    },
+  ];
+
   return (
     <div
       className="min-h-screen bg-background"
@@ -34,17 +71,7 @@ const Index = () => {
         title={seoConfig.site_title}
         description={seoConfig.site_description}
         canonical="/"
-        jsonLd={{
-          "@context": "https://schema.org",
-          "@type": "WebSite",
-          name: "Zandofy",
-          url: import.meta.env.VITE_SITE_URL || "https://zandofy.com",
-          potentialAction: {
-            "@type": "SearchAction",
-            target: `${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/search?q={search_term_string}`,
-            "query-input": "required name=search_term_string",
-          },
-        }}
+        jsonLd={jsonLd as any}
       />
       <Header />
 
