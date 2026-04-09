@@ -1110,13 +1110,15 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
               if (!resp.ok) throw new Error(resp.status === 401 ? "Session expirée" : `Erreur ${resp.status}`);
               const html = await resp.text();
               if (!html) return;
-              const printWindow = window.open("", "_blank", "width=800,height=600");
+              const blob = new Blob([html], { type: "text/html" });
+              const url = URL.createObjectURL(blob);
+              const printWindow = window.open(url, "_blank", "width=800,height=600");
               if (printWindow) {
-                printWindow.document.write(html);
-                printWindow.document.close();
                 printWindow.onload = () => {
-                  setTimeout(() => { printWindow.print(); }, 500);
+                  setTimeout(() => { printWindow.print(); URL.revokeObjectURL(url); }, 500);
                 };
+              } else {
+                URL.revokeObjectURL(url);
               }
             } catch (e) {
               toast({ title: "Erreur", description: e instanceof Error ? e.message : "Impossible de télécharger la facture.", variant: "destructive" });

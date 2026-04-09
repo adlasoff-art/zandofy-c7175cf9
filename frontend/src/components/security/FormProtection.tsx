@@ -35,7 +35,7 @@ export function FormProtection({ children, onValidSubmit }: FormProtectionProps)
           opacity: 0,
           height: 0,
           overflow: "hidden",
-          tabIndex: -1,
+          pointerEvents: "none" as const,
         }}
       >
         <label htmlFor="zfy_website">Ne pas remplir</label>
