@@ -33,7 +33,7 @@ export default function AdminErrorReportsPage() {
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ["admin-error-reports"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("error_reports")
         .select("*")
         .order("created_at", { ascending: false })
@@ -53,7 +53,7 @@ export default function AdminErrorReportsPage() {
       if (notes !== undefined) {
         updates.admin_notes = notes;
       }
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("error_reports")
         .update(updates)
         .eq("id", id);
@@ -101,8 +101,8 @@ export default function AdminErrorReportsPage() {
           </Card>
           <Card>
             <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 text-primary" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{countByStatus("resolved")}</p>
