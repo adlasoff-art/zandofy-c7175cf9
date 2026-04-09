@@ -31,26 +31,26 @@ export default function TrendingProductsManager() {
 
   const loadTrending = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from("trending_products")
       .select("id, product_id, sort_order")
       .order("sort_order");
 
     if (data && data.length > 0) {
-      const productIds = data.map((d) => d.product_id);
+      const productIds = data.map((d: any) => d.product_id);
       const { data: products } = await supabase
         .from("products")
-        .select("id, name, image_url, price, sales_count, rating, review_count")
+        .select("id, name, price, sales_count, rating, review_count")
         .in("id", productIds);
 
-      const productMap = new Map((products || []).map((p) => [p.id, p]));
+      const productMap = new Map((products || []).map((p: any) => [p.id, p]));
       setTrending(
         data
-          .map((d) => ({
+          .map((d: any) => ({
             ...d,
             product: productMap.get(d.product_id) as Product,
           }))
-          .filter((d) => d.product)
+          .filter((d: any) => d.product)
       );
     } else {
       setTrending([]);
@@ -66,17 +66,17 @@ export default function TrendingProductsManager() {
     setSearching(true);
     const { data } = await supabase
       .from("products")
-      .select("id, name, image_url, price, sales_count, rating, review_count")
+      .select("id, name, price, sales_count, rating, review_count")
       .ilike("name", `%${q}%`)
       .order("sales_count", { ascending: false })
       .limit(10);
-    setResults(data || []);
+    setResults((data as any) || []);
     setSearching(false);
   }, []);
 
   const addProduct = async (productId: string) => {
     const maxOrder = trending.length > 0 ? Math.max(...trending.map((t) => t.sort_order)) + 1 : 0;
-    await supabase.from("trending_products").insert({ product_id: productId, sort_order: maxOrder });
+    await (supabase as any).from("trending_products").insert({ product_id: productId, sort_order: maxOrder });
     toast({ title: "Produit ajouté aux tendances" });
     setSearch("");
     setResults([]);
@@ -84,7 +84,7 @@ export default function TrendingProductsManager() {
   };
 
   const removeProduct = async (id: string) => {
-    await supabase.from("trending_products").delete().eq("id", id);
+    await (supabase as any).from("trending_products").delete().eq("id", id);
     toast({ title: "Produit retiré des tendances" });
     loadTrending();
   };
@@ -99,8 +99,8 @@ export default function TrendingProductsManager() {
     newTrending[swapIndex].sort_order = tempOrder;
 
     await Promise.all([
-      supabase.from("trending_products").update({ sort_order: newTrending[index].sort_order }).eq("id", newTrending[index].id),
-      supabase.from("trending_products").update({ sort_order: newTrending[swapIndex].sort_order }).eq("id", newTrending[swapIndex].id),
+      (supabase as any).from("trending_products").update({ sort_order: newTrending[index].sort_order }).eq("id", newTrending[index].id),
+      (supabase as any).from("trending_products").update({ sort_order: newTrending[swapIndex].sort_order }).eq("id", newTrending[swapIndex].id),
     ]);
     loadTrending();
   };
