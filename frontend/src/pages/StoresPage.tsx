@@ -18,6 +18,14 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
+/* ─── Helpers ─── */
+const TWO_MIN = 2 * 60 * 1000;
+function isStoreOnline(s: StoreRow): boolean {
+  if (!s.is_online) return false;
+  if (!s.last_seen_at) return false;
+  return new Date(s.last_seen_at).getTime() > Date.now() - TWO_MIN;
+}
+
 /* ─── Types ─── */
 interface StoreRow {
   id: string;
