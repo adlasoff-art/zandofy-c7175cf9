@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator, Crown, Shield } from "lucide-react";
+import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator, Crown, Shield, Camera } from "lucide-react";
 import { GeoBlockingSettings } from "@/components/admin/GeoBlockingSettings";
 import { KelpayWebhookPanel } from "@/components/admin/KelpayWebhookPanel";
 import { MonetizationSettings } from "@/components/admin/MonetizationSettings";
@@ -213,7 +213,11 @@ export default function AdminSettingsPage() {
       .from("platform_settings")
       .upsert({ key: "review_bonus", value: reviewBonus as any, updated_at: now }, { onConflict: "key" });
 
-    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8 || e9 || e10;
+    const { error: e11 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "visual_search_enabled", value: { enabled: visualSearchEnabled } as any, updated_at: now }, { onConflict: "key" });
+
+    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8 || e9 || e10 || e11;
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
