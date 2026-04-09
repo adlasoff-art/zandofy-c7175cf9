@@ -216,6 +216,70 @@ function BrandingTab() {
         </p>
       </div>
 
+      {/* ═══════════════ TYPOGRAPHY SECTION ═══════════════ */}
+      <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <Type size={16} /> Typographie de la plateforme
+        </h3>
+        <p className="text-[10px] text-muted-foreground">
+          Choisissez la police principale utilisée sur l'ensemble du site. Le changement s'applique immédiatement aux titres, textes et boutons.
+        </p>
+
+        <Select
+          value={config.primary_font}
+          onValueChange={(v) => setConfig((prev) => ({ ...prev, primary_font: v }))}
+        >
+          <SelectTrigger className="w-full max-w-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PLATFORM_FONTS.map((f) => (
+              <SelectItem key={f.value} value={f.value}>
+                <span style={{ fontFamily: f.value }}>{f.label}</span>
+                <span className="text-muted-foreground ml-2 text-[10px]">— {f.description}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Live Preview */}
+        <div className="border border-border rounded-lg p-5 space-y-4 bg-muted/20" style={{ fontFamily: config.primary_font }}>
+          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Aperçu en direct</p>
+          <h1 className="text-2xl font-bold text-foreground">Titre principal (H1 · Bold 700)</h1>
+          <h2 className="text-xl font-semibold text-foreground">Sous-titre (H2 · Semi-Bold 600)</h2>
+          <h3 className="text-lg font-medium text-foreground">Section (H3 · Medium 500)</h3>
+          <p className="text-sm text-foreground">
+            Ceci est un paragraphe de texte en taille normale (Regular 400). La plateforme Zandofy offre une expérience
+            d'achat moderne et intuitive pour tous ses utilisateurs.
+          </p>
+          <p className="text-xs text-muted-foreground font-light">
+            Texte secondaire en Light 300 — utilisé pour les descriptions courtes et les légendes.
+          </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <span className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold" style={{ fontFamily: config.primary_font }}>
+              Bouton principal
+            </span>
+            <span className="border border-border px-4 py-2 rounded-lg text-sm font-medium text-foreground" style={{ fontFamily: config.primary_font }}>
+              Bouton secondaire
+            </span>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 pt-2 border-t border-border">
+            {[
+              { w: 300, l: "Light" },
+              { w: 400, l: "Regular" },
+              { w: 500, l: "Medium" },
+              { w: 600, l: "Semi-Bold" },
+              { w: 700, l: "Bold" },
+            ].map(({ w, l }) => (
+              <div key={w} className="text-center">
+                <p className="text-lg text-foreground" style={{ fontWeight: w }}>Aa</p>
+                <p className="text-[9px] text-muted-foreground">{l} ({w})</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Header Logo */}
       <FileUploadZone
         field="header_logo_url"
