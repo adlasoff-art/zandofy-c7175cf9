@@ -6,6 +6,7 @@ import { fetchProducts, type Product } from "@/services/api";
 import { computeStoreYears, formatStoreYears } from "@/lib/store-years";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { SEOHead } from "@/components/SEOHead";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { CertificationBadge } from "@/components/CertificationBadge";
@@ -77,14 +78,19 @@ export default function StorePage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
+  // Resolve store by slug or UUID
+  const isUUID = id ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) : false;
+
   const { data: store, isLoading: storeLoading } = useQuery({
     queryKey: ["store", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("stores")
-        .select("*")
-        .eq("id", id!)
-        .maybeSingle();
+      let query = supabase.from("stores").select("*");
+      if (isUUID) {
+        query = query.eq("id", id!);
+      } else {
+        query = query.eq("slug", id!);
+      }
+      const { data, error } = await query.maybeSingle();
       if (error || !data) return null;
       return data as unknown as StoreData;
     },
