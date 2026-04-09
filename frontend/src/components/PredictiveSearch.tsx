@@ -6,6 +6,7 @@ import type { Product } from "@/services/api";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useVisualSearchEnabled } from "@/hooks/useVisualSearchEnabled";
 
 interface PredictiveSearchProps {
   mobile?: boolean;
@@ -38,6 +39,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
   const navigate = useNavigate();
   const { t } = useI18n();
   const { toast } = useToast();
+  const { enabled: visualSearchEnabled } = useVisualSearchEnabled();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout>>();
