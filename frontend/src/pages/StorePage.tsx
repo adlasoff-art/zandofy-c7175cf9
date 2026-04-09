@@ -255,8 +255,19 @@ export default function StorePage() {
     </div>
   );
 
+  const seoTitle = store ? `${store.name} — Boutique` : "Boutique";
+  const seoDesc = store
+    ? `Découvrez la boutique ${store.name} sur Zandofy. ${store.description?.slice(0, 120) || "Produits de qualité, vendeur vérifié."}`
+    : "Découvrez cette boutique sur Zandofy.";
+
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead
+        title={seoTitle}
+        description={seoDesc}
+        canonical={store ? `/store/${store.slug || store.id}` : undefined}
+        ogImage={store?.logo_url || undefined}
+      />
       <Header />
 
       <main>
