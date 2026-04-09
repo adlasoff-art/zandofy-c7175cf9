@@ -111,7 +111,7 @@ function StoreCard({ store }: { store: StoreRow }) {
 
   return (
     <Link
-      to={`/store/${store.id}`}
+      to={`/store/${store.slug || store.id}`}
       className="group relative flex flex-col bg-card border border-border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-0.5"
     >
       {/* Banner */}
@@ -257,8 +257,8 @@ export default function StoresPage() {
     queryKey: ["all-stores"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("stores")
-        .select("id, name, description, logo_url, banner_url, is_verified, verified_years, followers_count, products_count, sales_count, rating, is_online, last_seen_at, created_at, followers_override, sales_override, verified_years_override, review_count_override")
+        .from("stores_public" as any)
+        .select("id, name, slug, description, logo_url, banner_url, is_verified, verified_years, followers_count, products_count, sales_count, rating, is_online, last_seen_at, created_at, followers_override, sales_override, verified_years_override, review_count_override")
         .order("sales_count", { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as StoreRow[];
@@ -329,6 +329,11 @@ export default function StoresPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead
+        title="Nos Fournisseurs — Marketplace"
+        description="Explorez les fournisseurs vérifiés de Zandofy. Comparez les boutiques, découvrez leurs produits et trouvez ceux qui correspondent à vos besoins."
+        canonical="/stores"
+      />
       <Header />
 
       <main className="pb-24">
