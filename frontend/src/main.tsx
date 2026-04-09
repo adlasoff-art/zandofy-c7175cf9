@@ -2,6 +2,44 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
+// Chunk load error detection & auto-reload
+function isChunkLoadError(error: unknown): boolean {
+  if (!error) return false;
+  const msg = (error as Error)?.message || String(error);
+  return (
+    msg.includes("Failed to fetch dynamically imported module") ||
+    msg.includes("Loading chunk") ||
+    msg.includes("Loading CSS chunk") ||
+    msg.includes("Importing a module script failed")
+  );
+}
+
+function handleChunkReload(): void {
+  const key = "chunk_reload_attempted";
+  if (sessionStorage.getItem(key)) return; // already tried once
+  sessionStorage.setItem(key, "1");
+  window.location.reload();
+}
+
+// Clear the flag on successful load so future deploys can retry
+sessionStorage.removeItem("chunk_reload_attempted");
+
+// Catch unhandled promise rejections from lazy imports
+window.addEventListener("unhandledrejection", (event) => {
+  if (isChunkLoadError(event.reason)) {
+    event.preventDefault();
+    handleChunkReload();
+  }
+});
+
+// Catch synchronous chunk errors
+window.addEventListener("error", (event) => {
+  if (isChunkLoadError(event.error) || (event.message && isChunkLoadError({ message: event.message }))) {
+    event.preventDefault();
+    handleChunkReload();
+  }
+});
+
 createRoot(document.getElementById("root")!).render(<App />);
 
 // Register service worker for PWA
