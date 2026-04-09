@@ -1,5 +1,6 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator, Crown, Shield } from "lucide-react";
+import { GeoBlockingSettings } from "@/components/admin/GeoBlockingSettings";
 import { KelpayWebhookPanel } from "@/components/admin/KelpayWebhookPanel";
 import { MonetizationSettings } from "@/components/admin/MonetizationSettings";
 import { AdminDefaultPaymentNumbers } from "@/components/admin/AdminDefaultPaymentNumbers";
@@ -411,6 +412,9 @@ export default function AdminSettingsPage() {
             />
           </div>
         </section>
+
+        {/* Geo-Blocking */}
+        <GeoBlockingSettings />
 
         <section className="bg-card border-2 border-destructive/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
