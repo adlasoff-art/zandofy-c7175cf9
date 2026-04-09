@@ -420,6 +420,24 @@ export default function AdminSettingsPage() {
           </div>
         </section>
 
+        {/* Visual Search Toggle */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Camera size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Recherche visuelle (IA)</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Permet aux clients de rechercher des produits en prenant une photo ou en uploadant une image. Cette fonctionnalité nécessite une configuration IA avancée (vectoriel, etc.).
+          </p>
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div>
+              <p className="text-sm font-medium text-foreground">Activer la recherche visuelle</p>
+              <p className="text-xs text-muted-foreground">Affiche le bouton caméra dans la barre de recherche</p>
+            </div>
+            <Switch checked={visualSearchEnabled} onCheckedChange={setVisualSearchEnabled} />
+          </div>
+        </section>
+
         {/* Geo-Blocking */}
         <GeoBlockingSettings />
 
