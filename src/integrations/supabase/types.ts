@@ -3791,6 +3791,36 @@ export type Database = {
         }
         Relationships: []
       }
+      pwa_installs: {
+        Row: {
+          browser: string | null
+          created_at: string
+          device_type: string | null
+          id: string
+          os: string | null
+          session_id: string
+          user_id: string | null
+        }
+        Insert: {
+          browser?: string | null
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          os?: string | null
+          session_id: string
+          user_id?: string | null
+        }
+        Update: {
+          browser?: string | null
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          os?: string | null
+          session_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       quartiers: {
         Row: {
           commune_id: string
