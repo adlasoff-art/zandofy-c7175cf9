@@ -95,6 +95,21 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, serviceKey);
 
+  // Rate limiting: 30 requests/min by IP
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const { data: rlAllowed } = await supabase.rpc("check_rate_limit", {
+    p_identifier: clientIp,
+    p_endpoint: "push-notifications",
+    p_max_requests: 30,
+    p_window_seconds: 60,
+  });
+  if (rlAllowed === false) {
+    return new Response(
+      JSON.stringify({ error: "Too many requests" }),
+      { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
+    );
+  }
+
   const url = new URL(req.url);
   const action = url.searchParams.get("action");
 

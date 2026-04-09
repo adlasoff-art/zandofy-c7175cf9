@@ -72,6 +72,21 @@ Deno.serve(async (req) => {
     }
     const userId = userData.user.id;
 
+    // Rate limiting: 5 requests/min per user
+    const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+    const { data: allowed } = await serviceClient.rpc("check_rate_limit", {
+      p_identifier: userId,
+      p_endpoint: "kelpay-payment",
+      p_max_requests: 5,
+      p_window_seconds: 60,
+    });
+    if (allowed === false) {
+      return new Response(
+        JSON.stringify({ error: "Too many requests. Please wait before retrying." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
+      );
+    }
+
     const body = await req.json();
     const { order_id, phone_number, amount, currency, provider, payment_type } = body;
 

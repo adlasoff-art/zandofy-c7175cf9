@@ -63,6 +63,17 @@ Deno.serve(async (req) => {
       return errorResponse("Non autorisé");
     }
 
+    // Rate limiting: 5 requests/min per user
+    const { data: rlAllowed } = await supabase.rpc("check_rate_limit", {
+      p_identifier: user.id,
+      p_endpoint: "keccel-cardpay",
+      p_max_requests: 5,
+      p_window_seconds: 60,
+    });
+    if (rlAllowed === false) {
+      return errorResponse("Trop de requêtes. Veuillez patienter.");
+    }
+
     const body = await req.json();
     const { order_id, payment_method, payment_type, save_card } = body;
 
