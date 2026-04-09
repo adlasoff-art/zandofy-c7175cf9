@@ -35,6 +35,8 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoadingSkeleton } from "@/components/PageLoadingSkeleton";
 import { RoleGuard } from "@/components/admin/RoleGuard";
 import { BanGuard } from "@/components/BanGuard";
+import { useGeoBlocking } from "@/hooks/useGeoBlocking";
+import { GeoBlockScreen } from "@/components/security/GeoBlockScreen";
 
 // Lazy-loaded routes
 const Index = lazy(() => import("./pages/Index"));
@@ -134,6 +136,13 @@ function SupportDrawerWrapper() {
 
 function CmsThemeInjector() { useCmsTheme(); return null; }
 
+function GeoBlockGuard({ children }: { children: React.ReactNode }) {
+  const { blocked, loading } = useGeoBlocking();
+  if (loading) return null;
+  if (blocked) return <GeoBlockScreen />;
+  return <>{children}</>;
+}
+
 // Analytics is injected inside Router via a lazy component
 import { useAnalyticsTracker, trackPWAPresence } from "@/hooks/use-analytics";
 import { useAuth } from "@/contexts/AuthContext";
@@ -153,6 +162,7 @@ const App = () => (
     <BrowserRouter>
     <TooltipProvider>
       <AuthProvider>
+        <GeoBlockGuard>
         <ImpersonationProvider>
         <ImpersonationBanner />
         <CartProvider>
@@ -281,6 +291,7 @@ const App = () => (
           </WishlistProvider>
         </CartProvider>
         </ImpersonationProvider>
+        </GeoBlockGuard>
       </AuthProvider>
     </TooltipProvider>
     </BrowserRouter>

@@ -75,6 +75,24 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Rate limiting: 3 emails/min per user
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+    const { data: rlAllowed } = await serviceClient.rpc("check_rate_limit", {
+      p_identifier: user.id,
+      p_endpoint: "send-email",
+      p_max_requests: 3,
+      p_window_seconds: 60,
+    });
+    if (rlAllowed === false) {
+      return new Response(
+        JSON.stringify({ error: "Too many email requests. Please wait." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" } }
+      );
+    }
+
     const { to, subject, html } = await req.json();
 
     if (!to || !subject || !html) {

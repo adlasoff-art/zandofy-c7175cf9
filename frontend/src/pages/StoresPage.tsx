@@ -18,6 +18,14 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
+/* ─── Helpers ─── */
+const TWO_MIN = 2 * 60 * 1000;
+function isStoreOnline(s: StoreRow): boolean {
+  if (!s.is_online) return false;
+  if (!s.last_seen_at) return false;
+  return new Date(s.last_seen_at).getTime() > Date.now() - TWO_MIN;
+}
+
 /* ─── Types ─── */
 interface StoreRow {
   id: string;
@@ -33,6 +41,7 @@ interface StoreRow {
   rating: number | null;
   is_online: boolean | null;
   created_at: string;
+  last_seen_at: string | null;
   followers_override: number | null;
   sales_override: number | null;
   verified_years_override: number | null;
@@ -90,6 +99,7 @@ function StatPill({ icon: Icon, value, label, highlight = false }: {
 
 /* ─── Store Card ─── */
 function StoreCard({ store }: { store: StoreRow }) {
+  const online = isStoreOnline(store);
   const followers = store.followers_override ?? store.followers_count ?? 0;
   const sales = store.sales_override ?? store.sales_count ?? 0;
   const products = store.products_count ?? 0;
@@ -120,14 +130,14 @@ function StoreCard({ store }: { store: StoreRow }) {
         <div className="absolute inset-0 bg-gradient-to-t from-card via-card/30 to-transparent" />
 
         {/* Online indicator */}
-        <span className={`absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-card/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium shadow-sm border border-border ${store.is_online ? "text-emerald-600" : "text-muted-foreground"}`}>
+        <span className={`absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-card/90 backdrop-blur-sm px-2 py-0.5 text-[10px] font-medium shadow-sm border border-border ${online ? "text-emerald-600" : "text-muted-foreground"}`}>
           <span className="relative flex h-2 w-2">
-            {store.is_online && (
+            {online && (
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             )}
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${store.is_online ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${online ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
           </span>
-          {store.is_online ? "En ligne" : "Hors ligne"}
+          {online ? "En ligne" : "Hors ligne"}
         </span>
 
         {/* Verified badge */}
@@ -246,10 +256,10 @@ export default function StoresPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("stores")
-        .select("id, name, description, logo_url, banner_url, is_verified, verified_years, followers_count, products_count, sales_count, rating, is_online, created_at, followers_override, sales_override, verified_years_override, review_count_override")
+        .select("id, name, description, logo_url, banner_url, is_verified, verified_years, followers_count, products_count, sales_count, rating, is_online, last_seen_at, created_at, followers_override, sales_override, verified_years_override, review_count_override")
         .order("sales_count", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as StoreRow[];
+      return (data ?? []) as unknown as StoreRow[];
     },
   });
 
@@ -273,7 +283,7 @@ export default function StoresPage() {
         result = result.filter((s) => s.is_verified);
         break;
       case "online":
-        result = result.filter((s) => s.is_online);
+        result = result.filter((s) => isStoreOnline(s));
         break;
       case "top_rated":
         result = result.filter((s) => (s.rating ?? 0) >= 4);
