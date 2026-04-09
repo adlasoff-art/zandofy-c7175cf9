@@ -40,6 +40,7 @@ const DEFAULT: BrandingConfig = {
   email_signature_email: "",
   email_signature_website: "https://zandofy.com",
   email_signature_extra: "",
+  primary_font: PLATFORM_FONTS[0].value,
 };
 
 function BrandingTab() {
