@@ -1,103 +1,49 @@
 
 
-# SEO Zandofy — Recommandations et améliorations admin
+# Plan : Améliorations Analytics, PWA, Filtres et Email Templates
 
-## 1. Recommandations SEO pour Zandofy
+## Contexte et explications demandées
 
-### Titre du site (max 60 caractères)
-```
-Zandofy — Achetez en Chine, livré en Afrique | Prix usine
-```
-(57 caractères — inclut le nom de marque, la proposition de valeur, et un mot-clé fort)
+**Durée moyenne** : Elle est calculée à partir des événements `session_end` qui enregistrent le temps passé entre le début et la fin de session d'un utilisateur. Si un utilisateur quitte l'onglet ou ferme le navigateur, un événement `session_end` est émis avec la durée en secondes. La moyenne est faite sur toutes ces durées.
 
-### Meta description (max 160 caractères)
-```
-Achetez directement aux usines chinoises, turques et internationales. Zandofy gère fournisseurs, logistique et livraison en Afrique. Prix imbattables, support en français.
-```
-(157 caractères — couvre les intentions de recherche clés : acheter en Chine, livraison Afrique, prix usine, français)
+**PWA installées = 0** : Le problème est identifié : dans `AdminAnalyticsPage.tsx` ligne 551, `persistentPwaCount` est codé en dur à `0`. Le compteur ne lit jamais la table `pwa_installs`. Cela sera corrigé.
 
-### Mots-clés recommandés
-```
-acheter en chine depuis l'afrique, importer de chine afrique, fournisseur chine afrique, 
-transitaire chine afrique, marketplace sino-africaine, achat chine livraison afrique, 
-prix usine chine, grossiste chine, import turquie afrique, import dubai afrique, 
-acheter alibaba afrique, alternative alibaba afrique, zandofy, e-commerce afrique, 
-fournisseur vérifié chine, logistique chine afrique, acheter pas cher chine
-```
+**Google Site Verification** : C'est un code fourni par Google Search Console (search.google.com/search-console). Après avoir ajouté votre site, Google vous donne un code de vérification (ex: `google1234abcd.html` ou une balise meta). Collez le contenu de la balise meta dans ce champ pour prouver à Google que vous êtes propriétaire du site.
+
+**Google Analytics / GTM ID** : C'est l'identifiant de suivi de Google Analytics (format `G-XXXXXXX`) ou Google Tag Manager (format `GTM-XXXXXXX`). Créez un compte sur analytics.google.com, créez une propriété pour zandofy.com, et copiez l'ID de mesure dans ce champ. Cela injectera automatiquement le script de tracking Google sur votre site.
 
 ---
 
-## 2. Nouveaux champs admin SEO (à ajouter)
+## Modifications techniques
 
-La page admin actuelle ne gère que titre, description et mots-clés. Pour un SEO compétitif, il faut ajouter :
+### 1. Ajouter filtres 24h et 48h (AdminAnalyticsPage.tsx)
 
-| Champ | Utilité |
-|---|---|
-| **OG Image par défaut** | Image affichée lors des partages sociaux (URL) |
-| **Langue principale** | Balise `lang` et hreflang (actuellement hardcodé "fr") |
-| **Nom de marque alternatif** | Pour le JSON-LD Organization (ex: "Zandofy Marketplace") |
-| **Slogan / tagline** | Utilisé dans le JSON-LD et le footer structuré |
-| **URL des réseaux sociaux** | Facebook, Instagram, Twitter — injectés dans le JSON-LD Organization |
-| **Google Site Verification** | Code de vérification Google Search Console |
-| **Script de tracking** | Google Analytics / Tag Manager ID |
+Ajouter `{ key: "24h", label: "24h", days: 1 }` et `{ key: "48h", label: "48h", days: 2 }` au tableau `PERIODS`.
 
----
+### 2. Ajouter KPI "Visiteurs" + Histogramme trafic journalier (AdminAnalyticsPage.tsx)
 
-## 3. Plan technique
+- Ajouter une carte KPI "Visiteurs uniques" basée sur les `session_id` distincts (déjà calculé comme `uniqueSessions`, mais le renommer en "Visiteurs" pour plus de clarté).
+- Ajouter un histogramme (BarChart de recharts) montrant le nombre de sessions/visiteurs par jour sur la période sélectionnée.
 
-### A. Enrichir le `seo_config` dans `platform_settings`
+### 3. Corriger le compteur PWA (AdminAnalyticsPage.tsx)
 
-Ajouter les champs suivants à l'objet JSON stocké :
-- `default_og_image` (string URL)
-- `site_language` (string, défaut "fr")  
-- `brand_name` (string, défaut "Zandofy")
-- `tagline` (string)
-- `social_urls` (objet : facebook, instagram, twitter)
-- `google_site_verification` (string)
-- `google_analytics_id` (string)
+- Remplacer `persistentPwaCount={0}` par une requête réelle vers la table `pwa_installs` avec le filtre de période.
+- Ajouter un `useQuery` qui compte les entrées dans `pwa_installs` filtrées par la période sélectionnée.
 
-Pas de migration SQL nécessaire — ces champs vivent dans le JSONB existant de `platform_settings`.
+### 4. Afficher les noms des boutiques (AdminAnalyticsPage.tsx)
 
-### B. Refondre `AdminSEOPage.tsx`
+- Dans `OverviewTab`, charger les noms des boutiques via `supabase.from("stores").select("id, name")` pour les IDs présents dans `topStores`.
+- Afficher le nom de la boutique au lieu de l'ID tronqué.
 
-Organiser en sections :
-1. **Toggle global** (existant)
-2. **Métadonnées principales** — titre, description, mots-clés (existant, valeurs mises à jour)
-3. **Image & Branding** — OG image URL, nom de marque, tagline
-4. **Réseaux sociaux** — URLs Facebook/Instagram/Twitter
-5. **Vérification & Analytics** — Google Site Verification, GA/GTM ID
-6. **Aperçu SERP** — simulation visuelle de l'apparence Google (titre bleu, URL verte, description grise)
-7. **Boutiques & Produits** (existant)
+### 5. Email Templates : Police Outfit + Upload logo (AdminEmailTemplatesPage.tsx)
 
-### C. Mettre à jour `SEOHead.tsx`
-
-- Injecter `google-site-verification` meta tag si configuré
-- Injecter le script Google Analytics/GTM si configuré
-- Utiliser `default_og_image` comme fallback OG image
-- Ajouter un JSON-LD `Organization` sur la page d'accueil avec les réseaux sociaux
-
-### D. Mettre à jour `Index.tsx`
-
-- Enrichir le JSON-LD WebSite avec le JSON-LD Organization :
-```json
-{
-  "@type": "Organization",
-  "name": "Zandofy",
-  "url": "https://zandofy.com",
-  "logo": "...",
-  "description": "Première plateforme e-commerce sino-africaine...",
-  "sameAs": ["https://facebook.com/...", "https://instagram.com/..."]
-}
-```
-
-### E. Activer le sitemap dans `robots.txt`
-
-Décommenter la ligne Sitemap pour qu'elle soit active.
+- Remplacer le champ "Police" par un sélecteur (Select) proposant :
+  - `Arial, sans-serif` (actuel)
+  - `'Outfit', sans-serif` (police Zandofy)
+- Ajouter l'import Google Fonts pour Outfit dans l'aperçu email.
+- Remplacer le champ "URL du logo" par un composant d'upload (réutiliser le même pattern que `SeoBrandingSection.tsx` avec le bucket `seo-assets`).
 
 ### Fichiers modifiés
-- `frontend/src/pages/admin/AdminSEOPage.tsx` — refonte complète
-- `frontend/src/components/SEOHead.tsx` — nouveaux tags
-- `frontend/src/hooks/use-seo-config.ts` — nouveaux champs
-- `frontend/src/pages/Index.tsx` — JSON-LD Organization
-- `frontend/public/robots.txt` — activer sitemap
+- `frontend/src/pages/admin/AdminAnalyticsPage.tsx` — filtres 24h/48h, visiteurs, histogramme, PWA count, noms boutiques
+- `frontend/src/pages/admin/AdminEmailTemplatesPage.tsx` — sélecteur police Outfit, upload logo
 

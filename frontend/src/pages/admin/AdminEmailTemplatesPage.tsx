@@ -1,6 +1,6 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Mail, Save, Loader2, Eye, RotateCcw, Plus, Trash2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Mail, Save, Loader2, Eye, RotateCcw, Upload } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface EmailTemplate {
   id: string;
@@ -32,6 +33,11 @@ interface EmailBranding {
   company_name: string;
   support_email: string;
 }
+
+const FONT_OPTIONS = [
+  { value: "Arial, sans-serif", label: "Arial (par défaut)" },
+  { value: "'Outfit', sans-serif", label: "Outfit (police Zandofy)" },
+];
 
 const DEFAULT_TEMPLATES: EmailTemplate[] = [
   {
@@ -91,16 +97,68 @@ const DEFAULT_BRANDING: EmailBranding = {
   primary_color: "#000000",
   text_color: "#333333",
   bg_color: "#f9f9f9",
-  font_family: "Arial, sans-serif",
+  font_family: "'Outfit', sans-serif",
   company_name: "Zandofy",
   support_email: "support@zandofy.com",
 };
+
+function LogoUploadField({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
+  const handleUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Erreur", description: "Fichier image requis", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    const ext = file.name.split(".").pop() || "png";
+    const path = `email-logo.${ext}`;
+    const { error } = await supabase.storage.from("seo-assets").upload(path, file, { upsert: true });
+    if (error) {
+      toast({ title: "Erreur d'upload", description: error.message, variant: "destructive" });
+      setUploading(false);
+      return;
+    }
+    const { data: urlData } = supabase.storage.from("seo-assets").getPublicUrl(path);
+    onChange(urlData.publicUrl + "?t=" + Date.now());
+    setUploading(false);
+    toast({ title: "Logo uploadé" });
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs">Logo email</Label>
+      {value && (
+        <div className="flex items-center gap-3 p-2 border border-border rounded bg-muted/30">
+          <img src={value} alt="Logo" className="h-10 max-w-[120px] object-contain" />
+        </div>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => fileRef.current?.click()}
+        disabled={uploading}
+      >
+        {uploading ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Upload size={14} className="mr-1" />}
+        {value ? "Changer le logo" : "Uploader un logo"}
+      </Button>
+    </div>
+  );
+}
 
 export default function AdminEmailTemplatesPage() {
   const [templates, setTemplates] = useState<EmailTemplate[]>(DEFAULT_TEMPLATES);
   const [branding, setBranding] = useState<EmailBranding>(DEFAULT_BRANDING);
   const [saving, setSaving] = useState(false);
-  const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -153,6 +211,8 @@ export default function AdminEmailTemplatesPage() {
     toast({ title: "Réinitialisé", description: "Templates remis par défaut (non sauvegardé)." });
   };
 
+  const isOutfit = branding.font_family.includes("Outfit");
+
   const renderPreview = (tpl: EmailTemplate) => (
     <div
       style={{
@@ -163,16 +223,34 @@ export default function AdminEmailTemplatesPage() {
         margin: "0 auto",
       }}
     >
+      {/* Google Font import for Outfit in preview */}
+      {isOutfit && (
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');`}</style>
+      )}
       <div style={{ backgroundColor: "#ffffff", borderRadius: 8, padding: 32, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
         {branding.logo_url && (
           <div style={{ textAlign: "center", marginBottom: 24 }}>
             <img src={branding.logo_url} alt={branding.company_name} style={{ maxHeight: 48 }} />
           </div>
         )}
-        <h1 style={{ color: branding.text_color, fontSize: 22, fontWeight: 700, marginBottom: 16, textAlign: "center" }}>
+        <h1 style={{
+          color: branding.text_color,
+          fontSize: 22,
+          fontWeight: isOutfit ? 600 : 700,
+          marginBottom: 16,
+          textAlign: "center",
+          fontFamily: branding.font_family,
+        }}>
           {tpl.heading}
         </h1>
-        <p style={{ color: branding.text_color, fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+        <p style={{
+          color: branding.text_color,
+          fontSize: 14,
+          lineHeight: 1.6,
+          marginBottom: 24,
+          fontWeight: isOutfit ? 300 : 400,
+          fontFamily: branding.font_family,
+        }}>
           {tpl.body}
         </p>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
@@ -183,19 +261,27 @@ export default function AdminEmailTemplatesPage() {
               color: "#ffffff",
               padding: "12px 32px",
               borderRadius: 6,
-              fontWeight: 600,
+              fontWeight: isOutfit ? 500 : 600,
               fontSize: 14,
               textDecoration: "none",
+              fontFamily: branding.font_family,
             }}
           >
             {tpl.cta_label}
           </span>
         </div>
-        <p style={{ color: "#999999", fontSize: 12, textAlign: "center", marginTop: 24 }}>
+        <p style={{
+          color: "#999999",
+          fontSize: 12,
+          textAlign: "center",
+          marginTop: 24,
+          fontWeight: isOutfit ? 300 : 400,
+          fontFamily: branding.font_family,
+        }}>
           {tpl.footer_text}
         </p>
         <hr style={{ border: "none", borderTop: "1px solid #eee", margin: "24px 0" }} />
-        <p style={{ color: "#999999", fontSize: 11, textAlign: "center" }}>
+        <p style={{ color: "#999999", fontSize: 11, textAlign: "center", fontFamily: branding.font_family }}>
           © {new Date().getFullYear()} {branding.company_name} · {branding.support_email}
         </p>
       </div>
@@ -246,13 +332,28 @@ export default function AdminEmailTemplatesPage() {
                   <Label className="text-xs">Email de support</Label>
                   <Input value={branding.support_email} onChange={(e) => setBranding({ ...branding, support_email: e.target.value })} />
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">URL du logo</Label>
-                  <Input value={branding.logo_url} onChange={(e) => setBranding({ ...branding, logo_url: e.target.value })} placeholder="https://..." />
-                </div>
+                <LogoUploadField
+                  value={branding.logo_url}
+                  onChange={(url) => setBranding({ ...branding, logo_url: url })}
+                />
                 <div className="space-y-1.5">
                   <Label className="text-xs">Police</Label>
-                  <Input value={branding.font_family} onChange={(e) => setBranding({ ...branding, font_family: e.target.value })} />
+                  <Select
+                    value={branding.font_family}
+                    onValueChange={(v) => setBranding({ ...branding, font_family: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FONT_OPTIONS.map((f) => (
+                        <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">
+                    Outfit : Light pour le texte, Semi Bold pour les titres
+                  </p>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Couleur principale (boutons)</Label>
@@ -288,7 +389,7 @@ export default function AdminEmailTemplatesPage() {
                     <div className="flex items-center gap-3">
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm" onClick={() => setPreviewTemplate(tpl)}>
+                          <Button variant="ghost" size="sm">
                             <Eye size={14} className="mr-1" /> Aperçu
                           </Button>
                         </DialogTrigger>
