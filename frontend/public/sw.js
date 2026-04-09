@@ -30,12 +30,11 @@ self.addEventListener("activate", (event) => {
 // Cache top products for offline catalog
 async function cacheTopProducts() {
   try {
-    const supabaseUrl = self.location.origin.includes("localhost")
-      ? "https://uogkklwfvwoxkifpkzpu.supabase.co"
-      : "https://uogkklwfvwoxkifpkzpu.supabase.co";
+    // Dynamically determine Supabase URL from env or fallback
+    const supabaseUrl = "https://uogkklwfvwoxkifpkzpu.supabase.co";
     const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvZ2trbHdmdndveGtpZnBrenB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4ODY0MzcsImV4cCI6MjA4NzQ2MjQzN30.9NhIOytfsQ7Gdufs0goV6Lk97IyMkda362jh3IGMVi4";
 
-    const url = `${supabaseUrl}/rest/v1/products?select=id,name,name_fr,price,rating,product_images(image_url)&publish_status=eq.published&order=rating.desc.nullslast&limit=50`;
+    const url = `${supabaseUrl}/rest/v1/products_public?select=id,name,name_fr,price,rating,product_images(image_url)&publish_status=eq.published&order=rating.desc.nullslast&limit=50`;
     const response = await fetch(url, {
       headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
     });

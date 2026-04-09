@@ -29,61 +29,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isBanned, setIsBanned] = useState(false);
 
   const ensureProfile = useCallback(async (authUser: User) => {
-    const { data: existing } = await supabase
-      .from("profiles")
-      .select("id, email, first_name, last_name")
-      .eq("id", authUser.id)
-      .maybeSingle();
+    try {
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id, email, first_name, last_name")
+        .eq("id", authUser.id)
+        .maybeSingle();
 
-    const metadata = (authUser.user_metadata ?? {}) as Record<string, unknown>;
-    const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
-    const firstNameMeta = typeof metadata.first_name === "string" ? metadata.first_name.trim() : "";
-    const lastNameMeta = typeof metadata.last_name === "string" ? metadata.last_name.trim() : "";
+      const metadata = (authUser.user_metadata ?? {}) as Record<string, unknown>;
+      const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
+      const firstNameMeta = typeof metadata.first_name === "string" ? metadata.first_name.trim() : "";
+      const lastNameMeta = typeof metadata.last_name === "string" ? metadata.last_name.trim() : "";
 
-    const firstName = firstNameMeta || (fullName ? fullName.split(" ")[0] : null);
-    const lastName = lastNameMeta || (fullName.includes(" ") ? fullName.split(" ").slice(1).join(" ") : null);
+      const firstName = firstNameMeta || (fullName ? fullName.split(" ")[0] : null);
+      const lastName = lastNameMeta || (fullName.includes(" ") ? fullName.split(" ").slice(1).join(" ") : null);
 
-    if (existing) {
-      const patch: Record<string, string | null> = {};
+      if (existing) {
+        const patch: Record<string, string | null> = {};
+        if (!existing.email && authUser.email) patch.email = authUser.email;
+        if (!existing.first_name && firstName) patch.first_name = firstName;
+        if (!existing.last_name && lastName) patch.last_name = lastName;
 
-      if (!existing.email && authUser.email) patch.email = authUser.email;
-      if (!existing.first_name && firstName) patch.first_name = firstName;
-      if (!existing.last_name && lastName) patch.last_name = lastName;
-
-      if (Object.keys(patch).length > 0) {
-        const { error } = await supabase
-          .from("profiles")
-          .update(patch)
-          .eq("id", authUser.id)
-          .select("id")
-          .maybeSingle();
-
-        if (error) {
-          console.warn("ensureProfile backfill failed", error.message);
+        if (Object.keys(patch).length > 0) {
+          await supabase
+            .from("profiles")
+            .update(patch)
+            .eq("id", authUser.id)
+            .select("id")
+            .maybeSingle();
         }
+        return;
       }
 
-      return;
-    }
+      const { error } = await supabase.from("profiles").insert({
+        id: authUser.id,
+        email: authUser.email ?? null,
+        first_name: firstName || null,
+        last_name: lastName || null,
+      });
 
-    const { error } = await supabase.from("profiles").insert({
-      id: authUser.id,
-      email: authUser.email ?? null,
-      first_name: firstName || null,
-      last_name: lastName || null,
-    });
-
-    if (error && error.code !== "23505") {
-      // 23505 = unique violation (profile already exists via trigger) — ignore
-      console.warn("ensureProfile failed", error.message);
+      if (error && error.code !== "23505") {
+        console.warn("ensureProfile failed", error.message);
+      }
+    } catch (e) {
+      console.warn("ensureProfile error", e);
     }
   }, []);
 
-  // Update last_login_at and login_count on login (atomic increment via RPC-style)
   const trackLogin = useCallback(async (userId: string) => {
     try {
       logLoginEvent(userId);
-      // First read current count, then update — two separate calls to avoid race
       const { data: profile } = await fromTable("profiles")
         .select("login_count")
         .eq("id", userId)
@@ -130,20 +125,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsBanned(false);
       return;
     }
-    supabase
-      .from("profiles")
-      .select("is_banned")
-      .eq("id", user.id)
-      .single()
-      .then(({ data }) => {
+    const checkBan = async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("is_banned")
+          .eq("id", user.id)
+          .single();
         setIsBanned(data?.is_banned ?? false);
-      });
+      } catch {
+        setIsBanned(false);
+      }
+    };
+    checkBan();
   }, [user]);
 
-  const signOut = async () => {
-    if (user?.id) logLogoutEvent(user.id);
-    await supabase.auth.signOut();
-  };
+  /**
+   * Robust sign-out: always clears local state even if the network call fails.
+   * This prevents the user from being stuck in a "logged in but broken" state.
+   */
+  const signOut = useCallback(async () => {
+    const userId = user?.id;
+    if (userId) {
+      try { logLogoutEvent(userId); } catch { /* best effort */ }
+    }
+
+    // Clear local state FIRST so the UI reacts immediately
+    setUser(null);
+    setSession(null);
+    setIsBanned(false);
+
+    // Then attempt network sign-out (best effort)
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn("[Auth] Network sign-out failed, local state already cleared:", e);
+    }
+  }, [user]);
 
   return (
     <AuthContext.Provider value={{ user, session, loading, isBanned, signOut }}>
