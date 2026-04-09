@@ -9,8 +9,11 @@ import {
   Globe, TrendingUp, Clock, Download, Store, Heart, ShoppingCart,
   Package, ChevronLeft, ChevronRight, ArrowUpDown,
 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const PERIODS = [
+  { key: "24h", label: "24h", days: 1 },
+  { key: "48h", label: "48h", days: 2 },
   { key: "7d", label: "7j", days: 7 },
   { key: "30d", label: "30j", days: 30 },
   { key: "90d", label: "3 mois", days: 90 },
@@ -47,7 +50,63 @@ function StatCard({ icon: Icon, label, value, sub }: { icon: any; label: string;
   );
 }
 
-function OverviewTab({ events, period, persistentPwaCount }: { events: AnalyticsEvent[]; period: string; persistentPwaCount: number }) {
+// ─── Daily Traffic Histogram ──────────────────────────────────────
+function DailyTrafficChart({ events }: { events: AnalyticsEvent[] }) {
+  const dailyData = useMemo(() => {
+    const byDay = new Map<string, Set<string>>();
+    events.forEach((e) => {
+      const day = e.created_at.slice(0, 10);
+      if (!byDay.has(day)) byDay.set(day, new Set());
+      byDay.get(day)!.add(e.session_id);
+    });
+    return Array.from(byDay.entries())
+      .map(([date, sessions]) => ({ date, visiteurs: sessions.size }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [events]);
+
+  if (dailyData.length === 0) return null;
+
+  return (
+    <div className="bg-card border border-border rounded-lg p-4">
+      <h3 className="text-xs font-semibold text-foreground mb-3 flex items-center gap-1.5">
+        <BarChart3 size={14} /> Trafic journalier (visiteurs uniques)
+      </h3>
+      <ResponsiveContainer width="100%" height={220}>
+        <BarChart data={dailyData}>
+          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+          <XAxis
+            dataKey="date"
+            tick={{ fontSize: 10 }}
+            tickFormatter={(v) => {
+              const d = new Date(v);
+              return `${d.getDate()}/${d.getMonth() + 1}`;
+            }}
+            className="text-muted-foreground"
+          />
+          <YAxis tick={{ fontSize: 10 }} allowDecimals={false} className="text-muted-foreground" />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            labelFormatter={(v) => new Date(v).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+          />
+          <Bar dataKey="visiteurs" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ─── Overview Tab ─────────────────────────────────────────────────
+function OverviewTab({
+  events,
+  period,
+  pwaCount,
+  storeNames,
+}: {
+  events: AnalyticsEvent[];
+  period: string;
+  pwaCount: number;
+  storeNames: Map<string, string>;
+}) {
   const allEvents = events;
   const pageViews = allEvents.filter((e) => e.event_type === "page_view");
   const productClicks = allEvents.filter((e) => e.event_type === "product_click");
@@ -111,14 +170,18 @@ function OverviewTab({ events, period, persistentPwaCount }: { events: Analytics
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+      <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
+        <StatCard icon={Users} label="Visiteurs" value={uniqueSessions} sub="sessions uniques" />
         <StatCard icon={Eye} label="Pages vues" value={pageViews.length} />
-        <StatCard icon={Users} label="Sessions" value={uniqueSessions} />
         <StatCard icon={Users} label="Connectés" value={uniqueUsers} />
         <StatCard icon={Globe} label="Anonymes" value={anonymousVisitors} />
         <StatCard icon={Clock} label="Durée moy." value={formatDuration(avgSessionDuration)} />
-        <StatCard icon={Download} label="PWA installées" value={persistentPwaCount} sub={`(période: ${pwaInstalls.length})`} />
+        <StatCard icon={Download} label="PWA installées" value={pwaCount} sub={`(période: ${pwaInstalls.length})`} />
+        <StatCard icon={MousePointer} label="Clics produits" value={productClicks.length} />
       </div>
+
+      {/* Daily traffic histogram */}
+      <DailyTrafficChart events={allEvents} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="bg-card border border-border rounded-lg p-3">
@@ -232,7 +295,9 @@ function OverviewTab({ events, period, persistentPwaCount }: { events: Analytics
             {topStores.map(([id, count], i) => (
               <div key={id} className="flex items-center gap-1.5">
                 <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
-                <span className="text-[11px] text-foreground flex-1 truncate font-mono">{id.slice(0, 8)}…</span>
+                <span className="text-[11px] text-foreground flex-1 truncate">
+                  {storeNames.get(id) || id.slice(0, 8) + "…"}
+                </span>
                 <span className="text-[11px] font-medium text-foreground">{count} vues</span>
               </div>
             ))}
@@ -253,7 +318,6 @@ function ProductTrackingTab({ period, since }: { period: string; since: string |
   const [page, setPage] = useState(0);
   const [sortBy, setSortBy] = useState<SortField>("clicks");
 
-  // 1) All products (name + first image)
   const { data: allProducts } = useQuery({
     queryKey: ["analytics-products-list"],
     queryFn: async () => {
@@ -274,7 +338,6 @@ function ProductTrackingTab({ period, since }: { period: string; since: string |
     staleTime: 5 * 60_000,
   });
 
-  // 2) Product clicks from analytics_events
   const { data: clickEvents } = useQuery({
     queryKey: ["analytics-product-clicks", period],
     queryFn: async () => {
@@ -288,7 +351,6 @@ function ProductTrackingTab({ period, since }: { period: string; since: string |
     },
   });
 
-  // 3) Wishlist counts
   const { data: wishlistData } = useQuery({
     queryKey: ["analytics-wishlists", period],
     queryFn: async () => {
@@ -299,7 +361,6 @@ function ProductTrackingTab({ period, since }: { period: string; since: string |
     },
   });
 
-  // 4) Cart items
   const { data: cartData } = useQuery({
     queryKey: ["analytics-cart-items", period],
     queryFn: async () => {
@@ -310,7 +371,6 @@ function ProductTrackingTab({ period, since }: { period: string; since: string |
     },
   });
 
-  // 5) Order items (delivered only for confirmed orders)
   const { data: orderItemsData } = useQuery({
     queryKey: ["analytics-order-items", period],
     queryFn: async () => {
@@ -320,10 +380,9 @@ function ProductTrackingTab({ period, since }: { period: string; since: string |
     },
   });
 
-  // Aggregate
   const productStats = useMemo(() => {
     if (!allProducts) return [];
-    
+
     const clickMap = new Map<string, number>();
     (clickEvents || []).forEach((e: any) => {
       if (e.product_id) clickMap.set(e.product_id, (clickMap.get(e.product_id) || 0) + 1);
@@ -510,15 +569,37 @@ export default function AdminAnalyticsPage() {
     },
   });
 
+  // PWA install count from dedicated table
+  const { data: pwaCount } = useQuery({
+    queryKey: ["admin-pwa-count", period],
+    queryFn: async () => {
+      let q = fromTable("pwa_installs").select("id", { count: "exact", head: true });
+      if (since) q = q.gte("created_at", since);
+      const { count } = await q;
+      return count || 0;
+    },
+  });
+
+  // Store names for top stores display
+  const { data: storeNamesMap } = useQuery({
+    queryKey: ["admin-store-names"],
+    queryFn: async () => {
+      const { data } = await supabase.from("stores").select("id, name").limit(1000);
+      const map = new Map<string, string>();
+      (data || []).forEach((s) => map.set(s.id, s.name));
+      return map;
+    },
+    staleTime: 10 * 60_000,
+  });
+
   return (
     <AdminLayout title="Analytics & Tracking">
       <div className="space-y-4">
-        {/* Period filters */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
             <BarChart3 size={20} /> Vue d'ensemble
           </h2>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap">
             {PERIODS.map((p) => (
               <button
                 key={p.key}
@@ -548,7 +629,12 @@ export default function AdminAnalyticsPage() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="overview">
-              <OverviewTab events={events || []} period={period} persistentPwaCount={0} />
+              <OverviewTab
+                events={events || []}
+                period={period}
+                pwaCount={pwaCount || 0}
+                storeNames={storeNamesMap || new Map()}
+              />
             </TabsContent>
             <TabsContent value="products">
               <ProductTrackingTab period={period} since={since} />
