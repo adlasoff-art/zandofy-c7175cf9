@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Trash2, Image, Monitor, Smartphone, Info, Mail } from "lucide-react";
+import { Upload, Trash2, Image, Monitor, Smartphone, Info, Mail, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PLATFORM_FONTS } from "@/hooks/usePlatformFont";
 
 interface BrandingConfig {
   header_logo_url: string | null;
@@ -22,6 +23,7 @@ interface BrandingConfig {
   email_signature_email: string;
   email_signature_website: string;
   email_signature_extra: string;
+  primary_font: string;
 }
 
 const DEFAULT: BrandingConfig = {
