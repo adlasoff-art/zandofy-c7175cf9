@@ -78,12 +78,13 @@ export default function AdminSettingsPage() {
 
   const [gatewayFees, setGatewayFees] = useState({ mobile_money_fee_pct: 2.5 });
   const [reviewBonus, setReviewBonus] = useState({ bonus_pct: 0.10 });
+  const [visualSearchEnabled, setVisualSearchEnabled] = useState(false);
 
   useEffect(() => {
     supabase
       .from("platform_settings")
       .select("key, value")
-      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings", "gateway_fees", "review_bonus"])
+      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings", "gateway_fees", "review_bonus", "visual_search_enabled"])
       .then(({ data }) => {
         data?.forEach((row) => {
           const v = row.value as any;
@@ -134,6 +135,8 @@ export default function AdminSettingsPage() {
             setGatewayFees({ mobile_money_fee_pct: Number(v.mobile_money_fee_pct) || 2.5 });
           } else if (row.key === "review_bonus") {
             setReviewBonus({ bonus_pct: Number(v.bonus_pct) || 0.10 });
+          } else if (row.key === "visual_search_enabled") {
+            setVisualSearchEnabled(v?.enabled === true);
           }
         });
       });
