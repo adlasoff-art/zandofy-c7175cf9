@@ -1,135 +1,119 @@
 
 
-# Plan de Sécurisation Avancée — Zandofy
+# Audit de Vérification Post-Sécurisation — Failles & Lacunes Restantes
 
-## Résumé
-
-Mise en place d'un ensemble de protections de cybersécurité couvrant : le blocage géographique par pays (admin-configurable), la protection anti-bot sur les formulaires, le rate-limiting côté serveur sur les Edge Functions critiques, la correction des failles détectées par l'audit (storage, realtime, XSS), et le durcissement global de la plateforme.
+Après inspection complète du code, des politiques RLS, du storage, du realtime et des Edge Functions, voici les problèmes non résolus ou partiellement traités.
 
 ---
 
-## Lot A — Blocage Géographique Configurable (Geo-Blocking)
+## Failles Restantes Identifiées
 
-**Objectif** : L'admin coche des pays dans le panel admin → les visiteurs de ces pays voient "Site inaccessible".
+### 1. CRITIQUE — Realtime diffuse des tables sensibles sans filtrage
 
-1. **Migration DB** : Créer une entrée `platform_settings` avec clé `geo_blocked_countries` (JSONB : `{ "blocked": ["RU", "CN", "KP", ...] }`).
+Les tables suivantes sont toujours dans `supabase_realtime` et exposent des données sensibles à tout abonné authentifié :
 
-2. **Interface Admin** : Ajouter un onglet "Pays bloqués" dans les paramètres de sécurité admin, avec la liste complète des pays (checkbox multi-sélection). Sauvegarder dans `platform_settings`.
+- `payment_transactions` (montants, statuts de paiement)
+- `customer_locations` (coordonnées GPS des clients)
+- `rider_locations` (positions GPS des livreurs)
+- `withdrawal_requests` (demandes de retrait financier)
 
-3. **Hook `useGeoBlocking`** : Au chargement de l'app (dans `App.tsx`), détecter le pays du visiteur via l'API de géolocalisation déjà en place (`useGeoDetection`), comparer avec la liste bloquée, et afficher un écran plein "Ce site n'est pas disponible dans votre région" avec un design minimaliste.
-
-4. **Edge Function `geo-check`** : Pour les appels API critiques (paiement, inscription), vérifier l'en-tête `X-Forwarded-For` / `CF-IPCountry` côté serveur et rejeter avec 403.
-
----
-
-## Lot B — Protection Anti-Bot & Anti-Spam (Formulaires)
-
-**Objectif** : Protéger tous les formulaires contre les soumissions automatisées.
-
-1. **Cloudflare Turnstile** (gratuit) : Intégrer le widget Turnstile sur les formulaires critiques :
-   - Inscription / Connexion
-   - Mot de passe oublié
-   - Support (guest tickets)
-   - Contact / "Me notifier"
-
-2. **Honeypot Fields** : Ajouter un champ caché CSS (`display:none`) sur chaque formulaire. Si rempli → rejet silencieux.
-
-3. **Composant `<FormProtection>`** : Créer un composant wrapper qui combine Turnstile + honeypot, réutilisable partout.
+**Action** : Migration pour retirer ces 4 tables de la publication realtime.
 
 ---
 
-## Lot C — Rate Limiting Serveur (Edge Functions)
+### 2. CRITIQUE — Storage `product-media` INSERT toujours ouvert
 
-**Objectif** : Empêcher la saturation des requêtes (anti-DDoS applicatif).
+La politique INSERT reste `auth.uid() IS NOT NULL` — n'importe quel utilisateur authentifié peut uploader dans n'importe quel dossier. Le plan prévoyait de restreindre via `storage.foldername(name)[1]` au store du propriétaire.
 
-1. **Migration DB** : Créer une table `rate_limit_entries` :
-   ```
-   id, identifier (IP ou user_id), endpoint, request_count, window_start, created_at
-   ```
-   Avec index sur `(identifier, endpoint, window_start)`.
-
-2. **Utilitaire `checkRateLimit`** (partagé entre Edge Functions) : Avant chaque traitement, vérifier le nombre de requêtes dans la fenêtre glissante. Limites par endpoint :
-   - Auth (login/signup) : 10 req/min
-   - Paiement : 5 req/min
-   - Recherche : 30 req/min
-   - Envoi d'email : 3 req/min
-   - Webhooks : 60 req/min
-
-3. **Réponse 429** : Retourner `Too Many Requests` avec header `Retry-After`.
+**Action** : Remplacer la politique INSERT par une vérification de propriété du store via le chemin du fichier.
 
 ---
 
-## Lot D — Correction des Failles Détectées (Audit)
+### 3. CRITIQUE — Storage `supplier-images` DELETE/UPDATE sans vérification de propriétaire
 
-L'audit de sécurité a identifié **7 problèmes**. Corrections :
+Deux politiques dupliquées existent pour DELETE et UPDATE, et aucune ne vérifie la propriété. Tout utilisateur authentifié peut supprimer/modifier les images de n'importe quel fournisseur.
 
-### Erreurs critiques (3)
-
-| Faille | Correction |
-|--------|------------|
-| **Realtime sans RLS** — 15 tables diffusent des données sensibles (paiements, adresses, GPS) à tous les abonnés | Retirer les tables sensibles de la publication realtime OU ajouter des politiques de filtrage par canal |
-| **Storage `supplier-images`** — DELETE/UPDATE sans vérification de propriétaire | Ajouter un contrôle de chemin : `(storage.foldername(name))[1]` doit correspondre au supplier de l'utilisateur |
-| **Storage `product-media`** — INSERT ouvert à tout utilisateur authentifié | Restreindre l'INSERT au propriétaire du store via `(storage.foldername(name))[1]` |
-
-### Avertissements (4)
-
-| Faille | Correction |
-|--------|------------|
-| **RLS `USING(true)`** sur opérations d'écriture | Identifier et restreindre les policies permissives |
-| **`store_payment_numbers`** lisible publiquement | Restreindre SELECT aux utilisateurs authentifiés en cours de transaction |
-| **`delivery-proofs`** bucket public | Rendre privé, restreindre SELECT au client, rider et staff |
-| **`chat-media`** bucket public | Rendre privé, restreindre SELECT aux participants de la conversation |
+**Action** : Supprimer les doublons et ajouter un contrôle `storage.foldername(name)[1]` lié au supplier de l'utilisateur.
 
 ---
 
-## Lot E — Durcissement XSS et Injection
+### 4. IMPORTANT — Buckets `delivery-proofs` et `chat-media` toujours publics
 
-1. **`document.write(html)`** dans `DashboardPage.tsx` (facture PDF) : Remplacer par `Blob + URL.createObjectURL` comme déjà fait ailleurs dans l'audit.
+Le plan prévoyait de les rendre privés. Ils sont encore en `public: true`, ce qui signifie que les URLs sont devinables et accessibles sans authentification.
 
-2. **Sanitisation systématique** : Vérifier que tous les `dangerouslySetInnerHTML` utilisent `DOMPurify.sanitize()` (déjà OK pour blog et modération, mais vérifier les cas restants).
-
-3. **Validation d'entrées côté Edge Functions** : Ajouter une validation Zod systématique sur toutes les Edge Functions qui acceptent du JSON (certaines en manquent).
+**Action** : Migration pour passer ces buckets en `public = false` et ajuster les politiques SELECT.
 
 ---
 
-## Lot F — Durcissement Auth & Sessions
+### 5. IMPORTANT — Rate limiting non intégré dans les Edge Functions
 
-1. **Rate limiting serveur** des tentatives de connexion : La limitation actuelle est côté client (localStorage, contournable). Ajouter un check serveur dans la table `failed_login_attempts` AVANT le `signInWithPassword`.
+La table `rate_limit_entries` et la fonction `check_rate_limit()` existent en base, mais **aucune des 20 Edge Functions ne les utilise**. Le rate limiting serveur est donc inactif.
 
-2. **Invalidation de session** : Après 3 changements de mot de passe en 24h, forcer la déconnexion de toutes les sessions.
+**Action** : Ajouter l'appel `check_rate_limit` (via RPC Supabase) dans les Edge Functions critiques : `kelpay-payment`, `keccel-cardpay`, `send-email`, `admin-users`, `push-notifications`.
 
-3. **Headers de sécurité** (via `index.html` meta tags puisque pas de serveur custom) :
-   - `<meta http-equiv="X-Content-Type-Options" content="nosniff">`
-   - CSP minimal via meta tag
+---
+
+### 6. IMPORTANT — Rate limiting login reste côté client (localStorage)
+
+`auth-helpers.ts` utilise toujours `localStorage` comme mécanisme principal de rate limiting. Un attaquant peut simplement vider le localStorage pour contourner le verrouillage. Le `fromTable("failed_login_attempts").insert()` est en "fire-and-forget" et n'est jamais vérifié côté serveur AVANT l'authentification.
+
+**Action** : Créer une Edge Function `auth-rate-check` qui vérifie la table `failed_login_attempts` côté serveur avant de permettre `signInWithPassword`.
+
+---
+
+### 7. MOYEN — FormProtection (honeypot) non utilisé sur les formulaires
+
+Le composant `FormProtection` et `HoneypotField` sont créés mais **jamais importés ni utilisés** dans aucun formulaire (AuthPage, contact, support, etc.).
+
+**Action** : Intégrer `HoneypotField` dans AuthPage, les formulaires de support guest, et le formulaire de contact.
+
+---
+
+### 8. MOYEN — Pas de Content-Security-Policy (CSP) dans index.html
+
+Les headers `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` et `Permissions-Policy` sont présents, mais le **CSP** (Content-Security-Policy) est absent. C'est la protection anti-XSS la plus importante côté navigateur.
+
+**Action** : Ajouter un meta tag CSP minimal qui autorise les origines connues (self, supabase, CDN images).
+
+---
+
+### 9. MINEUR — Politique RLS `USING(true)` persistante sur `error_reports` INSERT
+
+La table `error_reports` a une politique INSERT avec `WITH CHECK (true)`. C'est intentionnel (tout le monde doit pouvoir reporter des erreurs), mais cela pourrait être exploité pour remplir la base.
+
+**Action** : Acceptable si un rate-limit est appliqué côté client. Documenter comme "accepté".
+
+---
+
+## Résumé des actions par priorité
+
+| # | Priorité | Action | Type |
+|---|----------|--------|------|
+| 1 | CRITIQUE | Retirer `payment_transactions`, `customer_locations`, `rider_locations`, `withdrawal_requests` du realtime | Migration SQL |
+| 2 | CRITIQUE | Restreindre INSERT `product-media` au propriétaire du store | Migration SQL |
+| 3 | CRITIQUE | Fixer DELETE/UPDATE `supplier-images` avec vérification propriétaire | Migration SQL |
+| 4 | IMPORTANT | Passer `delivery-proofs` et `chat-media` en buckets privés | Migration SQL |
+| 5 | IMPORTANT | Intégrer `check_rate_limit` dans les Edge Functions critiques | Code Edge Functions |
+| 6 | IMPORTANT | Rate limiting login côté serveur réel | Edge Function + AuthPage |
+| 7 | MOYEN | Intégrer les honeypots dans les formulaires existants | Code frontend |
+| 8 | MOYEN | Ajouter CSP meta tag | index.html |
+| 9 | MINEUR | Ignorer `error_reports` (intentionnel) | Documentation |
 
 ---
 
 ## Détails techniques
 
-### Fichiers à créer
-- `frontend/src/hooks/useGeoBlocking.ts` — Hook de blocage géographique
-- `frontend/src/components/security/GeoBlockScreen.tsx` — Écran "Site inaccessible"
-- `frontend/src/components/security/FormProtection.tsx` — Turnstile + honeypot wrapper
-- `frontend/supabase/functions/geo-check/index.ts` — Vérification géo serveur
-- 2-3 migrations SQL (rate_limit_entries, storage policies, realtime cleanup)
-
 ### Fichiers à modifier
-- `frontend/src/App.tsx` — Intégrer le geo-blocking au niveau racine
-- `frontend/src/pages/AuthPage.tsx` — Ajouter Turnstile + honeypot
-- `frontend/src/pages/DashboardPage.tsx` — Fix XSS facture (`document.write`)
-- `frontend/src/lib/auth-helpers.ts` — Rate limiting serveur
-- Edge Functions existantes — Ajouter rate limiting utilitaire
-- `frontend/index.html` — Meta tags de sécurité
-- Admin settings page — Onglet pays bloqués
+- 1 migration SQL combinée (items 1-4)
+- 5 Edge Functions (item 5) : `kelpay-payment`, `keccel-cardpay`, `send-email`, `admin-users`, `push-notifications`
+- `frontend/src/pages/AuthPage.tsx` (items 6-7)
+- `frontend/src/pages/HelpCenterPage.tsx` ou formulaire support guest (item 7)
+- `frontend/index.html` (item 8)
 
-### Dépendances
-- Clé de site Cloudflare Turnstile (gratuit, à configurer comme secret)
-
-### Ordre d'implémentation recommandé
-1. Lot D (corrections audit — failles existantes)
-2. Lot E (XSS/injection)
-3. Lot F (auth hardening)
-4. Lot C (rate limiting serveur)
-5. Lot B (anti-bot)
-6. Lot A (geo-blocking)
+### Ordre d'implémentation
+1. Migration SQL (critiques 1-4 en un seul fichier)
+2. Edge Functions rate limiting (item 5)
+3. Honeypots sur formulaires (item 7)
+4. CSP header (item 8)
+5. Marquer `error_reports` comme ignoré dans le scan de sécurité (item 9)
 
