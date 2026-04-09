@@ -1,4 +1,5 @@
 import { useRef, useCallback } from "react";
+import DOMPurify from "dompurify";
 import { Bold, Italic, Underline, List, ListOrdered, Image, Link, AlignLeft, AlignCenter, Type } from "lucide-react";
 
 interface RichTextEditorProps {
