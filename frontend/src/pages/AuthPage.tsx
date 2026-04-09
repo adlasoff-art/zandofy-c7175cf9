@@ -12,6 +12,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useGeoDetection } from "@/hooks/use-geo-detection";
 import { useActiveGeo } from "@/hooks/useActiveGeo";
 import { LegalModal } from "@/components/auth/LegalModal";
+import { HoneypotField, isHoneypotTriggered } from "@/components/security/FormProtection";
 import {
   signInWithGoogle,
   checkRateLimit,
@@ -54,6 +55,13 @@ export default function AuthPage() {
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Honeypot check
+    const form = e.target as HTMLFormElement;
+    if (isHoneypotTriggered(form)) {
+      console.warn("[Security] Bot detected via honeypot on auth form.");
+      return;
+    }
 
     const rl = checkRateLimit();
     if (!rl.allowed) {
@@ -327,7 +335,8 @@ export default function AuthPage() {
             </>
           )}
 
-          <form onSubmit={handleEmailAuth} className="space-y-4">
+          <form onSubmit={handleEmailAuth} className="space-y-4 relative">
+            <HoneypotField />
             {mode === "signup" && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
