@@ -162,6 +162,7 @@ const App = () => (
     <BrowserRouter>
     <TooltipProvider>
       <AuthProvider>
+        <GeoBlockGuard>
         <ImpersonationProvider>
         <ImpersonationBanner />
         <CartProvider>
@@ -290,6 +291,7 @@ const App = () => (
           </WishlistProvider>
         </CartProvider>
         </ImpersonationProvider>
+        </GeoBlockGuard>
       </AuthProvider>
     </TooltipProvider>
     </BrowserRouter>
