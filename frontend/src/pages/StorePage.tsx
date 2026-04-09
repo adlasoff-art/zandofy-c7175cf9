@@ -29,6 +29,7 @@ import { StoreReviewsList } from "@/components/reviews/StoreReviewsList";
 interface StoreData {
   id: string;
   name: string;
+  slug: string | null;
   description: string | null;
   logo_url: string | null;
   banner_url: string | null;
