@@ -6,6 +6,7 @@ import type { Product } from "@/services/api";
 import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useVisualSearchEnabled } from "@/hooks/useVisualSearchEnabled";
 
 interface PredictiveSearchProps {
   mobile?: boolean;
@@ -38,6 +39,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
   const navigate = useNavigate();
   const { t } = useI18n();
   const { toast } = useToast();
+  const { enabled: visualSearchEnabled } = useVisualSearchEnabled();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -260,15 +262,17 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
           </div>
 
           {/* Camera / visual search button */}
-          <button
-            type="button"
-            onClick={() => setVisualModalOpen(true)}
-            disabled={visualLoading}
-            className="flex items-center justify-center w-10 h-full border-2 border-l-0 border-r-0 border-primary/30 bg-card text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
-            aria-label="Recherche visuelle"
-          >
-            {visualLoading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
-          </button>
+          {visualSearchEnabled && (
+            <button
+              type="button"
+              onClick={() => setVisualModalOpen(true)}
+              disabled={visualLoading}
+              className="flex items-center justify-center w-10 h-full border-2 border-l-0 border-r-0 border-primary/30 bg-card text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+              aria-label="Recherche visuelle"
+            >
+              {visualLoading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+            </button>
+          )}
 
           {/* Search button with gradient */}
           <button
