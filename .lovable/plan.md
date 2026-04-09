@@ -1,119 +1,120 @@
 
+Objectif: remettre la plateforme en état sans annuler le durcissement sécurité, en corrigeant les points qui cassent l’affichage, l’authentification et l’accès admin.
 
-# Audit de Vérification Post-Sécurisation — Failles & Lacunes Restantes
+Diagnostic le plus probable
+1. CSP trop stricte et codée en dur dans `frontend/index.html`
+   - `connect-src`, `img-src`, `preconnect` et `dns-prefetch` autorisent un seul hôte backend stocké en dur.
+   - Sur staging/prod/GitHub/Vercel, si l’URL backend réelle est différente, cela bloque:
+     - les lectures backend,
+     - les images stockées,
+     - certaines opérations d’authentification, dont la déconnexion.
+   - C’est la cause la plus forte pour: structure visible mais contenu/images absents.
 
-Après inspection complète du code, des politiques RLS, du storage, du realtime et des Edge Functions, voici les problèmes non résolus ou partiellement traités.
+2. Risque d’écran blanc au bootstrap
+   - `frontend/src/hooks/useGeoBlocking.ts` ne termine pas proprement si la requête initiale échoue vraiment.
+   - `App.tsx` rend `null` tant que `GeoBlockGuard` est “loading”.
+   - Chaîne probable:
+     ```text
+     requête config bloquée/échouée
+       -> settingsLoaded ne passe jamais à true
+       -> GeoBlockGuard reste en attente
+       -> écran blanc
+     ```
 
----
+3. Le rôle admin n’a probablement pas été perdu en base
+   - La capture réseau actuelle montre encore `user_roles = admin` pour le compte observé.
+   - Donc le problème “admin disparu” semble frontend/session, pas une suppression réelle du rôle.
 
-## Failles Restantes Identifiées
+4. `useRoles` fige aussi les échecs
+   - Dans `frontend/src/hooks/use-roles.ts`, l’utilisateur est marqué comme “déjà chargé” même si la lecture des rôles échoue.
+   - Résultat: un échec transitoire peut figer `roles=[]`, masquer “Administrateur” et bloquer les routes protégées jusqu’au reload.
 
-### 1. CRITIQUE — Realtime diffuse des tables sensibles sans filtrage
+5. La déconnexion est fragile
+   - `AuthContext.signOut()` dépend d’un appel réseau.
+   - Dans le Header, le clic n’attend pas la promesse et ne traite pas l’échec.
+   - Si l’appel auth est bloqué par CSP/réseau, l’utilisateur reste coincé.
 
-Les tables suivantes sont toujours dans `supabase_realtime` et exposent des données sensibles à tout abonné authentifié :
+6. La lecture publique de `platform_settings` est trop limitée pour le frontend actuel
+   - La politique publique autorise un sous-ensemble de clés.
+   - Or le code lit aussi publiquement: `branding`, `header_theme`, `theme_colors`, `topbar_config`, `geo_blocked_countries`, `active_countries`, `cookie_settings`, `seo_config`.
+   - Effets attendus: logo, thème, topbar, cookies, géoblocage, branding partiel qui ne chargent plus correctement.
 
-- `payment_transactions` (montants, statuts de paiement)
-- `customer_locations` (coordonnées GPS des clients)
-- `rider_locations` (positions GPS des livreurs)
-- `withdrawal_requests` (demandes de retrait financier)
+7. Le modèle “vue publique” n’est pas encore aligné avec le storefront
+   - `stores_public` existe, mais le frontend continue de faire plusieurs lectures publiques sur `stores`/jointures directes.
+   - Donc le durcissement backend et les requêtes frontend ne sont pas encore parfaitement raccordés.
 
-**Action** : Migration pour retirer ces 4 tables de la publication realtime.
+8. Le service worker peut aggraver les symptômes
+   - `frontend/public/sw.js` contient aussi une URL backend figée.
+   - Après plusieurs déploiements, le cache peut conserver un état incohérent et amplifier l’impression de panne.
 
----
+Plan de correction recommandé
+1. Restaurer d’abord la disponibilité
+   - Corriger la CSP pour qu’elle soit dépendante de l’environnement au lieu d’une URL backend codée en dur.
+   - Autoriser l’hôte backend courant dans `connect-src`, `img-src`, `preconnect` et `dns-prefetch`.
+   - Garder la protection XSS, mais arrêter de casser staging/prod.
 
-### 2. CRITIQUE — Storage `product-media` INSERT toujours ouvert
+2. Éliminer définitivement l’écran blanc de bootstrap
+   - Corriger `useGeoBlocking` avec un vrai `catch/finally` et un fallback fail-open.
+   - Vérifier que les hooks racine de config ne peuvent jamais bloquer tout l’arbre React.
 
-La politique INSERT reste `auth.uid() IS NOT NULL` — n'importe quel utilisateur authentifié peut uploader dans n'importe quel dossier. Le plan prévoyait de restreindre via `storage.foldername(name)[1]` au store du propriétaire.
+3. Réparer l’affichage admin sans relâcher la sécurité
+   - Corriger `useRoles` pour:
+     - ne mémoriser un utilisateur “chargé” qu’après succès réel,
+     - réinitialiser correctement sur erreur,
+     - éventuellement retenter la lecture après restauration de session.
+   - Faire attendre proprement auth + rôles avant tout rendu admin.
 
-**Action** : Remplacer la politique INSERT par une vérification de propriété du store via le chemin du fichier.
+4. Rendre la déconnexion fiable
+   - Passer à une déconnexion locale robuste côté client, avec nettoyage réseau en best effort si nécessaire.
+   - Attendre la promesse dans le Header/AdminLayout et remettre l’état auth à zéro proprement.
 
----
+5. Faire une migration corrective minimale
+   - Une seule migration ciblée, pas une réexécution confuse des anciens lots.
+   - Cette migration devra:
+     - élargir proprement la lecture publique de `platform_settings` aux clés publiques réellement utilisées,
+     - compléter si besoin les politiques `SELECT` publiques des contenus CMS strictement publics,
+     - ne pas réouvrir les buckets privés ni les tables sensibles.
 
-### 3. CRITIQUE — Storage `supplier-images` DELETE/UPDATE sans vérification de propriétaire
+6. Réaligner le storefront avec le modèle public sécurisé
+   - Là où c’est nécessaire, basculer les lectures publiques vers les vues publiques (`stores_public`, et `products_public` si appropriée/disponible) au lieu des tables brutes.
+   - Conserver les champs sensibles masqués.
 
-Deux politiques dupliquées existent pour DELETE et UPDATE, et aucune ne vérifie la propriété. Tout utilisateur authentifié peut supprimer/modifier les images de n'importe quel fournisseur.
+7. Nettoyer la couche cache/PWA
+   - Retirer les URL backend figées du service worker.
+   - Forcer une invalidation propre des caches après correctif pour éviter les faux positifs post-déploiement.
 
-**Action** : Supprimer les doublons et ajouter un contrôle `storage.foldername(name)[1]` lié au supplier de l'utilisateur.
+8. Vérification finale multi-environnements
+   - Lovable preview: plus d’écran blanc.
+   - Staging Vercel: données, bannières, images produits, logos visibles.
+   - Production: mêmes vérifications.
+   - Compte admin: lien “Administrateur” visible, routes admin accessibles.
+   - Déconnexion/reconnexion: fonctionnement normal.
+   - Sécurité conservée: pas de réouverture des buckets privés, pas d’exposition des données sensibles.
 
----
+Fichiers prioritaires
+```text
+frontend/index.html
+frontend/src/hooks/useGeoBlocking.ts
+frontend/src/hooks/use-roles.ts
+frontend/src/contexts/AuthContext.tsx
+frontend/src/components/Header.tsx
+frontend/src/components/admin/AdminLayout.tsx
+frontend/public/sw.js
+frontend/src/hooks/use-push-notifications.ts
+```
 
-### 4. IMPORTANT — Buckets `delivery-proofs` et `chat-media` toujours publics
+Lots/morceaux les plus suspects
+```text
+- durcissement CSP récent
+- restriction publique de platform_settings (migration 20260317201809_...)
+- ajout de stores_public sans réalignement complet des requêtes frontend (migration 20260409082324_...)
+```
 
-Le plan prévoyait de les rendre privés. Ils sont encore en `public: true`, ce qui signifie que les URLs sont devinables et accessibles sans authentification.
-
-**Action** : Migration pour passer ces buckets en `public = false` et ajuster les politiques SELECT.
-
----
-
-### 5. IMPORTANT — Rate limiting non intégré dans les Edge Functions
-
-La table `rate_limit_entries` et la fonction `check_rate_limit()` existent en base, mais **aucune des 20 Edge Functions ne les utilise**. Le rate limiting serveur est donc inactif.
-
-**Action** : Ajouter l'appel `check_rate_limit` (via RPC Supabase) dans les Edge Functions critiques : `kelpay-payment`, `keccel-cardpay`, `send-email`, `admin-users`, `push-notifications`.
-
----
-
-### 6. IMPORTANT — Rate limiting login reste côté client (localStorage)
-
-`auth-helpers.ts` utilise toujours `localStorage` comme mécanisme principal de rate limiting. Un attaquant peut simplement vider le localStorage pour contourner le verrouillage. Le `fromTable("failed_login_attempts").insert()` est en "fire-and-forget" et n'est jamais vérifié côté serveur AVANT l'authentification.
-
-**Action** : Créer une Edge Function `auth-rate-check` qui vérifie la table `failed_login_attempts` côté serveur avant de permettre `signInWithPassword`.
-
----
-
-### 7. MOYEN — FormProtection (honeypot) non utilisé sur les formulaires
-
-Le composant `FormProtection` et `HoneypotField` sont créés mais **jamais importés ni utilisés** dans aucun formulaire (AuthPage, contact, support, etc.).
-
-**Action** : Intégrer `HoneypotField` dans AuthPage, les formulaires de support guest, et le formulaire de contact.
-
----
-
-### 8. MOYEN — Pas de Content-Security-Policy (CSP) dans index.html
-
-Les headers `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` et `Permissions-Policy` sont présents, mais le **CSP** (Content-Security-Policy) est absent. C'est la protection anti-XSS la plus importante côté navigateur.
-
-**Action** : Ajouter un meta tag CSP minimal qui autorise les origines connues (self, supabase, CDN images).
-
----
-
-### 9. MINEUR — Politique RLS `USING(true)` persistante sur `error_reports` INSERT
-
-La table `error_reports` a une politique INSERT avec `WITH CHECK (true)`. C'est intentionnel (tout le monde doit pouvoir reporter des erreurs), mais cela pourrait être exploité pour remplir la base.
-
-**Action** : Acceptable si un rate-limit est appliqué côté client. Documenter comme "accepté".
-
----
-
-## Résumé des actions par priorité
-
-| # | Priorité | Action | Type |
-|---|----------|--------|------|
-| 1 | CRITIQUE | Retirer `payment_transactions`, `customer_locations`, `rider_locations`, `withdrawal_requests` du realtime | Migration SQL |
-| 2 | CRITIQUE | Restreindre INSERT `product-media` au propriétaire du store | Migration SQL |
-| 3 | CRITIQUE | Fixer DELETE/UPDATE `supplier-images` avec vérification propriétaire | Migration SQL |
-| 4 | IMPORTANT | Passer `delivery-proofs` et `chat-media` en buckets privés | Migration SQL |
-| 5 | IMPORTANT | Intégrer `check_rate_limit` dans les Edge Functions critiques | Code Edge Functions |
-| 6 | IMPORTANT | Rate limiting login côté serveur réel | Edge Function + AuthPage |
-| 7 | MOYEN | Intégrer les honeypots dans les formulaires existants | Code frontend |
-| 8 | MOYEN | Ajouter CSP meta tag | index.html |
-| 9 | MINEUR | Ignorer `error_reports` (intentionnel) | Documentation |
-
----
-
-## Détails techniques
-
-### Fichiers à modifier
-- 1 migration SQL combinée (items 1-4)
-- 5 Edge Functions (item 5) : `kelpay-payment`, `keccel-cardpay`, `send-email`, `admin-users`, `push-notifications`
-- `frontend/src/pages/AuthPage.tsx` (items 6-7)
-- `frontend/src/pages/HelpCenterPage.tsx` ou formulaire support guest (item 7)
-- `frontend/index.html` (item 8)
-
-### Ordre d'implémentation
-1. Migration SQL (critiques 1-4 en un seul fichier)
-2. Edge Functions rate limiting (item 5)
-3. Honeypots sur formulaires (item 7)
-4. CSP header (item 8)
-5. Marquer `error_reports` comme ignoré dans le scan de sécurité (item 9)
-
+Conclusion
+- Je ne vois pas d’indice fort que le rôle admin ait été supprimé en base.
+- Le noyau du problème semble être un cumul de:
+  - CSP trop stricte et figée,
+  - bootstrap frontend fail-close,
+  - hook de rôles qui mémorise un échec,
+  - politique publique de configuration trop étroite pour le frontend actuel.
+- Je recommande donc une correction chirurgicale orientée disponibilité, puis un réalignement propre entre sécurité et storefront, plutôt qu’un rollback global des protections.
