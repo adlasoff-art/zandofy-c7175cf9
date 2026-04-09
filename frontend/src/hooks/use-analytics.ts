@@ -86,6 +86,8 @@ export function useAnalyticsTracker() {
 
     const handleBeforeUnload = () => {
       const duration = Math.round((Date.now() - sessionStartRef.current) / 1000);
+      // sendBeacon uses anon key (no JWT), so user_id must be null
+      // to comply with RLS policy that checks user_id = auth.uid()
       const row: any = {
         session_id: getSessionId(),
         event_type: "session_end",
@@ -98,7 +100,6 @@ export function useAnalyticsTracker() {
         screen_height: window.screen.height,
         duration_seconds: duration,
       };
-      if (user?.id) row.user_id = user.id;
       const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/analytics_events`;
       navigator.sendBeacon(
         url + "?" + new URLSearchParams({ apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY }).toString(),
