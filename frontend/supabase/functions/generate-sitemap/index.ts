@@ -36,7 +36,7 @@ Deno.serve(async () => {
     // Fetch stores
     const { data: stores } = await supabase
       .from("stores")
-      .select("id, created_at")
+      .select("id, slug, name, created_at")
       .limit(1000);
 
     // Build XML
@@ -60,9 +60,10 @@ Deno.serve(async () => {
       xml += `  <url><loc>${SITE_URL}/category/${encodeURIComponent(c.name.toLowerCase())}</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>\n`;
     }
 
-    // Stores
+    // Stores (use slug when available, fallback to id)
     for (const s of stores || []) {
-      xml += `  <url><loc>${SITE_URL}/store/${s.id}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>\n`;
+      const storePath = s.slug || s.id;
+      xml += `  <url><loc>${SITE_URL}/store/${storePath}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>\n`;
     }
 
     xml += `</urlset>`;

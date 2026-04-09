@@ -6,6 +6,7 @@ import { fetchProducts, type Product } from "@/services/api";
 import { computeStoreYears, formatStoreYears } from "@/lib/store-years";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { SEOHead } from "@/components/SEOHead";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { CertificationBadge } from "@/components/CertificationBadge";
@@ -28,6 +29,7 @@ import { StoreReviewsList } from "@/components/reviews/StoreReviewsList";
 interface StoreData {
   id: string;
   name: string;
+  slug: string | null;
   description: string | null;
   logo_url: string | null;
   banner_url: string | null;
@@ -77,16 +79,23 @@ export default function StorePage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
+  // Resolve store by slug or UUID
+  const isUUID = id ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) : false;
+
   const { data: store, isLoading: storeLoading } = useQuery({
     queryKey: ["store", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("stores")
-        .select("*")
-        .eq("id", id!)
-        .maybeSingle();
+      let data: any = null;
+      let error: any = null;
+      if (isUUID) {
+        const res = await supabase.from("stores").select("*").eq("id", id!).maybeSingle();
+        data = res.data; error = res.error;
+      } else {
+        const res = await (supabase as any).from("stores").select("*").eq("slug", id!).maybeSingle();
+        data = res.data; error = res.error;
+      }
       if (error || !data) return null;
-      return data as unknown as StoreData;
+      return data as StoreData;
     },
     enabled: !!id,
   });
@@ -247,8 +256,19 @@ export default function StorePage() {
     </div>
   );
 
+  const seoTitle = store ? `${store.name} — Boutique` : "Boutique";
+  const seoDesc = store
+    ? `Découvrez la boutique ${store.name} sur Zandofy. ${store.description?.slice(0, 120) || "Produits de qualité, vendeur vérifié."}`
+    : "Découvrez cette boutique sur Zandofy.";
+
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead
+        title={seoTitle}
+        description={seoDesc}
+        canonical={store ? `/store/${store.slug || store.id}` : undefined}
+        ogImage={store?.logo_url || undefined}
+      />
       <Header />
 
       <main>
