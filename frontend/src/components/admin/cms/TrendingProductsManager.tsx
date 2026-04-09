@@ -143,7 +143,7 @@ export default function TrendingProductsManager() {
                 <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
                 <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                   <span className="flex items-center gap-0.5"><ShoppingCart size={10} />{p.sales_count} ventes</span>
-                  <span className="flex items-center gap-0.5"><Star size={10} className="text-yellow-500" />{p.rating}</span>
+                  <span className="flex items-center gap-0.5"><Star size={10} className="text-warning" />{p.rating}</span>
                   <span>{p.review_count} avis</span>
                 </div>
               </div>
@@ -181,7 +181,7 @@ export default function TrendingProductsManager() {
               <p className="text-sm font-medium text-foreground truncate">{entry.product.name}</p>
               <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                 <span className="flex items-center gap-0.5"><ShoppingCart size={10} />{entry.product.sales_count} ventes</span>
-                <span className="flex items-center gap-0.5"><Star size={10} className="text-yellow-500" />{entry.product.rating}</span>
+                <span className="flex items-center gap-0.5"><Star size={10} className="text-warning" />{entry.product.rating}</span>
                 <span>{entry.product.review_count} avis</span>
               </div>
             </div>
