@@ -84,15 +84,17 @@ export default function StorePage() {
   const { data: store, isLoading: storeLoading } = useQuery({
     queryKey: ["store", id],
     queryFn: async () => {
-      let query = supabase.from("stores").select("*");
+      let data: any = null;
+      let error: any = null;
       if (isUUID) {
-        query = query.eq("id", id!);
+        const res = await supabase.from("stores").select("*").eq("id", id!).maybeSingle();
+        data = res.data; error = res.error;
       } else {
-        query = query.eq("slug", id!);
+        const res = await (supabase as any).from("stores").select("*").eq("slug", id!).maybeSingle();
+        data = res.data; error = res.error;
       }
-      const { data, error } = await query.maybeSingle();
       if (error || !data) return null;
-      return data as unknown as StoreData;
+      return data as StoreData;
     },
     enabled: !!id,
   });
