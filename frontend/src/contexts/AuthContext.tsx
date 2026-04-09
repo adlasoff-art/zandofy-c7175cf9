@@ -125,15 +125,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsBanned(false);
       return;
     }
-    supabase
-      .from("profiles")
-      .select("is_banned")
-      .eq("id", user.id)
-      .single()
-      .then(({ data }) => {
+    const checkBan = async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("is_banned")
+          .eq("id", user.id)
+          .single();
         setIsBanned(data?.is_banned ?? false);
-      })
-      .catch(() => setIsBanned(false));
+      } catch {
+        setIsBanned(false);
+      }
+    };
+    checkBan();
   }, [user]);
 
   /**

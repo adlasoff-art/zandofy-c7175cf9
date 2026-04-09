@@ -13,24 +13,24 @@ export function useGeoBlocking() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
-    supabase
-      .from("platform_settings")
-      .select("value")
-      .eq("key", "geo_blocked_countries")
-      .maybeSingle()
-      .then(({ data }) => {
+    const load = async () => {
+      try {
+        const { data } = await supabase
+          .from("platform_settings")
+          .select("value")
+          .eq("key", "geo_blocked_countries")
+          .maybeSingle();
         const val = data?.value as any;
         if (val?.blocked && Array.isArray(val.blocked)) {
           setBlockedCountries(val.blocked.map((c: string) => c.toUpperCase()));
         }
-      })
-      .catch(() => {
-        // Fail-open: if we can't read settings, don't block anyone
+      } catch {
         console.warn("[GeoBlocking] Failed to load geo settings, failing open");
-      })
-      .finally(() => {
+      } finally {
         setSettingsLoaded(true);
-      });
+      }
+    };
+    load();
   }, []);
 
   const loading = geo.loading || !settingsLoaded;
