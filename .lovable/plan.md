@@ -1,49 +1,45 @@
 
 
-# Plan : Améliorations Analytics, PWA, Filtres et Email Templates
+# Sélecteur de police global pour la plateforme
 
-## Contexte et explications demandées
+## Résumé
 
-**Durée moyenne** : Elle est calculée à partir des événements `session_end` qui enregistrent le temps passé entre le début et la fin de session d'un utilisateur. Si un utilisateur quitte l'onglet ou ferme le navigateur, un événement `session_end` est émis avec la durée en secondes. La moyenne est faite sur toutes ces durées.
+Ajouter dans l'onglet **Branding & Logo** (CMS) un sélecteur de police globale. L'admin peut changer la typographie de tout le site parmi 6 polices, avec preview en temps réel. Persistance via `platform_settings` (pas de migration SQL).
 
-**PWA installées = 0** : Le problème est identifié : dans `AdminAnalyticsPage.tsx` ligne 551, `persistentPwaCount` est codé en dur à `0`. Le compteur ne lit jamais la table `pwa_installs`. Cela sera corrigé.
+## 6 polices proposées
 
-**Google Site Verification** : C'est un code fourni par Google Search Console (search.google.com/search-console). Après avoir ajouté votre site, Google vous donne un code de vérification (ex: `google1234abcd.html` ou une balise meta). Collez le contenu de la balise meta dans ce champ pour prouver à Google que vous êtes propriétaire du site.
+1. **Inter** (défaut actuel) — Sans-serif moderne, lisibilité optimale
+2. **Outfit** — Police du logo Zandofy, toutes graisses 100-900
+3. **Poppins** — Géométrique moderne, populaire e-commerce
+4. **DM Sans** — Clean et contemporain
+5. **Plus Jakarta Sans** — Élégant et professionnel
+6. **Roboto** — Classique Google, universel, toutes graisses 100-900
 
-**Google Analytics / GTM ID** : C'est l'identifiant de suivi de Google Analytics (format `G-XXXXXXX`) ou Google Tag Manager (format `GTM-XXXXXXX`). Créez un compte sur analytics.google.com, créez une propriété pour zandofy.com, et copiez l'ID de mesure dans ce champ. Cela injectera automatiquement le script de tracking Google sur votre site.
+## Modifications
 
----
+### 1. `frontend/src/index.css`
+- Étendre l'import Google Fonts pour les 6 familles (toutes graisses)
+- Ajouter `--font-primary: 'Inter', sans-serif` dans `:root`
+- `body` et `h1-h4` utilisent `var(--font-primary)`
 
-## Modifications techniques
+### 2. `tailwind.config.ts` + `frontend/tailwind.config.ts`
+- `fontFamily.sans` → `['var(--font-primary)', 'system-ui', 'sans-serif']`
 
-### 1. Ajouter filtres 24h et 48h (AdminAnalyticsPage.tsx)
+### 3. `frontend/src/components/admin/cms/BrandingTab.tsx`
+- Section "Typographie" avec Select des 6 polices (chaque option rendue dans sa propre police)
+- Preview : H1, H2, paragraphe, bouton dans la police sélectionnée avec graisses variées
+- Sauvegarde `primary_font` dans `platform_settings` (clé `branding`, champ JSONB existant)
 
-Ajouter `{ key: "24h", label: "24h", days: 1 }` et `{ key: "48h", label: "48h", days: 2 }` au tableau `PERIODS`.
+### 4. `frontend/src/hooks/usePlatformFont.ts` (nouveau)
+- Hook chargeant `branding.primary_font` et appliquant `--font-primary` sur `documentElement`
+- Défaut : Inter
 
-### 2. Ajouter KPI "Visiteurs" + Histogramme trafic journalier (AdminAnalyticsPage.tsx)
+### 5. `frontend/src/App.tsx`
+- Appel de `usePlatformFont()`
 
-- Ajouter une carte KPI "Visiteurs uniques" basée sur les `session_id` distincts (déjà calculé comme `uniqueSessions`, mais le renommer en "Visiteurs" pour plus de clarté).
-- Ajouter un histogramme (BarChart de recharts) montrant le nombre de sessions/visiteurs par jour sur la période sélectionnée.
+### 6. Nettoyage inline
+- `AuthPage.tsx`, `OnboardingPage.tsx`, `ResetPassword.tsx` : remplacer `fontFamily: "'Inter'"` par `var(--font-primary)`
 
-### 3. Corriger le compteur PWA (AdminAnalyticsPage.tsx)
-
-- Remplacer `persistentPwaCount={0}` par une requête réelle vers la table `pwa_installs` avec le filtre de période.
-- Ajouter un `useQuery` qui compte les entrées dans `pwa_installs` filtrées par la période sélectionnée.
-
-### 4. Afficher les noms des boutiques (AdminAnalyticsPage.tsx)
-
-- Dans `OverviewTab`, charger les noms des boutiques via `supabase.from("stores").select("id, name")` pour les IDs présents dans `topStores`.
-- Afficher le nom de la boutique au lieu de l'ID tronqué.
-
-### 5. Email Templates : Police Outfit + Upload logo (AdminEmailTemplatesPage.tsx)
-
-- Remplacer le champ "Police" par un sélecteur (Select) proposant :
-  - `Arial, sans-serif` (actuel)
-  - `'Outfit', sans-serif` (police Zandofy)
-- Ajouter l'import Google Fonts pour Outfit dans l'aperçu email.
-- Remplacer le champ "URL du logo" par un composant d'upload (réutiliser le même pattern que `SeoBrandingSection.tsx` avec le bucket `seo-assets`).
-
-### Fichiers modifiés
-- `frontend/src/pages/admin/AdminAnalyticsPage.tsx` — filtres 24h/48h, visiteurs, histogramme, PWA count, noms boutiques
-- `frontend/src/pages/admin/AdminEmailTemplatesPage.tsx` — sélecteur police Outfit, upload logo
+## Pas de migration SQL
+Le champ `primary_font` est stocké dans le JSONB existant de `platform_settings`.
 
