@@ -112,6 +112,7 @@ const sidebarSections: SidebarSection[] = [
     icon: Settings,
     items: [
       { title: "Support client", url: "/admin/support", icon: Headphones },
+      { title: "Rapports d'erreurs", url: "/admin/error-reports", icon: Bug },
       { title: "Journal d'audit", url: "/admin/audit", icon: ScrollText },
       { title: "Notifications", url: "/admin/notifications", icon: Bell },
       { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
