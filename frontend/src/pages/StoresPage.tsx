@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { SEOHead } from "@/components/SEOHead";
 import {
   Search, Store, Users, Package, TrendingUp, Star, StarHalf,
   ShieldCheck, SlidersHorizontal, X, ArrowUpDown, Eye, ChevronDown,
@@ -30,6 +31,7 @@ function isStoreOnline(s: StoreRow): boolean {
 interface StoreRow {
   id: string;
   name: string;
+  slug: string | null;
   description: string | null;
   logo_url: string | null;
   banner_url: string | null;

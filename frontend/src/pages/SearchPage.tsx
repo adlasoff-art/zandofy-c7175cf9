@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { SEOHead } from "@/components/SEOHead";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { PredictiveSearch } from "@/components/PredictiveSearch";
 import { searchProducts, fetchAllColors, fetchAllSizes, type SearchFilters } from "@/services/search";
@@ -251,8 +252,16 @@ export default function SearchPage() {
     </div>
   );
 
+  const seoTitle = queryParam
+    ? `Résultats pour "${queryParam}" — Recherche`
+    : "Rechercher des produits";
+  const seoDesc = queryParam
+    ? `Trouvez "${queryParam}" parmi des milliers de produits mode, tech et maison sur Zandofy. Prix compétitifs et livraison rapide en Afrique.`
+    : "Recherchez parmi des milliers de produits mode, électronique et maison sur Zandofy. Filtrez par catégorie, prix et taille.";
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <SEOHead title={seoTitle} description={seoDesc} canonical={`/search${queryParam ? `?q=${encodeURIComponent(queryParam)}` : ""}`} />
       <Header />
 
       <main className="flex-1">
