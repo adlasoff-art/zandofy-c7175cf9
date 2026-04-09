@@ -33,7 +33,6 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
     // When SEO is disabled, force noindex/nofollow
     if (!seoEnabled) {
       setMeta("robots", "noindex, nofollow");
-      // Still set title for browser tab but skip all other SEO tags
       return () => {
         document.querySelector('script[data-seo-jsonld]')?.remove();
       };
@@ -52,8 +51,10 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
     setMeta("twitter:card", ogImage ? "summary_large_image" : "summary");
     setMeta("twitter:title", fullTitle);
     setMeta("twitter:description", description);
+    setMeta("twitter:site", "@Zandofy");
     if (ogImage) setMeta("twitter:image", ogImage);
 
+    // Canonical
     if (canonical) {
       const url = canonical.startsWith("http") ? canonical : `${SITE_URL}${canonical}`;
       let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
@@ -65,6 +66,25 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
       link.href = url;
     }
 
+    // hreflang tags (fr primary + x-default)
+    const currentUrl = canonical
+      ? (canonical.startsWith("http") ? canonical : `${SITE_URL}${canonical}`)
+      : `${SITE_URL}${window.location.pathname}`;
+
+    const setHreflang = (lang: string, href: string) => {
+      let link = document.querySelector(`link[rel="alternate"][hreflang="${lang}"]`) as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "alternate";
+        link.setAttribute("hreflang", lang);
+        document.head.appendChild(link);
+      }
+      link.href = href;
+    };
+    setHreflang("fr", currentUrl);
+    setHreflang("x-default", currentUrl);
+
+    // JSON-LD
     if (jsonLd) {
       let script = document.querySelector('script[data-seo-jsonld]') as HTMLScriptElement | null;
       if (!script) {

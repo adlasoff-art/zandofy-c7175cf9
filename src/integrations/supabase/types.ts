@@ -5138,6 +5138,7 @@ export type Database = {
           sales_trend: string | null
           seo_keywords: string[] | null
           shop_type: string
+          slug: string | null
           suspended_activities: string[] | null
           suspended_at: string | null
           suspended_by: string | null
@@ -5197,6 +5198,7 @@ export type Database = {
           sales_trend?: string | null
           seo_keywords?: string[] | null
           shop_type?: string
+          slug?: string | null
           suspended_activities?: string[] | null
           suspended_at?: string | null
           suspended_by?: string | null
@@ -5256,6 +5258,7 @@ export type Database = {
           sales_trend?: string | null
           seo_keywords?: string[] | null
           shop_type?: string
+          slug?: string | null
           suspended_activities?: string[] | null
           suspended_at?: string | null
           suspended_by?: string | null
@@ -6706,6 +6709,7 @@ export type Database = {
           sales_override: number | null
           sales_trend: string | null
           shop_type: string | null
+          slug: string | null
           verified_years: number | null
           verified_years_override: number | null
         }
@@ -6739,6 +6743,7 @@ export type Database = {
           sales_override?: number | null
           sales_trend?: string | null
           shop_type?: string | null
+          slug?: string | null
           verified_years?: number | null
           verified_years_override?: number | null
         }
@@ -6772,6 +6777,7 @@ export type Database = {
           sales_override?: number | null
           sales_trend?: string | null
           shop_type?: string | null
+          slug?: string | null
           verified_years?: number | null
           verified_years_override?: number | null
         }
