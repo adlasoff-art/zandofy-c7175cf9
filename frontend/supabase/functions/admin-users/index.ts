@@ -58,6 +58,17 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Forbidden: admin role required" }, 403);
     }
 
+    // Rate limiting: 10 requests/min per admin
+    const { data: rlAllowed } = await anonClient.rpc("check_rate_limit", {
+      p_identifier: callerId,
+      p_endpoint: "admin-users",
+      p_max_requests: 10,
+      p_window_seconds: 60,
+    });
+    if (rlAllowed === false) {
+      return jsonResponse({ error: "Too many requests. Please wait." }, 429);
+    }
+
     // Service role client for admin operations
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
