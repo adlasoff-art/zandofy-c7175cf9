@@ -33,6 +33,7 @@ interface StoreRow {
   rating: number | null;
   is_online: boolean | null;
   created_at: string;
+  last_seen_at: string | null;
   followers_override: number | null;
   sales_override: number | null;
   verified_years_override: number | null;
@@ -246,7 +247,7 @@ export default function StoresPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("stores")
-        .select("id, name, description, logo_url, banner_url, is_verified, verified_years, followers_count, products_count, sales_count, rating, is_online, created_at, followers_override, sales_override, verified_years_override, review_count_override")
+        .select("id, name, description, logo_url, banner_url, is_verified, verified_years, followers_count, products_count, sales_count, rating, is_online, last_seen_at, created_at, followers_override, sales_override, verified_years_override, review_count_override")
         .order("sales_count", { ascending: false });
       if (error) throw error;
       return (data ?? []) as StoreRow[];
@@ -273,7 +274,7 @@ export default function StoresPage() {
         result = result.filter((s) => s.is_verified);
         break;
       case "online":
-        result = result.filter((s) => s.is_online);
+        result = result.filter((s) => isStoreOnline(s));
         break;
       case "top_rated":
         result = result.filter((s) => (s.rating ?? 0) >= 4);
