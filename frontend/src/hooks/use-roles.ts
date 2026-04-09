@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -10,8 +10,33 @@ export function useRoles() {
   const [loading, setLoading] = useState(true);
   const fetchedUserId = useRef<string | null>(null);
 
+  const fetchRoles = useCallback(async (userId: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+
+      if (error) {
+        console.warn("[useRoles] Failed to fetch roles:", error.message);
+        // Do NOT mark as fetched — allow retry on next render
+        setRoles([]);
+        setLoading(false);
+        return;
+      }
+
+      setRoles(data.map((r) => r.role as AppRole));
+      fetchedUserId.current = userId;
+      setLoading(false);
+    } catch (e) {
+      console.warn("[useRoles] Unexpected error:", e);
+      setRoles([]);
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    // Keep loading true while auth is still resolving
     if (authLoading) {
       setLoading(true);
       return;
@@ -24,26 +49,11 @@ export function useRoles() {
       return;
     }
 
-    // Avoid re-fetch if already fetched for this user
+    // Avoid re-fetch if already successfully fetched for this user
     if (fetchedUserId.current === user.id) return;
 
-    setLoading(true);
-
-    async function fetchRoles() {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id);
-
-      if (!error && data) {
-        setRoles(data.map((r) => r.role as AppRole));
-      }
-      fetchedUserId.current = user!.id;
-      setLoading(false);
-    }
-
-    fetchRoles();
-  }, [user, authLoading]);
+    fetchRoles(user.id);
+  }, [user, authLoading, fetchRoles]);
 
   const hasRole = (role: AppRole) => roles.includes(role);
   const isAdmin = hasRole("admin");
