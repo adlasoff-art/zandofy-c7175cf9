@@ -38,7 +38,7 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
-          <a href="/" className="text-2xl font-bold tracking-[0.18em] uppercase text-foreground" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}>ZANDOFY</a>
+          <a href="/" className="text-2xl font-bold tracking-[0.18em] uppercase text-foreground" style={{ fontWeight: 800 }}>ZANDOFY</a>
           <h1 className="text-xl font-bold text-foreground">Nouveau mot de passe</h1>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">

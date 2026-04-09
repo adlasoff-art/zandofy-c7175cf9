@@ -139,7 +139,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b border-border bg-card">
         <div className="container flex items-center justify-between h-14">
-          <a href="/" className="text-xl font-bold tracking-[0.18em] uppercase text-foreground" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800 }}>
+          <a href="/" className="text-xl font-bold tracking-[0.18em] uppercase text-foreground" style={{ fontWeight: 800 }}>
             ZANDOFY
           </a>
           <button onClick={() => navigate("/")} className="text-sm text-muted-foreground hover:text-foreground">
