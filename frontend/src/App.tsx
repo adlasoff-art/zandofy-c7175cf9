@@ -123,6 +123,7 @@ const AdminStoreChangeRequestsPage = lazy(() => import("./pages/admin/AdminStore
 const AdminServicePlansPage = lazy(() => import("./pages/admin/AdminServicePlansPage"));
 const AdminDeliveryPlansPage = lazy(() => import("./pages/admin/AdminDeliveryPlansPage"));
 const AdminServicePackagesPage = lazy(() => import("./pages/admin/AdminServicePackagesPage"));
+const AdminErrorReportsPage = lazy(() => import("./pages/admin/AdminErrorReportsPage"));
 const ImpersonatePage = lazy(() => import("./pages/ImpersonatePage"));
 
 const queryClient = new QueryClient({
@@ -252,6 +253,7 @@ const App = () => (
                 <Route path="/admin/vendor-subscriptions" element={<RoleGuard allowedRoles={["admin"]}><AdminVendorSubscriptionsPage /></RoleGuard>} />
                 <Route path="/admin/vendor-pricing" element={<RoleGuard allowedRoles={["admin"]}><AdminVendorPricingPage /></RoleGuard>} />
                 <Route path="/admin/audit" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminAuditPage /></RoleGuard>} />
+                <Route path="/admin/error-reports" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminErrorReportsPage /></RoleGuard>} />
                 <Route path="/admin/loyalty" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminLoyaltyPage /></RoleGuard>} />
                 <Route path="/admin/points" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminPointsPage /></RoleGuard>} />
                 <Route path="/admin/coupons" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminCouponsPage /></RoleGuard>} />

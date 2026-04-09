@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator, Crown, Shield } from "lucide-react";
+import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator, Crown, Shield, Camera } from "lucide-react";
 import { GeoBlockingSettings } from "@/components/admin/GeoBlockingSettings";
 import { KelpayWebhookPanel } from "@/components/admin/KelpayWebhookPanel";
 import { MonetizationSettings } from "@/components/admin/MonetizationSettings";
@@ -78,12 +78,13 @@ export default function AdminSettingsPage() {
 
   const [gatewayFees, setGatewayFees] = useState({ mobile_money_fee_pct: 2.5 });
   const [reviewBonus, setReviewBonus] = useState({ bonus_pct: 0.10 });
+  const [visualSearchEnabled, setVisualSearchEnabled] = useState(false);
 
   useEffect(() => {
     supabase
       .from("platform_settings")
       .select("key, value")
-      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings", "gateway_fees", "review_bonus"])
+      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings", "gateway_fees", "review_bonus", "visual_search_enabled"])
       .then(({ data }) => {
         data?.forEach((row) => {
           const v = row.value as any;
@@ -134,6 +135,8 @@ export default function AdminSettingsPage() {
             setGatewayFees({ mobile_money_fee_pct: Number(v.mobile_money_fee_pct) || 2.5 });
           } else if (row.key === "review_bonus") {
             setReviewBonus({ bonus_pct: Number(v.bonus_pct) || 0.10 });
+          } else if (row.key === "visual_search_enabled") {
+            setVisualSearchEnabled(v?.enabled === true);
           }
         });
       });
@@ -210,7 +213,11 @@ export default function AdminSettingsPage() {
       .from("platform_settings")
       .upsert({ key: "review_bonus", value: reviewBonus as any, updated_at: now }, { onConflict: "key" });
 
-    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8 || e9 || e10;
+    const { error: e11 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "visual_search_enabled", value: { enabled: visualSearchEnabled } as any, updated_at: now }, { onConflict: "key" });
+
+    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8 || e9 || e10 || e11;
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
@@ -410,6 +417,24 @@ export default function AdminSettingsPage() {
               onChange={(e) => setPricing((p) => ({ ...p, platform_commission_default: Number(e.target.value) || 10 }))}
               className={inputClass + " max-w-[200px]"}
             />
+          </div>
+        </section>
+
+        {/* Visual Search Toggle */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Camera size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Recherche visuelle (IA)</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Permet aux clients de rechercher des produits en prenant une photo ou en uploadant une image. Cette fonctionnalité nécessite une configuration IA avancée (vectoriel, etc.).
+          </p>
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div>
+              <p className="text-sm font-medium text-foreground">Activer la recherche visuelle</p>
+              <p className="text-xs text-muted-foreground">Affiche le bouton caméra dans la barre de recherche</p>
+            </div>
+            <Switch checked={visualSearchEnabled} onCheckedChange={setVisualSearchEnabled} />
           </div>
         </section>
 
