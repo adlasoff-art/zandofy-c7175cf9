@@ -187,7 +187,7 @@ const App = () => (
           <I18nProvider>
           <ThemeProvider>
           <UIConfigProvider>
-            <CmsThemeInjector />
+            <ErrorBoundary><CmsThemeInjector /></ErrorBoundary>
             <AnalyticsTrackerInjector />
             <DynamicFavicon />
             <UserPresenceTracker />

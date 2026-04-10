@@ -99,7 +99,7 @@ function CityAutocomplete({ label, value, onSelect }: {
           value={query}
           onChange={e => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 200)}
+          onBlur={() => setTimeout(() => { if (!loading) setOpen(false); }, 400)}
           placeholder="Rechercher une ville (mondiale)..."
           className="h-9 pl-8 text-sm"
         />
@@ -116,7 +116,7 @@ function CityAutocomplete({ label, value, onSelect }: {
                   <button
                     key={city.id}
                     className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center justify-between transition-colors"
-                    onMouseDown={e => { e.preventDefault(); onSelect(city); setQuery(`${city.name} (${city.country_code})`); setOpen(false); }}
+                    onPointerDown={e => { e.preventDefault(); onSelect(city); setQuery(`${city.name} (${city.country_code})`); setOpen(false); }}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <MapPin size={12} className="text-primary shrink-0" />
@@ -137,7 +137,7 @@ function CityAutocomplete({ label, value, onSelect }: {
                       <button
                         key={`wc-${wc.countryCode}-${wc.city}-${i}`}
                         className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center justify-between transition-colors"
-                        onMouseDown={e => { e.preventDefault(); handleSelectWorldCity(wc); }}
+                        onPointerDown={e => { e.preventDefault(); handleSelectWorldCity(wc); }}
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <Globe size={12} className="text-muted-foreground shrink-0" />

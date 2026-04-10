@@ -93,7 +93,7 @@ export function ProductShippingEstimator({ productWeightGrams, originCountry }: 
           value={query}
           onChange={e => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 200)}
+          onBlur={() => setTimeout(() => { if (!loading) setOpen(false); }, 400)}
           placeholder="Entrez votre ville pour estimer..."
           className="h-9 pl-8 text-sm w-full max-w-full"
           style={{ fontSize: '16px' }}
@@ -108,7 +108,7 @@ export function ProductShippingEstimator({ productWeightGrams, originCountry }: 
               <button
                 key={city.id}
                 className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors"
-                onMouseDown={e => { e.preventDefault(); handleSelect(city); }}
+                onPointerDown={e => { e.preventDefault(); handleSelect(city); }}
               >
                 <MapPin size={12} className="text-primary shrink-0" />
                 <span className="truncate font-medium">{city.name}</span>
