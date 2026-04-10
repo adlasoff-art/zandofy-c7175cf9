@@ -156,7 +156,7 @@ export function PWAInstallBanner() {
   }
 
   // Android with native prompt
-  if (deferredPrompt) {
+  if (deferredPrompt || deferredPromptRef.current) {
     const label = isFr ? "Installer l'app Zandofy" : "Install Zandofy app";
     const cta = isFr ? "Installer" : "Install";
 
