@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Download, MoreVertical } from "lucide-react";
+import { X, Download, MoreVertical, AlertCircle } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -22,11 +22,21 @@ function isInStandaloneMode() {
 export function PWAInstallBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
-  const [dismissed, setDismissed] = useState(() => localStorage.getItem("pwa_banner_dismissed") === "1");
   const [isInstalled, setIsInstalled] = useState(false);
   const [showIOSBanner, setShowIOSBanner] = useState(false);
   const [showAndroidFallback, setShowAndroidFallback] = useState(false);
+  const [showFallbackMessage, setShowFallbackMessage] = useState(false);
   const { locale } = useI18n();
+
+  const isIOSDevice = isIOS();
+
+  // iOS: sessionStorage (reappears each visit) / Android: localStorage (permanent dismiss)
+  const [dismissed, setDismissed] = useState(() => {
+    if (isIOSDevice) {
+      return sessionStorage.getItem("pwa_banner_dismissed") === "1";
+    }
+    return localStorage.getItem("pwa_banner_dismissed") === "1";
+  });
 
   useEffect(() => {
     if (isInStandaloneMode()) {
@@ -34,7 +44,7 @@ export function PWAInstallBanner() {
       return;
     }
 
-    if (isIOS()) {
+    if (isIOSDevice) {
       setShowIOSBanner(true);
       return;
     }
@@ -42,13 +52,13 @@ export function PWAInstallBanner() {
     const handler = (e: Event) => {
       e.preventDefault();
       const prompt = e as BeforeInstallPromptEvent;
-      setDeferredPrompt(prompt);
       deferredPromptRef.current = prompt;
+      setDeferredPrompt(prompt);
       setShowAndroidFallback(false);
+      setShowFallbackMessage(false);
     };
     window.addEventListener("beforeinstallprompt", handler);
 
-    // Listen for successful install
     const installedHandler = () => {
       setIsInstalled(true);
       setDeferredPrompt(null);
@@ -56,7 +66,6 @@ export function PWAInstallBanner() {
     };
     window.addEventListener("appinstalled", installedHandler);
 
-    // Android fallback: if beforeinstallprompt doesn't fire within 3s
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
     if (isAndroid()) {
       fallbackTimer = setTimeout(() => {
@@ -71,21 +80,34 @@ export function PWAInstallBanner() {
       window.removeEventListener("appinstalled", installedHandler);
       if (fallbackTimer) clearTimeout(fallbackTimer);
     };
-  }, []);
+  }, [isIOSDevice]);
 
   const handleInstall = async () => {
-    const prompt = deferredPromptRef.current || deferredPrompt;
-    if (!prompt) return;
-    await prompt.prompt();
-    const { outcome } = await prompt.userChoice;
-    if (outcome === "accepted") setIsInstalled(true);
+    const prompt = deferredPromptRef.current;
+    if (!prompt) {
+      // Native prompt unavailable — show fallback message + manual instructions
+      setShowFallbackMessage(true);
+      setShowAndroidFallback(true);
+      return;
+    }
+    try {
+      await prompt.prompt();
+      const { outcome } = await prompt.userChoice;
+      if (outcome === "accepted") setIsInstalled(true);
+    } catch {
+      // prompt() can only be called once
+    }
     setDeferredPrompt(null);
     deferredPromptRef.current = null;
   };
 
   const handleDismiss = () => {
     setDismissed(true);
-    localStorage.setItem("pwa_banner_dismissed", "1");
+    if (isIOSDevice) {
+      sessionStorage.setItem("pwa_banner_dismissed", "1");
+    } else {
+      localStorage.setItem("pwa_banner_dismissed", "1");
+    }
   };
 
   if (isInstalled || dismissed) return null;
@@ -145,7 +167,7 @@ export function PWAInstallBanner() {
   }
 
   // Android with native prompt
-  if (deferredPrompt) {
+  if ((deferredPrompt || deferredPromptRef.current) && !showAndroidFallback) {
     const label = isFr ? "Installer l'app Zandofy" : "Install Zandofy app";
     const cta = isFr ? "Installer" : "Install";
 
@@ -172,7 +194,7 @@ export function PWAInstallBanner() {
     );
   }
 
-  // Android fallback: manual instructions + Install button
+  // Android fallback: manual instructions + Install button + fallback message
   if (showAndroidFallback) {
     return (
       <div className="fixed bottom-16 inset-x-0 z-[60] px-3 pb-2 lg:hidden animate-fade-in">
@@ -187,6 +209,18 @@ export function PWAInstallBanner() {
           <p className="text-sm font-bold mb-2 pr-6">
             {isFr ? "Installer Zandofy" : "Install Zandofy"}
           </p>
+
+          {showFallbackMessage && (
+            <div className="flex items-start gap-2 mb-2 bg-primary-foreground/15 rounded-lg px-3 py-2">
+              <AlertCircle size={16} className="shrink-0 mt-0.5" />
+              <p className="text-xs leading-relaxed">
+                {isFr
+                  ? "Votre navigateur ne prend pas en charge l'installation directe. Suivez les étapes ci-dessous."
+                  : "Your browser doesn't support direct installation. Follow the steps below."}
+              </p>
+            </div>
+          )}
+
           <div className="space-y-1.5 text-xs leading-relaxed opacity-95">
             <p className="flex items-center gap-1.5">
               <span className="shrink-0 w-5 h-5 rounded-full bg-primary-foreground/20 flex items-center justify-center text-[10px] font-bold">1</span>
