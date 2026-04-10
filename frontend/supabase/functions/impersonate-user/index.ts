@@ -136,11 +136,12 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "token required" }, 400, corsHeaders);
       }
 
-      // Find and validate token
+      // Hash the incoming token and look up by hash
+      const incomingHash = await sha256Hex(impersonationToken);
       const { data: tokenRecord } = await supabaseAdmin
         .from("impersonation_tokens")
         .select("*")
-        .eq("token", impersonationToken)
+        .eq("token_hash", incomingHash)
         .eq("used", false)
         .single();
 
