@@ -18,6 +18,7 @@ export default function AdminDashboard() {
   const [geoFilters, setGeoFilters] = useState<GlobalFilters>({ country: "all", city: "all" });
   const queryClient = useQueryClient();
 
+  // Realtime for orders only (products/stores removed for security - cost_real, whatsapp_number)
   useEffect(() => {
     const channel = supabase
       .channel('admin-orders-realtime')
@@ -29,6 +30,16 @@ export default function AdminDashboard() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
+
+  // Polling for product/store counters (30s) — replaces removed Realtime channels
+  useEffect(() => {
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stores"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-vendor-stats"] });
+    }, 30000);
+    return () => clearInterval(interval);
   }, [queryClient]);
 
   return (
