@@ -2888,6 +2888,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "payment_transactions_card_token_id_fkey"
+            columns: ["card_token_id"]
+            isOneToOne: false
+            referencedRelation: "saved_cards_safe"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "payment_transactions_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -6707,6 +6714,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      saved_cards_safe: {
+        Row: {
+          card_brand: string | null
+          created_at: string | null
+          expiry_month: number | null
+          expiry_year: number | null
+          id: string | null
+          is_default: boolean | null
+          label: string | null
+          last_four: string | null
+          provider: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          card_brand?: string | null
+          created_at?: string | null
+          expiry_month?: number | null
+          expiry_year?: number | null
+          id?: string | null
+          is_default?: boolean | null
+          label?: string | null
+          last_four?: string | null
+          provider?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          card_brand?: string | null
+          created_at?: string | null
+          expiry_month?: number | null
+          expiry_year?: number | null
+          id?: string | null
+          is_default?: boolean | null
+          label?: string | null
+          last_four?: string | null
+          provider?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       stores_public: {
         Row: {
