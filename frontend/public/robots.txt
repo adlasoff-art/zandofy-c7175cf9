@@ -8,3 +8,4 @@ Disallow: /shipper
 Disallow: /auth
 
 Sitemap: https://zandofy.com/sitemap.xml
+Sitemap: https://vpttoqojmiqxgudknyxf.supabase.co/functions/v1/generate-sitemap
