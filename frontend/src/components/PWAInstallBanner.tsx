@@ -42,8 +42,9 @@ export function PWAInstallBanner() {
     const handler = (e: Event) => {
       e.preventDefault();
       const prompt = e as BeforeInstallPromptEvent;
-      setDeferredPrompt(prompt);
       deferredPromptRef.current = prompt;
+      setDeferredPrompt(prompt);
+      // If we were in fallback mode, switch to native
       setShowAndroidFallback(false);
     };
     window.addEventListener("beforeinstallprompt", handler);
@@ -74,11 +75,21 @@ export function PWAInstallBanner() {
   }, []);
 
   const handleInstall = async () => {
-    const prompt = deferredPromptRef.current || deferredPrompt;
-    if (!prompt) return;
-    await prompt.prompt();
-    const { outcome } = await prompt.userChoice;
-    if (outcome === "accepted") setIsInstalled(true);
+    // Always prefer the ref — it stays current even if state is stale
+    const prompt = deferredPromptRef.current;
+    if (!prompt) {
+      // No native prompt available — nothing we can do programmatically.
+      // On Android, the browser may not have fired beforeinstallprompt yet.
+      // Show a brief toast or simply do nothing (fallback instructions are visible).
+      return;
+    }
+    try {
+      await prompt.prompt();
+      const { outcome } = await prompt.userChoice;
+      if (outcome === "accepted") setIsInstalled(true);
+    } catch {
+      // prompt() can only be called once — if already called, ignore
+    }
     setDeferredPrompt(null);
     deferredPromptRef.current = null;
   };
@@ -145,7 +156,7 @@ export function PWAInstallBanner() {
   }
 
   // Android with native prompt
-  if (deferredPrompt) {
+  if (deferredPrompt || deferredPromptRef.current) {
     const label = isFr ? "Installer l'app Zandofy" : "Install Zandofy app";
     const cta = isFr ? "Installer" : "Install";
 
