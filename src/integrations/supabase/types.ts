@@ -2129,7 +2129,6 @@ export type Database = {
           expires_at: string
           id: string
           target_user_id: string
-          token: string | null
           token_hash: string | null
           used: boolean
         }
@@ -2139,7 +2138,6 @@ export type Database = {
           expires_at: string
           id?: string
           target_user_id: string
-          token?: string | null
           token_hash?: string | null
           used?: boolean
         }
@@ -2149,7 +2147,6 @@ export type Database = {
           expires_at?: string
           id?: string
           target_user_id?: string
-          token?: string | null
           token_hash?: string | null
           used?: boolean
         }
@@ -7054,6 +7051,14 @@ export type Database = {
         Returns: undefined
       }
       update_user_presence: { Args: { p_user_id: string }; Returns: undefined }
+      upsert_rate_limit: {
+        Args: {
+          p_key: string
+          p_max_requests?: number
+          p_window_seconds?: number
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "vendor" | "shipper" | "rider"
