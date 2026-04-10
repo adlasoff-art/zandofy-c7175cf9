@@ -1,44 +1,65 @@
 
 
-# Plan : Bannière PWA Install fiable + Estimation frais mobile
+# Plan : Corriger les 3 vulnérabilités critiques (sans casse)
 
-## Probleme 1 : Estimation frais "Aucune ville trouvée" sur mobile
+## Contexte
 
-L'estimateur de frais utilise `onBlur` avec un `setTimeout` de 200ms pour fermer le dropdown. Sur mobile, le clavier virtuel et les événements tactiles provoquent des cycles blur/focus inattendus qui ferment le dropdown avant que les resultats n'arrivent, ou avant que l'utilisateur puisse les toucher.
+Les vues `products_public` et `stores_public` existent déjà et masquent les colonnes sensibles. Le problème : le code frontend et le Realtime ne les utilisent pas systématiquement.
 
-De plus, les boutons de selection utilisent `onMouseDown` au lieu de `onPointerDown`, ce qui peut ne pas fonctionner correctement sur certains navigateurs mobiles.
+## Approche conservative
 
-### Corrections
+Aucune suppression de politique RLS, aucun changement de structure de table. On agit uniquement sur deux axes : (1) retirer des tables sensibles du Realtime, (2) migrer les requêtes frontend publiques vers les vues existantes.
 
-**3 fichiers concernes** : `ProductShippingEstimator.tsx`, `PrecisionShippingEstimate.tsx`, `DynamicShippingCalculator.tsx`
+---
 
-Pour chacun :
-- Augmenter le timeout `onBlur` de 200ms a 400ms pour laisser le temps aux interactions tactiles
-- Remplacer `onMouseDown` par `onPointerDown` sur les boutons de selection de ville (meilleure compatibilite mobile)
-- Ajouter une protection : ne pas fermer le dropdown si une recherche est en cours (`loading`)
+## Correction 1 — Realtime : retirer les tables qui exposent des données sensibles
 
-## Probleme 2 : Banniere PWA Install absente sur mobile
+**Migration SQL** :
 
-Le composant `PWAInstallBanner.tsx` existe et fonctionne correctement pour iOS. Cependant, sur Android, si l'evenement `beforeinstallprompt` ne se declenche pas (cas frequent en environnement preview ou certains navigateurs), la banniere ne s'affiche jamais (ligne 116 : `if (!deferredPrompt) return null`).
+Retirer `products` et `stores` de la publication `supabase_realtime`. Ces tables diffusent leurs lignes complètes (y compris `cost_real`, `cost_calc`, `whatsapp_number`) à tout abonné authentifié.
 
-### Corrections
+Tables conservées dans Realtime (aucun changement) : `orders`, `messages`, `notifications`, `order_status_history`, `deliveries`, `shipments`, `support_messages`, `dispute_messages`, `delivery_chats`.
 
-**Fichier** : `PWAInstallBanner.tsx`
+**Impact frontend** : Seuls 2 fichiers utilisent le Realtime sur `products`/`stores` :
+- `AdminDashboard.tsx` — écoute `orders` (pas affecté), mais aussi `products` et `stores` pour invalider des compteurs admin. On remplacera par un polling toutes les 30 secondes sur ces compteurs, ou on ajoutera un channel Realtime sur `orders` uniquement (déjà en place).
+- Aucun composant public n'écoute `products` ou `stores` en Realtime.
 
-- Ajouter un fallback Android : si `beforeinstallprompt` ne se declenche pas apres 3 secondes, afficher quand meme une banniere avec instructions manuelles ("Menu > Ajouter a l'ecran d'accueil")
-- Garder le comportement actuel si `beforeinstallprompt` se declenche (bouton Installer natif)
-- Garder le comportement iOS inchange (guide 3 etapes)
-- Garder la detection standalone (ne rien afficher si app deja installee)
+**Risque de casse** : Très faible. Les admins verront un léger délai de rafraîchissement sur les compteurs produits/boutiques (30s au lieu d'instantané). Tout le reste fonctionne identiquement.
 
-**Fichier** : `App.tsx`
+---
 
-- Envelopper `CmsThemeInjector` dans un `ErrorBoundary` pour isoler le crash `No QueryClient set` et ne pas bloquer le rendu de la banniere PWA
+## Correction 2 — Masquer `cost_real` / `cost_calc` pour les requêtes publiques
 
-## Fichiers modifies
+Les vues `products_public` existent et excluent ces colonnes. Le frontend public query déjà `products` directement mais ne sélectionne jamais `cost_real`/`cost_calc` dans les pages publiques (seuls `OrdersTab` et `AdminVendorAccountingPage` le font, et ils sont admin-only).
 
-- `frontend/src/components/ProductShippingEstimator.tsx` -- blur timeout + onPointerDown
-- `frontend/src/components/PrecisionShippingEstimate.tsx` -- idem
-- `frontend/src/components/DynamicShippingCalculator.tsx` -- idem
-- `frontend/src/components/PWAInstallBanner.tsx` -- fallback Android
-- `frontend/src/App.tsx` -- ErrorBoundary autour de CmsThemeInjector
+**Action** : Aucune modification de code nécessaire côté public. Les pages admin continueront à lire `cost_real`/`cost_calc` via la table `products` (RLS "Admins and managers read all products" les y autorise).
+
+**Protection supplémentaire** : Le retrait de `products` du Realtime (Correction 1) empêche la diffusion de ces colonnes via les WebSockets. C'était le vrai vecteur d'exposition.
+
+---
+
+## Correction 3 — Masquer `whatsapp_number` des requêtes publiques sur `stores`
+
+La vue `stores_public` existe et exclut `whatsapp_number`. Le fichier `StoresPage.tsx` utilise déjà `stores_public`.
+
+**Action** : Vérifier et migrer tout composant public qui query `stores` directement et qui pourrait recevoir `whatsapp_number`. Les pages produit et boutique publiques qui affichent le bouton WhatsApp doivent conditionner l'affichage à l'utilisateur authentifié (déjà le cas puisque le bouton WhatsApp n'est visible que pour les clients connectés qui consultent une boutique).
+
+**Protection supplémentaire** : Le retrait de `stores` du Realtime (Correction 1) empêche la diffusion de `whatsapp_number` via WebSockets.
+
+---
+
+## Fichiers modifiés
+
+| Fichier | Changement |
+|---------|-----------|
+| Migration SQL | `DROP TABLE public.products, public.stores` de `supabase_realtime` |
+| `frontend/src/pages/admin/AdminDashboard.tsx` | Remplacer le channel Realtime `products`/`stores` par un polling 30s ou supprimer (le channel `orders` reste) |
+
+## Score estimé après corrections
+
+68 → ~80/100. Les trois vecteurs d'exposition (Realtime broadcast, coûts, WhatsApp) sont neutralisés sans toucher aux RLS policies ni à la structure des tables.
+
+## Fichier SQL téléchargeable
+
+Conformément à SAFETY_POLICY, un fichier SQL sera généré et fourni pour synchronisation manuelle staging/production.
 
