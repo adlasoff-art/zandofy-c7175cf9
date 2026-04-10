@@ -224,91 +224,41 @@ export default function VendorDashboardPage() {
       setConversations(items);
       setLoading(false);
       hasLoadedRef.current = true;
-      setupRealtime(activeStore.id);
-    }
-
-    function setupRealtime(storeId: string) {
-      // Clean previous channel
-      if (realtimeChannelRef.current) {
-        supabase.removeChannel(realtimeChannelRef.current);
-      }
-
-      const channel = supabase
-        .channel(`vendor-dashboard-${storeId}`)
-        // Products changes → update count
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'products', filter: `store_id=eq.${storeId}` },
-          async () => {
-            const { count } = await supabase
-              .from("products")
-              .select("id", { count: "exact", head: true })
-              .eq("store_id", storeId);
-            setStore(prev => prev ? { ...prev, products_count: count || 0 } : prev);
-          }
-        )
-        // Orders changes → toast + refresh counters
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` },
-          async (payload) => {
-            if (payload.eventType === 'INSERT') {
-              toast.success(`Nouvelle commande : ${(payload.new as any).order_ref}`);
-            }
-            await fetchOrderCounters(storeId);
-          }
-        )
-        // Messages changes → update unread counts
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'messages' },
-          async (payload) => {
-            const msg = payload.new as any;
-            if (msg.sender_id === user!.id) return;
-            // Check if conversation belongs to this store
-            const { data: conv } = await supabase
-              .from("conversations")
-              .select("id")
-              .eq("id", msg.conversation_id)
-              .eq("store_id", storeId)
-              .maybeSingle();
-            if (conv) {
-              setConversations(prev =>
-                prev.map(c =>
-                  c.id === msg.conversation_id
-                    ? { ...c, unread_count: c.unread_count + 1, last_message: msg.content }
-                    : c
-                )
-              );
-            }
-          }
-        )
-        // Store name changes → sync
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'stores', filter: `id=eq.${storeId}` },
-          (payload) => {
-            const updated = payload.new as any;
-            setStore(prev => prev ? {
-              ...prev,
-              name: updated.name,
-              pending_name: updated.pending_name,
-              name_change_status: updated.name_change_status,
-            } : prev);
-          }
-        )
-        .subscribe();
-
-      realtimeChannelRef.current = channel;
     }
 
     loadVendorData();
 
-    return () => {
-      if (realtimeChannelRef.current) {
-        supabase.removeChannel(realtimeChannelRef.current);
-        realtimeChannelRef.current = null;
+    // Polling every 20s for products, orders, store, and messages (replaces Realtime for security)
+    const pollInterval = setInterval(async () => {
+      if (!activeStoreRef.current) return;
+      const storeId = activeStoreRef.current;
+
+      // Refresh product count
+      const { count: prodCount } = await supabase
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", storeId);
+      setStore(prev => prev ? { ...prev, products_count: prodCount || 0 } : prev);
+
+      // Refresh order counters
+      await fetchOrderCounters(storeId);
+
+      // Refresh store info
+      const { data: storeData } = await supabase
+        .from("stores")
+        .select("name, pending_name, name_change_status")
+        .eq("id", storeId)
+        .maybeSingle();
+      if (storeData) {
+        setStore(prev => prev ? { ...prev, ...storeData } : prev);
       }
+    }, 20000);
+
+    // Store the active store ID for polling
+    const activeStoreRef = { current: store?.id || null };
+
+    return () => {
+      clearInterval(pollInterval);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user?.id, navigate]);
