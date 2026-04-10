@@ -83,6 +83,40 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const { isAdmin, isManager } = useRoles();
   const isStaff = isAdmin || isManager;
+  const { user } = useAuth();
+
+  // PII masking: detect if current user is a collaborator with restricted sub_role
+  const [shouldMaskPII, setShouldMaskPII] = useState(false);
+  useEffect(() => {
+    if (!user || !storeId) return;
+    async function checkCollabRole() {
+      // Check if user is the store owner
+      const { data: store } = await supabase
+        .from("stores")
+        .select("owner_id")
+        .eq("id", storeId)
+        .single();
+      if (store?.owner_id === user!.id) {
+        setShouldMaskPII(false);
+        return;
+      }
+      // User is a collaborator — check sub_role
+      const { data: collab } = await (supabase as any)
+        .from("store_collaborators")
+        .select("sub_role, permissions")
+        .eq("store_id", storeId)
+        .eq("user_id", user!.id)
+        .eq("status", "active")
+        .maybeSingle();
+      if (!collab) {
+        setShouldMaskPII(true); // Not owner, not collab → mask by default
+        return;
+      }
+      const hasFullAccess = ["orders", "logistics"].includes(collab.sub_role);
+      setShouldMaskPII(!hasFullAccess);
+    }
+    checkCollabRole();
+  }, [user, storeId]);
 
   // Search and filter states
   const [orderSearch, setOrderSearch] = useState("");
@@ -355,16 +389,24 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <span className="text-muted-foreground">Client</span>
-                    <p className="font-medium text-foreground">{order.shipping_first_name} {order.shipping_last_name}</p>
+                    <p className="font-medium text-foreground">
+                      {shouldMaskPII
+                        ? `${order.shipping_first_name || ""} ***`
+                        : `${order.shipping_first_name} ${order.shipping_last_name}`}
+                    </p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Téléphone</span>
-                    <p className="font-medium text-foreground">{order.shipping_phone || "—"}</p>
+                    <p className="font-medium text-foreground">
+                      {shouldMaskPII ? "***" : (order.shipping_phone || "—")}
+                    </p>
                   </div>
                   <div className="col-span-2">
                     <span className="text-muted-foreground flex items-center gap-1"><MapPin size={10} /> Adresse complète</span>
                     <p className="font-medium text-foreground">
-                      {[order.shipping_address, order.shipping_city, order.shipping_country].filter(Boolean).join(", ") || "—"}
+                      {shouldMaskPII
+                        ? [order.shipping_city, order.shipping_country].filter(Boolean).join(", ") || "—"
+                        : [order.shipping_address, order.shipping_city, order.shipping_country].filter(Boolean).join(", ") || "—"}
                     </p>
                   </div>
                   <div>
