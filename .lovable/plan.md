@@ -1,101 +1,119 @@
 
 
-# Plan : Pack Sécurité Pré-Lancement — Failles 1 à 6
+# Plan : Hardening Final — 7 corrections pour atteindre ~99/100
 
-## Résumé
+## Approche
 
-Corriger les 6 failles de sécurité restantes en une seule opération. Aucun changement de structure de table. Uniquement des modifications de politiques RLS, un trigger SQL, et des ajustements frontend mineurs. La faille 7 (Realtime granulaire phase 2) est reportée post-lancement.
-
-**Score estimé après corrections : ~93/100** (contre ~80 actuellement).
+Vu la complexité et le risque, ce plan est découpé en **3 lots séquentiels**. Chaque lot sera soumis à approbation avant exécution.
 
 ---
 
-## Faille 1 — Retirer les tables sensibles du Realtime
+## LOT 1 — SQL Migration (Failles 1, 3, 4, 5, 6)
 
-Les tables `messages`, `deliveries`, `delivery_chats`, `dispute_messages`, `support_messages` diffusent des données privées (contenu des messages, adresses de livraison) à tout abonné authentifié.
+### Faille 1 — Realtime : contrôle par channel (3 pts)
 
-**Migration SQL** : Retirer ces 5 tables de `supabase_realtime`. Tables conservées : `orders`, `notifications`, `shipments`, `order_status_history` (protégées par RLS au niveau table).
+**Problème** : Les tables `orders`, `notifications`, `shipments`, `order_status_history` restent dans Realtime sans contrôle granulaire. Tout authentifié peut écouter les changements de n'importe quel utilisateur.
 
-**Frontend** : Remplacer les listeners Realtime sur `messages` et `delivery_chats` par du polling (30s). Les composants concernés :
-- `InternalChat` / `ConversationMessages` — polling des messages
-- `DeliveryChat` — polling des messages livreur
-- Les `support_messages` et `dispute_messages` utilisent déjà du polling via `useQuery`
+**Solution** : Supabase ne supporte pas nativement les politiques RLS sur `realtime.messages` dans ce contexte Cloud. L'approche la plus sûre et sans casse : **retirer ces 4 tables du Realtime** et basculer toute la logique frontend vers du polling sécurisé (les requêtes de polling passent par RLS normalement).
 
----
+Tables restant dans Realtime après cette correction : **aucune**. Toute communication temps réel sera gérée par polling (5-30s selon la criticité).
 
-## Faille 2 — Protéger le WhatsApp des boutiques
+**Impact frontend** : `AdminDashboard.tsx` utilise déjà du polling pour products/stores. Il faut aussi migrer les listeners `orders`/`notifications` vers du polling. Les composants client (DashboardPage, NotificationsPage) utilisent déjà `useQuery` avec refetchInterval — aucun changement nécessaire côté client.
 
-Actuellement, la politique `Public read stores` utilise `USING (true)` pour `{public}`, exposant `whatsapp_number`, `ban_reason`, `suspension_reason` à tous.
+### Faille 3 — order_status_history INSERT (1 pt)
 
-**Migration SQL** :
-1. Supprimer la politique `Public read stores`
-2. Créer 2 nouvelles politiques SELECT :
-   - **Non authentifié** : accès limité aux colonnes non sensibles via une fonction `SECURITY DEFINER` qui retourne les données sans `whatsapp_number`, `ban_reason`, `suspension_reason` — OU plus simplement, remplacer par une politique qui redirige vers `stores_public` (la vue existe déjà)
-   - **Authentifié** : `USING (true)` pour les colonnes de base + `whatsapp_number` visible uniquement via la table (les authentifiés peuvent contacter)
-   
-En pratique, l'approche la plus propre et sans casse :
-- Garder `USING (true)` sur la politique SELECT de `stores` mais **pour `{authenticated}` uniquement** (pas `{public}`)
-- Ajouter une politique SELECT `{anon}` avec `USING (true)` — les visiteurs non connectés passent par `stores_public` (vue sans colonnes sensibles)
-- Le bouton WhatsApp sur `StorePage.tsx` et `VendorProfileCard.tsx` sera conditionné à l'authentification
+**Problème** : La politique actuelle `Authenticated insert order history` est trop permissive (le `WITH CHECK` est large).
 
-**Frontend** :
-- `StorePage.tsx` : requêter `stores_public` au lieu de `stores` pour les visiteurs non connectés, ou conditionner l'affichage du bouton WhatsApp à `session !== null`
-- `VendorProfileCard.tsx` : conditionner le lien WhatsApp à l'utilisateur connecté
-- `api.ts` (fetchProducts) : la requête inclut `whatsapp_number` dans le join `stores` — adapter pour ne l'inclure que si authentifié, ou accepter que les authentifiés y aient accès (comportement voulu)
+**Solution** : Remplacer par une politique plus restrictive :
+- L'insertion est autorisée uniquement pour : le propriétaire de la commande (`user_id`), l'équipe boutique (`can_access_store_orders`), ou les admins/managers.
+- Note : Le trigger `log_order_status_change()` (SECURITY DEFINER) insère automatiquement — il contourne RLS. La politique restrictive empêche seulement les insertions manuelles arbitraires.
 
----
+### Faille 4 — Stores : colonnes de modération (0.5 pt)
 
-## Faille 3 — error_reports : bloquer l'injection d'email
+**Problème** : `ban_reason`, `banned_at`, `suspension_reason`, `pending_name`, `name_change_status` visibles par tous.
 
-**Migration SQL** : Ajouter un trigger `BEFORE INSERT` sur `error_reports` qui force `user_email` à être dérivé du profil si `auth.uid()` est défini, ou `NULL` si anonyme. Empêche un attaquant d'injecter un email arbitraire.
+**Solution** : Créer une vue `stores_safe` (similaire à `stores_public` mais pour les authentifiés) qui exclut ces colonnes de modération. Les pages publiques (StorePage, etc.) utiliseront cette vue. Les admins continuent à lire la table `stores` directement.
 
-**Frontend** : Dans `error-reporter.ts`, supprimer l'envoi de `user_email` depuis le client (le trigger s'en charge).
+Approche simplifiée retenue : modifier les politiques RLS existantes pour que les non-admins passent par la vue `stores_public` (déjà sans colonnes sensibles). Les politiques SELECT sur `stores` restent ouvertes car RLS ne peut pas filtrer par colonne — la protection se fait côté vue et code frontend.
 
----
+### Faille 5 — saved_cards : card_token (0.5 pt)
 
-## Faille 4 — pwa_installs : restreindre la lecture
+**Problème** : `card_token` lisible par l'utilisateur propriétaire.
 
-**Migration SQL** :
-- Remplacer `Anyone can read pwa installs` (`USING (true)`, `{public}`) par :
-  - Admins peuvent tout lire
-  - Utilisateurs authentifiés ne lisent que leurs propres lignes (`user_id = auth.uid()`)
-- Restreindre la politique INSERT : `WITH CHECK (user_id IS NULL OR user_id = auth.uid())`
+**Solution** : Créer une vue `saved_cards_safe` qui exclut `card_token`, et modifier le frontend pour lire depuis cette vue. Les opérations de paiement (Edge Functions) liront `card_token` via service_role_key.
+
+### Faille 6 — KYC : accès managers (0.5 pt)
+
+**Problème** : Managers peuvent lire `document_front_url`, `document_back_url`, `selfie_url`.
+
+**Solution** : Supprimer la politique `Managers read all KYC` et `Managers update KYC`. Seuls les admins auront accès aux documents KYC. L'interface admin KYC vérifiera le rôle avant d'afficher les pièces d'identité.
 
 ---
 
-## Faille 5 — rider_ratings : restreindre la lecture
+## LOT 2 — Impersonation Token Hashing (Faille 2, 1 pt)
 
-**Migration SQL** : Remplacer `Authenticated read rider ratings` (`USING (true)`) par :
-- L'auteur peut lire ses propres avis (`user_id = auth.uid()`)
-- Le livreur concerné peut lire ses avis (`rider_id = auth.uid()`)
-- Les admins/managers peuvent tout lire
+### Faille 2 — Tokens d'impersonation en clair
+
+**Problème** : Les tokens sont stockés en texte brut dans `impersonation_tokens.token`.
+
+**Solution** :
+1. **Migration SQL** : Ajouter une colonne `token_hash TEXT` à `impersonation_tokens`. Rendre `token` nullable (pour ne plus le stocker en clair à terme).
+2. **Edge Function `impersonate-user`** :
+   - Action `start` : générer le token, hasher avec SHA-256, stocker uniquement le hash dans `token_hash`, retourner le token brut au client.
+   - Action `exchange` : recevoir le token brut, le hasher, chercher par `token_hash` au lieu de `token`.
+3. **Nettoyage** : Un trigger ou la migration mettra `token = NULL` pour les anciens enregistrements expirés.
 
 ---
 
-## Faille 6 — service_plans
+## LOT 3 — Frontend + PII Collaborateurs (Faille 7, 0.5 pt)
 
-Déjà corrigée. La table s'appelle `service_packages` et la politique publique utilise déjà `USING (is_active = true)`. Aucune action nécessaire.
+### Faille 7 — PII client visible par tous les collaborateurs
+
+**Problème** : Tous les collaborateurs avec `can_access_store_orders` voient nom, téléphone, email, adresse complète.
+
+**Solution** : Créer une vue `orders_team` (SECURITY DEFINER) qui masque les colonnes PII sensibles (`shipping_phone`, `shipping_email`, adresse complète) pour les collaborateurs dont le `sub_role` n'est pas `orders` ou `logistics`. Concrètement :
+- Collaborateurs `orders`/`logistics` : voient tout (besoin métier)
+- Autres collaborateurs : voient prénom + ville uniquement
+
+Approche alternative plus simple (recommandée pour éviter la casse) : filtrer côté frontend dans les composants de commande vendeur. Les collaborateurs sans permission `orders` ne voient déjà que ce que leur permission leur permet d'accéder.
+
+**Note** : Cette faille est la plus complexe et a le plus faible impact. L'approche frontend est préférée pour le pré-lancement.
 
 ---
 
-## Fichiers modifiés
+## Fichiers modifiés par lot
 
-| Fichier | Changement |
-|---------|-----------|
-| Migration SQL | Retrait 5 tables du Realtime, nouvelles politiques RLS pour `stores`, `pwa_installs`, `rider_ratings`, trigger `error_reports` |
-| `frontend/src/services/error-reporter.ts` | Supprimer `user_email` du payload client |
-| `frontend/src/pages/StorePage.tsx` | Conditionner bouton WhatsApp à l'authentification |
-| `frontend/src/components/VendorProfileCard.tsx` | Conditionner lien WhatsApp à l'authentification |
-| Composants de chat (si Realtime utilisé) | Remplacer par polling si nécessaire |
+| Lot | Fichiers | Type |
+|-----|----------|------|
+| 1 | Migration SQL unique | Realtime, order_status_history, saved_cards_safe view, KYC policies |
+| 1 | `AdminDashboard.tsx` | Retirer listener Realtime orders |
+| 2 | Migration SQL | Colonne `token_hash` sur impersonation_tokens |
+| 2 | `supabase/functions/impersonate-user/index.ts` | Hashing SHA-256 |
+| 3 | Composants vendeur commande | Masquage PII frontend |
+
+## Score après chaque lot
+
+- Lot 1 : ~80 → **~94/100**
+- Lot 2 : ~94 → **~95/100**
+- Lot 3 : ~95 → **~96/100**
+
+Les 4 derniers points = WAF Cloudflare + audit de pénétration externe + SIEM monitoring.
+
+## Cloudflare — Réflexion
+
+Pour les derniers points (WAF/DDoS), Cloudflare s'intègre à votre infrastructure via :
+1. **DNS Proxy** : Pointer `zandofy.com` vers Cloudflare (mode proxied). Cela active automatiquement la protection DDoS L3/L4/L7.
+2. **WAF Rules** : Activer les managed rulesets (OWASP Top 10) dans le dashboard Cloudflare.
+3. **Bot Management** : Cloudflare détecte et bloque les bots malveillants.
+4. **Rate Limiting** : Limiter les requêtes par IP au niveau CDN (avant qu'elles atteignent votre serveur).
+
+Cela ne nécessite aucun changement de code — uniquement de la configuration DNS et du dashboard Cloudflare. Le plan gratuit offre déjà la protection DDoS de base. Le plan Pro ($20/mois) ajoute le WAF managé.
 
 ## Fichier SQL téléchargeable
 
-Conformément à SAFETY_POLICY, un fichier SQL complet sera généré pour synchronisation staging/production.
+Chaque lot produira un fichier SQL téléchargeable pour synchronisation staging/production.
 
-## Impact sur l'expérience utilisateur
+## Procédure
 
-- Les visiteurs non connectés voient toujours les boutiques et produits normalement
-- Le bouton WhatsApp n'apparaît que pour les utilisateurs connectés (comportement logique : il faut un compte pour contacter un vendeur)
-- Les messages et chats fonctionnent identiquement (polling au lieu de Realtime, délai max 30s)
-- Aucun changement visible pour les admins
+Je commence par le **Lot 1** dès votre approbation. Après validation, je passe au Lot 2, puis au Lot 3.
 
