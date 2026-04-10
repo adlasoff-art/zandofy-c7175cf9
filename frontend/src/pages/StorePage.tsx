@@ -72,6 +72,7 @@ const SORT_OPTIONS = [
 ];
 
 export default function StorePage() {
+  const { user } = useAuth();
   const { id } = useParams<{ id: string }>();
   const [sortBy, setSortBy] = useState("newest");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
