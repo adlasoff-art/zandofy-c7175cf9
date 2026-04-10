@@ -91,9 +91,7 @@ export default function VendorDashboardPage() {
   // Presence heartbeat — marks store as online while vendor is on dashboard
   useStorePresence(store?.id);
 
-  // Realtime channel ref for cleanup
   const hasLoadedRef = useRef(false);
-  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     if (authLoading) {
