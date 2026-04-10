@@ -105,29 +105,27 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
 
     loadMessages();
 
-    const channel = supabase
-      .channel(`messages-${conversationId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        (payload) => {
-          const msg = payload.new as ChatMessage;
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === msg.id)) return prev;
-            return [...prev, msg];
-          });
-          setTimeout(scrollToBottom, 100);
-        }
-      )
-      .subscribe();
+    // Poll for new messages every 5 seconds (Realtime removed for security)
+    const pollInterval = setInterval(async () => {
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", conversationId!)
+        .order("created_at", { ascending: true });
+
+      if (data) {
+        setMessages((prev) => {
+          if (data.length !== prev.length || (data.length > 0 && data[data.length - 1].id !== prev[prev.length - 1]?.id)) {
+            setTimeout(scrollToBottom, 100);
+            return data as ChatMessage[];
+          }
+          return prev;
+        });
+      }
+    }, 5000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
   }, [conversationId, scrollToBottom]);
 

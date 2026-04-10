@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { X, Download, Share, MoreVertical } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Download, MoreVertical } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -21,7 +21,8 @@ function isInStandaloneMode() {
 
 export function PWAInstallBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [dismissed, setDismissed] = useState(() => sessionStorage.getItem("pwa_banner_dismissed") === "1");
+  const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem("pwa_banner_dismissed") === "1");
   const [isInstalled, setIsInstalled] = useState(false);
   const [showIOSBanner, setShowIOSBanner] = useState(false);
   const [showAndroidFallback, setShowAndroidFallback] = useState(false);
@@ -40,49 +41,51 @@ export function PWAInstallBanner() {
 
     const handler = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      const prompt = e as BeforeInstallPromptEvent;
+      setDeferredPrompt(prompt);
+      deferredPromptRef.current = prompt;
+      setShowAndroidFallback(false);
     };
     window.addEventListener("beforeinstallprompt", handler);
 
-    // Android fallback: if beforeinstallprompt doesn't fire within 3s, show manual instructions
+    // Listen for successful install
+    const installedHandler = () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+      deferredPromptRef.current = null;
+    };
+    window.addEventListener("appinstalled", installedHandler);
+
+    // Android fallback: if beforeinstallprompt doesn't fire within 3s
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
     if (isAndroid()) {
       fallbackTimer = setTimeout(() => {
-        // Only show fallback if native prompt didn't fire
-        setShowAndroidFallback((prev) => prev); // trigger re-render check
-        // We check deferredPrompt via a ref-like approach
+        if (!deferredPromptRef.current) {
+          setShowAndroidFallback(true);
+        }
       }, 3000);
     }
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", installedHandler);
       if (fallbackTimer) clearTimeout(fallbackTimer);
     };
   }, []);
 
-  // Separate effect to handle the Android fallback timing
-  useEffect(() => {
-    if (isInStandaloneMode() || isIOS() || deferredPrompt) return;
-    if (!isAndroid()) return;
-
-    const timer = setTimeout(() => {
-      setShowAndroidFallback(true);
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [deferredPrompt]);
-
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
+    const prompt = deferredPromptRef.current || deferredPrompt;
+    if (!prompt) return;
+    await prompt.prompt();
+    const { outcome } = await prompt.userChoice;
     if (outcome === "accepted") setIsInstalled(true);
     setDeferredPrompt(null);
+    deferredPromptRef.current = null;
   };
 
   const handleDismiss = () => {
     setDismissed(true);
-    sessionStorage.setItem("pwa_banner_dismissed", "1");
+    localStorage.setItem("pwa_banner_dismissed", "1");
   };
 
   if (isInstalled || dismissed) return null;
@@ -169,7 +172,7 @@ export function PWAInstallBanner() {
     );
   }
 
-  // Android fallback: manual instructions when beforeinstallprompt didn't fire
+  // Android fallback: manual instructions + Install button
   if (showAndroidFallback) {
     return (
       <div className="fixed bottom-16 inset-x-0 z-[60] px-3 pb-2 lg:hidden animate-fade-in">
@@ -202,6 +205,13 @@ export function PWAInstallBanner() {
               {isFr ? "Confirmez « Ajouter »" : "Confirm \"Add\""}
             </p>
           </div>
+          <button
+            onClick={handleInstall}
+            className="mt-3 w-full px-4 py-2 text-xs font-bold bg-primary-foreground text-primary rounded-full hover:opacity-90 transition-opacity touch-manipulation flex items-center justify-center gap-2"
+          >
+            <Download size={14} />
+            {isFr ? "Installer" : "Install"}
+          </button>
         </div>
       </div>
     );

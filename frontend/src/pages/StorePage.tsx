@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { fetchProducts, type Product } from "@/services/api";
 import { computeStoreYears, formatStoreYears } from "@/lib/store-years";
 import { Header } from "@/components/Header";
@@ -71,6 +72,7 @@ const SORT_OPTIONS = [
 ];
 
 export default function StorePage() {
+  const { user } = useAuth();
   const { id } = useParams<{ id: string }>();
   const [sortBy, setSortBy] = useState("newest");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -398,7 +400,7 @@ export default function StorePage() {
                         </div>
                       </SheetContent>
                     </Sheet>
-                    {store.whatsapp_number && (
+                    {store.whatsapp_number && user && (
                       <a
                         href={`https://wa.me/${store.whatsapp_number.replace(/\D/g, "")}?text=${encodeURIComponent(
                           `Bonjour, je suis intéressé par votre boutique "${store.name}" sur Zandofy.`
