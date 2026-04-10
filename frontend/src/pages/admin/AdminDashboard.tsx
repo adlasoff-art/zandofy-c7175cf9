@@ -10,7 +10,6 @@ import { LogisticsTab } from "@/components/admin/dashboard/LogisticsTab";
 import { VendorsTab } from "@/components/admin/dashboard/VendorsTab";
 import { ClientsTab } from "@/components/admin/dashboard/ClientsTab";
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { LayoutDashboard, BarChart3, Truck, Store, Users, Receipt } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -18,18 +17,15 @@ export default function AdminDashboard() {
   const [geoFilters, setGeoFilters] = useState<GlobalFilters>({ country: "all", city: "all" });
   const queryClient = useQueryClient();
 
-  // Realtime for orders only (products/stores removed for security - cost_real, whatsapp_number)
+  // Polling for orders (15s) — Realtime removed for security
   useEffect(() => {
-    const channel = supabase
-      .channel('admin-orders-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] });
-        queryClient.invalidateQueries({ queryKey: ["admin-recent-orders"] });
-        queryClient.invalidateQueries({ queryKey: ["admin-sales-orders"] });
-        queryClient.invalidateQueries({ queryKey: ["dashboard-orders-detail"] });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-recent-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-sales-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-orders-detail"] });
+    }, 15000);
+    return () => clearInterval(interval);
   }, [queryClient]);
 
   // Polling for product/store counters (30s) — replaces removed Realtime channels

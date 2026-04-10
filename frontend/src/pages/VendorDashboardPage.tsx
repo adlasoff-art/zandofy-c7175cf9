@@ -91,9 +91,7 @@ export default function VendorDashboardPage() {
   // Presence heartbeat — marks store as online while vendor is on dashboard
   useStorePresence(store?.id);
 
-  // Realtime channel ref for cleanup
   const hasLoadedRef = useRef(false);
-  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     if (authLoading) {
@@ -170,7 +168,7 @@ export default function VendorDashboardPage() {
         setConversations([]);
         setLoading(false);
         hasLoadedRef.current = true;
-        setupRealtime(activeStore.id);
+        // No realtime setup needed — polling handles updates
         return;
       }
 
@@ -224,91 +222,40 @@ export default function VendorDashboardPage() {
       setConversations(items);
       setLoading(false);
       hasLoadedRef.current = true;
-      setupRealtime(activeStore.id);
-    }
-
-    function setupRealtime(storeId: string) {
-      // Clean previous channel
-      if (realtimeChannelRef.current) {
-        supabase.removeChannel(realtimeChannelRef.current);
-      }
-
-      const channel = supabase
-        .channel(`vendor-dashboard-${storeId}`)
-        // Products changes → update count
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'products', filter: `store_id=eq.${storeId}` },
-          async () => {
-            const { count } = await supabase
-              .from("products")
-              .select("id", { count: "exact", head: true })
-              .eq("store_id", storeId);
-            setStore(prev => prev ? { ...prev, products_count: count || 0 } : prev);
-          }
-        )
-        // Orders changes → toast + refresh counters
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` },
-          async (payload) => {
-            if (payload.eventType === 'INSERT') {
-              toast.success(`Nouvelle commande : ${(payload.new as any).order_ref}`);
-            }
-            await fetchOrderCounters(storeId);
-          }
-        )
-        // Messages changes → update unread counts
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'messages' },
-          async (payload) => {
-            const msg = payload.new as any;
-            if (msg.sender_id === user!.id) return;
-            // Check if conversation belongs to this store
-            const { data: conv } = await supabase
-              .from("conversations")
-              .select("id")
-              .eq("id", msg.conversation_id)
-              .eq("store_id", storeId)
-              .maybeSingle();
-            if (conv) {
-              setConversations(prev =>
-                prev.map(c =>
-                  c.id === msg.conversation_id
-                    ? { ...c, unread_count: c.unread_count + 1, last_message: msg.content }
-                    : c
-                )
-              );
-            }
-          }
-        )
-        // Store name changes → sync
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'stores', filter: `id=eq.${storeId}` },
-          (payload) => {
-            const updated = payload.new as any;
-            setStore(prev => prev ? {
-              ...prev,
-              name: updated.name,
-              pending_name: updated.pending_name,
-              name_change_status: updated.name_change_status,
-            } : prev);
-          }
-        )
-        .subscribe();
-
-      realtimeChannelRef.current = channel;
     }
 
     loadVendorData();
 
-    return () => {
-      if (realtimeChannelRef.current) {
-        supabase.removeChannel(realtimeChannelRef.current);
-        realtimeChannelRef.current = null;
+    // Store the active store ID for polling
+    const activeStoreId = store?.id || null;
+
+    // Polling every 20s for products, orders, store, and messages (replaces Realtime for security)
+    const pollInterval = setInterval(async () => {
+      if (!activeStoreId) return;
+
+      // Refresh product count
+      const { count: prodCount } = await supabase
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", activeStoreId);
+      setStore(prev => prev ? { ...prev, products_count: prodCount || 0 } : prev);
+
+      // Refresh order counters
+      await fetchOrderCounters(activeStoreId);
+
+      // Refresh store info
+      const { data: storeData } = await supabase
+        .from("stores")
+        .select("name, pending_name, name_change_status")
+        .eq("id", activeStoreId)
+        .maybeSingle();
+      if (storeData) {
+        setStore(prev => prev ? { ...prev, ...storeData } : prev);
       }
+    }, 20000);
+
+    return () => {
+      clearInterval(pollInterval);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user?.id, navigate]);

@@ -559,17 +559,14 @@ export default function TrackingPage() {
     };
   }, []);
 
-  // Real-time subscription
+  // Polling for order tracking updates (replaces Realtime for security)
   useEffect(() => {
     if (!orderResult) return;
-    const channel = supabase
-      .channel(`order-track-${orderResult.id}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${orderResult.id}` },
-        async () => { const updated = await fetchOrder(orderResult.order_ref); if (updated) setOrderResult(updated); })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "order_status_history", filter: `order_id=eq.${orderResult.id}` },
-        async () => { const updated = await fetchOrder(orderResult.order_ref); if (updated) setOrderResult(updated); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const interval = setInterval(async () => {
+      const updated = await fetchOrder(orderResult.order_ref);
+      if (updated) setOrderResult(updated);
+    }, 15000);
+    return () => clearInterval(interval);
   }, [orderResult?.id, orderResult?.order_ref, fetchOrder]);
 
   const resetResults = () => {
