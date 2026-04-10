@@ -22,21 +22,22 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => !keepCaches.includes(k)).map((k) => caches.delete(k)))
-    ).then(() => cacheTopProducts())
+    )
   );
   self.clients.claim();
 });
 
+// Supabase config — injected at runtime by main app via postMessage
+let _supabaseUrl = null;
+let _anonKey = null;
+
 // Cache top products for offline catalog
 async function cacheTopProducts() {
+  if (!_supabaseUrl || !_anonKey) return; // Config not yet received
   try {
-    // Dynamically determine Supabase URL from env or fallback
-    const supabaseUrl = "https://uogkklwfvwoxkifpkzpu.supabase.co";
-    const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvZ2trbHdmdndveGtpZnBrenB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4ODY0MzcsImV4cCI6MjA4NzQ2MjQzN30.9NhIOytfsQ7Gdufs0goV6Lk97IyMkda362jh3IGMVi4";
-
-    const url = `${supabaseUrl}/rest/v1/products_public?select=id,name,name_fr,price,rating,product_images(image_url)&publish_status=eq.published&order=rating.desc.nullslast&limit=50`;
+    const url = `${_supabaseUrl}/rest/v1/products_public?select=id,name,name_fr,price,rating,product_images(image_url)&publish_status=eq.published&order=rating.desc.nullslast&limit=50`;
     const response = await fetch(url, {
-      headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+      headers: { apikey: _anonKey, Authorization: `Bearer ${_anonKey}` },
     });
 
     if (response.ok) {
@@ -246,6 +247,13 @@ self.addEventListener("message", (event) => {
   }
   if (event.data && event.data.type === "CLEAR_CACHES") {
     caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
+  }
+  if (event.data && event.data.type === "SW_CONFIG") {
+    // Receive Supabase config from the main app — no hardcoded keys
+    _supabaseUrl = event.data.supabaseUrl || _supabaseUrl;
+    _anonKey = event.data.anonKey || _anonKey;
+    // Now that we have config, cache top products
+    cacheTopProducts();
   }
   if (event.data && event.data.type === "GET_OFFLINE_CATALOG") {
     caches.open("zandofy-catalog-v1").then((cache) =>

@@ -56,6 +56,21 @@ if ("serviceWorker" in navigator) {
     };
 
     navigator.serviceWorker.register("/sw.js").then((registration) => {
+      // Send Supabase config to SW so it doesn't need hardcoded keys
+      const sendConfig = (sw: ServiceWorker | null) => {
+        sw?.postMessage({
+          type: "SW_CONFIG",
+          supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+          anonKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        });
+      };
+      sendConfig(registration.active);
+      if (registration.installing) {
+        registration.installing.addEventListener("statechange", (e) => {
+          if ((e.target as ServiceWorker).state === "activated") sendConfig(registration.active);
+        });
+      }
+
       dispatchUpdateAvailable(registration);
 
       // Check for updates periodically (every 30 min)
