@@ -170,7 +170,7 @@ export default function VendorDashboardPage() {
         setConversations([]);
         setLoading(false);
         hasLoadedRef.current = true;
-        setupRealtime(activeStore.id);
+        // No realtime setup needed — polling handles updates
         return;
       }
 
