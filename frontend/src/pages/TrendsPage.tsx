@@ -64,7 +64,7 @@ export default function TrendsPage() {
               Produits Tendances
             </h1>
             <p className="text-sm text-primary-foreground/80 max-w-lg mx-auto">
-              Les produits les plus en vogue, sélectionnés par notre équipe.
+              Les produits les plus en vogue actuellement.
             </p>
           </div>
         </section>

@@ -66,7 +66,7 @@ export default function PopularPage() {
               Les Plus Populaires
             </h1>
             <p className="text-sm text-primary-foreground/80 max-w-lg mx-auto">
-              Tous les produits classés du plus vendu au moins vendu.
+              Nos produits classés par ordre de popularité.
             </p>
           </div>
         </section>

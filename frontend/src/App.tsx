@@ -24,6 +24,7 @@ import { ScrollRestoration } from "@/components/ScrollRestoration";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 import { useCmsTheme } from "@/hooks/use-cms-theme";
+import { usePlatformFont } from "@/hooks/usePlatformFont";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { MaintenanceGuard } from "@/components/MaintenanceGuard";
 import { CookieConsent } from "@/components/CookieConsent";
@@ -149,7 +150,7 @@ function SupportDrawerWrapper() {
   return <SupportDrawer open={open} onOpenChange={setOpen} />;
 }
 
-function CmsThemeInjector() { useCmsTheme(); return null; }
+function CmsThemeInjector() { useCmsTheme(); usePlatformFont(); return null; }
 
 function GeoBlockGuard({ children }: { children: React.ReactNode }) {
   const { blocked, loading } = useGeoBlocking();
@@ -186,7 +187,7 @@ const App = () => (
           <I18nProvider>
           <ThemeProvider>
           <UIConfigProvider>
-            <CmsThemeInjector />
+            <ErrorBoundary><CmsThemeInjector /></ErrorBoundary>
             <AnalyticsTrackerInjector />
             <DynamicFavicon />
             <UserPresenceTracker />

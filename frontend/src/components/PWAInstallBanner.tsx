@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Download, Share } from "lucide-react";
+import { X, Download, Share, MoreVertical } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -11,6 +11,10 @@ function isIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 }
 
+function isAndroid() {
+  return /Android/i.test(navigator.userAgent);
+}
+
 function isInStandaloneMode() {
   return window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true;
 }
@@ -20,6 +24,7 @@ export function PWAInstallBanner() {
   const [dismissed, setDismissed] = useState(() => sessionStorage.getItem("pwa_banner_dismissed") === "1");
   const [isInstalled, setIsInstalled] = useState(false);
   const [showIOSBanner, setShowIOSBanner] = useState(false);
+  const [showAndroidFallback, setShowAndroidFallback] = useState(false);
   const { locale } = useI18n();
 
   useEffect(() => {
@@ -38,8 +43,34 @@ export function PWAInstallBanner() {
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
     window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+
+    // Android fallback: if beforeinstallprompt doesn't fire within 3s, show manual instructions
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    if (isAndroid()) {
+      fallbackTimer = setTimeout(() => {
+        // Only show fallback if native prompt didn't fire
+        setShowAndroidFallback((prev) => prev); // trigger re-render check
+        // We check deferredPrompt via a ref-like approach
+      }, 3000);
+    }
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+    };
   }, []);
+
+  // Separate effect to handle the Android fallback timing
+  useEffect(() => {
+    if (isInStandaloneMode() || isIOS() || deferredPrompt) return;
+    if (!isAndroid()) return;
+
+    const timer = setTimeout(() => {
+      setShowAndroidFallback(true);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [deferredPrompt]);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
@@ -56,10 +87,10 @@ export function PWAInstallBanner() {
 
   if (isInstalled || dismissed) return null;
 
+  const isFr = locale === "fr";
+
   // iOS banner
   if (showIOSBanner) {
-    const isFr = locale === "fr";
-
     return (
       <div className="fixed bottom-16 inset-x-0 z-[60] px-3 pb-2 lg:hidden animate-fade-in">
         <div className="relative bg-primary text-primary-foreground rounded-xl px-4 py-3 shadow-lg">
@@ -78,7 +109,6 @@ export function PWAInstallBanner() {
               <span className="shrink-0 w-5 h-5 rounded-full bg-primary-foreground/20 flex items-center justify-center text-[10px] font-bold">1</span>
               {isFr ? "Appuyez sur" : "Tap"}{" "}
               <span className="inline-flex items-center gap-1 bg-primary-foreground/25 rounded px-1.5 py-0.5 font-semibold">
-                {/* Safari share icon (box with arrow) */}
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" />
                   <polyline points="16 6 12 2 8 6" />
@@ -105,38 +135,77 @@ export function PWAInstallBanner() {
               {isFr ? "Appuyez « Ajouter »" : "Tap \"Add\""}
             </p>
           </div>
-          {/* Arrow pointing down to Safari share bar */}
           <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-primary rotate-45" />
         </div>
       </div>
     );
   }
 
-  // Android / desktop banner
-  if (!deferredPrompt) return null;
+  // Android with native prompt
+  if (deferredPrompt) {
+    const label = isFr ? "Installer l'app Zandofy" : "Install Zandofy app";
+    const cta = isFr ? "Installer" : "Install";
 
-  const label = locale === "fr" ? "Installer l'app Zandofy" : "Install Zandofy app";
-  const cta = locale === "fr" ? "Installer" : "Install";
-
-  return (
-    <div className="fixed bottom-16 inset-x-0 z-[60] px-3 pb-2 lg:hidden animate-fade-in">
-      <div className="flex items-center gap-3 bg-primary text-primary-foreground rounded-xl px-4 py-3 shadow-lg">
-        <Download size={20} className="shrink-0" />
-        <span className="text-sm font-medium flex-1">{label}</span>
-        <button
-          onClick={handleInstall}
-          className="px-4 py-1.5 text-xs font-bold bg-primary-foreground text-primary rounded-full hover:opacity-90 transition-opacity touch-manipulation"
-        >
-          {cta}
-        </button>
-        <button
-          onClick={handleDismiss}
-          className="p-1 rounded-full hover:bg-primary-foreground/20 transition-colors touch-manipulation"
-          aria-label="Close"
-        >
-          <X size={16} />
-        </button>
+    return (
+      <div className="fixed bottom-16 inset-x-0 z-[60] px-3 pb-2 lg:hidden animate-fade-in">
+        <div className="flex items-center gap-3 bg-primary text-primary-foreground rounded-xl px-4 py-3 shadow-lg">
+          <Download size={20} className="shrink-0" />
+          <span className="text-sm font-medium flex-1">{label}</span>
+          <button
+            onClick={handleInstall}
+            className="px-4 py-1.5 text-xs font-bold bg-primary-foreground text-primary rounded-full hover:opacity-90 transition-opacity touch-manipulation"
+          >
+            {cta}
+          </button>
+          <button
+            onClick={handleDismiss}
+            className="p-1 rounded-full hover:bg-primary-foreground/20 transition-colors touch-manipulation"
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // Android fallback: manual instructions when beforeinstallprompt didn't fire
+  if (showAndroidFallback) {
+    return (
+      <div className="fixed bottom-16 inset-x-0 z-[60] px-3 pb-2 lg:hidden animate-fade-in">
+        <div className="relative bg-primary text-primary-foreground rounded-xl px-4 py-3 shadow-lg">
+          <button
+            onClick={handleDismiss}
+            className="absolute top-2.5 right-2.5 p-1 rounded-full hover:bg-primary-foreground/20 transition-colors touch-manipulation"
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+          <p className="text-sm font-bold mb-2 pr-6">
+            {isFr ? "Installer Zandofy" : "Install Zandofy"}
+          </p>
+          <div className="space-y-1.5 text-xs leading-relaxed opacity-95">
+            <p className="flex items-center gap-1.5">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-primary-foreground/20 flex items-center justify-center text-[10px] font-bold">1</span>
+              {isFr ? "Appuyez sur" : "Tap"}{" "}
+              <span className="inline-flex items-center gap-1 bg-primary-foreground/25 rounded px-1.5 py-0.5 font-semibold">
+                <MoreVertical size={14} />
+                Menu
+              </span>
+            </p>
+            <p className="flex items-center gap-1.5">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-primary-foreground/20 flex items-center justify-center text-[10px] font-bold">2</span>
+              {isFr ? "Choisissez « Ajouter à l'écran d'accueil »" : "Choose \"Add to Home Screen\""}
+            </p>
+            <p className="flex items-center gap-1.5">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-primary-foreground/20 flex items-center justify-center text-[10px] font-bold">3</span>
+              {isFr ? "Confirmez « Ajouter »" : "Confirm \"Add\""}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }

@@ -15,6 +15,7 @@ export interface BrandingConfig {
   email_signature_email: string;
   email_signature_website: string;
   email_signature_extra: string;
+  primary_font: string;
 }
 
 const DEFAULT_BRANDING: BrandingConfig = {
@@ -31,6 +32,7 @@ const DEFAULT_BRANDING: BrandingConfig = {
   email_signature_email: "",
   email_signature_website: "https://zandofy.com",
   email_signature_extra: "",
+  primary_font: "'Inter', system-ui, sans-serif",
 };
 
 export function useBranding() {
