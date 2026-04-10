@@ -22,7 +22,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => !keepCaches.includes(k)).map((k) => caches.delete(k)))
-    ).then(() => cacheTopProducts())
+    )
   );
   self.clients.claim();
 });
