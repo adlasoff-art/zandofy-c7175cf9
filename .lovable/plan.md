@@ -1,50 +1,80 @@
 
 
-# Plan : Corriger les 3 vulnérabilités critiques (sans casse)
+# Plan : Pack Sécurité Pré-Lancement — Failles 1 à 6
 
-## Contexte
+## Résumé
 
-Les vues `products_public` et `stores_public` existent déjà et masquent les colonnes sensibles. Le problème : le code frontend et le Realtime ne les utilisent pas systématiquement.
+Corriger les 6 failles de sécurité restantes en une seule opération. Aucun changement de structure de table. Uniquement des modifications de politiques RLS, un trigger SQL, et des ajustements frontend mineurs. La faille 7 (Realtime granulaire phase 2) est reportée post-lancement.
 
-## Approche conservative
-
-Aucune suppression de politique RLS, aucun changement de structure de table. On agit uniquement sur deux axes : (1) retirer des tables sensibles du Realtime, (2) migrer les requêtes frontend publiques vers les vues existantes.
+**Score estimé après corrections : ~93/100** (contre ~80 actuellement).
 
 ---
 
-## Correction 1 — Realtime : retirer les tables qui exposent des données sensibles
+## Faille 1 — Retirer les tables sensibles du Realtime
+
+Les tables `messages`, `deliveries`, `delivery_chats`, `dispute_messages`, `support_messages` diffusent des données privées (contenu des messages, adresses de livraison) à tout abonné authentifié.
+
+**Migration SQL** : Retirer ces 5 tables de `supabase_realtime`. Tables conservées : `orders`, `notifications`, `shipments`, `order_status_history` (protégées par RLS au niveau table).
+
+**Frontend** : Remplacer les listeners Realtime sur `messages` et `delivery_chats` par du polling (30s). Les composants concernés :
+- `InternalChat` / `ConversationMessages` — polling des messages
+- `DeliveryChat` — polling des messages livreur
+- Les `support_messages` et `dispute_messages` utilisent déjà du polling via `useQuery`
+
+---
+
+## Faille 2 — Protéger le WhatsApp des boutiques
+
+Actuellement, la politique `Public read stores` utilise `USING (true)` pour `{public}`, exposant `whatsapp_number`, `ban_reason`, `suspension_reason` à tous.
 
 **Migration SQL** :
+1. Supprimer la politique `Public read stores`
+2. Créer 2 nouvelles politiques SELECT :
+   - **Non authentifié** : accès limité aux colonnes non sensibles via une fonction `SECURITY DEFINER` qui retourne les données sans `whatsapp_number`, `ban_reason`, `suspension_reason` — OU plus simplement, remplacer par une politique qui redirige vers `stores_public` (la vue existe déjà)
+   - **Authentifié** : `USING (true)` pour les colonnes de base + `whatsapp_number` visible uniquement via la table (les authentifiés peuvent contacter)
+   
+En pratique, l'approche la plus propre et sans casse :
+- Garder `USING (true)` sur la politique SELECT de `stores` mais **pour `{authenticated}` uniquement** (pas `{public}`)
+- Ajouter une politique SELECT `{anon}` avec `USING (true)` — les visiteurs non connectés passent par `stores_public` (vue sans colonnes sensibles)
+- Le bouton WhatsApp sur `StorePage.tsx` et `VendorProfileCard.tsx` sera conditionné à l'authentification
 
-Retirer `products` et `stores` de la publication `supabase_realtime`. Ces tables diffusent leurs lignes complètes (y compris `cost_real`, `cost_calc`, `whatsapp_number`) à tout abonné authentifié.
-
-Tables conservées dans Realtime (aucun changement) : `orders`, `messages`, `notifications`, `order_status_history`, `deliveries`, `shipments`, `support_messages`, `dispute_messages`, `delivery_chats`.
-
-**Impact frontend** : Seuls 2 fichiers utilisent le Realtime sur `products`/`stores` :
-- `AdminDashboard.tsx` — écoute `orders` (pas affecté), mais aussi `products` et `stores` pour invalider des compteurs admin. On remplacera par un polling toutes les 30 secondes sur ces compteurs, ou on ajoutera un channel Realtime sur `orders` uniquement (déjà en place).
-- Aucun composant public n'écoute `products` ou `stores` en Realtime.
-
-**Risque de casse** : Très faible. Les admins verront un léger délai de rafraîchissement sur les compteurs produits/boutiques (30s au lieu d'instantané). Tout le reste fonctionne identiquement.
-
----
-
-## Correction 2 — Masquer `cost_real` / `cost_calc` pour les requêtes publiques
-
-Les vues `products_public` existent et excluent ces colonnes. Le frontend public query déjà `products` directement mais ne sélectionne jamais `cost_real`/`cost_calc` dans les pages publiques (seuls `OrdersTab` et `AdminVendorAccountingPage` le font, et ils sont admin-only).
-
-**Action** : Aucune modification de code nécessaire côté public. Les pages admin continueront à lire `cost_real`/`cost_calc` via la table `products` (RLS "Admins and managers read all products" les y autorise).
-
-**Protection supplémentaire** : Le retrait de `products` du Realtime (Correction 1) empêche la diffusion de ces colonnes via les WebSockets. C'était le vrai vecteur d'exposition.
+**Frontend** :
+- `StorePage.tsx` : requêter `stores_public` au lieu de `stores` pour les visiteurs non connectés, ou conditionner l'affichage du bouton WhatsApp à `session !== null`
+- `VendorProfileCard.tsx` : conditionner le lien WhatsApp à l'utilisateur connecté
+- `api.ts` (fetchProducts) : la requête inclut `whatsapp_number` dans le join `stores` — adapter pour ne l'inclure que si authentifié, ou accepter que les authentifiés y aient accès (comportement voulu)
 
 ---
 
-## Correction 3 — Masquer `whatsapp_number` des requêtes publiques sur `stores`
+## Faille 3 — error_reports : bloquer l'injection d'email
 
-La vue `stores_public` existe et exclut `whatsapp_number`. Le fichier `StoresPage.tsx` utilise déjà `stores_public`.
+**Migration SQL** : Ajouter un trigger `BEFORE INSERT` sur `error_reports` qui force `user_email` à être dérivé du profil si `auth.uid()` est défini, ou `NULL` si anonyme. Empêche un attaquant d'injecter un email arbitraire.
 
-**Action** : Vérifier et migrer tout composant public qui query `stores` directement et qui pourrait recevoir `whatsapp_number`. Les pages produit et boutique publiques qui affichent le bouton WhatsApp doivent conditionner l'affichage à l'utilisateur authentifié (déjà le cas puisque le bouton WhatsApp n'est visible que pour les clients connectés qui consultent une boutique).
+**Frontend** : Dans `error-reporter.ts`, supprimer l'envoi de `user_email` depuis le client (le trigger s'en charge).
 
-**Protection supplémentaire** : Le retrait de `stores` du Realtime (Correction 1) empêche la diffusion de `whatsapp_number` via WebSockets.
+---
+
+## Faille 4 — pwa_installs : restreindre la lecture
+
+**Migration SQL** :
+- Remplacer `Anyone can read pwa installs` (`USING (true)`, `{public}`) par :
+  - Admins peuvent tout lire
+  - Utilisateurs authentifiés ne lisent que leurs propres lignes (`user_id = auth.uid()`)
+- Restreindre la politique INSERT : `WITH CHECK (user_id IS NULL OR user_id = auth.uid())`
+
+---
+
+## Faille 5 — rider_ratings : restreindre la lecture
+
+**Migration SQL** : Remplacer `Authenticated read rider ratings` (`USING (true)`) par :
+- L'auteur peut lire ses propres avis (`user_id = auth.uid()`)
+- Le livreur concerné peut lire ses avis (`rider_id = auth.uid()`)
+- Les admins/managers peuvent tout lire
+
+---
+
+## Faille 6 — service_plans
+
+Déjà corrigée. La table s'appelle `service_packages` et la politique publique utilise déjà `USING (is_active = true)`. Aucune action nécessaire.
 
 ---
 
@@ -52,14 +82,20 @@ La vue `stores_public` existe et exclut `whatsapp_number`. Le fichier `StoresPag
 
 | Fichier | Changement |
 |---------|-----------|
-| Migration SQL | `DROP TABLE public.products, public.stores` de `supabase_realtime` |
-| `frontend/src/pages/admin/AdminDashboard.tsx` | Remplacer le channel Realtime `products`/`stores` par un polling 30s ou supprimer (le channel `orders` reste) |
-
-## Score estimé après corrections
-
-68 → ~80/100. Les trois vecteurs d'exposition (Realtime broadcast, coûts, WhatsApp) sont neutralisés sans toucher aux RLS policies ni à la structure des tables.
+| Migration SQL | Retrait 5 tables du Realtime, nouvelles politiques RLS pour `stores`, `pwa_installs`, `rider_ratings`, trigger `error_reports` |
+| `frontend/src/services/error-reporter.ts` | Supprimer `user_email` du payload client |
+| `frontend/src/pages/StorePage.tsx` | Conditionner bouton WhatsApp à l'authentification |
+| `frontend/src/components/VendorProfileCard.tsx` | Conditionner lien WhatsApp à l'authentification |
+| Composants de chat (si Realtime utilisé) | Remplacer par polling si nécessaire |
 
 ## Fichier SQL téléchargeable
 
-Conformément à SAFETY_POLICY, un fichier SQL sera généré et fourni pour synchronisation manuelle staging/production.
+Conformément à SAFETY_POLICY, un fichier SQL complet sera généré pour synchronisation staging/production.
+
+## Impact sur l'expérience utilisateur
+
+- Les visiteurs non connectés voient toujours les boutiques et produits normalement
+- Le bouton WhatsApp n'apparaît que pour les utilisateurs connectés (comportement logique : il faut un compte pour contacter un vendeur)
+- Les messages et chats fonctionnent identiquement (polling au lieu de Realtime, délai max 30s)
+- Aucun changement visible pour les admins
 
