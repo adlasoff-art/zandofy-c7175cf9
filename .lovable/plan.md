@@ -1,97 +1,44 @@
 
 
-# Plan : Gestion Admin Tendances, Footer, Badge Promo, QR Code App
+# Plan : Bannière PWA Install fiable + Estimation frais mobile
 
-## Résumé
+## Probleme 1 : Estimation frais "Aucune ville trouvée" sur mobile
 
-5 chantiers : (1) Interface admin pour gérer les produits "Top Tendances", (2) Liens Trends + Populaires dans le footer, (3) Toggle admin + traduction du badge "Get 20% OFF" (désactivé par défaut), (4) Refonte du popup App Download avec QR code réel et promo configurable, (5) Installation d'une librairie QR code.
+L'estimateur de frais utilise `onBlur` avec un `setTimeout` de 200ms pour fermer le dropdown. Sur mobile, le clavier virtuel et les événements tactiles provoquent des cycles blur/focus inattendus qui ferment le dropdown avant que les resultats n'arrivent, ou avant que l'utilisateur puisse les toucher.
 
----
+De plus, les boutons de selection utilisent `onMouseDown` au lieu de `onPointerDown`, ce qui peut ne pas fonctionner correctement sur certains navigateurs mobiles.
 
-## 1. Admin : Gestionnaire de produits Top Tendances
+### Corrections
 
-**Fichier** : `frontend/src/components/admin/cms/TrendingProductsManager.tsx` (nouveau)
+**3 fichiers concernes** : `ProductShippingEstimator.tsx`, `PrecisionShippingEstimate.tsx`, `DynamicShippingCalculator.tsx`
 
-La table `trending_products` existe déjà (colonnes : `id`, `product_id`, `sort_order`, `created_at`). Il manque uniquement l'interface admin.
+Pour chacun :
+- Augmenter le timeout `onBlur` de 200ms a 400ms pour laisser le temps aux interactions tactiles
+- Remplacer `onMouseDown` par `onPointerDown` sur les boutons de selection de ville (meilleure compatibilite mobile)
+- Ajouter une protection : ne pas fermer le dropdown si une recherche est en cours (`loading`)
 
-Composant avec :
-- Recherche de produits (par nom) dans la table `products`
-- Pour chaque produit affiché : nom, image, nombre de ventes (`sales_count`), note (`rating`), nombre d'avis (`review_count`)
-- Bouton "Ajouter aux tendances" qui insère dans `trending_products`
-- Liste des produits sélectionnés avec drag-and-drop pour l'ordre, bouton supprimer
-- Limite visuelle de 12 produits recommandée
+## Probleme 2 : Banniere PWA Install absente sur mobile
 
-**Fichier** : `frontend/src/pages/admin/AdminCMSPage.tsx`
-- Intégrer le composant dans l'onglet "Tendances" (tab `trends`), en dessous ou à la place du `TrendTagsTab` existant (les deux coexisteront : tags + sélection de produits)
+Le composant `PWAInstallBanner.tsx` existe et fonctionne correctement pour iOS. Cependant, sur Android, si l'evenement `beforeinstallprompt` ne se declenche pas (cas frequent en environnement preview ou certains navigateurs), la banniere ne s'affiche jamais (ligne 116 : `if (!deferredPrompt) return null`).
 
----
+### Corrections
 
-## 2. Footer : Liens Trends et Populaires
+**Fichier** : `PWAInstallBanner.tsx`
 
-**Fichier** : `frontend/src/components/Footer.tsx`
+- Ajouter un fallback Android : si `beforeinstallprompt` ne se declenche pas apres 3 secondes, afficher quand meme une banniere avec instructions manuelles ("Menu > Ajouter a l'ecran d'accueil")
+- Garder le comportement actuel si `beforeinstallprompt` se declenche (bouton Installer natif)
+- Garder le comportement iOS inchange (guide 3 etapes)
+- Garder la detection standalone (ne rien afficher si app deja installee)
 
-Ajouter dans la section "Aide & Support" ou une section existante :
-- `{ label: "Top Tendances", to: "/trends" }`
-- `{ label: "Plus Populaires", to: "/popular" }`
+**Fichier** : `App.tsx`
 
----
+- Envelopper `CmsThemeInjector` dans un `ErrorBoundary` pour isoler le crash `No QueryClient set` et ne pas bloquer le rendu de la banniere PWA
 
-## 3. Badge "Get 20% OFF" — Toggle admin + désactivé par défaut
+## Fichiers modifies
 
-**Fichier** : `frontend/src/contexts/UIConfigContext.tsx`
-- Charger la valeur `showDiscountBadge` depuis `platform_settings` (clé `ui_config`)
-- Défaut : `false` (désactivé)
-
-**Fichier** : `frontend/src/components/FloatingActions.tsx`
-- Remplacer le texte en dur "Get 20% OFF" par une valeur traduisible (i18n ou configurable admin)
-
-**Admin** : Ajouter un toggle dans la section "Sections" ou un emplacement pertinent du CMS pour activer/désactiver le badge et configurer son texte.
-
----
-
-## 4. Popup App Download — QR Code réel + Promo configurable
-
-**Dépendance** : Installer `qrcode.react` pour générer un QR code côté client.
-
-**Fichier** : `frontend/src/components/FloatingActions.tsx`
-
-Refonte du popup :
-- Remplacer le placeholder par un vrai QR code (via `qrcode.react`) pointant vers l'URL du site
-- QR code avec le logo Zandofy (icône panier) au centre (option `imageSettings` de `qrcode.react`)
-- Supprimer les boutons Android/iOS, remplacer par un texte "Android & iOS"
-- Texte "Scannez le QR code pour installer l'application"
-- Section promo : code, pourcentage et seuil minimum configurables par l'admin
-
-**Persistance admin** : Stocker dans `platform_settings` (clé `app_promo`) :
-```json
-{
-  "code": "APP20",
-  "discount_pct": 20,
-  "min_order_amount": 100,
-  "enabled": true
-}
-```
-
-**Admin UI** : Ajouter une section dans le CMS (onglet "Sections" ou dédié) pour configurer :
-- Code promo
-- Pourcentage de réduction
-- Montant minimum de commande
-- Toggle activation
-
----
-
-## 5. Pas de migration SQL
-
-Toutes les données sont stockées dans `platform_settings` (JSONB existant). La table `trending_products` existe déjà.
-
----
-
-## Fichiers modifiés/créés
-
-- `frontend/src/components/admin/cms/TrendingProductsManager.tsx` — nouveau
-- `frontend/src/pages/admin/AdminCMSPage.tsx` — intégration onglet tendances
-- `frontend/src/components/Footer.tsx` — liens trends + popular
-- `frontend/src/contexts/UIConfigContext.tsx` — badge désactivé par défaut, chargement DB
-- `frontend/src/components/FloatingActions.tsx` — QR code, refonte popup, promo configurable
-- `frontend/package.json` — ajout `qrcode.react`
+- `frontend/src/components/ProductShippingEstimator.tsx` -- blur timeout + onPointerDown
+- `frontend/src/components/PrecisionShippingEstimate.tsx` -- idem
+- `frontend/src/components/DynamicShippingCalculator.tsx` -- idem
+- `frontend/src/components/PWAInstallBanner.tsx` -- fallback Android
+- `frontend/src/App.tsx` -- ErrorBoundary autour de CmsThemeInjector
 
