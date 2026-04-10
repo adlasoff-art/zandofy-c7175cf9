@@ -51,7 +51,7 @@ export async function reportError({ error, componentStack }: ErrorReport) {
 
     const payload = {
       user_id: session?.user?.id ?? null,
-      user_email: session?.user?.email ?? null,
+      // user_email is set server-side by trigger for security (prevents injection)
       user_role: userRole,
       error_message: error.message || String(error),
       error_stack: error.stack?.slice(0, 4000) ?? null,
