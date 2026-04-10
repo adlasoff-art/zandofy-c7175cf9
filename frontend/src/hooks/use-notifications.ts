@@ -42,23 +42,9 @@ export function useNotifications() {
     }
     fetchNotifications();
 
-    const channel = supabase
-      .channel("notif-realtime")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
-        () => fetchNotifications()
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
-        () => fetchNotifications()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // Polling every 10s instead of Realtime (removed for security)
+    const interval = setInterval(fetchNotifications, 10000);
+    return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, fetchNotifications]);
 
