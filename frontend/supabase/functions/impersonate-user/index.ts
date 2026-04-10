@@ -70,24 +70,12 @@ Deno.serve(async (req) => {
         .eq("user_id", adminId);
 
       const isAdmin = adminRoles?.some((r: any) => r.role === "admin");
-      const isManager = adminRoles?.some((r: any) => r.role === "manager");
-      if (!isAdmin && !isManager) {
-        return jsonResponse({ error: "Admin or manager role required" }, 403, corsHeaders);
+      if (!isAdmin) {
+        return jsonResponse({ error: "Admin role required" }, 403, corsHeaders);
       }
 
       if (!targetUserId) {
         return jsonResponse({ error: "targetUserId required" }, 400, corsHeaders);
-      }
-
-      // Manager cannot impersonate admin
-      if (isManager && !isAdmin) {
-        const { data: targetRoles } = await supabaseAdmin
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", targetUserId);
-        if (targetRoles?.some((r: any) => r.role === "admin")) {
-          return jsonResponse({ error: "Managers cannot impersonate admins" }, 403, corsHeaders);
-        }
       }
 
       // Verify target exists
@@ -101,11 +89,11 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "User not found" }, 404, corsHeaders);
       }
 
-      // Hash token before storing (never store plaintext)
+      // Generate token, hash before storing (never store plaintext)
+      const tokenStr = crypto.randomUUID();
       const tokenHash = await sha256Hex(tokenStr);
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
       await supabaseAdmin.from("impersonation_tokens").insert({
-        token: null,
         token_hash: tokenHash,
         admin_id: adminId,
         target_user_id: targetUserId,
