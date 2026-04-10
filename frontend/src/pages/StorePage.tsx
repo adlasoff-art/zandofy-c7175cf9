@@ -398,7 +398,7 @@ export default function StorePage() {
                         </div>
                       </SheetContent>
                     </Sheet>
-                    {store.whatsapp_number && (
+                    {store.whatsapp_number && user && (
                       <a
                         href={`https://wa.me/${store.whatsapp_number.replace(/\D/g, "")}?text=${encodeURIComponent(
                           `Bonjour, je suis intéressé par votre boutique "${store.name}" sur Zandofy.`

@@ -43,26 +43,32 @@ export function DeliveryChat({ orderId, deliveryId, otherPartyName = "Interlocut
       });
   }, [open, orderId]);
 
-  // Realtime subscription
+  // Poll for new messages every 5 seconds (Realtime removed for security)
   useEffect(() => {
     if (!orderId) return;
-    const channel = supabase
-      .channel(`delivery-chat-${orderId}`)
-      .on("postgres_changes", {
-        event: "INSERT",
-        schema: "public",
-        table: "delivery_chats",
-        filter: `order_id=eq.${orderId}`,
-      }, (payload: any) => {
-        const msg = payload.new as ChatMessage;
-        setMessages((prev) => [...prev, msg]);
-        if (!open && msg.sender_id !== user?.id) {
-          setUnread((u) => u + 1);
-        }
-        setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current?.scrollHeight || 0, behavior: "smooth" }), 50);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const pollInterval = setInterval(async () => {
+      const { data } = await fromTable("delivery_chats")
+        .select("id, sender_id, message, created_at")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: true });
+      if (data) {
+        setMessages((prev: ChatMessage[]) => {
+          const newMsgs = (data as ChatMessage[]);
+          if (newMsgs.length > prev.length) {
+            const added = newMsgs.slice(prev.length);
+            added.forEach((msg) => {
+              if (!open && msg.sender_id !== user?.id) {
+                setUnread((u) => u + 1);
+              }
+            });
+            setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current?.scrollHeight || 0, behavior: "smooth" }), 50);
+            return newMsgs;
+          }
+          return prev;
+        });
+      }
+    }, 5000);
+    return () => { clearInterval(pollInterval); };
   }, [orderId, open, user?.id]);
 
   const sendMessage = async () => {
