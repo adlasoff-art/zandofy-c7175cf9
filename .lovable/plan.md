@@ -1,14 +1,24 @@
 
 
-# Plan : Mise à jour de `robots.txt`
+# Plan : Correction impersonation — Option A (Admin seul)
 
-Ajouter les deux lignes Sitemap demandées dans `frontend/public/robots.txt`. La ligne statique existante sera conservée (elle est identique à la première demandée), et la ligne dynamique (Edge Function production) sera ajoutée.
+## Problème
+1. `tokenStr` n'est jamais déclaré → ReferenceError immédiat
+2. `token: null` référence une colonne supprimée
+3. Les managers peuvent encore déclencher l'impersonation
 
-## Fichier modifié
+## Corrections dans `frontend/supabase/functions/impersonate-user/index.ts`
 
-| Fichier | Changement |
-|---------|-----------|
-| `frontend/public/robots.txt` | Ajouter `Sitemap: https://vpttoqojmiqxgudknyxf.supabase.co/functions/v1/generate-sitemap` après la ligne Sitemap existante |
+| Ligne | Changement |
+|-------|-----------|
+| ~104 | Ajouter `const tokenStr = crypto.randomUUID();` avant `sha256Hex(tokenStr)` |
+| ~108 | Retirer `token: null,` de l'insert (colonne supprimée) |
+| ~73-80 | Retirer la vérification `isManager` — seul `isAdmin` autorise l'action `start` |
+| ~82-90 | Retirer le bloc "Manager cannot impersonate admin" (devenu inutile) |
 
-Le fichier contiendra donc les deux entrées Sitemap pointant vers le sitemap statique et le sitemap dynamique.
+## Résultat
+- Seuls les utilisateurs avec le rôle `admin` peuvent impersonner
+- Le token est généré, hashé, et seul le hash est stocké
+- Aucune migration SQL nécessaire
+- Score sécurité inchangé (99/100)
 
