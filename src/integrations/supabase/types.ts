@@ -2129,7 +2129,8 @@ export type Database = {
           expires_at: string
           id: string
           target_user_id: string
-          token: string
+          token: string | null
+          token_hash: string | null
           used: boolean
         }
         Insert: {
@@ -2138,7 +2139,8 @@ export type Database = {
           expires_at: string
           id?: string
           target_user_id: string
-          token: string
+          token?: string | null
+          token_hash?: string | null
           used?: boolean
         }
         Update: {
@@ -2147,7 +2149,8 @@ export type Database = {
           expires_at?: string
           id?: string
           target_user_id?: string
-          token?: string
+          token?: string | null
+          token_hash?: string | null
           used?: boolean
         }
         Relationships: []
