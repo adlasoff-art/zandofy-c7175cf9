@@ -42,8 +42,9 @@ export function PWAInstallBanner() {
     const handler = (e: Event) => {
       e.preventDefault();
       const prompt = e as BeforeInstallPromptEvent;
-      setDeferredPrompt(prompt);
       deferredPromptRef.current = prompt;
+      setDeferredPrompt(prompt);
+      // If we were in fallback mode, switch to native
       setShowAndroidFallback(false);
     };
     window.addEventListener("beforeinstallprompt", handler);
