@@ -226,34 +226,33 @@ export default function VendorDashboardPage() {
 
     loadVendorData();
 
+    // Store the active store ID for polling
+    const activeStoreId = store?.id || null;
+
     // Polling every 20s for products, orders, store, and messages (replaces Realtime for security)
     const pollInterval = setInterval(async () => {
-      if (!activeStoreRef.current) return;
-      const storeId = activeStoreRef.current;
+      if (!activeStoreId) return;
 
       // Refresh product count
       const { count: prodCount } = await supabase
         .from("products")
         .select("id", { count: "exact", head: true })
-        .eq("store_id", storeId);
+        .eq("store_id", activeStoreId);
       setStore(prev => prev ? { ...prev, products_count: prodCount || 0 } : prev);
 
       // Refresh order counters
-      await fetchOrderCounters(storeId);
+      await fetchOrderCounters(activeStoreId);
 
       // Refresh store info
       const { data: storeData } = await supabase
         .from("stores")
         .select("name, pending_name, name_change_status")
-        .eq("id", storeId)
+        .eq("id", activeStoreId)
         .maybeSingle();
       if (storeData) {
         setStore(prev => prev ? { ...prev, ...storeData } : prev);
       }
     }, 20000);
-
-    // Store the active store ID for polling
-    const activeStoreRef = { current: store?.id || null };
 
     return () => {
       clearInterval(pollInterval);

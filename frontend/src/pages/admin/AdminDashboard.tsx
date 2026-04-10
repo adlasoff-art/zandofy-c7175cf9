@@ -10,7 +10,6 @@ import { LogisticsTab } from "@/components/admin/dashboard/LogisticsTab";
 import { VendorsTab } from "@/components/admin/dashboard/VendorsTab";
 import { ClientsTab } from "@/components/admin/dashboard/ClientsTab";
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { LayoutDashboard, BarChart3, Truck, Store, Users, Receipt } from "lucide-react";
 
 export default function AdminDashboard() {
