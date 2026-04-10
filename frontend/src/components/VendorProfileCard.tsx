@@ -6,6 +6,7 @@ import { VerificationBadge } from "@/components/VerificationBadge";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { InternalChat } from "@/components/InternalChat";
+import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface VendorProfileCardProps {
@@ -54,12 +55,13 @@ function StatusDot({ isOnline }: { isOnline: boolean }) {
 }
 
 export function VendorProfileCard({ store, productName, productId, originCountry, productSku, productPrice, productImage }: VendorProfileCardProps) {
+  const { user } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const isOnline = store.is_online ?? false;
 
-  // WhatsApp Business URL — uses direct product link
+  // WhatsApp Business URL — only available for authenticated users
   const productUrl = typeof window !== "undefined" ? `${window.location.origin}/product/${productId}` : "";
-  const whatsappUrl = store.whatsapp_number
+  const whatsappUrl = user && store.whatsapp_number
     ? `https://wa.me/${store.whatsapp_number.replace(/\D/g, "")}?text=${encodeURIComponent(
         `Bonjour, je suis intéressé par votre produit "${productName}"${productSku ? `\nSKU : ${productSku}` : ""}${productPrice ? `\nPrix : ${productPrice}` : ""}\n${productUrl}`
       )}`
