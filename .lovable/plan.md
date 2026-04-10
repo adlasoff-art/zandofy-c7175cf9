@@ -1,18 +1,14 @@
 
-# Plan : Forcer zandofy.com dans le sitemap dynamique
 
-## Problème
-L'Edge Function `generate-sitemap` lit `SITE_BASE_URL` depuis les variables d'environnement. Dans Lovable Cloud, cette variable vaut `https://...lovable.app`, ce qui écrase le fallback `https://zandofy.com`.
+# Plan : Mise à jour de `robots.txt`
 
-## Solution
-Hardcoder `https://zandofy.com` directement dans l'Edge Function au lieu de dépendre de `SITE_BASE_URL`. C'est la bonne approche car le sitemap est destiné à Google/SEO et doit toujours pointer vers le domaine de production.
+Ajouter les deux lignes Sitemap demandées dans `frontend/public/robots.txt`. La ligne statique existante sera conservée (elle est identique à la première demandée), et la ligne dynamique (Edge Function production) sera ajoutée.
 
 ## Fichier modifié
 
 | Fichier | Changement |
 |---------|-----------|
-| `frontend/supabase/functions/generate-sitemap/index.ts` | Ligne 3 : remplacer `Deno.env.get("SITE_BASE_URL") \|\| "https://zandofy.com"` par `"https://zandofy.com"` directement |
+| `frontend/public/robots.txt` | Ajouter `Sitemap: https://vpttoqojmiqxgudknyxf.supabase.co/functions/v1/generate-sitemap` après la ligne Sitemap existante |
 
-## Vérification
-- Le sitemap statique `frontend/public/sitemap.xml` utilise déjà `zandofy.com` ✓
-- Après déploiement, tester via `curl` sur l'Edge Function pour confirmer que tous les liens pointent vers `zandofy.com`
+Le fichier contiendra donc les deux entrées Sitemap pointant vers le sitemap statique et le sitemap dynamique.
+
