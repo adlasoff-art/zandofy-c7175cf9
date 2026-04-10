@@ -21,6 +21,12 @@ function jsonResponse(body: unknown, status: number, cors: Record<string, string
   });
 }
 
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -93,10 +99,12 @@ Deno.serve(async (req) => {
       crypto.getRandomValues(tokenBytes);
       const tokenStr = Array.from(tokenBytes, (b) => b.toString(16).padStart(2, "0")).join("");
 
-      // Store token (expires in 5 minutes)
+      // Hash token before storing (never store plaintext)
+      const tokenHash = await sha256Hex(tokenStr);
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
       await supabaseAdmin.from("impersonation_tokens").insert({
-        token: tokenStr,
+        token: null,
+        token_hash: tokenHash,
         admin_id: adminId,
         target_user_id: targetUserId,
         expires_at: expiresAt,
@@ -126,11 +134,12 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "token required" }, 400, corsHeaders);
       }
 
-      // Find and validate token
+      // Hash the incoming token and look up by hash
+      const incomingHash = await sha256Hex(impersonationToken);
       const { data: tokenRecord } = await supabaseAdmin
         .from("impersonation_tokens")
         .select("*")
-        .eq("token", impersonationToken)
+        .eq("token_hash", incomingHash)
         .eq("used", false)
         .single();
 
