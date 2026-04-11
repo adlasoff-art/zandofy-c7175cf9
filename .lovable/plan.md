@@ -1,19 +1,27 @@
 
 
-# Plan : Ajout de Google Analytics dans img-src de la CSP
+# Plan : Scroll-to-top lors du changement d'étape Checkout
 
-## Constat
+## Problème
+Quand le client passe de l'étape "Expédition" à "Paiement" (ou "Confirmation"), la page reste à la même position de scroll. Sur mobile, le client doit remonter manuellement pour voir les options de paiement.
 
-La CSP dans `frontend/index.html` ligne 47 contient déjà :
-- **script-src** : `https://www.googletagmanager.com https://www.google-analytics.com` — OK
-- **connect-src** : `https://www.google-analytics.com https://www.googletagmanager.com` — OK
-- **img-src** : `https://www.googletagmanager.com` — manque `https://www.google-analytics.com`
+## Solution
+Ajouter un `window.scrollTo(0, 0)` à chaque appel de `setStep()` dans `CheckoutPage.tsx`. Cela garantit que le haut de la page (avec les onglets et le contenu de l'étape) est visible immédiatement.
 
-## Correction
+## Fichier modifié
 
 | Fichier | Changement |
 |---------|-----------|
-| `frontend/index.html` ligne 47 | Ajouter `https://www.google-analytics.com` après `https://www.googletagmanager.com` dans la section `img-src` |
+| `frontend/src/pages/CheckoutPage.tsx` | Créer une fonction `goToStep(newStep)` qui appelle `setStep(newStep)` puis `window.scrollTo({ top: 0, behavior: 'smooth' })`. Remplacer tous les appels `setStep("payment")`, `setStep("confirmation")`, `setStep("shipping")` par `goToStep(...)`. |
 
-Cela permettra à Google Analytics d'envoyer ses pixels de tracking (balises `<img>`) sans être bloqué par la CSP. Aucun autre changement nécessaire — le reste est déjà en place.
+## Détail technique
+
+```typescript
+const goToStep = (next: Step) => {
+  setStep(next);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
+```
+
+Environ 10+ occurrences de `setStep(...)` à remplacer par `goToStep(...)` dans le fichier. Aucun autre fichier impacté.
 
