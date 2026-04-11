@@ -95,6 +95,10 @@ export default function CheckoutPage() {
   
 
   const [step, setStep] = useState<Step>("shipping");
+  const goToStep = (next: Step) => {
+    setStep(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("mobile_money");
   const [processing, setProcessing] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
