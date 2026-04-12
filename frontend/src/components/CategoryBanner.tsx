@@ -113,6 +113,7 @@ export function CategoryBanner() {
               ) : (
                 <>Voir tout ({categories.length}) <ChevronDown size={14} /></>
               )}
+
             </button>
           )}
         </div>

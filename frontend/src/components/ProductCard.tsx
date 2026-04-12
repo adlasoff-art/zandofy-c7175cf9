@@ -133,25 +133,25 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
         {/* Wishlist button - top right — always visible on touch */}
         <button
           onClick={handleWishlist}
-          className={`absolute top-2 right-2 w-9 h-9 bg-card/80 rounded-full flex items-center justify-center touch-manipulation active-press ${
+          className={`absolute top-2 right-2 w-9 h-9 bg-card/80 dark:bg-card rounded-full flex items-center justify-center touch-manipulation active-press ${
             wishlisted ? "opacity-100 scale-110" : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
           }`}
           aria-label={wishlisted ? "Retirer des favoris" : "Ajouter aux favoris"}
           style={{ WebkitTapHighlightColor: "transparent", transition: "opacity 0.2s, transform 0.2s" }}
         >
-          <Heart size={14} className={wishlisted ? "fill-sale text-sale" : "text-foreground"} />
+          <Heart size={14} className={wishlisted ? "fill-sale text-sale" : "text-foreground dark:text-primary/80"} />
         </button>
 
         {/* Compare button - below wishlist */}
         <button
           onClick={handleCompare}
-          className={`absolute top-12 right-2 w-9 h-9 bg-card/80 rounded-full flex items-center justify-center touch-manipulation active-press ${
+          className={`absolute top-12 right-2 w-9 h-9 bg-card/80 dark:bg-card rounded-full flex items-center justify-center touch-manipulation active-press ${
             compared ? "opacity-100 bg-primary/20" : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
           }`}
           aria-label={compared ? "Retirer du comparateur" : "Comparer"}
           style={{ WebkitTapHighlightColor: "transparent", transition: "opacity 0.2s, transform 0.2s" }}
         >
-          <GitCompareArrows size={14} className={compared ? "text-primary" : "text-foreground"} />
+          <GitCompareArrows size={14} className={compared ? "text-primary" : "text-foreground dark:text-primary/80"} />
         </button>
       </div>
 
@@ -164,7 +164,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
 
         {/* Psychological pricing */}
         <div className="flex items-baseline gap-1.5 flex-wrap">
-          <span className="text-foreground font-bold text-base">
+          <span className="text-foreground dark:text-primary font-bold text-base">
             {formatPrice(product.price)}
           </span>
           {product.originalPrice && (
@@ -191,8 +191,8 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
             </span>
           )}
           {product.originCountry && (
-            <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-              <span className="w-2 h-2 rounded-full bg-primary/60 inline-block" />
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+              <span className="w-2 h-2 rounded-full bg-sale inline-block" />
               {product.originCountry}
             </span>
           )}
