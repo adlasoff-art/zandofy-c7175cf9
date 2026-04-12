@@ -1,6 +1,7 @@
 import { useCart } from "@/contexts/CartContext";
 import { getColorDisplay } from "@/utils/colorName";
 import { useAuth } from "@/contexts/AuthContext";
+import { useI18n } from "@/contexts/I18nContext";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,6 +16,7 @@ export function CartDrawer() {
     toggleSelected, selectAll, deselectAll,
   } = useCart();
   const { user } = useAuth();
+  const { t } = useI18n();
 
   const allSelected = items.length > 0 && items.every(i => i.selected);
   const noneSelected = items.every(i => !i.selected);
@@ -24,23 +26,23 @@ export function CartDrawer() {
       <SheetContent side="right" className="w-full sm:max-w-md flex flex-col">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <ShoppingBag size={20} /> Panier ({itemCount})
+            <ShoppingBag size={20} /> {t("cart.title")} ({itemCount})
           </SheetTitle>
         </SheetHeader>
 
         {!user ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center">
             <ShoppingBag size={48} className="text-muted-foreground" />
-            <p className="text-muted-foreground">Connectez-vous pour voir votre panier</p>
+            <p className="text-muted-foreground">{t("cart.loginRequired")}</p>
             <Link to="/auth" onClick={() => setDrawerOpen(false)}>
-              <Button>Se connecter</Button>
+              <Button>{t("cart.login")}</Button>
             </Link>
           </div>
         ) : items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center">
             <ShoppingBag size={48} className="text-muted-foreground" />
-            <p className="text-muted-foreground">Votre panier est vide</p>
-            <Button variant="outline" onClick={() => setDrawerOpen(false)}>Continuer mes achats</Button>
+            <p className="text-muted-foreground">{t("cart.empty")}</p>
+            <Button variant="outline" onClick={() => setDrawerOpen(false)}>{t("cart.continueShopping")}</Button>
           </div>
         ) : (
           <>
@@ -51,10 +53,10 @@ export function CartDrawer() {
                 className="text-xs font-medium text-primary hover:underline flex items-center gap-1.5"
               >
                 {allSelected ? <Square size={14} /> : <CheckSquare size={14} />}
-                {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+                {allSelected ? t("cart.deselectAll") : t("cart.selectAll")}
               </button>
               <span className="text-xs text-muted-foreground">
-                {selectedCount} article{selectedCount !== 1 ? "s" : ""} sélectionné{selectedCount !== 1 ? "s" : ""}
+                {selectedCount} {t("cart.itemsSelected")}
               </span>
             </div>
 
@@ -81,7 +83,7 @@ export function CartDrawer() {
                           </span>
                         ) : null;
                       })()}
-                      {item.size && <span>Taille: {item.size}</span>}
+                      {item.size && <span>{t("search.size")}: {item.size}</span>}
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-foreground">${(item.price * item.quantity).toFixed(2)}</span>
@@ -99,7 +101,7 @@ export function CartDrawer() {
                       </div>
                     </div>
                     {item.moq > 1 && item.quantity < item.moq && (
-                      <p className="text-xs text-sale">Min. {item.moq} pièces requis</p>
+                      <p className="text-xs text-sale">{t("cart.minRequired").replace("{min}", String(item.moq))}</p>
                     )}
                     <CartItemVariantEditor
                       cartItemId={item.id}
@@ -115,17 +117,17 @@ export function CartDrawer() {
             {/* Footer */}
             <div className="border-t border-border pt-4 space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Sous-total ({selectedCount} sélectionné{selectedCount !== 1 ? "s" : ""})</span>
+                <span className="text-muted-foreground">{t("cart.subtotal")} ({selectedCount} {t("cart.selected")})</span>
                 <span className="font-bold text-foreground">${selectedSubtotal.toFixed(2)}</span>
               </div>
-              <p className="text-xs text-muted-foreground">Frais de port calculés au checkout</p>
+              <p className="text-xs text-muted-foreground">{t("cart.shippingAtCheckout")}</p>
               {noneSelected ? (
                 <Button className="w-full h-12 font-bold" disabled>
-                  Sélectionnez des articles
+                  {t("cart.selectItems")}
                 </Button>
               ) : (
                 <Link to="/checkout" onClick={() => setDrawerOpen(false)}>
-                  <Button className="w-full h-12 font-bold">Commander ({selectedCount}) — ${selectedSubtotal.toFixed(2)}</Button>
+                  <Button className="w-full h-12 font-bold">{t("cart.order")} ({selectedCount}) — ${selectedSubtotal.toFixed(2)}</Button>
                 </Link>
               )}
             </div>

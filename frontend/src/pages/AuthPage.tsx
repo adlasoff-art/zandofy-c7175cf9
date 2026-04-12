@@ -357,7 +357,7 @@ export default function AuthPage() {
               <Label htmlFor="email" className="text-xs">{t("auth.email")}</Label>
               <div className="relative">
                 <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input id="email" type="email" placeholder="vous@exemple.com" value={email} onChange={e => setEmail(e.target.value)} className="pl-9 h-11" required />
+                <Input id="email" type="email" placeholder="example@mail.com" value={email} onChange={e => setEmail(e.target.value)} className="pl-9 h-11" required />
               </div>
             </div>
 
@@ -425,7 +425,7 @@ export default function AuthPage() {
 
           <p className="text-center text-[11px] text-muted-foreground/60 flex items-center justify-center gap-1">
             <ShieldCheck size={12} />
-            Connexion sécurisée · Données chiffrées
+            {t("auth.secureConnection")}
           </p>
         </div>
       </main>

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronRight, Flame, Clock } from "lucide-react";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { fetchFlashSaleProducts, type Product } from "@/services/api";
+import { useI18n } from "@/contexts/I18nContext";
 
 function useCountdown(targetDate: Date) {
   const [timeLeft, setTimeLeft] = useState(getTimeLeft(targetDate));
@@ -29,6 +30,7 @@ function getTimeLeft(target: Date) {
 export function FlashSales() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const { t } = useI18n();
 
   // Find the nearest promo end date from fetched products, fallback to 8h
   const [saleEnd, setSaleEnd] = useState(() => new Date(Date.now() + 8 * 60 * 60 * 1000));
@@ -61,7 +63,7 @@ export function FlashSales() {
           <div className="flex items-center gap-2">
             <h2 className="text-base md:text-lg font-bold text-foreground flex items-center gap-1.5 whitespace-nowrap">
               <Flame size={18} className="text-sale" />
-              Super Promos
+              {t("home.flashSales")}
             </h2>
             <ChevronRight size={16} className="text-muted-foreground hidden md:block" />
           </div>
@@ -69,7 +71,7 @@ export function FlashSales() {
           {/* Countdown — on its own line on mobile */}
           <div className="flex items-center gap-1.5 text-xs">
             <Clock size={12} className="text-sale shrink-0" />
-            <span className="text-muted-foreground whitespace-nowrap">Se termine dans</span>
+            <span className="text-sale whitespace-nowrap">{t("home.endsIn")}</span>
             <div className="flex gap-0.5 font-mono">
               <span className="bg-foreground text-card px-1.5 py-0.5 rounded text-[11px] font-bold w-[26px] text-center tabular-nums">
                 {String(countdown.hours).padStart(2, "0")}

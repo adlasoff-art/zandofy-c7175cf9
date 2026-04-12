@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { SlidersHorizontal, X } from "lucide-react";
+import { useI18n } from "@/contexts/I18nContext";
 
 function mapProduct(row: any) {
   const sortedImages = (row.product_images || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
@@ -52,6 +53,7 @@ const SPECIAL_SLUGS = ["nouveautes", "soldes"];
 
 export default function CategoryPage() {
   const { slug } = useParams<{ slug: string }>();
+  const { t } = useI18n();
   const isSpecial = SPECIAL_SLUGS.includes(slug?.toLowerCase() || "");
 
   // Filters state
@@ -200,8 +202,8 @@ export default function CategoryPage() {
       <div className="min-h-screen bg-background">
         <Header />
         <main className="max-w-7xl mx-auto px-4 py-20 text-center">
-          <h1 className="text-2xl font-bold text-foreground">Catégorie introuvable</h1>
-          <Link to="/" className="text-primary underline mt-4 inline-block">Retour à l'accueil</Link>
+          <h1 className="text-2xl font-bold text-foreground">{t("filter.categoryNotFound")}</h1>
+          <Link to="/" className="text-primary underline mt-4 inline-block">{t("product.backToHome")}</Link>
         </main>
         <Footer />
       </div>
@@ -228,7 +230,7 @@ export default function CategoryPage() {
         {/* Breadcrumb */}
         <Breadcrumb className="mb-4">
           <BreadcrumbList>
-            <BreadcrumbItem><BreadcrumbLink asChild><Link to="/">Accueil</Link></BreadcrumbLink></BreadcrumbItem>
+            <BreadcrumbItem><BreadcrumbLink asChild><Link to="/">{t("general.home")}</Link></BreadcrumbLink></BreadcrumbItem>
             <BreadcrumbSeparator />
             {category.parent && (
               <>
@@ -251,7 +253,7 @@ export default function CategoryPage() {
             <div>
               <h1 className="text-2xl font-bold text-foreground">{category.name_fr}</h1>
               <p className="text-sm text-muted-foreground mt-1">
-                {filteredProducts?.length || 0} produit{(filteredProducts?.length || 0) > 1 ? "s" : ""}
+                {filteredProducts?.length || 0} {t("filter.products")}
               </p>
             </div>
           </div>
@@ -260,7 +262,7 @@ export default function CategoryPage() {
         {/* Subcategories */}
         {!isSpecial && category.subcategories && category.subcategories.length > 0 && (
           <div className="mb-6">
-            <h2 className="text-sm font-semibold text-foreground mb-3">Sous-catégories</h2>
+            <h2 className="text-sm font-semibold text-foreground mb-3">{t("filter.subcategories")}</h2>
             <div className="flex gap-2 flex-wrap">
               {category.subcategories.map((sub: any) => (
                 <Link
@@ -283,7 +285,7 @@ export default function CategoryPage() {
             className="flex items-center gap-2 px-4 py-2 text-sm border border-border rounded-lg bg-card text-foreground hover:border-primary transition-colors"
           >
             <SlidersHorizontal size={14} />
-            Filtres
+            {t("filter.filters")}
             {activeFiltersCount > 0 && (
               <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{activeFiltersCount}</Badge>
             )}
@@ -294,10 +296,10 @@ export default function CategoryPage() {
             onChange={(e) => setSortBy(e.target.value)}
             className="px-3 py-2 text-sm border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
-            <option value="recent">Plus récents</option>
-            <option value="price-asc">Prix croissant</option>
-            <option value="price-desc">Prix décroissant</option>
-            <option value="rating">Mieux notés</option>
+             <option value="recent">{t("filter.recent")}</option>
+             <option value="price-asc">{t("filter.priceAsc")}</option>
+             <option value="price-desc">{t("filter.priceDesc")}</option>
+             <option value="rating">{t("filter.bestRated")}</option>
           </select>
         </div>
 
@@ -305,18 +307,18 @@ export default function CategoryPage() {
         {filtersOpen && (
           <div className="bg-card border border-border rounded-xl p-4 mb-6 space-y-4 animate-fade-in">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-foreground">Filtres</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t("filter.filters")}</h3>
               <button
                 onClick={() => { setPriceRange([0, 10000]); setSelectedSizes([]); setSelectedColors([]); }}
                 className="text-xs text-primary hover:underline"
               >
-                Réinitialiser
+                {t("filter.reset")}
               </button>
             </div>
 
             {/* Price range */}
             <div className="space-y-2">
-              <Label className="text-xs">Prix (USD)</Label>
+              <Label className="text-xs">{t("filter.price")} (USD)</Label>
               <Slider
                 value={priceRange}
                 onValueChange={(v) => setPriceRange(v as [number, number])}
@@ -335,7 +337,7 @@ export default function CategoryPage() {
             {/* Sizes */}
             {availableSizes.length > 0 && (
               <div className="space-y-2">
-                <Label className="text-xs">Tailles</Label>
+                <Label className="text-xs">{t("filter.sizes")}</Label>
                 <div className="flex flex-wrap gap-1.5">
                   {availableSizes.map((size) => (
                     <button
@@ -357,7 +359,7 @@ export default function CategoryPage() {
             {/* Colors */}
             {availableColors.length > 0 && (
               <div className="space-y-2">
-                <Label className="text-xs">Couleurs</Label>
+                <Label className="text-xs">{t("filter.colors")}</Label>
                 <div className="flex flex-wrap gap-2">
                   {availableColors.map((color) => (
                     <button
@@ -415,7 +417,7 @@ export default function CategoryPage() {
           </div>
         ) : (
           <div className="py-20 text-center text-muted-foreground">
-            Aucun produit dans cette catégorie pour le moment.
+            {t("filter.noProducts")}
           </div>
         )}
       </main>
