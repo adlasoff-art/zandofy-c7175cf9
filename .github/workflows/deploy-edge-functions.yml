@@ -6,6 +6,8 @@ on:
     paths:
       - "frontend/supabase/functions/**"
       - "frontend/supabase/config.toml"
+      - "supabase/functions/**"
+      - "supabase/config.toml"
   workflow_dispatch:
 
 jobs:
