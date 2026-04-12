@@ -71,7 +71,7 @@ export function FlashSales() {
           {/* Countdown — on its own line on mobile */}
           <div className="flex items-center gap-1.5 text-xs">
             <Clock size={12} className="text-sale shrink-0" />
-            <span className="text-muted-foreground whitespace-nowrap">{t("home.endsIn")}</span>
+            <span className="text-sale whitespace-nowrap">{t("home.endsIn")}</span>
             <div className="flex gap-0.5 font-mono">
               <span className="bg-foreground text-card px-1.5 py-0.5 rounded text-[11px] font-bold w-[26px] text-center tabular-nums">
                 {String(countdown.hours).padStart(2, "0")}

@@ -172,7 +172,7 @@ export function ProductGrid() {
   ];
 
   return (
-    <section id="products" className="py-6 bg-muted/30">
+    <section id="products" className="py-6 bg-muted/30 dark:bg-muted/10">
       <div className="container">
         {/* ═══════════════════════════════════════════ */}
         {/* POPULAR PRODUCTS SECTION                    */}

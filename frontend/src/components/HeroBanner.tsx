@@ -129,8 +129,8 @@ export function HeroBanner() {
             {leftBanners.map((b) => (
               <Link key={b.id} to={b.link || "/"} className="relative block rounded-xl overflow-hidden group" style={{ flex: 1 }}>
                 <img src={b.image_url || "/placeholder.svg"} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                <div className="absolute inset-0 bg-foreground/40 flex items-center justify-center">
-                  <span className="text-card text-sm font-bold">{b.title}</span>
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                  <span className="text-white text-sm font-bold">{b.title}</span>
                 </div>
               </Link>
             ))}
@@ -166,11 +166,11 @@ export function HeroBanner() {
                   className="w-full h-full object-cover"
                   loading={i === 0 ? "eager" : "lazy"}
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-foreground/50 to-transparent flex flex-col justify-center pl-6 md:pl-12">
-                  <h2 className="text-card text-xl md:text-4xl font-bold tracking-wide max-w-md">{slide.title}</h2>
-                  {slide.subtitle && <p className="text-card/80 text-sm md:text-base mt-1 max-w-sm">{slide.subtitle}</p>}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent flex flex-col justify-center pl-6 md:pl-12">
+                  <h2 className="text-white text-xl md:text-4xl font-bold tracking-wide max-w-md">{slide.title}</h2>
+                  {slide.subtitle && <p className="text-white/80 text-sm md:text-base mt-1 max-w-sm">{slide.subtitle}</p>}
                   {slide.cta && (
-                    <Link to={slide.link || "/"} className="mt-4 inline-block w-fit px-6 py-2.5 text-xs font-bold bg-card text-foreground rounded-sm hover:bg-card/90 transition-colors uppercase tracking-wider">
+                    <Link to={slide.link || "/"} className="mt-4 inline-block w-fit px-6 py-2.5 text-xs font-bold bg-white text-gray-900 rounded-sm hover:bg-white/90 transition-colors uppercase tracking-wider">
                       {slide.cta}
                     </Link>
                   )}
@@ -179,11 +179,11 @@ export function HeroBanner() {
             ))}
 
             {/* Navigation arrows */}
-            <button onClick={goPrev} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-card/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-card transition-colors z-10 shadow-md">
-              <ChevronLeft size={18} className="text-foreground" />
+            <button onClick={goPrev} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors z-10 shadow-md">
+              <ChevronLeft size={18} className="text-gray-900" />
             </button>
-            <button onClick={goNext} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-card/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-card transition-colors z-10 shadow-md">
-              <ChevronRight size={18} className="text-foreground" />
+            <button onClick={goNext} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors z-10 shadow-md">
+              <ChevronRight size={18} className="text-gray-900" />
             </button>
 
             {/* Dots */}
@@ -203,8 +203,8 @@ export function HeroBanner() {
             {rightBanners.map((b) => (
               <Link key={b.id} to={b.link || "/"} className="relative block rounded-xl overflow-hidden group" style={{ flex: 1 }}>
                 <img src={b.image_url || "/placeholder.svg"} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                <div className="absolute inset-0 bg-foreground/40 flex items-center justify-center">
-                  <span className="text-card text-sm font-bold">{b.title}</span>
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                  <span className="text-white text-sm font-bold">{b.title}</span>
                 </div>
               </Link>
             ))}
