@@ -192,7 +192,7 @@ export function HeroBanner() {
                 <button
                   key={i}
                   onClick={() => goTo(i, i > current ? "left" : "right")}
-                  className={`rounded-full transition-all duration-300 ${i === current ? "bg-card w-6 h-2" : "bg-card/40 w-2 h-2 hover:bg-card/60"}`}
+                  className={`rounded-full transition-all duration-300 ${i === current ? "bg-white w-6 h-2" : "bg-white/40 w-2 h-2 hover:bg-white/60"}`}
                 />
               ))}
             </div>
