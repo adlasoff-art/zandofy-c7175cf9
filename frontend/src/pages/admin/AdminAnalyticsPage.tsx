@@ -569,13 +569,24 @@ export default function AdminAnalyticsPage() {
     },
   });
 
-  // PWA install count from dedicated table
+  // PWA install count — total cumulative (no date filter)
   const { data: pwaCount } = useQuery({
-    queryKey: ["admin-pwa-count", period],
+    queryKey: ["admin-pwa-count-total"],
     queryFn: async () => {
-      let q = fromTable("pwa_installs").select("id", { count: "exact", head: true });
-      if (since) q = q.gte("created_at", since);
-      const { count } = await q;
+      const { count } = await fromTable("pwa_installs").select("id", { count: "exact", head: true });
+      return count || 0;
+    },
+  });
+
+  // PWA installs in current period (for sub-label)
+  const { data: pwaPeriodCount } = useQuery({
+    queryKey: ["admin-pwa-count-period", period],
+    queryFn: async () => {
+      if (!since) {
+        const { count } = await fromTable("pwa_installs").select("id", { count: "exact", head: true });
+        return count || 0;
+      }
+      const { count } = await fromTable("pwa_installs").select("id", { count: "exact", head: true }).gte("created_at", since);
       return count || 0;
     },
   });
