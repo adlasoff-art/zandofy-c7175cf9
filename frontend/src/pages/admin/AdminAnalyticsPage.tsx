@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   BarChart3, Users, Eye, MousePointer, Smartphone, Monitor, Tablet,
   Globe, TrendingUp, Clock, Download, Store, Heart, ShoppingCart,
-  Package, ChevronLeft, ChevronRight, ArrowUpDown,
+  Package, ChevronLeft, ChevronRight, ArrowUpDown, Wifi,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -20,22 +20,6 @@ const PERIODS = [
   { key: "365d", label: "1 an", days: 365 },
   { key: "all", label: "Tout", days: 0 },
 ];
-
-interface AnalyticsEvent {
-  event_type: string;
-  page_path: string | null;
-  product_id: string | null;
-  store_id: string | null;
-  device_type: string | null;
-  os: string | null;
-  browser: string | null;
-  is_pwa: boolean | null;
-  session_id: string;
-  user_id: string | null;
-  duration_seconds: number | null;
-  created_at: string;
-  metadata: any;
-}
 
 function StatCard({ icon: Icon, label, value, sub }: { icon: any; label: string; value: string | number; sub?: string }) {
   return (
@@ -51,20 +35,8 @@ function StatCard({ icon: Icon, label, value, sub }: { icon: any; label: string;
 }
 
 // ─── Daily Traffic Histogram ──────────────────────────────────────
-function DailyTrafficChart({ events }: { events: AnalyticsEvent[] }) {
-  const dailyData = useMemo(() => {
-    const byDay = new Map<string, Set<string>>();
-    events.forEach((e) => {
-      const day = e.created_at.slice(0, 10);
-      if (!byDay.has(day)) byDay.set(day, new Set());
-      byDay.get(day)!.add(e.session_id);
-    });
-    return Array.from(byDay.entries())
-      .map(([date, sessions]) => ({ date, visiteurs: sessions.size }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [events]);
-
-  if (dailyData.length === 0) return null;
+function DailyTrafficChart({ data }: { data: { day: string; visitors: number }[] }) {
+  if (data.length === 0) return null;
 
   return (
     <div className="bg-card border border-border rounded-lg p-4">
@@ -72,118 +44,75 @@ function DailyTrafficChart({ events }: { events: AnalyticsEvent[] }) {
         <BarChart3 size={14} /> Trafic journalier (visiteurs uniques)
       </h3>
       <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={dailyData}>
+        <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
           <XAxis
-            dataKey="date"
+            dataKey="day"
             tick={{ fontSize: 10 }}
             tickFormatter={(v) => {
               const d = new Date(v);
               return `${d.getDate()}/${d.getMonth() + 1}`;
             }}
             className="text-muted-foreground"
+            interval={data.length > 60 ? Math.floor(data.length / 15) : data.length > 14 ? 2 : 0}
           />
           <YAxis tick={{ fontSize: 10 }} allowDecimals={false} className="text-muted-foreground" />
           <Tooltip
             contentStyle={{ fontSize: 12, borderRadius: 8 }}
             labelFormatter={(v) => new Date(v).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
           />
-          <Bar dataKey="visiteurs" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="visitors" name="Visiteurs" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
+const formatDuration = (s: number) => {
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}m ${sec}s`;
+};
+
 // ─── Overview Tab ─────────────────────────────────────────────────
 function OverviewTab({
-  events,
-  period,
+  kpis,
+  dailyTraffic,
+  topProducts,
+  topStores,
+  topPages,
+  devices,
   pwaCount,
   pwaPeriodCount,
-  storeNames,
 }: {
-  events: AnalyticsEvent[];
-  period: string;
+  kpis: any;
+  dailyTraffic: { day: string; visitors: number }[];
+  topProducts: { product_name: string; click_count: number }[];
+  topStores: { store_name: string; view_count: number }[];
+  topPages: { page_path: string; view_count: number }[];
+  devices: any;
   pwaCount: number;
   pwaPeriodCount: number;
-  storeNames: Map<string, string>;
 }) {
-  const allEvents = events;
-  const pageViews = allEvents.filter((e) => e.event_type === "page_view");
-  const productClicks = allEvents.filter((e) => e.event_type === "product_click");
-  const storeViews = allEvents.filter((e) => e.event_type === "store_view");
-  const pwaInstalls = allEvents.filter((e) => e.event_type === "pwa_install");
-  const sessionEnds = allEvents.filter((e) => e.event_type === "session_end");
-
-  const uniqueSessions = new Set(allEvents.map((e) => e.session_id)).size;
-  const uniqueUsers = new Set(allEvents.filter((e) => e.user_id).map((e) => e.user_id)).size;
-  const anonymousVisitors = new Set(allEvents.filter((e) => !e.user_id).map((e) => e.session_id)).size;
-
-  const avgSessionDuration = sessionEnds.length > 0
-    ? Math.round(sessionEnds.reduce((s, e) => s + (e.duration_seconds || 0), 0) / sessionEnds.length)
-    : 0;
-
-  const deviceCounts = { mobile: 0, tablet: 0, desktop: 0 };
-  const uniqueDeviceSessions = new Map<string, string>();
-  allEvents.forEach((e) => {
-    if (!uniqueDeviceSessions.has(e.session_id)) {
-      uniqueDeviceSessions.set(e.session_id, e.device_type || "desktop");
-    }
-  });
-  uniqueDeviceSessions.forEach((dt) => {
-    if (dt in deviceCounts) deviceCounts[dt as keyof typeof deviceCounts]++;
-  });
-
-  const osSessionMap = new Map<string, string>();
-  allEvents.forEach((e) => {
-    if (!osSessionMap.has(e.session_id) && e.os) osSessionMap.set(e.session_id, e.os);
-  });
-  const osBreakdown: Record<string, number> = {};
-  osSessionMap.forEach((os) => { osBreakdown[os] = (osBreakdown[os] || 0) + 1; });
-
-  const pwaSessions = new Set(allEvents.filter((e) => e.is_pwa).map((e) => e.session_id)).size;
-  const webSessions = uniqueSessions - pwaSessions;
-
-  const topPages = Object.entries(
-    pageViews.reduce((acc, e) => { const p = e.page_path || "/"; acc[p] = (acc[p] || 0) + 1; return acc; }, {} as Record<string, number>)
-  ).sort((a, b) => b[1] - a[1]).slice(0, 10);
-
-  const topProducts = Object.entries(
-    productClicks.reduce((acc, e) => { if (e.product_id) acc[e.product_id] = (acc[e.product_id] || 0) + 1; return acc; }, {} as Record<string, number>)
-  ).sort((a, b) => b[1] - a[1]).slice(0, 10);
-
-  const topStores = Object.entries(
-    storeViews.reduce((acc, e) => { if (e.store_id) acc[e.store_id] = (acc[e.store_id] || 0) + 1; return acc; }, {} as Record<string, number>)
-  ).sort((a, b) => b[1] - a[1]).slice(0, 10);
-
-  const pwaByOS: Record<string, number> = {};
-  pwaInstalls.forEach((e) => {
-    const os = (e.metadata as any)?.os || e.os || "unknown";
-    pwaByOS[os] = (pwaByOS[os] || 0) + 1;
-  });
-
-  const formatDuration = (s: number) => {
-    if (s < 60) return `${s}s`;
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}m ${sec}s`;
-  };
+  const deviceCounts = devices?.devices || {};
+  const osBreakdown = devices?.os || {};
+  const totalSessions = kpis?.unique_sessions || 0;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 md:grid-cols-7 gap-2">
-        <StatCard icon={Users} label="Visiteurs" value={uniqueSessions} sub="sessions uniques" />
-        <StatCard icon={Eye} label="Pages vues" value={pageViews.length} />
-        <StatCard icon={Users} label="Connectés" value={uniqueUsers} />
-        <StatCard icon={Globe} label="Anonymes" value={anonymousVisitors} />
-        <StatCard icon={Clock} label="Durée moy." value={formatDuration(avgSessionDuration)} />
-        <StatCard icon={Download} label="PWA installées" value={pwaCount} sub={`(+${pwaPeriodCount} période)`} />
-        <StatCard icon={MousePointer} label="Clics produits" value={productClicks.length} />
+      <div className="grid grid-cols-3 md:grid-cols-8 gap-2">
+        <StatCard icon={Users} label="Visiteurs" value={kpis?.unique_sessions || 0} sub="sessions uniques" />
+        <StatCard icon={Eye} label="Pages vues" value={kpis?.page_views || 0} />
+        <StatCard icon={Users} label="Authentifiés" value={kpis?.authenticated_sessions || 0} sub="sessions connectées" />
+        <StatCard icon={Globe} label="Anonymes" value={kpis?.anonymous_sessions || 0} sub="sans compte" />
+        <StatCard icon={Wifi} label="En ligne" value={kpis?.online_now || 0} sub="temps réel" />
+        <StatCard icon={Clock} label="Durée moy." value={formatDuration(kpis?.avg_duration || 0)} />
+        <StatCard icon={Download} label="PWA installées" value={pwaCount} sub={`+${pwaPeriodCount} période`} />
+        <StatCard icon={MousePointer} label="Clics produits" value={kpis?.product_clicks || 0} />
       </div>
 
-      {/* Daily traffic histogram */}
-      <DailyTrafficChart events={allEvents} />
+      <DailyTrafficChart data={dailyTraffic} />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="bg-card border border-border rounded-lg p-3">
@@ -192,16 +121,17 @@ function OverviewTab({
           </h3>
           <div className="space-y-1.5">
             {([
-              { label: "Mobile", icon: Smartphone, count: deviceCounts.mobile },
-              { label: "Tablette", icon: Tablet, count: deviceCounts.tablet },
-              { label: "Ordinateur", icon: Monitor, count: deviceCounts.desktop },
+              { label: "Mobile", icon: Smartphone, key: "mobile" },
+              { label: "Tablette", icon: Tablet, key: "tablet" },
+              { label: "Ordinateur", icon: Monitor, key: "desktop" },
             ] as const).map((d) => {
-              const pct = uniqueSessions > 0 ? Math.round((d.count / uniqueSessions) * 100) : 0;
+              const count = deviceCounts[d.key] || 0;
+              const pct = totalSessions > 0 ? Math.round((count / totalSessions) * 100) : 0;
               return (
                 <div key={d.label} className="flex items-center gap-2">
                   <d.icon size={12} className="text-muted-foreground" />
                   <span className="text-xs text-foreground flex-1">{d.label}</span>
-                  <span className="text-xs font-medium text-foreground">{d.count}</span>
+                  <span className="text-xs font-medium text-foreground">{count}</span>
                   <span className="text-[10px] text-muted-foreground w-8 text-right">{pct}%</span>
                 </div>
               );
@@ -214,12 +144,12 @@ function OverviewTab({
             <Globe size={14} /> Systèmes d'exploitation
           </h3>
           <div className="space-y-1.5">
-            {Object.entries(osBreakdown).sort((a, b) => b[1] - a[1]).map(([os, count]) => {
-              const pct = uniqueSessions > 0 ? Math.round((count / uniqueSessions) * 100) : 0;
+            {Object.entries(osBreakdown as Record<string, number>).sort((a, b) => (b[1] as number) - (a[1] as number)).map(([os, count]) => {
+              const pct = totalSessions > 0 ? Math.round(((count as number) / totalSessions) * 100) : 0;
               return (
                 <div key={os} className="flex items-center gap-2">
                   <span className="text-xs text-foreground flex-1 capitalize">{os}</span>
-                  <span className="text-xs font-medium text-foreground">{count}</span>
+                  <span className="text-xs font-medium text-foreground">{count as number}</span>
                   <span className="text-[10px] text-muted-foreground w-8 text-right">{pct}%</span>
                 </div>
               );
@@ -229,29 +159,17 @@ function OverviewTab({
 
         <div className="bg-card border border-border rounded-lg p-3">
           <h3 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-            <Smartphone size={14} /> PWA vs Navigateur
+            <Smartphone size={14} /> Sessions PWA vs Web
           </h3>
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-foreground flex-1">PWA installée</span>
-              <span className="text-xs font-medium text-foreground">{pwaSessions}</span>
+              <span className="text-xs text-foreground flex-1">Sessions PWA</span>
+              <span className="text-xs font-medium text-foreground">{kpis?.pwa_sessions || 0}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-foreground flex-1">Navigateur web</span>
-              <span className="text-xs font-medium text-foreground">{webSessions}</span>
+              <span className="text-xs text-foreground flex-1">Sessions Web</span>
+              <span className="text-xs font-medium text-foreground">{kpis?.web_sessions || 0}</span>
             </div>
-            {Object.entries(pwaByOS).length > 0 && (
-              <>
-                <hr className="border-border" />
-                <p className="text-[10px] text-muted-foreground font-medium">Installations par OS</p>
-                {Object.entries(pwaByOS).sort((a, b) => b[1] - a[1]).map(([os, count]) => (
-                  <div key={os} className="flex items-center gap-2">
-                    <span className="text-[11px] text-foreground flex-1 capitalize">{os}</span>
-                    <span className="text-[11px] font-medium text-foreground">{count}</span>
-                  </div>
-                ))}
-              </>
-            )}
           </div>
         </div>
       </div>
@@ -262,11 +180,11 @@ function OverviewTab({
             <TrendingUp size={14} /> Pages les plus visitées
           </h3>
           <div className="space-y-1">
-            {topPages.map(([path, count], i) => (
-              <div key={path} className="flex items-center gap-1.5">
+            {topPages.map((p, i) => (
+              <div key={p.page_path} className="flex items-center gap-1.5">
                 <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
-                <span className="text-[11px] text-foreground flex-1 truncate">{path}</span>
-                <span className="text-[11px] font-medium text-foreground">{count}</span>
+                <span className="text-[11px] text-foreground flex-1 truncate">{p.page_path}</span>
+                <span className="text-[11px] font-medium text-foreground">{p.view_count}</span>
               </div>
             ))}
             {topPages.length === 0 && <p className="text-[11px] text-muted-foreground">Aucune donnée</p>}
@@ -278,11 +196,11 @@ function OverviewTab({
             <MousePointer size={14} /> Produits les plus cliqués
           </h3>
           <div className="space-y-1">
-            {topProducts.map(([id, count], i) => (
-              <div key={id} className="flex items-center gap-1.5">
+            {topProducts.map((p, i) => (
+              <div key={i} className="flex items-center gap-1.5">
                 <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
-                <span className="text-[11px] text-foreground flex-1 truncate font-mono">{id.slice(0, 8)}…</span>
-                <span className="text-[11px] font-medium text-foreground">{count} clics</span>
+                <span className="text-[11px] text-foreground flex-1 truncate">{p.product_name}</span>
+                <span className="text-[11px] font-medium text-foreground">{p.click_count} clics</span>
               </div>
             ))}
             {topProducts.length === 0 && <p className="text-[11px] text-muted-foreground">Aucune donnée</p>}
@@ -294,13 +212,11 @@ function OverviewTab({
             <Store size={14} /> Boutiques les plus visitées
           </h3>
           <div className="space-y-1">
-            {topStores.map(([id, count], i) => (
-              <div key={id} className="flex items-center gap-1.5">
+            {topStores.map((s, i) => (
+              <div key={i} className="flex items-center gap-1.5">
                 <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
-                <span className="text-[11px] text-foreground flex-1 truncate">
-                  {storeNames.get(id) || id.slice(0, 8) + "…"}
-                </span>
-                <span className="text-[11px] font-medium text-foreground">{count} vues</span>
+                <span className="text-[11px] text-foreground flex-1 truncate">{s.store_name}</span>
+                <span className="text-[11px] font-medium text-foreground">{s.view_count} vues</span>
               </div>
             ))}
             {topStores.length === 0 && <p className="text-[11px] text-muted-foreground">Aucune donnée</p>}
@@ -376,8 +292,7 @@ function ProductTrackingTab({ period, since }: { period: string; since: string |
   const { data: orderItemsData } = useQuery({
     queryKey: ["analytics-order-items", period],
     queryFn: async () => {
-      let q = supabase.from("order_items").select("product_id, quantity, order_id");
-      const { data } = await q.limit(50000);
+      const { data } = await supabase.from("order_items").select("product_id, quantity, order_id").limit(50000);
       return data || [];
     },
   });
@@ -558,20 +473,61 @@ export default function AdminAnalyticsPage() {
   const days = PERIODS.find((p) => p.key === period)?.days || 30;
   const since = days > 0 ? new Date(Date.now() - days * 86400000).toISOString() : null;
 
-  const { data: events, isLoading } = useQuery({
-    queryKey: ["admin-analytics", period],
+  // Backend-aggregated KPIs
+  const { data: kpis, isLoading } = useQuery({
+    queryKey: ["admin-analytics-kpis", period],
     queryFn: async () => {
-      let q = fromTable("analytics_events")
-        .select("event_type, page_path, product_id, store_id, device_type, os, browser, is_pwa, session_id, user_id, duration_seconds, created_at, metadata")
-        .order("created_at", { ascending: false })
-        .limit(50000);
-      if (since) q = q.gte("created_at", since);
-      const { data } = await q;
-      return (data || []) as AnalyticsEvent[];
+      const { data } = await supabase.rpc("get_analytics_kpis", { p_since: since });
+      return data as any;
     },
   });
 
-  // PWA install count — total cumulative (no date filter)
+  // Daily traffic histogram
+  const { data: dailyTraffic } = useQuery({
+    queryKey: ["admin-analytics-daily", period],
+    queryFn: async () => {
+      const { data } = await supabase.rpc("get_analytics_daily_traffic", { p_since: since });
+      return (data || []).map((d: any) => ({ day: d.day, visitors: Number(d.visitors) }));
+    },
+  });
+
+  // Top products
+  const { data: topProducts } = useQuery({
+    queryKey: ["admin-analytics-top-products", period],
+    queryFn: async () => {
+      const { data } = await supabase.rpc("get_analytics_top_products", { p_since: since });
+      return (data || []).map((d: any) => ({ product_name: d.product_name, click_count: Number(d.click_count) }));
+    },
+  });
+
+  // Top stores
+  const { data: topStores } = useQuery({
+    queryKey: ["admin-analytics-top-stores", period],
+    queryFn: async () => {
+      const { data } = await supabase.rpc("get_analytics_top_stores", { p_since: since });
+      return (data || []).map((d: any) => ({ store_name: d.store_name, view_count: Number(d.view_count) }));
+    },
+  });
+
+  // Top pages
+  const { data: topPages } = useQuery({
+    queryKey: ["admin-analytics-top-pages", period],
+    queryFn: async () => {
+      const { data } = await supabase.rpc("get_analytics_top_pages", { p_since: since });
+      return (data || []).map((d: any) => ({ page_path: d.page_path, view_count: Number(d.view_count) }));
+    },
+  });
+
+  // Device/OS breakdown
+  const { data: devices } = useQuery({
+    queryKey: ["admin-analytics-devices", period],
+    queryFn: async () => {
+      const { data } = await supabase.rpc("get_analytics_devices", { p_since: since });
+      return data as any;
+    },
+  });
+
+  // PWA install count — total cumulative
   const { data: pwaCount } = useQuery({
     queryKey: ["admin-pwa-count-total"],
     queryFn: async () => {
@@ -580,7 +536,7 @@ export default function AdminAnalyticsPage() {
     },
   });
 
-  // PWA installs in current period (for sub-label)
+  // PWA installs in current period
   const { data: pwaPeriodCount } = useQuery({
     queryKey: ["admin-pwa-count-period", period],
     queryFn: async () => {
@@ -591,18 +547,6 @@ export default function AdminAnalyticsPage() {
       const { count } = await fromTable("pwa_installs").select("id", { count: "exact", head: true }).gte("created_at", since);
       return count || 0;
     },
-  });
-
-  // Store names for top stores display
-  const { data: storeNamesMap } = useQuery({
-    queryKey: ["admin-store-names"],
-    queryFn: async () => {
-      const { data } = await supabase.from("stores").select("id, name").limit(1000);
-      const map = new Map<string, string>();
-      (data || []).forEach((s) => map.set(s.id, s.name));
-      return map;
-    },
-    staleTime: 10 * 60_000,
   });
 
   return (
@@ -643,11 +587,14 @@ export default function AdminAnalyticsPage() {
             </TabsList>
             <TabsContent value="overview">
               <OverviewTab
-                events={events || []}
-                period={period}
+                kpis={kpis || {}}
+                dailyTraffic={dailyTraffic || []}
+                topProducts={topProducts || []}
+                topStores={topStores || []}
+                topPages={topPages || []}
+                devices={devices || {}}
                 pwaCount={pwaCount || 0}
                 pwaPeriodCount={pwaPeriodCount || 0}
-                storeNames={storeNamesMap || new Map()}
               />
             </TabsContent>
             <TabsContent value="products">
