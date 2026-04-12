@@ -473,11 +473,13 @@ export default function AdminAnalyticsPage() {
   const days = PERIODS.find((p) => p.key === period)?.days || 30;
   const since = days > 0 ? new Date(Date.now() - days * 86400000).toISOString() : null;
 
+  const rpc = (supabase as any).rpc.bind(supabase);
+
   // Backend-aggregated KPIs
   const { data: kpis, isLoading } = useQuery({
     queryKey: ["admin-analytics-kpis", period],
     queryFn: async () => {
-      const { data } = await supabase.rpc("get_analytics_kpis", { p_since: since });
+      const { data } = await rpc("get_analytics_kpis", { p_since: since });
       return data as any;
     },
   });
@@ -486,8 +488,8 @@ export default function AdminAnalyticsPage() {
   const { data: dailyTraffic } = useQuery({
     queryKey: ["admin-analytics-daily", period],
     queryFn: async () => {
-      const { data } = await supabase.rpc("get_analytics_daily_traffic", { p_since: since });
-      return (data || []).map((d: any) => ({ day: d.day, visitors: Number(d.visitors) }));
+      const { data } = await rpc("get_analytics_daily_traffic", { p_since: since });
+      return ((data || []) as any[]).map((d: any) => ({ day: d.day, visitors: Number(d.visitors) }));
     },
   });
 
@@ -495,8 +497,8 @@ export default function AdminAnalyticsPage() {
   const { data: topProducts } = useQuery({
     queryKey: ["admin-analytics-top-products", period],
     queryFn: async () => {
-      const { data } = await supabase.rpc("get_analytics_top_products", { p_since: since });
-      return (data || []).map((d: any) => ({ product_name: d.product_name, click_count: Number(d.click_count) }));
+      const { data } = await rpc("get_analytics_top_products", { p_since: since });
+      return ((data || []) as any[]).map((d: any) => ({ product_name: d.product_name, click_count: Number(d.click_count) }));
     },
   });
 
@@ -504,8 +506,8 @@ export default function AdminAnalyticsPage() {
   const { data: topStores } = useQuery({
     queryKey: ["admin-analytics-top-stores", period],
     queryFn: async () => {
-      const { data } = await supabase.rpc("get_analytics_top_stores", { p_since: since });
-      return (data || []).map((d: any) => ({ store_name: d.store_name, view_count: Number(d.view_count) }));
+      const { data } = await rpc("get_analytics_top_stores", { p_since: since });
+      return ((data || []) as any[]).map((d: any) => ({ store_name: d.store_name, view_count: Number(d.view_count) }));
     },
   });
 
@@ -513,8 +515,8 @@ export default function AdminAnalyticsPage() {
   const { data: topPages } = useQuery({
     queryKey: ["admin-analytics-top-pages", period],
     queryFn: async () => {
-      const { data } = await supabase.rpc("get_analytics_top_pages", { p_since: since });
-      return (data || []).map((d: any) => ({ page_path: d.page_path, view_count: Number(d.view_count) }));
+      const { data } = await rpc("get_analytics_top_pages", { p_since: since });
+      return ((data || []) as any[]).map((d: any) => ({ page_path: d.page_path, view_count: Number(d.view_count) }));
     },
   });
 
@@ -522,7 +524,7 @@ export default function AdminAnalyticsPage() {
   const { data: devices } = useQuery({
     queryKey: ["admin-analytics-devices", period],
     queryFn: async () => {
-      const { data } = await supabase.rpc("get_analytics_devices", { p_since: since });
+      const { data } = await rpc("get_analytics_devices", { p_since: since });
       return data as any;
     },
   });
