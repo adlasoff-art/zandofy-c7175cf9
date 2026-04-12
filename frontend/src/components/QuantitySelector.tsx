@@ -1,5 +1,6 @@
 import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/contexts/I18nContext";
 
 interface QuantitySelectorProps {
   value: number;
@@ -18,6 +19,8 @@ export function QuantitySelector({
   step = 1,
   hideMoqText = false,
 }: QuantitySelectorProps) {
+  const { t } = useI18n();
+
   const decrement = () => {
     const next = value - step;
     if (next >= min) onChange(next);
@@ -73,7 +76,7 @@ export function QuantitySelector({
       </div>
       {!hideMoqText && (
         <p className="text-xs text-muted-foreground">
-          Quantité minimale : <span className="font-medium text-foreground">{min} pièce{min > 1 ? "s" : ""}</span>
+          {t("qty.minQuantity")} : <span className="font-medium text-foreground">{min} {min > 1 ? t("qty.pieces") : t("qty.piece")}</span>
         </p>
       )}
     </div>
