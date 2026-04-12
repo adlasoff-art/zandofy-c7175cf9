@@ -3802,8 +3802,10 @@ export type Database = {
         Row: {
           browser: string | null
           created_at: string
+          device_id: string | null
           device_type: string | null
           id: string
+          last_seen_at: string | null
           os: string | null
           session_id: string
           user_id: string | null
@@ -3811,8 +3813,10 @@ export type Database = {
         Insert: {
           browser?: string | null
           created_at?: string
+          device_id?: string | null
           device_type?: string | null
           id?: string
+          last_seen_at?: string | null
           os?: string | null
           session_id: string
           user_id?: string | null
@@ -3820,8 +3824,10 @@ export type Database = {
         Update: {
           browser?: string | null
           created_at?: string
+          device_id?: string | null
           device_type?: string | null
           id?: string
+          last_seen_at?: string | null
           os?: string | null
           session_id?: string
           user_id?: string | null

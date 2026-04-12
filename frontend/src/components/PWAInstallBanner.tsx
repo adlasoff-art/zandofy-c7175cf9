@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Download, MoreVertical, AlertCircle } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { trackPWAInstall } from "@/hooks/use-analytics";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -27,6 +29,7 @@ export function PWAInstallBanner() {
   const [showAndroidFallback, setShowAndroidFallback] = useState(false);
   const [showFallbackMessage, setShowFallbackMessage] = useState(false);
   const { locale } = useI18n();
+  const { user } = useAuth();
 
   const isIOSDevice = isIOS();
 
@@ -63,6 +66,7 @@ export function PWAInstallBanner() {
       setIsInstalled(true);
       setDeferredPrompt(null);
       deferredPromptRef.current = null;
+      trackPWAInstall(user?.id);
     };
     window.addEventListener("appinstalled", installedHandler);
 
@@ -93,7 +97,10 @@ export function PWAInstallBanner() {
     try {
       await prompt.prompt();
       const { outcome } = await prompt.userChoice;
-      if (outcome === "accepted") setIsInstalled(true);
+      if (outcome === "accepted") {
+        setIsInstalled(true);
+        trackPWAInstall(user?.id);
+      }
     } catch {
       // prompt() can only be called once
     }
