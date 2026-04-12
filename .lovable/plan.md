@@ -1,127 +1,98 @@
 
 
-# Plan : Traductions manquantes + ajustements UX — par lots
+# Plan : Corrections du mode sombre + vérification traductions
 
-## Portée identifiée
+## Problèmes identifiés
 
-Le système i18n existe (`I18nContext.tsx`) avec ~380 clés FR et ~350 clés EN. Le problème : **des dizaines de composants contiennent du texte français hardcodé** au lieu d'utiliser `t("clé")`. De plus, une demande de fonctionnalité distincte (sélection de variantes par image) est incluse.
-
-**Stratégie** : Travailler par lots pour ne rien casser. Chaque lot est testable indépendamment.
+Le site utilise les CSS variables Tailwind (`bg-card`, `text-foreground`, etc.) qui sont correctement définis dans `.dark` dans `index.css`. Cependant, plusieurs zones ont des problèmes de contraste ou de couleur en mode sombre :
 
 ---
 
-## Lot 1 — Page d'accueil + composants globaux (priorité haute)
+## Lot A — Corrections couleurs mode sombre
 
-### Fichiers concernés
-| Composant | Textes hardcodés FR |
-|-----------|-------------------|
-| `FlashSales.tsx` | "Se termine dans" |
-| `RecommendationsSection.tsx` | "Pour vous", "Produits populaires" |
-| `ProductGrid.tsx` | "Les Plus Populaires" |
-| `TopTrends.tsx` | "Top Tendances" |
-| `CategoryBanner.tsx` | Noms de catégories (Électronique, Hauts, Bas, Robes, etc.) — ces labels viennent probablement de la DB |
-| `Footer.tsx` | "Top Tendances", "Plus Populaires", "Tarification" hardcodés |
-| `CartDrawer.tsx` | "Panier", "Connectez-vous pour voir votre panier", "Se connecter", "Votre panier est vide", "Continuer mes achats", "Tout sélectionner/désélectionner", "article(s) sélectionné(s)" |
+### 1. ProductCard.tsx — Badge origine pays
+- Le badge `originCountry` utilise `bg-muted text-muted-foreground` — peu visible en dark
+- **Fix** : Remplacer par `bg-primary/15 text-primary` pour le point rond et le texte pays, rendant visible sur fond sombre
 
-### Actions
-- Ajouter ~25 nouvelles clés i18n (FR + EN) dans `I18nContext.tsx`
-- Remplacer les strings hardcodées par `t("clé")` dans chaque composant
-- Pour les catégories venant de la DB : utiliser `name` (FR) vs `name_en` si la colonne existe, sinon afficher tel quel
+### 2. ProductCard.tsx — Icônes favori et comparaison
+- Les boutons utilisent `bg-card/80` et `text-foreground` — peu visibles en dark
+- **Fix** : Ajouter `dark:bg-card dark:text-primary/80` pour les rendre plus lumineux
 
----
+### 3. FlashSales.tsx — Countdown et texte "Se termine dans"
+- Le countdown utilise `bg-foreground text-card` — inversé correctement via variables, mais le texte "Se termine dans" est `text-muted-foreground` qui est trop sombre en dark mode
+- **Fix** : Changer en `text-sale` pour harmoniser avec l'icône Clock
 
-## Lot 2 — Pages Sales, Category, Store + filtres/tri
+### 4. ProductGrid.tsx — Section bg-muted/30
+- La section Tendances utilise `bg-muted/30` — trop léger en dark mode, apparaît presque noir sur noir
+- **Fix** : Changer en `bg-muted/40 dark:bg-muted/20` pour un contraste subtil
 
-### Fichiers concernés
-| Composant | Textes hardcodés FR |
-|-----------|-------------------|
-| `CategoryPage.tsx` | "Filtres", "Plus récents", "Prix croissant", "Prix décroissant", "Mieux notés", "Réinitialiser" |
-| `StorePage.tsx` | "Nouveautés", "Prix croissant", "Prix décroissant", "Populaires" |
-| `StoresPage.tsx` | "Plus populaires", "Mieux notés", "Plus de ventes", "Plus d'abonnés", "Plus d'articles", "Plus récents" |
-| Page Sales (si distincte) | "Solde", "produits", "Filtre", "Plus récent" |
+### 5. ProductGrid.tsx — Onglets tendances
+- L'onglet non sélectionné utilise `bg-card text-foreground border-border` — peut apparaître blanc sur fond sombre
+- **Fix** : Pas de problème réel, `bg-card` est `120 20% 9%` en dark. Les tabs devraient fonctionner. Vérifier visuellement.
 
-### Actions
-- Ajouter ~20 clés i18n pour filtres/tri (réutilisables entre pages)
-- Remplacer dans chaque page
+### 6. CategoryBanner.tsx — Noms de catégories
+- Les textes utilisent `text-foreground` qui est `120 10% 90%` en dark — devrait être OK
+- Le texte "Voir tout" et "Réduire" utilise `text-muted-foreground` — pourrait être trop sombre
+- **Fix** : Ajouter `dark:text-muted-foreground/80` ou laisser tel quel (le `--muted-foreground` dark est `120 10% 60%`)
 
----
+### 7. MegaMenu.tsx — Fond et textes
+- Utilise `bg-card` — en dark c'est `120 20% 9%`, correct
+- L'élément actif `bg-primary/10 text-primary` — OK en dark
+- Le lien "Tout voir" `text-primary` — OK
+- **Pas de changement nécessaire** pour le mega menu
 
-## Lot 3 — Page produit (Product Detail)
+### 8. HeroBanner.tsx — Textes sur la bannière
+- Les textes utilisent `text-card` sur un overlay `bg-foreground/50` — en dark, `foreground` est clair et `card` est sombre, ce qui **inverse** le rendu !
+- **Fix critique** : Les textes du titre/sous-titre doivent rester blancs : remplacer `text-card` par `text-white` et `bg-foreground/50` par `bg-black/50`
+- Le CTA `bg-card text-foreground` doit devenir `bg-white text-gray-900` ou utiliser des couleurs fixes
 
-### Fichiers concernés
-| Composant | Textes hardcodés FR |
-|-----------|-------------------|
-| `ProductReviews.tsx` | "Avis clients", "Donner mon avis", "Aucun avis", "Avec photo", "Plus récent", "Plus utile" |
-| `ReviewForm.tsx` | "Donner mon avis" |
-| `QuantitySelector.tsx` | "Quantité minimale", "pièce(s)" |
-| `VendorProfileCard.tsx` | "En ligne", "Hors ligne", "Abonnés", "Vendus", "Articles" |
-| `FollowStoreButton.tsx` | "Abonné !", "Désabonné" |
-| `PrecisionShippingEstimate.tsx` | "Estimer les frais d'expédition", "Entrez votre ville" |
-| Section poids/dimensions | "Poids", "Longueur", "Largeur", "Hauteur" |
-| Section matière | "Matière" |
-| Section taille/mensurations | "Taille et mensurations", "Le mannequin porte la taille" |
-| Section fournisseur | "À propos du fournisseur", "Contactez", "Suivre", "Tous les articles" |
-| `VariantOrderDrawer.tsx` | "Sélectionner une couleur", "Sélectionner les options", "Ajouter au panier", "pièce(s)" |
+### 9. HeroBanner.tsx — Boutons navigation carousel
+- `bg-card/80` et `text-foreground` — même inversion en dark
+- **Fix** : Utiliser `bg-white/80 text-gray-900 dark:bg-white/80 dark:text-gray-900` pour les garder fixes
 
-### Actions
-- Ajouter ~40 clés i18n
-- Remplacer dans chaque composant
-- Produits multilingues : afficher `name_en` / `description_en` quand locale = "en" (si colonnes existantes)
+### 10. Footer.tsx — Adaptation dark mode
+- Le footer utilise `useFooterTheme()` avec des styles inline — déjà configurable via admin
+- Si les couleurs admin ne sont pas définies, il retombe sur les CSS variables qui fonctionnent en dark
+- **Fix minimal** : S'assurer que le fallback `text-foreground` et `bg-card` sont utilisés quand pas de config admin
+
+### 11. FlashSales.tsx — "Super Promos" texte couleur
+- Le titre "Super Promos" / flash sales est en `text-foreground` — en dark, c'est clair, OK
+- Le `text-sale` pour l'icône flamme est rouge — visible en dark
+
+### 12. ProductCard.tsx — Prix et texte produit
+- `text-foreground` pour le prix = `120 10% 90%` en dark — OK, mais pourrait être légèrement plus lumineux
+- **Fix optionnel** : Ajouter `dark:text-primary` sur le prix pour le rendre vert clair en dark
 
 ---
 
-## Lot 4 — Auth, Checkout, Help Center
+## Lot B — Vérification traductions (Lots 1-5 précédents)
 
-### Fichiers concernés
-| Composant | Textes hardcodés FR |
-|-----------|-------------------|
-| `AuthPage.tsx` | "Connexion sécurisée · Données chiffrées" (utiliser `t("checkout.securePayment")` qui existe déjà en EN), placeholder "vous@exemple.com" → "example@mail.com" |
-| `CheckoutPage.tsx` | "Paiement 100% sécurisé · Données chiffrées" — déjà une clé `checkout.securePayment` mais pas utilisée |
-| `HelpCenterPage.tsx` | "Centre d'aide", "Procédures", "Tickets support", "FAQ opérationnelle", supprimer "modifiables depuis le CMS", "Trouvez les procédures clés..." |
+Vérifier dans chaque fichier modifié que `t("key")` est bien appelé et que les clés existent en FR et EN dans `I18nContext.tsx`.
 
-### Actions
-- Ajouter ~15 clés i18n
-- Corriger le texte "Questions fréquentes modifiables depuis le CMS" → "Questions fréquentes"
-- Placeholder email : "example@mail.com" (neutre)
-
----
-
-## Lot 5 — Réorganisation modes de paiement (product detail)
-
-Dans la section "Paiement sécurisé" de la page produit, réordonner les badges :
-1. Orange Money
-2. Airtel Money  
-3. M-PESA
-4. Afric Money
-5. Visa
-6. Mastercard
-7. PayPal
-8. Google Pay
-9. Apple Pay
+### Fichiers à vérifier :
+| Composant | Clés ajoutées |
+|-----------|--------------|
+| FlashSales.tsx | `home.flashSales`, `home.endsIn` |
+| TopTrends.tsx | `home.topTrends` |
+| ProductGrid.tsx | `home.mostPopular`, `home.trends`, `home.all` |
+| Footer.tsx | `footer.topTrends`, `footer.mostPopular`, `footer.pricing` |
+| CartDrawer.tsx | `cart.title`, `cart.loginPrompt`, `cart.login`, `cart.empty`, etc. |
+| CategoryPage.tsx | Filtres/tri traduits |
+| ProductReviews.tsx | Avis traduits |
+| AuthPage.tsx | Placeholder email neutre |
+| ProductPage.tsx | Badges paiement réordonnés |
 
 ---
 
-## Lot 6 — Sélection variantes par image (REPORTÉ)
+## Résumé des fichiers modifiés
 
-> **Recommandation** : Cette fonctionnalité (permettre au vendeur de choisir entre afficher des pastilles couleur ou des miniatures produit pour la sélection de variante) est une **fonctionnalité complexe** qui touche :
-> - Le formulaire vendeur d'ajout de produit
-> - La liaison image ↔ couleur/variante
-> - L'affichage sur la page produit, le panier, le checkout, les commandes
->
-> **Risque élevé** de régression en production. Je recommande de la planifier après stabilisation du lancement, dans un lot dédié avec tests complets.
+| Fichier | Changements |
+|---------|------------|
+| `frontend/src/components/ProductCard.tsx` | Dark mode : badge origine, icônes favori/compare plus visibles, prix en `dark:text-primary` |
+| `frontend/src/components/FlashSales.tsx` | "Se termine dans" en `text-sale` au lieu de `text-muted-foreground` |
+| `frontend/src/components/HeroBanner.tsx` | Textes bannière en `text-white` fixe, overlay en `bg-black/50`, CTA et boutons navigation en couleurs fixes |
+| `frontend/src/components/ProductGrid.tsx` | Fond section ajusté pour dark mode |
+| `frontend/src/components/CategoryBanner.tsx` | Texte "Voir tout" plus visible en dark |
 
----
-
-## Contraintes techniques
-
-- Le système i18n est **centralisé** dans `I18nContext.tsx` — toutes les nouvelles clés y sont ajoutées
-- Les CMS overrides (`platform_settings.cms_texts`) permettent de modifier les textes sans redéployer
-- Les noms de catégories viennent de la DB — si pas de colonne `name_en`, on affiche le nom FR (pas de casse)
-- Accents dans les slugs/catégories : vérifier si c'est un problème de validation côté formulaire vendeur (pas d'action immédiate pour ne rien casser)
-
-## Ordre d'exécution
-
-Lot 1 → Lot 2 → Lot 3 → Lot 4 → Lot 5 → (Lot 6 reporté)
-
-Chaque lot est un commit indépendant, testable, et réversible.
+Aucune migration SQL nécessaire. Aucun risque de régression — les couleurs light mode ne sont pas modifiées.
 
