@@ -100,11 +100,13 @@ function OverviewTab({
   events,
   period,
   pwaCount,
+  pwaPeriodCount,
   storeNames,
 }: {
   events: AnalyticsEvent[];
   period: string;
   pwaCount: number;
+  pwaPeriodCount: number;
   storeNames: Map<string, string>;
 }) {
   const allEvents = events;
@@ -176,7 +178,7 @@ function OverviewTab({
         <StatCard icon={Users} label="Connectés" value={uniqueUsers} />
         <StatCard icon={Globe} label="Anonymes" value={anonymousVisitors} />
         <StatCard icon={Clock} label="Durée moy." value={formatDuration(avgSessionDuration)} />
-        <StatCard icon={Download} label="PWA installées" value={pwaCount} sub={`(période: ${pwaInstalls.length})`} />
+        <StatCard icon={Download} label="PWA installées" value={pwaCount} sub={`(+${pwaPeriodCount} période)`} />
         <StatCard icon={MousePointer} label="Clics produits" value={productClicks.length} />
       </div>
 
@@ -569,13 +571,24 @@ export default function AdminAnalyticsPage() {
     },
   });
 
-  // PWA install count from dedicated table
+  // PWA install count — total cumulative (no date filter)
   const { data: pwaCount } = useQuery({
-    queryKey: ["admin-pwa-count", period],
+    queryKey: ["admin-pwa-count-total"],
     queryFn: async () => {
-      let q = fromTable("pwa_installs").select("id", { count: "exact", head: true });
-      if (since) q = q.gte("created_at", since);
-      const { count } = await q;
+      const { count } = await fromTable("pwa_installs").select("id", { count: "exact", head: true });
+      return count || 0;
+    },
+  });
+
+  // PWA installs in current period (for sub-label)
+  const { data: pwaPeriodCount } = useQuery({
+    queryKey: ["admin-pwa-count-period", period],
+    queryFn: async () => {
+      if (!since) {
+        const { count } = await fromTable("pwa_installs").select("id", { count: "exact", head: true });
+        return count || 0;
+      }
+      const { count } = await fromTable("pwa_installs").select("id", { count: "exact", head: true }).gte("created_at", since);
       return count || 0;
     },
   });
@@ -633,6 +646,7 @@ export default function AdminAnalyticsPage() {
                 events={events || []}
                 period={period}
                 pwaCount={pwaCount || 0}
+                pwaPeriodCount={pwaPeriodCount || 0}
                 storeNames={storeNamesMap || new Map()}
               />
             </TabsContent>

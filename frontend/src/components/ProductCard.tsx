@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useCompare } from "@/contexts/CompareContext";
 import { useI18n } from "@/contexts/I18nContext";
+import { useTrackProductClick } from "@/hooks/use-analytics";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { formatStoreYears } from "@/lib/store-years";
 import type { Product } from "@/services/api";
@@ -24,6 +25,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { t, formatPrice, locale } = useI18n();
   const { isInCompare, addToCompare, removeFromCompare } = useCompare();
+  const trackProductClick = useTrackProductClick();
   const wishlisted = isInWishlist(product.id);
   const compared = isInCompare(product.id);
   const [cartSuccess, setCartSuccess] = useState(false);
@@ -82,6 +84,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
       className="group relative bg-card overflow-hidden rounded-sm shadow-card hover:shadow-card-hover transition-shadow duration-200 ease-in-out border border-border/40 flex flex-col h-full"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={() => trackProductClick(product.id, "card")}
     >
       {/* Image — fixed aspect ratio, object-contain to avoid blur */}
       <div className="relative aspect-[3/4] overflow-hidden bg-muted shrink-0">

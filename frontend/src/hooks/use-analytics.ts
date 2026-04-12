@@ -13,6 +13,16 @@ function getSessionId(): string {
   return sid;
 }
 
+/** Persistent device identifier — survives session restarts */
+function getDeviceId(): string {
+  let did = localStorage.getItem("z_device_id");
+  if (!did) {
+    did = `d_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 12)}`;
+    localStorage.setItem("z_device_id", did);
+  }
+  return did;
+}
+
 function getDeviceType(): string {
   const w = window.innerWidth;
   if (w < 768) return "mobile";
@@ -86,8 +96,6 @@ export function useAnalyticsTracker() {
 
     const handleBeforeUnload = () => {
       const duration = Math.round((Date.now() - sessionStartRef.current) / 1000);
-      // sendBeacon uses anon key (no JWT), so user_id must be null
-      // to comply with RLS policy that checks user_id = auth.uid()
       const row: any = {
         session_id: getSessionId(),
         event_type: "session_end",
@@ -100,11 +108,27 @@ export function useAnalyticsTracker() {
         screen_height: window.screen.height,
         duration_seconds: duration,
       };
+      if (user?.id) row.user_id = user.id;
+
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/analytics_events`;
-      navigator.sendBeacon(
-        url + "?" + new URLSearchParams({ apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY }).toString(),
-        new Blob([JSON.stringify(row)], { type: "application/json" })
-      );
+
+      // Use fetch with keepalive instead of sendBeacon to include required headers
+      try {
+        fetch(url, {
+          method: "POST",
+          keepalive: true,
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": anonKey,
+            "Authorization": `Bearer ${anonKey}`,
+            "Prefer": "return=minimal",
+          },
+          body: JSON.stringify(row),
+        });
+      } catch {
+        // Last-resort silent fail
+      }
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -136,7 +160,6 @@ export function useAnalyticsTracker() {
 
     trackEvent("page_view", extra, user?.id);
 
-    // Auto-track store_view when visiting a store page
     if (storeMatch) {
       trackEvent("store_view", { store_id: storeMatch[1] }, user?.id);
     }
@@ -168,25 +191,25 @@ export function useTrackStoreView() {
 
 /**
  * Track PWA install persistently — writes to both analytics_events AND pwa_installs table.
- * The pwa_installs table uses session_id as unique key so it won't duplicate on updates.
+ * Uses device_id (localStorage) as unique key so one device = one install record.
  */
 export function trackPWAInstall(userId?: string) {
-  const sessionId = getSessionId();
+  const deviceId = getDeviceId();
   
-  // Track in analytics_events (existing behavior)
   trackEvent("pwa_install", {
     metadata: { standalone: isPWA(), os: getOS(), device: getDeviceType() },
   }, userId);
 
-  // Also persist in dedicated pwa_installs table (won't duplicate thanks to unique index)
   try {
     supabase.from("pwa_installs" as any).upsert({
-      session_id: sessionId,
+      device_id: deviceId,
+      session_id: getSessionId(),
       user_id: userId || null,
       device_type: getDeviceType(),
       os: getOS(),
       browser: getBrowser(),
-    }, { onConflict: "session_id" }).then(() => {});
+      last_seen_at: new Date().toISOString(),
+    }, { onConflict: "device_id" }).then(() => {});
   } catch {
     // Silent fail
   }
@@ -194,20 +217,22 @@ export function trackPWAInstall(userId?: string) {
 
 /**
  * Track PWA presence on every session start (for accurate active PWA user counts).
- * This ensures PWA installs persist across platform updates.
+ * Updates last_seen_at so we can distinguish active vs dormant installs.
  */
 export function trackPWAPresence(userId?: string) {
   if (!isPWA()) return;
   
-  const sessionId = getSessionId();
+  const deviceId = getDeviceId();
   try {
     supabase.from("pwa_installs" as any).upsert({
-      session_id: sessionId,
+      device_id: deviceId,
+      session_id: getSessionId(),
       user_id: userId || null,
       device_type: getDeviceType(),
       os: getOS(),
       browser: getBrowser(),
-    }, { onConflict: "session_id" }).then(() => {});
+      last_seen_at: new Date().toISOString(),
+    }, { onConflict: "device_id" }).then(() => {});
   } catch {
     // Silent fail
   }
