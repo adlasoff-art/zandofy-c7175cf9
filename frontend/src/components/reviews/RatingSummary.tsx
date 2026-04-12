@@ -1,4 +1,5 @@
 import { Star, Camera } from "lucide-react";
+import { useI18n } from "@/contexts/I18nContext";
 
 interface RatingSummaryProps {
   avgRating: number;
@@ -15,6 +16,7 @@ export function RatingSummary({
   activeFilter,
   onFilterChange,
 }: RatingSummaryProps) {
+  const { t } = useI18n();
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-6">
@@ -37,7 +39,7 @@ export function RatingSummary({
             ))}
           </div>
           <span className="text-xs text-muted-foreground">
-            {totalReviews} avis
+            {totalReviews} {t("reviews.noReviews")}
           </span>
         </div>
 
@@ -74,8 +76,8 @@ export function RatingSummary({
       {/* Filter pills */}
       <div className="flex gap-2 flex-wrap">
         {[
-          { key: "all" as const, label: "Tous" },
-          { key: "photos" as const, label: "Avec photos" },
+          { key: "all" as const, label: t("reviews.all") },
+          { key: "photos" as const, label: t("reviews.withPhotos") },
         ].map((f) => (
           <button
             key={f.key}
