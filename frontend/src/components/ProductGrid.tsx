@@ -4,6 +4,7 @@ import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { fetchProducts, fetchTrendTags, fetchCategories, type Product, type TrendTag } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { ChevronRight, TrendingUp, Flame, Users } from "lucide-react";
+import { useI18n } from "@/contexts/I18nContext";
 
 const PAGE_SIZE = 24;
 
@@ -15,6 +16,7 @@ const CATEGORY_SECTIONS = [
 ];
 
 export function ProductGrid() {
+  const { t } = useI18n();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
@@ -165,7 +167,7 @@ export function ProductGrid() {
   };
 
   const tabs = [
-    { key: "all", label: "Tout" },
+    { key: "all", label: t("home.all") },
     ...trendTags.map((t) => ({ key: t.id, label: t.nameFr })),
   ];
 
@@ -180,7 +182,7 @@ export function ProductGrid() {
           <Link to="/popular" className="flex items-center gap-2 mb-4 group cursor-pointer">
               <Flame size={18} className="text-orange-500" />
               <h2 className="text-base md:text-lg font-bold text-foreground group-hover:text-primary transition-colors">
-                Les Plus Populaires
+                {t("home.mostPopular")}
               </h2>
               <ChevronRight size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
             </Link>
@@ -223,7 +225,7 @@ export function ProductGrid() {
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp size={18} className="text-primary" />
           <h2 className="text-base md:text-lg font-bold text-foreground">
-            Tendances
+            {t("home.trends")}
           </h2>
           <ChevronRight size={16} className="text-muted-foreground" />
         </div>
@@ -275,10 +277,10 @@ export function ProductGrid() {
               disabled={loadingMore}
               className="px-10 py-2.5 text-sm font-medium border border-foreground text-foreground bg-card hover:bg-foreground hover:text-card transition-colors disabled:opacity-50"
             >
-              {loadingMore ? "Chargement..." : "Voir Plus"}
+              {loadingMore ? t("general.loadingMore") : t("general.seeMore")}
             </button>
           ) : (
-            <p className="text-xs text-muted-foreground">Vous avez tout vu ✨</p>
+            <p className="text-xs text-muted-foreground">{t("general.allSeen")}</p>
           )}
         </div>
       </div>

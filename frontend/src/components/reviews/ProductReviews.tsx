@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { RatingSummary } from "./RatingSummary";
 import { ReviewForm } from "./ReviewForm";
@@ -25,6 +26,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
   const [filter, setFilter] = useState<"all" | "photos" | number>("all");
   const [sortBy, setSortBy] = useState<"recent" | "helpful">("recent");
   const [page, setPage] = useState(1);
+  const { t } = useI18n();
 
   // Fetch rating summary via RPC
   const { data: summary } = useQuery({
@@ -129,7 +131,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
     <section className="mt-12 border-t border-border pt-8">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-foreground">
-          Avis clients ({summary?.total_reviews || 0})
+          {t("reviews.title")} ({summary?.total_reviews || 0})
         </h2>
         <Button
           variant="outline"
@@ -137,7 +139,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
           onClick={() => setShowForm(!showForm)}
         >
           <MessageSquarePlus size={16} className="mr-1" />
-          Donner mon avis
+          {t("reviews.writeReview")}
         </Button>
       </div>
 
@@ -166,8 +168,8 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="recent">Plus récents</SelectItem>
-            <SelectItem value="helpful">Plus utiles</SelectItem>
+            <SelectItem value="recent">{t("reviews.recentSort")}</SelectItem>
+            <SelectItem value="helpful">{t("reviews.helpfulSort")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -185,7 +187,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
             disabled={currentPage <= 1}
             onClick={() => setPage((p) => p - 1)}
           >
-            Précédent
+            {t("reviews.previous")}
           </Button>
           <span className="text-sm text-muted-foreground">
             {currentPage} / {totalPages}
@@ -196,7 +198,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
             disabled={currentPage >= totalPages}
             onClick={() => setPage((p) => p + 1)}
           >
-            Suivant
+            {t("reviews.next")}
           </Button>
         </div>
       )}

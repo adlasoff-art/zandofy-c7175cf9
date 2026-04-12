@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useI18n } from "@/contexts/I18nContext";
 import { Sparkles, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -14,6 +15,7 @@ interface RecommendedProduct {
 
 export function RecommendationsSection() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [products, setProducts] = useState<RecommendedProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -21,9 +23,7 @@ export function RecommendationsSection() {
     async function load() {
       setLoading(true);
       try {
-        // Get user profile for gender/age-based filtering
         let userGender: string | null = null;
-        let userAge: number | null = null;
 
         if (user) {
           const { data: profile } = await supabase
@@ -34,15 +34,9 @@ export function RecommendationsSection() {
 
           if (profile) {
             userGender = (profile as any).gender || null;
-            const dob = (profile as any).date_of_birth;
-            if (dob) {
-              const birth = new Date(dob);
-              userAge = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-            }
           }
         }
 
-        // Build query based on gender/profile
         let query = supabase
           .from("products")
           .select("id, name, price, rating, product_images(image_url, position), gender_target")
@@ -56,17 +50,14 @@ export function RecommendationsSection() {
         let filtered: any[];
 
         if (userGender === "female" || userGender === "femme") {
-          // Prioritize female products
           const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
           const unisex = products_list.filter(p => p.gender_target === "unisex" && !female.includes(p));
           filtered = [...female, ...unisex].slice(0, 8);
         } else if (userGender === "male" || userGender === "homme") {
-          // Prioritize male products
           const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
           const unisex = products_list.filter(p => p.gender_target === "unisex" && !male.includes(p));
           filtered = [...male, ...unisex].slice(0, 8);
         } else {
-          // Mixed: some female, some male, some unisex/gadgets
           const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
           const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
           const unisex = products_list.filter(p => !["female", "femme", "male", "homme"].includes(p.gender_target || ""));
@@ -77,7 +68,6 @@ export function RecommendationsSection() {
           ].slice(0, 8);
         }
 
-        // If not enough products, fill with whatever is available
         if (filtered.length < 8) {
           const existingIds = new Set(filtered.map(p => p.id));
           const remaining = products_list.filter(p => !existingIds.has(p.id));
@@ -133,7 +123,7 @@ export function RecommendationsSection() {
       <div className="flex items-center gap-2 mb-4">
         <Sparkles size={20} className="text-primary" />
         <h2 className="text-lg font-bold text-foreground">
-          {user ? "Pour vous" : "Produits populaires"}
+          {user ? t("home.forYou") : t("home.popularProducts")}
         </h2>
       </div>
 
