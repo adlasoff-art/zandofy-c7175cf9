@@ -66,17 +66,16 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
     setMeta("twitter:site", "@Zandofy");
     if (resolvedOgImage) setMeta("twitter:image", resolvedOgImage);
 
-    // Canonical
-    if (canonical) {
-      const url = canonical.startsWith("http") ? canonical : `${SITE_URL}${canonical}`;
-      let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
-      if (!link) {
-        link = document.createElement("link");
-        link.rel = "canonical";
-        document.head.appendChild(link);
-      }
-      link.href = url;
+    // Canonical — always set, fallback to current pathname
+    const canonicalPath = canonical || window.location.pathname;
+    const canonicalUrl = canonicalPath.startsWith("http") ? canonicalPath : `${SITE_URL}${canonicalPath}`;
+    let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "canonical";
+      document.head.appendChild(link);
     }
+    link.href = canonicalUrl;
 
     // hreflang tags
     const lang = seoConfig.site_language || "fr";
