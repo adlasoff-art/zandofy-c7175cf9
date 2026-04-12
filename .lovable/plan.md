@@ -1,98 +1,66 @@
 
 
-# Plan : Corrections du mode sombre + vérification traductions
+# Diagnostic Analytics — Problèmes identifiés et corrections
 
-## Problèmes identifiés
+## Résumé des bugs trouvés
 
-Le site utilise les CSS variables Tailwind (`bg-card`, `text-foreground`, etc.) qui sont correctement définis dans `.dark` dans `index.css`. Cependant, plusieurs zones ont des problèmes de contraste ou de couleur en mode sombre :
+### Bug 1 : Clics produits toujours à 0
+**Cause** : Le hook `useTrackProductClick()` est **défini** dans `use-analytics.ts` mais **jamais appelé** nulle part. Aucun composant (ProductCard, grilles, etc.) ne l'importe ni ne l'utilise. Les événements `product_click` ne sont donc jamais enregistrés.
 
----
+**Fix** : Importer et appeler `useTrackProductClick` dans `ProductCard.tsx` quand l'utilisateur clique sur un produit (navigation vers la page produit).
 
-## Lot A — Corrections couleurs mode sombre
+### Bug 2 : PWA installées — compteur qui descend (le plus critique)
+**Causes multiples** :
 
-### 1. ProductCard.tsx — Badge origine pays
-- Le badge `originCountry` utilise `bg-muted text-muted-foreground` — peu visible en dark
-- **Fix** : Remplacer par `bg-primary/15 text-primary` pour le point rond et le texte pays, rendant visible sur fond sombre
+1. **`trackPWAInstall()` n'est jamais appelé** — La fonction existe dans `use-analytics.ts` mais n'est importée/utilisée dans **aucun composant**. Ni dans `PWAInstallBanner.tsx` (quand `appinstalled` se déclenche), ni ailleurs. Donc la table `pwa_installs` ne reçoit des données que via `trackPWAPresence()`.
 
-### 2. ProductCard.tsx — Icônes favori et comparaison
-- Les boutons utilisent `bg-card/80` et `text-foreground` — peu visibles en dark
-- **Fix** : Ajouter `dark:bg-card dark:text-primary/80` pour les rendre plus lumineux
+2. **`trackPWAPresence()` utilise `session_id` comme clé unique** — Le `session_id` est stocké dans `sessionStorage`, qui se réinitialise à chaque nouvelle session navigateur/PWA. Chaque ouverture de la PWA crée un **nouveau** `session_id` → une nouvelle ligne dans `pwa_installs`. Ce n'est pas un compteur d'installations, c'est un compteur de **sessions PWA**.
 
-### 3. FlashSales.tsx — Countdown et texte "Se termine dans"
-- Le countdown utilise `bg-foreground text-card` — inversé correctement via variables, mais le texte "Se termine dans" est `text-muted-foreground` qui est trop sombre en dark mode
-- **Fix** : Changer en `text-sale` pour harmoniser avec l'icône Clock
+3. **Le dashboard filtre par date** — `pwa_installs` est filtré avec `created_at >= since`. Avec le filtre "24h", seules les sessions PWA des dernières 24h comptent. Le nombre descend naturellement quand des utilisateurs n'ouvrent pas la PWA pendant la période sélectionnée.
 
-### 4. ProductGrid.tsx — Section bg-muted/30
-- La section Tendances utilise `bg-muted/30` — trop léger en dark mode, apparaît presque noir sur noir
-- **Fix** : Changer en `bg-muted/40 dark:bg-muted/20` pour un contraste subtil
+**Fix** : Refondre le système de comptage PWA :
+- Appeler `trackPWAInstall()` dans `PWAInstallBanner.tsx` lors de l'événement `appinstalled`
+- Utiliser un identifiant **persistant** (basé sur `localStorage` ou fingerprint navigateur) au lieu de `session_id` pour la table `pwa_installs` — un appareil = une ligne
+- Le filtre date ne devrait s'appliquer qu'aux **nouvelles installations**, pas au compteur total
+- Ajouter un champ `last_seen_at` mis à jour par `trackPWAPresence()` pour distinguer installations actives vs inactives
+- Le widget "PWA installées" doit montrer le **total cumulé** (sans filtre date) + les actives récentes
 
-### 5. ProductGrid.tsx — Onglets tendances
-- L'onglet non sélectionné utilise `bg-card text-foreground border-border` — peut apparaître blanc sur fond sombre
-- **Fix** : Pas de problème réel, `bg-card` est `120 20% 9%` en dark. Les tabs devraient fonctionner. Vérifier visuellement.
+### Bug 3 : Durée moyenne à 0 secondes
+**Cause probable** : L'événement `session_end` est envoyé via `navigator.sendBeacon()` avec seulement le `apikey` en query param. PostgREST nécessite aussi le header `Authorization` ou le header `Prefer` peut poser problème. De plus, le header `Content-Type` envoyé par sendBeacon avec un Blob n'inclut pas le `Prefer: return=minimal` requis par PostgREST pour les inserts — les données `session_end` **n'arrivent probablement pas en base**.
 
-### 6. CategoryBanner.tsx — Noms de catégories
-- Les textes utilisent `text-foreground` qui est `120 10% 90%` en dark — devrait être OK
-- Le texte "Voir tout" et "Réduire" utilise `text-muted-foreground` — pourrait être trop sombre
-- **Fix** : Ajouter `dark:text-muted-foreground/80` ou laisser tel quel (le `--muted-foreground` dark est `120 10% 60%`)
+**Fix** : Modifier le sendBeacon pour inclure les headers nécessaires. Utiliser un `fetch(..., { keepalive: true })` au lieu de `sendBeacon` pour pouvoir envoyer les headers requis :
+```typescript
+fetch(url, {
+  method: "POST",
+  keepalive: true,
+  headers: {
+    "Content-Type": "application/json",
+    "apikey": anonKey,
+    "Authorization": "Bearer " + anonKey,
+    "Prefer": "return=minimal",
+  },
+  body: JSON.stringify(row),
+});
+```
 
-### 7. MegaMenu.tsx — Fond et textes
-- Utilise `bg-card` — en dark c'est `120 20% 9%`, correct
-- L'élément actif `bg-primary/10 text-primary` — OK en dark
-- Le lien "Tout voir" `text-primary` — OK
-- **Pas de changement nécessaire** pour le mega menu
-
-### 8. HeroBanner.tsx — Textes sur la bannière
-- Les textes utilisent `text-card` sur un overlay `bg-foreground/50` — en dark, `foreground` est clair et `card` est sombre, ce qui **inverse** le rendu !
-- **Fix critique** : Les textes du titre/sous-titre doivent rester blancs : remplacer `text-card` par `text-white` et `bg-foreground/50` par `bg-black/50`
-- Le CTA `bg-card text-foreground` doit devenir `bg-white text-gray-900` ou utiliser des couleurs fixes
-
-### 9. HeroBanner.tsx — Boutons navigation carousel
-- `bg-card/80` et `text-foreground` — même inversion en dark
-- **Fix** : Utiliser `bg-white/80 text-gray-900 dark:bg-white/80 dark:text-gray-900` pour les garder fixes
-
-### 10. Footer.tsx — Adaptation dark mode
-- Le footer utilise `useFooterTheme()` avec des styles inline — déjà configurable via admin
-- Si les couleurs admin ne sont pas définies, il retombe sur les CSS variables qui fonctionnent en dark
-- **Fix minimal** : S'assurer que le fallback `text-foreground` et `bg-card` sont utilisés quand pas de config admin
-
-### 11. FlashSales.tsx — "Super Promos" texte couleur
-- Le titre "Super Promos" / flash sales est en `text-foreground` — en dark, c'est clair, OK
-- Le `text-sale` pour l'icône flamme est rouge — visible en dark
-
-### 12. ProductCard.tsx — Prix et texte produit
-- `text-foreground` pour le prix = `120 10% 90%` en dark — OK, mais pourrait être légèrement plus lumineux
-- **Fix optionnel** : Ajouter `dark:text-primary` sur le prix pour le rendre vert clair en dark
+### Bug 4 : Widget "PWA installées" en haut = toujours 0
+**Cause** : Le widget du haut (`StatCard` "PWA installées") affiche `pwaCount` qui vient de `pwa_installs.count`. Mais la politique RLS a été modifiée (migration `20260410`) pour restreindre la lecture : seul l'admin avec `has_role(auth.uid(), 'admin')` peut lire toutes les lignes. Si la requête utilise `fromTable` (qui utilise le client Supabase avec le token de l'utilisateur connecté), cela devrait fonctionner pour un admin. Mais il faut vérifier que l'admin connecté a bien le rôle dans `user_roles`.
 
 ---
 
-## Lot B — Vérification traductions (Lots 1-5 précédents)
+## Plan de corrections
 
-Vérifier dans chaque fichier modifié que `t("key")` est bien appelé et que les clés existent en FR et EN dans `I18nContext.tsx`.
+| # | Fichier | Action |
+|---|---------|--------|
+| 1 | `ProductCard.tsx` | Importer `useTrackProductClick` et l'appeler au clic sur le lien produit |
+| 2 | `PWAInstallBanner.tsx` | Importer et appeler `trackPWAInstall(userId)` dans le handler `appinstalled` et après `outcome === "accepted"` |
+| 3 | `use-analytics.ts` | Remplacer `session_id` par un `device_id` persistant (localStorage) dans `trackPWAInstall` et `trackPWAPresence`. Ajouter un upsert sur `device_id` au lieu de `session_id`. |
+| 4 | `use-analytics.ts` | Remplacer `sendBeacon` par `fetch({ keepalive: true })` avec les headers PostgREST corrects pour `session_end` |
+| 5 | `AdminAnalyticsPage.tsx` | Widget "PWA installées" : afficher le total **sans filtre date** pour le compteur principal, et le nombre de la période entre parenthèses |
+| 6 | Migration SQL | Ajouter colonne `device_id TEXT` + `last_seen_at TIMESTAMPTZ` à `pwa_installs`, créer un unique index sur `device_id`, mettre à jour la politique d'upsert |
 
-### Fichiers à vérifier :
-| Composant | Clés ajoutées |
-|-----------|--------------|
-| FlashSales.tsx | `home.flashSales`, `home.endsIn` |
-| TopTrends.tsx | `home.topTrends` |
-| ProductGrid.tsx | `home.mostPopular`, `home.trends`, `home.all` |
-| Footer.tsx | `footer.topTrends`, `footer.mostPopular`, `footer.pricing` |
-| CartDrawer.tsx | `cart.title`, `cart.loginPrompt`, `cart.login`, `cart.empty`, etc. |
-| CategoryPage.tsx | Filtres/tri traduits |
-| ProductReviews.tsx | Avis traduits |
-| AuthPage.tsx | Placeholder email neutre |
-| ProductPage.tsx | Badges paiement réordonnés |
-
----
-
-## Résumé des fichiers modifiés
-
-| Fichier | Changements |
-|---------|------------|
-| `frontend/src/components/ProductCard.tsx` | Dark mode : badge origine, icônes favori/compare plus visibles, prix en `dark:text-primary` |
-| `frontend/src/components/FlashSales.tsx` | "Se termine dans" en `text-sale` au lieu de `text-muted-foreground` |
-| `frontend/src/components/HeroBanner.tsx` | Textes bannière en `text-white` fixe, overlay en `bg-black/50`, CTA et boutons navigation en couleurs fixes |
-| `frontend/src/components/ProductGrid.tsx` | Fond section ajusté pour dark mode |
-| `frontend/src/components/CategoryBanner.tsx` | Texte "Voir tout" plus visible en dark |
-
-Aucune migration SQL nécessaire. Aucun risque de régression — les couleurs light mode ne sont pas modifiées.
+### Risques
+- **Aucun risque de régression** sur le front : on ajoute des appels de tracking manquants et on corrige le transport
+- **Migration SQL** : ajout de colonnes nullable + index, sans impact sur les données existantes
+- Le compteur PWA redémarrera à un chiffre plus précis après correction
 
