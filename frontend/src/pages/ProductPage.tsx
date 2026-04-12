@@ -774,30 +774,30 @@ export default function ProductPage() {
                   <button className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left hover:bg-muted/50 transition-colors">
                     <ShieldCheck size={18} className="text-primary shrink-0" />
                     <div className="flex-1">
-                      <span className="font-medium text-foreground">Paiement sécurisé</span>
-                      <span className="text-muted-foreground ml-1">· Confidentialité garantie</span>
+                      <span className="font-medium text-foreground">{t("product.securePayment")}</span>
+                      <span className="text-muted-foreground ml-1">· {t("product.confidentiality")}</span>
                     </div>
                     <ChevronRight size={14} className="text-muted-foreground" />
                   </button>
                 </DialogTrigger>
                 <DialogContent>
-                  <DialogHeader><DialogTitle className="flex items-center gap-2"><ShieldCheck size={18} /> Sécurité d'achat</DialogTitle></DialogHeader>
+                  <DialogHeader><DialogTitle className="flex items-center gap-2"><ShieldCheck size={18} /> {t("product.shoppingSecurity")}</DialogTitle></DialogHeader>
                   <div className="space-y-4 text-sm">
                     <div>
-                      <h4 className="font-semibold text-foreground mb-2">Méthodes de paiement acceptées</h4>
+                      <h4 className="font-semibold text-foreground mb-2">{t("product.acceptedMethods")}</h4>
                       <div className="flex flex-wrap gap-2">
-                        {["PayPal","Visa","MasterCard","Apple Pay","Google Pay"].map(m => (
+                        {["Orange Money","Airtel Money","M-PESA","Afric Money","Visa","MasterCard","PayPal","Google Pay","Apple Pay"].map(m => (
                           <span key={m} className="px-3 py-1.5 bg-muted rounded-sm text-xs font-medium text-foreground">{m}</span>
                         ))}
                       </div>
                     </div>
                     <div>
-                      <h4 className="font-semibold text-foreground mb-2">Certifications de sécurité</h4>
+                      <h4 className="font-semibold text-foreground mb-2">{t("product.securityCertifications")}</h4>
                       <div className="space-y-2">
                         {[
-                          { label: "MasterCard SecureCode", desc: "Protection renforcée par authentification 3D Secure" },
-                          { label: "Verified by Visa", desc: "Vérification d'identité pour chaque transaction" },
-                          { label: "Cryptage SSL 256-bit", desc: "Vos données sont chiffrées de bout en bout" },
+                          { label: "MasterCard SecureCode", desc: t("product.cert.mastercard") },
+                          { label: "Verified by Visa", desc: t("product.cert.visa") },
+                          { label: "SSL 256-bit", desc: t("product.cert.ssl") },
                         ].map(c => (
                           <div key={c.label} className="flex items-start gap-2 p-2 bg-secondary/50 rounded-sm">
                             <BadgeCheck size={14} className="text-primary mt-0.5 shrink-0" />
@@ -807,11 +807,11 @@ export default function ProductPage() {
                       </div>
                     </div>
                     <div>
-                      <h4 className="font-semibold text-foreground mb-2">Logistique sécurisée</h4>
+                      <h4 className="font-semibold text-foreground mb-2">{t("product.secureLogistics")}</h4>
                       <div className="space-y-1 text-muted-foreground">
-                        <p className="flex items-center gap-2"><Check size={13} className="text-primary" /> Suivi en temps réel de votre colis</p>
-                        <p className="flex items-center gap-2"><Check size={13} className="text-primary" /> Remboursement total si colis endommagé</p>
-                        <p className="flex items-center gap-2"><Check size={13} className="text-primary" /> Assurance transport incluse</p>
+                        <p className="flex items-center gap-2"><Check size={13} className="text-primary" /> {t("product.logistics.tracking")}</p>
+                        <p className="flex items-center gap-2"><Check size={13} className="text-primary" /> {t("product.logistics.refund")}</p>
+                        <p className="flex items-center gap-2"><Check size={13} className="text-primary" /> {t("product.logistics.insurance")}</p>
                       </div>
                     </div>
                   </div>
