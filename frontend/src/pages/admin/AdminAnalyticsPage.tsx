@@ -100,11 +100,13 @@ function OverviewTab({
   events,
   period,
   pwaCount,
+  pwaPeriodCount,
   storeNames,
 }: {
   events: AnalyticsEvent[];
   period: string;
   pwaCount: number;
+  pwaPeriodCount: number;
   storeNames: Map<string, string>;
 }) {
   const allEvents = events;
@@ -176,7 +178,7 @@ function OverviewTab({
         <StatCard icon={Users} label="Connectés" value={uniqueUsers} />
         <StatCard icon={Globe} label="Anonymes" value={anonymousVisitors} />
         <StatCard icon={Clock} label="Durée moy." value={formatDuration(avgSessionDuration)} />
-        <StatCard icon={Download} label="PWA installées" value={pwaCount} sub={`(période: ${pwaInstalls.length})`} />
+        <StatCard icon={Download} label="PWA installées" value={pwaCount} sub={`(+${pwaPeriodCount} période)`} />
         <StatCard icon={MousePointer} label="Clics produits" value={productClicks.length} />
       </div>
 
@@ -644,6 +646,7 @@ export default function AdminAnalyticsPage() {
                 events={events || []}
                 period={period}
                 pwaCount={pwaCount || 0}
+                pwaPeriodCount={pwaPeriodCount || 0}
                 storeNames={storeNamesMap || new Map()}
               />
             </TabsContent>
