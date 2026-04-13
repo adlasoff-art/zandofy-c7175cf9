@@ -479,7 +479,8 @@ export default function AdminAnalyticsPage() {
   const { data: kpis, isLoading } = useQuery({
     queryKey: ["admin-analytics-kpis", period],
     queryFn: async () => {
-      const { data } = await rpc("get_analytics_kpis", { p_since: since });
+      const { data, error } = await rpc("get_analytics_kpis", { p_since: since });
+      if (error) console.error("[Analytics] get_analytics_kpis failed:", error);
       return data as any;
     },
   });
@@ -488,7 +489,8 @@ export default function AdminAnalyticsPage() {
   const { data: dailyTraffic } = useQuery({
     queryKey: ["admin-analytics-daily", period],
     queryFn: async () => {
-      const { data } = await rpc("get_analytics_daily_traffic", { p_since: since });
+      const { data, error } = await rpc("get_analytics_daily_traffic", { p_since: since });
+      if (error) console.error("[Analytics] get_analytics_daily_traffic failed:", error);
       return ((data || []) as any[]).map((d: any) => ({ day: d.day, visitors: Number(d.visitors) }));
     },
   });
@@ -497,7 +499,8 @@ export default function AdminAnalyticsPage() {
   const { data: topProducts } = useQuery({
     queryKey: ["admin-analytics-top-products", period],
     queryFn: async () => {
-      const { data } = await rpc("get_analytics_top_products", { p_since: since });
+      const { data, error } = await rpc("get_analytics_top_products", { p_since: since });
+      if (error) console.error("[Analytics] get_analytics_top_products failed:", error);
       return ((data || []) as any[]).map((d: any) => ({ product_name: d.product_name, click_count: Number(d.click_count) }));
     },
   });
@@ -506,7 +509,8 @@ export default function AdminAnalyticsPage() {
   const { data: topStores } = useQuery({
     queryKey: ["admin-analytics-top-stores", period],
     queryFn: async () => {
-      const { data } = await rpc("get_analytics_top_stores", { p_since: since });
+      const { data, error } = await rpc("get_analytics_top_stores", { p_since: since });
+      if (error) console.error("[Analytics] get_analytics_top_stores failed:", error);
       return ((data || []) as any[]).map((d: any) => ({ store_name: d.store_name, view_count: Number(d.view_count) }));
     },
   });
@@ -515,7 +519,8 @@ export default function AdminAnalyticsPage() {
   const { data: topPages } = useQuery({
     queryKey: ["admin-analytics-top-pages", period],
     queryFn: async () => {
-      const { data } = await rpc("get_analytics_top_pages", { p_since: since });
+      const { data, error } = await rpc("get_analytics_top_pages", { p_since: since });
+      if (error) console.error("[Analytics] get_analytics_top_pages failed:", error);
       return ((data || []) as any[]).map((d: any) => ({ page_path: d.page_path, view_count: Number(d.view_count) }));
     },
   });
@@ -524,7 +529,8 @@ export default function AdminAnalyticsPage() {
   const { data: devices } = useQuery({
     queryKey: ["admin-analytics-devices", period],
     queryFn: async () => {
-      const { data } = await rpc("get_analytics_devices", { p_since: since });
+      const { data, error } = await rpc("get_analytics_devices", { p_since: since });
+      if (error) console.error("[Analytics] get_analytics_devices failed:", error);
       return data as any;
     },
   });
