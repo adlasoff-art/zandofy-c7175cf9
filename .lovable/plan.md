@@ -1,38 +1,82 @@
 
 
-## Correction immédiate — Forcer un push vers GitHub
+# Correction urgente : produits invisibles sur les pages boutiques
 
-### Diagnostic
+## Diagnostic
 
-Le paramètre **"Collaborators only"** sur les Pull Requests dans les settings GitHub du repo bloquait effectivement les pushes de Lovable. En le passant à **"All users"**, le blocage est levé.
+**Deux problemes identifies :**
 
-### Ce que je vais faire
+1. **Probleme de code (certain)** : `StorePage.tsx` appelle `fetchProducts()` sans filtre `store_id`, recupere TOUS les produits publies, puis filtre cote client. Avec la limite par defaut de 1000 lignes de Supabase, des produits peuvent etre manques. Plus important : c'est inefficace et fragile.
 
-Deux modifications minimales pour déclencher les deux pipelines :
+2. **Probleme de RLS probable (production)** : Les politiques RLS sur votre base de donnees **production** (`vpt...yxf`) peuvent avoir ete modifiees lors du hardening de securite. Je ne peux pas verifier cette base depuis Lovable Cloud. Il est possible que la table `stores` ait une politique SELECT restrictive sur production qui bloque les jointures dans `PRODUCT_SELECT`.
 
-**1. `frontend/src/main.tsx` (ligne 43)** — Mettre à jour le timestamp du commentaire deploy proof :
+## Plan de correction
+
+### Etape 1 — Ajouter le filtre `storeId` a `fetchProducts`
+
+Modifier `frontend/src/services/api.ts` pour accepter un parametre `storeId` dans `fetchProducts()` et filtrer directement cote serveur :
+
+```typescript
+// Ajouter dans les params
+storeId?: string;
+
+// Ajouter dans la query
+if (params?.storeId) {
+  query = query.eq("store_id", params.storeId);
+}
 ```
-// Zandofy deploy proof — 2026-04-13T03:10Z
+
+### Etape 2 — Modifier `StorePage.tsx` pour utiliser le filtre serveur
+
+Remplacer :
+```typescript
+const allProducts = await fetchProducts();
+return allProducts.filter((p) => p.storeId === id);
 ```
-Cela déclenche un **nouveau déploiement Vercel**.
 
-**2. `frontend/supabase/config.toml` (ligne 1)** — Mettre à jour le timestamp du commentaire :
+Par :
+```typescript
+return await fetchProducts({ storeId: id });
 ```
-# Zandofy — deploy proof 2026-04-13T03:10Z
+
+### Etape 3 — Verifier les politiques RLS (migration SQL)
+
+Creer une migration qui s'assure que les bonnes politiques existent pour la lecture publique :
+
+```sql
+-- Garantir l'acces public en lecture aux produits publies
+DROP POLICY IF EXISTS "Public read published products" ON public.products;
+CREATE POLICY "Public read published products" ON public.products
+  FOR SELECT TO anon, authenticated
+  USING (publish_status = 'published');
+
+-- Garantir l'acces public en lecture aux boutiques
+DROP POLICY IF EXISTS "Anon read stores" ON public.stores;
+CREATE POLICY "Anon read stores" ON public.stores
+  FOR SELECT TO anon USING (true);
+
+DROP POLICY IF EXISTS "Authenticated read stores" ON public.stores;  
+CREATE POLICY "Authenticated read stores" ON public.stores
+  FOR SELECT TO authenticated USING (true);
 ```
-Cela déclenche un **nouveau run GitHub Actions** (Deploy Edge Functions).
 
-### Résultat attendu
+**Important** : Cette migration doit egalement etre executee sur votre base de donnees **production** (`vpt...yxf`) et **staging** (`wgi...wete`) via le SQL Editor de Supabase.
 
-- Un commit visible sur GitHub (branche `develop`)
-- Un nouveau déploiement Vercel
-- Un nouveau run GitHub Actions "Deploy Edge Functions"
+### Etape 4 — Fichier SQL pour synchronisation manuelle
 
-### Migration SQL
+Conformement a la regle #6 du Safety Policy, un fichier SQL telechareable sera fourni pour que vous puissiez l'appliquer sur vos deux instances Supabase (staging et production).
 
-La migration `frontend/supabase/migrations/20260413023000_fix_error_reports_and_analytics_grants.sql` est déjà en place avec le bon contenu. Elle sera poussée avec ce commit.
+---
 
-### Temps estimé
+## Ce que vous devez faire manuellement apres mon intervention
 
-Moins d'une minute de changement. Vous pourrez vérifier sur GitHub et Vercel dans les 2-3 minutes qui suivent, puis aller dormir.
+1. **Appliquer le SQL** sur vos bases staging et production via le SQL Editor Supabase
+2. **Verifier** que les produits s'affichent sur une page boutique cote Vercel
+3. **Remettre la regle GitHub** une fois confirme
+
+## Fichiers modifies
+
+- `frontend/src/services/api.ts` — ajout du filtre `storeId`
+- `frontend/src/pages/StorePage.tsx` — utilisation du filtre serveur
+- Migration SQL pour les politiques RLS
 
