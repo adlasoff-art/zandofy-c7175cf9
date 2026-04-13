@@ -1,74 +1,86 @@
 
-Objectif: rendre la page Analytics fiable, lisible et cohérente avant toute présentation à des partenaires, tout en corrigeant définitivement l’affichage des noms produits.
+Objectif immédiat : arrêter la confusion entre GitHub, Vercel et les déploiements backend, puis forcer une preuve visible et contrôlée que les changements Zandofy partent bien du projet.
 
-Constat confirmé après lecture du code
-1. Le problème de nom produit n’est pas réellement corrigé dans l’état actuel du code: dans `AdminAnalyticsPage.tsx`, le widget “Produits les plus cliqués” affiche encore `id.slice(0, 8)` au lieu du nom.
-2. La page Analytics calcule presque tout côté navigateur à partir d’une lecture brute de `analytics_events` triée par date. Cette approche est fragile pour de l’historique:
-   - elle dépend d’un fetch limité (`limit(50000)` dans le code, avec en pratique un plafonnement backend possible),
-   - elle ne travaille que sur la fenêtre la plus récente des événements récupérés,
-   - donc les chiffres peuvent bouger à la baisse quand de nouveaux événements entrent et que d’anciens sortent de la fenêtre.
-3. L’histogramme “Trafic journalier” groupe seulement les jours présents dans les événements chargés. Il ne génère pas une vraie série de jours pour 48h / 7j / 30j / 90j / 1 an / Tout. C’est pour cela que vous pouvez voir une seule “bougie”.
-4. Le widget “Connectés” est trompeur: aujourd’hui il compte des `user_id` distincts vus dans les événements de la période, pas les personnes réellement en ligne maintenant. Il n’est donc pas comparable au module Utilisateurs.
-5. “PWA installées” et “PWA vs Navigateur” ne mesurent pas la même chose:
-   - `PWA installées` = appareils installés enregistrés dans `pwa_installs`,
-   - `PWA vs Navigateur` = sessions analytics marquées `is_pwa` sur la période.
-   Les deux peuvent être justes séparément, mais leur libellé actuel prête à confusion.
-6. Il y a en plus un bloqueur de build indépendant de l’Analytics: les fonctions mail Deno utilisent `npm:nodemailer@6.9.16` sans configuration de dépendance compatible. Tant que ce build n’est pas assaini, certains changements peuvent ne pas se propager proprement.
+Ce que j’ai confirmé dans le dépôt actuel
+- Les correctifs existent bien dans le code actuel :
+  - `frontend/src/main.tsx`
+  - `frontend/src/services/error-reporter.ts`
+  - `frontend/src/pages/admin/AdminAnalyticsPage.tsx`
+- La migration récente existe, mais elle est dans `supabase/migrations/20260413001453_a651a131-5963-4be8-a67f-8b273b75b4a4.sql`.
+- Le frontend déployé sur Vercel part de la racine du repo :
+  - `vercel.json` lance `npm run build`
+  - `package.json` racine lance `vite build`
+  - `vite.config.ts` racine pointe vers `frontend`
+  Donc un vrai commit sur `frontend/src/**` doit produire un nouveau déploiement Vercel.
+- Le seul workflow GitHub présent est `.github/workflows/deploy-edge-functions.yml`, et il ne surveille pas `frontend/src/**` ni `supabase/migrations/**`.
 
-Plan de correction
-1. Sécuriser d’abord le pipeline de build
-   - corriger la configuration des fonctions mail concernées (`notify-order-status` et `run-campaign`) pour que la build reparte proprement,
-   - revalider le build frontend ensuite.
-   But: éviter qu’un fix Analytics soit “écrit” mais non livré.
+Diagnostic clair
+1. L’absence de nouveau run GitHub Actions n’est pas une preuve que rien n’a changé : ce workflow ne se déclenche que sur les Edge Functions/config.
+2. L’absence de nouveau déploiement Vercel, elle, devient anormale seulement si un nouveau commit GitHub a réellement été créé sur `develop`.
+3. La boucle `main` / `develop` que vous voyez est cohérente avec un merge d’historique sans différence de fichiers :
+```text
+main:    A --- B
+develop: A --- B --- M
+```
+`M` peut être un commit de merge visible par GitHub, mais avec zéro fichier modifié. Cela crée une impression de boucle sans vrai changement produit.
+4. Il y a aussi une dérive de structure :
+- vos règles projet disent que `frontend/supabase/migrations/` est la source de vérité
+- la migration actuelle a été ajoutée dans `supabase/migrations/`
 
-2. Remplacer les calculs bruts côté frontend par des agrégations backend dédiées
-   - créer des fonctions SQL / vues de lecture pour l’Analytics admin,
-   - calculer au backend les KPI, les tops et l’histogramme à partir de tout l’historique filtré, pas d’un simple lot d’événements récents,
-   - conserver toutes les modifications via migrations versionnées, sans édition manuelle.
+Plan de correction propre
+1. Forcer une preuve frontend visible
+- Ajouter un changement strictement inoffensif et identifiable dans `frontend/src/main.tsx` ou un autre fichier frontend réellement pris en compte par le build.
+- But : provoquer un nouveau commit GitHub et un nouveau déploiement Vercel sur `develop`.
 
-3. Corriger la logique des métriques pour qu’elles soient stables et cohérentes
-   - `Visiteurs` = sessions uniques sur la période,
-   - `Anonymes` = sessions uniques sans compte sur la période,
-   - remplacer `Connectés` par une métrique cohérente:
-     - recommandé: `Sessions authentifiées`, pour que `sessions authentifiées + anonymes = visiteurs`,
-     - et/ou ajouter une vraie carte `En ligne maintenant` basée sur la présence réelle.
-   - clarifier la PWA:
-     - `PWA installées` = appareils installés cumulés,
-     - renommer le bloc comparatif en `Sessions PWA vs Sessions Web`,
-     - option recommandée: ajouter aussi `PWA actives sur la période` via `last_seen_at`.
+2. Forcer une preuve backend visible
+- Ajouter un changement strictement inoffensif dans l’arbre réellement utilisé par le workflow backend, c’est-à-dire `frontend/supabase/...`.
+- But : provoquer un nouveau run GitHub Actions “Deploy Edge Functions (Multi-Env)” sur `develop`.
 
-4. Refondre l’histogramme journalier
-   - générer une vraie série de dates avec un bucket par jour sur l’intervalle choisi,
-   - remplir les jours sans trafic avec zéro,
-   - garantir:
-     - 24h = 1 bucket journalier,
-     - 48h = 2,
-     - 7j = 7,
-     - 30j = 30,
-     - 90j = 90,
-     - 1 an = 365,
-     - Tout = de la première date disponible à aujourd’hui,
-   - corriger aussi le découpage temporel pour éviter un simple `created_at.slice(0,10)` trop naïf.
+3. Corriger l’emplacement de la migration
+- Replacer la migration SQL dans `frontend/supabase/migrations/` avec le même contenu validé.
+- On ne change pas la logique SQL ; on corrige l’emplacement pour respecter la convention Zandofy et rendre GitHub cohérent.
 
-5. Corriger définitivement les noms produits
-   - faire remonter les “top produits” avec jointure vers `products.name` directement dans l’agrégation backend,
-   - garder un fallback sur l’ID tronqué seulement si le produit n’existe plus,
-   - appliquer la même logique cohérente que pour les boutiques.
+4. Vérifier sans refaire de ping-pong entre branches
+- GitHub : vérifier la présence du nouveau commit sur `develop`
+- Vercel : vérifier que ce commit déclenche un nouveau déploiement `develop`
+- Actions : vérifier qu’un nouveau run apparaît pour le workflow backend
+- Ensuite seulement, décider si un vrai merge `develop -> main` est justifié
 
-6. Mettre à jour `AdminAnalyticsPage.tsx`
-   - brancher la page sur les nouvelles sources agrégées,
-   - conserver les filtres actuels (24h, 48h, 7j, 30j, 3 mois, 1 an, Tout),
-   - améliorer les libellés pour qu’ils reflètent exactement ce qui est mesuré.
+5. Éviter que cela se reproduise
+- Ne plus utiliser une PR vide `main -> develop` ou `develop -> main` comme preuve de bon fonctionnement
+- Utiliser à la place :
+  - le SHA du commit
+  - l’horodatage du commit
+  - le déploiement Vercel lié à ce SHA
+  - le run GitHub Actions lié à ce SHA
+
+Résultat attendu
+- Vous verrez un mouvement concret côté GitHub.
+- Vous verrez un nouveau déploiement Vercel si la synchronisation GitHub fonctionne bien.
+- Vous verrez un nouveau run GitHub Actions pour les Edge Functions.
+- Si l’un des trois manque encore, on saura précisément quel maillon est en panne :
+  - pas de commit = problème de sync vers GitHub
+  - commit sans Vercel = problème d’intégration Vercel
+  - commit frontend sans Actions = normal
+  - commit `frontend/supabase/**` sans Actions = problème workflow GitHub
 
 Détails techniques
-- Migration probable:
-  - fonctions SQL de lecture Analytics admin,
-  - éventuellement index complémentaires sur `analytics_events(created_at, event_type, session_id, user_id, product_id, store_id)` si nécessaire.
-- Pas de changement d’infra, de domaines, de Docker, de variables d’environnement ni de workflow Git.
-- Les tables existantes restent la source de vérité; on fiabilise surtout la façon de les agréger et de les afficher.
+```text
+Frontend déployé par Vercel
+repo root
+  -> package.json (build)
+  -> vite.config.ts (root = frontend)
+  -> frontend/src/**
 
-Résultat attendu après implémentation
-- le produit cliqué s’affiche par son vrai nom,
-- les compteurs ne “dégringolent” plus artificiellement sur 30 jours à cause d’une fenêtre partielle,
-- l’histogramme montre bien un point/barre par jour sur la période choisie,
-- la différence entre visiteurs, anonymes, sessions authentifiées, présence en ligne et PWA devient explicite et défendable.
+Backend déployé par GitHub Actions
+.github/workflows/deploy-edge-functions.yml
+  -> trigger: frontend/supabase/functions/**, frontend/supabase/config.toml, supabase/functions/**, supabase/config.toml
+  -> execution: working-directory = frontend
+  -> déploiement effectif: frontend/supabase/functions/**
+```
+
+Point important
+- Un changement dans `supabase/migrations/**` n’est pas un bon signal de test pour GitHub Actions ni pour Vercel.
+- Pour tester proprement, il faut deux touches séparées :
+  - une dans `frontend/src/**` pour Vercel
+  - une dans `frontend/supabase/**` pour le workflow backend
