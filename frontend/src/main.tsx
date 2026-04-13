@@ -40,6 +40,7 @@ window.addEventListener("error", (event) => {
   }
 });
 
+// Zandofy deploy proof — 2026-04-13T02:30Z
 createRoot(document.getElementById("root")!).render(<App />);
 
 // ─── Global error reporting (non-React errors) ──────────────────
