@@ -1,45 +1,23 @@
 
 
-# QR Code : design moderne + lien fixe vers zandofy.com
+# Transcription audio MP3
 
-## Changements
+## Approche
 
-### 1. Remplacer `qrcode.react` par `react-qrcode-logo`
+1. Copier le fichier `user-uploads://0413.MP3` vers `/tmp/0413.mp3`
+2. Utiliser le script Lovable AI avec le modèle **google/gemini-2.5-flash** (qui supporte l'audio/multimodal) pour transcrire le contenu
+3. Envoyer l'audio encodé en base64 au modèle avec une instruction de transcription français/lingala
+4. Sauvegarder le texte transcrit dans `/mnt/documents/transcription.txt`
 
-La librairie `qrcode.react` (QRCodeSVG) ne supporte pas les coins arrondis sur les "finder patterns" (les 3 grands carres). La librairie `react-qrcode-logo` offre nativement :
-- `qrStyle="dots"` — modules ronds au lieu de carres
-- `eyeRadius` — bords arrondis sur les 3 finder patterns
-- Logo au centre avec excavation
+## Détail technique
 
-### 2. Modifier `FloatingActions.tsx`
+- Le modèle Gemini 2.5 Flash supporte les entrées multimodales (audio inclus)
+- L'instruction demandera de transcrire fidèlement tout ce qui est dit, en gardant les mots français et lingala tels quels
+- Le résultat sera un fichier texte téléchargeable
 
-- Installer `react-qrcode-logo`
-- Remplacer `QRCodeSVG` par `QRCode` de `react-qrcode-logo`
-- Fixer la valeur du QR code a `https://zandofy.com` (au lieu de `window.location.origin`)
-- Appliquer le style moderne : dots ronds, coins arrondis, logo central
+## Fichiers produits
 
-```tsx
-import { QRCode } from "react-qrcode-logo";
+- `/mnt/documents/transcription.txt` — le texte transcrit
 
-<QRCode
-  value="https://zandofy.com"
-  size={140}
-  qrStyle="dots"
-  eyeRadius={12}
-  logoImage="/favicon.ico"
-  logoWidth={28}
-  logoHeight={28}
-  removeQrCodeBehindLogo
-  ecLevel="M"
-/>
-```
-
-### 3. Desinstaller `qrcode.react`
-
-Retirer l'ancienne dependance du `package.json`.
-
-## Fichiers modifies
-
-- `frontend/src/components/FloatingActions.tsx`
-- `package.json` (ajout `react-qrcode-logo`, retrait `qrcode.react`)
+Aucune modification du projet Zandofy n'est nécessaire.
 
