@@ -1,57 +1,38 @@
 
 
-# Plan : Correction des problèmes d'indexation Google Search Console
+## Correction immédiate — Forcer un push vers GitHub
 
-## Problèmes identifiés (depuis la capture)
+### Diagnostic
 
-| Problème | Pages | Cause probable |
-|----------|-------|----------------|
-| Bloquée par robots.txt | 4 | Le sitemap référence des URLs qui sont aussi dans `Disallow` du robots.txt (contradiction) |
-| Page en double sans URL canonique | 1 | Certaines pages n'ont pas de balise `<link rel="canonical">` — le composant `SEOHead` ne l'ajoute que si `canonical` est passé en prop |
-| Introuvable (404) | 5 | Probablement des anciennes URLs ou des pages SPA non reconnues par le crawler |
-| Exclue par balise noindex | 5 | Pages admin/vendor/dashboard qui ont un meta robots injecté dynamiquement |
+Le paramètre **"Collaborators only"** sur les Pull Requests dans les settings GitHub du repo bloquait effectivement les pushes de Lovable. En le passant à **"All users"**, le blocage est levé.
 
-## Corrections proposées
+### Ce que je vais faire
 
-### 1. robots.txt — Supprimer la contradiction sitemap/disallow
+Deux modifications minimales pour déclencher les deux pipelines :
 
-Le sitemap dynamique (edge function) pourrait inclure des URLs `/admin`, `/vendor`, etc. qui sont bloquées par `robots.txt`. Cela crée une contradiction que Google signale.
+**1. `frontend/src/main.tsx` (ligne 43)** — Mettre à jour le timestamp du commentaire deploy proof :
+```
+// Zandofy deploy proof — 2026-04-13T03:10Z
+```
+Cela déclenche un **nouveau déploiement Vercel**.
 
-**Action** : Vérifier l'edge function `generate-sitemap` pour s'assurer qu'elle n'inclut PAS les chemins bloqués. De plus, le `robots.txt` référence **deux sitemaps** — le statique `/sitemap.xml` n'existe probablement pas (aucun fichier trouvé dans `public/`), ce qui cause une 404.
+**2. `frontend/supabase/config.toml` (ligne 1)** — Mettre à jour le timestamp du commentaire :
+```
+# Zandofy — deploy proof 2026-04-13T03:10Z
+```
+Cela déclenche un **nouveau run GitHub Actions** (Deploy Edge Functions).
 
-**Fix robots.txt** :
-- Retirer la ligne `Sitemap: https://zandofy.com/sitemap.xml` (fichier inexistant)
-- Garder uniquement le sitemap dynamique de l'edge function
+### Résultat attendu
 
-### 2. Canonical manquant — Ajouter un fallback automatique
+- Un commit visible sur GitHub (branche `develop`)
+- Un nouveau déploiement Vercel
+- Un nouveau run GitHub Actions "Deploy Edge Functions"
 
-Le composant `SEOHead` n'ajoute la balise canonical que si la prop `canonical` est fournie. Certaines pages (ex: checkout, certaines sous-pages) ne passent pas cette prop.
+### Migration SQL
 
-**Fix `SEOHead.tsx`** : Ajouter un fallback automatique — si `canonical` n'est pas fourni, utiliser `window.location.pathname` comme canonical par défaut. Cela garantit que **toute page** a une URL canonique.
+La migration `frontend/supabase/migrations/20260413023000_fix_error_reports_and_analytics_grants.sql` est déjà en place avec le bon contenu. Elle sera poussée avec ce commit.
 
-### 3. Pages 404 — Pas d'action code nécessaire
+### Temps estimé
 
-Les 404 sont probablement des URLs mortes indexées avant (anciennes routes supprimées ou URLs mal formées). La SPA routing Lovable gère déjà le fallback vers `index.html`. Ces pages disparaîtront naturellement du rapport GSC une fois que Google les re-crawle.
-
-**Recommandation** : Inspecter les URLs exactes en 404 dans GSC pour vérifier qu'elles ne correspondent pas à des routes valides cassées.
-
-### 4. Pages noindex — Comportement attendu
-
-Les 5 pages exclues par `noindex` sont probablement les routes `/admin`, `/vendor`, `/dashboard`, etc. C'est le comportement voulu — ces pages ne doivent pas être indexées.
-
-**Pas d'action** nécessaire.
-
----
-
-## Fichiers modifiés
-
-| Fichier | Action |
-|---------|--------|
-| `frontend/public/robots.txt` | Retirer la ligne du sitemap statique inexistant |
-| `frontend/src/components/SEOHead.tsx` | Ajouter un canonical par défaut basé sur `window.location.pathname` quand aucun canonical n'est fourni |
-
-## Risques
-
-- **Aucun risque de régression** : on corrige un fichier statique et on ajoute un fallback non-cassant dans SEOHead
-- Le canonical automatique utilise le pathname courant, ce qui est la pratique standard recommandée par Google
+Moins d'une minute de changement. Vous pourrez vérifier sur GitHub et Vercel dans les 2-3 minutes qui suivent, puis aller dormir.
 

@@ -6924,6 +6924,38 @@ export type Database = {
         Args: { months_limit?: number }
         Returns: number
       }
+      get_analytics_daily_traffic: {
+        Args: { p_since?: string }
+        Returns: {
+          day: string
+          visitors: number
+        }[]
+      }
+      get_analytics_devices: { Args: { p_since?: string }; Returns: Json }
+      get_analytics_kpis: { Args: { p_since?: string }; Returns: Json }
+      get_analytics_top_pages: {
+        Args: { p_limit?: number; p_since?: string }
+        Returns: {
+          page_path: string
+          view_count: number
+        }[]
+      }
+      get_analytics_top_products: {
+        Args: { p_limit?: number; p_since?: string }
+        Returns: {
+          click_count: number
+          product_id: string
+          product_name: string
+        }[]
+      }
+      get_analytics_top_stores: {
+        Args: { p_limit?: number; p_since?: string }
+        Returns: {
+          store_id: string
+          store_name: string
+          view_count: number
+        }[]
+      }
       get_category_top_sellers: {
         Args: { p_category_id: string; p_limit?: number }
         Returns: {

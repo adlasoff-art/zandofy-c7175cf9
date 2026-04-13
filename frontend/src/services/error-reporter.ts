@@ -1,8 +1,25 @@
 /**
  * Captures error context and reports it to the error_reports table.
  * Works for both authenticated and unauthenticated users.
+ * Includes rate-limiting (max 5 reports/min) and fallback via REST API.
  */
 import { supabase } from "@/integrations/supabase/client";
+
+// ─── Rate limiter ────────────────────────────────────────────────
+const RATE_WINDOW_MS = 60_000; // 1 minute
+const MAX_REPORTS_PER_WINDOW = 5;
+const reportTimestamps: number[] = [];
+
+function isRateLimited(): boolean {
+  const now = Date.now();
+  // Remove timestamps older than the window
+  while (reportTimestamps.length > 0 && reportTimestamps[0] < now - RATE_WINDOW_MS) {
+    reportTimestamps.shift();
+  }
+  if (reportTimestamps.length >= MAX_REPORTS_PER_WINDOW) return true;
+  reportTimestamps.push(now);
+  return false;
+}
 
 interface ErrorReport {
   error: Error;
@@ -38,6 +55,12 @@ function isPWA(): boolean {
 
 export async function reportError({ error, componentStack }: ErrorReport) {
   try {
+    // Rate-limit: avoid flooding the DB with repeated errors
+    if (isRateLimited()) {
+      console.warn("[ErrorReporter] Rate-limited, skipping report");
+      return;
+    }
+
     // Get current user info (may be null)
     const { data: { session } } = await supabase.auth.getSession();
     let userRole: string | null = null;
@@ -67,7 +90,38 @@ export async function reportError({ error, componentStack }: ErrorReport) {
 
     await (supabase as any).from("error_reports").insert(payload);
   } catch (e) {
-    // Silently fail — we don't want error reporting to cause more errors
-    console.warn("[ErrorReporter] Failed to report error:", e);
+    // Fallback: try direct REST insert if Supabase client failed
+    try {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/error_reports`;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      if (url && anonKey) {
+        const fallbackPayload = {
+          error_message: error.message || String(error),
+          error_stack: error.stack?.slice(0, 4000) ?? null,
+          component_stack: componentStack?.slice(0, 4000) ?? null,
+          page_path: window.location.pathname,
+          browser: detectBrowser(),
+          os: detectOS(),
+          screen_width: window.innerWidth,
+          screen_height: window.innerHeight,
+          is_pwa: isPWA(),
+          severity: "error",
+        };
+        fetch(url, {
+          method: "POST",
+          keepalive: true,
+          headers: {
+            "Content-Type": "application/json",
+            apikey: anonKey,
+            Authorization: `Bearer ${anonKey}`,
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify(fallbackPayload),
+        }).catch(() => {});
+      }
+    } catch {
+      // Final silent fail
+    }
+    console.warn("[ErrorReporter] Primary report failed, fallback attempted:", e);
   }
 }
