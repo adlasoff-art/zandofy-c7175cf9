@@ -163,6 +163,7 @@ export async function fetchProducts(params?: {
   sale?: boolean;
   trendTagId?: string;
   categoryId?: string;
+  storeId?: string;
   orderBy?: "popular" | "newest" | "default";
 }): Promise<Product[]> {
   let query = supabase
@@ -182,6 +183,9 @@ export async function fetchProducts(params?: {
   }
   if (params?.categoryId) {
     query = query.eq("category_id", params.categoryId);
+  }
+  if (params?.storeId) {
+    query = query.eq("store_id", params.storeId);
   }
   if (params?.trendTagId) {
     query = (query as any).eq("trend_tag_id", params.trendTagId);

@@ -108,8 +108,7 @@ export default function StorePage() {
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ["store-products", id],
     queryFn: async () => {
-      const allProducts = await fetchProducts();
-      return allProducts.filter((p) => p.storeId === id);
+      return await fetchProducts({ storeId: id });
     },
     enabled: !!id,
   });
