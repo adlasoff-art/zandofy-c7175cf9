@@ -1,34 +1,45 @@
 
 
-# Correction : produits invisibles sur les pages boutiques
+# QR Code : design moderne + lien fixe vers zandofy.com
 
-## Probleme identifie
+## Changements
 
-Le bug est dans `StorePage.tsx` ligne 111. Le code passe le parametre URL brut (`id`) a `fetchProducts({ storeId: id })`. Or ce parametre peut etre un **slug** (ex: `ma-boutique`) et non un UUID. La requete fait alors `WHERE store_id = 'ma-boutique'` qui ne retourne jamais rien.
+### 1. Remplacer `qrcode.react` par `react-qrcode-logo`
 
-La requete de chargement du store (lignes 87-103) resout correctement slug → UUID, mais le chargement des produits (lignes 108-114) ne reutilise pas le store resolu.
+La librairie `qrcode.react` (QRCodeSVG) ne supporte pas les coins arrondis sur les "finder patterns" (les 3 grands carres). La librairie `react-qrcode-logo` offre nativement :
+- `qrStyle="dots"` — modules ronds au lieu de carres
+- `eyeRadius` — bords arrondis sur les 3 finder patterns
+- Logo au centre avec excavation
 
-## Correction
+### 2. Modifier `FloatingActions.tsx`
 
-**Fichier** : `frontend/src/pages/StorePage.tsx`
+- Installer `react-qrcode-logo`
+- Remplacer `QRCodeSVG` par `QRCode` de `react-qrcode-logo`
+- Fixer la valeur du QR code a `https://zandofy.com` (au lieu de `window.location.origin`)
+- Appliquer le style moderne : dots ronds, coins arrondis, logo central
 
-Modifier le query des produits pour utiliser `store.id` (UUID resolu) au lieu du parametre URL brut :
+```tsx
+import { QRCode } from "react-qrcode-logo";
 
-```typescript
-const { data: products, isLoading: productsLoading } = useQuery({
-  queryKey: ["store-products", store?.id],
-  queryFn: async () => {
-    return await fetchProducts({ storeId: store!.id });
-  },
-  enabled: !!store?.id,
-});
+<QRCode
+  value="https://zandofy.com"
+  size={140}
+  qrStyle="dots"
+  eyeRadius={12}
+  logoImage="/favicon.ico"
+  logoWidth={28}
+  logoHeight={28}
+  removeQrCodeBehindLogo
+  ecLevel="M"
+/>
 ```
 
-C'est un changement de 3 lignes. Aucune migration SQL necessaire — le probleme est purement cote code.
+### 3. Desinstaller `qrcode.react`
 
-## Impact
+Retirer l'ancienne dependance du `package.json`.
 
-- Corrige l'affichage "0 articles" sur toutes les boutiques accedees par slug
-- Les boutiques accedees par UUID directement fonctionnaient peut-etre deja
-- Aucun risque de regression
+## Fichiers modifies
+
+- `frontend/src/components/FloatingActions.tsx`
+- `package.json` (ajout `react-qrcode-logo`, retrait `qrcode.react`)
 
