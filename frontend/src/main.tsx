@@ -42,6 +42,25 @@ window.addEventListener("error", (event) => {
 
 createRoot(document.getElementById("root")!).render(<App />);
 
+// ─── Global error reporting (non-React errors) ──────────────────
+import("@/services/error-reporter").then(({ reportError }) => {
+  // Catch unhandled JS errors that are NOT chunk-load errors
+  window.addEventListener("error", (event) => {
+    if (isChunkLoadError(event.error)) return; // already handled above
+    if (!event.error) return;
+    reportError({ error: event.error });
+  });
+
+  // Catch unhandled promise rejections that are NOT chunk-load errors
+  window.addEventListener("unhandledrejection", (event) => {
+    if (isChunkLoadError(event.reason)) return; // already handled above
+    const err = event.reason instanceof Error
+      ? event.reason
+      : new Error(String(event.reason));
+    reportError({ error: err });
+  });
+});
+
 // Register service worker for PWA
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
