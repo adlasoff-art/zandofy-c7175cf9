@@ -106,11 +106,11 @@ export default function StorePage() {
   const isBannedStore = !!(store as any)?.is_banned;
 
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ["store-products", id],
+    queryKey: ["store-products", store?.id],
     queryFn: async () => {
-      return await fetchProducts({ storeId: id });
+      return await fetchProducts({ storeId: store!.id });
     },
-    enabled: !!id,
+    enabled: !!store?.id,
   });
 
   // Fetch reviews for all store products
