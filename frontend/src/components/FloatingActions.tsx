@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { ArrowUp, Smartphone, X } from "lucide-react";
 import { useUIConfig } from "@/contexts/UIConfigContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCode } from "react-qrcode-logo";
 
 export function FloatingActions() {
   const [showScroll, setShowScroll] = useState(false);
@@ -16,7 +16,7 @@ export function FloatingActions() {
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
-  const siteUrl = window.location.origin;
+
 
   return (
     <>
@@ -79,16 +79,16 @@ export function FloatingActions() {
             {/* Real QR Code */}
             <div className="flex justify-center mb-2">
               <div className="p-3 bg-background rounded-xl border border-border">
-                <QRCodeSVG
-                  value={siteUrl}
+                <QRCode
+                  value="https://zandofy.com"
                   size={140}
-                  level="M"
-                  imageSettings={{
-                    src: "/favicon.ico",
-                    height: 28,
-                    width: 28,
-                    excavate: true,
-                  }}
+                  qrStyle="dots"
+                  eyeRadius={12}
+                  logoImage="/favicon.ico"
+                  logoWidth={28}
+                  logoHeight={28}
+                  removeQrCodeBehindLogo
+                  ecLevel="M"
                 />
               </div>
             </div>
