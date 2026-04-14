@@ -759,9 +759,7 @@ export default function AdminSettingsPage() {
                 if (navigator.serviceWorker?.controller) {
                   navigator.serviceWorker.controller.postMessage({ type: "CLEAR_CACHES" });
                 }
-                // Clear React Query cache
-                const { QueryClient } = require("@tanstack/react-query");
-                // Use window reload as the simplest way to clear in-memory cache
+                // Reload clears React Query in-memory cache
                 toast({ title: "Cache purgé", description: "Le cache navigateur a été vidé. La page va se recharger." });
                 setTimeout(() => window.location.reload(), 1000);
               }}
