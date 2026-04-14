@@ -1,59 +1,43 @@
 
 
-# Correction du cache produits — implémentation sûre
-
-## Résumé
-
-3 changements isolés, chacun indépendant des autres. Aucune migration SQL. Aucun fichier sensible (Docker, env, routing) touché.
-
-## Analyse de risque
-
-| Changement | Risque | Mitigation |
-|---|---|---|
-| `staleTime: 0` sur StorePage | Aucun — ne touche que cette requête | Les autres pages gardent le staleTime global de 5 min |
-| Exclusion produits du cache SW | Très faible — ajoute une condition `return` avant le cache API | Les requêtes produits passent simplement en network-only |
-| Panneau admin cache | Aucun — ajout d'UI, pas de modification existante | Utilise les messages SW déjà supportés (`CLEAR_CACHES`, `REFRESH_CATALOG`) |
-
-**Aucun impact** sur : l'authentification, le panier, les paiements, le chat, les commandes, le SEO, le PWA install prompt.
+# Améliorations Analytics Dashboard
 
 ## Changements
 
-### 1. `frontend/src/pages/StorePage.tsx` (lignes 108-114)
+### 1. Ajouter le filtre "1h" dans les périodes
+Ajouter `{ key: "1h", label: "1h", days: 0.042 }` (1/24 de jour) dans le tableau `PERIODS` de `AdminAnalyticsPage.tsx`. Adapter le calcul de `since` pour supporter les fractions de jour.
 
-Ajouter `staleTime: 0` et `refetchOnMount: 'always'` à la requête produits existante. Rien d'autre ne change dans ce fichier.
+### 2. Pagination sur les widgets Top Products, Top Stores, Top Pages
+- Modifier les 3 fonctions SQL (`get_analytics_top_products`, `get_analytics_top_stores`, `get_analytics_top_pages`) : passer `p_limit` de 10 a 50 par defaut
+- Dans `OverviewTab`, ajouter un etat de pagination local pour chaque widget (10 items par page, navigation prev/next en haut a droite du widget)
+- Afficher le numero de la tranche (ex: "1-10 sur 47")
 
-```tsx
-const { data: products, isLoading: productsLoading } = useQuery({
-  queryKey: ["store-products", store?.id],
-  queryFn: async () => {
-    return await fetchProducts({ storeId: store!.id });
-  },
-  enabled: !!store?.id,
-  staleTime: 0,
-  refetchOnMount: 'always',
-});
+### 3. Nouveau KPI "Comptes créés"
+- Ajouter dans la fonction SQL `get_analytics_kpis` un nouveau champ `accounts_created` qui compte les profils crees dans la periode :
+```sql
+'accounts_created', (SELECT COUNT(*) FROM profiles WHERE (p_since IS NULL OR created_at >= p_since))
 ```
+- Ajouter un `StatCard` correspondant dans la grille de KPIs
 
-### 2. `frontend/public/sw.js` (après ligne 84)
+### 4. Graphique enrichi : courbes Inscriptions + Commandes superposees au trafic
+- Creer une nouvelle fonction SQL `get_analytics_daily_extended` qui retourne pour chaque jour : `visitors` (existant), `signups` (COUNT profiles), `orders` (COUNT orders)
+- Remplacer le `BarChart` simple par un `ComposedChart` (recharts) avec :
+  - Barres vertes = visiteurs uniques (existant)
+  - Ligne bleue = inscriptions du jour
+  - Ligne orange = commandes du jour
+- Ajouter une legende sous le graphique
 
-Ajouter une exclusion pour les requêtes produits Supabase, afin qu'elles ne soient jamais servies depuis le cache SW :
+### 5. Migration SQL
+Une seule migration pour :
+- Mettre a jour `get_analytics_kpis` (ajouter `accounts_created`)
+- Mettre a jour les 3 fonctions top (p_limit default 50)
+- Creer `get_analytics_daily_extended` avec les 3 series
+- Accorder les grants necessaires
 
-```js
-// Skip product API calls — always fetch fresh
-if (url.pathname.includes("/rest/v1/products")) return;
-```
+## Fichiers modifies
+- `AdminAnalyticsPage.tsx` — filtre 1h, pagination widgets, KPI comptes, graphique compose
+- 1 migration SQL — fonctions mises a jour + nouvelle fonction
 
-### 3. `frontend/src/pages/admin/AdminSettingsPage.tsx`
-
-Ajouter un bloc "Gestion du cache" en fin de page avec 2 boutons :
-- **Purger le cache** : envoie `CLEAR_CACHES` au SW + `queryClient.clear()` + reload
-- **Rafraîchir le catalogue offline** : envoie `REFRESH_CATALOG` au SW
-
-Ce bloc utilise les messages SW déjà implémentés — aucune modification du service worker nécessaire pour cette partie.
-
-## Fichiers modifiés
-
-- `frontend/src/pages/StorePage.tsx` — 2 lignes ajoutées
-- `frontend/public/sw.js` — 2 lignes ajoutées
-- `frontend/src/pages/admin/AdminSettingsPage.tsx` — nouveau bloc UI (~40 lignes)
+## Impact
+Aucun impact sur les autres pages ou fonctionnalites. Les fonctions SQL existantes restent compatibles (le p_limit par defaut change de 10 a 50, mais c'est un parametre optionnel). Le runtime error `useEffect null` est un probleme HMR transitoire, pas lie a ces changements.
 
