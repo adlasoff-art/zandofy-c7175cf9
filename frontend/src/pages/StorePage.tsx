@@ -111,6 +111,8 @@ export default function StorePage() {
       return await fetchProducts({ storeId: store!.id });
     },
     enabled: !!store?.id,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // Fetch reviews for all store products
