@@ -83,6 +83,9 @@ self.addEventListener("fetch", (event) => {
   // Skip OAuth paths
   if (url.pathname.startsWith("/~oauth")) return;
 
+  // Skip product API calls — always fetch fresh from network
+  if (url.hostname.includes("supabase") && url.pathname.includes("/rest/v1/products")) return;
+
   // Navigation: NETWORK-FIRST with cache fallback
   // This prevents stale HTML from being served after deployments
   if (request.mode === "navigate") {
