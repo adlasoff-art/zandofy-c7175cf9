@@ -6924,6 +6924,15 @@ export type Database = {
         Args: { months_limit?: number }
         Returns: number
       }
+      get_analytics_daily_extended: {
+        Args: { p_since?: string }
+        Returns: {
+          day: string
+          orders: number
+          signups: number
+          visitors: number
+        }[]
+      }
       get_analytics_daily_traffic: {
         Args: { p_since?: string }
         Returns: {

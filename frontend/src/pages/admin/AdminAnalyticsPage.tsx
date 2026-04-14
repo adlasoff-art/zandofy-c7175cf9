@@ -7,18 +7,22 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   BarChart3, Users, Eye, MousePointer, Smartphone, Monitor, Tablet,
   Globe, TrendingUp, Clock, Download, Store, Heart, ShoppingCart,
-  Package, ChevronLeft, ChevronRight, ArrowUpDown, Wifi,
+  Package, ChevronLeft, ChevronRight, ArrowUpDown, Wifi, UserPlus,
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import {
+  ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  CartesianGrid, Legend,
+} from "recharts";
 
 const PERIODS = [
-  { key: "24h", label: "24h", days: 1 },
-  { key: "48h", label: "48h", days: 2 },
-  { key: "7d", label: "7j", days: 7 },
-  { key: "30d", label: "30j", days: 30 },
-  { key: "90d", label: "3 mois", days: 90 },
-  { key: "365d", label: "1 an", days: 365 },
-  { key: "all", label: "Tout", days: 0 },
+  { key: "1h", label: "1h", hours: 1 },
+  { key: "24h", label: "24h", hours: 24 },
+  { key: "48h", label: "48h", hours: 48 },
+  { key: "7d", label: "7j", hours: 7 * 24 },
+  { key: "30d", label: "30j", hours: 30 * 24 },
+  { key: "90d", label: "3 mois", hours: 90 * 24 },
+  { key: "365d", label: "1 an", hours: 365 * 24 },
+  { key: "all", label: "Tout", hours: 0 },
 ];
 
 function StatCard({ icon: Icon, label, value, sub }: { icon: any; label: string; value: string | number; sub?: string }) {
@@ -34,17 +38,17 @@ function StatCard({ icon: Icon, label, value, sub }: { icon: any; label: string;
   );
 }
 
-// ─── Daily Traffic Histogram ──────────────────────────────────────
-function DailyTrafficChart({ data }: { data: { day: string; visitors: number }[] }) {
+// ─── Daily Traffic Chart (ComposedChart) ──────────────────────────
+function DailyTrafficChart({ data }: { data: { day: string; visitors: number; signups: number; orders: number }[] }) {
   if (data.length === 0) return null;
 
   return (
     <div className="bg-card border border-border rounded-lg p-4">
       <h3 className="text-xs font-semibold text-foreground mb-3 flex items-center gap-1.5">
-        <BarChart3 size={14} /> Trafic journalier (visiteurs uniques)
+        <BarChart3 size={14} /> Trafic journalier
       </h3>
-      <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={data}>
+      <ResponsiveContainer width="100%" height={260}>
+        <ComposedChart data={data}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
           <XAxis
             dataKey="day"
@@ -61,8 +65,11 @@ function DailyTrafficChart({ data }: { data: { day: string; visitors: number }[]
             contentStyle={{ fontSize: 12, borderRadius: 8 }}
             labelFormatter={(v) => new Date(v).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
           />
-          <Bar dataKey="visitors" name="Visiteurs" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-        </BarChart>
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Bar dataKey="visitors" name="Visiteurs uniques" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+          <Line type="monotone" dataKey="signups" name="Inscriptions" stroke="#3b82f6" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="orders" name="Commandes" stroke="#f59e0b" strokeWidth={2} dot={false} />
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );
@@ -74,6 +81,60 @@ const formatDuration = (s: number) => {
   const sec = s % 60;
   return `${m}m ${sec}s`;
 };
+
+// ─── Paginated Widget ─────────────────────────────────────────────
+const WIDGET_PAGE_SIZE = 10;
+
+function PaginatedWidget({
+  title,
+  icon: Icon,
+  items,
+  renderItem,
+}: {
+  title: string;
+  icon: any;
+  items: any[];
+  renderItem: (item: any, globalIndex: number) => React.ReactNode;
+}) {
+  const [page, setPage] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(items.length / WIDGET_PAGE_SIZE));
+  const pageItems = items.slice(page * WIDGET_PAGE_SIZE, (page + 1) * WIDGET_PAGE_SIZE);
+
+  return (
+    <div className="bg-card border border-border rounded-lg p-3">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+          <Icon size={14} /> {title}
+        </h3>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] text-muted-foreground">
+              {page * WIDGET_PAGE_SIZE + 1}-{Math.min((page + 1) * WIDGET_PAGE_SIZE, items.length)} sur {items.length}
+            </span>
+            <button
+              onClick={() => setPage(Math.max(0, page - 1))}
+              disabled={page === 0}
+              className="p-0.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
+            >
+              <ChevronLeft size={12} />
+            </button>
+            <button
+              onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+              disabled={page >= totalPages - 1}
+              className="p-0.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
+            >
+              <ChevronRight size={12} />
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="space-y-1">
+        {pageItems.map((item, i) => renderItem(item, page * WIDGET_PAGE_SIZE + i))}
+        {items.length === 0 && <p className="text-[11px] text-muted-foreground">Aucune donnée</p>}
+      </div>
+    </div>
+  );
+}
 
 // ─── Overview Tab ─────────────────────────────────────────────────
 function OverviewTab({
@@ -87,7 +148,7 @@ function OverviewTab({
   pwaPeriodCount,
 }: {
   kpis: any;
-  dailyTraffic: { day: string; visitors: number }[];
+  dailyTraffic: { day: string; visitors: number; signups: number; orders: number }[];
   topProducts: { product_name: string; click_count: number }[];
   topStores: { store_name: string; view_count: number }[];
   topPages: { page_path: string; view_count: number }[];
@@ -101,7 +162,7 @@ function OverviewTab({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 md:grid-cols-8 gap-2">
+      <div className="grid grid-cols-3 md:grid-cols-9 gap-2">
         <StatCard icon={Users} label="Visiteurs" value={kpis?.unique_sessions || 0} sub="sessions uniques" />
         <StatCard icon={Eye} label="Pages vues" value={kpis?.page_views || 0} />
         <StatCard icon={Users} label="Authentifiés" value={kpis?.authenticated_sessions || 0} sub="sessions connectées" />
@@ -110,6 +171,7 @@ function OverviewTab({
         <StatCard icon={Clock} label="Durée moy." value={formatDuration(kpis?.avg_duration || 0)} />
         <StatCard icon={Download} label="PWA installées" value={pwaCount} sub={`+${pwaPeriodCount} période`} />
         <StatCard icon={MousePointer} label="Clics produits" value={kpis?.product_clicks || 0} />
+        <StatCard icon={UserPlus} label="Comptes créés" value={kpis?.accounts_created || 0} sub="inscriptions" />
       </div>
 
       <DailyTrafficChart data={dailyTraffic} />
@@ -175,53 +237,44 @@ function OverviewTab({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="bg-card border border-border rounded-lg p-3">
-          <h3 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-            <TrendingUp size={14} /> Pages les plus visitées
-          </h3>
-          <div className="space-y-1">
-            {topPages.map((p, i) => (
-              <div key={p.page_path} className="flex items-center gap-1.5">
-                <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
-                <span className="text-[11px] text-foreground flex-1 truncate">{p.page_path}</span>
-                <span className="text-[11px] font-medium text-foreground">{p.view_count}</span>
-              </div>
-            ))}
-            {topPages.length === 0 && <p className="text-[11px] text-muted-foreground">Aucune donnée</p>}
-          </div>
-        </div>
+        <PaginatedWidget
+          title="Pages les plus visitées"
+          icon={TrendingUp}
+          items={topPages}
+          renderItem={(p, i) => (
+            <div key={p.page_path} className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
+              <span className="text-[11px] text-foreground flex-1 truncate">{p.page_path}</span>
+              <span className="text-[11px] font-medium text-foreground">{p.view_count}</span>
+            </div>
+          )}
+        />
 
-        <div className="bg-card border border-border rounded-lg p-3">
-          <h3 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-            <MousePointer size={14} /> Produits les plus cliqués
-          </h3>
-          <div className="space-y-1">
-            {topProducts.map((p, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
-                <span className="text-[11px] text-foreground flex-1 truncate">{p.product_name}</span>
-                <span className="text-[11px] font-medium text-foreground">{p.click_count} clics</span>
-              </div>
-            ))}
-            {topProducts.length === 0 && <p className="text-[11px] text-muted-foreground">Aucune donnée</p>}
-          </div>
-        </div>
+        <PaginatedWidget
+          title="Produits les plus cliqués"
+          icon={MousePointer}
+          items={topProducts}
+          renderItem={(p, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
+              <span className="text-[11px] text-foreground flex-1 truncate">{p.product_name}</span>
+              <span className="text-[11px] font-medium text-foreground">{p.click_count} clics</span>
+            </div>
+          )}
+        />
 
-        <div className="bg-card border border-border rounded-lg p-3">
-          <h3 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-            <Store size={14} /> Boutiques les plus visitées
-          </h3>
-          <div className="space-y-1">
-            {topStores.map((s, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
-                <span className="text-[11px] text-foreground flex-1 truncate">{s.store_name}</span>
-                <span className="text-[11px] font-medium text-foreground">{s.view_count} vues</span>
-              </div>
-            ))}
-            {topStores.length === 0 && <p className="text-[11px] text-muted-foreground">Aucune donnée</p>}
-          </div>
-        </div>
+        <PaginatedWidget
+          title="Boutiques les plus visitées"
+          icon={Store}
+          items={topStores}
+          renderItem={(s, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
+              <span className="text-[11px] text-foreground flex-1 truncate">{s.store_name}</span>
+              <span className="text-[11px] font-medium text-foreground">{s.view_count} vues</span>
+            </div>
+          )}
+        />
       </div>
     </div>
   );
@@ -470,8 +523,8 @@ function ProductTrackingTab({ period, since }: { period: string; since: string |
 // ─── Main Page ────────────────────────────────────────────────────
 export default function AdminAnalyticsPage() {
   const [period, setPeriod] = useState("30d");
-  const days = PERIODS.find((p) => p.key === period)?.days || 30;
-  const since = days > 0 ? new Date(Date.now() - days * 86400000).toISOString() : null;
+  const hours = PERIODS.find((p) => p.key === period)?.hours || 30 * 24;
+  const since = hours > 0 ? new Date(Date.now() - hours * 3600000).toISOString() : null;
 
   const rpc = (supabase as any).rpc.bind(supabase);
 
@@ -485,17 +538,22 @@ export default function AdminAnalyticsPage() {
     },
   });
 
-  // Daily traffic histogram
+  // Daily traffic with signups + orders
   const { data: dailyTraffic } = useQuery({
-    queryKey: ["admin-analytics-daily", period],
+    queryKey: ["admin-analytics-daily-extended", period],
     queryFn: async () => {
-      const { data, error } = await rpc("get_analytics_daily_traffic", { p_since: since });
-      if (error) console.error("[Analytics] get_analytics_daily_traffic failed:", error);
-      return ((data || []) as any[]).map((d: any) => ({ day: d.day, visitors: Number(d.visitors) }));
+      const { data, error } = await rpc("get_analytics_daily_extended", { p_since: since });
+      if (error) console.error("[Analytics] get_analytics_daily_extended failed:", error);
+      return ((data || []) as any[]).map((d: any) => ({
+        day: d.day,
+        visitors: Number(d.visitors),
+        signups: Number(d.signups),
+        orders: Number(d.orders),
+      }));
     },
   });
 
-  // Top products
+  // Top products (up to 50)
   const { data: topProducts } = useQuery({
     queryKey: ["admin-analytics-top-products", period],
     queryFn: async () => {
@@ -505,7 +563,7 @@ export default function AdminAnalyticsPage() {
     },
   });
 
-  // Top stores
+  // Top stores (up to 50)
   const { data: topStores } = useQuery({
     queryKey: ["admin-analytics-top-stores", period],
     queryFn: async () => {
@@ -515,7 +573,7 @@ export default function AdminAnalyticsPage() {
     },
   });
 
-  // Top pages
+  // Top pages (up to 50)
   const { data: topPages } = useQuery({
     queryKey: ["admin-analytics-top-pages", period],
     queryFn: async () => {
