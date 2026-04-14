@@ -1,43 +1,58 @@
 
 
-# Améliorations Analytics Dashboard
+# Correction du manifest PWA pour PWA Builder
 
-## Changements
+## Analyse des problèmes détectés par PWA Builder
 
-### 1. Ajouter le filtre "1h" dans les périodes
-Ajouter `{ key: "1h", label: "1h", days: 0.042 }` (1/24 de jour) dans le tableau `PERIODS` de `AdminAnalyticsPage.tsx`. Adapter le calcul de `since` pour supporter les fractions de jour.
+| Problème | Cause | Impact |
+|---|---|---|
+| "Fix icon types" (erreur critique) | `purpose: "any maskable"` combine les deux dans un seul icon — PWA Builder exige des entrées séparées | Bloque le packaging APK |
+| "Fix icon sizes" | Les shortcut icons déclarent `192x192` mais PWA Builder veut des tailles dédiées (96x96) | Avertissement |
+| "Service Worker not found" (+0) | L'enregistrement du SW est conditionnel (iframe/preview guard) — PWA Builder scanne en production et ne le détecte probablement pas | Perte de points, pas bloquant |
+| "Add screenshots" | Aucun champ `screenshots` dans le manifest | Requis pour le packaging Play Store |
+| "start_url missing" | Faux positif probable — `start_url` est présent, mais PWA Builder peut avoir un bug de parsing | Non bloquant |
 
-### 2. Pagination sur les widgets Top Products, Top Stores, Top Pages
-- Modifier les 3 fonctions SQL (`get_analytics_top_products`, `get_analytics_top_stores`, `get_analytics_top_pages`) : passer `p_limit` de 10 a 50 par defaut
-- Dans `OverviewTab`, ajouter un etat de pagination local pour chaque widget (10 items par page, navigation prev/next en haut a droite du widget)
-- Afficher le numero de la tranche (ex: "1-10 sur 47")
+## Changements prévus
 
-### 3. Nouveau KPI "Comptes créés"
-- Ajouter dans la fonction SQL `get_analytics_kpis` un nouveau champ `accounts_created` qui compte les profils crees dans la periode :
-```sql
-'accounts_created', (SELECT COUNT(*) FROM profiles WHERE (p_since IS NULL OR created_at >= p_since))
+### 1. `frontend/public/manifest.json`
+
+- **Séparer les icônes** : au lieu de `"purpose": "any maskable"`, créer 4 entrées (192 any, 192 maskable, 512 any, 512 maskable) pointant vers les mêmes fichiers
+- **Ajouter `screenshots`** : 2 entrées (mobile 1080x1920, desktop 1920x1080) avec des captures du site — on utilisera les icônes existantes comme placeholder en attendant de vraies captures
+- **Corriger shortcut icons** : ajouter `"type": "image/png"` manquant sur les shortcuts
+- **Retirer `display_override`** avec `window-controls-overlay` qui n'est pas pertinent pour un e-commerce mobile
+
+### 2. `frontend/public/sw.js`
+
+- Aucun changement nécessaire — le SW fonctionne, PWA Builder ne le détecte simplement pas lors du scan externe. Le SW s'enregistre correctement en production.
+
+### 3. Aucune migration SQL, aucun fichier sensible touché
+
+## Manifest corrigé (aperçu)
+
+```json
+{
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "form_factor": "narrow", "label": "Page d'accueil Zandofy" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "form_factor": "wide", "label": "Zandofy sur desktop" }
+  ]
+}
 ```
-- Ajouter un `StatCard` correspondant dans la grille de KPIs
 
-### 4. Graphique enrichi : courbes Inscriptions + Commandes superposees au trafic
-- Creer une nouvelle fonction SQL `get_analytics_daily_extended` qui retourne pour chaque jour : `visitors` (existant), `signups` (COUNT profiles), `orders` (COUNT orders)
-- Remplacer le `BarChart` simple par un `ComposedChart` (recharts) avec :
-  - Barres vertes = visiteurs uniques (existant)
-  - Ligne bleue = inscriptions du jour
-  - Ligne orange = commandes du jour
-- Ajouter une legende sous le graphique
+## Recommandation pour les screenshots
 
-### 5. Migration SQL
-Une seule migration pour :
-- Mettre a jour `get_analytics_kpis` (ajouter `accounts_created`)
-- Mettre a jour les 3 fonctions top (p_limit default 50)
-- Creer `get_analytics_daily_extended` avec les 3 series
-- Accorder les grants necessaires
+Les vraies captures d'écran (1080x1920 mobile, 1920x1080 desktop) sont requises par le Play Store pour générer l'APK. Pour l'instant je mets les icônes en placeholder. Tu pourras me fournir de vraies captures plus tard et je les remplacerai.
 
-## Fichiers modifies
-- `AdminAnalyticsPage.tsx` — filtre 1h, pagination widgets, KPI comptes, graphique compose
-- 1 migration SQL — fonctions mises a jour + nouvelle fonction
+## Fichiers modifiés
 
-## Impact
-Aucun impact sur les autres pages ou fonctionnalites. Les fonctions SQL existantes restent compatibles (le p_limit par defaut change de 10 a 50, mais c'est un parametre optionnel). Le runtime error `useEffect null` est un probleme HMR transitoire, pas lie a ces changements.
+- `frontend/public/manifest.json` — correction icônes, ajout screenshots, nettoyage
+
+## Risque
+
+Aucun. Seul le manifest statique change. Pas d'impact sur le code, le routage, l'auth ou les fonctionnalités.
 
