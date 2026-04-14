@@ -1,58 +1,44 @@
 
 
-# Correction du manifest PWA pour PWA Builder
+# Correction des icônes PWA — fichiers réels
 
-## Analyse des problèmes détectés par PWA Builder
+## Diagnostic
 
-| Problème | Cause | Impact |
-|---|---|---|
-| "Fix icon types" (erreur critique) | `purpose: "any maskable"` combine les deux dans un seul icon — PWA Builder exige des entrées séparées | Bloque le packaging APK |
-| "Fix icon sizes" | Les shortcut icons déclarent `192x192` mais PWA Builder veut des tailles dédiées (96x96) | Avertissement |
-| "Service Worker not found" (+0) | L'enregistrement du SW est conditionnel (iframe/preview guard) — PWA Builder scanne en production et ne le détecte probablement pas | Perte de points, pas bloquant |
-| "Add screenshots" | Aucun champ `screenshots` dans le manifest | Requis pour le packaging Play Store |
-| "start_url missing" | Faux positif probable — `start_url` est présent, mais PWA Builder peut avoir un bug de parsing | Non bloquant |
+Le manifest JSON est correct (icônes séparées, screenshots, shortcuts). Les 5 échecs PWA Builder viennent tous de la même cause :
 
-## Changements prévus
+| Échec | Cause réelle |
+|---|---|
+| IconTypesAreValid (REQUIRED) | `icon-192.png` est un JPEG renommé en .png |
+| IconSizesAreValid | `icon-192.png` fait 2000x2000 au lieu de 192x192 |
+| ShortcutIconTypesAreValid | Même fichier icon-192.png |
+| ShortcutIconSizesAreValid | Même fichier icon-192.png |
+| ScreenshotTypesAreValid | `icon-512.png` est aussi un JPEG renommé |
+| ScreenshotSizesAreValid | `icon-512.png` fait 2000x2000 au lieu de 512x512 |
 
-### 1. `frontend/public/manifest.json`
+## Changement
 
-- **Séparer les icônes** : au lieu de `"purpose": "any maskable"`, créer 4 entrées (192 any, 192 maskable, 512 any, 512 maskable) pointant vers les mêmes fichiers
-- **Ajouter `screenshots`** : 2 entrées (mobile 1080x1920, desktop 1920x1080) avec des captures du site — on utilisera les icônes existantes comme placeholder en attendant de vraies captures
-- **Corriger shortcut icons** : ajouter `"type": "image/png"` manquant sur les shortcuts
-- **Retirer `display_override`** avec `window-controls-overlay` qui n'est pas pertinent pour un e-commerce mobile
+Regénérer les 2 fichiers d'icônes à partir du fichier source 2000x2000 existant :
 
-### 2. `frontend/public/sw.js`
+- `frontend/public/icons/icon-192.png` — redimensionné à 192x192, converti en vrai PNG
+- `frontend/public/icons/icon-512.png` — redimensionné à 512x512, converti en vrai PNG
 
-- Aucun changement nécessaire — le SW fonctionne, PWA Builder ne le détecte simplement pas lors du scan externe. Le SW s'enregistre correctement en production.
+Utilisation de ImageMagick pour convertir et redimensionner. Le fichier source sera lu depuis le serveur de production.
 
-### 3. Aucune migration SQL, aucun fichier sensible touché
+## Éléments optionnels (non bloquants)
 
-## Manifest corrigé (aperçu)
+Les échecs "Feature" (file_handlers, launch_handler, share_target, widgets, etc.) sont des fonctionnalités avancées optionnelles. Ils n'empêchent pas le packaging APK. Je ne les implémente pas sauf si tu le demandes.
 
-```json
-{
-  "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ],
-  "screenshots": [
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "form_factor": "narrow", "label": "Page d'accueil Zandofy" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "form_factor": "wide", "label": "Zandofy sur desktop" }
-  ]
-}
-```
+Le Service Worker non détecté est un faux négatif — PWA Builder ne le trouve pas car il s'enregistre côté client via JavaScript. Cela ne bloque pas le packaging.
 
-## Recommandation pour les screenshots
+## Impact
 
-Les vraies captures d'écran (1080x1920 mobile, 1920x1080 desktop) sont requises par le Play Store pour générer l'APK. Pour l'instant je mets les icônes en placeholder. Tu pourras me fournir de vraies captures plus tard et je les remplacerai.
+- Aucun changement de code
+- Aucune migration SQL
+- Seuls 2 fichiers images remplacés
+- Le manifest reste identique
 
 ## Fichiers modifiés
 
-- `frontend/public/manifest.json` — correction icônes, ajout screenshots, nettoyage
-
-## Risque
-
-Aucun. Seul le manifest statique change. Pas d'impact sur le code, le routage, l'auth ou les fonctionnalités.
+- `frontend/public/icons/icon-192.png` — regénéré en vrai PNG 192x192
+- `frontend/public/icons/icon-512.png` — regénéré en vrai PNG 512x512
 
