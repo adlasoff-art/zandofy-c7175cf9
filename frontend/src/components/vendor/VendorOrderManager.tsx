@@ -392,10 +392,19 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
 
         return (
           <div key={order.id} className="bg-card border border-border rounded-lg overflow-hidden">
-            <button
-              onClick={() => setExpandedId(isExpanded ? null : order.id)}
-              className="w-full p-3 flex items-center gap-3 text-left hover:bg-muted/30 transition-colors"
-            >
+            <div className="w-full p-3 flex items-center gap-3 text-left hover:bg-muted/30 transition-colors">
+              {labelsEnabled && (
+                <Checkbox
+                  checked={selectedOrderIds.includes(order.id)}
+                  onCheckedChange={() => toggleOrderSelection(order.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="shrink-0"
+                />
+              )}
+              <button
+                onClick={() => setExpandedId(isExpanded ? null : order.id)}
+                className="flex-1 flex items-center gap-3 text-left"
+              >
               <StatusIcon size={18} className={config.color} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
