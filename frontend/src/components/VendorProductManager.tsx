@@ -373,6 +373,8 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       auto_pricing_enabled: (product as any).auto_pricing_enabled !== false,
       vendor_extra_margin: (product as any).vendor_extra_margin || 0,
       model_size: (product as any).model_size || "",
+      can_ship_air: (product as any).can_ship_air !== false,
+      can_ship_sea: (product as any).can_ship_sea === true,
     });
     // Split images: position 0 = main, rest = variations
     const sorted = [...product.images].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
@@ -461,6 +463,8 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       auto_pricing_enabled: form.auto_pricing_enabled,
       vendor_extra_margin: form.vendor_extra_margin || 0,
       model_size: form.model_size && form.model_size.trim() !== '' ? form.model_size.trim() : null,
+      can_ship_air: form.can_ship_air,
+      can_ship_sea: form.can_ship_sea,
     };
 
     let productId = editing?.id;
