@@ -543,7 +543,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
                         highlightedMsgId === msg.id && "ring-2 ring-accent"
                       )}
                     >
-                      {renderContent(msg.content)}
+                      {renderChatMessageContent(msg.content)}
                       <div className={cn(
                         "flex items-center gap-1 mt-1",
                         isOwn ? "justify-end" : "justify-start"
@@ -616,7 +616,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+              accept="image/*,application/pdf"
               className="hidden"
               onChange={handleFileUpload}
             />
@@ -630,12 +630,14 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
           </>
         )}
         <textarea
+          ref={textareaRef}
           value={newMessage}
-          onChange={e => { setNewMessage(e.target.value); broadcastTyping(); }}
+          onChange={e => { setNewMessage(e.target.value); broadcastTyping(); autoResize(); }}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder="Écrivez votre message..."
-          rows={1}
-          className="flex-1 resize-none bg-muted/50 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground"
+          rows={2}
+          className="flex-1 resize-none bg-muted/50 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground min-h-[44px] max-h-[120px]"
         />
         <Button
           size="icon"
