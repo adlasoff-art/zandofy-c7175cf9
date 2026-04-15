@@ -1,53 +1,96 @@
 
 
-# Correction du bouton "Installer" PWA + Preservation du tracking
+# Simulation de design d'étiquette d'expédition + Implémentation complète
 
-## Contexte analytique verifie
+## Étape 1 — Génération d'un mockup PDF (100mm × 150mm)
 
-Le systeme de tracking PWA fonctionne en 2 couches :
-1. **`trackPWAInstall()`** — ecrit dans `analytics_events` (event_type = "pwa_install") ET dans `pwa_installs` (upsert par device_id)
-2. **`trackPWAPresence()`** — met a jour `last_seen_at` dans `pwa_installs` a chaque session PWA
+Je vais générer un PDF de simulation avec Python (reportlab) au format exact 100×150mm, en noir et blanc pur, optimisé thermal printer.
 
-La page Admin Analytics lit depuis `pwa_installs` pour afficher le compteur d'installations.
+### Layout de l'étiquette
 
-**Les changements ci-dessous ne touchent PAS aux appels `trackPWAInstall` ni `trackPWAPresence`.** Ils corrigent uniquement la logique d'affichage et de declenchement du bouton. Les 2 appels `trackPWAInstall(user?.id)` (lignes 69 et 102) restent exactement en place.
+```text
+┌──────────────────────────────────┐  ← 100mm
+│  [ZANDOFY ICON]    [VERYSPEED]  │
+│  ████  grand Z      ██ logo VS  │
+│  Powered by VerySpeed           │
+│─────────────────────────────────│
+│  DE (FROM):                     │
+│  Boutique XYZ                   │
+│  Kinshasa, RDC                  │
+│─────────────────────────────────│
+│  À (SHIP TO):                   │
+│  Jean Dupont                    │
+│  123 Avenue Liberté             │
+│  Lubumbashi, Haut-Katanga       │
+│  RDC  ·  +243 xxx xxx xxx      │
+│─────────────────────────────────│
+│  REF: ZDY-20260415-A001         │
+│  SUIVI: TRK-789456              │
+│  MODE: Aérien  ·  2 articles   │
+│  EXPÉDITION: $12.50             │
+│─────────────────────────────────│
+│         ┌─────────┐            │
+│         │ QR CODE │  ← B&W     │
+│         │  (ref)  │  sans logo │
+│         └─────────┘            │
+│  ▇▇▇▇▇▇▇ BARCODE ▇▇▇▇▇▇▇▇▇  │
+│         ZDY-20260415-A001       │
+└──────────────────────────────────┘  ← 150mm
+```
 
-## Changements dans `PWAInstallBanner.tsx`
+### Détails du mockup
 
-### 1. Ne pas detruire le prompt en cas d'annulation
+- Les deux logos (Zandofy et VerySpeed) seront convertis en noir pur (threshold) pour compatibilité thermique
+- QR code généré avec `qrcode` Python, style carré classique noir/blanc
+- Police monospace pour lisibilité scanner
+- Données fictives pour la démo
 
-**Avant** (ligne 107-108) : apres `prompt()`, les refs sont mises a `null` dans tous les cas — meme si l'utilisateur refuse.
-**Apres** : ne mettre a `null` que si `outcome === "accepted"`. Si l'utilisateur annule, le bouton reste fonctionnel pour un nouvel essai.
+## Étape 2 — Implémentation dans la plateforme
 
-### 2. Augmenter le timeout du fallback Android
+### Migration SQL
 
-**Avant** : 3 secondes.
-**Apres** : 6 secondes — laisse plus de temps au navigateur d'emettre `beforeinstallprompt` sur connexions lentes.
+```sql
+ALTER TABLE vendor_pricing_overrides
+  ADD COLUMN IF NOT EXISTS shipping_labels_enabled boolean NOT NULL DEFAULT false;
 
-### 3. Re-capturer le prompt tardif
+ALTER TABLE products
+  ADD COLUMN IF NOT EXISTS can_ship_air boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS can_ship_sea boolean NOT NULL DEFAULT false;
+```
 
-Ajouter dans le `useEffect` : si `beforeinstallprompt` arrive apres que le fallback manuel est deja affiche, basculer automatiquement vers le bouton natif (desactiver `showAndroidFallback`). Cela couvre le cas ou le SW met du temps a s'activer.
+Note : si `vendor_pricing_overrides` n'existe pas encore, je créerai la table avec les colonnes nécessaires + RLS.
 
-### 4. Feedback si prompt indisponible
+### Edge Function `generate-shipping-labels`
 
-Si l'utilisateur clique "Installer" mais que le prompt natif n'existe pas, afficher les instructions manuelles avec un message explicatif (deja partiellement en place via `showFallbackMessage`).
+- Accepte `orderIds[]`, vérifie JWT + rôle (admin/manager/vendeur propriétaire)
+- Vérifie `shipping_labels_enabled` pour les vendeurs
+- Génère HTML multi-étiquettes au format 100×150mm avec CSS `@media print`
+- QR code encodant la référence commande
 
-## Impact sur le tracking
+### Composants React
 
-| Element | Modifie ? | Detail |
-|---|---|---|
-| `trackPWAInstall()` appels | Non | Les 2 appels restent identiques (lignes 69 et 102) |
-| `trackPWAPresence()` dans App.tsx | Non | Aucun changement |
-| Table `pwa_installs` | Non | Aucune migration |
-| Table `analytics_events` | Non | Aucune migration |
-| Page Admin Analytics | Non | Les queries sur `pwa_installs` restent inchangees |
-| KPIs `pwa_sessions` / `web_sessions` | Non | Calcules dans `get_analytics_kpis`, pas impactes |
+- `ShippingLabelPreview` — dialog d'aperçu + boutons Imprimer / PDF
+- Checkboxes multi-sélection dans `AdminOrdersPage` et pages vendeur
+- Checkboxes `can_ship_air` / `can_ship_sea` dans le formulaire produit
 
-## Fichier modifie
+### Sécurité
 
-- `frontend/src/components/PWAInstallBanner.tsx` — 4 corrections logiques, 0 changement de tracking
+- JWT obligatoire, vérification rôle server-side
+- Vendeurs : accès uniquement leurs commandes + toggle activé
+- CORS restrictif (même pattern que `generate-invoice`)
 
-## Risque
+## Fichiers créés/modifiés
 
-Aucun. Seule la logique d'affichage du banner change. Le tracking PWA reste intact a 100%.
+| Fichier | Action |
+|---|---|
+| `/mnt/documents/shipping_label_mockup.pdf` | Nouveau — simulation visuelle |
+| Migration SQL | ALTER TABLE (2 colonnes produits + 1 toggle vendeur) |
+| `frontend/supabase/functions/generate-shipping-labels/index.ts` | Nouveau |
+| `frontend/src/components/shipping/ShippingLabelPreview.tsx` | Nouveau |
+| `frontend/src/pages/admin/AdminOrdersPage.tsx` | Modifié — multi-sélection |
+| `frontend/src/components/VendorProductManager.tsx` | Modifié — checkboxes expédition |
+
+## Livraison
+
+D'abord le mockup PDF pour validation visuelle, puis l'implémentation complète.
 
