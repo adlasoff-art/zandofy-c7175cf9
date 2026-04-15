@@ -238,6 +238,7 @@ const App = () => (
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/tracking" element={<TrackingPage />} />
+                <Route path="/tracking/:ref" element={<TrackingPage />} />
                 <Route path="/become-vendor" element={<BecomeVendorPage />} />
                 <Route path="/driver" element={<DriverPage />} />
                 <Route path="/affiliate-program" element={<AffiliateProgramPage />} />
