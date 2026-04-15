@@ -843,6 +843,40 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             <Field label="Hauteur (cm)" type="number" value={String(form.height_cm)} onChange={(v) => setForm({ ...form, height_cm: Number(v) })} />
           </div>
 
+          {/* Modes d'expédition */}
+          <div className="border-t border-border pt-3 mt-1">
+            <label className="text-xs font-semibold text-foreground">✈️ Modes d'expédition disponibles</label>
+            <p className="text-[10px] text-muted-foreground mb-2">Cochez les modes d'expédition possibles pour ce produit</p>
+          </div>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.can_ship_air}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  if (!val && !form.can_ship_sea) { return; }
+                  setForm({ ...form, can_ship_air: val });
+                }}
+                className="rounded border-border"
+              />
+              ✈️ Aérien
+            </label>
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.can_ship_sea}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  if (!val && !form.can_ship_air) { return; }
+                  setForm({ ...form, can_ship_sea: val });
+                }}
+                className="rounded border-border"
+              />
+              🚢 Maritime
+            </label>
+          </div>
+
           {/* Délai de préparation fournisseur */}
           <div className="border-t border-border pt-3 mt-1">
             <label className="text-xs font-semibold text-foreground">⏱️ Délai de préparation fournisseur (jours)</label>
