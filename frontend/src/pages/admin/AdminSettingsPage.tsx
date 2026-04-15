@@ -1,5 +1,6 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator, Crown, Shield, Camera } from "lucide-react";
+import { CarrierLogoUpload } from "@/components/admin/CarrierLogoUpload";
 import { GeoBlockingSettings } from "@/components/admin/GeoBlockingSettings";
 import { KelpayWebhookPanel } from "@/components/admin/KelpayWebhookPanel";
 import { MonetizationSettings } from "@/components/admin/MonetizationSettings";
@@ -551,6 +552,15 @@ export default function AdminSettingsPage() {
               </div>
             )}
           </div>
+        </section>
+
+        {/* Carrier Logo for Shipping Labels */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Truck size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Logo transporteur (étiquettes)</h2>
+          </div>
+          <CarrierLogoUpload />
         </section>
 
         {/* Discount Caps - Financial Protection */}
