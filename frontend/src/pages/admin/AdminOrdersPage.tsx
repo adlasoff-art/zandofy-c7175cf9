@@ -399,7 +399,9 @@ export default function AdminOrdersPage() {
             </button>
           </div>
         </div>
-      )
+      )}
+
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
         {isLoading ? (
           <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={24} /></div>
         ) : filtered.length === 0 ? (
