@@ -306,6 +306,134 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_user_progress: {
+        Row: {
+          anon_id: string | null
+          created_at: string
+          display_count: number
+          id: string
+          last_displayed_at: string | null
+          scheduled_at: string | null
+          sent_at: string | null
+          status: string
+          user_id: string | null
+          workflow_id: string
+        }
+        Insert: {
+          anon_id?: string | null
+          created_at?: string
+          display_count?: number
+          id?: string
+          last_displayed_at?: string | null
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string
+          user_id?: string | null
+          workflow_id: string
+        }
+        Update: {
+          anon_id?: string | null
+          created_at?: string
+          display_count?: number
+          id?: string
+          last_displayed_at?: string | null
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string
+          user_id?: string | null
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_user_progress_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_workflows: {
+        Row: {
+          channel: Database["public"]["Enums"]["automation_channel"]
+          condition_has_account: boolean | null
+          condition_has_order: boolean | null
+          condition_max_days_since_signup: number | null
+          created_at: string
+          delay_days: number
+          delay_minutes: number
+          display_frequency: Database["public"]["Enums"]["automation_display_frequency"]
+          email_html_content: string | null
+          email_subject: string | null
+          id: string
+          is_active: boolean
+          max_displays: number | null
+          name: string
+          popup_content: string | null
+          popup_cta_label: string | null
+          popup_cta_link: string | null
+          popup_image_url: string | null
+          popup_title: string | null
+          push_body: string | null
+          push_title: string | null
+          sort_order: number
+          trigger_type: Database["public"]["Enums"]["automation_trigger_type"]
+          updated_at: string
+        }
+        Insert: {
+          channel?: Database["public"]["Enums"]["automation_channel"]
+          condition_has_account?: boolean | null
+          condition_has_order?: boolean | null
+          condition_max_days_since_signup?: number | null
+          created_at?: string
+          delay_days?: number
+          delay_minutes?: number
+          display_frequency?: Database["public"]["Enums"]["automation_display_frequency"]
+          email_html_content?: string | null
+          email_subject?: string | null
+          id?: string
+          is_active?: boolean
+          max_displays?: number | null
+          name: string
+          popup_content?: string | null
+          popup_cta_label?: string | null
+          popup_cta_link?: string | null
+          popup_image_url?: string | null
+          popup_title?: string | null
+          push_body?: string | null
+          push_title?: string | null
+          sort_order?: number
+          trigger_type: Database["public"]["Enums"]["automation_trigger_type"]
+          updated_at?: string
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["automation_channel"]
+          condition_has_account?: boolean | null
+          condition_has_order?: boolean | null
+          condition_max_days_since_signup?: number | null
+          created_at?: string
+          delay_days?: number
+          delay_minutes?: number
+          display_frequency?: Database["public"]["Enums"]["automation_display_frequency"]
+          email_html_content?: string | null
+          email_subject?: string | null
+          id?: string
+          is_active?: boolean
+          max_displays?: number | null
+          name?: string
+          popup_content?: string | null
+          popup_cta_label?: string | null
+          popup_cta_link?: string | null
+          popup_image_url?: string | null
+          popup_title?: string | null
+          push_body?: string | null
+          push_title?: string | null
+          sort_order?: number
+          trigger_type?: Database["public"]["Enums"]["automation_trigger_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       badge_requests: {
         Row: {
           created_at: string
@@ -7127,6 +7255,26 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "vendor" | "shipper" | "rider"
+      automation_channel:
+        | "popup"
+        | "push"
+        | "email"
+        | "popup_push"
+        | "push_email"
+        | "all"
+      automation_display_frequency:
+        | "every_visit"
+        | "once"
+        | "daily"
+        | "once_per_session"
+      automation_trigger_type:
+        | "visit_no_account"
+        | "account_created"
+        | "visit_no_order"
+        | "product_viewed_no_order"
+        | "no_order_delay"
+        | "referral_prompt"
+        | "custom"
       kyc_document_type:
         | "national_id"
         | "voter_card"
@@ -7273,6 +7421,29 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "vendor", "shipper", "rider"],
+      automation_channel: [
+        "popup",
+        "push",
+        "email",
+        "popup_push",
+        "push_email",
+        "all",
+      ],
+      automation_display_frequency: [
+        "every_visit",
+        "once",
+        "daily",
+        "once_per_session",
+      ],
+      automation_trigger_type: [
+        "visit_no_account",
+        "account_created",
+        "visit_no_order",
+        "product_viewed_no_order",
+        "no_order_delay",
+        "referral_prompt",
+        "custom",
+      ],
       kyc_document_type: [
         "national_id",
         "voter_card",
