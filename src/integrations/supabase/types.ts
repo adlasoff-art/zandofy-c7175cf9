@@ -5137,6 +5137,7 @@ export type Database = {
       }
       stores: {
         Row: {
+          address: string | null
           ban_reason: string | null
           banned_at: string | null
           banned_by: string | null
@@ -5145,7 +5146,9 @@ export type Database = {
           chat_links_allowed: boolean
           chat_media_enabled: boolean | null
           chat_phone_allowed: boolean
+          city: string | null
           collaborators_enabled: boolean
+          country: string | null
           created_at: string
           default_transit_days_max: number | null
           default_transit_days_min: number | null
@@ -5197,6 +5200,7 @@ export type Database = {
           whatsapp_number: string | null
         }
         Insert: {
+          address?: string | null
           ban_reason?: string | null
           banned_at?: string | null
           banned_by?: string | null
@@ -5205,7 +5209,9 @@ export type Database = {
           chat_links_allowed?: boolean
           chat_media_enabled?: boolean | null
           chat_phone_allowed?: boolean
+          city?: string | null
           collaborators_enabled?: boolean
+          country?: string | null
           created_at?: string
           default_transit_days_max?: number | null
           default_transit_days_min?: number | null
@@ -5257,6 +5263,7 @@ export type Database = {
           whatsapp_number?: string | null
         }
         Update: {
+          address?: string | null
           ban_reason?: string | null
           banned_at?: string | null
           banned_by?: string | null
@@ -5265,7 +5272,9 @@ export type Database = {
           chat_links_allowed?: boolean
           chat_media_enabled?: boolean | null
           chat_phone_allowed?: boolean
+          city?: string | null
           collaborators_enabled?: boolean
+          country?: string | null
           created_at?: string
           default_transit_days_max?: number | null
           default_transit_days_min?: number | null
