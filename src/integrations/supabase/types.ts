@@ -3395,6 +3395,8 @@ export type Database = {
       products: {
         Row: {
           auto_pricing_enabled: boolean
+          can_ship_air: boolean
+          can_ship_sea: boolean
           care_instructions: string | null
           category_id: string | null
           cost_calc: number | null
@@ -3456,6 +3458,8 @@ export type Database = {
         }
         Insert: {
           auto_pricing_enabled?: boolean
+          can_ship_air?: boolean
+          can_ship_sea?: boolean
           care_instructions?: string | null
           category_id?: string | null
           cost_calc?: number | null
@@ -3517,6 +3521,8 @@ export type Database = {
         }
         Update: {
           auto_pricing_enabled?: boolean
+          can_ship_air?: boolean
+          can_ship_sea?: boolean
           care_instructions?: string | null
           category_id?: string | null
           cost_calc?: number | null
@@ -6093,6 +6099,7 @@ export type Database = {
           max_products_override: number | null
           multiplier: number | null
           notes: string | null
+          shipping_labels_enabled: boolean
           store_id: string
           suppliers_enabled: boolean
           updated_at: string
@@ -6117,6 +6124,7 @@ export type Database = {
           max_products_override?: number | null
           multiplier?: number | null
           notes?: string | null
+          shipping_labels_enabled?: boolean
           store_id: string
           suppliers_enabled?: boolean
           updated_at?: string
@@ -6141,6 +6149,7 @@ export type Database = {
           max_products_override?: number | null
           multiplier?: number | null
           notes?: string | null
+          shipping_labels_enabled?: boolean
           store_id?: string
           suppliers_enabled?: boolean
           updated_at?: string
