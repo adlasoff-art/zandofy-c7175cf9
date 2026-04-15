@@ -31,7 +31,7 @@ function getAnonId(): string {
   const key = "zandofy_anon_id";
   let id = localStorage.getItem(key);
   if (!id) {
-    id = uuidv4();
+    id = crypto.randomUUID();
     localStorage.setItem(key, id);
   }
   return id;
