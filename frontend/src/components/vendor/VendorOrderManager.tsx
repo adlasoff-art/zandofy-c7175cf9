@@ -424,7 +424,8 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                 {new Date(order.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
               </span>
               {isExpanded ? <ChevronUp size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />}
-            </button>
+              </button>
+            </div>
 
             {isExpanded && (
               <div className="px-3 pb-3 border-t border-border space-y-3 pt-3">
