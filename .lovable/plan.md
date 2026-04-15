@@ -1,63 +1,69 @@
 
 
-# Améliorations des étiquettes d'expédition
+# Toggle étiquettes admin + Localisation boutique + Interconnexions
 
-## Résumé des changements demandés
+## Résumé
 
-1. **FROM** : Afficher le nom de la boutique en gras (même taille que le nom du destinataire) + origine du produit (pays d'origine)
-2. **SHIP TO** : Ajouter le champ email du client
-3. **TRACK** : Toujours afficher le tracking number (du fournisseur) dans la grille de détails
-4. **Logo carrier** : Remplacer le texte "VERYSPEED" par un logo uploadable par l'admin via `platform_settings` (clé `shipping_label_config`)
-5. **QR code moderne** : Utiliser le style arrondi (dots) au lieu du style carré classique
-6. **Code-barres** : Ajouter un vrai code-barres (Code128) en bas de l'étiquette via la lib `react-barcode`
+3 problèmes identifiés :
+1. **Pas de toggle admin** pour activer `shipping_labels_enabled` par boutique — la colonne existe en DB mais aucun switch dans l'interface admin
+2. **Pas de champs localisation** sur la table `stores` (city, country, address) — l'edge function les référence mais ils n'existent pas
+3. **Pas de section vendeur** pour renseigner l'adresse de la boutique
 
-## Détail technique
+## Plan d'exécution
 
-### 1. Edge Function `generate-shipping-labels`
+### 1. Migration SQL — Ajouter city, country, address à `stores`
 
-**Modifications** :
-- Ajouter `shipping_email` à la requête SELECT sur `orders`
-- Ajouter `origin_country` à la requête via les `order_items` → `products` (récupérer l'`origin_country` du premier produit de la commande)
-- Ajouter `recipientEmail` et `originCountry` aux données retournées
-- Récupérer le logo carrier depuis `platform_settings` clé `shipping_label_config` → `carrier_logo_url`
+```sql
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS address text;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS city text;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS country text;
+```
 
-### 2. Admin : Upload du logo carrier
+Fichier export SQL téléchargeable dans `/mnt/documents/store_location_migration.sql`.
 
-Ajouter une section dans la page admin existante (branding ou settings) permettant d'uploader un logo pour les étiquettes d'expédition. Le logo sera stocké dans le bucket `product-media` (existant) et l'URL sauvegardée dans `platform_settings` avec la clé `shipping_label_config`.
+### 2. Admin — Toggle étiquettes dans AdminVendorPricingPage
 
-Pas de migration SQL nécessaire — on utilise `platform_settings` (upsert sur la clé).
+Ajouter un switch "Étiquettes d'expédition" dans la page **Tarification par boutique** (`AdminVendorPricingPage.tsx`), entre le toggle "Gestion des fournisseurs" et le Webhook URL. Ce toggle contrôle `shipping_labels_enabled` dans `vendor_pricing_overrides`.
 
-### 3. Composant `ShippingLabelPreview.tsx`
+Ajouter aussi `shipping_labels_enabled` au payload `handleSave`.
 
-**Modifications** :
-- Ajouter `recipientEmail`, `originCountry`, `carrierLogoUrl` à l'interface `LabelData`
-- **FROM** : Afficher `storeName` en gras taille `text-sm font-black` (même style que recipientName), puis l'origine en dessous
-- **SHIP TO** : Ajouter `✉ recipientEmail` sous le téléphone
-- **TRACK** : Afficher systématiquement (même vide avec "—")
-- **Logo** : Remplacer le texte "VERYSPEED / LOGISTICS" par une balise `<img>` si `carrierLogoUrl` est fourni, sinon fallback texte
-- **QR code** : Passer les options de style arrondi via les props de `QRCodeCanvas` (si qrcode.react v4+ le supporte, sinon utiliser `qrcode-react` avec `imageSettings`)
-- **Code-barres** : Installer `react-barcode` et ajouter un composant `<Barcode>` en bas avec la référence commande, format CODE128
-- Même ajustements dans le HTML généré pour `handlePrint`
+### 3. Vendeur — Section localisation dans VendorSettings
 
-### 4. Dépendance
+Ajouter 3 champs (Adresse, Ville, Pays) dans la section **Paramètres** de l'espace vendeur (`VendorDashboardPage.tsx` → `VendorSettings`). Ces champs sont sauvegardés dans `stores.address`, `stores.city`, `stores.country`.
 
-- Installer `react-barcode` pour le code-barres en bas de l'étiquette
+### 4. Interconnexions identifiées
 
-### 5. Mockup PDF v3
+Les champs `city`/`country`/`address` de la boutique serviront à :
 
-Régénérer un PDF mis à jour avec tous les changements pour validation visuelle.
+| Fonctionnalité | Utilisation |
+|---|---|
+| **Étiquettes d'expédition** | Section FROM : nom boutique + ville + pays |
+| **Page boutique publique** | Afficher la localisation sous le nom de la boutique (StorePage) |
+| **Calcul shipping local** | Distance vendeur ↔ client pour le moteur logistique (haversine) — futur |
+| **Filtres marketplace** | Filtrer les boutiques par ville/pays côté client — futur |
+| **Factures / reçus** | Adresse de l'expéditeur dans les documents — futur |
+
+Pour l'instant, seules les 2 premières seront implémentées (étiquettes + page boutique).
+
+### 5. Page boutique publique — Afficher la localisation
+
+Dans `StorePage.tsx`, afficher `📍 Ville, Pays` sous le nom de la boutique si ces champs sont renseignés.
+
+### 6. Edge Function — Déjà OK
+
+L'edge function `generate-shipping-labels` sélectionne déjà `stores.city` et `stores.country`. Une fois la migration appliquée, les données remonteront automatiquement.
 
 ## Fichiers modifiés/créés
 
 | Fichier | Action |
 |---|---|
-| `frontend/supabase/functions/generate-shipping-labels/index.ts` | Ajouter email, origin_country, carrier_logo_url |
-| `frontend/src/components/shipping/ShippingLabelPreview.tsx` | Refonte FROM, email, logo image, barcode, QR arrondi |
-| `frontend/src/pages/admin/AdminEmailTemplatesPage.tsx` ou nouveau composant admin | Section upload logo carrier pour étiquettes |
-| `package.json` | Ajouter `react-barcode` |
-| `/mnt/documents/shipping_label_mockup_v3.pdf` | Nouveau mockup |
+| Migration SQL | `ALTER TABLE stores ADD city, country, address` |
+| `/mnt/documents/store_location_migration.sql` | Export téléchargeable |
+| `AdminVendorPricingPage.tsx` | Toggle `shipping_labels_enabled` |
+| `VendorDashboardPage.tsx` (VendorSettings) | Champs adresse/ville/pays |
+| `StorePage.tsx` | Affichage localisation boutique |
 
 ## Sécurité
 
-Aucun changement de schéma DB. Le logo est stocké via `platform_settings` (table déjà protégée par RLS admin). L'Edge Function conserve toutes ses vérifications JWT et rôles existantes.
+Les colonnes `city`/`country`/`address` sont publiques (affichées sur la page boutique). Les RLS existantes sur `stores` couvrent déjà les permissions de lecture (public) et d'écriture (owner + admin). Aucune nouvelle politique nécessaire.
 
