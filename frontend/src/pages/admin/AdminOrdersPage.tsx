@@ -456,8 +456,8 @@ export default function AdminOrdersPage() {
                       {format(new Date(o.created_at), "d MMM", { locale: fr })}
                     </span>
                     {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  </button>
-
+                    </button>
+                  </div>
                   {isExpanded && (
                     <div className="px-4 pb-4 space-y-3 bg-muted/10">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
