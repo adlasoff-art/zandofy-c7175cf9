@@ -24,7 +24,7 @@ interface InternalChatProps {
   productPrice?: string;
 }
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 
 export function InternalChat({ storeId, storeName, productId, productName, productImage, productPrice }: InternalChatProps) {
