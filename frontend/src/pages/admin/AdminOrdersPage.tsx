@@ -688,6 +688,12 @@ export default function AdminOrdersPage() {
           }}
         />
       )}
+
+      <ShippingLabelPreview
+        open={showLabelsPreview}
+        onClose={() => setShowLabelsPreview(false)}
+        orderIds={selectedOrders}
+      />
     </AdminLayout>
   );
 }
