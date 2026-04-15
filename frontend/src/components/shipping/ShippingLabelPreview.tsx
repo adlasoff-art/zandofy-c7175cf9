@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { QRCodeCanvas } from "qrcode.react";
 import Barcode from "react-barcode";
+import { useI18n } from "@/contexts/I18nContext";
 
 interface LabelData {
   orderRef: string;
@@ -24,6 +25,10 @@ interface LabelData {
   storeCountry: string;
   originCountry: string;
   carrierLogoUrl: string;
+  shippingMode: string;
+  totalWeightKg: number;
+  totalVolumeCBM: number;
+  estimatedDimensions: string;
 }
 
 interface Props {
@@ -37,6 +42,7 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+  const { t } = useI18n();
 
   const fetchLabels = async () => {
     if (fetched && labels.length > 0) return;
@@ -63,9 +69,15 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
   }
 
   const getModeLabel = (choice: string) => {
-    if (choice === "home_delivery") return "Home Delivery";
-    if (choice === "hub_pickup") return "Hub Pickup";
+    if (choice === "home_delivery") return t("label.homeDelivery");
+    if (choice === "hub_pickup") return t("label.hubPickup");
     return choice || "—";
+  };
+
+  const getShippingModeLabel = (mode: string) => {
+    if (mode === "air") return t("label.air");
+    if (mode === "sea") return t("label.sea");
+    return mode || "";
   };
 
   const handlePrint = () => {
@@ -78,14 +90,12 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
       return;
     }
 
-    // Capture QR canvases
     const qrCanvases = content.querySelectorAll("canvas[data-qr]");
     const qrDataUrls: string[] = [];
     qrCanvases.forEach((canvas) => {
       qrDataUrls.push((canvas as HTMLCanvasElement).toDataURL("image/png"));
     });
 
-    // Capture barcode SVGs
     const barcodeSvgs = content.querySelectorAll("[data-barcode] svg");
     const barcodeDataUrls: string[] = [];
     barcodeSvgs.forEach((svg) => {
@@ -97,7 +107,7 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
     const carrierLogoUrl = labels[0]?.carrierLogoUrl || "";
 
     printWindow.document.write(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Shipping Labels</title>
+<html><head><meta charset="utf-8"><title>${t("label.shippingLabels")}</title>
 <style>
   @page { size: 100mm 150mm; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -129,7 +139,8 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
       const qrUrl = qrDataUrls[i] || "";
       const barcodeUrl = barcodeDataUrls[i] || "";
       const fromLine = [label.storeCity, label.storeCountry].filter(Boolean).join(", ");
-      const originLine = label.originCountry ? `Origin: ${label.originCountry}` : "";
+      const originLine = label.originCountry ? `${t("label.origin")}: ${label.originCountry}` : "";
+      const shippingModeStr = getShippingModeLabel(label.shippingMode);
 
       printWindow.document.write(`
 <div class="label">
@@ -143,12 +154,12 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
     ${qrUrl ? `<img src="${qrUrl}" class="qr-top" alt="QR"/>` : ""}
   </div>
   <hr class="sep-double"/><hr class="sep-double-2"/>
-  <div class="section-lbl">FROM:</div>
+  <div class="section-lbl">${t("label.from")}</div>
   <div class="store-name">${label.storeName}</div>
   <div class="info">${fromLine || "—"}</div>
   ${originLine ? `<div class="info">${originLine}</div>` : ""}
   <hr class="sep"/>
-  <div class="section-lbl">SHIP TO:</div>
+  <div class="section-lbl">${t("label.shipTo")}</div>
   <div class="recipient">${label.recipientName}</div>
   <div class="info">${label.recipientAddress || "—"}</div>
   <div class="info">${[label.recipientCity, label.recipientCountry].filter(Boolean).join(", ")}</div>
@@ -156,16 +167,20 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
   ${label.recipientEmail ? `<div class="info">✉ ${label.recipientEmail}</div>` : ""}
   <hr class="sep-double"/><hr class="sep-double-2"/>
   <div class="detail-grid">
-    <span class="detail-key">ORDER:</span><span class="detail-val">${label.orderRef}</span>
-    <span class="detail-key">TRACK:</span><span class="detail-val">${label.trackingNumber || "—"}</span>
-    <span class="detail-key">MODE:</span><span class="detail-val">${getModeLabel(label.deliveryChoice)} · ${label.itemsCount} item(s)</span>
-    <span class="detail-key">SHIP:</span><span class="detail-val">$${label.shippingCost}</span>
+    <span class="detail-key">${t("label.order")}</span><span class="detail-val">${label.orderRef}</span>
+    <span class="detail-key">${t("label.track")}</span><span class="detail-val">${label.trackingNumber || "—"}</span>
+    <span class="detail-key">${t("label.mode")}</span><span class="detail-val">${getModeLabel(label.deliveryChoice)} · ${label.itemsCount} ${t("label.items")}</span>
+    <span class="detail-key">${t("label.shipCost")}</span><span class="detail-val">$${label.shippingCost}</span>
+    ${shippingModeStr ? `<span class="detail-key">${t("label.shippingMode")}</span><span class="detail-val">${shippingModeStr}</span>` : ""}
+    ${label.totalWeightKg > 0 ? `<span class="detail-key">${t("label.weight")}</span><span class="detail-val">${label.totalWeightKg} kg</span>` : ""}
+    ${label.estimatedDimensions ? `<span class="detail-key">${t("label.dimensions")}</span><span class="detail-val">${label.estimatedDimensions}</span>` : ""}
+    ${label.totalVolumeCBM > 0 ? `<span class="detail-key">${t("label.volumeCbm")}</span><span class="detail-val">${label.totalVolumeCBM} m³</span>` : ""}
   </div>
   <hr class="sep-double"/><hr class="sep-double-2"/>
   <div class="barcode-area">
     ${barcodeUrl ? `<img src="${barcodeUrl}" class="barcode-img" alt="Barcode"/>` : ""}
     <div class="barcode-ref">${label.orderRef}</div>
-    <div class="scan-hint">Scan QR to track your parcel</div>
+    <div class="scan-hint">${t("label.scanQr")}</div>
   </div>
 </div>`);
     });
@@ -181,7 +196,7 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Printer size={18} />
-            Shipping Labels ({orderIds.length})
+            {t("label.shippingLabels")} ({orderIds.length})
           </DialogTitle>
         </DialogHeader>
 
@@ -191,18 +206,20 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
           </div>
         ) : labels.length === 0 ? (
           <p className="text-center py-8 text-sm text-muted-foreground">
-            No labels to display.
+            {t("label.noLabels")}
           </p>
         ) : (
           <>
             <div className="flex gap-2 mb-4">
               <Button onClick={handlePrint} className="gap-2">
-                <Printer size={14} /> Print ({labels.length} label{labels.length > 1 ? "s" : ""})
+                <Printer size={14} /> {t("label.print")} ({labels.length})
               </Button>
             </div>
 
             <div ref={printRef} className="space-y-4">
-              {labels.map((label, i) => (
+              {labels.map((label, i) => {
+                const shippingModeStr = getShippingModeLabel(label.shippingMode);
+                return (
                 <div
                   key={i}
                   className="border-[3px] border-foreground rounded-lg p-4 bg-background"
@@ -236,22 +253,21 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
                     />
                   </div>
 
-                  {/* Double separator */}
                   <div className="border-t-[3px] border-foreground mb-0.5" />
                   <div className="border-t-[1.5px] border-foreground mb-2" />
 
                   {/* FROM */}
-                  <p className="text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground mb-0.5">FROM:</p>
+                  <p className="text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground mb-0.5">{t("label.from")}</p>
                   <p className="text-sm font-black mb-0.5">{label.storeName}</p>
                   <p className="text-xs">{[label.storeCity, label.storeCountry].filter(Boolean).join(", ") || "—"}</p>
                   {label.originCountry && (
-                    <p className="text-xs text-muted-foreground">Origin: {label.originCountry}</p>
+                    <p className="text-xs text-muted-foreground">{t("label.origin")}: {label.originCountry}</p>
                   )}
 
                   <hr className="border-foreground my-2" />
 
                   {/* SHIP TO */}
-                  <p className="text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground mb-0.5">SHIP TO:</p>
+                  <p className="text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground mb-0.5">{t("label.shipTo")}</p>
                   <p className="text-sm font-black mb-0.5">{label.recipientName}</p>
                   <p className="text-xs">{label.recipientAddress || "—"}</p>
                   <p className="text-xs">{[label.recipientCity, label.recipientCountry].filter(Boolean).join(", ")}</p>
@@ -260,23 +276,45 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
                     <p className="text-xs">✉ {label.recipientEmail}</p>
                   )}
 
-                  {/* Double separator */}
                   <div className="border-t-[3px] border-foreground mt-2 mb-0.5" />
                   <div className="border-t-[1.5px] border-foreground mb-2" />
 
                   {/* Details grid */}
                   <div className="grid grid-cols-[80px_1fr] gap-y-0.5 gap-x-2 text-xs mb-2">
-                    <span className="font-extrabold text-[10px] text-muted-foreground">ORDER:</span>
+                    <span className="font-extrabold text-[10px] text-muted-foreground">{t("label.order")}</span>
                     <span className="font-bold">{label.orderRef}</span>
-                    <span className="font-extrabold text-[10px] text-muted-foreground">TRACK:</span>
+                    <span className="font-extrabold text-[10px] text-muted-foreground">{t("label.track")}</span>
                     <span className="font-bold">{label.trackingNumber || "—"}</span>
-                    <span className="font-extrabold text-[10px] text-muted-foreground">MODE:</span>
-                    <span>{getModeLabel(label.deliveryChoice)} · {label.itemsCount} item(s)</span>
-                    <span className="font-extrabold text-[10px] text-muted-foreground">SHIP:</span>
+                    <span className="font-extrabold text-[10px] text-muted-foreground">{t("label.mode")}</span>
+                    <span>{getModeLabel(label.deliveryChoice)} · {label.itemsCount} {t("label.items")}</span>
+                    <span className="font-extrabold text-[10px] text-muted-foreground">{t("label.shipCost")}</span>
                     <span className="font-bold">${label.shippingCost}</span>
+                    {shippingModeStr && (
+                      <>
+                        <span className="font-extrabold text-[10px] text-muted-foreground">{t("label.shippingMode")}</span>
+                        <span className="font-bold">{shippingModeStr}</span>
+                      </>
+                    )}
+                    {label.totalWeightKg > 0 && (
+                      <>
+                        <span className="font-extrabold text-[10px] text-muted-foreground">{t("label.weight")}</span>
+                        <span className="font-bold">{label.totalWeightKg} kg</span>
+                      </>
+                    )}
+                    {label.estimatedDimensions && (
+                      <>
+                        <span className="font-extrabold text-[10px] text-muted-foreground">{t("label.dimensions")}</span>
+                        <span className="font-bold">{label.estimatedDimensions}</span>
+                      </>
+                    )}
+                    {label.totalVolumeCBM > 0 && (
+                      <>
+                        <span className="font-extrabold text-[10px] text-muted-foreground">{t("label.volumeCbm")}</span>
+                        <span className="font-bold">{label.totalVolumeCBM} m³</span>
+                      </>
+                    )}
                   </div>
 
-                  {/* Double separator */}
                   <div className="border-t-[3px] border-foreground mb-0.5" />
                   <div className="border-t-[1.5px] border-foreground mb-2" />
 
@@ -291,10 +329,11 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
                       margin={0}
                     />
                     <p className="font-mono text-[10px] font-black mt-1">{label.orderRef}</p>
-                    <p className="text-[8px] text-muted-foreground">Scan QR to track your parcel</p>
+                    <p className="text-[8px] text-muted-foreground">{t("label.scanQr")}</p>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
