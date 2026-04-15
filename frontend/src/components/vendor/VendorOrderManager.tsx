@@ -149,6 +149,19 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
     check();
   }, [storeId]);
 
+  // Check if shipping labels are enabled for this store
+  useEffect(() => {
+    async function checkLabels() {
+      const { data } = await (supabase as any)
+        .from("vendor_pricing_overrides")
+        .select("shipping_labels_enabled")
+        .eq("store_id", storeId)
+        .maybeSingle();
+      setLabelsEnabled(data?.shipping_labels_enabled || false);
+    }
+    checkLabels();
+  }, [storeId]);
+
   const loadOrders = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
