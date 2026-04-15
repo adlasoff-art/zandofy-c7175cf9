@@ -874,6 +874,18 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
           />
         );
       })()}
+
+      {/* Shipping Label Preview */}
+      {labelsEnabled && showLabelPreview && selectedOrderIds.length > 0 && (
+        <ShippingLabelPreview
+          open={showLabelPreview}
+          onClose={() => {
+            setShowLabelPreview(false);
+            setSelectedOrderIds([]);
+          }}
+          orderIds={selectedOrderIds}
+        />
+      )}
     </div>
   );
 }
