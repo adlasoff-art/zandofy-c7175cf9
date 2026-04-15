@@ -561,6 +561,23 @@ export default function TrackingPage() {
     };
   }, []);
 
+  // Auto-search from URL param (QR code scan)
+  useEffect(() => {
+    if (urlRef && !autoSearched) {
+      setQuery(urlRef);
+      setTab("order");
+      setAutoSearched(true);
+      (async () => {
+        setLoading(true);
+        resetResults();
+        const result = await fetchOrder(urlRef);
+        if (result) setOrderResult(result);
+        else setNotFound(true);
+        setLoading(false);
+      })();
+    }
+  }, [urlRef, autoSearched, fetchOrder]);
+
   // Polling for order tracking updates (replaces Realtime for security)
   useEffect(() => {
     if (!orderResult) return;
