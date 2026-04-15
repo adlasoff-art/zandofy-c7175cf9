@@ -5,7 +5,7 @@ import { useRoles } from "@/hooks/use-roles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Send, Loader2, MessageCircle, Paperclip, FileText, Search, X,
+  Send, Loader2, MessageCircle, Paperclip, Search, X,
   Check, CheckCheck, ChevronDown, Trash2, ArrowLeft,
 } from "lucide-react";
 import { QuickReplies } from "./QuickReplies";
