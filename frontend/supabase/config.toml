@@ -54,3 +54,6 @@ verify_jwt = false
 
 [functions.ai-recommendations]
 verify_jwt = true
+
+[functions.generate-shipping-labels]
+verify_jwt = false
