@@ -42,7 +42,24 @@ export default function AdminOrdersPage() {
   const [shippedModal, setShippedModal] = useState<string | null>(null);
   const [riderModal, setRiderModal] = useState<string | null>(null);
 
-  const { data: orders = [], isLoading } = useQuery({
+  // Multi-select for shipping labels
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [showLabelsPreview, setShowLabelsPreview] = useState(false);
+
+  const toggleOrderSelection = (orderId: string) => {
+    setSelectedOrders((prev) =>
+      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
+    );
+  };
+
+  const toggleSelectAll = (orderIds: string[]) => {
+    const allSelected = orderIds.every((id) => selectedOrders.includes(id));
+    if (allSelected) {
+      setSelectedOrders((prev) => prev.filter((id) => !orderIds.includes(id)));
+    } else {
+      setSelectedOrders((prev) => [...new Set([...prev, ...orderIds])]);
+    }
+  };
     queryKey: ["admin-orders", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
