@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ConversationItem } from "./ConversationList";
+import { renderChatMessageContent, mergeChatMessages } from "./chatMessageUtils";
 
 interface ChatMessage {
   id: string;
@@ -56,6 +57,14 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const autoResize = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -223,19 +232,23 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
 
     setSending(true);
     try {
-      const { error } = await supabase.from("messages").insert({
+      const { data, error } = await supabase.from("messages").insert({
         conversation_id: conversation.id,
         sender_id: user.id,
         content,
-      });
+      }).select().single();
 
       if (error) {
         console.error("Error sending message:", error);
         toast.error("Erreur lors de l'envoi");
-      } else {
+      } else if (data) {
+        // Optimistic: show immediately
+        setMessages(prev => mergeChatMessages(prev, [{ ...data, read_at: null } as ChatMessage]));
         setNewMessage("");
+        if (textareaRef.current) textareaRef.current.style.height = "auto";
+        setTimeout(scrollToBottom, 50);
         // Update conversation timestamp
-        await supabase
+        supabase
           .from("conversations")
           .update({ updated_at: new Date().toISOString() })
           .eq("id", conversation.id);
@@ -279,11 +292,16 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
         ? `[📄 PDF] ${file.name}\n${urlData.publicUrl}`
         : `[📷 Image]\n${urlData.publicUrl}`;
 
-      await supabase.from("messages").insert({
+      const { data } = await supabase.from("messages").insert({
         conversation_id: conversation.id,
         sender_id: user.id,
         content,
-      });
+      }).select().single();
+
+      if (data) {
+        setMessages(prev => mergeChatMessages(prev, [{ ...data, read_at: null } as ChatMessage]));
+        setTimeout(scrollToBottom, 50);
+      }
     } finally {
       setUploading(false);
     }
