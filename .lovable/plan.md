@@ -1,69 +1,34 @@
 
 
-# Toggle étiquettes admin + Localisation boutique + Interconnexions
+# Ajouter "Fournisseurs" au menu mobile compte (PWA)
 
-## Résumé
+## Problème
 
-3 problèmes identifiés :
-1. **Pas de toggle admin** pour activer `shipping_labels_enabled` par boutique — la colonne existe en DB mais aucun switch dans l'interface admin
-2. **Pas de champs localisation** sur la table `stores` (city, country, address) — l'edge function les référence mais ils n'existent pas
-3. **Pas de section vendeur** pour renseigner l'adresse de la boutique
+Sur la version mobile/PWA, les vendeurs n'ont pas d'accès direct à la page Fournisseurs depuis le menu Compte. Le lien n'apparaît que dans les onglets du dashboard vendeur, difficilement accessibles sur mobile.
 
-## Plan d'exécution
+## Solution
 
-### 1. Migration SQL — Ajouter city, country, address à `stores`
+Ajouter un lien "Fournisseurs" dans la section **"Mes interfaces"** du `MobileAccountMenu.tsx`, visible uniquement pour les vendeurs. Ce lien redirigera vers `/vendor?tab=suppliers` (le dashboard vendeur avec l'onglet fournisseurs pré-sélectionné).
 
-```sql
-ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS address text;
-ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS city text;
-ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS country text;
-```
+Comme l'accès aux fournisseurs dépend du flag `suppliers_enabled` (dans `vendor_pricing_overrides`), il faut aussi vérifier ce flag pour n'afficher le lien que si la fonctionnalité est activée pour la boutique du vendeur.
 
-Fichier export SQL téléchargeable dans `/mnt/documents/store_location_migration.sql`.
+## Fichier modifié
 
-### 2. Admin — Toggle étiquettes dans AdminVendorPricingPage
-
-Ajouter un switch "Étiquettes d'expédition" dans la page **Tarification par boutique** (`AdminVendorPricingPage.tsx`), entre le toggle "Gestion des fournisseurs" et le Webhook URL. Ce toggle contrôle `shipping_labels_enabled` dans `vendor_pricing_overrides`.
-
-Ajouter aussi `shipping_labels_enabled` au payload `handleSave`.
-
-### 3. Vendeur — Section localisation dans VendorSettings
-
-Ajouter 3 champs (Adresse, Ville, Pays) dans la section **Paramètres** de l'espace vendeur (`VendorDashboardPage.tsx` → `VendorSettings`). Ces champs sont sauvegardés dans `stores.address`, `stores.city`, `stores.country`.
-
-### 4. Interconnexions identifiées
-
-Les champs `city`/`country`/`address` de la boutique serviront à :
-
-| Fonctionnalité | Utilisation |
+| Fichier | Modification |
 |---|---|
-| **Étiquettes d'expédition** | Section FROM : nom boutique + ville + pays |
-| **Page boutique publique** | Afficher la localisation sous le nom de la boutique (StorePage) |
-| **Calcul shipping local** | Distance vendeur ↔ client pour le moteur logistique (haversine) — futur |
-| **Filtres marketplace** | Filtrer les boutiques par ville/pays côté client — futur |
-| **Factures / reçus** | Adresse de l'expéditeur dans les documents — futur |
+| `frontend/src/components/MobileAccountMenu.tsx` | Ajouter une requête pour vérifier `suppliers_enabled` + lien conditionnel "Fournisseurs" dans la section "Mon espace" (visible si `isVendor && suppliersEnabled`) pointant vers `/vendor?tab=suppliers` |
 
-Pour l'instant, seules les 2 premières seront implémentées (étiquettes + page boutique).
+## Détail
 
-### 5. Page boutique publique — Afficher la localisation
+1. Importer `useEffect`/`useState` et `supabase` dans `MobileAccountMenu.tsx`
+2. Récupérer le `store_id` du vendeur connecté puis vérifier `suppliers_enabled` dans `vendor_pricing_overrides`
+3. Ajouter dans la section "Mon espace" (après "Messages") un item conditionnel :
+   ```
+   { to: "/vendor?tab=suppliers", icon: Truck, label: "Fournisseurs" }
+   ```
+   visible uniquement si `isVendor && suppliersEnabled`
 
-Dans `StorePage.tsx`, afficher `📍 Ville, Pays` sous le nom de la boutique si ces champs sont renseignés.
+## Risque
 
-### 6. Edge Function — Déjà OK
-
-L'edge function `generate-shipping-labels` sélectionne déjà `stores.city` et `stores.country`. Une fois la migration appliquée, les données remonteront automatiquement.
-
-## Fichiers modifiés/créés
-
-| Fichier | Action |
-|---|---|
-| Migration SQL | `ALTER TABLE stores ADD city, country, address` |
-| `/mnt/documents/store_location_migration.sql` | Export téléchargeable |
-| `AdminVendorPricingPage.tsx` | Toggle `shipping_labels_enabled` |
-| `VendorDashboardPage.tsx` (VendorSettings) | Champs adresse/ville/pays |
-| `StorePage.tsx` | Affichage localisation boutique |
-
-## Sécurité
-
-Les colonnes `city`/`country`/`address` sont publiques (affichées sur la page boutique). Les RLS existantes sur `stores` couvrent déjà les permissions de lecture (public) et d'écriture (owner + admin). Aucune nouvelle politique nécessaire.
+Faible — ajout d'un lien conditionnel, aucun impact sur les autres rôles.
 
