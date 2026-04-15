@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SupplierPopover, OrderSuppliersPopover } from "@/components/vendor/SupplierPopover";
-import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send, Edit2, Truck, Search, Check, X } from "lucide-react";
+import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send, Edit2, Truck, Search, Check, X, Printer } from "lucide-react";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { Button } from "@/components/ui/button";
 import { PaymentProofUpload } from "@/components/PaymentProofUpload";
@@ -24,6 +24,8 @@ import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, Delive
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { getColorDisplay } from "@/utils/colorName";
+import { ShippingLabelPreview } from "@/components/shipping/ShippingLabelPreview";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface OrderItem {
   id: string;
@@ -130,6 +132,9 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
   const [editTrackingModal, setEditTrackingModal] = useState<string | null>(null);
   const [hubPickupModal, setHubPickupModal] = useState<string | null>(null);
   const [hasSelfDelivery, setHasSelfDelivery] = useState(false);
+  const [labelsEnabled, setLabelsEnabled] = useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [showLabelPreview, setShowLabelPreview] = useState(false);
 
   // Check if store has self-delivery
   useEffect(() => {
