@@ -620,7 +620,9 @@ export default function AdminOrdersPage() {
                   )}
                 </div>
               );
-            })
+            })}
+                </>
+              );
             })()}
             <DataTablePagination
               totalItems={filtered.length}
