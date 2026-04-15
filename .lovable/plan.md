@@ -1,45 +1,63 @@
 
 
-# Corrections UX mobile + QR code étiquettes
+# Améliorations des étiquettes d'expédition
 
-## Problème 1 — Bouton X caché derrière la barre de statut (Chat, Support, Couleurs produit)
+## Résumé des changements demandés
 
-Le bouton de fermeture (X) des composants `Sheet` et `Dialog` utilise `top-4` (16px) comme position. Sur les téléphones modernes avec encoche/barre de statut épaisse, ce bouton se retrouve sous la zone système.
+1. **FROM** : Afficher le nom de la boutique en gras (même taille que le nom du destinataire) + origine du produit (pays d'origine)
+2. **SHIP TO** : Ajouter le champ email du client
+3. **TRACK** : Toujours afficher le tracking number (du fournisseur) dans la grille de détails
+4. **Logo carrier** : Remplacer le texte "VERYSPEED" par un logo uploadable par l'admin via `platform_settings` (clé `shipping_label_config`)
+5. **QR code moderne** : Utiliser le style arrondi (dots) au lieu du style carré classique
+6. **Code-barres** : Ajouter un vrai code-barres (Code128) en bas de l'étiquette via la lib `react-barcode`
 
-### Solution
+## Détail technique
 
-Modifier les deux composants UI de base pour respecter la zone de sécurité iOS/Android :
+### 1. Edge Function `generate-shipping-labels`
 
-**`frontend/src/components/ui/sheet.tsx`** — Changer le close button de `top-4` à `top-[max(1rem,env(safe-area-inset-top,1rem))]` et ajouter `pt-[env(safe-area-inset-top)]` au conteneur SheetContent.
+**Modifications** :
+- Ajouter `shipping_email` à la requête SELECT sur `orders`
+- Ajouter `origin_country` à la requête via les `order_items` → `products` (récupérer l'`origin_country` du premier produit de la commande)
+- Ajouter `recipientEmail` et `originCountry` aux données retournées
+- Récupérer le logo carrier depuis `platform_settings` clé `shipping_label_config` → `carrier_logo_url`
 
-**`frontend/src/components/ui/dialog.tsx`** — Même correction sur le close button. Ajouter un padding-top safe-area sur mobile pour que le contenu ne soit pas masqué.
+### 2. Admin : Upload du logo carrier
 
-**`frontend/src/pages/MessagesPage.tsx`** — Remplacer `h-screen` par `h-[100dvh]` pour que la hauteur tienne compte de la barre d'adresse mobile et ajouter `pt-[env(safe-area-inset-top)]`.
+Ajouter une section dans la page admin existante (branding ou settings) permettant d'uploader un logo pour les étiquettes d'expédition. Le logo sera stocké dans le bucket `product-media` (existant) et l'URL sauvegardée dans `platform_settings` avec la clé `shipping_label_config`.
 
-**`frontend/src/components/messages/ChatPanel.tsx`** — Ajouter `pt-[env(safe-area-inset-top)]` au header sticky mobile pour le décaler sous la barre de statut.
+Pas de migration SQL nécessaire — on utilise `platform_settings` (upsert sur la clé).
 
-**`index.html`** — Vérifier que `<meta name="viewport">` contient `viewport-fit=cover` (nécessaire pour que `env(safe-area-inset-*)` fonctionne).
+### 3. Composant `ShippingLabelPreview.tsx`
 
-## Problème 2 — QR code gêné par les lignes dans l'étiquette d'expédition
+**Modifications** :
+- Ajouter `recipientEmail`, `originCountry`, `carrierLogoUrl` à l'interface `LabelData`
+- **FROM** : Afficher `storeName` en gras taille `text-sm font-black` (même style que recipientName), puis l'origine en dessous
+- **SHIP TO** : Ajouter `✉ recipientEmail` sous le téléphone
+- **TRACK** : Afficher systématiquement (même vide avec "—")
+- **Logo** : Remplacer le texte "VERYSPEED / LOGISTICS" par une balise `<img>` si `carrierLogoUrl` est fourni, sinon fallback texte
+- **QR code** : Passer les options de style arrondi via les props de `QRCodeCanvas` (si qrcode.react v4+ le supporte, sinon utiliser `qrcode-react` avec `imageSettings`)
+- **Code-barres** : Installer `react-barcode` et ajouter un composant `<Barcode>` en bas avec la référence commande, format CODE128
+- Même ajustements dans le HTML généré pour `handlePrint`
 
-Les doubles séparateurs (lignes) sont collés au QR code en haut de l'étiquette, rendant le scan difficile.
+### 4. Dépendance
 
-### Solution
+- Installer `react-barcode` pour le code-barres en bas de l'étiquette
 
-**`frontend/src/components/shipping/ShippingLabelPreview.tsx`** — Ajouter `mb-4` au bloc header (QR + VERYSPEED) pour créer un espace avant les séparateurs. Identique dans le HTML généré pour l'impression (`handlePrint`).
+### 5. Mockup PDF v3
 
-## Résumé des fichiers modifiés
+Régénérer un PDF mis à jour avec tous les changements pour validation visuelle.
 
-| Fichier | Modification |
+## Fichiers modifiés/créés
+
+| Fichier | Action |
 |---|---|
-| `frontend/src/components/ui/sheet.tsx` | Safe-area padding + close button position |
-| `frontend/src/components/ui/dialog.tsx` | Safe-area padding + close button position |
-| `frontend/src/pages/MessagesPage.tsx` | `h-[100dvh]` + safe-area top |
-| `frontend/src/components/messages/ChatPanel.tsx` | Safe-area top sur le header sticky |
-| `frontend/src/components/shipping/ShippingLabelPreview.tsx` | Espacement QR code |
-| `index.html` | `viewport-fit=cover` dans meta viewport |
+| `frontend/supabase/functions/generate-shipping-labels/index.ts` | Ajouter email, origin_country, carrier_logo_url |
+| `frontend/src/components/shipping/ShippingLabelPreview.tsx` | Refonte FROM, email, logo image, barcode, QR arrondi |
+| `frontend/src/pages/admin/AdminEmailTemplatesPage.tsx` ou nouveau composant admin | Section upload logo carrier pour étiquettes |
+| `package.json` | Ajouter `react-barcode` |
+| `/mnt/documents/shipping_label_mockup_v3.pdf` | Nouveau mockup |
 
-## Risque
+## Sécurité
 
-Faible. Les corrections CSS n'affectent que le positionnement mobile. Le fallback `env(safe-area-inset-top, 1rem)` assure la compatibilité avec les navigateurs qui ne supportent pas cette propriété.
+Aucun changement de schéma DB. Le logo est stocké via `platform_settings` (table déjà protégée par RLS admin). L'Edge Function conserve toutes ses vérifications JWT et rôles existantes.
 
