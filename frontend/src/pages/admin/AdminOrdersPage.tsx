@@ -378,7 +378,28 @@ export default function AdminOrdersPage() {
         ))}
       </div>
 
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
+      {/* Floating action bar for selected orders */}
+      {selectedOrders.length > 0 && (
+        <div className="mb-4 p-3 bg-primary/10 border border-primary/30 rounded-xl flex items-center justify-between">
+          <span className="text-sm font-medium text-foreground">
+            {selectedOrders.length} commande{selectedOrders.length > 1 ? "s" : ""} sélectionnée{selectedOrders.length > 1 ? "s" : ""}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowLabelsPreview(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              <Printer size={14} /> Imprimer étiquettes
+            </button>
+            <button
+              onClick={() => setSelectedOrders([])}
+              className="px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-muted"
+            >
+              Désélectionner
+            </button>
+          </div>
+        </div>
+      )
         {isLoading ? (
           <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={24} /></div>
         ) : filtered.length === 0 ? (
