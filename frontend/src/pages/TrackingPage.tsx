@@ -473,6 +473,7 @@ function RiderProfileBanner({ riderId, riderName }: { riderId: string; riderName
 export default function TrackingPage() {
   const { user } = useAuth();
   const { t } = useI18n();
+  const { ref: urlRef } = useParams<{ ref?: string }>();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState("order");
   const [loading, setLoading] = useState(false);
@@ -484,6 +485,7 @@ export default function TrackingPage() {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [tippingEnabled, setTippingEnabled] = useState(false);
   const [maxTip, setMaxTip] = useState(20);
+  const [autoSearched, setAutoSearched] = useState(false);
 
   // Check tipping settings
   useEffect(() => {
