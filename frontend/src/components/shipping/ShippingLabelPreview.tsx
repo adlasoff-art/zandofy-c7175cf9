@@ -88,7 +88,7 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
   body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #000; background: #fff; }
   .label { width: 100mm; height: 150mm; padding: 4mm; border: 2.5px solid #000; page-break-after: always; position: relative; overflow: hidden; }
   .label:last-child { page-break-after: auto; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2mm; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5mm; padding-bottom: 1mm; }
   .carrier-brand { font-size: 16pt; font-weight: 900; letter-spacing: 1px; }
   .carrier-sub { font-size: 6pt; font-weight: 600; color: #333; }
   .qr-top { width: 22mm; height: 22mm; }
@@ -184,7 +184,7 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
                   style={{ width: "100%", maxWidth: "380px", margin: "0 auto" }}
                 >
                   {/* Header: Brand + QR */}
-                  <div className="flex justify-between items-start mb-2">
+                  <div className="flex justify-between items-start mb-5 pb-1">
                     <div>
                       <p className="text-lg font-black tracking-wider leading-none">VERYSPEED</p>
                       <p className="text-[9px] font-semibold text-muted-foreground tracking-widest">LOGISTICS</p>
@@ -195,7 +195,7 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
                       level="M"
                       bgColor="#ffffff"
                       fgColor="#000000"
-                      includeMargin={false}
+                      includeMargin={true}
                     />
                   </div>
 

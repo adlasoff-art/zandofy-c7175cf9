@@ -370,7 +370,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header — sticky on mobile */}
-      <div className="px-4 py-3 border-b border-border flex items-center gap-3 shrink-0 sticky top-0 z-10 bg-background md:static">
+      <div className="px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top,0.75rem))] md:pt-3 border-b border-border flex items-center gap-3 shrink-0 sticky top-0 z-10 bg-background md:static">
         {onBack && (
           <button onClick={onBack} className="text-muted-foreground hover:text-foreground md:hidden">
             <ArrowLeft size={20} />
