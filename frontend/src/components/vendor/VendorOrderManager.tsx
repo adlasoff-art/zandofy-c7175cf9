@@ -87,6 +87,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
   const { isAdmin, isManager } = useRoles();
   const isStaff = isAdmin || isManager;
   const { user } = useAuth();
+  const { t } = useI18n();
 
   // PII masking: detect if current user is a collaborator with restricted sub_role
   const [shouldMaskPII, setShouldMaskPII] = useState(false);
