@@ -91,11 +91,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch orders (added shipping_email)
+    // Fetch orders (added shipping_email, shipping_mode)
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, order_ref, shipping_first_name, shipping_last_name, shipping_phone, shipping_email, shipping_address, shipping_city, shipping_country, total, shipping_cost, tracking_number, delivery_choice, store_id, status"
+        "id, order_ref, shipping_first_name, shipping_last_name, shipping_phone, shipping_email, shipping_address, shipping_city, shipping_country, total, shipping_cost, tracking_number, delivery_choice, store_id, status, shipping_mode"
       )
       .in("id", orderIds);
 
@@ -151,44 +151,65 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch order items count + origin_country per order
+    // Fetch order items with product physical attributes
     const { data: orderItems } = await supabaseAdmin
       .from("order_items")
       .select("order_id, quantity, product_id")
       .in("order_id", orderIds);
 
     const itemCountMap: Record<string, number> = {};
-    const orderProductIds: Record<string, string[]> = {};
+    const orderProductIds: Record<string, { product_id: string; quantity: number }[]> = {};
     (orderItems || []).forEach((i: any) => {
       itemCountMap[i.order_id] = (itemCountMap[i.order_id] || 0) + (i.quantity || 1);
       if (i.product_id) {
         if (!orderProductIds[i.order_id]) orderProductIds[i.order_id] = [];
-        orderProductIds[i.order_id].push(i.product_id);
+        orderProductIds[i.order_id].push({ product_id: i.product_id, quantity: i.quantity || 1 });
       }
     });
 
-    // Fetch origin_country from products
-    const allProductIds = [...new Set(Object.values(orderProductIds).flat())];
-    const originMap: Record<string, string> = {};
+    // Fetch products with physical attributes + origin_country
+    const allProductIds = [...new Set(Object.values(orderProductIds).flat().map(x => x.product_id))];
+    const productMap: Record<string, any> = {};
     if (allProductIds.length > 0) {
       const { data: products } = await supabaseAdmin
         .from("products")
-        .select("id, origin_country")
+        .select("id, origin_country, weight_grams, length_cm, width_cm, height_cm")
         .in("id", allProductIds);
       (products || []).forEach((p: any) => {
-        if (p.origin_country) originMap[p.id] = p.origin_country;
+        productMap[p.id] = p;
       });
     }
 
-    // Get origin_country per order (first product's origin)
+    // Compute origin, weight, CBM, estimated dimensions per order
     const orderOriginMap: Record<string, string> = {};
-    for (const [orderId, pids] of Object.entries(orderProductIds)) {
-      for (const pid of pids) {
-        if (originMap[pid]) {
-          orderOriginMap[orderId] = originMap[pid];
-          break;
+    const orderMetrics: Record<string, { totalWeightKg: number; totalVolumeCBM: number; estimatedDimensions: string }> = {};
+    for (const [orderId, items] of Object.entries(orderProductIds)) {
+      let totalWeightG = 0;
+      let totalCBM = 0;
+      let maxL = 0, maxW = 0, sumH = 0;
+      let originSet = false;
+      for (const item of items) {
+        const p = productMap[item.product_id];
+        if (!p) continue;
+        if (!originSet && p.origin_country) {
+          orderOriginMap[orderId] = p.origin_country;
+          originSet = true;
+        }
+        const qty = item.quantity;
+        totalWeightG += (p.weight_grams || 0) * qty;
+        const l = p.length_cm || 0, w = p.width_cm || 0, h = p.height_cm || 0;
+        if (l > 0 && w > 0 && h > 0) {
+          totalCBM += (l * w * h / 1000000) * qty;
+          if (l > maxL) maxL = l;
+          if (w > maxW) maxW = w;
+          sumH += h * qty;
         }
       }
+      orderMetrics[orderId] = {
+        totalWeightKg: Math.round(totalWeightG / 10) / 100, // grams -> kg with 2 decimals
+        totalVolumeCBM: Math.round(totalCBM * 10000) / 10000, // 4 decimals
+        estimatedDimensions: maxL > 0 ? `${maxL}×${maxW}×${sumH} cm` : "",
+      };
     }
 
     // Fetch store info
@@ -218,6 +239,7 @@ Deno.serve(async (req) => {
     // Build labels data
     const labels = orders.map((o: any) => {
       const store = storeMap[o.store_id] || {};
+      const metrics = orderMetrics[o.id] || { totalWeightKg: 0, totalVolumeCBM: 0, estimatedDimensions: "" };
       return {
         orderRef: o.order_ref || "—",
         trackingNumber: o.tracking_number || "",
@@ -235,6 +257,10 @@ Deno.serve(async (req) => {
         storeCountry: store.country || "",
         originCountry: orderOriginMap[o.id] || "",
         carrierLogoUrl,
+        shippingMode: o.shipping_mode || "",
+        totalWeightKg: metrics.totalWeightKg,
+        totalVolumeCBM: metrics.totalVolumeCBM,
+        estimatedDimensions: metrics.estimatedDimensions,
       };
     });
 

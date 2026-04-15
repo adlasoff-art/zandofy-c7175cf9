@@ -2732,6 +2732,7 @@ export type Database = {
           shipping_email: string | null
           shipping_first_name: string | null
           shipping_last_name: string | null
+          shipping_mode: string | null
           shipping_payment_proof_url: string | null
           shipping_payment_status: string | null
           shipping_phone: string | null
@@ -2786,6 +2787,7 @@ export type Database = {
           shipping_email?: string | null
           shipping_first_name?: string | null
           shipping_last_name?: string | null
+          shipping_mode?: string | null
           shipping_payment_proof_url?: string | null
           shipping_payment_status?: string | null
           shipping_phone?: string | null
@@ -2840,6 +2842,7 @@ export type Database = {
           shipping_email?: string | null
           shipping_first_name?: string | null
           shipping_last_name?: string | null
+          shipping_mode?: string | null
           shipping_payment_proof_url?: string | null
           shipping_payment_status?: string | null
           shipping_phone?: string | null

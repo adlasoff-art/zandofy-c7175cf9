@@ -6,6 +6,7 @@ import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { Button } from "@/components/ui/button";
 import { PaymentProofUpload } from "@/components/PaymentProofUpload";
 import { useAuth } from "@/contexts/AuthContext";
+import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
 import { triggerOrderStatusNotification } from "@/services/order-notifications";
 import {
@@ -86,6 +87,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
   const { isAdmin, isManager } = useRoles();
   const isStaff = isAdmin || isManager;
   const { user } = useAuth();
+  const { t } = useI18n();
 
   // PII masking: detect if current user is a collaborator with restricted sub_role
   const [shouldMaskPII, setShouldMaskPII] = useState(false);
@@ -339,7 +341,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
         </h3>
         {labelsEnabled && selectedOrderIds.length > 0 && (
           <Button size="sm" onClick={() => setShowLabelPreview(true)} className="gap-1.5">
-            <Printer size={14} /> Print Labels ({selectedOrderIds.length})
+            <Printer size={14} /> {t("label.printLabels")} ({selectedOrderIds.length})
           </Button>
         )}
       </div>
