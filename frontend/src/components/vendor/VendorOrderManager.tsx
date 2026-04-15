@@ -322,11 +322,27 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
     );
   }
 
+  const toggleOrderSelection = (orderId: string) => {
+    setSelectedOrderIds(prev => prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]);
+  };
+
+  const toggleAllOrders = (orderIds: string[]) => {
+    const allSelected = orderIds.every(id => selectedOrderIds.includes(id));
+    setSelectedOrderIds(allSelected ? selectedOrderIds.filter(id => !orderIds.includes(id)) : [...new Set([...selectedOrderIds, ...orderIds])]);
+  };
+
   return (
     <div className="space-y-3">
-      <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-        <Package size={16} /> Commandes ({filteredOrders.length})
-      </h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+          <Package size={16} /> Commandes ({filteredOrders.length})
+        </h3>
+        {labelsEnabled && selectedOrderIds.length > 0 && (
+          <Button size="sm" onClick={() => setShowLabelPreview(true)} className="gap-1.5">
+            <Printer size={14} /> Print Labels ({selectedOrderIds.length})
+          </Button>
+        )}
+      </div>
 
       {/* Search bar */}
       <div className="relative">
