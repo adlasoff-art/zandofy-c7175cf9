@@ -66,7 +66,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate UUIDs
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!orderIds.every((id) => uuidRegex.test(id))) {
       return new Response(
@@ -92,11 +91,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch orders
+    // Fetch orders (added shipping_email)
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, order_ref, shipping_first_name, shipping_last_name, shipping_phone, shipping_address, shipping_city, shipping_country, total, shipping_cost, tracking_number, delivery_choice, store_id, status"
+        "id, order_ref, shipping_first_name, shipping_last_name, shipping_phone, shipping_email, shipping_address, shipping_city, shipping_country, total, shipping_cost, tracking_number, delivery_choice, store_id, status"
       )
       .in("id", orderIds);
 
@@ -112,7 +111,6 @@ Deno.serve(async (req) => {
       const storeIds = [...new Set(orders.map((o: any) => o.store_id).filter(Boolean))];
 
       for (const sid of storeIds) {
-        // Check ownership or collaboration
         const { data: store } = await supabaseAdmin
           .from("stores")
           .select("owner_id")
@@ -138,7 +136,6 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Check shipping_labels_enabled
         const { data: pricing } = await supabaseAdmin
           .from("vendor_pricing_overrides")
           .select("shipping_labels_enabled")
@@ -154,16 +151,45 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch order items count per order
-    const { data: itemCounts } = await supabaseAdmin
+    // Fetch order items count + origin_country per order
+    const { data: orderItems } = await supabaseAdmin
       .from("order_items")
-      .select("order_id, quantity")
+      .select("order_id, quantity, product_id")
       .in("order_id", orderIds);
 
     const itemCountMap: Record<string, number> = {};
-    (itemCounts || []).forEach((i: any) => {
+    const orderProductIds: Record<string, string[]> = {};
+    (orderItems || []).forEach((i: any) => {
       itemCountMap[i.order_id] = (itemCountMap[i.order_id] || 0) + (i.quantity || 1);
+      if (i.product_id) {
+        if (!orderProductIds[i.order_id]) orderProductIds[i.order_id] = [];
+        orderProductIds[i.order_id].push(i.product_id);
+      }
     });
+
+    // Fetch origin_country from products
+    const allProductIds = [...new Set(Object.values(orderProductIds).flat())];
+    const originMap: Record<string, string> = {};
+    if (allProductIds.length > 0) {
+      const { data: products } = await supabaseAdmin
+        .from("products")
+        .select("id, origin_country")
+        .in("id", allProductIds);
+      (products || []).forEach((p: any) => {
+        if (p.origin_country) originMap[p.id] = p.origin_country;
+      });
+    }
+
+    // Get origin_country per order (first product's origin)
+    const orderOriginMap: Record<string, string> = {};
+    for (const [orderId, pids] of Object.entries(orderProductIds)) {
+      for (const pid of pids) {
+        if (originMap[pid]) {
+          orderOriginMap[orderId] = originMap[pid];
+          break;
+        }
+      }
+    }
 
     // Fetch store info
     const storeIds = [...new Set(orders.map((o: any) => o.store_id).filter(Boolean))];
@@ -177,6 +203,18 @@ Deno.serve(async (req) => {
       storeMap[s.id] = s;
     });
 
+    // Fetch carrier logo from platform_settings
+    let carrierLogoUrl = "";
+    const { data: labelConfig } = await supabaseAdmin
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "shipping_label_config")
+      .single();
+    if (labelConfig?.value) {
+      const cfg = labelConfig.value as any;
+      carrierLogoUrl = cfg.carrier_logo_url || "";
+    }
+
     // Build labels data
     const labels = orders.map((o: any) => {
       const store = storeMap[o.store_id] || {};
@@ -185,6 +223,7 @@ Deno.serve(async (req) => {
         trackingNumber: o.tracking_number || "",
         recipientName: `${o.shipping_first_name || ""} ${o.shipping_last_name || ""}`.trim() || "—",
         recipientPhone: o.shipping_phone || "",
+        recipientEmail: o.shipping_email || "",
         recipientAddress: o.shipping_address || "",
         recipientCity: o.shipping_city || "",
         recipientCountry: o.shipping_country || "",
@@ -194,6 +233,8 @@ Deno.serve(async (req) => {
         storeName: store.name || "Zandofy",
         storeCity: store.city || "",
         storeCountry: store.country || "",
+        originCountry: orderOriginMap[o.id] || "",
+        carrierLogoUrl,
       };
     });
 
