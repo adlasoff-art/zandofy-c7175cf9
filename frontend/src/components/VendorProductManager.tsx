@@ -104,6 +104,8 @@ const EMPTY_FORM = {
   model_size: "",
   prep_days_min: 2,
   prep_days_max: 5,
+  can_ship_air: true,
+  can_ship_sea: false,
 };
 
 type ProductFormState = typeof EMPTY_FORM;
@@ -161,7 +163,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     setLoading(prev => products.length === 0 ? true : prev);
     const { data } = await (supabase
       .from("products")
-      .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max") as any)
+      .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea") as any)
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
 
@@ -371,6 +373,8 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       auto_pricing_enabled: (product as any).auto_pricing_enabled !== false,
       vendor_extra_margin: (product as any).vendor_extra_margin || 0,
       model_size: (product as any).model_size || "",
+      can_ship_air: (product as any).can_ship_air !== false,
+      can_ship_sea: (product as any).can_ship_sea === true,
     });
     // Split images: position 0 = main, rest = variations
     const sorted = [...product.images].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
@@ -459,6 +463,8 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       auto_pricing_enabled: form.auto_pricing_enabled,
       vendor_extra_margin: form.vendor_extra_margin || 0,
       model_size: form.model_size && form.model_size.trim() !== '' ? form.model_size.trim() : null,
+      can_ship_air: form.can_ship_air,
+      can_ship_sea: form.can_ship_sea,
     };
 
     let productId = editing?.id;
@@ -835,6 +841,40 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
           <div className="grid grid-cols-2 gap-3">
             <Field label="Largeur (cm)" type="number" value={String(form.width_cm)} onChange={(v) => setForm({ ...form, width_cm: Number(v) })} />
             <Field label="Hauteur (cm)" type="number" value={String(form.height_cm)} onChange={(v) => setForm({ ...form, height_cm: Number(v) })} />
+          </div>
+
+          {/* Modes d'expédition */}
+          <div className="border-t border-border pt-3 mt-1">
+            <label className="text-xs font-semibold text-foreground">✈️ Modes d'expédition disponibles</label>
+            <p className="text-[10px] text-muted-foreground mb-2">Cochez les modes d'expédition possibles pour ce produit</p>
+          </div>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.can_ship_air}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  if (!val && !form.can_ship_sea) { return; }
+                  setForm({ ...form, can_ship_air: val });
+                }}
+                className="rounded border-border"
+              />
+              ✈️ Aérien
+            </label>
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.can_ship_sea}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  if (!val && !form.can_ship_air) { return; }
+                  setForm({ ...form, can_ship_sea: val });
+                }}
+                className="rounded border-border"
+              />
+              🚢 Maritime
+            </label>
           </div>
 
           {/* Délai de préparation fournisseur */}
