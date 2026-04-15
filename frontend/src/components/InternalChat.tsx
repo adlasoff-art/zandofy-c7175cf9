@@ -214,7 +214,7 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
-      toast.error("Le fichier ne doit pas dépasser 5 Mo.");
+      toast.error("Le fichier ne doit pas dépasser 3 Mo.");
       return;
     }
 
@@ -271,7 +271,7 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
         const file = item.getAsFile();
         if (!file) return;
         if (file.size > MAX_FILE_SIZE) {
-          toast.error("L'image collée dépasse 5 Mo.");
+          toast.error("L'image collée dépasse 3 Mo.");
           return;
         }
 
@@ -403,26 +403,22 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
 
       {/* Input area */}
       <div className="border-t border-border px-3 py-2 flex items-end gap-2">
-        {/* File upload button (only if media enabled) */}
-        {mediaEnabled && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,application/pdf"
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="shrink-0 w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 mb-0.5"
-              title="Envoyer une image ou un PDF (max 5 Mo)"
-            >
-              {uploading ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
-            </button>
-          </>
-        )}
+        {/* File upload button — always visible */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,application/pdf"
+          className="hidden"
+          onChange={handleFileUpload}
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="shrink-0 w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 mb-0.5"
+          title="Joindre une image ou un PDF (max 3 Mo)"
+        >
+          {uploading ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
+        </button>
         <textarea
           ref={textareaRef}
           value={newMessage}
