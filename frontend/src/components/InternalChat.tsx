@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Send, Loader2, MessageCircle, LogIn, ImageIcon, FileText, X, Paperclip } from "lucide-react";
+import { Send, Loader2, MessageCircle, LogIn, FileText, Paperclip } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { renderChatMessageContent, mergeChatMessages } from "@/components/messages/chatMessageUtils";
 
 interface ChatMessage {
   id: string;
@@ -37,9 +38,19 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
   const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const lastFetchRef = useRef<string | null>(null);
 
   const scrollToBottom = useCallback(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, []);
+
+  // Auto-resize textarea
+  const autoResize = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
   }, []);
 
   // Check if store has media enabled
@@ -86,7 +97,7 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
     initConversation();
   }, [user, storeId, productId]);
 
-  // Load messages when conversation exists
+  // Load messages when conversation exists + fast polling
   useEffect(() => {
     if (!conversationId) return;
 
@@ -97,35 +108,46 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
         .eq("conversation_id", conversationId!)
         .order("created_at", { ascending: true });
 
-      if (data) {
+      if (data && data.length > 0) {
         setMessages(data as ChatMessage[]);
+        lastFetchRef.current = data[data.length - 1].created_at;
         setTimeout(scrollToBottom, 100);
       }
     }
 
     loadMessages();
 
-    // Poll for new messages every 5 seconds (Realtime removed for security)
-    const pollInterval = setInterval(async () => {
-      const { data } = await supabase
+    // Fast incremental polling (1.2s when tab focused)
+    let active = true;
+    const poll = async () => {
+      if (!active || document.hidden) return;
+      const since = lastFetchRef.current;
+      let query = supabase
         .from("messages")
         .select("*")
         .eq("conversation_id", conversationId!)
         .order("created_at", { ascending: true });
 
-      if (data) {
-        setMessages((prev) => {
-          if (data.length !== prev.length || (data.length > 0 && data[data.length - 1].id !== prev[prev.length - 1]?.id)) {
-            setTimeout(scrollToBottom, 100);
-            return data as ChatMessage[];
-          }
-          return prev;
-        });
+      if (since) {
+        query = query.gt("created_at", since);
       }
-    }, 5000);
+
+      const { data } = await query;
+      if (data && data.length > 0) {
+        lastFetchRef.current = data[data.length - 1].created_at;
+        setMessages(prev => mergeChatMessages(prev, data as ChatMessage[]));
+        setTimeout(scrollToBottom, 100);
+      }
+    };
+
+    const interval = setInterval(poll, 1200);
+    const onFocus = () => poll();
+    window.addEventListener("focus", onFocus);
 
     return () => {
-      clearInterval(pollInterval);
+      active = false;
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
     };
   }, [conversationId, scrollToBottom]);
 
@@ -152,22 +174,30 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
 
   const handleSend = async () => {
     if (!newMessage.trim() || !user || sending) return;
+    const content = newMessage.trim();
     setSending(true);
 
     try {
       const convId = await ensureConversation();
       if (!convId) { setSending(false); return; }
 
-      const { error } = await supabase.from("messages").insert({
+      const { data, error } = await supabase.from("messages").insert({
         conversation_id: convId,
         sender_id: user.id,
-        content: newMessage.trim(),
-      });
+        content,
+      }).select().single();
 
       if (error) {
         console.error("Error sending message:", error);
-      } else {
+      } else if (data) {
+        // Optimistic: show immediately
+        setMessages(prev => mergeChatMessages(prev, [data as ChatMessage]));
+        lastFetchRef.current = data.created_at;
         setNewMessage("");
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto";
+        }
+        setTimeout(scrollToBottom, 50);
       }
     } finally {
       setSending(false);
@@ -177,17 +207,12 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-
-    // Reset input
     if (fileInputRef.current) fileInputRef.current.value = "";
 
-    // Validate type
     if (!ALLOWED_TYPES.includes(file.type)) {
       toast.error("Format non autorisé. Seuls les images (JPG, PNG, WebP, GIF) et les PDF sont acceptés.");
       return;
     }
-
-    // Validate size
     if (file.size > MAX_FILE_SIZE) {
       toast.error("Le fichier ne doit pas dépasser 5 Mo.");
       return;
@@ -213,20 +238,79 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
       }
 
       const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(filePath);
-
-      // Send as message with special format
       const isPdf = file.type === "application/pdf";
       const content = isPdf
         ? `[📄 PDF] ${file.name}\n${urlData.publicUrl}`
         : `[📷 Image]\n${urlData.publicUrl}`;
 
-      await supabase.from("messages").insert({
+      const { data } = await supabase.from("messages").insert({
         conversation_id: convId,
         sender_id: user.id,
         content,
-      });
+      }).select().single();
+
+      if (data) {
+        setMessages(prev => mergeChatMessages(prev, [data as ChatMessage]));
+        lastFetchRef.current = data.created_at;
+        setTimeout(scrollToBottom, 50);
+      }
     } finally {
       setUploading(false);
+    }
+  };
+
+  // Handle paste for images
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    if (!mediaEnabled || !user) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        if (file.size > MAX_FILE_SIZE) {
+          toast.error("L'image collée dépasse 5 Mo.");
+          return;
+        }
+
+        setUploading(true);
+        try {
+          const convId = await ensureConversation();
+          if (!convId) { setUploading(false); return; }
+
+          const ext = file.type.split("/")[1] || "png";
+          const filePath = `${user.id}/${Date.now()}-paste.${ext}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from("chat-media")
+            .upload(filePath, file);
+
+          if (uploadError) {
+            toast.error("Erreur lors de l'upload de l'image");
+            return;
+          }
+
+          const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(filePath);
+          const content = `[📷 Image]\n${urlData.publicUrl}`;
+
+          const { data } = await supabase.from("messages").insert({
+            conversation_id: convId,
+            sender_id: user.id,
+            content,
+          }).select().single();
+
+          if (data) {
+            setMessages(prev => mergeChatMessages(prev, [data as ChatMessage]));
+            lastFetchRef.current = data.created_at;
+            setTimeout(scrollToBottom, 50);
+          }
+        } finally {
+          setUploading(false);
+        }
+        return; // only handle first image
+      }
     }
   };
 
@@ -235,37 +319,6 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
       e.preventDefault();
       handleSend();
     }
-  };
-
-  // Render message content (detect images and PDFs)
-  const renderContent = (content: string) => {
-    // Image message
-    if (content.startsWith("[📷 Image]")) {
-      const url = content.split("\n")[1]?.trim();
-      if (url) {
-        return (
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            <img src={url} alt="Image partagée" className="max-w-[200px] max-h-[200px] rounded-md object-cover" />
-          </a>
-        );
-      }
-    }
-    // PDF message
-    if (content.startsWith("[📄 PDF]")) {
-      const lines = content.split("\n");
-      const fileName = lines[0]?.replace("[📄 PDF] ", "").trim();
-      const url = lines[1]?.trim();
-      if (url) {
-        return (
-          <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm underline">
-            <FileText size={16} className="shrink-0" />
-            <span className="truncate">{fileName || "Document PDF"}</span>
-          </a>
-        );
-      }
-    }
-    // Regular text
-    return <p className="whitespace-pre-wrap break-words">{content}</p>;
   };
 
   // Not logged in state
@@ -330,7 +383,7 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
                       : "bg-[hsl(var(--chat-received))] text-[hsl(var(--chat-received-foreground))] rounded-bl-none"
                   }`}
                 >
-                  {renderContent(msg.content)}
+                  {renderChatMessageContent(msg.content)}
                   <span
                     className={`block text-[10px] mt-1 ${
                       isOwn ? "text-primary-foreground/60" : "text-muted-foreground"
@@ -349,21 +402,21 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
       </div>
 
       {/* Input area */}
-      <div className="border-t border-border px-3 py-2 flex items-center gap-2">
+      <div className="border-t border-border px-3 py-2 flex items-end gap-2">
         {/* File upload button (only if media enabled) */}
         {mediaEnabled && (
           <>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+              accept="image/*,application/pdf"
               className="hidden"
               onChange={handleFileUpload}
             />
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="shrink-0 w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              className="shrink-0 w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 mb-0.5"
               title="Envoyer une image ou un PDF (max 5 Mo)"
             >
               {uploading ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
@@ -371,18 +424,20 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
           </>
         )}
         <textarea
+          ref={textareaRef}
           value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
+          onChange={(e) => { setNewMessage(e.target.value); autoResize(); }}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder="Écrivez votre message..."
-          rows={1}
-          className="flex-1 resize-none bg-muted/50 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground"
+          rows={2}
+          className="flex-1 resize-none bg-muted/50 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground min-h-[44px] max-h-[120px]"
         />
         <Button
           size="icon"
           onClick={handleSend}
           disabled={!newMessage.trim() || sending}
-          className="shrink-0 h-9 w-9"
+          className="shrink-0 h-9 w-9 mb-0.5"
         >
           {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
         </Button>

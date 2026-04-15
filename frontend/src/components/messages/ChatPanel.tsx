@@ -5,7 +5,7 @@ import { useRoles } from "@/hooks/use-roles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Send, Loader2, MessageCircle, Paperclip, FileText, Search, X,
+  Send, Loader2, MessageCircle, Paperclip, Search, X,
   Check, CheckCheck, ChevronDown, Trash2, ArrowLeft,
 } from "lucide-react";
 import { QuickReplies } from "./QuickReplies";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ConversationItem } from "./ConversationList";
+import { renderChatMessageContent, mergeChatMessages } from "./chatMessageUtils";
 
 interface ChatMessage {
   id: string;
@@ -56,6 +57,14 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const autoResize = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -223,19 +232,23 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
 
     setSending(true);
     try {
-      const { error } = await supabase.from("messages").insert({
+      const { data, error } = await supabase.from("messages").insert({
         conversation_id: conversation.id,
         sender_id: user.id,
         content,
-      });
+      }).select().single();
 
       if (error) {
         console.error("Error sending message:", error);
         toast.error("Erreur lors de l'envoi");
-      } else {
+      } else if (data) {
+        // Optimistic: show immediately
+        setMessages(prev => mergeChatMessages(prev, [{ ...data, read_at: null } as ChatMessage]));
         setNewMessage("");
+        if (textareaRef.current) textareaRef.current.style.height = "auto";
+        setTimeout(scrollToBottom, 50);
         // Update conversation timestamp
-        await supabase
+        supabase
           .from("conversations")
           .update({ updated_at: new Date().toISOString() })
           .eq("id", conversation.id);
@@ -279,11 +292,16 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
         ? `[📄 PDF] ${file.name}\n${urlData.publicUrl}`
         : `[📷 Image]\n${urlData.publicUrl}`;
 
-      await supabase.from("messages").insert({
+      const { data } = await supabase.from("messages").insert({
         conversation_id: conversation.id,
         sender_id: user.id,
         content,
-      });
+      }).select().single();
+
+      if (data) {
+        setMessages(prev => mergeChatMessages(prev, [{ ...data, read_at: null } as ChatMessage]));
+        setTimeout(scrollToBottom, 50);
+      }
     } finally {
       setUploading(false);
     }
@@ -315,32 +333,42 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
     setTimeout(() => setHighlightedMsgId(null), 2000);
   };
 
-  // Render message content
-  const renderContent = (content: string) => {
-    if (content.startsWith("[📷 Image]")) {
-      const url = content.split("\n")[1]?.trim();
-      if (url) {
-        return (
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            <img src={url} alt="Image" className="max-w-[200px] max-h-[200px] rounded-md object-cover" />
-          </a>
-        );
+  // Paste image handler
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    if (!mediaEnabled || !user) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        if (file.size > MAX_FILE_SIZE) {
+          toast.error("L'image collée dépasse 5 Mo.");
+          return;
+        }
+        setUploading(true);
+        try {
+          const ext = file.type.split("/")[1] || "png";
+          const filePath = `${user.id}/${Date.now()}-paste.${ext}`;
+          const { error: uploadError } = await supabase.storage.from("chat-media").upload(filePath, file);
+          if (uploadError) { toast.error("Erreur lors de l'upload"); return; }
+          const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(filePath);
+          const content = `[📷 Image]\n${urlData.publicUrl}`;
+          const { data } = await supabase.from("messages").insert({
+            conversation_id: conversation.id,
+            sender_id: user.id,
+            content,
+          }).select().single();
+          if (data) {
+            setMessages(prev => mergeChatMessages(prev, [{ ...data, read_at: null } as ChatMessage]));
+            setTimeout(scrollToBottom, 50);
+          }
+        } finally { setUploading(false); }
+        return;
       }
     }
-    if (content.startsWith("[📄 PDF]")) {
-      const lines = content.split("\n");
-      const fileName = lines[0]?.replace("[📄 PDF] ", "").trim();
-      const url = lines[1]?.trim();
-      if (url) {
-        return (
-          <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm underline">
-            <FileText size={16} className="shrink-0" />
-            <span className="truncate">{fileName || "Document PDF"}</span>
-          </a>
-        );
-      }
-    }
-    return <p className="whitespace-pre-wrap break-words">{content}</p>;
   };
 
   // Group messages by date
@@ -515,7 +543,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
                         highlightedMsgId === msg.id && "ring-2 ring-accent"
                       )}
                     >
-                      {renderContent(msg.content)}
+                      {renderChatMessageContent(msg.content)}
                       <div className={cn(
                         "flex items-center gap-1 mt-1",
                         isOwn ? "justify-end" : "justify-start"
@@ -588,7 +616,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+              accept="image/*,application/pdf"
               className="hidden"
               onChange={handleFileUpload}
             />
@@ -602,12 +630,14 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
           </>
         )}
         <textarea
+          ref={textareaRef}
           value={newMessage}
-          onChange={e => { setNewMessage(e.target.value); broadcastTyping(); }}
+          onChange={e => { setNewMessage(e.target.value); broadcastTyping(); autoResize(); }}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder="Écrivez votre message..."
-          rows={1}
-          className="flex-1 resize-none bg-muted/50 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground"
+          rows={2}
+          className="flex-1 resize-none bg-muted/50 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground min-h-[44px] max-h-[120px]"
         />
         <Button
           size="icon"
