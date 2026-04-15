@@ -35,7 +35,27 @@ export function MobileAccountMenu() {
   const { user, loading: authLoading, signOut } = useAuth();
   const { isAdmin, isManager, isVendor, isShipper, isRider, isStaff, loading: rolesLoading } = useRoles();
   const { t } = useI18n();
-  const { isCertified } = useCertification();
+  const [suppliersEnabled, setSuppliersEnabled] = useState(false);
+
+  useEffect(() => {
+    if (!user || !isVendor) return;
+    const check = async () => {
+      const { data: store } = await supabase
+        .from("stores")
+        .select("id")
+        .eq("owner_id", user.id)
+        .maybeSingle();
+      if (!store) return;
+      const { data: vpo } = await supabase
+        .from("vendor_pricing_overrides")
+        .select("suppliers_enabled")
+        .eq("store_id", store.id)
+        .maybeSingle();
+      setSuppliersEnabled(vpo?.suppliers_enabled ?? false);
+    };
+    check();
+  }, [user, isVendor]);
+
 
   if (authLoading || rolesLoading) {
     return (
@@ -74,8 +94,7 @@ export function MobileAccountMenu() {
         { to: "/dashboard?tab=subscriptions", icon: Award, label: "Mes abonnements" },
         { to: "/wishlist", icon: Heart, label: "Liste de souhaits" },
         { to: "/messages", icon: MessageSquare, label: "Messages" },
-      ],
-    },
+        ...(isVendor && suppliersEnabled ? [{ to: "/vendor?tab=suppliers", icon: Package, label: "Fournisseurs" }] : []),
     {
       title: "Fidélité & Parrainage",
       items: [
