@@ -1,8 +1,11 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRoles } from "@/hooks/use-roles";
 import { useI18n } from "@/contexts/I18nContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
+  Package,
   LayoutDashboard,
   Store,
   Truck,
