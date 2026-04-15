@@ -29,6 +29,7 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { MaintenanceGuard } from "@/components/MaintenanceGuard";
 import { CookieConsent } from "@/components/CookieConsent";
 import { AnnouncementPopup } from "@/components/AnnouncementPopup";
+import { AutomationPopup } from "@/components/AutomationPopup";
 import { DynamicFavicon } from "@/components/DynamicFavicon";
 import { UserPresenceTracker } from "@/components/UserPresenceTracker";
 import { Suspense, lazy, ComponentType } from "react";
@@ -206,6 +207,7 @@ const App = () => (
             <OfflineIndicator />
             <CookieConsent />
             <AnnouncementPopup />
+            <AutomationPopup />
             <MaintenanceGuard>
             <BanGuard>
             <Suspense fallback={<PageLoadingSkeleton />}>
