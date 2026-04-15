@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SupplierPopover, OrderSuppliersPopover } from "@/components/vendor/SupplierPopover";
-import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send, Edit2, Truck, Search, Check, X } from "lucide-react";
+import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User as UserIcon, Bike, AlertTriangle, Send, Edit2, Truck, Search, Check, X, Printer } from "lucide-react";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { Button } from "@/components/ui/button";
 import { PaymentProofUpload } from "@/components/PaymentProofUpload";
@@ -24,6 +24,8 @@ import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, Delive
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { getColorDisplay } from "@/utils/colorName";
+import { ShippingLabelPreview } from "@/components/shipping/ShippingLabelPreview";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface OrderItem {
   id: string;
@@ -130,6 +132,9 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
   const [editTrackingModal, setEditTrackingModal] = useState<string | null>(null);
   const [hubPickupModal, setHubPickupModal] = useState<string | null>(null);
   const [hasSelfDelivery, setHasSelfDelivery] = useState(false);
+  const [labelsEnabled, setLabelsEnabled] = useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [showLabelPreview, setShowLabelPreview] = useState(false);
 
   // Check if store has self-delivery
   useEffect(() => {
@@ -142,6 +147,19 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
       setHasSelfDelivery(data?.can_self_deliver || false);
     }
     check();
+  }, [storeId]);
+
+  // Check if shipping labels are enabled for this store
+  useEffect(() => {
+    async function checkLabels() {
+      const { data } = await (supabase as any)
+        .from("vendor_pricing_overrides")
+        .select("shipping_labels_enabled")
+        .eq("store_id", storeId)
+        .maybeSingle();
+      setLabelsEnabled(data?.shipping_labels_enabled || false);
+    }
+    checkLabels();
   }, [storeId]);
 
   const loadOrders = useCallback(async () => {
@@ -304,11 +322,27 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
     );
   }
 
+  const toggleOrderSelection = (orderId: string) => {
+    setSelectedOrderIds(prev => prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]);
+  };
+
+  const toggleAllOrders = (orderIds: string[]) => {
+    const allSelected = orderIds.every(id => selectedOrderIds.includes(id));
+    setSelectedOrderIds(allSelected ? selectedOrderIds.filter(id => !orderIds.includes(id)) : [...new Set([...selectedOrderIds, ...orderIds])]);
+  };
+
   return (
     <div className="space-y-3">
-      <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-        <Package size={16} /> Commandes ({filteredOrders.length})
-      </h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+          <Package size={16} /> Commandes ({filteredOrders.length})
+        </h3>
+        {labelsEnabled && selectedOrderIds.length > 0 && (
+          <Button size="sm" onClick={() => setShowLabelPreview(true)} className="gap-1.5">
+            <Printer size={14} /> Print Labels ({selectedOrderIds.length})
+          </Button>
+        )}
+      </div>
 
       {/* Search bar */}
       <div className="relative">
@@ -358,10 +392,19 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
 
         return (
           <div key={order.id} className="bg-card border border-border rounded-lg overflow-hidden">
-            <button
-              onClick={() => setExpandedId(isExpanded ? null : order.id)}
-              className="w-full p-3 flex items-center gap-3 text-left hover:bg-muted/30 transition-colors"
-            >
+            <div className="w-full p-3 flex items-center gap-3 text-left hover:bg-muted/30 transition-colors">
+              {labelsEnabled && (
+                <Checkbox
+                  checked={selectedOrderIds.includes(order.id)}
+                  onCheckedChange={() => toggleOrderSelection(order.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="shrink-0"
+                />
+              )}
+              <button
+                onClick={() => setExpandedId(isExpanded ? null : order.id)}
+                className="flex-1 flex items-center gap-3 text-left"
+              >
               <StatusIcon size={18} className={config.color} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -381,7 +424,8 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                 {new Date(order.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
               </span>
               {isExpanded ? <ChevronUp size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />}
-            </button>
+              </button>
+            </div>
 
             {isExpanded && (
               <div className="px-3 pb-3 border-t border-border space-y-3 pt-3">
@@ -830,6 +874,18 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
           />
         );
       })()}
+
+      {/* Shipping Label Preview */}
+      {labelsEnabled && showLabelPreview && selectedOrderIds.length > 0 && (
+        <ShippingLabelPreview
+          open={showLabelPreview}
+          onClose={() => {
+            setShowLabelPreview(false);
+            setSelectedOrderIds([]);
+          }}
+          orderIds={selectedOrderIds}
+        />
+      )}
     </div>
   );
 }
