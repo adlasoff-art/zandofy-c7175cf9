@@ -60,6 +60,8 @@ export default function AdminOrdersPage() {
       setSelectedOrders((prev) => [...new Set([...prev, ...orderIds])]);
     }
   };
+
+  const { data: orders = [], isLoading } = useQuery({
     queryKey: ["admin-orders", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
