@@ -1,7 +1,9 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { LocationHierarchyFilter, type LocationFilters } from "@/components/admin/LocationHierarchyFilter";
-import { Search, Loader2, ChevronDown, ChevronUp, MapPin, Truck, AlertTriangle, Download, Hash, Bike, DollarSign, Trash2 } from "lucide-react";
+import { Search, Loader2, ChevronDown, ChevronUp, MapPin, Truck, AlertTriangle, Download, Hash, Bike, DollarSign, Trash2, Printer } from "lucide-react";
 import { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ShippingLabelPreview } from "@/components/shipping/ShippingLabelPreview";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
