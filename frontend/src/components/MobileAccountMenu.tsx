@@ -95,6 +95,8 @@ export function MobileAccountMenu() {
         { to: "/wishlist", icon: Heart, label: "Liste de souhaits" },
         { to: "/messages", icon: MessageSquare, label: "Messages" },
         ...(isVendor && suppliersEnabled ? [{ to: "/vendor?tab=suppliers", icon: Package, label: "Fournisseurs" }] : []),
+      ],
+    },
     {
       title: "Fidélité & Parrainage",
       items: [
