@@ -333,32 +333,42 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
     setTimeout(() => setHighlightedMsgId(null), 2000);
   };
 
-  // Render message content
-  const renderContent = (content: string) => {
-    if (content.startsWith("[📷 Image]")) {
-      const url = content.split("\n")[1]?.trim();
-      if (url) {
-        return (
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            <img src={url} alt="Image" className="max-w-[200px] max-h-[200px] rounded-md object-cover" />
-          </a>
-        );
+  // Paste image handler
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    if (!mediaEnabled || !user) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        if (file.size > MAX_FILE_SIZE) {
+          toast.error("L'image collée dépasse 5 Mo.");
+          return;
+        }
+        setUploading(true);
+        try {
+          const ext = file.type.split("/")[1] || "png";
+          const filePath = `${user.id}/${Date.now()}-paste.${ext}`;
+          const { error: uploadError } = await supabase.storage.from("chat-media").upload(filePath, file);
+          if (uploadError) { toast.error("Erreur lors de l'upload"); return; }
+          const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(filePath);
+          const content = `[📷 Image]\n${urlData.publicUrl}`;
+          const { data } = await supabase.from("messages").insert({
+            conversation_id: conversation.id,
+            sender_id: user.id,
+            content,
+          }).select().single();
+          if (data) {
+            setMessages(prev => mergeChatMessages(prev, [{ ...data, read_at: null } as ChatMessage]));
+            setTimeout(scrollToBottom, 50);
+          }
+        } finally { setUploading(false); }
+        return;
       }
     }
-    if (content.startsWith("[📄 PDF]")) {
-      const lines = content.split("\n");
-      const fileName = lines[0]?.replace("[📄 PDF] ", "").trim();
-      const url = lines[1]?.trim();
-      if (url) {
-        return (
-          <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm underline">
-            <FileText size={16} className="shrink-0" />
-            <span className="truncate">{fileName || "Document PDF"}</span>
-          </a>
-        );
-      }
-    }
-    return <p className="whitespace-pre-wrap break-words">{content}</p>;
   };
 
   // Group messages by date
