@@ -408,22 +408,43 @@ export default function AdminOrdersPage() {
           <p className="text-center py-8 text-sm text-muted-foreground">Aucune commande trouvée.</p>
         ) : (
           <div className="divide-y divide-border">
+            {/* Select all header */}
             {(() => {
               const safeAdminPage = Math.max(1, Math.min(adminOrderPage, Math.ceil(filtered.length / adminOrderPageSize)));
               const paginatedFiltered = filtered.slice((safeAdminPage - 1) * adminOrderPageSize, safeAdminPage * adminOrderPageSize);
-              return paginatedFiltered.map((o) => {
+              const pageIds = paginatedFiltered.map((o: any) => o.id);
+              const allPageSelected = pageIds.length > 0 && pageIds.every((id: string) => selectedOrders.includes(id));
+              return (
+                <>
+                  <div className="px-3 py-2 flex items-center gap-3 bg-muted/30 border-b border-border">
+                    <Checkbox
+                      checked={allPageSelected}
+                      onCheckedChange={() => toggleSelectAll(pageIds)}
+                      aria-label="Sélectionner toutes les commandes de la page"
+                    />
+                    <span className="text-[10px] text-muted-foreground">Tout sélectionner</span>
+                  </div>
+                  {paginatedFiltered.map((o: any) => {
               const cfg = STATUS_CONFIG[o.status] || STATUS_CONFIG.pending;
               const StatusIcon = cfg.icon;
               const next = getNextStatus(o.status);
               const canAdvance = canAdminAdvance(o.status);
               const isExpanded = expandedId === o.id;
+              const isSelected = selectedOrders.includes(o.id);
 
               return (
                 <div key={o.id}>
-                  <button
-                    onClick={() => setExpandedId(isExpanded ? null : o.id)}
-                    className="w-full p-3 flex items-center gap-3 text-left hover:bg-muted/20 transition-colors text-sm"
-                  >
+                  <div className="w-full p-3 flex items-center gap-3 text-left text-sm">
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleOrderSelection(o.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Sélectionner ${o.order_ref}`}
+                    />
+                    <button
+                      onClick={() => setExpandedId(isExpanded ? null : o.id)}
+                      className="flex-1 flex items-center gap-3 hover:bg-muted/20 transition-colors rounded-md px-1"
+                    >
                     <StatusIcon size={16} className={cfg.color} />
                     <span className="font-mono text-xs w-28 shrink-0">{o.order_ref}</span>
                     <span className="flex-1 min-w-0 truncate">{o.shipping_first_name} {o.shipping_last_name?.charAt(0)}.</span>
