@@ -35,6 +35,7 @@ export function MobileAccountMenu() {
   const { user, loading: authLoading, signOut } = useAuth();
   const { isAdmin, isManager, isVendor, isShipper, isRider, isStaff, loading: rolesLoading } = useRoles();
   const { t } = useI18n();
+  const { isCertified } = useCertification();
   const [suppliersEnabled, setSuppliersEnabled] = useState(false);
 
   useEffect(() => {
@@ -47,11 +48,11 @@ export function MobileAccountMenu() {
         .maybeSingle();
       if (!store) return;
       const { data: vpo } = await supabase
-        .from("vendor_pricing_overrides")
+        .from("vendor_pricing_overrides" as any)
         .select("suppliers_enabled")
         .eq("store_id", store.id)
         .maybeSingle();
-      setSuppliersEnabled(vpo?.suppliers_enabled ?? false);
+      setSuppliersEnabled((vpo as any)?.suppliers_enabled ?? false);
     };
     check();
   }, [user, isVendor]);
