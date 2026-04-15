@@ -104,6 +104,8 @@ const EMPTY_FORM = {
   model_size: "",
   prep_days_min: 2,
   prep_days_max: 5,
+  can_ship_air: true,
+  can_ship_sea: false,
 };
 
 type ProductFormState = typeof EMPTY_FORM;
