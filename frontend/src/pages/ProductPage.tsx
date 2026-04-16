@@ -247,8 +247,8 @@ export default function ProductPage() {
   });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
     { name: "Accueil", url: "/" },
-    { name: product.categoryFr, url: `/category/${product.categoryFr?.toLowerCase()}` },
-    { name: product.nameFr, url: `/product/${product.slug || product.id}` },
+    { name: product.categoryFr || "Produit", url: `/category/${(product.categoryFr || "produit").toLowerCase()}` },
+    { name: product.nameFr || "Produit", url: `/product/${product.slug || product.id}` },
   ]);
 
   return (

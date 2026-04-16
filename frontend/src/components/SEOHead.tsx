@@ -184,10 +184,11 @@ export function buildProductJsonLd(product: {
 
 // ─── Helper: Build BreadcrumbList JSON-LD ─────────────
 export function buildBreadcrumbJsonLd(items: { name: string; url: string }[]) {
+  const validItems = items.filter(i => i.name && i.name.trim());
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: items.map((item, i) => ({
+    itemListElement: validItems.map((item, i) => ({
       "@type": "ListItem",
       position: i + 1,
       name: item.name,
