@@ -94,6 +94,21 @@ export function HeroBanner() {
     if (current >= heroSlides.length && heroSlides.length > 0) setCurrent(0);
   }, [heroSlides.length, current]);
 
+  // Inject preload link for first slide image (LCP optimization)
+  useEffect(() => {
+    const firstUrl = heroSlides[0]?.image_url;
+    if (!firstUrl) return;
+    const id = "hero-lcp-preload";
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "preload";
+    link.as = "image";
+    link.href = firstUrl;
+    (link as any).fetchPriority = "high";
+    document.head.appendChild(link);
+  }, [heroSlides]);
+
   // Touch handlers for swipe
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
