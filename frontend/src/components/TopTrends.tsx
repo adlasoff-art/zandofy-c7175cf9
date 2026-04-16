@@ -9,10 +9,13 @@ import { useI18n } from "@/contexts/I18nContext";
 export function TopTrends() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const { t } = useI18n();
 
-  useEffect(() => {
-    (async () => {
+  const loadProducts = async () => {
+    setLoading(true);
+    setError(false);
+    try {
       // Try to load admin-selected trending products first
       const { data: trending } = await (supabase
         .from("trending_products" as any)
@@ -33,9 +36,15 @@ export function TopTrends() {
         const data = await fetchProducts({ limit: 12 });
         setProducts(data);
       }
+    } catch (err) {
+      console.error("[TopTrends] Load failed:", err);
+      setError(true);
+    } finally {
       setLoading(false);
-    })();
-  }, []);
+    }
+  };
+
+  useEffect(() => { loadProducts(); }, []);
 
   return (
     <section className="py-6 bg-card">
@@ -47,15 +56,27 @@ export function TopTrends() {
           <ChevronRight size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
         </Link>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5 md:gap-2">
-          {loading
-            ? Array.from({ length: 12 }).map((_, i) => <ProductCardSkeleton key={i} />)
-            : products.map((product, i) => (
-                <Link to={`/product/${product.slug || product.id}`} key={product.id}>
-                  <ProductCard product={product} index={i} />
-                </Link>
-              ))}
-        </div>
+        {error ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground mb-3">Impossible de charger les produits</p>
+            <button
+              onClick={loadProducts}
+              className="px-6 py-2 text-sm font-medium border border-foreground text-foreground bg-card hover:bg-foreground hover:text-card transition-colors"
+            >
+              Réessayer
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5 md:gap-2">
+            {loading
+              ? Array.from({ length: 12 }).map((_, i) => <ProductCardSkeleton key={i} />)
+              : products.map((product, i) => (
+                  <Link to={`/product/${product.slug || product.id}`} key={product.id}>
+                    <ProductCard product={product} index={i} />
+                  </Link>
+                ))}
+          </div>
+        )}
       </div>
     </section>
   );
