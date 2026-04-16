@@ -648,6 +648,26 @@ export default function AdminAnalyticsPage() {
     },
   });
 
+  // Top countries
+  const { data: topCountries } = useQuery({
+    queryKey: ["admin-analytics-top-countries", period],
+    queryFn: async () => {
+      const { data, error } = await rpc("get_analytics_top_countries", { p_since: since });
+      if (error) console.error("[Analytics] get_analytics_top_countries failed:", error);
+      return ((data || []) as any[]).map((d: any) => ({ country: d.country, session_count: Number(d.session_count) }));
+    },
+  });
+
+  // Top cities
+  const { data: topCities } = useQuery({
+    queryKey: ["admin-analytics-top-cities", period],
+    queryFn: async () => {
+      const { data, error } = await rpc("get_analytics_top_cities", { p_since: since });
+      if (error) console.error("[Analytics] get_analytics_top_cities failed:", error);
+      return ((data || []) as any[]).map((d: any) => ({ city: d.city, country: d.country, session_count: Number(d.session_count) }));
+    },
+  });
+
   return (
     <AdminLayout title="Analytics & Tracking">
       <div className="space-y-4">
@@ -694,6 +714,8 @@ export default function AdminAnalyticsPage() {
                 devices={devices || {}}
                 pwaCount={pwaCount || 0}
                 pwaPeriodCount={pwaPeriodCount || 0}
+                topCountries={topCountries || []}
+                topCities={topCities || []}
               />
             </TabsContent>
             <TabsContent value="products">
