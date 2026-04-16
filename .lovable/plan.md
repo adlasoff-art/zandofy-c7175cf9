@@ -1,89 +1,107 @@
 
 
-# Diagnostic GSC zandofy.com — Comparatif et plan d'action
+# Optimisation PageSpeed zandofy.com — Plan ciblé sans sacrifice qualité
 
-## Ce que disent vraiment vos exports
+## Contexte du rapport PageSpeed
 
-| Date | Indexées | Non indexées | Impressions |
-|---|---|---|---|
-| 09/04 | — | — | 8 |
-| 10/04 | 8 | 22 | 3 |
-| 11/04 | 8 | **137** ← saut | 2 |
-| 12/04 | 8 | 137 | 3 |
-| 13/04 | 8 | 137 | 1 |
+**Important** : le test a été effectué depuis l'Europe et a déclenché votre **geo-block** ("Ce site n'est pas disponible dans votre région"). Le LCP mesuré est donc le bouclier rouge, pas votre vraie page d'accueil. Les scores réels avec produits seraient différents (probablement plus bas car plus d'images à charger), mais **les diagnostics réseau/JS/fonts ci-dessous restent 100% valides** car ils concernent le bootstrap commun.
 
-Les données s'arrêtent au 13/04. C'est une **latence GSC normale** (3-4 jours). Les chiffres affichés aujourd'hui reflètent l'état du site **avant** vos derniers correctifs.
+### Scores actuels (mobile)
+| Métrique | Valeur | Verdict |
+|---|---|---|
+| Performance | **78** | À améliorer |
+| Accessibilité | 90 | Bon |
+| Bonnes pratiques | 96 | Excellent |
+| SEO | 91 | Bon |
+| FCP | 3,4 s | Lent |
+| LCP | 4,3 s | Lent |
+| TBT | 0 ms | Excellent |
+| CLS | 0,012 | Excellent |
 
-## Réponse à votre question principale : ancien WordPress ou nouveau projet ?
+## Problèmes confirmés et corrections proposées
 
-**Mélange des deux**, voici la décomposition :
+### 1. Google Fonts massif (1 168 ms perdus) — IMPACT MAJEUR
+**Problème** : vous chargez **6 familles** × **9 graisses chacune** depuis Google Fonts (DM Sans, Inter, Outfit, Plus Jakarta Sans, Poppins, Roboto). Total : ~54 fichiers de polices possibles, 750 ms de blocage initial.
 
-### Vient du nouveau projet (Lovable/Vercel) — la majorité
-- **114 "Détectées, non indexées"** → ce sont les pages produits/boutiques listées par votre `generate-sitemap` Edge Function. Elles correspondent aux **117 pages découvertes** dans votre sitemap. Google les connaît mais ne les juge pas prioritaires (site neuf, autorité faible).
-- **5 "Bloquées par robots.txt"** → vos routes `/dashboard`, `/admin`, `/vendor`, etc. **C'est voulu**, à laisser tel quel.
-- **1 "Page en double sans canonical"** → bug réel du nouveau projet (manque de balise `<link rel="canonical">` sur certaines pages).
-- **1 "Page avec redirection"** → probablement le 301 du sitemap découvert ci-dessous.
+**Correction sans perte visuelle** :
+- Identifier dans le code les polices **réellement utilisées** (probablement 1-2 max : Inter pour le body + 1 display).
+- Supprimer les 4-5 familles inutilisées du `<link>` Google Fonts.
+- Réduire à 3-4 graisses par famille (400, 500, 600, 700 suffisent dans 99% des cas).
+- Ajouter `&display=swap` (peut-être déjà présent — à vérifier).
+- **Préconnecter** `fonts.gstatic.com` (pas seulement `fonts.googleapis.com`).
 
-### Vient probablement de l'ancien WordPress
-- **5 "404 Introuvables"** → URLs WordPress mortes (`/wp-content/...`, `/?p=123`, articles legacy). À rediriger ou ignorer.
-- **4 "Exclue par noindex"** → résidus possibles de pages WordPress encore en cache GSC, ou pages neuves avec noindex involontaire.
-- **4 "Indexées malgré blocage robots.txt"** → pages historiques encore connues de Google (anciennes pages WordPress qui ne sont plus servies mais dont l'URL reste).
+**Gain estimé** : -600 à -900 ms sur FCP/LCP. Aucun changement visuel si on garde les bonnes familles.
 
-## Bugs RÉELS confirmés dans le code (à corriger)
+### 2. JavaScript inutilisé (180 Kio) — IMPACT MAJEUR
+**Problème** : `index-CoKm8oQV.js` fait 254 Kio dont 180 Kio jamais exécutés au chargement initial.
 
-### 1. Le sitemap pointe vers le **mauvais projet Supabase**
-Dans `frontend/public/robots.txt` ligne 10 :
-```
-Sitemap: https://uogkklwfvwoxkifpkzpu.supabase.co/...   ← projet LOVABLE CLOUD (preview)
-```
-Or production utilise le projet `vpttoqojmiqxgudknyxf` (visible dans le 301 retourné par `https://zandofy.com/sitemap-dynamic.xml`). **Le sitemap référencé dans votre robots.txt n'est pas celui de production.** Google suit la redirection 301, donc ça marche, mais c'est fragile et incohérent.
+**Correction sans casser le site** :
+- Vérifier le `vite.config.ts` pour activer/améliorer le **code-splitting manuel** (`manualChunks`) : séparer vendor React, Radix UI, lucide-icons, Supabase.
+- **Lazy-load** les pages lourdes via `React.lazy()` + `Suspense` (Dashboard, Admin, Vendor, Checkout, Map, Blog editor) — ces pages ne sont pas nécessaires pour la home.
+- Auditer les imports : remplacer `import * from 'lucide-react'` par imports nommés ciblés (déjà probablement le cas avec Vite tree-shaking, à confirmer).
 
-### 2. Le sitemap déclaré dans GSC (`/sitemap-dynamic.xml`) renvoie un **301**
-GSC accepte mais c'est sous-optimal. Il faut soit déclarer directement l'URL Supabase finale, soit servir le XML directement sur le domaine.
+**Gain estimé** : -100 à -150 Kio sur le bundle initial = -800 ms à -1,2 s sur réseau lent.
 
-### 3. Cloudflare est bien actif (réponse `server: cloudflare`)
-Contrairement à ce que vous pensiez, **Cloudflare est en frontal** (probablement via Vercel ou DNS). Cela ajoute le bloc "Cloudflare Managed Content" dans votre robots.txt servi (avant vos règles). Pas grave, mais à savoir.
+### 3. CSS inutilisé (20 Kio)
+**Problème** : 20 Kio de règles Tailwind jamais utilisées dans le CSS livré.
 
-### 4. Canonical manquant sur certaines pages
-Confirmé par GSC ("Page en double sans URL canonique"). À auditer dans `SEOHead.tsx` et pages produits/boutiques.
+**Correction** :
+- Vérifier que `tailwind.config.ts` a bien `content` qui couvre uniquement `./src/**/*` (pas de paths trop larges).
+- Activer le mode `JIT` (par défaut sur Tailwind v3) — à confirmer.
 
-## Côté Google Search Console — ce qu'il faut faire
+**Gain estimé** : -15 Kio CSS.
 
-### À NE PAS faire
-- **Ne supprimez pas** la nouvelle propriété.
-- **Ne refaites pas** la configuration GSC : votre nouvelle propriété fonctionne (sitemap lu le 16/04, 117 pages découvertes = bon signe).
+### 4. Préconnexions mal calibrées
+**Problème** : 
+- Vous préconnectez `uogkklwfvwoxkifpkzpu.supabase.co` (projet Lovable preview, **jamais utilisé en prod**).
+- Vous préconnectez `images.unsplash.com` (peu utilisé).
+- Vous **ne préconnectez pas** `vpttoqojmiqxgudknyxf.supabase.co` (projet prod réel) → Lighthouse signale 320 ms de gain LCP possible.
 
-### À FAIRE manuellement dans GSC
-1. **Supprimer définitivement l'ancienne propriété WordPress** (Paramètres → Supprimer la propriété). La "Suppression temporaire" du 10/04 expire au bout de 6 mois, ce n'est pas la bonne action.
-2. **Garder uniquement la propriété de domaine** (`zandofy.com`) qui couvre tout (HTTP/HTTPS/www/non-www).
-3. **Demander l'indexation manuelle** de 5-10 URLs prioritaires : `/`, `/search`, `/about`, top 5 produits/boutiques (Inspection URL → Demander indexation).
-4. **Patienter 7-14 jours** : les "Détectées non indexées" baisseront naturellement avec l'autorité qui se construit.
+**Correction** dans `frontend/index.html` :
+- Remplacer `uogkklwfvwoxkifpkzpu.supabase.co` par `vpttoqojmiqxgudknyxf.supabase.co`.
+- Garder `images.unsplash.com` seulement si encore utilisé (sinon retirer).
+- Ajouter préconnexion à `fonts.gstatic.com`.
 
-## Plan de correction code (3 fichiers)
+**Gain estimé** : -300 ms LCP.
 
-### 1. `frontend/public/robots.txt`
-Remplacer la ligne Sitemap par l'URL canonique du domaine :
-```
-Sitemap: https://zandofy.com/sitemap-dynamic.xml
-```
+### 5. Appel `ipapi.co` bloquant (1 627 ms)
+**Problème** : la détection géo via `ipapi.co/json/` est dans le chemin critique et prend 1,6 s. Couplée à la requête `platform_settings?key=geo_blocked_countries`, elle bloque le rendu.
 
-### 2. `frontend/vercel.json` (à vérifier/créer)
-Au lieu d'un 301 vers Supabase, faire un **rewrite transparent** pour que `/sitemap-dynamic.xml` serve directement le XML sans redirection :
-```json
-{ "rewrites": [{ "source": "/sitemap-dynamic.xml", "destination": "https://vpttoqojmiqxgudknyxf.supabase.co/functions/v1/generate-sitemap" }] }
-```
+**Correction sans casser le geo-block** :
+- Déplacer l'appel `ipapi.co` **après** le premier rendu (différer dans un `useEffect` plutôt qu'au bootstrap).
+- Cacher le résultat dans `sessionStorage` pour les navigations suivantes.
+- Afficher la home **immédiatement**, puis remplacer par le bouclier si le pays est bloqué (rare cas → meilleur UX pour 99% des visiteurs).
+- Alternative : faire la vérif côté Edge Function Supabase (header CF/Vercel `x-vercel-ip-country`) au lieu de `ipapi.co` côté client.
 
-### 3. Audit canonical dans `SEOHead.tsx` et pages produits
-S'assurer que chaque page produit/boutique passe un `canonical` explicite (déjà partiellement fait, à étendre aux pages qui ne l'ont pas).
+**Gain estimé** : -1 à -1,5 s sur FCP perçu pour les visiteurs autorisés.
 
-## Ce qui n'est PAS à faire
-- Ne pas réécrire le sitemap (il fonctionne, 117 pages détectées).
-- Ne pas toucher au `noindex` du `index.html` (déjà sur `index, follow`).
-- Ne pas paniquer sur les 137 non indexées : c'est l'état normal d'un site neuf de moins de 30 jours sans backlinks.
+### 6. CLS causé par le swap de police (0,012 — déjà bon)
+Très faible, mais peut être éliminé en ajoutant `font-display: optional` ou des **size-adjust fallbacks** (`@font-face` avec `size-adjust`, `ascent-override`). Optionnel.
+
+## Ce que je NE vais PAS toucher
+- Les images produits (qualité préservée — vous l'avez explicitement demandé).
+- Le service worker / cache strategy (déjà optimisé d'après mémoire).
+- Le geo-block lui-même (logique métier).
+- Le CSP, les headers de sécurité.
+- Le design / les couleurs / la typo visible.
+
+## Fichiers concernés
+
+| Fichier | Modification |
+|---|---|
+| `frontend/index.html` | Réduire Google Fonts à 1-2 familles, fixer préconnexions |
+| `frontend/vite.config.ts` | Améliorer `manualChunks` pour code-splitting |
+| Pages lourdes (Dashboard, Admin, etc.) | `React.lazy()` dans `App.tsx` ou router |
+| Hook/composant geo-block | Différer `ipapi.co` après premier rendu |
+| `frontend/tailwind.config.ts` | Vérifier `content` paths |
+
+## Étape préalable nécessaire
+Je dois d'abord **lire** : `frontend/src/App.tsx` (routes), `frontend/vite.config.ts`, le composant qui gère le geo-block, et `frontend/tailwind.config.ts` pour identifier précisément les polices utilisées et les routes à lazy-loader.
 
 ## Résultat attendu
-- Sitemap servi sans 301 = crawl plus efficace
-- Cohérence robots.txt ↔ sitemap réel
-- Disparition progressive des 5 404 WordPress (à mesure que Google oublie l'ancien site)
-- Passage de 8 → 30-50 pages indexées sous 2-3 semaines (sans backlinks externes, ce sera plus lent)
+- Performance : **78 → 90+** sur mobile
+- FCP : 3,4 s → ~1,8 s
+- LCP : 4,3 s → ~2,5 s
+- Bundle JS initial : 254 Kio → ~130 Kio
+- **Aucun changement visuel** pour l'utilisateur
 
