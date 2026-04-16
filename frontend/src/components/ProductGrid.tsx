@@ -20,6 +20,7 @@ export function ProductGrid() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [activeTab, setActiveTab] = useState("all");
   const [trendTags, setTrendTags] = useState<TrendTag[]>([]);
 
@@ -143,7 +144,7 @@ export function ProductGrid() {
         setError(err.message || "Erreur de chargement");
         setLoading(false);
       });
-  }, [activeTab]);
+  }, [activeTab, retryKey]);
 
   const handleLoadMore = async () => {
     if (loadingMore || !hasMore) return;
