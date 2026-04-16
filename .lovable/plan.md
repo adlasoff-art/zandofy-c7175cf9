@@ -1,65 +1,40 @@
 
 
-# Visiteurs par pays et par ville — Analytics Dashboard
+# Fix Géo-tracking Analytics — Mixed Content Bloqué
 
-## Constat
+## Problème identifié
 
-La table `analytics_events` possède déjà les colonnes `country` et `city` (type text), mais elles ne sont jamais remplies par le hook `use-analytics.ts`. Les widgets n'existent pas non plus dans le dashboard.
+**Cause racine confirmée** : `ip-api.com` est appelé en `http://` (ligne 65 de `use-analytics.ts`). Comme zandofy.com est servi en HTTPS, les navigateurs bloquent silencieusement cette requête (mixed content). Résultat : les 301 événements récents ont tous `country = NULL` et `city = NULL`.
 
-## Plan d'implémentation
+Le hook `use-geo-detection.ts` utilise déjà `https://ipapi.co/json/` qui fonctionne en HTTPS gratuitement — il suffit d'aligner `use-analytics.ts` sur la même API.
 
-### 1. Géolocalisation IP côté client
+## Fix
 
-**Fichier** : `frontend/src/hooks/use-analytics.ts`
+### Fichier : `frontend/src/hooks/use-analytics.ts`
 
-Au `session_start`, appeler une API de géolocalisation gratuite (ip-api.com, pas de clé requise) une seule fois par session, puis stocker country/city en `sessionStorage` pour les réutiliser dans tous les événements suivants.
+Remplacer l'appel `http://ip-api.com/json/?fields=country,city` par `https://ipapi.co/json/` et adapter le parsing :
 
 ```typescript
-// Appelé une fois au session_start
 async function getGeoData(): Promise<{ country: string; city: string }> {
   const cached = sessionStorage.getItem("z_geo");
-  if (cached) return JSON.parse(cached);
+  if (cached) {
+    try { return JSON.parse(cached); } catch { /* ignore */ }
+  }
   try {
-    const res = await fetch("http://ip-api.com/json/?fields=country,city", { signal: AbortSignal.timeout(3000) });
+    const res = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(3000) });
     const data = await res.json();
-    const geo = { country: data.country || "", city: data.city || "" };
+    const geo = { country: data.country_name || "", city: data.city || "" };
     sessionStorage.setItem("z_geo", JSON.stringify(geo));
     return geo;
-  } catch { return { country: "", city: "" }; }
+  } catch {
+    return { country: "", city: "" };
+  }
 }
 ```
 
-Injecter `country` et `city` dans chaque `trackEvent` si disponible.
-
-### 2. Deux fonctions SQL (migration)
-
-**`get_analytics_top_countries(p_since)`** : agrège les sessions uniques par `country`, retourne `country` + `session_count`, trié par session_count DESC, LIMIT 50.
-
-**`get_analytics_top_cities(p_since)`** : idem par `city` (inclut `country` pour contexte), LIMIT 50.
-
-### 3. Deux widgets dans le dashboard
-
-**Fichier** : `frontend/src/pages/admin/AdminAnalyticsPage.tsx`
-
-- Ajouter deux queries (`admin-analytics-top-countries` et `admin-analytics-top-cities`) appelant les RPC ci-dessus
-- Passer les données à `OverviewTab`
-- Ajouter deux `PaginatedWidget` dans la grille existante (à côté des pages/produits/boutiques) :
-  - 🌍 **Visiteurs par pays** — drapeau emoji + nom du pays + nombre de sessions
-  - 🏙️ **Visiteurs par ville** — nom de la ville (pays) + nombre de sessions
-
-### 4. Fix erreur QueryClient
-
-L'erreur runtime `No QueryClient set` vient probablement d'un import/mount hors du provider — je vérifierai et corrigerai si nécessaire.
-
-## Fichiers concernés
-
-| Action | Fichier |
-|--------|---------|
-| Modifier | `frontend/src/hooks/use-analytics.ts` — géolocalisation IP |
-| Migration | Fonctions SQL `get_analytics_top_countries`, `get_analytics_top_cities` |
-| Modifier | `frontend/src/pages/admin/AdminAnalyticsPage.tsx` — queries + widgets |
+**Un seul fichier modifié, une seule ligne changée (URL + champ `country_name` au lieu de `country`).** Aucune migration, aucun impact sur les données existantes. Les nouvelles sessions commenceront à remplir `country` et `city` immédiatement.
 
 ## Risque
 
-Faible. L'API ip-api.com est appelée une seule fois par session avec timeout 3s et fallback silencieux. Les données existantes (country = NULL) seront simplement ignorées par les widgets jusqu'à ce que de nouvelles sessions remplissent les colonnes.
+Nul. Changement isolé à la fonction `getGeoData()`. Fallback silencieux en cas d'échec. ipapi.co est déjà utilisé ailleurs dans le projet.
 
