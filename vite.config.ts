@@ -25,6 +25,26 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: "../dist",
       emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            "react-vendor": ["react", "react-dom", "react/jsx-runtime", "react-router-dom"],
+            "query-vendor": ["@tanstack/react-query"],
+            "supabase-vendor": ["@supabase/supabase-js"],
+            "charts-vendor": ["recharts"],
+            "motion-vendor": ["framer-motion"],
+            "radix-vendor": [
+              "@radix-ui/react-dropdown-menu",
+              "@radix-ui/react-popover",
+              "@radix-ui/react-dialog",
+              "@radix-ui/react-tooltip",
+              "@radix-ui/react-select",
+              "@radix-ui/react-accordion",
+              "@radix-ui/react-tabs",
+            ],
+          },
+        },
+      },
     },
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
     optimizeDeps: {
