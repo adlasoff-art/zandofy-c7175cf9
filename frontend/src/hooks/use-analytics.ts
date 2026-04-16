@@ -55,12 +55,37 @@ function isPWA(): boolean {
     || (navigator as any).standalone === true;
 }
 
+/** Fetch geo data once per session via ip-api.com */
+async function getGeoData(): Promise<{ country: string; city: string }> {
+  const cached = sessionStorage.getItem("z_geo");
+  if (cached) {
+    try { return JSON.parse(cached); } catch { /* ignore */ }
+  }
+  try {
+    const res = await fetch("http://ip-api.com/json/?fields=country,city", { signal: AbortSignal.timeout(3000) });
+    const data = await res.json();
+    const geo = { country: data.country || "", city: data.city || "" };
+    sessionStorage.setItem("z_geo", JSON.stringify(geo));
+    return geo;
+  } catch {
+    return { country: "", city: "" };
+  }
+}
+
+/** Internal geo cache — populated on first trackEvent call */
+let _geoPromise: Promise<{ country: string; city: string }> | null = null;
+function ensureGeo() {
+  if (!_geoPromise) _geoPromise = getGeoData();
+  return _geoPromise;
+}
+
 async function trackEvent(
   eventType: string,
   extra: Record<string, any> = {},
   userId?: string
 ) {
   const sessionId = getSessionId();
+  const geo = await ensureGeo();
   const row: any = {
     session_id: sessionId,
     event_type: eventType,
@@ -72,6 +97,8 @@ async function trackEvent(
     is_pwa: isPWA(),
     screen_width: window.screen.width,
     screen_height: window.screen.height,
+    country: geo.country || null,
+    city: geo.city || null,
     ...extra,
   };
   if (userId) row.user_id = userId;
