@@ -8,6 +8,7 @@ import {
   BarChart3, Users, Eye, MousePointer, Smartphone, Monitor, Tablet,
   Globe, TrendingUp, Clock, Download, Store, Heart, ShoppingCart,
   Package, ChevronLeft, ChevronRight, ArrowUpDown, Wifi, UserPlus,
+  MapPin,
 } from "lucide-react";
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -146,6 +147,8 @@ function OverviewTab({
   devices,
   pwaCount,
   pwaPeriodCount,
+  topCountries,
+  topCities,
 }: {
   kpis: any;
   dailyTraffic: { day: string; visitors: number; signups: number; orders: number }[];
@@ -155,6 +158,8 @@ function OverviewTab({
   devices: any;
   pwaCount: number;
   pwaPeriodCount: number;
+  topCountries: { country: string; session_count: number }[];
+  topCities: { city: string; country: string; session_count: number }[];
 }) {
   const deviceCounts = devices?.devices || {};
   const osBreakdown = devices?.os || {};
@@ -272,6 +277,34 @@ function OverviewTab({
               <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
               <span className="text-[11px] text-foreground flex-1 truncate">{s.store_name}</span>
               <span className="text-[11px] font-medium text-foreground">{s.view_count} vues</span>
+            </div>
+          )}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <PaginatedWidget
+          title="🌍 Visiteurs par pays"
+          icon={Globe}
+          items={topCountries}
+          renderItem={(c, i) => (
+            <div key={c.country} className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
+              <span className="text-[11px] text-foreground flex-1 truncate">{c.country}</span>
+              <span className="text-[11px] font-medium text-foreground">{c.session_count} sessions</span>
+            </div>
+          )}
+        />
+
+        <PaginatedWidget
+          title="🏙️ Visiteurs par ville"
+          icon={MapPin}
+          items={topCities}
+          renderItem={(c, i) => (
+            <div key={`${c.city}-${c.country}`} className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
+              <span className="text-[11px] text-foreground flex-1 truncate">{c.city} <span className="text-muted-foreground">({c.country})</span></span>
+              <span className="text-[11px] font-medium text-foreground">{c.session_count} sessions</span>
             </div>
           )}
         />
