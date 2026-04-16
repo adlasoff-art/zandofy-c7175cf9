@@ -7,4 +7,4 @@ Disallow: /rider
 Disallow: /shipper
 Disallow: /auth
 
-Sitemap: https://uogkklwfvwoxkifpkzpu.supabase.co/functions/v1/generate-sitemap
+Sitemap: https://zandofy.com/sitemap-dynamic.xml
