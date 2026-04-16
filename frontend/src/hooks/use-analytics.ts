@@ -64,7 +64,7 @@ async function getGeoData(): Promise<{ country: string; city: string }> {
   try {
     const res = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(3000) });
     const data = await res.json();
-    const geo = { country: data.country || "", city: data.city || "" };
+    const geo = { country: data.country_name || "", city: data.city || "" };
     sessionStorage.setItem("z_geo", JSON.stringify(geo));
     return geo;
   } catch {
