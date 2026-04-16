@@ -139,8 +139,8 @@ export function HeroBanner() {
           {/* Center carousel with horizontal slide animation */}
           <div
             ref={sliderRef}
-            className="relative rounded-xl overflow-hidden touch-pan-y select-none"
-            style={{ height: 380 }}
+            className="relative rounded-xl overflow-hidden touch-pan-y select-none bg-muted"
+            style={{ height: 380, minHeight: 380 }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -165,6 +165,10 @@ export function HeroBanner() {
                   alt={slide.title}
                   className="w-full h-full object-cover"
                   loading={i === 0 ? "eager" : "lazy"}
+                  fetchPriority={i === 0 ? "high" : "auto"}
+                  decoding={i === 0 ? "sync" : "async"}
+                  width={1200}
+                  height={380}
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent flex flex-col justify-center pl-6 md:pl-12">
                   <h2 className="text-white text-xl md:text-4xl font-bold tracking-wide max-w-md">{slide.title}</h2>
