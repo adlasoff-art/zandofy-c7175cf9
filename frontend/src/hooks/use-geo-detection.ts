@@ -29,6 +29,19 @@ export function useGeoDetection(): GeoResult {
       } catch { /* ignore */ }
     }
 
+    // Skip network call unless geo-detection is explicitly required (e.g. at checkout).
+    // This avoids ~1.5s of blocking I/O on the home page for 99% of visitors.
+    const needed = sessionStorage.getItem("zandofy_geo_needed") === "1";
+    if (!needed) {
+      setResult({
+        country_code: "CD",
+        country_name: "Congo (RDC)",
+        city: "",
+        loading: false,
+      });
+      return;
+    }
+
     const controller = new AbortController();
     let timeoutId: any;
     const run = () => {
