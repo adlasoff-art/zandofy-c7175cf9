@@ -1,56 +1,57 @@
 
-# Fix analytics géographiques — rendre pays/ville réellement opérationnels
 
-## Ce que j’ai confirmé
-- Dans la base actuellement connectée, les champs `country`/`city` existent et la collecte a bien commencé à fonctionner au moins pour 1 session récente : 4 événements géolocalisés, et la fonction `get_analytics_top_countries(...)` renvoie déjà `Democratic Republic of the Congo`.
-- Mais sur l’ensemble actuel, il n’y a que 4 lignes géolocalisées pour 2 389 événements et 51 sessions. Donc le problème n’est pas seulement visuel.
-- Surtout, les fonctions SQL `get_analytics_top_countries` / `get_analytics_top_cities` ont été créées dans `supabase/migrations/...`, alors que votre workflow GitHub/Coolify utilise `frontend/supabase/migrations/` comme source de vérité. Le live que vous regardez peut donc très bien ne jamais avoir reçu cette migration.
-- Le dashboard masque aussi les erreurs RPC en retournant un tableau vide quand la requête échoue. Résultat : si la fonction manque en production, vous voyez juste “Aucune donnée”.
-- La carte “En ligne” ne compte pas la même chose : elle lit `profiles.is_online`, pas `analytics_events`. Donc 5 personnes en ligne n’impliquent pas automatiquement 5 visiteurs visibles par pays/ville.
+# Diagnostic et correction : "Vous avez tout vu" — produits absents sur la page d'accueil
+
+## Diagnostic
+
+La capture d'écran montre que **toutes les sections produits sont vides** : Top Tendances (0 produit), Les Plus Populaires (pas affiché du tout), et Tendances (montre "Vous avez tout vu ✨" immédiatement).
+
+**Cause racine** : `fetchProducts()` dans `frontend/src/services/api.ts` retourne `[]` silencieusement en cas d'erreur (ligne 204-206). Quand le résultat est vide, `hasMore` passe à `false` (car `0 < 24`), et le composant affiche "Vous avez tout vu" au lieu d'un message d'erreur. L'utilisateur croit qu'il n'y a aucun produit alors qu'en réalité **la requête a échoué**.
+
+La cause probable de l'échec sur production : le `PRODUCT_SELECT` joint des colonnes qui peuvent ne pas exister sur la base de données de production (ex: `is_certified`, `verified_years_override`, `shop_type`, `trend_tag_id`) si les migrations n'ont pas toutes été appliquées. Supabase renvoie alors une erreur 400, que le code convertit en `[]`.
 
 ## Plan de correction
-1. **Remettre la migration au bon endroit**
-   - Recréer proprement la migration des fonctions `get_analytics_top_countries` et `get_analytics_top_cities` dans `frontend/supabase/migrations/`.
-   - Inclure les `GRANT EXECUTE` nécessaires pour coller au reste du dashboard.
-   - Ne plus dépendre du dossier racine `supabase/migrations/` pour cette feature.
 
-2. **Fiabiliser la collecte côté client**
-   - Reprendre `frontend/src/hooks/use-analytics.ts`.
-   - Remplacer `AbortSignal.timeout(3000)` par un pattern plus robuste type `AbortController`, déjà utilisé ailleurs dans le projet, pour éviter les échecs silencieux sur certains navigateurs.
-   - Harmoniser la logique avec le hook géo existant pour réduire les divergences.
+### 1. Ajouter un état d'erreur dans `ProductGrid.tsx`
 
-3. **Arrêter les faux “Aucune donnée”**
-   - Dans `frontend/src/pages/admin/AdminAnalyticsPage.tsx`, ne plus convertir silencieusement une erreur RPC en `[]`.
-   - Afficher un état d’erreur admin explicite si la fonction SQL n’existe pas, si les droits manquent, ou si l’environnement pointe vers une autre base.
+Au lieu de montrer "Vous avez tout vu" quand le fetch échoue, distinguer entre :
+- **0 résultat réel** → "Vous avez tout vu ✨"
+- **Erreur de chargement** → "Impossible de charger les produits. Réessayer." avec bouton retry
 
-4. **Vérifier l’environnement réellement consulté**
-   - Contrôler si la page analytics que vous regardez pointe bien vers la même base que celle modifiée ici.
-   - C’est important car la base que j’ai pu lire contient déjà 1 session géolocalisée, alors que vous voyez encore zéro : cela indique très probablement un décalage d’environnement ou de pipeline de migration.
+Ajouter un state `error` et un mécanisme de retry.
 
-5. **QA ciblée après correctif**
-   - Ouvrir une nouvelle session propre (nouvel onglet / navigation privée).
-   - Générer quelques visites réelles : comptes connectés + visiteur anonyme.
-   - Vérifier que `session_start` et `page_view` enregistrent bien `country` et `city`.
-   - Vérifier ensuite les widgets “1h”, “24h”, “48h” dans l’admin.
+### 2. Ajouter un état d'erreur dans `TopTrends.tsx`
+
+Même logique : si `fetchProducts` retourne un tableau vide alors qu'on n'a jamais eu de données, afficher un message d'erreur au lieu de rien du tout.
+
+### 3. Rendre `fetchProducts` plus transparent
+
+Modifier `fetchProducts()` dans `api.ts` pour :
+- Propager l'erreur Supabase au lieu de la masquer (ou retourner un objet `{ data, error }`)
+- Ou a minima logger l'erreur avec suffisamment de détail pour le diagnostic
+
+### 4. Rendre `PRODUCT_SELECT` plus résilient
+
+Vérifier que les colonnes jointées (`is_certified`, `verified_years_override`, `shop_type` sur stores, `trend_tag_id` sur products) existent bien en production. Si une colonne manque, la requête entière échoue.
+
+**Solution** : séparer la jointure en un fallback — si la requête principale échoue, retenter avec un SELECT plus basique (sans les colonnes récemment ajoutées).
+
+### 5. Corriger l'erreur runtime `useState null`
+
+L'erreur `Cannot read properties of null (reading 'useState')` dans `NotificationCenter` indique un problème d'import React. Le `SafeRadix` error boundary devrait la contenir, mais je vérifierai que c'est bien le cas et que ça ne cascade pas.
 
 ## Fichiers concernés
-- `frontend/src/hooks/use-analytics.ts`
-- `frontend/src/pages/admin/AdminAnalyticsPage.tsx`
-- `frontend/supabase/migrations/<nouvelle_migration>.sql`
+
+| Fichier | Modification |
+|---------|-------------|
+| `frontend/src/components/ProductGrid.tsx` | État erreur + retry au lieu de "Vous avez tout vu" |
+| `frontend/src/components/TopTrends.tsx` | État erreur + retry |
+| `frontend/src/services/api.ts` | Meilleur logging d'erreur, fallback SELECT |
+| `frontend/src/hooks/use-notifications.ts` | Fix crash useState si nécessaire |
 
 ## Résultat attendu
-- Les widgets pays/ville ne resteront plus vides à cause d’une erreur silencieuse.
-- La collecte géographique sera plus fiable selon le navigateur.
-- Le live utilisera enfin la bonne migration.
-- Les nouvelles sessions commenceront à remonter correctement dans les cartes pays et ville.
 
-## Détail technique
-```text
-Utilisateur → use-analytics.ts → analytics_events(country, city)
-                     ↓
-     RPC get_analytics_top_countries / cities
-                     ↓
-        AdminAnalyticsPage widgets pays / ville
-```
+- Les clients verront "Réessayer" au lieu de "Vous avez tout vu" quand les produits ne chargent pas
+- Les erreurs Supabase seront visibles dans la console pour le diagnostic
+- Si une colonne manque en production, un fallback basique chargera quand même les produits
 
-Le point le plus probable à corriger en priorité est : **migration placée dans le mauvais dossier pour votre workflow**, puis **erreur RPC masquée par l’UI**.
