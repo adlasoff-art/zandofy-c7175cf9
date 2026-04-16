@@ -1,57 +1,89 @@
 
 
-# Diagnostic et correction : "Vous avez tout vu" — produits absents sur la page d'accueil
+# Diagnostic GSC zandofy.com — Comparatif et plan d'action
 
-## Diagnostic
+## Ce que disent vraiment vos exports
 
-La capture d'écran montre que **toutes les sections produits sont vides** : Top Tendances (0 produit), Les Plus Populaires (pas affiché du tout), et Tendances (montre "Vous avez tout vu ✨" immédiatement).
+| Date | Indexées | Non indexées | Impressions |
+|---|---|---|---|
+| 09/04 | — | — | 8 |
+| 10/04 | 8 | 22 | 3 |
+| 11/04 | 8 | **137** ← saut | 2 |
+| 12/04 | 8 | 137 | 3 |
+| 13/04 | 8 | 137 | 1 |
 
-**Cause racine** : `fetchProducts()` dans `frontend/src/services/api.ts` retourne `[]` silencieusement en cas d'erreur (ligne 204-206). Quand le résultat est vide, `hasMore` passe à `false` (car `0 < 24`), et le composant affiche "Vous avez tout vu" au lieu d'un message d'erreur. L'utilisateur croit qu'il n'y a aucun produit alors qu'en réalité **la requête a échoué**.
+Les données s'arrêtent au 13/04. C'est une **latence GSC normale** (3-4 jours). Les chiffres affichés aujourd'hui reflètent l'état du site **avant** vos derniers correctifs.
 
-La cause probable de l'échec sur production : le `PRODUCT_SELECT` joint des colonnes qui peuvent ne pas exister sur la base de données de production (ex: `is_certified`, `verified_years_override`, `shop_type`, `trend_tag_id`) si les migrations n'ont pas toutes été appliquées. Supabase renvoie alors une erreur 400, que le code convertit en `[]`.
+## Réponse à votre question principale : ancien WordPress ou nouveau projet ?
 
-## Plan de correction
+**Mélange des deux**, voici la décomposition :
 
-### 1. Ajouter un état d'erreur dans `ProductGrid.tsx`
+### Vient du nouveau projet (Lovable/Vercel) — la majorité
+- **114 "Détectées, non indexées"** → ce sont les pages produits/boutiques listées par votre `generate-sitemap` Edge Function. Elles correspondent aux **117 pages découvertes** dans votre sitemap. Google les connaît mais ne les juge pas prioritaires (site neuf, autorité faible).
+- **5 "Bloquées par robots.txt"** → vos routes `/dashboard`, `/admin`, `/vendor`, etc. **C'est voulu**, à laisser tel quel.
+- **1 "Page en double sans canonical"** → bug réel du nouveau projet (manque de balise `<link rel="canonical">` sur certaines pages).
+- **1 "Page avec redirection"** → probablement le 301 du sitemap découvert ci-dessous.
 
-Au lieu de montrer "Vous avez tout vu" quand le fetch échoue, distinguer entre :
-- **0 résultat réel** → "Vous avez tout vu ✨"
-- **Erreur de chargement** → "Impossible de charger les produits. Réessayer." avec bouton retry
+### Vient probablement de l'ancien WordPress
+- **5 "404 Introuvables"** → URLs WordPress mortes (`/wp-content/...`, `/?p=123`, articles legacy). À rediriger ou ignorer.
+- **4 "Exclue par noindex"** → résidus possibles de pages WordPress encore en cache GSC, ou pages neuves avec noindex involontaire.
+- **4 "Indexées malgré blocage robots.txt"** → pages historiques encore connues de Google (anciennes pages WordPress qui ne sont plus servies mais dont l'URL reste).
 
-Ajouter un state `error` et un mécanisme de retry.
+## Bugs RÉELS confirmés dans le code (à corriger)
 
-### 2. Ajouter un état d'erreur dans `TopTrends.tsx`
+### 1. Le sitemap pointe vers le **mauvais projet Supabase**
+Dans `frontend/public/robots.txt` ligne 10 :
+```
+Sitemap: https://uogkklwfvwoxkifpkzpu.supabase.co/...   ← projet LOVABLE CLOUD (preview)
+```
+Or production utilise le projet `vpttoqojmiqxgudknyxf` (visible dans le 301 retourné par `https://zandofy.com/sitemap-dynamic.xml`). **Le sitemap référencé dans votre robots.txt n'est pas celui de production.** Google suit la redirection 301, donc ça marche, mais c'est fragile et incohérent.
 
-Même logique : si `fetchProducts` retourne un tableau vide alors qu'on n'a jamais eu de données, afficher un message d'erreur au lieu de rien du tout.
+### 2. Le sitemap déclaré dans GSC (`/sitemap-dynamic.xml`) renvoie un **301**
+GSC accepte mais c'est sous-optimal. Il faut soit déclarer directement l'URL Supabase finale, soit servir le XML directement sur le domaine.
 
-### 3. Rendre `fetchProducts` plus transparent
+### 3. Cloudflare est bien actif (réponse `server: cloudflare`)
+Contrairement à ce que vous pensiez, **Cloudflare est en frontal** (probablement via Vercel ou DNS). Cela ajoute le bloc "Cloudflare Managed Content" dans votre robots.txt servi (avant vos règles). Pas grave, mais à savoir.
 
-Modifier `fetchProducts()` dans `api.ts` pour :
-- Propager l'erreur Supabase au lieu de la masquer (ou retourner un objet `{ data, error }`)
-- Ou a minima logger l'erreur avec suffisamment de détail pour le diagnostic
+### 4. Canonical manquant sur certaines pages
+Confirmé par GSC ("Page en double sans URL canonique"). À auditer dans `SEOHead.tsx` et pages produits/boutiques.
 
-### 4. Rendre `PRODUCT_SELECT` plus résilient
+## Côté Google Search Console — ce qu'il faut faire
 
-Vérifier que les colonnes jointées (`is_certified`, `verified_years_override`, `shop_type` sur stores, `trend_tag_id` sur products) existent bien en production. Si une colonne manque, la requête entière échoue.
+### À NE PAS faire
+- **Ne supprimez pas** la nouvelle propriété.
+- **Ne refaites pas** la configuration GSC : votre nouvelle propriété fonctionne (sitemap lu le 16/04, 117 pages découvertes = bon signe).
 
-**Solution** : séparer la jointure en un fallback — si la requête principale échoue, retenter avec un SELECT plus basique (sans les colonnes récemment ajoutées).
+### À FAIRE manuellement dans GSC
+1. **Supprimer définitivement l'ancienne propriété WordPress** (Paramètres → Supprimer la propriété). La "Suppression temporaire" du 10/04 expire au bout de 6 mois, ce n'est pas la bonne action.
+2. **Garder uniquement la propriété de domaine** (`zandofy.com`) qui couvre tout (HTTP/HTTPS/www/non-www).
+3. **Demander l'indexation manuelle** de 5-10 URLs prioritaires : `/`, `/search`, `/about`, top 5 produits/boutiques (Inspection URL → Demander indexation).
+4. **Patienter 7-14 jours** : les "Détectées non indexées" baisseront naturellement avec l'autorité qui se construit.
 
-### 5. Corriger l'erreur runtime `useState null`
+## Plan de correction code (3 fichiers)
 
-L'erreur `Cannot read properties of null (reading 'useState')` dans `NotificationCenter` indique un problème d'import React. Le `SafeRadix` error boundary devrait la contenir, mais je vérifierai que c'est bien le cas et que ça ne cascade pas.
+### 1. `frontend/public/robots.txt`
+Remplacer la ligne Sitemap par l'URL canonique du domaine :
+```
+Sitemap: https://zandofy.com/sitemap-dynamic.xml
+```
 
-## Fichiers concernés
+### 2. `frontend/vercel.json` (à vérifier/créer)
+Au lieu d'un 301 vers Supabase, faire un **rewrite transparent** pour que `/sitemap-dynamic.xml` serve directement le XML sans redirection :
+```json
+{ "rewrites": [{ "source": "/sitemap-dynamic.xml", "destination": "https://vpttoqojmiqxgudknyxf.supabase.co/functions/v1/generate-sitemap" }] }
+```
 
-| Fichier | Modification |
-|---------|-------------|
-| `frontend/src/components/ProductGrid.tsx` | État erreur + retry au lieu de "Vous avez tout vu" |
-| `frontend/src/components/TopTrends.tsx` | État erreur + retry |
-| `frontend/src/services/api.ts` | Meilleur logging d'erreur, fallback SELECT |
-| `frontend/src/hooks/use-notifications.ts` | Fix crash useState si nécessaire |
+### 3. Audit canonical dans `SEOHead.tsx` et pages produits
+S'assurer que chaque page produit/boutique passe un `canonical` explicite (déjà partiellement fait, à étendre aux pages qui ne l'ont pas).
+
+## Ce qui n'est PAS à faire
+- Ne pas réécrire le sitemap (il fonctionne, 117 pages détectées).
+- Ne pas toucher au `noindex` du `index.html` (déjà sur `index, follow`).
+- Ne pas paniquer sur les 137 non indexées : c'est l'état normal d'un site neuf de moins de 30 jours sans backlinks.
 
 ## Résultat attendu
-
-- Les clients verront "Réessayer" au lieu de "Vous avez tout vu" quand les produits ne chargent pas
-- Les erreurs Supabase seront visibles dans la console pour le diagnostic
-- Si une colonne manque en production, un fallback basique chargera quand même les produits
+- Sitemap servi sans 301 = crawl plus efficace
+- Cohérence robots.txt ↔ sitemap réel
+- Disparition progressive des 5 404 WordPress (à mesure que Google oublie l'ancien site)
+- Passage de 8 → 30-50 pages indexées sous 2-3 semaines (sans backlinks externes, ce sera plus lent)
 
