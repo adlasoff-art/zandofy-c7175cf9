@@ -137,6 +137,17 @@ export function useAnalyticsTracker() {
 
     const handleBeforeUnload = () => {
       const duration = Math.round((Date.now() - sessionStartRef.current) / 1000);
+      // Read geo from shared cache (synchronous — no async in beforeunload)
+      let country: string | null = null;
+      let city: string | null = null;
+      try {
+        const cached = sessionStorage.getItem("zandofy_geo");
+        if (cached) {
+          const geo = JSON.parse(cached);
+          country = geo.country_name || geo.country || null;
+          city = geo.city || null;
+        }
+      } catch { /* ignore */ }
       const row: any = {
         session_id: getSessionId(),
         event_type: "session_end",
@@ -148,6 +159,8 @@ export function useAnalyticsTracker() {
         screen_width: window.screen.width,
         screen_height: window.screen.height,
         duration_seconds: duration,
+        country,
+        city,
       };
       if (user?.id) row.user_id = user.id;
 
