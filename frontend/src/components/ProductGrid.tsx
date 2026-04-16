@@ -261,7 +261,7 @@ export function ProductGrid() {
           <div className="text-center py-10">
             <p className="text-sm text-muted-foreground mb-3">Impossible de charger les produits</p>
             <button
-              onClick={() => setActiveTab((prev) => prev)}
+              onClick={() => setRetryKey((k) => k + 1)}
               className="px-6 py-2 text-sm font-medium border border-foreground text-foreground bg-card hover:bg-foreground hover:text-card transition-colors"
             >
               Réessayer
