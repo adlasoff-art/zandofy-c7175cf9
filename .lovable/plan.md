@@ -1,74 +1,52 @@
 
 
-# Étiquettes d'expédition : i18n, poids/CBM, mode de transport
+# Fix Google Search Console — Breadcrumb Structured Data
 
-## Constat actuel
+## Problem
 
-1. **Bouton "Print Labels"** et tout le contenu des étiquettes sont en anglais dur — aucune utilisation de `useI18n()`.
-2. **Poids/dimensions** : les produits ont `weight_grams`, `length_cm`, `width_cm`, `height_cm` en base, mais l'Edge Function `generate-shipping-labels` et le composant `ShippingLabelPreview` ne les exploitent pas.
-3. **Mode de transport (Air/Sea)** : les produits ont `can_ship_air` et `can_ship_sea` en base, mais la table `orders` n'a **aucune colonne** pour stocker le mode de transport choisi. Le checkout ne distingue pas Air vs Sea actuellement.
-4. **CBM** : calculable depuis les dimensions produit (`L × W × H / 1 000 000`).
+Google requires every `ListItem` in a `BreadcrumbList` to have a non-empty `name` property. Two issues in `buildBreadcrumbJsonLd`:
 
-## Changements prévus
+1. **Missing `name` guard**: If `product.categoryFr` or any field is `undefined`/`null`, the JSON-LD emits `"name": null` which Google rejects.
+2. **Last item missing `item`**: Google expects `item` (URL) on every `ListItem` including the last one. The current code does include it, but the URL could be malformed if the name is undefined (e.g., `/category/undefined`).
 
-### 1. i18n du bouton et des étiquettes
+## Fix
 
-**Fichiers** : `VendorOrderManager.tsx`, `ShippingLabelPreview.tsx`, `I18nContext.tsx`
+### 1. `buildBreadcrumbJsonLd` in `SEOHead.tsx`
 
-- Ajouter les clés i18n : `print_labels`, `shipping_labels`, `no_labels`, `scan_qr_track`, `from`, `ship_to`, `order`, `track`, `mode`, `ship_cost`, `weight`, `dimensions`, `volume_cbm`, `home_delivery`, `hub_pickup`, `air`, `sea`, `items_count`, `print_btn`
-- Remplacer tous les textes en dur par `t("clé")`
-- Le bouton affichera "Imprimer étiquettes" en FR, "Print Labels" en EN
+- Filter out any breadcrumb items where `name` is falsy before building the JSON-LD
+- Ensure `name` always falls back to a non-empty string
+- Keep `item` (URL) on every entry
 
-### 2. Poids et CBM sur les étiquettes
+```typescript
+export function buildBreadcrumbJsonLd(items: { name: string; url: string }[]) {
+  const validItems = items.filter(i => i.name && i.name.trim());
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: validItems.map((item, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: item.name,
+      item: item.url.startsWith("http") ? item.url : `${SITE_URL}${item.url}`,
+    })),
+  };
+}
+```
 
-**Fichier** : `generate-shipping-labels/index.ts` (Edge Function)
+### 2. Callers — defensive fallbacks
 
-- Enrichir la requête `order_items` pour joindre les produits avec `weight_grams`, `length_cm`, `width_cm`, `height_cm`
-- Calculer par commande :
-  - **Poids total** : somme de (`weight_grams × quantity`) → afficher en kg
-  - **Volume CBM** : somme de (`L × W × H / 1 000 000 × quantity`)
-  - **Dimensions estimées** : boîte englobante simplifiée (largeur max, profondeur max, somme des hauteurs)
-- Retourner `totalWeightKg`, `totalVolumeCBM`, `estimatedDimensions` dans chaque label
+- **ProductPage.tsx**: `name: product.categoryFr || "Produit"` and `name: product.nameFr || "Produit"`
+- **CategoryPage.tsx**: `name: category.name_fr || category.name || slug` and parent fallback
 
-**Fichier** : `ShippingLabelPreview.tsx`
+## Files modified
 
-- Ajouter les champs WEIGHT, DIMS, CBM dans le grid de détails
-- N'afficher que si les valeurs sont > 0
+| File | Change |
+|------|--------|
+| `frontend/src/components/SEOHead.tsx` | Filter empty names in `buildBreadcrumbJsonLd` |
+| `frontend/src/pages/ProductPage.tsx` | Fallback strings for breadcrumb names |
+| `frontend/src/pages/CategoryPage.tsx` | Fallback strings for breadcrumb names |
 
-### 3. Mode de transport (Air/Sea) — migration requise
+## Risk
 
-**Migration SQL** :
-- Ajouter `shipping_mode text` sur la table `orders` (nullable, valeurs : `air`, `sea`, `mixed`, null)
-- Pas de contrainte, pas d'impact sur les commandes existantes (null = non défini)
-
-**Edge Function** : retourner `shippingMode` depuis la commande
-
-**ShippingLabelPreview** : afficher "Air" ou "Sea" à côté du MODE existant
-
-### 4. Compatibilité produits Air/Sea — avertissement au checkout
-
-**Fichier** : `CheckoutPage.tsx`
-
-- Lors du calcul de shipping, vérifier `can_ship_air` et `can_ship_sea` de chaque produit
-- Si le mode choisi est Air mais un produit n'a que `can_ship_sea = true`, afficher un avertissement : "Certains produits ne peuvent être expédiés que par voie maritime"
-- Si mix incompatible, proposer de séparer les commandes ou changer de mode
-- Stocker le `shipping_mode` choisi dans la commande
-
-*Note : cette partie (checkout) est plus complexe et dépend du flux de sélection du mode de transport qui n'existe pas encore complètement. Je propose de l'implémenter en deux temps : d'abord les étiquettes (i18n + poids/CBM + affichage du mode), puis le checkout (sélection du mode + validation de compatibilité).*
-
-## Fichiers concernés
-
-| Action | Fichier |
-|--------|---------|
-| Modifier | `frontend/src/components/shipping/ShippingLabelPreview.tsx` — i18n + nouveaux champs |
-| Modifier | `frontend/src/components/vendor/VendorOrderManager.tsx` — i18n bouton |
-| Modifier | `frontend/supabase/functions/generate-shipping-labels/index.ts` — poids, CBM, dimensions, shipping_mode |
-| Modifier | `supabase/functions/generate-shipping-labels/index.ts` — idem |
-| Modifier | `frontend/src/contexts/I18nContext.tsx` — nouvelles clés |
-| Migration | Ajouter `shipping_mode` sur `orders` |
-| Phase 2 | `CheckoutPage.tsx` — sélection mode + validation compatibilité produits |
-
-## Risque
-
-Faible pour la phase 1 (étiquettes). Les calculs de poids/CBM sont en lecture seule. La colonne `shipping_mode` est nullable, zéro impact sur les commandes existantes. La phase 2 (checkout) nécessitera plus de réflexion sur le flux UX.
+Minimal. Read-only change to JSON-LD output. No DB, no migration, no new dependencies.
 
