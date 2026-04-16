@@ -67,7 +67,7 @@ export function CategoryBanner() {
   const showAll = expanded || !hasMoreOnMobile;
 
   return (
-    <section className="py-4 bg-card">
+    <section className="py-4 bg-card" style={{ minHeight: 120 }}>
       <div className="container">
         {/* Mobile: grid 5 cols, collapsible */}
         <div className="sm:hidden">
