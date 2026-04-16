@@ -653,8 +653,11 @@ export default function AdminAnalyticsPage() {
     queryKey: ["admin-analytics-top-countries", period],
     queryFn: async () => {
       const { data, error } = await rpc("get_analytics_top_countries", { p_since: since });
-      if (error) console.error("[Analytics] get_analytics_top_countries failed:", error);
-      return ((data || []) as any[]).map((d: any) => ({ country: d.country, session_count: Number(d.session_count) }));
+      if (error) {
+        console.error("[Analytics] get_analytics_top_countries failed:", error);
+        throw new Error(error.message);
+      }
+      return ((data || []) as any[]).map((d: any) => ({ country: d.country, session_count: Number(d.sessions || 0) }));
     },
   });
 
@@ -663,8 +666,11 @@ export default function AdminAnalyticsPage() {
     queryKey: ["admin-analytics-top-cities", period],
     queryFn: async () => {
       const { data, error } = await rpc("get_analytics_top_cities", { p_since: since });
-      if (error) console.error("[Analytics] get_analytics_top_cities failed:", error);
-      return ((data || []) as any[]).map((d: any) => ({ city: d.city, country: d.country, session_count: Number(d.session_count) }));
+      if (error) {
+        console.error("[Analytics] get_analytics_top_cities failed:", error);
+        throw new Error(error.message);
+      }
+      return ((data || []) as any[]).map((d: any) => ({ city: d.city, country: d.country, session_count: Number(d.sessions || 0) }));
     },
   });
 

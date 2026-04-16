@@ -55,20 +55,24 @@ function isPWA(): boolean {
     || (navigator as any).standalone === true;
 }
 
-/** Fetch geo data once per session via ip-api.com */
+/** Fetch geo data once per session via ipapi.co (HTTPS) */
 async function getGeoData(): Promise<{ country: string; city: string }> {
   const cached = sessionStorage.getItem("z_geo");
   if (cached) {
     try { return JSON.parse(cached); } catch { /* ignore */ }
   }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000);
   try {
-    const res = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(3000) });
+    const res = await fetch("https://ipapi.co/json/", { signal: controller.signal });
     const data = await res.json();
     const geo = { country: data.country_name || "", city: data.city || "" };
     sessionStorage.setItem("z_geo", JSON.stringify(geo));
     return geo;
   } catch {
     return { country: "", city: "" };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

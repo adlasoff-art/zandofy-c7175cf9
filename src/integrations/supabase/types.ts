@@ -7091,21 +7091,40 @@ export type Database = {
       }
       get_analytics_devices: { Args: { p_since?: string }; Returns: Json }
       get_analytics_kpis: { Args: { p_since?: string }; Returns: Json }
-      get_analytics_top_cities: {
-        Args: { p_since?: string }
-        Returns: {
-          city: string
-          country: string
-          session_count: number
-        }[]
-      }
-      get_analytics_top_countries: {
-        Args: { p_since?: string }
-        Returns: {
-          country: string
-          session_count: number
-        }[]
-      }
+      get_analytics_top_cities:
+        | {
+            Args: { p_since?: string }
+            Returns: {
+              city: string
+              country: string
+              session_count: number
+            }[]
+          }
+        | {
+            Args: { p_limit?: number; p_since?: string }
+            Returns: {
+              city: string
+              country: string
+              page_views: number
+              sessions: number
+            }[]
+          }
+      get_analytics_top_countries:
+        | {
+            Args: { p_since?: string }
+            Returns: {
+              country: string
+              session_count: number
+            }[]
+          }
+        | {
+            Args: { p_limit?: number; p_since?: string }
+            Returns: {
+              country: string
+              page_views: number
+              sessions: number
+            }[]
+          }
       get_analytics_top_pages: {
         Args: { p_limit?: number; p_since?: string }
         Returns: {
