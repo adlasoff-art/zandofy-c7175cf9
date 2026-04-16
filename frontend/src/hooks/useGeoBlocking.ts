@@ -13,6 +13,7 @@ export function useGeoBlocking() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
+    // Defer to idle so geo-block check doesn't block first paint.
     const load = async () => {
       try {
         const { data } = await supabase
@@ -30,7 +31,13 @@ export function useGeoBlocking() {
         setSettingsLoaded(true);
       }
     };
-    load();
+    const w = window as any;
+    if (typeof w.requestIdleCallback === "function") {
+      const id = w.requestIdleCallback(load, { timeout: 2000 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(load, 0);
+    return () => clearTimeout(t);
   }, []);
 
   const loading = geo.loading || !settingsLoaded;
