@@ -92,6 +92,13 @@ export default function CheckoutPage() {
   const { t } = useI18n();
   const { data: paymentConfig } = usePaymentMethods();
   const { isVerified: isKycVerified, isOrderBlocked, needsKyc, kycStatus } = useKycStatus();
+
+  // Enable real geo-IP detection only on checkout (perf: avoid blocking home rendering).
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("zandofy_geo_needed", "1");
+    }
+  }, []);
   
 
   const [step, setStep] = useState<Step>("shipping");
