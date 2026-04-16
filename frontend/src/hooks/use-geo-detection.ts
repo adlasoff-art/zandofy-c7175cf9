@@ -20,6 +20,7 @@ export function useGeoDetection(): GeoResult {
   });
 
   useEffect(() => {
+    // Check shared cache key (may have been set by use-analytics.ts)
     const cached = sessionStorage.getItem("zandofy_geo");
     if (cached) {
       try {
@@ -29,8 +30,12 @@ export function useGeoDetection(): GeoResult {
     }
 
     const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
     fetch("https://ipapi.co/json/", { signal: controller.signal })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
         const geo = {
           country_code: data.country_code || "CD",
@@ -47,7 +52,8 @@ export function useGeoDetection(): GeoResult {
           city: "",
           loading: false,
         });
-      });
+      })
+      .finally(() => clearTimeout(timeoutId));
 
     return () => controller.abort();
   }, []);
