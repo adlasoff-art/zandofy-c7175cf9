@@ -55,20 +55,30 @@ function isPWA(): boolean {
     || (navigator as any).standalone === true;
 }
 
-/** Fetch geo data once per session via ipapi.co (HTTPS) */
+/** Fetch geo data once per session — shared cache key with use-geo-detection */
 async function getGeoData(): Promise<{ country: string; city: string }> {
-  const cached = sessionStorage.getItem("z_geo");
+  // Check both cache keys for compatibility
+  const cached = sessionStorage.getItem("zandofy_geo") || sessionStorage.getItem("z_geo");
   if (cached) {
-    try { return JSON.parse(cached); } catch { /* ignore */ }
+    try {
+      const parsed = JSON.parse(cached);
+      return { country: parsed.country_name || parsed.country || "", city: parsed.city || "" };
+    } catch { /* ignore */ }
   }
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3000);
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
   try {
     const res = await fetch("https://ipapi.co/json/", { signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    const geo = { country: data.country_name || "", city: data.city || "" };
-    sessionStorage.setItem("z_geo", JSON.stringify(geo));
-    return geo;
+    const geo = {
+      country_code: data.country_code || "",
+      country_name: data.country_name || "",
+      city: data.city || "",
+    };
+    // Store under shared key so use-geo-detection can reuse it
+    sessionStorage.setItem("zandofy_geo", JSON.stringify(geo));
+    return { country: geo.country_name, city: geo.city };
   } catch {
     return { country: "", city: "" };
   } finally {
