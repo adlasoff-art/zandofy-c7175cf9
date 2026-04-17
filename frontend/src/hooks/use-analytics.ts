@@ -207,10 +207,11 @@ export function useAnalyticsTracker() {
     if (lastPathRef.current) {
       const duration = Math.round((Date.now() - pageStartRef.current) / 1000);
       if (duration > 0) {
-        trackEvent("page_view_end", {
-          page_path: lastPathRef.current,
+        const prevPath = lastPathRef.current;
+        deferToIdle(() => trackEvent("page_view_end", {
+          page_path: prevPath,
           duration_seconds: duration,
-        }, user?.id);
+        }, user?.id));
       }
     }
 
@@ -223,10 +224,11 @@ export function useAnalyticsTracker() {
     if (productMatch) extra.product_id = productMatch[1];
     if (storeMatch) extra.store_id = storeMatch[1];
 
-    trackEvent("page_view", extra, user?.id);
+    // Defer page_view to idle — frees the main thread for rendering
+    deferToIdle(() => trackEvent("page_view", extra, user?.id));
 
     if (storeMatch) {
-      trackEvent("store_view", { store_id: storeMatch[1] }, user?.id);
+      deferToIdle(() => trackEvent("store_view", { store_id: storeMatch[1] }, user?.id));
     }
   }, [location.pathname, user?.id]);
 }
