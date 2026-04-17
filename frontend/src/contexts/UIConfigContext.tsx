@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 
 interface UIConfig {
   showAppDownloadBanner: boolean;
@@ -18,27 +19,43 @@ const UIConfigContext = createContext<UIConfig | null>(null);
 export function UIConfigProvider({ children }: { children: ReactNode }) {
   const isMobile = useIsMobile();
   const [showAppDownloadBanner, setShowAppDownloadBanner] = useState(true);
-  const [showDiscountBadge, setShowDiscountBadge] = useState(false); // disabled by default
+  const [showDiscountBadge, setShowDiscountBadge] = useState(false);
   const [discountBadgeText, setDiscountBadgeText] = useState("Obtenez 20% de réduction");
   const [appPromo, setAppPromo] = useState(DEFAULT_APP_PROMO);
 
+  // ui_config comes from bootstrap (no extra request)
+  const { value: uiConfigValue } = useBootstrapSetting<any>("ui_config");
+
   useEffect(() => {
-    supabase
-      .from("platform_settings")
-      .select("key, value")
-      .in("key", ["ui_config", "app_promo"])
-      .then(({ data }) => {
-        data?.forEach((row) => {
-          const v = row.value as any;
-          if (row.key === "ui_config") {
-            if (typeof v?.showDiscountBadge === "boolean") setShowDiscountBadge(v.showDiscountBadge);
-            if (v?.discountBadgeText) setDiscountBadgeText(v.discountBadgeText);
-          }
-          if (row.key === "app_promo") {
-            setAppPromo({ ...DEFAULT_APP_PROMO, ...v });
-          }
+    if (uiConfigValue) {
+      if (typeof uiConfigValue.showDiscountBadge === "boolean") {
+        setShowDiscountBadge(uiConfigValue.showDiscountBadge);
+      }
+      if (uiConfigValue.discountBadgeText) {
+        setDiscountBadgeText(uiConfigValue.discountBadgeText);
+      }
+    }
+  }, [uiConfigValue]);
+
+  // app_promo is not in bootstrap (rarely used) — fetch lazily on idle
+  useEffect(() => {
+    const w = window as any;
+    const load = () => {
+      supabase
+        .from("platform_settings")
+        .select("value")
+        .eq("key", "app_promo")
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.value) setAppPromo({ ...DEFAULT_APP_PROMO, ...(data.value as any) });
         });
-      });
+    };
+    if (typeof w.requestIdleCallback === "function") {
+      const id = w.requestIdleCallback(load, { timeout: 3000 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(load, 1500);
+    return () => clearTimeout(t);
   }, []);
 
   const effectiveDiscountBadge = isMobile ? false : showDiscountBadge;
