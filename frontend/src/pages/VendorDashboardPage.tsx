@@ -832,7 +832,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
       const compressed = await compressImage(file);
       const ext = compressed.name.split(".").pop();
       const path = `${store.id}/logo-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true });
+      const { error: upErr } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true, cacheControl: "31536000" });
       if (upErr) { toast.error("Erreur upload logo"); return; }
       const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
       const url = urlData.publicUrl;
@@ -861,7 +861,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
       const compressed = await compressImage(file);
       const ext = compressed.name.split(".").pop();
       const path = `${store.id}/banner-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true });
+      const { error: upErr } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true, cacheControl: "31536000" });
       if (upErr) { toast.error("Erreur upload bannière"); return; }
       const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
       const url = urlData.publicUrl;

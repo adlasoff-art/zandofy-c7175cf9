@@ -279,7 +279,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
 
       const { error: uploadError } = await supabase.storage
         .from("chat-media")
-        .upload(filePath, file);
+        .upload(filePath, file, { cacheControl: "31536000" });
 
       if (uploadError) {
         toast.error("Erreur lors de l'upload");
@@ -352,7 +352,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
         try {
           const ext = file.type.split("/")[1] || "png";
           const filePath = `${user.id}/${Date.now()}-paste.${ext}`;
-          const { error: uploadError } = await supabase.storage.from("chat-media").upload(filePath, file);
+          const { error: uploadError } = await supabase.storage.from("chat-media").upload(filePath, file, { cacheControl: "31536000" });
           if (uploadError) { toast.error("Erreur lors de l'upload"); return; }
           const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(filePath);
           const content = `[📷 Image]\n${urlData.publicUrl}`;

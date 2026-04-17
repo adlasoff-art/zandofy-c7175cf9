@@ -179,7 +179,7 @@ function PostsManager() {
     if (file.size > 3 * 1024 * 1024) return toast({ title: "Max 3MB", variant: "destructive" });
     const ext = file.name.split(".").pop();
     const path = `blog/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("cms-assets").upload(path, file);
+    const { error } = await supabase.storage.from("cms-assets").upload(path, file, { cacheControl: "31536000" });
     if (error) return toast({ title: "Erreur upload", variant: "destructive" });
     const { data: pub } = supabase.storage.from("cms-assets").getPublicUrl(path);
     setForm((f) => ({ ...f, cover_image_url: pub.publicUrl }));
