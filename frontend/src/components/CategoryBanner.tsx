@@ -43,7 +43,7 @@ export function CategoryBanner() {
 
   if (isLoading) {
     return (
-      <section className="py-4 bg-card" style={{ minHeight: 120 }}>
+      <section className="py-4 bg-card" style={{ minHeight: 180 }}>
         <div className="container">
           <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-3">
             {Array.from({ length: 10 }).map((_, i) => (
@@ -67,7 +67,7 @@ export function CategoryBanner() {
   const showAll = expanded || !hasMoreOnMobile;
 
   return (
-    <section className="py-4 bg-card" style={{ minHeight: 120 }}>
+    <section className="py-4 bg-card" style={{ minHeight: 180 }}>
       <div className="container">
         {/* Mobile: grid 5 cols, collapsible */}
         <div className="sm:hidden">
@@ -85,8 +85,11 @@ export function CategoryBanner() {
                       <img
                         src={cat.image_url}
                         alt={cat.name_fr}
+                        width={56}
+                        height={56}
                         className="w-full h-full object-cover"
                         loading="lazy"
+                        decoding="async"
                       />
                     ) : cat.icon ? (
                       <span className="text-xl">{cat.icon}</span>
@@ -131,8 +134,11 @@ export function CategoryBanner() {
                   <img
                     src={cat.image_url}
                     alt={cat.name_fr}
+                    width={72}
+                    height={72}
                     className="w-full h-full object-cover"
                     loading="lazy"
+                    decoding="async"
                   />
                 ) : cat.icon ? (
                   <span className="text-2xl">{cat.icon}</span>
