@@ -143,7 +143,8 @@ export function useAnalyticsTracker() {
 
   useEffect(() => {
     sessionStartRef.current = Date.now();
-    trackEvent("session_start", {}, user?.id);
+    // Defer session_start to idle so it never blocks LCP/FCP
+    deferToIdle(() => trackEvent("session_start", {}, user?.id));
 
     const handleBeforeUnload = () => {
       const duration = Math.round((Date.now() - sessionStartRef.current) / 1000);
