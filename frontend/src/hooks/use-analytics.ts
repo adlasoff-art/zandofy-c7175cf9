@@ -124,6 +124,16 @@ async function trackEvent(
   }
 }
 
+/** Defer non-critical analytics work to idle time so it never blocks LCP/FCP. */
+function deferToIdle(fn: () => void, timeout = 2000) {
+  const w = window as any;
+  if (typeof w.requestIdleCallback === "function") {
+    w.requestIdleCallback(fn, { timeout });
+  } else {
+    setTimeout(fn, 1);
+  }
+}
+
 export function useAnalyticsTracker() {
   const location = useLocation();
   const { user } = useAuth();
