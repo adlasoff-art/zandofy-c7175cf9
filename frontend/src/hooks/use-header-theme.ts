@@ -1,5 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 
 export interface HeaderTheme {
   bg_color: string;
@@ -26,17 +25,6 @@ const DEFAULTS: HeaderTheme = {
 };
 
 export function useHeaderTheme() {
-  const { data: theme } = useQuery({
-    queryKey: ["header-theme"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("platform_settings")
-        .select("value")
-        .eq("key", "header_theme")
-        .maybeSingle();
-      return { ...DEFAULTS, ...(data?.value as any || {}) } as HeaderTheme;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-  return theme || DEFAULTS;
+  const { value } = useBootstrapSetting<Partial<HeaderTheme>>("header_theme");
+  return { ...DEFAULTS, ...(value || {}) } as HeaderTheme;
 }

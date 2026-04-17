@@ -1,5 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 
 export interface BrandingConfig {
   header_logo_url: string | null;
@@ -35,20 +34,14 @@ const DEFAULT_BRANDING: BrandingConfig = {
   primary_font: "'Inter', system-ui, sans-serif",
 };
 
+/**
+ * Reads branding from the shared platform-bootstrap cache.
+ * No additional network request — data is already in QueryClient.
+ */
 export function useBranding() {
-  return useQuery({
-    queryKey: ["branding"],
-    queryFn: async (): Promise<BrandingConfig> => {
-      const { data, error } = await supabase
-        .from("platform_settings")
-        .select("value")
-        .eq("key", "branding")
-        .maybeSingle();
-
-      if (error || !data) return DEFAULT_BRANDING;
-      const v = data.value as any;
-      return { ...DEFAULT_BRANDING, ...v };
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+  const { value, isLoading } = useBootstrapSetting<Partial<BrandingConfig>>(
+    "branding"
+  );
+  const data: BrandingConfig = { ...DEFAULT_BRANDING, ...(value || {}) };
+  return { data, isLoading };
 }
