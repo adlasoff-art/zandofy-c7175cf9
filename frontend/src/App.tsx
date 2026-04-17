@@ -25,6 +25,7 @@ import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 import { useCmsTheme } from "@/hooks/use-cms-theme";
 import { usePlatformFont } from "@/hooks/usePlatformFont";
+import { usePlatformBootstrap } from "@/hooks/use-platform-bootstrap";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { MaintenanceGuard } from "@/components/MaintenanceGuard";
 import { CookieConsent } from "@/components/CookieConsent";
@@ -151,6 +152,8 @@ function SupportDrawerWrapper() {
   return <SupportDrawer open={open} onOpenChange={setOpen} />;
 }
 
+/** Single bootstrap call → feeds branding/seo/themes/topbar/footer/geo etc. */
+function PlatformBootstrap() { usePlatformBootstrap(); return null; }
 function CmsThemeInjector() { useCmsTheme(); usePlatformFont(); return null; }
 
 function GeoBlockGuard({ children }: { children: React.ReactNode }) {
@@ -179,6 +182,7 @@ const App = () => (
     <BrowserRouter>
     <TooltipProvider>
       <AuthProvider>
+        <PlatformBootstrap />
         <GeoBlockGuard>
         <ImpersonationProvider>
         <ImpersonationBanner />

@@ -124,6 +124,16 @@ async function trackEvent(
   }
 }
 
+/** Defer non-critical analytics work to idle time so it never blocks LCP/FCP. */
+function deferToIdle(fn: () => void, timeout = 2000) {
+  const w = window as any;
+  if (typeof w.requestIdleCallback === "function") {
+    w.requestIdleCallback(fn, { timeout });
+  } else {
+    setTimeout(fn, 1);
+  }
+}
+
 export function useAnalyticsTracker() {
   const location = useLocation();
   const { user } = useAuth();
@@ -133,7 +143,8 @@ export function useAnalyticsTracker() {
 
   useEffect(() => {
     sessionStartRef.current = Date.now();
-    trackEvent("session_start", {}, user?.id);
+    // Defer session_start to idle so it never blocks LCP/FCP
+    deferToIdle(() => trackEvent("session_start", {}, user?.id));
 
     const handleBeforeUnload = () => {
       const duration = Math.round((Date.now() - sessionStartRef.current) / 1000);
@@ -196,10 +207,11 @@ export function useAnalyticsTracker() {
     if (lastPathRef.current) {
       const duration = Math.round((Date.now() - pageStartRef.current) / 1000);
       if (duration > 0) {
-        trackEvent("page_view_end", {
-          page_path: lastPathRef.current,
+        const prevPath = lastPathRef.current;
+        deferToIdle(() => trackEvent("page_view_end", {
+          page_path: prevPath,
           duration_seconds: duration,
-        }, user?.id);
+        }, user?.id));
       }
     }
 
@@ -212,10 +224,11 @@ export function useAnalyticsTracker() {
     if (productMatch) extra.product_id = productMatch[1];
     if (storeMatch) extra.store_id = storeMatch[1];
 
-    trackEvent("page_view", extra, user?.id);
+    // Defer page_view to idle — frees the main thread for rendering
+    deferToIdle(() => trackEvent("page_view", extra, user?.id));
 
     if (storeMatch) {
-      trackEvent("store_view", { store_id: storeMatch[1] }, user?.id);
+      deferToIdle(() => trackEvent("store_view", { store_id: storeMatch[1] }, user?.id));
     }
   }, [location.pathname, user?.id]);
 }

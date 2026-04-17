@@ -1,5 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 
 export interface FooterTheme {
   bg_color: string;
@@ -32,17 +31,6 @@ const DEFAULTS: FooterTheme = {
 };
 
 export function useFooterTheme() {
-  const { data: theme } = useQuery({
-    queryKey: ["footer-theme"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("platform_settings")
-        .select("value")
-        .eq("key", "footer_theme")
-        .maybeSingle();
-      return { ...DEFAULTS, ...(data?.value as any || {}) } as FooterTheme;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-  return theme || DEFAULTS;
+  const { value } = useBootstrapSetting<Partial<FooterTheme>>("footer_theme");
+  return { ...DEFAULTS, ...(value || {}) } as FooterTheme;
 }
