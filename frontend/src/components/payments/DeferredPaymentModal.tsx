@@ -200,7 +200,7 @@ export function DeferredPaymentModal({ orderId, orderRef, amount, paymentType, o
       const compressed = await compressImage(file);
       const ext = compressed.name.split(".").pop() || "jpg";
       const path = `payment-proofs/${orderId}/${proofField}-${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from("delivery-proofs").upload(path, compressed, { upsert: true });
+      const { error: uploadError } = await supabase.storage.from("delivery-proofs").upload(path, compressed, { upsert: true, cacheControl: "31536000" });
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from("delivery-proofs").getPublicUrl(path);
       await supabase.from("orders").update({ [proofField]: urlData.publicUrl } as any).eq("id", orderId);

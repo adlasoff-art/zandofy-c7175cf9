@@ -20,10 +20,16 @@
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   <link rel="manifest" href="/manifest.json" />
 
-  <!-- Preconnect: prod Supabase + Google Fonts (critical) -->
+  <!-- Preconnect: prod Supabase + Google Fonts + Unsplash (critical) -->
   <link rel="preconnect" href="https://vpttoqojmiqxgudknyxf.supabase.co" crossorigin />
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
+
+  <!-- LCP image preload — keep in sync with the first active hero_slide banner.
+       If you swap the hero image in the admin, update this URL too. -->
+  <link rel="preload" as="image" fetchpriority="high"
+        href="https://images.unsplash.com/photo-1468495244123-6c6c332eeece?w=900&h=450&fit=crop" />
 
   <!-- Critical font: Inter (default) — render-blocking minimal weights -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />

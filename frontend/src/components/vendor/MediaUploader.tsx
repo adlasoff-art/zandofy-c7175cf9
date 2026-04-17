@@ -38,7 +38,7 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
       const ext = file.name.split(".").pop();
       const path = `${storeId}/${Date.now()}-${i}.${ext}`;
 
-      const { error } = await supabase.storage.from("product-media").upload(path, file);
+      const { error } = await supabase.storage.from("product-media").upload(path, file, { cacheControl: "31536000" });
       if (error) {
         toast.error(`Erreur upload: ${file.name}`);
         continue;

@@ -36,7 +36,7 @@ export function SeoBrandingSection({
     const ext = file.name.split(".").pop();
     const path = `og-image-${Date.now()}.${ext}`;
 
-    const { error } = await supabase.storage.from("seo-assets").upload(path, file, { upsert: true });
+    const { error } = await supabase.storage.from("seo-assets").upload(path, file, { upsert: true, cacheControl: "31536000" });
     if (error) {
       toast.error("Erreur upload : " + error.message);
       setUploading(false);

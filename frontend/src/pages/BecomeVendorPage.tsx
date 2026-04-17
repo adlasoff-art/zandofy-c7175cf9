@@ -419,7 +419,7 @@ export default function BecomeVendorPage() {
 
     const ext = file.name.split(".").pop();
     const path = `${user.id}/${docType}_${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from("vendor-documents").upload(path, file);
+    const { error: upErr } = await supabase.storage.from("vendor-documents").upload(path, file, { cacheControl: "31536000" });
     if (upErr) {
       toast({ title: t("auth.error"), description: upErr.message, variant: "destructive" });
       setUploading(null);

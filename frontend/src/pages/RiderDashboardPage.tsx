@@ -332,7 +332,7 @@ export default function RiderDashboardPage() {
       if (signatureDataUrl) {
         const blob = await (await fetch(signatureDataUrl)).blob();
         const path = `signatures/${id}-${Date.now()}.png`;
-        const { error: sigErr } = await supabase.storage.from("delivery-proofs").upload(path, blob);
+        const { error: sigErr } = await supabase.storage.from("delivery-proofs").upload(path, blob, { cacheControl: "31536000" });
         if (!sigErr) {
           const { data: urlData } = supabase.storage.from("delivery-proofs").getPublicUrl(path);
           updates.signature_url = urlData.publicUrl;
@@ -342,7 +342,7 @@ export default function RiderDashboardPage() {
       if (proofPhoto) {
         const ext = proofPhoto.name.split(".").pop();
         const path = `photos/${id}-${Date.now()}.${ext}`;
-        const { error: photoErr } = await supabase.storage.from("delivery-proofs").upload(path, proofPhoto);
+        const { error: photoErr } = await supabase.storage.from("delivery-proofs").upload(path, proofPhoto, { cacheControl: "31536000" });
         if (!photoErr) {
           const { data: urlData } = supabase.storage.from("delivery-proofs").getPublicUrl(path);
           updates.proof_photo_url = urlData.publicUrl;

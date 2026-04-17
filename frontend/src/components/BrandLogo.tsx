@@ -21,10 +21,13 @@ export function BrandLogo({ variant = "header", className = "" }: BrandLogoProps
   const imgHeight = variant === "header" ? 40 : 28;
   const imgWidth = variant === "header" ? 140 : 100;
 
+  // fetchpriority must be lowercase to be a valid HTML attribute (avoids React warning)
+  const imgExtra = { fetchpriority: "high" } as any;
+
   if (mode === "logo_only" && logoUrl) {
     return (
       <Link to="/" className={`shrink-0 ${className}`}>
-        <img src={logoUrl} alt="Zandofy" width={imgWidth} height={imgHeight} className={imgClass} fetchPriority="high" />
+        <img src={logoUrl} alt="Zandofy" width={imgWidth} height={imgHeight} className={imgClass} {...imgExtra} />
       </Link>
     );
   }
@@ -32,7 +35,7 @@ export function BrandLogo({ variant = "header", className = "" }: BrandLogoProps
   if (mode === "logo_and_text" && logoUrl) {
     return (
       <Link to="/" className={`flex items-end gap-2 shrink-0 ${className}`}>
-        <img src={logoUrl} alt="Zandofy" width={imgWidth} height={imgHeight} className={imgClass} fetchPriority="high" />
+        <img src={logoUrl} alt="Zandofy" width={imgWidth} height={imgHeight} className={imgClass} {...imgExtra} />
         <span className={textStyle} style={{ fontFamily: "'Outfit', sans-serif", fontWeight: variant === "header" ? 700 : 400, lineHeight: 1 }}>
           Zandofy
         </span>
