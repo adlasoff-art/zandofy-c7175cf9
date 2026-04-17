@@ -1,19 +1,22 @@
-import { useCallback } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { HeroBanner } from "@/components/HeroBanner";
 import { CategoryBanner } from "@/components/CategoryBanner";
-import { FlashSales } from "@/components/FlashSales";
-import { TopTrends } from "@/components/TopTrends";
-import { ProductGrid } from "@/components/ProductGrid";
-import { FeaturedSidebar } from "@/components/FeaturedSidebar";
-import { RecommendationsSection } from "@/components/RecommendationsSection";
-import { Footer } from "@/components/Footer";
-import { FloatingActions } from "@/components/FloatingActions";
+import { LazyMount } from "@/components/LazyMount";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { SEOHead } from "@/components/SEOHead";
 import { useSeoConfig } from "@/hooks/use-seo-config";
 import { Loader2 } from "lucide-react";
+
+// Below-the-fold: lazy-loaded to reduce initial JS and main-thread work.
+const FlashSales = lazy(() => import("@/components/FlashSales").then(m => ({ default: m.FlashSales })));
+const TopTrends = lazy(() => import("@/components/TopTrends").then(m => ({ default: m.TopTrends })));
+const ProductGrid = lazy(() => import("@/components/ProductGrid").then(m => ({ default: m.ProductGrid })));
+const FeaturedSidebar = lazy(() => import("@/components/FeaturedSidebar").then(m => ({ default: m.FeaturedSidebar })));
+const RecommendationsSection = lazy(() => import("@/components/RecommendationsSection").then(m => ({ default: m.RecommendationsSection })));
+const Footer = lazy(() => import("@/components/Footer").then(m => ({ default: m.Footer })));
+const FloatingActions = lazy(() => import("@/components/FloatingActions").then(m => ({ default: m.FloatingActions })));
 
 const SITE_URL = import.meta.env.VITE_SITE_URL || "https://zandofy.com";
 
@@ -92,28 +95,58 @@ const Index = () => {
       <main>
         <HeroBanner />
         <CategoryBanner />
-        <FlashSales />
-        <RecommendationsSection />
+
+        <LazyMount minHeight={320}>
+          <Suspense fallback={<div style={{ minHeight: 320 }} />}>
+            <FlashSales />
+          </Suspense>
+        </LazyMount>
+
+        <LazyMount minHeight={400}>
+          <Suspense fallback={<div style={{ minHeight: 400 }} />}>
+            <RecommendationsSection />
+          </Suspense>
+        </LazyMount>
 
         {/* Featured sidebar + TopTrends only */}
         <div className="container">
           <div className="flex flex-col lg:flex-row gap-4 py-4">
             {/* Featured sidebar – left on desktop */}
             <div className="order-2 lg:order-1">
-              <FeaturedSidebar />
+              <LazyMount minHeight={300}>
+                <Suspense fallback={<div style={{ minHeight: 300 }} />}>
+                  <FeaturedSidebar />
+                </Suspense>
+              </LazyMount>
             </div>
             {/* TopTrends beside sidebar */}
             <div className="flex-1 min-w-0 order-1 lg:order-2">
-              <TopTrends />
+              <LazyMount minHeight={500}>
+                <Suspense fallback={<div style={{ minHeight: 500 }} />}>
+                  <TopTrends />
+                </Suspense>
+              </LazyMount>
             </div>
           </div>
         </div>
 
         {/* ProductGrid returns to full width */}
-        <ProductGrid />
+        <LazyMount minHeight={600}>
+          <Suspense fallback={<div style={{ minHeight: 600 }} />}>
+            <ProductGrid />
+          </Suspense>
+        </LazyMount>
       </main>
-      <Footer />
-      <FloatingActions />
+
+      <LazyMount minHeight={300}>
+        <Suspense fallback={<div style={{ minHeight: 300 }} />}>
+          <Footer />
+        </Suspense>
+      </LazyMount>
+
+      <Suspense fallback={null}>
+        <FloatingActions />
+      </Suspense>
     </div>
   );
 };
