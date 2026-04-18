@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, ShieldCheck, X, Clock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -17,12 +17,13 @@ interface PaymentWaitingPanelProps {
   onCancel: () => void;
   /** Callback déclenché quand le compte à rebours atteint zéro. */
   onExpire?: () => void;
+  /** Auto-abandon si pas d'action après expiration (défaut 60s). */
+  onAutoAbandon?: () => void;
+  autoAbandonAfterExpireSeconds?: number;
 }
 
 /**
  * Panneau visuel pendant l'attente d'un paiement Mobile Money.
- * Affiche un compte à rebours, un bouton "Vérifier" proéminent et
- * pousse le client à l'action pour confirmer son paiement.
  */
 export function PaymentWaitingPanel({
   durationSeconds = 180,
@@ -32,18 +33,44 @@ export function PaymentWaitingPanel({
   onCheck,
   onCancel,
   onExpire,
+  onAutoAbandon,
+  autoAbandonAfterExpireSeconds = 60,
 }: PaymentWaitingPanelProps) {
   const [remaining, setRemaining] = useState(durationSeconds);
+  const [graceRemaining, setGraceRemaining] = useState<number | null>(null);
+  const expireFiredRef = useRef(false);
+  const abandonFiredRef = useRef(false);
 
   useEffect(() => {
     if (remaining <= 0) {
-      onExpire?.();
+      if (!expireFiredRef.current) {
+        expireFiredRef.current = true;
+        onExpire?.();
+        setGraceRemaining(autoAbandonAfterExpireSeconds);
+      }
       return;
     }
     const id = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remaining]);
+
+  useEffect(() => {
+    if (graceRemaining === null) return;
+    if (graceRemaining <= 0) {
+      if (!abandonFiredRef.current) {
+        abandonFiredRef.current = true;
+        onAutoAbandon?.();
+      }
+      return;
+    }
+    const id = setInterval(
+      () => setGraceRemaining((g) => (g === null ? null : Math.max(0, g - 1))),
+      1000
+    );
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graceRemaining]);
 
   const minutes = Math.floor(remaining / 60);
   const seconds = remaining % 60;
