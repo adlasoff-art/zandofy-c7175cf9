@@ -309,7 +309,7 @@ Deno.serve(async (req) => {
         storeCountry: store.country || "",
         originCountry: orderOriginMap[o.id] || "",
         carrierLogoUrl,
-        shippingMode: o.shipping_mode || "",
+        shippingMode: "",
         totalWeightKg: metrics.totalWeightKg,
         totalVolumeCBM: metrics.totalVolumeCBM,
         estimatedDimensions: metrics.estimatedDimensions,
