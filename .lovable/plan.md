@@ -1,113 +1,71 @@
 
 
-## 🎯 Cause racine identifiée — c'est CORS, pas un bug applicatif
+## Je comprends ta frustration — recadrons le diagnostic
 
-Les logs console que tu viens de coller révèlent **la vraie cause** du problème "Aucune commande trouvée" (et de plein d'autres bugs latents en prod) :
+Tu as raison : ça marchait, ça ne marche plus, et mes itérations n'ont pas résolu. Je dois arrêter de tâtonner et **regarder les vraies données** au lieu de supposer.
 
+### Ce que je sais déjà (logs prod confirmés)
+- ✅ CORS preflight passe maintenant (plus d'erreur "blocked by CORS policy" sur `generate-shipping-labels`)
+- ✅ L'edge function répond : `[ShippingLabels] response: Object` apparaît dans la console
+- ❌ Mais le résultat affiche toujours "Aucune commande trouvée"
+
+**Donc le problème n'est plus CORS.** L'edge function répond, mais avec un `errorCode` qui déclenche le toast. Il faut voir **le contenu exact de cette réponse**.
+
+### Hypothèse forte — pourquoi ça marchait avant et plus maintenant
+
+Quand tu dis "ça marchait", c'était probablement avec un **ancien schéma de la table `orders` en prod**. Mes derniers ajouts au `SELECT` incluent des colonnes qui pourraient ne pas exister en prod :
+- `shipping_email`
+- `shipping_mode`
+
+Si une de ces colonnes n'existe pas dans la DB prod (`vpt...yxf`), le `SELECT` retourne une erreur Postgres → la fonction renvoie `errorCode: DB_ERROR` → le frontend affiche un message générique.
+
+C'est exactement le scénario "ça marchait avant l'ajout de ces colonnes, ça casse maintenant".
+
+### Plan d'action — diagnostic en 1 coup, sans tâtonner
+
+**Étape 1 — Mode lecture (immédiat)**
+Je regarde 3 choses dans le code :
+1. `frontend/src/components/shipping/ShippingLabelPreview.tsx` → comment le frontend traite la réponse (extraire le vrai message d'erreur du `data` pour l'afficher tel quel au lieu du fallback générique)
+2. `frontend/supabase/functions/generate-shipping-labels/index.ts` → confirmer que je log bien `ordersError.message` quand le SELECT échoue
+3. `frontend/supabase/migrations/` → chercher si `shipping_email` et `shipping_mode` ont une migration → si non, ces colonnes n'existent pas en prod
+
+**Étape 2 — Correctif sans risque (mode default)**
+Deux changements minimaux :
+
+**A.** Côté **frontend** : afficher le vrai `error` de la réponse au lieu du toast générique
+```ts
+if (!data.success) {
+  toast.error(`${data.errorCode || 'ERREUR'}: ${data.error || 'Aucune commande trouvée'}`);
+  return;
+}
 ```
-Access to fetch at 'https://vpttoqojmiqxgudknyxf.supabase.co/functions/v1/platform-bootstrap' 
-from origin 'https://zandofy.com' has been blocked by CORS policy: 
-Response to preflight request doesn't pass access control check: 
-It does not have HTTP ok status.
-```
+→ Comme ça, au prochain test, tu verras directement `DB_ERROR: column "shipping_email" does not exist` (ou autre) au lieu de "Aucune commande trouvée".
 
-### Ce que ça signifie concrètement
+**B.** Côté **edge function** : retirer temporairement `shipping_email` et `shipping_mode` du `SELECT` et utiliser `COALESCE` pour les valeurs par défaut. Ça garantit que la fonction marche même si ces colonnes manquent en prod.
 
-1. Le navigateur, avant tout appel `POST` vers une edge function, envoie une requête `OPTIONS` (preflight CORS).
-2. Cette requête `OPTIONS` arrive sur l'edge function `platform-bootstrap` (et probablement aussi `generate-shipping-labels`) en prod.
-3. **L'edge function ne répond PAS correctement au preflight** → elle renvoie un statut non-2xx (probablement 401 ou 500), ce qui fait que le navigateur **bloque** l'appel `POST` réel avant même qu'il parte.
-4. Côté frontend, on ne voit qu'une erreur générique → on retombe sur le toast "Aucune commande trouvée" qui est en réalité un fallback d'erreur réseau silencieuse.
+**Étape 3 — Validation (1 clic de ta part)**
+Tu retestes "Imprimer étiquette". Cette fois :
+- ✅ Si le PDF se génère → problème réglé, on documente
+- ❌ Si tu vois un message d'erreur précis → tu me l'envoies (1 ligne) et je tranche en 1 fix final
 
-### Pourquoi c'est arrivé
+**Étape 4 (séparée) — Migration des colonnes manquantes**
+Si `shipping_email` et `shipping_mode` doivent exister en prod (pour d'autres features), je créerai une migration `ALTER TABLE orders ADD COLUMN IF NOT EXISTS ...` à pousser via GitHub Actions.
 
-Tes edge functions en prod (`vpt...yxf`) ont probablement **un de ces 3 problèmes** :
-- **A.** Pas de handler `if (req.method === 'OPTIONS')` qui retourne `200` avec les headers CORS
-- **B.** `verify_jwt = true` dans `config.toml` → le preflight `OPTIONS` (qui n'a JAMAIS de header `Authorization`) est rejeté avec 401 par le runtime Supabase **avant** d'atteindre ton code
-- **C.** Header `Access-Control-Allow-Origin` mal configuré (ex: ne contient pas `https://zandofy.com`)
+### Ce que je ne ferai PAS
+- Re-toucher au CORS (déjà OK)
+- Re-toucher à `config.toml` (déjà OK)
+- Modifier `client.ts`, `.env`, `types.ts`
+- Faire des migrations sans ton accord explicite
 
-### Bonus : 2 autres erreurs visibles dans la console
+### Pourquoi cette fois je suis plus confiant
+- Les logs montrent que la requête **arrive** à l'edge function (CORS OK)
+- L'edge function **répond** (response: Object)
+- Donc l'erreur est forcément **dans le payload de réponse** → on doit juste l'afficher au lieu de le masquer
 
-- `automation_workflows ... 404` → la table existe en Lovable Cloud mais **pas en prod Supabase** → migration manquante
-- `Cloudflare Insights bloqué par CSP` → bénin, ignorable
-- `X-Frame-Options via <meta>` → bénin, juste un avertissement HTML
-
----
-
-## 🛠️ Plan d'action — corriger CORS sur toutes les edge functions critiques en prod
-
-### Étape 1 — Audit lecture (immédiat, en mode plan)
-
-Je vais lire les fichiers suivants dans le repo pour cartographier l'état actuel :
-
-1. `frontend/supabase/functions/platform-bootstrap/index.ts` → vérifier handler OPTIONS + headers CORS
-2. `frontend/supabase/functions/generate-shipping-labels/index.ts` → idem
-3. `frontend/supabase/config.toml` → vérifier `verify_jwt` pour ces 2 fonctions
-
-### Étape 2 — Correctif standardisé (en mode default, après ton OK)
-
-Pour **chaque** edge function publique appelée depuis `zandofy.com`, appliquer ce pattern verrouillé :
-
-```typescript
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",  // ou Deno.env.get("ALLOWED_ORIGIN") || "https://zandofy.com"
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
-
-Deno.serve(async (req) => {
-  // ⚠️ TOUJOURS en premier, avant toute logique
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-  
-  // ... reste du code ...
-  
-  // Toutes les réponses doivent inclure corsHeaders
-  return new Response(JSON.stringify({ ok: true, ... }), {
-    status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-});
-```
-
-Et dans `frontend/supabase/config.toml` :
-```toml
-[functions.platform-bootstrap]
-verify_jwt = false
-
-[functions.generate-shipping-labels]
-verify_jwt = false  # le JWT est validé manuellement dans le code via getUser()
-```
-
-### Étape 3 — Push vers GitHub → déploiement auto sur Supabase prod (`vpt...yxf`)
-
-Comme on est sur la stack `Lovable → GitHub → Vercel/Supabase prod`, le commit déclenchera le redéploiement automatique des edge functions vers ta prod via GitHub Actions.
-
-### Étape 4 — Validation
-
-Tu retesteras "Imprimer étiquette" sur `zandofy.com`. Cette fois la requête preflight passera, l'edge function répondra correctement, et tu verras soit :
-- ✅ Le PDF généré → problème résolu
-- ❌ Une nouvelle erreur **précise** (avec `errorCode` lisible) → on saura quoi corriger ensuite
-
-### Étape 5 (séparée, optionnelle) — Migration `automation_workflows` manquante en prod
-
-Le 404 sur `automation_workflows` indique que cette table existe en Lovable Cloud mais pas dans ta DB prod. À traiter dans un second temps si tu utilises cette feature.
-
----
-
-## ⚠️ Ce que je ne ferai PAS
-
-- Aucun changement à `client.ts`, `.env`, `types.ts`
-- Aucune migration DB (sauf si tu valides séparément l'étape 5)
-- Aucun déploiement direct vers prod (tout passe par GitHub)
-- Aucun changement sur Lovable Cloud (ce n'est pas la source de vérité)
-
-## ✅ Décision attendue
-
-**Confirme** et je passe en exécution :
-1. Lecture des 2 edge functions + `config.toml`
-2. Application du pattern CORS verrouillé + `verify_jwt = false`
-3. Commit → GitHub → déploiement auto sur Supabase prod
-4. Tu retestes et on confirme la résolution
+### Décision attendue
+Confirme et je passe en exécution :
+1. Lecture des 3 fichiers (frontend handler + edge function + migrations)
+2. Patch frontend pour afficher le vrai message d'erreur
+3. Patch edge function pour retirer les colonnes potentiellement manquantes
+4. Tu retestes → on a soit le succès, soit un message d'erreur précis qui finit le diagnostic
 
