@@ -288,14 +288,16 @@ Deno.serve(async (req) => {
       };
     });
 
-    return new Response(JSON.stringify({ success: true, labels }), {
+    console.log("[v2] success: returning", labels.length, "labels");
+    return new Response(JSON.stringify({ ok: true, success: true, labels }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
+    console.error("[v2] uncaught error:", e);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Erreur interne" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ ok: false, success: false, error: e instanceof Error ? e.message : "Erreur interne", errorCode: "INTERNAL_ERROR" }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
