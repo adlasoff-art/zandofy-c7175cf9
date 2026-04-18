@@ -123,11 +123,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch orders (added shipping_email, shipping_mode)
+    // Fetch orders (shipping_mode removed — column not yet migrated to prod)
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, order_ref, shipping_first_name, shipping_last_name, shipping_phone, shipping_email, shipping_address, shipping_city, shipping_country, total, shipping_cost, tracking_number, delivery_choice, store_id, status, shipping_mode"
+        "id, order_ref, shipping_first_name, shipping_last_name, shipping_phone, shipping_email, shipping_address, shipping_city, shipping_country, total, shipping_cost, tracking_number, delivery_choice, store_id, status"
       )
       .in("id", orderIds);
 
@@ -309,7 +309,7 @@ Deno.serve(async (req) => {
         storeCountry: store.country || "",
         originCountry: orderOriginMap[o.id] || "",
         carrierLogoUrl,
-        shippingMode: o.shipping_mode || "",
+        shippingMode: "",
         totalWeightKg: metrics.totalWeightKg,
         totalVolumeCBM: metrics.totalVolumeCBM,
         estimatedDimensions: metrics.estimatedDimensions,
