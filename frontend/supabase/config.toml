@@ -1,6 +1,9 @@
 # Zandofy — deploy proof 2026-04-13T06:42Z
 project_id = "uogkklwfvwoxkifpkzpu"
 
+[functions.platform-bootstrap]
+verify_jwt = false
+
 [functions.send-email]
 verify_jwt = true
 

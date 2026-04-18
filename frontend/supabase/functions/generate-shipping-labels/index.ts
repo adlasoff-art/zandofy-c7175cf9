@@ -17,15 +17,19 @@ function getCorsHeaders(req: Request) {
     origin.endsWith(".lovableproject.com") ||
     origin.startsWith("http://localhost");
   return {
-    "Access-Control-Allow-Origin": isAllowed ? origin : allowed[0],
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowed[1],
     "Access-Control-Allow-Headers": ALLOWED_HEADERS,
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin",
   };
 }
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
+  // CORS preflight — ALWAYS first, never blocked by auth
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
