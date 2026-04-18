@@ -1,71 +1,103 @@
 
 
-## CAUSE RACINE CONFIRMÉE — enfin la vraie
+L'utilisateur veut les 3 options : walkthrough visuel + activation popups + moteur d'envoi email/push. Je structure le plan en 3 phases claires.
 
-Les logs prod sont sans ambiguïté :
+## Plan complet — Activation de l'automation marketing
 
-```
-ordersError= column orders.shipping_mode does not exist
-```
+### Phase 1 — Walkthrough visuel (Option C, immédiat, 0 dev)
 
-L'edge function tape bien la **bonne base** prod (le user `6afbf0da...` et son rôle `admin,vendor` correspondent à ton compte). Mais la requête SQL plante car la colonne `shipping_mode` **n'existe pas dans la table `orders` en prod**.
+Je te guide pas à pas pour trouver et utiliser l'écran admin :
 
-Donc :
-- ❌ Le `SELECT` échoue → `orders` retourne `[]`
-- ❌ La fonction renvoie `ORDERS_NOT_FOUND` (faux positif, c'est en réalité une erreur de schéma)
-- ✅ La commande `ZND-MN7F2J3P` existe bien
+**Accès :**
+1. Connecte-toi sur `https://zandofy.com` avec ton compte admin
+2. Va dans **Admin** (sidebar de gauche) → **Popups & Cookies**
+3. URL directe : `https://zandofy.com/admin/popups`
+4. Clique sur l'onglet **"Automations"** (icône éclair ⚡, entre "Annonces commerciales" et "Gestion cookies")
 
-J'avais ajouté `shipping_mode` au SELECT lors d'une itération précédente sans vérifier qu'une migration existait pour cette colonne en prod.
+**Ce que tu verras :**
+- Liste des 13 workflows pré-créés (J0 Bienvenue, J1 Découverte, J3 Premier achat, J7 Relance, J14, J21, J30, etc.)
+- Chaque ligne avec : nom, déclencheur, canal (popup/push/email), délai, statut (toggle on/off)
+- Flèche pour déplier et voir/éditer le contenu (titre, image, CTA, sujet email, message push)
+- Bouton "+ Nouveau workflow" en haut à droite
 
-## Plan de correction — 2 actions, fin du tunnel
+### Phase 2 — Activation popups (Option A, 0 dev)
 
-### Action 1 — Retirer `shipping_mode` du SELECT (fix immédiat, 0 risque)
+Pour tes ~50 nouveaux clients de la semaine :
 
-Dans `frontend/supabase/functions/generate-shipping-labels/index.ts`, retirer `shipping_mode` de la liste du `select(...)` et le remplacer par une valeur par défaut côté JS :
+1. **Identifier les workflows pertinents** pour leur ancienneté (≤ 7 jours) :
+   - "J0 - Bienvenue après inscription"
+   - "J1 - Découverte catalogue"
+   - "J3 - Premier achat - Code promo"
+   - "J7 - Relance pas encore commandé"
 
-```ts
-// AVANT
-.select("id, order_ref, ..., shipping_mode")
+2. **Pour chaque workflow** : déplier → vérifier le contenu (titre, image, lien CTA) → ajuster si besoin → activer le toggle
 
-// APRÈS
-.select("id, order_ref, ...")  // sans shipping_mode
+3. **Effet immédiat** : dès la prochaine visite des clients éligibles, le popup s'affiche selon les conditions (anti-spam : 1x/session ou 1x total selon `display_frequency`)
 
-// Plus bas dans le map :
-shippingMode: "",  // valeur par défaut, sera réactivée après migration
-```
+**Aucun risque** : le système exclut automatiquement les utilisateurs déjà ciblés (table `automation_user_progress`).
 
-Idem pour `shipping_email` par précaution — je vérifie d'abord si la colonne existe (si l'erreur ne mentionne que `shipping_mode`, alors `shipping_email` est OK et je le garde).
+### Phase 3 — Moteur d'envoi email/push (Option B, dev nécessaire)
 
-### Action 2 — Créer la migration `shipping_mode` (à pousser séparément)
+Pour que les workflows avec canal `email`, `push`, `popup_push`, `push_email` ou `all` envoient réellement les notifications (et pas seulement les popups) :
 
-Créer `frontend/supabase/migrations/<timestamp>_add_shipping_mode_to_orders.sql` :
+#### Nouveau edge function : `process-automation-workflows`
 
+**Fonction** : Cron job déclenché toutes les heures qui :
+1. Liste les workflows actifs avec channel ≠ `popup`
+2. Pour chaque workflow, identifie les utilisateurs éligibles :
+   - Conditions remplies (`condition_has_account`, `condition_has_order`, `condition_max_days_since_signup`)
+   - Délai écoulé (`delay_days` depuis signup ou trigger)
+   - Pas encore traité (vérification dans `automation_user_progress`)
+   - Respect de `display_frequency` et `max_displays`
+3. Pour chaque utilisateur éligible :
+   - Si canal inclut `email` → appel `send-transactional-email` avec template du workflow
+   - Si canal inclut `push` → appel `push-notifications` avec titre/message du workflow
+   - Insert dans `automation_user_progress` (status `sent`)
+
+#### Planification pg_cron
+
+Job SQL toutes les heures :
 ```sql
-ALTER TABLE public.orders
-ADD COLUMN IF NOT EXISTS shipping_mode TEXT;
+SELECT cron.schedule(
+  'process-automation-hourly',
+  '0 * * * *',
+  $$ SELECT net.http_post(
+    url := 'https://vpttoqojmiqxgudknyxf.supabase.co/functions/v1/process-automation-workflows',
+    headers := '{"Authorization": "Bearer <ANON_KEY>"}'::jsonb
+  ) $$
+);
 ```
 
-Cette migration sera appliquée sur prod via ton workflow GitHub Actions habituel. Une fois appliquée, je pourrai réintégrer `shipping_mode` dans le SELECT.
+#### Sécurités intégrées
 
-### Action 3 — Garde-fou logs
+- **Idempotence** : un utilisateur ne reçoit jamais 2x le même workflow (clé unique `(user_id, workflow_id)` dans `automation_user_progress`)
+- **Rate limit SMTP** : batching 10 emails / 20 min (déjà géré par `send-transactional-email`)
+- **Logs** : chaque envoi est tracé dans `automation_user_progress` avec `status` et `last_displayed_at`
+- **Désactivation propre** : suffit de couper le toggle d'un workflow → le cron l'ignore
 
-Garder les logs `[v2]` actuels et le log `[v3] SUPABASE_URL=...` (déjà en place) pour que la prochaine erreur de schéma soit diagnostiquée en 1 lecture de log au lieu de 5 itérations.
+#### Fichiers à créer/modifier
 
-## Ce que je NE ferai pas
+- `frontend/supabase/functions/process-automation-workflows/index.ts` (nouveau, ~250 lignes)
+- `frontend/supabase/config.toml` : ajouter bloc `[functions.process-automation-workflows]` avec `verify_jwt = false`
+- Migration SQL : création du cron job pg_cron (à appliquer une seule fois en prod)
 
-- Aucun changement CORS (déjà OK, logs le confirment)
-- Aucun changement `config.toml`, `client.ts`, `.env`, `types.ts`
-- Pas de modification Lovable Cloud
+### Ordre d'exécution proposé
 
-## Pourquoi cette fois c'est définitif
+1. **Aujourd'hui** : tu suis le walkthrough Phase 1, tu actives les popups Phase 2 → effet immédiat sur tes 50 clients
+2. **Cette semaine** : je code Phase 3, tu pushes via GitHub Actions, tu actives le cron en prod → les emails/push partent automatiquement
 
-Les logs prod montrent **textuellement** l'erreur PostgreSQL : `column orders.shipping_mode does not exist`. Ce n'est plus une hypothèse — c'est la base de données prod qui parle. Le fix retire la cause exacte de cette erreur.
+### Ce que je NE ferai pas
 
-## Décision attendue
+- Aucune modification des 13 workflows existants (contenu, conditions)
+- Aucune nouvelle table en base
+- Aucun changement sur Lovable Cloud
+- Aucune modification du hook `useAutomation` (popups continuent de marcher en parallèle)
+
+### Décision attendue
 
 Confirme et je passe en exécution mode default :
-1. Patch edge function : retrait de `shipping_mode` du SELECT (+ valeur par défaut côté JS)
-2. Création de la migration SQL `ADD COLUMN IF NOT EXISTS shipping_mode`
-3. Tu pushes → la fonction marche immédiatement (avant même que la migration soit appliquée)
-4. Quand tu appliques la migration, on réactivera `shipping_mode` dans une PR séparée
+1. Création de `process-automation-workflows/index.ts`
+2. Ajout du bloc dans `config.toml`
+3. Création de la migration `cron.schedule` (à appliquer après push via Actions)
+4. Je te donne les instructions précises pour activer les workflows côté admin
 
