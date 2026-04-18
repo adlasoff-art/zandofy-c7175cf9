@@ -99,6 +99,11 @@ export function PaymentWaitingPanel({
             Ouvrez l'application{providerLabel ? ` ${providerLabel}` : " Mobile Money"} et validez le paiement avec votre code PIN.
           </p>
         )}
+        {isExpired && graceRemaining !== null && graceRemaining > 0 && (
+          <p className="text-xs text-destructive max-w-xs font-medium">
+            Sans action de votre part, cette commande sera marquée comme « paiement échoué » dans {graceRemaining}s.
+          </p>
+        )}
       </div>
 
       {/* Countdown */}
