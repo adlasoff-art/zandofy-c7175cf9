@@ -82,10 +82,11 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
         return;
       }
 
-      console.log("[ShippingLabels] response:", { status: res.status, data });
+      console.log("[ShippingLabels] response:", { status: res.status, data, sentOrderIds: orderIds });
 
       if (!data?.ok) {
-        toast.error(data?.error || `Erreur (HTTP ${res.status})`);
+        const code = data?.errorCode ? `[${data.errorCode}] ` : "";
+        toast.error(`${code}${data?.error || `Erreur (HTTP ${res.status})`}`);
         setLoading(false);
         return;
       }
