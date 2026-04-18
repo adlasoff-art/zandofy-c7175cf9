@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
       user_id: o.user_id,
       type: "order",
       title: "Paiement expiré",
-      message: `Le paiement de votre commande ${o.order_ref} a expiré après 30 minutes. Vous pouvez relancer le paiement depuis votre espace.`,
+      message: `Le paiement de votre commande ${o.order_ref} n'a pas été confirmé à temps. Vous pouvez relancer le paiement depuis votre espace en quelques clics.`,
       link: "/dashboard",
     }));
 
