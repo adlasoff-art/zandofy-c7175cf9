@@ -168,7 +168,7 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
     const carrierLogoUrl = labels[0]?.carrierLogoUrl || "";
 
     printWindow.document.write(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>${t("label.shippingLabels")}</title>
+<html><head><meta charset="utf-8"><title>Shipping Labels</title>
 <style>
   @page { size: 100mm 150mm; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -200,7 +200,7 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
       const qrUrl = qrDataUrls[i] || "";
       const barcodeUrl = barcodeDataUrls[i] || "";
       const fromLine = [label.storeCity, label.storeCountry].filter(Boolean).join(", ");
-      const originLine = label.originCountry ? `${t("label.origin")}: ${label.originCountry}` : "";
+      const originLine = label.originCountry ? `Origin: ${label.originCountry}` : "";
       const shippingModeStr = getShippingModeLabel(label.shippingMode);
 
       printWindow.document.write(`
@@ -215,12 +215,12 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
     ${qrUrl ? `<img src="${qrUrl}" class="qr-top" alt="QR"/>` : ""}
   </div>
   <hr class="sep-double"/><hr class="sep-double-2"/>
-  <div class="section-lbl">${t("label.from")}</div>
+  <div class="section-lbl">From</div>
   <div class="store-name">${label.storeName}</div>
   <div class="info">${fromLine || "—"}</div>
   ${originLine ? `<div class="info">${originLine}</div>` : ""}
   <hr class="sep"/>
-  <div class="section-lbl">${t("label.shipTo")}</div>
+  <div class="section-lbl">Ship to</div>
   <div class="recipient">${label.recipientName}</div>
   <div class="info">${label.recipientAddress || "—"}</div>
   <div class="info">${[label.recipientCity, label.recipientCountry].filter(Boolean).join(", ")}</div>
@@ -228,20 +228,20 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
   ${label.recipientEmail ? `<div class="info">✉ ${label.recipientEmail}</div>` : ""}
   <hr class="sep-double"/><hr class="sep-double-2"/>
   <div class="detail-grid">
-    <span class="detail-key">${t("label.order")}</span><span class="detail-val">${label.orderRef}</span>
-    <span class="detail-key">${t("label.track")}</span><span class="detail-val">${label.trackingNumber || "—"}</span>
-    <span class="detail-key">${t("label.mode")}</span><span class="detail-val">${getModeLabel(label.deliveryChoice)} · ${label.itemsCount} ${t("label.items")}</span>
-    <span class="detail-key">${t("label.shipCost")}</span><span class="detail-val">$${label.shippingCost}</span>
-    ${shippingModeStr ? `<span class="detail-key">${t("label.shippingMode")}</span><span class="detail-val">${shippingModeStr}</span>` : ""}
-    ${label.totalWeightKg > 0 ? `<span class="detail-key">${t("label.weight")}</span><span class="detail-val">${label.totalWeightKg} kg</span>` : ""}
-    ${label.estimatedDimensions ? `<span class="detail-key">${t("label.dimensions")}</span><span class="detail-val">${label.estimatedDimensions}</span>` : ""}
-    ${label.totalVolumeCBM > 0 ? `<span class="detail-key">${t("label.volumeCbm")}</span><span class="detail-val">${label.totalVolumeCBM} m³</span>` : ""}
+    <span class="detail-key">Order</span><span class="detail-val">${label.orderRef}</span>
+    <span class="detail-key">Tracking</span><span class="detail-val">${label.trackingNumber || "—"}</span>
+    <span class="detail-key">Mode</span><span class="detail-val">${getModeLabel(label.deliveryChoice)} · ${label.itemsCount} items</span>
+    <span class="detail-key">Shipping cost</span><span class="detail-val">$${label.shippingCost}</span>
+    ${shippingModeStr ? `<span class="detail-key">Shipping mode</span><span class="detail-val">${shippingModeStr}</span>` : ""}
+    ${label.totalWeightKg > 0 ? `<span class="detail-key">Weight</span><span class="detail-val">${label.totalWeightKg} kg</span>` : ""}
+    ${label.estimatedDimensions ? `<span class="detail-key">Dims</span><span class="detail-val">${label.estimatedDimensions}</span>` : ""}
+    ${label.totalVolumeCBM > 0 ? `<span class="detail-key">CBM</span><span class="detail-val">${label.totalVolumeCBM} m³</span>` : ""}
   </div>
   <hr class="sep-double"/><hr class="sep-double-2"/>
   <div class="barcode-area">
     ${barcodeUrl ? `<img src="${barcodeUrl}" class="barcode-img" alt="Barcode"/>` : ""}
     <div class="barcode-ref">${label.orderRef}</div>
-    <div class="scan-hint">${t("label.scanQr")}</div>
+    <div class="scan-hint">Scan QR to track your parcel · Scannez le QR pour suivre votre colis</div>
   </div>
 </div>`);
     });
