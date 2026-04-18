@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2, Printer } from "lucide-react";
@@ -45,7 +45,6 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
   const { t } = useI18n();
 
   const fetchLabels = async () => {
-    if (fetched && labels.length > 0) return;
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("generate-shipping-labels", {
@@ -64,9 +63,16 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
     setLoading(false);
   };
 
-  if (open && !fetched && !loading) {
-    fetchLabels();
-  }
+  useEffect(() => {
+    if (open && !fetched && !loading) {
+      fetchLabels();
+    }
+    if (!open) {
+      setFetched(false);
+      setLabels([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const getModeLabel = (choice: string) => {
     if (choice === "home_delivery") return t("label.homeDelivery");
