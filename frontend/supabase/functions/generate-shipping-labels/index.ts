@@ -85,9 +85,12 @@ Deno.serve(async (req) => {
     const isStaff = userRoles.includes("admin") || userRoles.includes("manager");
     const isVendor = userRoles.includes("vendor");
 
+    console.log("[v2] userId=", userId, "roles=", userRoles, "orderIds reçus=", orderIds);
+
     if (!isStaff && !isVendor) {
-      return new Response(JSON.stringify({ error: "Accès refusé" }), {
-        status: 403,
+      console.log("[v2] access denied: no staff/vendor role");
+      return new Response(JSON.stringify({ ok: false, success: false, error: "Accès refusé" }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
