@@ -1,71 +1,68 @@
 
 
-## Je comprends ta frustration — recadrons le diagnostic
+## Diagnostic — je comprends enfin la vraie cause
 
-Tu as raison : ça marchait, ça ne marche plus, et mes itérations n'ont pas résolu. Je dois arrêter de tâtonner et **regarder les vraies données** au lieu de supposer.
+Tu as raison de t'énerver. Je tournais en rond parce que je regardais la mauvaise base. Voici ce que je comprends maintenant :
 
-### Ce que je sais déjà (logs prod confirmés)
-- ✅ CORS preflight passe maintenant (plus d'erreur "blocked by CORS policy" sur `generate-shipping-labels`)
-- ✅ L'edge function répond : `[ShippingLabels] response: Object` apparaît dans la console
-- ❌ Mais le résultat affiche toujours "Aucune commande trouvée"
+### Ce qui se passe réellement
 
-**Donc le problème n'est plus CORS.** L'edge function répond, mais avec un `errorCode` qui déclenche le toast. Il faut voir **le contenu exact de cette réponse**.
+- **Frontend prod** (`zandofy.com`) → lit la **DB prod** (`vpt...yxf`) → tu vois la commande `ZND-MN7F2J3P` dans la liste → tu la sélectionnes ✅
+- **Edge Function `generate-shipping-labels`** déployée sur prod → mais elle utilise les variables d'environnement `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` du **mauvais projet** (probablement staging `wgi...ete`) → elle cherche `ZND-MN7F2J3P` dans staging → ne trouve rien → renvoie `ORDERS_NOT_FOUND` ❌
 
-### Hypothèse forte — pourquoi ça marchait avant et plus maintenant
+C'est exactement le scénario "frontend pointe vers prod, edge function pointe vers staging". Ça explique pourquoi :
+- La commande existe (ta capture le confirme : 52 lignes dans `orders` prod)
+- L'auth passe (le JWT vient de prod)
+- Mais le SELECT par UUID ne renvoie rien
 
-Quand tu dis "ça marchait", c'était probablement avec un **ancien schéma de la table `orders` en prod**. Mes derniers ajouts au `SELECT` incluent des colonnes qui pourraient ne pas exister en prod :
-- `shipping_email`
-- `shipping_mode`
+### Pourquoi je n'avais pas vu ça
 
-Si une de ces colonnes n'existe pas dans la DB prod (`vpt...yxf`), le `SELECT` retourne une erreur Postgres → la fonction renvoie `errorCode: DB_ERROR` → le frontend affiche un message générique.
+Je supposais que les secrets `SUPABASE_URL` injectés dans l'edge function correspondaient au projet de déploiement. Mais sur Supabase self-managed (Coolify/GitHub Actions), ces secrets sont **configurés manuellement** par projet, et rien ne garantit qu'ils sont alignés.
 
-C'est exactement le scénario "ça marchait avant l'ajout de ces colonnes, ça casse maintenant".
+### Plan de correction — 3 étapes ciblées
 
-### Plan d'action — diagnostic en 1 coup, sans tâtonner
+**Étape 1 — Diagnostic instantané (mode default, sans rien modifier)**
 
-**Étape 1 — Mode lecture (immédiat)**
-Je regarde 3 choses dans le code :
-1. `frontend/src/components/shipping/ShippingLabelPreview.tsx` → comment le frontend traite la réponse (extraire le vrai message d'erreur du `data` pour l'afficher tel quel au lieu du fallback générique)
-2. `frontend/supabase/functions/generate-shipping-labels/index.ts` → confirmer que je log bien `ordersError.message` quand le SELECT échoue
-3. `frontend/supabase/migrations/` → chercher si `shipping_email` et `shipping_mode` ont une migration → si non, ces colonnes n'existent pas en prod
+J'ajoute **2 lignes de log** dans `frontend/supabase/functions/generate-shipping-labels/index.ts` au tout début du handler :
 
-**Étape 2 — Correctif sans risque (mode default)**
-Deux changements minimaux :
-
-**A.** Côté **frontend** : afficher le vrai `error` de la réponse au lieu du toast générique
 ```ts
-if (!data.success) {
-  toast.error(`${data.errorCode || 'ERREUR'}: ${data.error || 'Aucune commande trouvée'}`);
-  return;
-}
+console.log("[v3] SUPABASE_URL=", Deno.env.get("SUPABASE_URL"));
+console.log("[v3] orderIds reçus=", orderIds);
 ```
-→ Comme ça, au prochain test, tu verras directement `DB_ERROR: column "shipping_email" does not exist` (ou autre) au lieu de "Aucune commande trouvée".
 
-**B.** Côté **edge function** : retirer temporairement `shipping_email` et `shipping_mode` du `SELECT` et utiliser `COALESCE` pour les valeurs par défaut. Ça garantit que la fonction marche même si ces colonnes manquent en prod.
+Tu pushes, tu retestes une fois, et on lit les logs côté Supabase prod. Si l'URL loggée est `wgi...ete` au lieu de `vpt...yxf` → diagnostic confirmé en 30 secondes.
 
-**Étape 3 — Validation (1 clic de ta part)**
-Tu retestes "Imprimer étiquette". Cette fois :
-- ✅ Si le PDF se génère → problème réglé, on documente
-- ❌ Si tu vois un message d'erreur précis → tu me l'envoies (1 ligne) et je tranche en 1 fix final
+**Étape 2 — Correction selon le résultat**
 
-**Étape 4 (séparée) — Migration des colonnes manquantes**
-Si `shipping_email` et `shipping_mode` doivent exister en prod (pour d'autres features), je créerai une migration `ALTER TABLE orders ADD COLUMN IF NOT EXISTS ...` à pousser via GitHub Actions.
+- **Cas A** (URL = staging) : il faut corriger les secrets de l'edge function dans le dashboard Supabase prod (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`). Je te donnerai la procédure exacte à suivre côté Supabase self-hosted, **car je n'ai pas accès à ces secrets** (limitation que j'aurais dû te signaler depuis le début).
+- **Cas B** (URL = prod correcte) : alors le problème vient d'ailleurs (RLS sur `supabaseAdmin`, ou la commande appartient à un autre `store_id`). Je creuserai les logs `[v2] missing orderIds=` qui sont déjà en place.
+
+**Étape 3 — Garde-fou permanent**
+
+J'ajoute un check au démarrage de chaque edge function critique : si `SUPABASE_URL` ne correspond pas au domaine attendu pour l'environnement, la fonction renvoie immédiatement une erreur `WRONG_ENV` au lieu de chercher silencieusement dans la mauvaise base. Ça évite que ce bug se reproduise sur d'autres fonctions.
+
+### Rapport de limitation (comme tu me l'as demandé)
+
+Tu as raison sur ce point aussi. Voici mes vraies limites que j'aurais dû annoncer plus tôt :
+1. **Je n'ai PAS accès à ta DB prod `vpt...yxf` ni à ta DB staging `wgi...ete`** (toutes deux self-hosted sur Coolify). Quand je dis "j'ai vérifié en SQL", j'interroge en réalité Lovable Cloud (`uog...zpu`), qui est un **3ème environnement** sans rapport.
+2. **Je n'ai PAS accès aux secrets configurés dans tes edge functions self-hosted** (Supabase Vault de tes instances).
+3. **Je ne peux PAS déployer directement** sur tes instances prod/staging — tout passe par GitHub Actions que toi seul peux déclencher.
+
+→ La seule chose que je peux faire, c'est modifier le code et te donner des instructions précises. Tout diagnostic doit passer par les logs que **toi** tu lis sur ton dashboard Supabase prod.
+
+### Ce que je vais faire (mode default)
+
+1. Ajouter le log `[v3] SUPABASE_URL=...` dans l'edge function `generate-shipping-labels`
+2. Ajouter le garde-fou `WRONG_ENV` (configurable via une variable `EXPECTED_SUPABASE_HOST`)
+3. Te donner les 2 commandes à lancer après ton push pour lire les logs prod
 
 ### Ce que je ne ferai PAS
-- Re-toucher au CORS (déjà OK)
-- Re-toucher à `config.toml` (déjà OK)
-- Modifier `client.ts`, `.env`, `types.ts`
-- Faire des migrations sans ton accord explicite
 
-### Pourquoi cette fois je suis plus confiant
-- Les logs montrent que la requête **arrive** à l'edge function (CORS OK)
-- L'edge function **répond** (response: Object)
-- Donc l'erreur est forcément **dans le payload de réponse** → on doit juste l'afficher au lieu de le masquer
+- Aucune migration DB
+- Aucune modification de `client.ts`, `.env`, `types.ts`, `config.toml`
+- Aucun changement sur Lovable Cloud
+- Aucune modification de CORS ou d'auth
 
 ### Décision attendue
-Confirme et je passe en exécution :
-1. Lecture des 3 fichiers (frontend handler + edge function + migrations)
-2. Patch frontend pour afficher le vrai message d'erreur
-3. Patch edge function pour retirer les colonnes potentiellement manquantes
-4. Tu retestes → on a soit le succès, soit un message d'erreur précis qui finit le diagnostic
+
+Confirme et j'ajoute les 2 lignes de log + le garde-fou. Tu pushes, tu retestes 1 fois, tu me colles le log `[v3] SUPABASE_URL=...` depuis ton dashboard Supabase prod, et on tranche définitivement en 1 itération.
 
