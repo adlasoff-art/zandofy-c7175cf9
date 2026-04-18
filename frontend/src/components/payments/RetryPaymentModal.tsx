@@ -212,6 +212,21 @@ export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF",
                   setPolling(false);
                   setPaymentStatus("idle");
                 }}
+                onAutoAbandon={async () => {
+                  // Délai dépassé sans action : on demande au backend
+                  // de marquer la commande en payment_failed après vérification finale.
+                  try {
+                    await supabase.functions.invoke("mark-payment-abandoned", {
+                      body: { order_ids: [orderId], reference },
+                    });
+                  } catch {
+                    // best-effort
+                  }
+                  if (pollInterval.current) clearInterval(pollInterval.current);
+                  setPolling(false);
+                  setPaymentStatus("failed");
+                  toast.error("Paiement non confirmé à temps. Vous pouvez relancer.");
+                }}
               />
             )}
 
