@@ -1,7 +1,9 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { LocationHierarchyFilter, type LocationFilters } from "@/components/admin/LocationHierarchyFilter";
-import { Search, Loader2, ChevronDown, ChevronUp, MapPin, Truck, AlertTriangle, Download, Hash, Bike, DollarSign, Trash2 } from "lucide-react";
+import { Search, Loader2, ChevronDown, ChevronUp, MapPin, Truck, AlertTriangle, Download, Hash, Bike, DollarSign, Trash2, Printer } from "lucide-react";
 import { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ShippingLabelPreview } from "@/components/shipping/ShippingLabelPreview";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,6 +41,25 @@ export default function AdminOrdersPage() {
   const [supplierModal, setSupplierModal] = useState<string | null>(null);
   const [shippedModal, setShippedModal] = useState<string | null>(null);
   const [riderModal, setRiderModal] = useState<string | null>(null);
+
+  // Multi-select for shipping labels
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [showLabelsPreview, setShowLabelsPreview] = useState(false);
+
+  const toggleOrderSelection = (orderId: string) => {
+    setSelectedOrders((prev) =>
+      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
+    );
+  };
+
+  const toggleSelectAll = (orderIds: string[]) => {
+    const allSelected = orderIds.every((id) => selectedOrders.includes(id));
+    if (allSelected) {
+      setSelectedOrders((prev) => prev.filter((id) => !orderIds.includes(id)));
+    } else {
+      setSelectedOrders((prev) => [...new Set([...prev, ...orderIds])]);
+    }
+  };
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["admin-orders", user?.id],
@@ -357,6 +378,29 @@ export default function AdminOrdersPage() {
         ))}
       </div>
 
+      {/* Floating action bar for selected orders */}
+      {selectedOrders.length > 0 && (
+        <div className="mb-4 p-3 bg-primary/10 border border-primary/30 rounded-xl flex items-center justify-between">
+          <span className="text-sm font-medium text-foreground">
+            {selectedOrders.length} commande{selectedOrders.length > 1 ? "s" : ""} sélectionnée{selectedOrders.length > 1 ? "s" : ""}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowLabelsPreview(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              <Printer size={14} /> Imprimer étiquettes
+            </button>
+            <button
+              onClick={() => setSelectedOrders([])}
+              className="px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-muted"
+            >
+              Désélectionner
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         {isLoading ? (
           <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={24} /></div>
@@ -364,22 +408,43 @@ export default function AdminOrdersPage() {
           <p className="text-center py-8 text-sm text-muted-foreground">Aucune commande trouvée.</p>
         ) : (
           <div className="divide-y divide-border">
+            {/* Select all header */}
             {(() => {
               const safeAdminPage = Math.max(1, Math.min(adminOrderPage, Math.ceil(filtered.length / adminOrderPageSize)));
               const paginatedFiltered = filtered.slice((safeAdminPage - 1) * adminOrderPageSize, safeAdminPage * adminOrderPageSize);
-              return paginatedFiltered.map((o) => {
+              const pageIds = paginatedFiltered.map((o: any) => o.id);
+              const allPageSelected = pageIds.length > 0 && pageIds.every((id: string) => selectedOrders.includes(id));
+              return (
+                <>
+                  <div className="px-3 py-2 flex items-center gap-3 bg-muted/30 border-b border-border">
+                    <Checkbox
+                      checked={allPageSelected}
+                      onCheckedChange={() => toggleSelectAll(pageIds)}
+                      aria-label="Sélectionner toutes les commandes de la page"
+                    />
+                    <span className="text-[10px] text-muted-foreground">Tout sélectionner</span>
+                  </div>
+                  {paginatedFiltered.map((o: any) => {
               const cfg = STATUS_CONFIG[o.status] || STATUS_CONFIG.pending;
               const StatusIcon = cfg.icon;
               const next = getNextStatus(o.status);
               const canAdvance = canAdminAdvance(o.status);
               const isExpanded = expandedId === o.id;
+              const isSelected = selectedOrders.includes(o.id);
 
               return (
                 <div key={o.id}>
-                  <button
-                    onClick={() => setExpandedId(isExpanded ? null : o.id)}
-                    className="w-full p-3 flex items-center gap-3 text-left hover:bg-muted/20 transition-colors text-sm"
-                  >
+                  <div className="w-full p-3 flex items-center gap-3 text-left text-sm">
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleOrderSelection(o.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Sélectionner ${o.order_ref}`}
+                    />
+                    <button
+                      onClick={() => setExpandedId(isExpanded ? null : o.id)}
+                      className="flex-1 flex items-center gap-3 hover:bg-muted/20 transition-colors rounded-md px-1"
+                    >
                     <StatusIcon size={16} className={cfg.color} />
                     <span className="font-mono text-xs w-28 shrink-0">{o.order_ref}</span>
                     <span className="flex-1 min-w-0 truncate">{o.shipping_first_name} {o.shipping_last_name?.charAt(0)}.</span>
@@ -391,8 +456,8 @@ export default function AdminOrdersPage() {
                       {format(new Date(o.created_at), "d MMM", { locale: fr })}
                     </span>
                     {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  </button>
-
+                    </button>
+                  </div>
                   {isExpanded && (
                     <div className="px-4 pb-4 space-y-3 bg-muted/10">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
@@ -555,7 +620,9 @@ export default function AdminOrdersPage() {
                   )}
                 </div>
               );
-            })
+            })}
+                </>
+              );
             })()}
             <DataTablePagination
               totalItems={filtered.length}
@@ -621,6 +688,12 @@ export default function AdminOrdersPage() {
           }}
         />
       )}
+
+      <ShippingLabelPreview
+        open={showLabelsPreview}
+        onClose={() => setShowLabelsPreview(false)}
+        orderIds={selectedOrders}
+      />
     </AdminLayout>
   );
 }

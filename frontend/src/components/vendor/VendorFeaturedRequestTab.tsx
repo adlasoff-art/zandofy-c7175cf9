@@ -77,7 +77,7 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
     if (!imageFile || !user) return null;
     const ext = imageFile.name.split(".").pop();
     const path = `featured/${user.id}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("cms-assets").upload(path, imageFile, { upsert: true });
+    const { error } = await supabase.storage.from("cms-assets").upload(path, imageFile, { upsert: true, cacheControl: "31536000" });
     if (error) throw error;
     const { data: urlData } = supabase.storage.from("cms-assets").getPublicUrl(path);
     return urlData.publicUrl;

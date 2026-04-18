@@ -156,6 +156,16 @@ const PRODUCT_SELECT = `
   stores!products_store_id_fkey(id, name, is_verified, is_certified, verified_years, verified_years_override, created_at, is_online, sales_count, sales_override, followers_count, followers_override, shop_type)
 `;
 
+// Fallback SELECT without recently added columns that may be missing in production
+const PRODUCT_SELECT_FALLBACK = `
+  *,
+  categories(name, name_fr, parent_id),
+  product_images(image_url, position),
+  product_colors(color_hex, color_name, image_url),
+  product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
+  stores!products_store_id_fkey(id, name, is_verified, verified_years, created_at, is_online, sales_count, followers_count)
+`;
+
 export async function fetchProducts(params?: {
   category?: string;
   limit?: number;
@@ -163,42 +173,59 @@ export async function fetchProducts(params?: {
   sale?: boolean;
   trendTagId?: string;
   categoryId?: string;
+  storeId?: string;
   orderBy?: "popular" | "newest" | "default";
 }): Promise<Product[]> {
-  let query = supabase
-    .from("products")
-    .select(PRODUCT_SELECT)
-    .eq("publish_status", "published");
+  const tryFetch = async (selectQuery: string): Promise<{ data: any[] | null; error: any }> => {
+    let query = supabase
+      .from("products")
+      .select(selectQuery)
+      .eq("publish_status", "published");
 
-  // Order
-  if (params?.orderBy === "popular") {
-    query = query.order("review_count", { ascending: false });
-  } else {
-    query = query.order("created_at", { ascending: false });
-  }
+    if (params?.orderBy === "popular") {
+      query = query.order("review_count", { ascending: false });
+    } else {
+      query = query.order("created_at", { ascending: false });
+    }
 
-  if (params?.category) {
-    query = query.eq("categories.name", params.category);
-  }
-  if (params?.categoryId) {
-    query = query.eq("category_id", params.categoryId);
-  }
-  if (params?.trendTagId) {
-    query = (query as any).eq("trend_tag_id", params.trendTagId);
-  }
-  if (params?.sale) {
-    query = query.eq("is_sale", true);
-  }
-  if (params?.offset) {
-    query = query.range(params.offset, params.offset + (params?.limit || 24) - 1);
-  } else if (params?.limit) {
-    query = query.limit(params.limit);
-  }
+    if (params?.category) {
+      query = query.eq("categories.name", params.category);
+    }
+    if (params?.categoryId) {
+      query = query.eq("category_id", params.categoryId);
+    }
+    if (params?.storeId) {
+      query = query.eq("store_id", params.storeId);
+    }
+    if (params?.trendTagId) {
+      query = (query as any).eq("trend_tag_id", params.trendTagId);
+    }
+    if (params?.sale) {
+      query = query.eq("is_sale", true);
+    }
+    if (params?.offset) {
+      query = query.range(params.offset, params.offset + (params?.limit || 24) - 1);
+    } else if (params?.limit) {
+      query = query.limit(params.limit);
+    }
 
-  const { data, error } = await query;
+    return await query;
+  };
+
+  // Try main query first
+  let { data, error } = await tryFetch(PRODUCT_SELECT);
+
+  // If main query fails (e.g. missing columns), try fallback
   if (error) {
-    console.error("Error fetching products:", error);
-    return [];
+    console.warn("[fetchProducts] Primary query failed, trying fallback:", error.message);
+    const fallback = await tryFetch(PRODUCT_SELECT_FALLBACK);
+    data = fallback.data;
+    error = fallback.error;
+  }
+
+  if (error) {
+    console.error("[fetchProducts] Both queries failed:", error.message, error.details, error.hint);
+    throw new Error(`Impossible de charger les produits: ${error.message}`);
   }
 
   let results = (data || []).map(mapProduct);

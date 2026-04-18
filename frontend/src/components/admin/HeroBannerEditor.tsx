@@ -73,7 +73,7 @@ export function HeroBannerEditor() {
     if (!file) return;
     setUploading(true);
     const path = `banners/${Date.now()}_${file.name}`;
-    const { error } = await supabase.storage.from("cms-assets").upload(path, file);
+    const { error } = await supabase.storage.from("cms-assets").upload(path, file, { cacheControl: "31536000" });
     if (error) {
       toast({ title: "Erreur upload", description: error.message, variant: "destructive" });
       setUploading(false);
@@ -96,7 +96,7 @@ export function HeroBannerEditor() {
     if (formImageFile) {
       setUploading(true);
       const path = `banners/${Date.now()}_${formImageFile.name}`;
-      const { error } = await supabase.storage.from("cms-assets").upload(path, formImageFile);
+      const { error } = await supabase.storage.from("cms-assets").upload(path, formImageFile, { cacheControl: "31536000" });
       if (error) {
         toast({ title: "Erreur upload", description: error.message, variant: "destructive" });
         setUploading(false);

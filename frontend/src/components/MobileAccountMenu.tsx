@@ -1,8 +1,11 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRoles } from "@/hooks/use-roles";
 import { useI18n } from "@/contexts/I18nContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
+  Package,
   LayoutDashboard,
   Store,
   Truck,
@@ -33,6 +36,27 @@ export function MobileAccountMenu() {
   const { isAdmin, isManager, isVendor, isShipper, isRider, isStaff, loading: rolesLoading } = useRoles();
   const { t } = useI18n();
   const { isCertified } = useCertification();
+  const [suppliersEnabled, setSuppliersEnabled] = useState(false);
+
+  useEffect(() => {
+    if (!user || !isVendor) return;
+    const check = async () => {
+      const { data: store } = await supabase
+        .from("stores")
+        .select("id")
+        .eq("owner_id", user.id)
+        .maybeSingle();
+      if (!store) return;
+      const { data: vpo } = await supabase
+        .from("vendor_pricing_overrides" as any)
+        .select("suppliers_enabled")
+        .eq("store_id", store.id)
+        .maybeSingle();
+      setSuppliersEnabled((vpo as any)?.suppliers_enabled ?? false);
+    };
+    check();
+  }, [user, isVendor]);
+
 
   if (authLoading || rolesLoading) {
     return (
@@ -71,6 +95,7 @@ export function MobileAccountMenu() {
         { to: "/dashboard?tab=subscriptions", icon: Award, label: "Mes abonnements" },
         { to: "/wishlist", icon: Heart, label: "Liste de souhaits" },
         { to: "/messages", icon: MessageSquare, label: "Messages" },
+        ...(isVendor && suppliersEnabled ? [{ to: "/vendor?tab=suppliers", icon: Package, label: "Fournisseurs" }] : []),
       ],
     },
     {

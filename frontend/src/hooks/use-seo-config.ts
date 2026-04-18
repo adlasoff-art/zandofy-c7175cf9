@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 
 interface SocialUrls {
   facebook?: string;
@@ -44,39 +44,30 @@ const DEFAULT_CONFIG: SeoConfig = {
   google_analytics_id: "",
 };
 
-let cachedConfig: SeoConfig | null = null;
-
+/**
+ * Reads SEO config from the shared platform-bootstrap cache.
+ * No additional network request.
+ */
 export function useSeoConfig() {
-  const [config, setConfig] = useState<SeoConfig>(cachedConfig ?? DEFAULT_CONFIG);
+  const { value } = useBootstrapSetting<Partial<SeoConfig>>("seo_config");
+  const [config, setConfig] = useState<SeoConfig>(DEFAULT_CONFIG);
 
   useEffect(() => {
-    if (cachedConfig) return;
-
-    supabase
-      .from("platform_settings")
-      .select("value")
-      .eq("key", "seo_config")
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.value) {
-          const v = data.value as any;
-          const c: SeoConfig = {
-            site_title: v.site_title || DEFAULT_CONFIG.site_title,
-            site_description: v.site_description || DEFAULT_CONFIG.site_description,
-            default_keywords: v.default_keywords || DEFAULT_CONFIG.default_keywords,
-            default_og_image: v.default_og_image || "",
-            site_language: v.site_language || "fr",
-            brand_name: v.brand_name || "Zandofy",
-            tagline: v.tagline || DEFAULT_CONFIG.tagline,
-            social_urls: v.social_urls || {},
-            google_site_verification: v.google_site_verification || "",
-            google_analytics_id: v.google_analytics_id || "",
-          };
-          cachedConfig = c;
-          setConfig(c);
-        }
-      });
-  }, []);
+    if (!value) return;
+    const v = value as any;
+    setConfig({
+      site_title: v.site_title || DEFAULT_CONFIG.site_title,
+      site_description: v.site_description || DEFAULT_CONFIG.site_description,
+      default_keywords: v.default_keywords || DEFAULT_CONFIG.default_keywords,
+      default_og_image: v.default_og_image || "",
+      site_language: v.site_language || "fr",
+      brand_name: v.brand_name || "Zandofy",
+      tagline: v.tagline || DEFAULT_CONFIG.tagline,
+      social_urls: v.social_urls || {},
+      google_site_verification: v.google_site_verification || "",
+      google_analytics_id: v.google_analytics_id || "",
+    });
+  }, [value]);
 
   return config;
 }

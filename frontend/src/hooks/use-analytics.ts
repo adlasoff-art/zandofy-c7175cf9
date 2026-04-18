@@ -55,12 +55,51 @@ function isPWA(): boolean {
     || (navigator as any).standalone === true;
 }
 
+/** Fetch geo data once per session — shared cache key with use-geo-detection */
+async function getGeoData(): Promise<{ country: string; city: string }> {
+  // Check both cache keys for compatibility
+  const cached = sessionStorage.getItem("zandofy_geo") || sessionStorage.getItem("z_geo");
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      return { country: parsed.country_name || parsed.country || "", city: parsed.city || "" };
+    } catch { /* ignore */ }
+  }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
+  try {
+    const res = await fetch("https://ipapi.co/json/", { signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const geo = {
+      country_code: data.country_code || "",
+      country_name: data.country_name || "",
+      city: data.city || "",
+    };
+    // Store under shared key so use-geo-detection can reuse it
+    sessionStorage.setItem("zandofy_geo", JSON.stringify(geo));
+    return { country: geo.country_name, city: geo.city };
+  } catch {
+    return { country: "", city: "" };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/** Internal geo cache — populated on first trackEvent call */
+let _geoPromise: Promise<{ country: string; city: string }> | null = null;
+function ensureGeo() {
+  if (!_geoPromise) _geoPromise = getGeoData();
+  return _geoPromise;
+}
+
 async function trackEvent(
   eventType: string,
   extra: Record<string, any> = {},
   userId?: string
 ) {
   const sessionId = getSessionId();
+  const geo = await ensureGeo();
   const row: any = {
     session_id: sessionId,
     event_type: eventType,
@@ -72,6 +111,8 @@ async function trackEvent(
     is_pwa: isPWA(),
     screen_width: window.screen.width,
     screen_height: window.screen.height,
+    country: geo.country || null,
+    city: geo.city || null,
     ...extra,
   };
   if (userId) row.user_id = userId;
@@ -80,6 +121,16 @@ async function trackEvent(
     await fromTable("analytics_events").insert(row);
   } catch {
     // Silent fail
+  }
+}
+
+/** Defer non-critical analytics work to idle time so it never blocks LCP/FCP. */
+function deferToIdle(fn: () => void, timeout = 2000) {
+  const w = window as any;
+  if (typeof w.requestIdleCallback === "function") {
+    w.requestIdleCallback(fn, { timeout });
+  } else {
+    setTimeout(fn, 1);
   }
 }
 
@@ -92,10 +143,22 @@ export function useAnalyticsTracker() {
 
   useEffect(() => {
     sessionStartRef.current = Date.now();
-    trackEvent("session_start", {}, user?.id);
+    // Defer session_start to idle so it never blocks LCP/FCP
+    deferToIdle(() => trackEvent("session_start", {}, user?.id));
 
     const handleBeforeUnload = () => {
       const duration = Math.round((Date.now() - sessionStartRef.current) / 1000);
+      // Read geo from shared cache (synchronous — no async in beforeunload)
+      let country: string | null = null;
+      let city: string | null = null;
+      try {
+        const cached = sessionStorage.getItem("zandofy_geo");
+        if (cached) {
+          const geo = JSON.parse(cached);
+          country = geo.country_name || geo.country || null;
+          city = geo.city || null;
+        }
+      } catch { /* ignore */ }
       const row: any = {
         session_id: getSessionId(),
         event_type: "session_end",
@@ -107,6 +170,8 @@ export function useAnalyticsTracker() {
         screen_width: window.screen.width,
         screen_height: window.screen.height,
         duration_seconds: duration,
+        country,
+        city,
       };
       if (user?.id) row.user_id = user.id;
 
@@ -142,10 +207,11 @@ export function useAnalyticsTracker() {
     if (lastPathRef.current) {
       const duration = Math.round((Date.now() - pageStartRef.current) / 1000);
       if (duration > 0) {
-        trackEvent("page_view_end", {
-          page_path: lastPathRef.current,
+        const prevPath = lastPathRef.current;
+        deferToIdle(() => trackEvent("page_view_end", {
+          page_path: prevPath,
           duration_seconds: duration,
-        }, user?.id);
+        }, user?.id));
       }
     }
 
@@ -158,10 +224,11 @@ export function useAnalyticsTracker() {
     if (productMatch) extra.product_id = productMatch[1];
     if (storeMatch) extra.store_id = storeMatch[1];
 
-    trackEvent("page_view", extra, user?.id);
+    // Defer page_view to idle — frees the main thread for rendering
+    deferToIdle(() => trackEvent("page_view", extra, user?.id));
 
     if (storeMatch) {
-      trackEvent("store_view", { store_id: storeMatch[1] }, user?.id);
+      deferToIdle(() => trackEvent("store_view", { store_id: storeMatch[1] }, user?.id));
     }
   }, [location.pathname, user?.id]);
 }

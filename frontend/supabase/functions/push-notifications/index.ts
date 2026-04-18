@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import * as webpush from "jsr:@negrel/webpush@0.5.0";
 
 const ALLOWED_HEADERS =

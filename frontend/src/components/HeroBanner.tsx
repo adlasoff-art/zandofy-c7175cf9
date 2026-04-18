@@ -94,6 +94,21 @@ export function HeroBanner() {
     if (current >= heroSlides.length && heroSlides.length > 0) setCurrent(0);
   }, [heroSlides.length, current]);
 
+  // Inject preload link for first slide image (LCP optimization)
+  useEffect(() => {
+    const firstUrl = heroSlides[0]?.image_url;
+    if (!firstUrl) return;
+    const id = "hero-lcp-preload";
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "preload";
+    link.as = "image";
+    link.href = firstUrl;
+    (link as any).fetchPriority = "high";
+    document.head.appendChild(link);
+  }, [heroSlides]);
+
   // Touch handlers for swipe
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -139,8 +154,8 @@ export function HeroBanner() {
           {/* Center carousel with horizontal slide animation */}
           <div
             ref={sliderRef}
-            className="relative rounded-xl overflow-hidden touch-pan-y select-none"
-            style={{ height: 380 }}
+            className="relative rounded-xl overflow-hidden touch-pan-y select-none bg-muted"
+            style={{ height: 380, minHeight: 380 }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -165,6 +180,10 @@ export function HeroBanner() {
                   alt={slide.title}
                   className="w-full h-full object-cover"
                   loading={i === 0 ? "eager" : "lazy"}
+                  decoding={i === 0 ? "sync" : "async"}
+                  width={1200}
+                  height={380}
+                  {...(i === 0 ? ({ fetchpriority: "high" } as any) : {})}
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent flex flex-col justify-center pl-6 md:pl-12">
                   <h2 className="text-white text-xl md:text-4xl font-bold tracking-wide max-w-md">{slide.title}</h2>

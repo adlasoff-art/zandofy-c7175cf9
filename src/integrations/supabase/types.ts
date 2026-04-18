@@ -306,6 +306,134 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_user_progress: {
+        Row: {
+          anon_id: string | null
+          created_at: string
+          display_count: number
+          id: string
+          last_displayed_at: string | null
+          scheduled_at: string | null
+          sent_at: string | null
+          status: string
+          user_id: string | null
+          workflow_id: string
+        }
+        Insert: {
+          anon_id?: string | null
+          created_at?: string
+          display_count?: number
+          id?: string
+          last_displayed_at?: string | null
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string
+          user_id?: string | null
+          workflow_id: string
+        }
+        Update: {
+          anon_id?: string | null
+          created_at?: string
+          display_count?: number
+          id?: string
+          last_displayed_at?: string | null
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string
+          user_id?: string | null
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_user_progress_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_workflows: {
+        Row: {
+          channel: Database["public"]["Enums"]["automation_channel"]
+          condition_has_account: boolean | null
+          condition_has_order: boolean | null
+          condition_max_days_since_signup: number | null
+          created_at: string
+          delay_days: number
+          delay_minutes: number
+          display_frequency: Database["public"]["Enums"]["automation_display_frequency"]
+          email_html_content: string | null
+          email_subject: string | null
+          id: string
+          is_active: boolean
+          max_displays: number | null
+          name: string
+          popup_content: string | null
+          popup_cta_label: string | null
+          popup_cta_link: string | null
+          popup_image_url: string | null
+          popup_title: string | null
+          push_body: string | null
+          push_title: string | null
+          sort_order: number
+          trigger_type: Database["public"]["Enums"]["automation_trigger_type"]
+          updated_at: string
+        }
+        Insert: {
+          channel?: Database["public"]["Enums"]["automation_channel"]
+          condition_has_account?: boolean | null
+          condition_has_order?: boolean | null
+          condition_max_days_since_signup?: number | null
+          created_at?: string
+          delay_days?: number
+          delay_minutes?: number
+          display_frequency?: Database["public"]["Enums"]["automation_display_frequency"]
+          email_html_content?: string | null
+          email_subject?: string | null
+          id?: string
+          is_active?: boolean
+          max_displays?: number | null
+          name: string
+          popup_content?: string | null
+          popup_cta_label?: string | null
+          popup_cta_link?: string | null
+          popup_image_url?: string | null
+          popup_title?: string | null
+          push_body?: string | null
+          push_title?: string | null
+          sort_order?: number
+          trigger_type: Database["public"]["Enums"]["automation_trigger_type"]
+          updated_at?: string
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["automation_channel"]
+          condition_has_account?: boolean | null
+          condition_has_order?: boolean | null
+          condition_max_days_since_signup?: number | null
+          created_at?: string
+          delay_days?: number
+          delay_minutes?: number
+          display_frequency?: Database["public"]["Enums"]["automation_display_frequency"]
+          email_html_content?: string | null
+          email_subject?: string | null
+          id?: string
+          is_active?: boolean
+          max_displays?: number | null
+          name?: string
+          popup_content?: string | null
+          popup_cta_label?: string | null
+          popup_cta_link?: string | null
+          popup_image_url?: string | null
+          popup_title?: string | null
+          push_body?: string | null
+          push_title?: string | null
+          sort_order?: number
+          trigger_type?: Database["public"]["Enums"]["automation_trigger_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       badge_requests: {
         Row: {
           created_at: string
@@ -2604,6 +2732,7 @@ export type Database = {
           shipping_email: string | null
           shipping_first_name: string | null
           shipping_last_name: string | null
+          shipping_mode: string | null
           shipping_payment_proof_url: string | null
           shipping_payment_status: string | null
           shipping_phone: string | null
@@ -2658,6 +2787,7 @@ export type Database = {
           shipping_email?: string | null
           shipping_first_name?: string | null
           shipping_last_name?: string | null
+          shipping_mode?: string | null
           shipping_payment_proof_url?: string | null
           shipping_payment_status?: string | null
           shipping_phone?: string | null
@@ -2712,6 +2842,7 @@ export type Database = {
           shipping_email?: string | null
           shipping_first_name?: string | null
           shipping_last_name?: string | null
+          shipping_mode?: string | null
           shipping_payment_proof_url?: string | null
           shipping_payment_status?: string | null
           shipping_phone?: string | null
@@ -3395,6 +3526,8 @@ export type Database = {
       products: {
         Row: {
           auto_pricing_enabled: boolean
+          can_ship_air: boolean
+          can_ship_sea: boolean
           care_instructions: string | null
           category_id: string | null
           cost_calc: number | null
@@ -3456,6 +3589,8 @@ export type Database = {
         }
         Insert: {
           auto_pricing_enabled?: boolean
+          can_ship_air?: boolean
+          can_ship_sea?: boolean
           care_instructions?: string | null
           category_id?: string | null
           cost_calc?: number | null
@@ -3517,6 +3652,8 @@ export type Database = {
         }
         Update: {
           auto_pricing_enabled?: boolean
+          can_ship_air?: boolean
+          can_ship_sea?: boolean
           care_instructions?: string | null
           category_id?: string | null
           cost_calc?: number | null
@@ -5131,6 +5268,7 @@ export type Database = {
       }
       stores: {
         Row: {
+          address: string | null
           ban_reason: string | null
           banned_at: string | null
           banned_by: string | null
@@ -5139,7 +5277,9 @@ export type Database = {
           chat_links_allowed: boolean
           chat_media_enabled: boolean | null
           chat_phone_allowed: boolean
+          city: string | null
           collaborators_enabled: boolean
+          country: string | null
           created_at: string
           default_transit_days_max: number | null
           default_transit_days_min: number | null
@@ -5191,6 +5331,7 @@ export type Database = {
           whatsapp_number: string | null
         }
         Insert: {
+          address?: string | null
           ban_reason?: string | null
           banned_at?: string | null
           banned_by?: string | null
@@ -5199,7 +5340,9 @@ export type Database = {
           chat_links_allowed?: boolean
           chat_media_enabled?: boolean | null
           chat_phone_allowed?: boolean
+          city?: string | null
           collaborators_enabled?: boolean
+          country?: string | null
           created_at?: string
           default_transit_days_max?: number | null
           default_transit_days_min?: number | null
@@ -5251,6 +5394,7 @@ export type Database = {
           whatsapp_number?: string | null
         }
         Update: {
+          address?: string | null
           ban_reason?: string | null
           banned_at?: string | null
           banned_by?: string | null
@@ -5259,7 +5403,9 @@ export type Database = {
           chat_links_allowed?: boolean
           chat_media_enabled?: boolean | null
           chat_phone_allowed?: boolean
+          city?: string | null
           collaborators_enabled?: boolean
+          country?: string | null
           created_at?: string
           default_transit_days_max?: number | null
           default_transit_days_min?: number | null
@@ -6093,6 +6239,7 @@ export type Database = {
           max_products_override: number | null
           multiplier: number | null
           notes: string | null
+          shipping_labels_enabled: boolean
           store_id: string
           suppliers_enabled: boolean
           updated_at: string
@@ -6117,6 +6264,7 @@ export type Database = {
           max_products_override?: number | null
           multiplier?: number | null
           notes?: string | null
+          shipping_labels_enabled?: boolean
           store_id: string
           suppliers_enabled?: boolean
           updated_at?: string
@@ -6141,6 +6289,7 @@ export type Database = {
           max_products_override?: number | null
           multiplier?: number | null
           notes?: string | null
+          shipping_labels_enabled?: boolean
           store_id?: string
           suppliers_enabled?: boolean
           updated_at?: string
@@ -6924,6 +7073,15 @@ export type Database = {
         Args: { months_limit?: number }
         Returns: number
       }
+      get_analytics_daily_extended: {
+        Args: { p_since?: string }
+        Returns: {
+          day: string
+          orders: number
+          signups: number
+          visitors: number
+        }[]
+      }
       get_analytics_daily_traffic: {
         Args: { p_since?: string }
         Returns: {
@@ -6933,6 +7091,40 @@ export type Database = {
       }
       get_analytics_devices: { Args: { p_since?: string }; Returns: Json }
       get_analytics_kpis: { Args: { p_since?: string }; Returns: Json }
+      get_analytics_top_cities:
+        | {
+            Args: { p_since?: string }
+            Returns: {
+              city: string
+              country: string
+              session_count: number
+            }[]
+          }
+        | {
+            Args: { p_limit?: number; p_since?: string }
+            Returns: {
+              city: string
+              country: string
+              page_views: number
+              sessions: number
+            }[]
+          }
+      get_analytics_top_countries:
+        | {
+            Args: { p_since?: string }
+            Returns: {
+              country: string
+              session_count: number
+            }[]
+          }
+        | {
+            Args: { p_limit?: number; p_since?: string }
+            Returns: {
+              country: string
+              page_views: number
+              sessions: number
+            }[]
+          }
       get_analytics_top_pages: {
         Args: { p_limit?: number; p_since?: string }
         Returns: {
@@ -7100,6 +7292,26 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "vendor" | "shipper" | "rider"
+      automation_channel:
+        | "popup"
+        | "push"
+        | "email"
+        | "popup_push"
+        | "push_email"
+        | "all"
+      automation_display_frequency:
+        | "every_visit"
+        | "once"
+        | "daily"
+        | "once_per_session"
+      automation_trigger_type:
+        | "visit_no_account"
+        | "account_created"
+        | "visit_no_order"
+        | "product_viewed_no_order"
+        | "no_order_delay"
+        | "referral_prompt"
+        | "custom"
       kyc_document_type:
         | "national_id"
         | "voter_card"
@@ -7246,6 +7458,29 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "vendor", "shipper", "rider"],
+      automation_channel: [
+        "popup",
+        "push",
+        "email",
+        "popup_push",
+        "push_email",
+        "all",
+      ],
+      automation_display_frequency: [
+        "every_visit",
+        "once",
+        "daily",
+        "once_per_session",
+      ],
+      automation_trigger_type: [
+        "visit_no_account",
+        "account_created",
+        "visit_no_order",
+        "product_viewed_no_order",
+        "no_order_delay",
+        "referral_prompt",
+        "custom",
+      ],
       kyc_document_type: [
         "national_id",
         "voter_card",

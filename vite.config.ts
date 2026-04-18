@@ -25,6 +25,22 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: "../dist",
       emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (!id.includes("node_modules")) return undefined;
+            if (id.includes("/lucide-react/")) return "lucide-vendor";
+            if (id.includes("/react-router")) return "react-vendor";
+            if (id.includes("/react-dom/") || id.match(/\/react\/[^/]+$/)) return "react-vendor";
+            if (id.includes("/@tanstack/react-query")) return "query-vendor";
+            if (id.includes("/@supabase/")) return "supabase-vendor";
+            if (id.includes("/recharts/") || id.includes("/d3-")) return "charts-vendor";
+            if (id.includes("/framer-motion/")) return "motion-vendor";
+            if (id.includes("/@radix-ui/")) return "radix-vendor";
+            return undefined;
+          },
+        },
+      },
     },
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
     optimizeDeps: {
@@ -37,7 +53,6 @@ export default defineConfig(({ mode }) => {
         "react-dom/client",
         "react-router-dom",
         "@tanstack/react-query",
-        "recharts",
         "framer-motion",
         "@radix-ui/react-dropdown-menu",
         "@radix-ui/react-popover",
@@ -47,7 +62,7 @@ export default defineConfig(({ mode }) => {
         "@radix-ui/react-accordion",
         "@radix-ui/react-tabs",
       ],
-      exclude: [],
+      exclude: ["recharts"],
     },
     resolve: {
       dedupe: [

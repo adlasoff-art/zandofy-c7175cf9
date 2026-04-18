@@ -25,7 +25,7 @@ export default function MessagesPage() {
   const showChat = isMobile ? !!selectedConv : true;
 
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className="h-[100dvh] flex flex-col bg-background pt-[env(safe-area-inset-top)]">
       <Header />
       <main className="flex-1 flex flex-col min-h-0 container py-2 sm:py-4">
         <div className="flex-1 flex flex-col min-h-0 border border-border rounded-lg overflow-hidden bg-background">

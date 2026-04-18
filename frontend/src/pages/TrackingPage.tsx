@@ -23,7 +23,7 @@ import { DeliveryMap } from "@/components/DeliveryMap";
 import { useRiderLocationSubscription } from "@/hooks/use-rider-location";
 import { useCustomerLocationBroadcast } from "@/hooks/use-customer-location";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { DeliveryChat } from "@/components/delivery/DeliveryChat";
 import { RiderRatingModal } from "@/components/delivery/RiderRatingModal";
 import { fromTable } from "@/lib/supabase-helpers";
@@ -473,6 +473,7 @@ function RiderProfileBanner({ riderId, riderName }: { riderId: string; riderName
 export default function TrackingPage() {
   const { user } = useAuth();
   const { t } = useI18n();
+  const { ref: urlRef } = useParams<{ ref?: string }>();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState("order");
   const [loading, setLoading] = useState(false);
@@ -484,6 +485,7 @@ export default function TrackingPage() {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [tippingEnabled, setTippingEnabled] = useState(false);
   const [maxTip, setMaxTip] = useState(20);
+  const [autoSearched, setAutoSearched] = useState(false);
 
   // Check tipping settings
   useEffect(() => {
@@ -558,6 +560,23 @@ export default function TrackingPage() {
       delivery_id: deliveryData?.id || null,
     };
   }, []);
+
+  // Auto-search from URL param (QR code scan)
+  useEffect(() => {
+    if (urlRef && !autoSearched) {
+      setQuery(urlRef);
+      setTab("order");
+      setAutoSearched(true);
+      (async () => {
+        setLoading(true);
+        resetResults();
+        const result = await fetchOrder(urlRef);
+        if (result) setOrderResult(result);
+        else setNotFound(true);
+        setLoading(false);
+      })();
+    }
+  }, [urlRef, autoSearched, fetchOrder]);
 
   // Polling for order tracking updates (replaces Realtime for security)
   useEffect(() => {

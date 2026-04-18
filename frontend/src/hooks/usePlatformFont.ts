@@ -1,6 +1,5 @@
 import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 
 export const PLATFORM_FONTS = [
   { value: "'Inter', system-ui, sans-serif", label: "Inter", description: "Sans-serif moderne, lisibilité optimale" },
@@ -13,23 +12,14 @@ export const PLATFORM_FONTS = [
 
 const DEFAULT_FONT = PLATFORM_FONTS[0].value;
 
+/**
+ * Reads primary font from the shared platform-bootstrap cache (no extra request).
+ */
 export function usePlatformFont() {
-  const { data: fontValue } = useQuery({
-    queryKey: ["platform-font"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("platform_settings")
-        .select("value")
-        .eq("key", "branding")
-        .maybeSingle();
-      const v = data?.value as any;
-      return v?.primary_font || DEFAULT_FONT;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+  const { value } = useBootstrapSetting<any>("branding");
+  const font = value?.primary_font || DEFAULT_FONT;
 
   useEffect(() => {
-    const font = fontValue || DEFAULT_FONT;
     document.documentElement.style.setProperty("--font-primary", font);
-  }, [fontValue]);
+  }, [font]);
 }

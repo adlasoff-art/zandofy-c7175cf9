@@ -1,39 +1,20 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 import { useGeoDetection } from "@/hooks/use-geo-detection";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 
 /**
  * Geo-blocking hook — checks if the visitor's country is in the admin-configured block list.
- * Returns { blocked, loading, countryCode }.
- * IMPORTANT: fail-open — if settings can't be loaded, the user is NOT blocked.
+ * Reads block list from the shared platform-bootstrap cache (no extra request).
+ * Fail-open: if anything fails, the user is NOT blocked.
  */
 export function useGeoBlocking() {
   const geo = useGeoDetection();
-  const [blockedCountries, setBlockedCountries] = useState<string[]>([]);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const { value, isLoading } = useBootstrapSetting<{ blocked?: string[] }>(
+    "geo_blocked_countries"
+  );
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const { data } = await supabase
-          .from("platform_settings")
-          .select("value")
-          .eq("key", "geo_blocked_countries")
-          .maybeSingle();
-        const val = data?.value as any;
-        if (val?.blocked && Array.isArray(val.blocked)) {
-          setBlockedCountries(val.blocked.map((c: string) => c.toUpperCase()));
-        }
-      } catch {
-        console.warn("[GeoBlocking] Failed to load geo settings, failing open");
-      } finally {
-        setSettingsLoaded(true);
-      }
-    };
-    load();
-  }, []);
-
-  const loading = geo.loading || !settingsLoaded;
+  const blockedCountries = (value?.blocked ?? []).map((c) => c.toUpperCase());
+  const loading = geo.loading || isLoading;
   const blocked =
     !loading &&
     geo.country_code !== "" &&

@@ -52,6 +52,8 @@ interface StoreData {
   followers_override: number | null;
   sales_override: number | null;
   is_certified: boolean | null;
+  city: string | null;
+  country: string | null;
 }
 
 interface StoreReview {
@@ -106,12 +108,13 @@ export default function StorePage() {
   const isBannedStore = !!(store as any)?.is_banned;
 
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ["store-products", id],
+    queryKey: ["store-products", store?.id],
     queryFn: async () => {
-      const allProducts = await fetchProducts();
-      return allProducts.filter((p) => p.storeId === id);
+      return await fetchProducts({ storeId: store!.id });
     },
-    enabled: !!id,
+    enabled: !!store?.id,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // Fetch reviews for all store products
@@ -374,6 +377,11 @@ export default function StorePage() {
                       {store.is_online ? (
                         <span className="text-emerald-600 font-medium">En ligne</span>
                       ) : <span className="text-amber-600">Hors ligne</span>}
+                      {(store.city || store.country) && (
+                        <span className="ml-2 text-muted-foreground">
+                          📍 {[store.city, store.country].filter(Boolean).join(", ")}
+                        </span>
+                      )}
                     </p>
                     {store.description && (
                       <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 mt-1">{store.description}</p>

@@ -783,6 +783,11 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [presenceVisible, setPresenceVisible] = useState(true);
 
+  // Location fields
+  const [storeAddress, setStoreAddress] = useState("");
+  const [storeCity, setStoreCity] = useState("");
+  const [storeCountry, setStoreCountry] = useState("");
+
   // SEO fields
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDesc, setSeoDesc] = useState("");
@@ -790,10 +795,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   const [seoLoading, setSeoLoading] = useState(true);
 
   useEffect(() => {
-    // Load banner_url + SEO + presence
+    // Load banner_url + SEO + presence + location
     (supabase as any)
       .from("stores")
-      .select("meta_title, meta_description, seo_keywords, banner_url, presence_visible")
+      .select("meta_title, meta_description, seo_keywords, banner_url, presence_visible, address, city, country")
       .eq("id", store.id)
       .single()
       .then(({ data }: any) => {
@@ -803,6 +808,9 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
           setSeoKeywords((data.seo_keywords || []).join(", "));
           setBannerPreview(data.banner_url || null);
           setPresenceVisible(data.presence_visible !== false);
+          setStoreAddress(data.address || "");
+          setStoreCity(data.city || "");
+          setStoreCountry(data.country || "");
         }
         setSeoLoading(false);
       });
@@ -824,7 +832,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
       const compressed = await compressImage(file);
       const ext = compressed.name.split(".").pop();
       const path = `${store.id}/logo-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true });
+      const { error: upErr } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true, cacheControl: "31536000" });
       if (upErr) { toast.error("Erreur upload logo"); return; }
       const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
       const url = urlData.publicUrl;
@@ -853,7 +861,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
       const compressed = await compressImage(file);
       const ext = compressed.name.split(".").pop();
       const path = `${store.id}/banner-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true });
+      const { error: upErr } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true, cacheControl: "31536000" });
       if (upErr) { toast.error("Erreur upload bannière"); return; }
       const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
       const url = urlData.publicUrl;
@@ -868,13 +876,16 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   const handleSave = async () => {
     setSaving(true);
     const keywords = seoKeywords.split(",").map((k) => k.trim()).filter(Boolean);
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("stores")
       .update({
         whatsapp_number: whatsapp.trim() || null,
         meta_title: seoTitle.trim() || null,
         meta_description: seoDesc.trim() || null,
         seo_keywords: keywords.length > 0 ? keywords : null,
+        address: storeAddress.trim() || null,
+        city: storeCity.trim() || null,
+        country: storeCountry.trim() || null,
       })
       .eq("id", store.id);
 
@@ -1046,6 +1057,45 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* ═══ LOCALISATION ═══ */}
+      <div className="bg-card border border-border rounded-lg p-4 space-y-4">
+        <label className="text-sm font-medium text-foreground flex items-center gap-2">
+          📍 Localisation de la boutique
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Ces informations apparaissent sur votre page boutique et sur les étiquettes d'expédition.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Adresse</label>
+            <input
+              value={storeAddress}
+              onChange={(e) => setStoreAddress(e.target.value)}
+              placeholder="123 Avenue Commerce"
+              className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Ville</label>
+            <input
+              value={storeCity}
+              onChange={(e) => setStoreCity(e.target.value)}
+              placeholder="Kinshasa"
+              className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Pays</label>
+            <input
+              value={storeCountry}
+              onChange={(e) => setStoreCountry(e.target.value)}
+              placeholder="RD Congo"
+              className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
         </div>
       </div>
 

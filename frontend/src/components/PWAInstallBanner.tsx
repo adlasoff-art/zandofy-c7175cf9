@@ -57,6 +57,7 @@ export function PWAInstallBanner() {
       const prompt = e as BeforeInstallPromptEvent;
       deferredPromptRef.current = prompt;
       setDeferredPrompt(prompt);
+      // If fallback was already showing, switch back to native button
       setShowAndroidFallback(false);
       setShowFallbackMessage(false);
     };
@@ -76,7 +77,7 @@ export function PWAInstallBanner() {
         if (!deferredPromptRef.current) {
           setShowAndroidFallback(true);
         }
-      }, 3000);
+      }, 6000);
     }
 
     return () => {
@@ -100,12 +101,15 @@ export function PWAInstallBanner() {
       if (outcome === "accepted") {
         setIsInstalled(true);
         trackPWAInstall(user?.id);
+        setDeferredPrompt(null);
+        deferredPromptRef.current = null;
       }
+      // If dismissed, keep the prompt ref so the user can retry
     } catch {
-      // prompt() can only be called once
+      // prompt() can only be called once — clear refs
+      setDeferredPrompt(null);
+      deferredPromptRef.current = null;
     }
-    setDeferredPrompt(null);
-    deferredPromptRef.current = null;
   };
 
   const handleDismiss = () => {

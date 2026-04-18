@@ -756,7 +756,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
     for (const file of Array.from(files).slice(0, 3)) {
       const compressed = await compressImage(file);
       const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
-      const { error } = await supabase.storage.from("reviews").upload(fileName, compressed);
+      const { error } = await supabase.storage.from("reviews").upload(fileName, compressed, { cacheControl: "31536000" });
       if (!error) {
         const { data: pub } = supabase.storage.from("reviews").getPublicUrl(fileName);
         urls.push(pub.publicUrl);
@@ -1794,7 +1794,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
     const compressed = await compressImage(file);
     const ext = compressed.name.split(".").pop();
     const path = `${user.id}/avatar.${ext}`;
-    const { error } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true });
+    const { error } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true, cacheControl: "31536000" });
     if (error) {
       toast({ title: "Erreur upload", description: error.message, variant: "destructive" });
       return;

@@ -1,5 +1,6 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Key, DollarSign, Bell, Save, Truck, Loader2, Users, AlertTriangle, Calculator, Crown, Shield, Camera } from "lucide-react";
+import { CarrierLogoUpload } from "@/components/admin/CarrierLogoUpload";
 import { GeoBlockingSettings } from "@/components/admin/GeoBlockingSettings";
 import { KelpayWebhookPanel } from "@/components/admin/KelpayWebhookPanel";
 import { MonetizationSettings } from "@/components/admin/MonetizationSettings";
@@ -553,6 +554,15 @@ export default function AdminSettingsPage() {
           </div>
         </section>
 
+        {/* Carrier Logo for Shipping Labels */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Truck size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Logo transporteur (étiquettes)</h2>
+          </div>
+          <CarrierLogoUpload />
+        </section>
+
         {/* Discount Caps - Financial Protection */}
         <section className="bg-card border-2 border-primary/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
@@ -740,6 +750,46 @@ export default function AdminSettingsPage() {
         {/* Default Payment Numbers */}
         <div className="border-t border-border pt-6 mt-6">
           <AdminDefaultPaymentNumbers />
+        </div>
+
+        {/* Cache Management */}
+        <div className="border-t border-border pt-6 mt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-bold text-foreground">Gestion du cache</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Si les produits ou données ne s'affichent pas correctement pour certains utilisateurs, vous pouvez forcer une purge du cache.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-destructive text-destructive-foreground text-sm font-medium hover:bg-destructive/90 transition-colors"
+              onClick={() => {
+                // Clear SW caches
+                if (navigator.serviceWorker?.controller) {
+                  navigator.serviceWorker.controller.postMessage({ type: "CLEAR_CACHES" });
+                }
+                // Reload clears React Query in-memory cache
+                toast({ title: "Cache purgé", description: "Le cache navigateur a été vidé. La page va se recharger." });
+                setTimeout(() => window.location.reload(), 1000);
+              }}
+            >
+              <AlertTriangle className="w-4 h-4" />
+              Purger le cache navigateur
+            </button>
+            <button
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 transition-colors"
+              onClick={() => {
+                if (navigator.serviceWorker?.controller) {
+                  navigator.serviceWorker.controller.postMessage({ type: "REFRESH_CATALOG" });
+                }
+                toast({ title: "Catalogue rafraîchi", description: "Le catalogue offline a été mis à jour." });
+              }}
+            >
+              <Save className="w-4 h-4" />
+              Rafraîchir le catalogue offline
+            </button>
+          </div>
         </div>
       </div>
     </AdminLayout>

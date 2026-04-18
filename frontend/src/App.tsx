@@ -25,10 +25,12 @@ import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 import { useCmsTheme } from "@/hooks/use-cms-theme";
 import { usePlatformFont } from "@/hooks/usePlatformFont";
+import { usePlatformBootstrap } from "@/hooks/use-platform-bootstrap";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { MaintenanceGuard } from "@/components/MaintenanceGuard";
 import { CookieConsent } from "@/components/CookieConsent";
 import { AnnouncementPopup } from "@/components/AnnouncementPopup";
+import { AutomationPopup } from "@/components/AutomationPopup";
 import { DynamicFavicon } from "@/components/DynamicFavicon";
 import { UserPresenceTracker } from "@/components/UserPresenceTracker";
 import { Suspense, lazy, ComponentType } from "react";
@@ -150,6 +152,8 @@ function SupportDrawerWrapper() {
   return <SupportDrawer open={open} onOpenChange={setOpen} />;
 }
 
+/** Single bootstrap call → feeds branding/seo/themes/topbar/footer/geo etc. */
+function PlatformBootstrap() { usePlatformBootstrap(); return null; }
 function CmsThemeInjector() { useCmsTheme(); usePlatformFont(); return null; }
 
 function GeoBlockGuard({ children }: { children: React.ReactNode }) {
@@ -178,6 +182,7 @@ const App = () => (
     <BrowserRouter>
     <TooltipProvider>
       <AuthProvider>
+        <PlatformBootstrap />
         <GeoBlockGuard>
         <ImpersonationProvider>
         <ImpersonationBanner />
@@ -206,6 +211,7 @@ const App = () => (
             <OfflineIndicator />
             <CookieConsent />
             <AnnouncementPopup />
+            <AutomationPopup />
             <MaintenanceGuard>
             <BanGuard>
             <Suspense fallback={<PageLoadingSkeleton />}>
@@ -238,6 +244,7 @@ const App = () => (
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/tracking" element={<TrackingPage />} />
+                <Route path="/tracking/:ref" element={<TrackingPage />} />
                 <Route path="/become-vendor" element={<BecomeVendorPage />} />
                 <Route path="/driver" element={<DriverPage />} />
                 <Route path="/affiliate-program" element={<AffiliateProgramPage />} />

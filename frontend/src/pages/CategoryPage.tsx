@@ -221,8 +221,8 @@ export default function CategoryPage() {
         canonical={`/category/${slug}`}
         jsonLd={buildBreadcrumbJsonLd([
           { name: "Accueil", url: "/" },
-          ...(category.parent ? [{ name: category.parent.name_fr, url: `/category/${category.parent.name.toLowerCase()}` }] : []),
-          { name: category.name_fr, url: `/category/${slug}` },
+          ...(category.parent ? [{ name: category.parent.name_fr || category.parent.name || "Catégorie", url: `/category/${category.parent.name.toLowerCase()}` }] : []),
+          { name: category.name_fr || category.name || slug, url: `/category/${slug}` },
         ])}
       />
       <Header />
