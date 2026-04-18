@@ -31,8 +31,8 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
+      return new Response(JSON.stringify({ ok: false, success: false, error: "Unauthorized", errorCode: "NO_AUTH" }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -51,8 +51,9 @@ Deno.serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
+      console.log("[v2] auth failed:", claimsError?.message);
+      return new Response(JSON.stringify({ ok: false, success: false, error: "Unauthorized", errorCode: "INVALID_TOKEN" }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -62,16 +63,16 @@ Deno.serve(async (req) => {
     const orderIds: string[] = body?.orderIds;
     if (!Array.isArray(orderIds) || orderIds.length === 0 || orderIds.length > 50) {
       return new Response(
-        JSON.stringify({ error: "orderIds doit être un tableau de 1 à 50 éléments" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ ok: false, success: false, error: "orderIds doit être un tableau de 1 à 50 éléments", errorCode: "BAD_INPUT" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!orderIds.every((id) => uuidRegex.test(id))) {
       return new Response(
-        JSON.stringify({ error: "Format d'ID invalide" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ ok: false, success: false, error: "Format d'ID invalide", errorCode: "BAD_UUID" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
