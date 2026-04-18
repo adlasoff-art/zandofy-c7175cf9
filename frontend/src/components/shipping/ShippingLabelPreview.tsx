@@ -51,26 +51,16 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
         body: { orderIds },
       });
 
-      // Try to extract a useful error message even when invoke wraps the response
-      let errMsg: string | null = null;
       if (error) {
-        // FunctionsHttpError exposes context.response with the JSON body
-        try {
-          const ctx: any = (error as any).context;
-          if (ctx?.response && typeof ctx.response.json === "function") {
-            const body = await ctx.response.json();
-            errMsg = body?.error || JSON.stringify(body);
-          } else {
-            errMsg = (error as any).message || "Edge function error";
-          }
-        } catch {
-          errMsg = (error as any).message || "Edge function error";
-        }
-        console.error("[ShippingLabels] invoke error:", error, "→", errMsg);
+        console.error("[ShippingLabels] network/invoke error:", error);
+        toast.error("Erreur réseau. Vérifiez votre connexion.");
+        setLoading(false);
+        return;
       }
 
-      if (errMsg || !data?.success) {
-        toast.error(errMsg || data?.error || "Error generating labels");
+      if (!data?.ok) {
+        console.error("[ShippingLabels] server error:", data);
+        toast.error(data?.error || "Erreur lors de la génération");
         setLoading(false);
         return;
       }
@@ -84,8 +74,8 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
       setLabels(data.labels);
       setFetched(true);
     } catch (e) {
-      console.error("[ShippingLabels] network error:", e);
-      toast.error("Network error");
+      console.error("[ShippingLabels] unexpected:", e);
+      toast.error("Erreur inattendue");
     }
     setLoading(false);
   };

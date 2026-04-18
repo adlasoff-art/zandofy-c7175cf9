@@ -23,6 +23,12 @@ function getCorsHeaders(req: Request) {
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
+  const respond = (ok: boolean, payload: Record<string, unknown> = {}) =>
+    new Response(JSON.stringify({ ok, success: ok, ...payload }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -30,10 +36,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return respond(false, { error: "Unauthorized", errorCode: "AUTH_MISSING" });
     }
 
     const supabaseAdmin = createClient(
@@ -50,29 +53,22 @@ Deno.serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return respond(false, { error: "Unauthorized", errorCode: "AUTH_INVALID" });
     }
     const userId = user.id;
 
     const body = await req.json();
     const orderIds: string[] = body?.orderIds;
     if (!Array.isArray(orderIds) || orderIds.length === 0 || orderIds.length > 50) {
-      return new Response(
-        JSON.stringify({ error: "orderIds doit être un tableau de 1 à 50 éléments" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return respond(false, { error: "orderIds doit être un tableau de 1 à 50 éléments", errorCode: "INVALID_INPUT" });
     }
 
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!orderIds.every((id) => uuidRegex.test(id))) {
-      return new Response(
-        JSON.stringify({ error: "Format d'ID invalide" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return respond(false, { error: "Format d'ID invalide", errorCode: "INVALID_UUID" });
     }
+
+    console.log("[shipping-labels] userId:", userId, "orderIds:", orderIds);
 
     // Check roles
     const { data: roles } = await supabaseAdmin
@@ -84,11 +80,10 @@ Deno.serve(async (req) => {
     const isStaff = userRoles.includes("admin") || userRoles.includes("manager");
     const isVendor = userRoles.includes("vendor");
 
+    console.log("[shipping-labels] roles:", userRoles, "isStaff:", isStaff, "isVendor:", isVendor);
+
     if (!isStaff && !isVendor) {
-      return new Response(JSON.stringify({ error: "Accès refusé" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return respond(false, { error: "Accès refusé", errorCode: "FORBIDDEN_ROLE" });
     }
 
     // Fetch orders (added shipping_email, shipping_mode)
@@ -99,16 +94,19 @@ Deno.serve(async (req) => {
       )
       .in("id", orderIds);
 
-    if (ordersError || !orders || orders.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "Aucune commande trouvée" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    console.log("[shipping-labels] orders found:", orders?.length || 0, "error:", ordersError?.message);
+
+    if (ordersError) {
+      return respond(false, { error: "Erreur DB: " + ordersError.message, errorCode: "DB_ERROR" });
+    }
+    if (!orders || orders.length === 0) {
+      return respond(false, { error: "Aucune commande trouvée pour les IDs fournis", errorCode: "NO_ORDERS" });
     }
 
     // For vendors: verify they own the store + labels enabled
     if (!isStaff) {
       const storeIds = [...new Set(orders.map((o: any) => o.store_id).filter(Boolean))];
+      console.log("[shipping-labels] vendor check storeIds:", storeIds);
 
       for (const sid of storeIds) {
         const { data: store } = await supabaseAdmin
@@ -129,10 +127,8 @@ Deno.serve(async (req) => {
             .limit(1);
 
           if (!collab || collab.length === 0) {
-            return new Response(
-              JSON.stringify({ error: "Accès refusé à cette boutique" }),
-              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
+            console.log("[shipping-labels] denied: not owner/collab for store", sid);
+            return respond(false, { error: "Accès refusé à cette boutique", errorCode: "FORBIDDEN_STORE" });
           }
         }
 
@@ -143,10 +139,8 @@ Deno.serve(async (req) => {
           .single();
 
         if (!pricing?.shipping_labels_enabled) {
-          return new Response(
-            JSON.stringify({ error: "Étiquettes d'expédition non activées pour cette boutique" }),
-            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          console.log("[shipping-labels] labels not enabled for store", sid);
+          return respond(false, { error: "Étiquettes d'expédition non activées pour cette boutique. Contactez l'administrateur pour activer cette fonctionnalité.", errorCode: "LABELS_DISABLED" });
         }
       }
     }
@@ -264,14 +258,13 @@ Deno.serve(async (req) => {
       };
     });
 
-    return new Response(JSON.stringify({ success: true, labels }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.log("[shipping-labels] returning", labels.length, "labels");
+    return respond(true, { labels });
   } catch (e) {
+    console.error("[shipping-labels] uncaught:", e);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Erreur interne" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ ok: false, success: false, error: e instanceof Error ? e.message : "Erreur interne", errorCode: "INTERNAL" }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
