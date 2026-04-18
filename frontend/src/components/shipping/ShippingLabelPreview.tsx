@@ -47,20 +47,44 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
   const fetchLabels = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-shipping-labels", {
-        body: { orderIds },
-      });
+      // Refresh session to avoid stale JWT
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
 
-      if (error) {
-        console.error("[ShippingLabels] network/invoke error:", error);
-        toast.error("Erreur réseau. Vérifiez votre connexion.");
+      if (!token) {
+        toast.error("Session expirée. Reconnectez-vous.");
         setLoading(false);
         return;
       }
 
+      // Direct fetch bypasses supabase.functions.invoke quirks (it sometimes
+      // swallows the JSON body or reports a generic error even when the function
+      // returns a structured 200 response).
+      const url = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/generate-shipping-labels`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ orderIds }),
+      });
+
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        console.error("[ShippingLabels] JSON parse error:", parseErr, "status:", res.status);
+        toast.error(`Erreur serveur (HTTP ${res.status})`);
+        setLoading(false);
+        return;
+      }
+
+      console.log("[ShippingLabels] response:", { status: res.status, data });
+
       if (!data?.ok) {
-        console.error("[ShippingLabels] server error:", data);
-        toast.error(data?.error || "Erreur lors de la génération");
+        toast.error(data?.error || `Erreur (HTTP ${res.status})`);
         setLoading(false);
         return;
       }
@@ -73,9 +97,9 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
 
       setLabels(data.labels);
       setFetched(true);
-    } catch (e) {
-      console.error("[ShippingLabels] unexpected:", e);
-      toast.error("Erreur inattendue");
+    } catch (e: any) {
+      console.error("[ShippingLabels] network error:", e);
+      toast.error(`Erreur réseau: ${e?.message || "vérifiez votre connexion"}`);
     }
     setLoading(false);
   };
