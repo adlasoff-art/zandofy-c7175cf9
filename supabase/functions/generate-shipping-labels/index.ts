@@ -23,6 +23,12 @@ function getCorsHeaders(req: Request) {
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
+  const respond = (ok: boolean, payload: Record<string, unknown> = {}) =>
+    new Response(JSON.stringify({ ok, success: ok, ...payload }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -30,10 +36,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return respond(false, { error: "Unauthorized", errorCode: "AUTH_MISSING" });
     }
 
     const supabaseAdmin = createClient(
