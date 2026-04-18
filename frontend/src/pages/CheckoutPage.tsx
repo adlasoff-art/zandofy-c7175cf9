@@ -25,6 +25,7 @@ import { useKycStatus } from "@/hooks/use-kyc";
 import { KycBanner } from "@/components/kyc/KycBanner";
 import { getColorDisplay } from "@/utils/colorName";
 import { useStorePaymentNumbers } from "@/hooks/use-store-payment-numbers";
+import { PaymentWaitingPanel } from "@/components/payments/PaymentWaitingPanel";
 
 type Step = "shipping" | "payment" | "confirmation";
 type PaymentMethod = "stripe" | "card" | "paypal" | "mobile_money" | "cod" | "off_platform";
