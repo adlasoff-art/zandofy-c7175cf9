@@ -950,6 +950,51 @@ export default function CheckoutPage() {
     toast({ title: "Paiement annulé", description: "Vous pouvez réessayer avec un autre moyen de paiement.", variant: "destructive" });
   };
 
+  /**
+   * Auto-abandon : compte à rebours expiré + 60s sans action OU fermeture de page.
+   * Vérifie une dernière fois auprès de KelPay puis bascule en payment_failed.
+   */
+  const handleAutoAbandonPayment = async () => {
+    if (paymentOrderIds.length === 0) return;
+    try {
+      await supabase.functions.invoke("mark-payment-abandoned", {
+        body: { order_ids: paymentOrderIds, reference: paymentReference },
+      });
+    } catch (e) {
+      console.warn("auto-abandon failed:", e);
+    }
+    if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
+    setPaymentPending(false);
+    setPaymentTransactionId(null);
+    setPaymentReference(null);
+    toast({
+      title: "Paiement non confirmé",
+      description: "Le paiement n'a pas été validé à temps. Vous pouvez relancer depuis votre tableau de bord.",
+      variant: "destructive",
+    });
+  };
+
+  // Filet de sécurité : abandon propre si l'utilisateur ferme la page pendant
+  // un paiement en attente (sendBeacon survit à la fermeture de l'onglet).
+  useEffect(() => {
+    if (!paymentPending || paymentOrderIds.length === 0) return;
+    const beaconAbandon = () => {
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mark-payment-abandoned`;
+        const payload = JSON.stringify({
+          order_ids: paymentOrderIds,
+          reference: paymentReference,
+        });
+        const blob = new Blob([payload], { type: "application/json" });
+        navigator.sendBeacon?.(url, blob);
+      } catch {
+        // best-effort
+      }
+    };
+    window.addEventListener("beforeunload", beaconAbandon);
+    return () => window.removeEventListener("beforeunload", beaconAbandon);
+  }, [paymentPending, paymentOrderIds, paymentReference]);
+
   const updateField = (field: keyof ShippingInfo, value: string) =>
     setShipping(prev => ({ ...prev, [field]: value }));
 
