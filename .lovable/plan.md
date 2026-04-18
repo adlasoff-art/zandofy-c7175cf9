@@ -1,100 +1,52 @@
 
 
-## Plan v4 — Pousser de 57 → 75+ sur mobile
+## Diagnostic — "Error generating labels"
 
-### Constat sur le rapport actuel
-Le test du **17 avril 08:31 UTC-4** montre encore l'**ancien bundle** (`index-C7b9Bwhv.js`) — la v3 (bootstrap unifié) **n'est pas encore déployée**. Les 22 requêtes séquentielles `platform_settings` y figurent toujours. Donc une partie du gain (~3-4 points LCP) viendra mécaniquement quand Vercel publiera la v3.
+### Cause racine identifiée
+L'edge function `generate-shipping-labels` utilise `supabase.auth.getClaims(token)` (ligne 51) — une méthode trop récente du SDK Supabase qui n'est pas disponible dans le runtime Deno actuel. Résultat : `claimsError` est toujours non-null → la fonction renvoie systématiquement **401 Unauthorized** → le toast affiche "Error generating labels".
 
-Mais pour viser **75+**, il faut 4 nouveaux leviers, tous non destructifs.
+**Preuve** : les autres edges fonctions du projet (`keccel-cardpay`, `subscribe-payment`) utilisent `supabase.auth.getUser(token)` qui fonctionne correctement. Seules deux fonctions utilisent `getClaims` — celle-ci et `verify-confirmation-code` (qui doit avoir le même bug latent).
 
----
+### Effet secondaire observé
+Le toast "Error generating labels" s'affiche plusieurs fois car le composant `ShippingLabelPreview` re-render et rappelle `fetchLabels()` à cause de la condition `if (open && !fetched && !loading)` placée dans le corps du composant (ligne 67) — un anti-pattern React qui déclenche plusieurs invocations.
 
-### Solution 1 — Précharger l'image LCP (gain LCP : ~1.5-2s)
-**Problème** : la première image visible (bannière hero / featured placement) attend que React soit monté + que la requête `featured_placements` revienne (~1.6s) + que l'image se télécharge (~500ms). Total : 3-4s avant LCP.
+## Solution
 
-**Solution** : Server-side, ajouter un `<link rel="preload" as="image" href="..." fetchpriority="high">` dans `index.html` pour la bannière hero principale (URL stable connue à l'avance).
+### Correctif 1 — remplacer `getClaims` par `getUser` (edge function)
+Dans `supabase/functions/generate-shipping-labels/index.ts` lignes 50-58, remplacer :
+```ts
+const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+if (claimsError || !claimsData?.claims) { ... }
+const userId = claimsData.claims.sub as string;
+```
+par le pattern éprouvé déjà utilisé partout :
+```ts
+const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+if (authError || !user) { return 401; }
+const userId = user.id;
+```
 
-**Comment** : la bannière hero principale est rarement modifiée → on hardcode son URL dans `index.html` (ou via une variable de build). Si elle change un jour, on update `index.html`. Coût : 0 UX, gain énorme.
+### Correctif 2 — supprimer le double appel côté client
+Dans `ShippingLabelPreview.tsx` ligne 67, déplacer le `fetchLabels()` dans un `useEffect([open])` proprement, pour qu'il ne soit appelé qu'une seule fois à l'ouverture du dialog. Ça évitera le triple toast d'erreur.
 
-**Alternative douce** : un edge function `bootstrap-html` qui injecte le preload dynamiquement, mais c'est plus complexe — gardons simple.
+### Correctif 3 (préventif) — appliquer le même fix sur `verify-confirmation-code`
+Même pattern problématique → même fix `getUser(token)` pour éviter qu'un autre flux casse demain.
 
----
-
-### Solution 2 — Cache long sur les images Supabase Storage (gain : 2 Mo économisés sur visites répétées + meilleur score Lighthouse)
-**Problème** : TTL actuel **1h**. Lighthouse pénalise tout ce qui est < 1 mois.
-
-**Solution** : Migration storage policy → `Cache-Control: public, max-age=31536000, immutable` pour tous les buckets `product-media`, `cms-assets`. Les noms de fichiers sont déjà horodatés (`1773741765164-0.webp`) donc safe pour `immutable`.
-
-**Comment** : 
-- Nouveaux uploads : ajouter `cacheControl: "31536000"` dans tous les `supabase.storage.upload()` du code.
-- Anciens fichiers : un script SQL one-shot ou via l'API metadata storage pour mettre à jour les headers existants.
-
-**Impact UX** : zéro. Les images ont des noms uniques → pas de problème de cache obsolète.
-
----
-
-### Solution 3 — Lazy-load agressif des composants below-the-fold (gain TBT + LCP : ~1s)
-**Problème** : `Index.tsx` charge **synchroniquement** : Header, HeroBanner, CategoryBanner, FlashSales, RecommendationsSection, FeaturedSidebar, TopTrends, ProductGrid, Footer, FloatingActions. Tous évalués au premier render → bloque le main thread.
-
-**Solution** : `React.lazy()` + `Suspense` pour tout ce qui est sous le fold initial mobile (412px de haut visible) :
-- Garder eager : Header, HeroBanner, CategoryBanner (visible en haut)
-- Lazy : FlashSales, RecommendationsSection, TopTrends, FeaturedSidebar, ProductGrid, Footer, FloatingActions
-
-**Comment** : Wrapper avec `IntersectionObserver` (déjà dispo via `useLazyImage`). Composant `<LazyMount>` qui ne monte le children qu'à l'approche du viewport.
-
-**Impact UX** : invisible (les sections apparaissent avant que l'utilisateur ne scrolle), sauf un flash possible 50ms — mitigé avec un skeleton de la bonne hauteur (donc bonus CLS).
-
----
-
-### Solution 4 — Réduire le bundle JS initial (gain TBT : ~80ms)
-**Problème** : `react-vendor` + `index.js` = ~600 KB+ chargés au démarrage. Beaucoup de code admin/dashboard/checkout n'est jamais utilisé sur la home.
-
-**Solution** : Vérifier que les routes admin/dashboard/checkout sont déjà en `lazy()` dans `App.tsx`. Sinon, les passer en lazy. Si c'est déjà fait → audit des imports globaux dans `App.tsx` qui tirent du code partout (ex: `framer-motion` chargé même si la home ne l'utilise pas).
-
-**Action** : audit du graph de dépendances avec `vite-bundle-visualizer` ou simple recherche d'imports `@radix-ui` non utilisés sur la home.
-
----
-
-### Solution 5 — Fix bug React `fetchPriority` (cleanup)
-Dans les logs : `React does not recognize the fetchPriority prop`. C'est une régression v3 sur `BrandLogo.tsx`. React 18 supporte `fetchPriority` (camelCase) mais pas sur tous les éléments. Il faut soit downgrade en `fetchpriority` (lowercase) si c'est natif HTML, soit n'appliquer la prop que si supportée.
-
-**Impact** : retire 1 warning sale en console + permet à Lighthouse de calculer correctement la priorité.
-
----
-
-### Récap impact attendu
-
-| Solution | Gain LCP | Gain TBT | Gain CLS | Gain Score |
-|---|---|---|---|---|
-| Déploiement v3 (déjà codé) | -3s | -50ms | -0.05 | +8 |
-| 1. Preload image LCP | -1.5s | 0 | 0 | +5 |
-| 2. Cache long images | 0 | 0 | 0 | +3 (Lighthouse audit) |
-| 3. Lazy components below fold | -0.8s | -80ms | 0 | +6 |
-| 4. Audit bundle JS | -0.3s | -50ms | 0 | +2 |
-| 5. Fix fetchPriority | 0 | 0 | 0 | +0 (cleanup) |
-| **Total estimé** | **-5.6s** | **-180ms** | **-0.05** | **+24 → ~80** |
-
----
-
-### Ordre d'implémentation recommandé
-1. **Solution 5** (fix bug, 5 min) — propre tout de suite
-2. **Solution 1** (preload LCP, 15 min) — impact immédiat
-3. **Solution 3** (lazy components, 30 min) — gros gain TBT
-4. **Solution 2** (cache long, 30 min — migration + code) — gain durable
-5. **Solution 4** (audit bundle, optionnel) — finition
-
-### Ce qui ne change PAS
-- Aucune modification visuelle perçue par l'utilisateur
-- Aucune fonctionnalité retirée
-- Aucune dépendance supprimée
-- Aucune modification de la base de données (sauf cache headers storage)
-- Pull-to-refresh, animations, scroll, transitions : intacts
+### Tests post-déploiement
+1. Sur un compte vendeur, sélectionner une commande → cliquer "Imprimer étiquette" → la prévisualisation doit s'afficher.
+2. Sur un compte admin, idem depuis `/admin/orders`.
+3. Vérifier qu'un seul toast apparaît en cas d'échec réel.
 
 ### Risques
-- **Solution 1** : si tu changes l'image hero un jour, il faut updater `index.html`. Mitigation : commentaire visible + check au déploiement.
-- **Solution 3** : un skeleton mal calibré peut introduire un mini-flash. Mitigation : on calque les hauteurs exactes des composants actuels.
-- **Solution 2** : aucune image existante ne sera invalidée car les noms sont horodatés.
+- Aucun. `getUser(token)` est utilisé en prod sur d'autres edges depuis longtemps.
+- Aucune migration DB.
+- Aucun changement visuel.
 
-### Décision attendue
-Confirme que tu veux que j'enchaîne **les 5 solutions** d'un coup (recommandé), ou seulement un sous-ensemble.
+### Ordre d'exécution (en mode default)
+1. Patcher l'edge function `generate-shipping-labels`
+2. Patcher l'edge function `verify-confirmation-code`
+3. Refactorer le `useEffect` dans `ShippingLabelPreview.tsx`
+4. Déployer les edges → tester
+
+Confirme et je passe en exécution.
 
