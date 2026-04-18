@@ -316,6 +316,27 @@ export default function CheckoutPage() {
     };
   }, []);
 
+  // Filet de sécurité : abandon propre si l'utilisateur ferme la page pendant
+  // un paiement en attente (sendBeacon survit à la fermeture de l'onglet).
+  useEffect(() => {
+    if (!paymentPending || paymentOrderIds.length === 0) return;
+    const beaconAbandon = () => {
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mark-payment-abandoned`;
+        const payload = JSON.stringify({
+          order_ids: paymentOrderIds,
+          reference: paymentReference,
+        });
+        const blob = new Blob([payload], { type: "application/json" });
+        navigator.sendBeacon?.(url, blob);
+      } catch {
+        // best-effort
+      }
+    };
+    window.addEventListener("beforeunload", beaconAbandon);
+    return () => window.removeEventListener("beforeunload", beaconAbandon);
+  }, [paymentPending, paymentOrderIds, paymentReference]);
+
   const handleShippingCostChange = useCallback((cost: number, mode: string) => {
     setDynamicShippingCost(cost > 0 ? cost : null);
     setShippingMode(mode);
