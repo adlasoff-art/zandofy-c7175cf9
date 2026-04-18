@@ -648,11 +648,11 @@ export default function AdminAnalyticsPage() {
     },
   });
 
-  // Top countries
+  // Top countries (up to 100)
   const { data: topCountries } = useQuery({
     queryKey: ["admin-analytics-top-countries", period],
     queryFn: async () => {
-      const { data, error } = await rpc("get_analytics_top_countries", { p_since: since });
+      const { data, error } = await rpc("get_analytics_top_countries", { p_since: since, p_limit: 100 });
       if (error) {
         console.error("[Analytics] get_analytics_top_countries failed:", error);
         throw new Error(error.message);
@@ -661,11 +661,11 @@ export default function AdminAnalyticsPage() {
     },
   });
 
-  // Top cities
+  // Top cities (up to 100)
   const { data: topCities } = useQuery({
     queryKey: ["admin-analytics-top-cities", period],
     queryFn: async () => {
-      const { data, error } = await rpc("get_analytics_top_cities", { p_since: since });
+      const { data, error } = await rpc("get_analytics_top_cities", { p_since: since, p_limit: 100 });
       if (error) {
         console.error("[Analytics] get_analytics_top_cities failed:", error);
         throw new Error(error.message);

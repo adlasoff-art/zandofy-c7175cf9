@@ -50,14 +50,41 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
       const { data, error } = await supabase.functions.invoke("generate-shipping-labels", {
         body: { orderIds },
       });
-      if (error || !data?.success) {
-        toast.error(data?.error || "Error generating labels");
+
+      // Try to extract a useful error message even when invoke wraps the response
+      let errMsg: string | null = null;
+      if (error) {
+        // FunctionsHttpError exposes context.response with the JSON body
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx?.response && typeof ctx.response.json === "function") {
+            const body = await ctx.response.json();
+            errMsg = body?.error || JSON.stringify(body);
+          } else {
+            errMsg = (error as any).message || "Edge function error";
+          }
+        } catch {
+          errMsg = (error as any).message || "Edge function error";
+        }
+        console.error("[ShippingLabels] invoke error:", error, "→", errMsg);
+      }
+
+      if (errMsg || !data?.success) {
+        toast.error(errMsg || data?.error || "Error generating labels");
         setLoading(false);
         return;
       }
+
+      if (!Array.isArray(data.labels) || data.labels.length === 0) {
+        toast.error("Aucune étiquette générée pour ces commandes");
+        setLoading(false);
+        return;
+      }
+
       setLabels(data.labels);
       setFetched(true);
-    } catch {
+    } catch (e) {
+      console.error("[ShippingLabels] network error:", e);
       toast.error("Network error");
     }
     setLoading(false);
