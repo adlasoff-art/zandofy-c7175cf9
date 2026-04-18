@@ -97,10 +97,16 @@ Deno.serve(async (req) => {
     console.log("[shipping-labels] orders found:", orders?.length || 0, "error:", ordersError?.message);
 
     if (ordersError) {
-      return respond(false, { error: "Erreur DB: " + ordersError.message, errorCode: "DB_ERROR" });
+      console.error("[shipping-labels] DB error:", ordersError);
+      return respond(false, { error: "Erreur DB: " + ordersError.message, errorCode: "DB_ERROR", details: ordersError });
     }
     if (!orders || orders.length === 0) {
-      return respond(false, { error: "Aucune commande trouvée pour les IDs fournis", errorCode: "NO_ORDERS" });
+      console.error("[shipping-labels] NO_ORDERS - requested:", orderIds);
+      return respond(false, {
+        error: `Aucune commande trouvée. IDs cherchés: ${orderIds.join(", ")}`,
+        errorCode: "NO_ORDERS",
+        requestedIds: orderIds,
+      });
     }
 
     // For vendors: verify they own the store + labels enabled
