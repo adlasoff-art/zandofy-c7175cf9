@@ -1,65 +1,52 @@
 
 
-## Diagnostic — "Aucune commande trouvée" persiste
+## Diagnostic — "Aucune commande trouvée" en prod après redéploiement
 
-### État actuel
-- Mémoire mise à jour : prod = `vpttoqojmiqxgudknyxf` (Supabase.com perso), front = `zandofy.com`.
-- Edge function `generate-shipping-labels` côté Lovable Cloud (`uog...zpu`) = à jour avec le pattern always-200 + `getUser`.
-- Mais le frontend prod sur `zandofy.com` appelle l'edge function du projet Supabase **prod** (`vpt...yxf`), où la fonction n'a **pas encore été redéployée** avec les correctifs récents.
+### Constat
+Tu as testé sur `zandofy.com` après le push du `[v2]` → toujours "Aucune commande trouvée". Cela signifie que la nouvelle edge function tourne maintenant en prod (sinon le message aurait changé de forme), mais elle retourne `errorCode: NO_ORDERS` après le `SELECT ... IN (orderIds)`.
 
-### Cause racine
-Les corrections faites dans Lovable touchent le repo GitHub (`frontend/supabase/functions/generate-shipping-labels/index.ts`). Pour qu'elles atteignent la prod, il faut que le workflow GitHub Actions `deploy-edge-functions.yml` se déclenche et déploie sur `vpt...yxf`. Tant que ce workflow n'a pas tourné avec succès, la prod exécute l'**ancienne** version de la fonction (celle qui ne loggue rien et masque les erreurs).
+### Hypothèses (par ordre de probabilité)
 
-Donc le message "Aucune commande trouvée" provient soit :
-1. De l'ancienne edge function en prod qui retourne 404 sur un cas qu'elle ne devrait pas (et le nouveau code aurait expliqué pourquoi)
-2. Du nouveau code une fois déployé, mais avec une vraie raison métier (RLS, store_id manquant, rôle non reconnu en prod)
+1. **Mismatch project/UUID** : les `orderIds` envoyés depuis le frontend prod n'existent pas dans la DB prod `vpt...yxf`. Peu probable si tu cliques depuis la liste UI prod, mais à confirmer.
+2. **RLS bloquant le service role** : improbable (le service role bypasse RLS), mais si la table `orders` a des policies restrictives + un trigger qui lit `auth.uid()`, ça peut filtrer.
+3. **store_id NULL sur les vraies commandes prod** : le `SELECT` n'utilise pas `store_id` dans le filtre, donc ça ne devrait pas causer 0 résultat. Écartable.
+4. **Schéma différent en prod** : une colonne du `SELECT` (ex: `shipping_email`, `shipping_mode`) n'existe pas en prod → erreur `ordersError` mais on retournerait `DB_ERROR`, pas `NO_ORDERS`. Donc à éliminer via les logs.
+5. **Le frontend appelle une URL hardcodée vers Lovable Cloud** au lieu de `VITE_SUPABASE_URL` → l'edge function exécutée serait toujours celle de `uog...zpu` qui n'a pas tes vraies commandes prod.
 
-Sans logs côté Supabase prod, impossible de trancher à l'aveugle.
+### Ce que je dois vérifier (mode lecture)
 
-### Plan d'action
+Avant de proposer un correctif, j'ai besoin de relire :
+- `frontend/src/components/shipping/ShippingLabelPreview.tsx` → comment l'URL de l'edge function est construite (hardcodée ? via env ? via `supabase.functions.invoke` ?)
+- Le composant parent qui passe les `orderIds` → s'assurer qu'il passe les vrais UUID prod, pas un mapping cassé
+- Confirmer que les logs `[v2]` côté client (`console.log("[ShippingLabelPreview] sending orderIds=", ...)`) ont bien été ajoutés et sont visibles dans la console navigateur
 
-**1. Forcer le redéploiement de l'edge function vers la prod**
-Faire un changement minimal et traçable dans `frontend/supabase/functions/generate-shipping-labels/index.ts` (ajout d'une ligne `console.log` de version `v2`) pour garantir que GitHub Actions détecte le diff et redéploie sur `vpt...yxf`.
+### Plan d'action concret
 
-**2. Renforcer les logs de diagnostic dans la fonction**
-Ajouter en début de handler (après auth) des `console.log` explicites :
-- `[v2] userId=`, `roles=`, `orderIds reçus=`
-- `[v2] orders.length après select=`, et si 0 → logger les UUID manquants
-- `[v2] store_ids=`, `isOwner/isCollab par store`
-Comme ça, dès que la fonction tourne en prod, on voit immédiatement dans Supabase Dashboard prod (Functions → Logs) ce qui cloche.
+**Étape 1 — Audit lecture seule (immédiat, en mode plan)**
+Relire `ShippingLabelPreview.tsx` + le composant parent (probablement `OrdersTab.tsx` ou équivalent vendeur) pour identifier :
+- Construction de l'URL edge function (hardcoded vs env)
+- Source des `orderIds` (depuis `selectedRows` / `selectedOrders` ?)
 
-**3. Vérifier l'invocation côté client**
-Relire `frontend/src/components/shipping/ShippingLabelPreview.tsx` pour confirmer que :
-- L'URL utilisée pour le `fetch` direct est bien construite à partir de `import.meta.env.VITE_SUPABASE_URL` (donc `vpt...yxf` en prod)
-- Le `Authorization: Bearer <token>` envoyé est bien le JWT prod (pas un cache d'un autre projet)
-- Les `orderIds` envoyés sont les bons UUID (logger côté client juste avant l'envoi)
+**Étape 2 — Demande à l'utilisatrice (avant de coder)**
+Tu m'envoies :
+- L'**UUID exact** (ou order_ref) de la commande sur laquelle tu cliques
+- La **console navigateur ouverte** (F12 → Console) au moment du clic, avec la ligne `[ShippingLabelPreview] sending orderIds=...` et l'`url=...`
+- Les **logs serveur** depuis Supabase prod (`vpt...yxf`) → Edge Functions → `generate-shipping-labels` → Logs : copier-coller toutes les lignes `[v2]` ou `[shipping-labels]` du dernier appel
 
-**4. Une fois déployé, l'utilisatrice clique "Imprimer étiquette"**
-Puis elle me transmet :
-- L'order_ref ou l'UUID de la commande sélectionnée
-- Le toast exact qui s'affiche
-- (idéalement) un screenshot de la console navigateur
+Avec ces 3 infos, je tranche en 1 itération entre :
+- **Cas A** : l'URL pointe vers Lovable Cloud → corriger côté frontend pour utiliser `import.meta.env.VITE_SUPABASE_URL`
+- **Cas B** : l'URL pointe bien vers prod, mais l'UUID envoyé n'existe pas en DB prod → bug de mapping côté UI vendeur
+- **Cas C** : tout est correct côté URL/UUID, mais le `SELECT` retourne 0 → problème de schéma (colonne manquante en prod) → adapter le SELECT
 
-Avec ça + les logs serveur prod, je tranche en 1 itération.
+**Étape 3 — Correctif ciblé (en mode default, après diagnostic)**
+Selon le cas A/B/C identifié, une seule modification précise. Aucune migration, aucun risque pour la prod.
 
-### Ce que je vais modifier (mode default, après ton OK)
+### Pourquoi je ne fonce pas tête baissée
+J'ai déjà fait 3 itérations qui n'ont pas résolu le problème. La règle "stuck pivot" s'applique : il faut **voir les logs réels prod + console nav** avant de toucher au code. Sinon je vais re-tâtonner et user ta confiance.
 
-| Fichier | Changement |
-|---|---|
-| `frontend/supabase/functions/generate-shipping-labels/index.ts` | Ajouter logs `[v2]` ciblés + bump de version dans un commentaire en tête pour forcer le diff |
-| `frontend/src/components/shipping/ShippingLabelPreview.tsx` | Ajouter `console.log("[ShippingLabelPreview] sending orderIds=", orderIds)` juste avant le `fetch` |
-
-Aucun changement de logique métier, aucune migration DB, aucun risque pour les 4000 visiteurs/jour.
-
-### Ce que tu fais après le push
-- Vérifier dans GitHub → Actions que `deploy-edge-functions.yml` tourne et passe ✅
-- Tester depuis `zandofy.com` → "Imprimer étiquette" sur une vraie commande
-- Si "Aucune commande trouvée" persiste : ouvrir Supabase prod (`vpt...yxf`) → Edge Functions → `generate-shipping-labels` → Logs, copier-coller les lignes `[v2]` ici
-- Je diagnostique précisément (RLS ? store_id null ? UUID inexistant ? rôle vendor non détecté en prod ?) et je corrige
-
-### Pourquoi je ne peux pas faire mieux maintenant
-Lovable n'a pas accès au projet Supabase prod (`vpt...yxf`) — je ne peux ni lire ses logs, ni déployer dessus directement. Le seul chemin légitime est : code → GitHub → Actions → Supabase prod. Toute autre approche violerait le SOP de déploiement.
-
-### Décision
-Confirme et je passe en exécution pour ajouter les logs `[v2]` + bump de version, ce qui déclenchera automatiquement le redéploiement vers ta prod.
+### Décision attendue
+Confirme et je :
+1. Lis `ShippingLabelPreview.tsx` + composant parent pour cartographier la chaîne d'appel exacte
+2. Te liste précisément les 3 infos à m'envoyer (UUID, console nav, logs Supabase prod)
+3. Une fois reçues, je passe en mode default avec le bon correctif
 
