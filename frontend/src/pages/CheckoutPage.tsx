@@ -1352,19 +1352,18 @@ export default function CheckoutPage() {
 
                 {paymentMethod === "mobile_money" && paymentPending && (
                   <div className="space-y-4 pt-2 border-t border-border">
-                    <div className="flex flex-col items-center gap-3 py-4 text-center">
-                      <Loader2 size={32} className="animate-spin text-primary" />
-                      <p className="text-sm font-medium text-foreground">En attente de validation...</p>
-                      <p className="text-xs text-muted-foreground max-w-xs">
-                        Ouvrez l'application {mobileMoneyProvider === "orange_money" ? "Orange Money" : mobileMoneyProvider === "mpesa" ? "M-Pesa" : mobileMoneyProvider === "airtel_money" ? "Airtel Money" : "AfriMoney"} sur votre téléphone et validez le paiement avec votre PIN.
-                      </p>
-                    </div>
-                    <Button variant="outline" onClick={handleCheckPaymentStatus} className="w-full">
-                      <ShieldCheck size={14} className="mr-2" /> Vérifier le statut du paiement
-                    </Button>
-                    <Button variant="destructive" onClick={handleCancelPaymentWait} className="w-full">
-                      <X size={14} className="mr-2" /> Annuler l'attente
-                    </Button>
+                    <PaymentWaitingPanel
+                      durationSeconds={180}
+                      providerLabel={
+                        mobileMoneyProvider === "orange_money" ? "Orange Money" :
+                        mobileMoneyProvider === "mpesa" ? "M-Pesa" :
+                        mobileMoneyProvider === "airtel_money" ? "Airtel Money" : "AfriMoney"
+                      }
+                      reference={paymentReference}
+                      checking={processing}
+                      onCheck={handleCheckPaymentStatus}
+                      onCancel={handleCancelPaymentWait}
+                    />
 
                     {/* Retry with different number */}
                     {!showRetryForm ? (
