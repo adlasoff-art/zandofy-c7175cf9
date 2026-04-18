@@ -33,6 +33,28 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // [v3] Diagnostic: log which Supabase project this function is connected to
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+    const EXPECTED_HOST = Deno.env.get("EXPECTED_SUPABASE_HOST") || "";
+    console.log("[v3] SUPABASE_URL=", SUPABASE_URL);
+    console.log("[v3] EXPECTED_SUPABASE_HOST=", EXPECTED_HOST || "(not set, skipping guard)");
+
+    // Guard rail: if EXPECTED_SUPABASE_HOST is configured and doesn't match, fail fast
+    if (EXPECTED_HOST && !SUPABASE_URL.includes(EXPECTED_HOST)) {
+      console.error("[v3] WRONG_ENV — function connected to", SUPABASE_URL, "but expected host containing", EXPECTED_HOST);
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          success: false,
+          error: `Edge function connectée à la mauvaise base. Attendu: ${EXPECTED_HOST}, Actuel: ${SUPABASE_URL}`,
+          errorCode: "WRONG_ENV",
+          actualUrl: SUPABASE_URL,
+          expectedHost: EXPECTED_HOST,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ ok: false, success: false, error: "Unauthorized", errorCode: "NO_AUTH" }), {
@@ -65,6 +87,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const orderIds: string[] = body?.orderIds;
+    console.log("[v3] orderIds reçus=", JSON.stringify(orderIds));
     if (!Array.isArray(orderIds) || orderIds.length === 0 || orderIds.length > 50) {
       return new Response(
         JSON.stringify({ ok: false, success: false, error: "orderIds doit être un tableau de 1 à 50 éléments", errorCode: "BAD_INPUT" }),
