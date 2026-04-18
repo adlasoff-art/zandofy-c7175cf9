@@ -32,14 +32,15 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Find orders stuck in awaiting_payment for > 30 minutes
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    // Find orders stuck in awaiting_payment for > 6 minutes
+    // (3 min KelPay gateway + 3 min grace for last manual "Verify" click)
+    const expirationCutoff = new Date(Date.now() - 6 * 60 * 1000).toISOString();
 
     const { data: expiredOrders, error: selectError } = await supabase
       .from("orders")
       .select("id, order_ref, user_id")
       .eq("status", "awaiting_payment")
-      .lt("created_at", thirtyMinutesAgo);
+      .lt("created_at", expirationCutoff);
 
     if (selectError) {
       console.error("Error finding expired orders:", selectError);
