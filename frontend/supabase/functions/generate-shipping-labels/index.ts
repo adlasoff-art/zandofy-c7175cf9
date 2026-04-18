@@ -1,3 +1,4 @@
+// generate-shipping-labels v2 — enhanced diagnostic logs (forces redeploy)
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const ALLOWED_HEADERS =
