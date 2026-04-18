@@ -61,6 +61,7 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
       // swallows the JSON body or reports a generic error even when the function
       // returns a structured 200 response).
       const url = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/generate-shipping-labels`;
+      console.log("[ShippingLabelPreview] sending orderIds=", orderIds, "to url=", url);
       const res = await fetch(url, {
         method: "POST",
         headers: {
