@@ -1411,6 +1411,7 @@ export default function CheckoutPage() {
                       checking={processing}
                       onCheck={handleCheckPaymentStatus}
                       onCancel={handleCancelPaymentWait}
+                      onAutoAbandon={handleAutoAbandonPayment}
                     />
 
                     {/* Retry with different number */}
