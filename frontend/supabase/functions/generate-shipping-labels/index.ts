@@ -1,3 +1,4 @@
+// generate-shipping-labels v2 — enhanced diagnostic logs (forces redeploy)
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const ALLOWED_HEADERS =
@@ -30,8 +31,8 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
+      return new Response(JSON.stringify({ ok: false, success: false, error: "Unauthorized", errorCode: "NO_AUTH" }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -50,8 +51,9 @@ Deno.serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
+      console.log("[v2] auth failed:", claimsError?.message);
+      return new Response(JSON.stringify({ ok: false, success: false, error: "Unauthorized", errorCode: "INVALID_TOKEN" }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -61,16 +63,16 @@ Deno.serve(async (req) => {
     const orderIds: string[] = body?.orderIds;
     if (!Array.isArray(orderIds) || orderIds.length === 0 || orderIds.length > 50) {
       return new Response(
-        JSON.stringify({ error: "orderIds doit être un tableau de 1 à 50 éléments" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ ok: false, success: false, error: "orderIds doit être un tableau de 1 à 50 éléments", errorCode: "BAD_INPUT" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!orderIds.every((id) => uuidRegex.test(id))) {
       return new Response(
-        JSON.stringify({ error: "Format d'ID invalide" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ ok: false, success: false, error: "Format d'ID invalide", errorCode: "BAD_UUID" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -84,9 +86,12 @@ Deno.serve(async (req) => {
     const isStaff = userRoles.includes("admin") || userRoles.includes("manager");
     const isVendor = userRoles.includes("vendor");
 
+    console.log("[v2] userId=", userId, "roles=", userRoles, "orderIds reçus=", orderIds);
+
     if (!isStaff && !isVendor) {
-      return new Response(JSON.stringify({ error: "Accès refusé" }), {
-        status: 403,
+      console.log("[v2] access denied: no staff/vendor role");
+      return new Response(JSON.stringify({ ok: false, success: false, error: "Accès refusé" }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -99,16 +104,29 @@ Deno.serve(async (req) => {
       )
       .in("id", orderIds);
 
+    console.log("[v2] orders.length après select=", orders?.length ?? 0, "ordersError=", ordersError?.message);
+
     if (ordersError || !orders || orders.length === 0) {
+      const foundIds = (orders || []).map((o: any) => o.id);
+      const missing = orderIds.filter((id) => !foundIds.includes(id));
+      console.log("[v2] missing orderIds=", missing);
       return new Response(
-        JSON.stringify({ error: "Aucune commande trouvée" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          ok: false,
+          success: false,
+          error: "Aucune commande trouvée",
+          errorCode: "ORDERS_NOT_FOUND",
+          missingIds: missing,
+          dbError: ordersError?.message || null,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // For vendors: verify they own the store + labels enabled
     if (!isStaff) {
       const storeIds = [...new Set(orders.map((o: any) => o.store_id).filter(Boolean))];
+      console.log("[v2] vendor flow store_ids=", storeIds);
 
       for (const sid of storeIds) {
         const { data: store } = await supabaseAdmin
@@ -118,6 +136,7 @@ Deno.serve(async (req) => {
           .single();
 
         const isOwner = store?.owner_id === userId;
+        let isCollab = false;
 
         if (!isOwner) {
           const { data: collab } = await supabaseAdmin
@@ -128,12 +147,17 @@ Deno.serve(async (req) => {
             .eq("status", "active")
             .limit(1);
 
-          if (!collab || collab.length === 0) {
+          isCollab = !!(collab && collab.length > 0);
+          console.log("[v2] store=", sid, "isOwner=", isOwner, "isCollab=", isCollab);
+
+          if (!isCollab) {
             return new Response(
-              JSON.stringify({ error: "Accès refusé à cette boutique" }),
-              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              JSON.stringify({ ok: false, success: false, error: "Accès refusé à cette boutique", errorCode: "STORE_ACCESS_DENIED" }),
+              { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
+        } else {
+          console.log("[v2] store=", sid, "isOwner=true");
         }
 
         const { data: pricing } = await supabaseAdmin
@@ -143,9 +167,10 @@ Deno.serve(async (req) => {
           .single();
 
         if (!pricing?.shipping_labels_enabled) {
+          console.log("[v2] labels not enabled for store=", sid);
           return new Response(
-            JSON.stringify({ error: "Étiquettes d'expédition non activées pour cette boutique" }),
-            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ ok: false, success: false, error: "Étiquettes d'expédition non activées pour cette boutique", errorCode: "LABELS_NOT_ENABLED" }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
       }
@@ -264,14 +289,16 @@ Deno.serve(async (req) => {
       };
     });
 
-    return new Response(JSON.stringify({ success: true, labels }), {
+    console.log("[v2] success: returning", labels.length, "labels");
+    return new Response(JSON.stringify({ ok: true, success: true, labels }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
+    console.error("[v2] uncaught error:", e);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Erreur interne" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ ok: false, success: false, error: e instanceof Error ? e.message : "Erreur interne", errorCode: "INTERNAL_ERROR" }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
