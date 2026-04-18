@@ -82,11 +82,21 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
         return;
       }
 
-      console.log("[ShippingLabels] response:", { status: res.status, data, sentOrderIds: orderIds });
+      console.log("[ShippingLabels] FULL response:", JSON.stringify({ status: res.status, data, sentOrderIds: orderIds }, null, 2));
 
       if (!data?.ok) {
         const code = data?.errorCode ? `[${data.errorCode}] ` : "";
-        toast.error(`${code}${data?.error || `Erreur (HTTP ${res.status})`}`);
+        const details: string[] = [];
+        if (Array.isArray(data?.missingIds) && data.missingIds.length > 0) {
+          details.push(`IDs introuvables: ${data.missingIds.join(", ")}`);
+        }
+        if (data?.dbError) {
+          details.push(`DB: ${data.dbError}`);
+        }
+        const detailSuffix = details.length > 0 ? ` — ${details.join(" | ")}` : "";
+        toast.error(`${code}${data?.error || `Erreur (HTTP ${res.status})`}${detailSuffix}`, {
+          duration: 15000,
+        });
         setLoading(false);
         return;
       }
