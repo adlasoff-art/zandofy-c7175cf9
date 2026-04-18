@@ -103,16 +103,29 @@ Deno.serve(async (req) => {
       )
       .in("id", orderIds);
 
+    console.log("[v2] orders.length après select=", orders?.length ?? 0, "ordersError=", ordersError?.message);
+
     if (ordersError || !orders || orders.length === 0) {
+      const foundIds = (orders || []).map((o: any) => o.id);
+      const missing = orderIds.filter((id) => !foundIds.includes(id));
+      console.log("[v2] missing orderIds=", missing);
       return new Response(
-        JSON.stringify({ error: "Aucune commande trouvée" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          ok: false,
+          success: false,
+          error: "Aucune commande trouvée",
+          errorCode: "ORDERS_NOT_FOUND",
+          missingIds: missing,
+          dbError: ordersError?.message || null,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // For vendors: verify they own the store + labels enabled
     if (!isStaff) {
       const storeIds = [...new Set(orders.map((o: any) => o.store_id).filter(Boolean))];
+      console.log("[v2] vendor flow store_ids=", storeIds);
 
       for (const sid of storeIds) {
         const { data: store } = await supabaseAdmin
@@ -122,6 +135,7 @@ Deno.serve(async (req) => {
           .single();
 
         const isOwner = store?.owner_id === userId;
+        let isCollab = false;
 
         if (!isOwner) {
           const { data: collab } = await supabaseAdmin
@@ -132,12 +146,17 @@ Deno.serve(async (req) => {
             .eq("status", "active")
             .limit(1);
 
-          if (!collab || collab.length === 0) {
+          isCollab = !!(collab && collab.length > 0);
+          console.log("[v2] store=", sid, "isOwner=", isOwner, "isCollab=", isCollab);
+
+          if (!isCollab) {
             return new Response(
-              JSON.stringify({ error: "Accès refusé à cette boutique" }),
-              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              JSON.stringify({ ok: false, success: false, error: "Accès refusé à cette boutique", errorCode: "STORE_ACCESS_DENIED" }),
+              { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
+        } else {
+          console.log("[v2] store=", sid, "isOwner=true");
         }
 
         const { data: pricing } = await supabaseAdmin
@@ -147,9 +166,10 @@ Deno.serve(async (req) => {
           .single();
 
         if (!pricing?.shipping_labels_enabled) {
+          console.log("[v2] labels not enabled for store=", sid);
           return new Response(
-            JSON.stringify({ error: "Étiquettes d'expédition non activées pour cette boutique" }),
-            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ ok: false, success: false, error: "Étiquettes d'expédition non activées pour cette boutique", errorCode: "LABELS_NOT_ENABLED" }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
       }
