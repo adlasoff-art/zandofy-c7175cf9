@@ -127,15 +127,17 @@ export function ShippingLabelPreview({ open, onClose, orderIds }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Shipping labels MUST always be in English for international credibility,
+  // regardless of the user's UI language. Do NOT replace these with t().
   const getModeLabel = (choice: string) => {
-    if (choice === "home_delivery") return t("label.homeDelivery");
-    if (choice === "hub_pickup") return t("label.hubPickup");
+    if (choice === "home_delivery") return "Home delivery";
+    if (choice === "hub_pickup") return "Hub pickup";
     return choice || "—";
   };
 
   const getShippingModeLabel = (mode: string) => {
-    if (mode === "air") return t("label.air");
-    if (mode === "sea") return t("label.sea");
+    if (mode === "air") return "Air";
+    if (mode === "sea") return "Sea";
     return mode || "";
   };
 
