@@ -258,14 +258,13 @@ Deno.serve(async (req) => {
       };
     });
 
-    return new Response(JSON.stringify({ success: true, labels }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.log("[shipping-labels] returning", labels.length, "labels");
+    return respond(true, { labels });
   } catch (e) {
+    console.error("[shipping-labels] uncaught:", e);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Erreur interne" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ ok: false, success: false, error: e instanceof Error ? e.message : "Erreur interne", errorCode: "INTERNAL" }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
