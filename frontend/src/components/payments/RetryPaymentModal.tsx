@@ -180,10 +180,38 @@ export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF",
             </div>
 
             {polling && (
-              <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3">
-                <Loader2 size={14} className="animate-spin" />
-                <span>En attente de confirmation sur votre téléphone... {reference && `(Réf: ${reference})`}</span>
-              </div>
+              <PaymentWaitingPanel
+                durationSeconds={300}
+                providerLabel={PROVIDERS.find(p => p.value === provider)?.label}
+                reference={reference}
+                onCheck={async () => {
+                  if (!reference) return;
+                  try {
+                    const checkRes = await supabase.functions.invoke("kelpay-check", { body: { reference } });
+                    if (checkRes.data?.status === "success") {
+                      if (pollInterval.current) clearInterval(pollInterval.current);
+                      setPolling(false);
+                      setPaymentStatus("success");
+                      toast.success("Paiement confirmé !");
+                      setTimeout(() => onSuccess(), 1500);
+                    } else if (checkRes.data?.status === "failed") {
+                      if (pollInterval.current) clearInterval(pollInterval.current);
+                      setPolling(false);
+                      setPaymentStatus("failed");
+                      toast.error("Paiement échoué");
+                    } else {
+                      toast.info("Paiement toujours en attente sur votre téléphone");
+                    }
+                  } catch {
+                    toast.error("Impossible de vérifier maintenant");
+                  }
+                }}
+                onCancel={() => {
+                  if (pollInterval.current) clearInterval(pollInterval.current);
+                  setPolling(false);
+                  setPaymentStatus("idle");
+                }}
+              />
             )}
 
             {paymentStatus === "failed" && (
