@@ -4,6 +4,7 @@ import { X, Loader2, Phone, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { PaymentWaitingPanel } from "./PaymentWaitingPanel";
 
 const PROVIDERS = [
   { value: "mpesa", label: "M-Pesa" },
