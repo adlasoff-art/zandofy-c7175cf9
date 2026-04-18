@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const orderIds: string[] = body?.orderIds;
+    console.log("[v3] orderIds reçus=", JSON.stringify(orderIds));
     if (!Array.isArray(orderIds) || orderIds.length === 0 || orderIds.length > 50) {
       return new Response(
         JSON.stringify({ ok: false, success: false, error: "orderIds doit être un tableau de 1 à 50 éléments", errorCode: "BAD_INPUT" }),
