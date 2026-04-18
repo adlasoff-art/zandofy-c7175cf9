@@ -1,68 +1,71 @@
 
 
-## Diagnostic — je comprends enfin la vraie cause
+## CAUSE RACINE CONFIRMÉE — enfin la vraie
 
-Tu as raison de t'énerver. Je tournais en rond parce que je regardais la mauvaise base. Voici ce que je comprends maintenant :
+Les logs prod sont sans ambiguïté :
 
-### Ce qui se passe réellement
-
-- **Frontend prod** (`zandofy.com`) → lit la **DB prod** (`vpt...yxf`) → tu vois la commande `ZND-MN7F2J3P` dans la liste → tu la sélectionnes ✅
-- **Edge Function `generate-shipping-labels`** déployée sur prod → mais elle utilise les variables d'environnement `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` du **mauvais projet** (probablement staging `wgi...ete`) → elle cherche `ZND-MN7F2J3P` dans staging → ne trouve rien → renvoie `ORDERS_NOT_FOUND` ❌
-
-C'est exactement le scénario "frontend pointe vers prod, edge function pointe vers staging". Ça explique pourquoi :
-- La commande existe (ta capture le confirme : 52 lignes dans `orders` prod)
-- L'auth passe (le JWT vient de prod)
-- Mais le SELECT par UUID ne renvoie rien
-
-### Pourquoi je n'avais pas vu ça
-
-Je supposais que les secrets `SUPABASE_URL` injectés dans l'edge function correspondaient au projet de déploiement. Mais sur Supabase self-managed (Coolify/GitHub Actions), ces secrets sont **configurés manuellement** par projet, et rien ne garantit qu'ils sont alignés.
-
-### Plan de correction — 3 étapes ciblées
-
-**Étape 1 — Diagnostic instantané (mode default, sans rien modifier)**
-
-J'ajoute **2 lignes de log** dans `frontend/supabase/functions/generate-shipping-labels/index.ts` au tout début du handler :
-
-```ts
-console.log("[v3] SUPABASE_URL=", Deno.env.get("SUPABASE_URL"));
-console.log("[v3] orderIds reçus=", orderIds);
+```
+ordersError= column orders.shipping_mode does not exist
 ```
 
-Tu pushes, tu retestes une fois, et on lit les logs côté Supabase prod. Si l'URL loggée est `wgi...ete` au lieu de `vpt...yxf` → diagnostic confirmé en 30 secondes.
+L'edge function tape bien la **bonne base** prod (le user `6afbf0da...` et son rôle `admin,vendor` correspondent à ton compte). Mais la requête SQL plante car la colonne `shipping_mode` **n'existe pas dans la table `orders` en prod**.
 
-**Étape 2 — Correction selon le résultat**
+Donc :
+- ❌ Le `SELECT` échoue → `orders` retourne `[]`
+- ❌ La fonction renvoie `ORDERS_NOT_FOUND` (faux positif, c'est en réalité une erreur de schéma)
+- ✅ La commande `ZND-MN7F2J3P` existe bien
 
-- **Cas A** (URL = staging) : il faut corriger les secrets de l'edge function dans le dashboard Supabase prod (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`). Je te donnerai la procédure exacte à suivre côté Supabase self-hosted, **car je n'ai pas accès à ces secrets** (limitation que j'aurais dû te signaler depuis le début).
-- **Cas B** (URL = prod correcte) : alors le problème vient d'ailleurs (RLS sur `supabaseAdmin`, ou la commande appartient à un autre `store_id`). Je creuserai les logs `[v2] missing orderIds=` qui sont déjà en place.
+J'avais ajouté `shipping_mode` au SELECT lors d'une itération précédente sans vérifier qu'une migration existait pour cette colonne en prod.
 
-**Étape 3 — Garde-fou permanent**
+## Plan de correction — 2 actions, fin du tunnel
 
-J'ajoute un check au démarrage de chaque edge function critique : si `SUPABASE_URL` ne correspond pas au domaine attendu pour l'environnement, la fonction renvoie immédiatement une erreur `WRONG_ENV` au lieu de chercher silencieusement dans la mauvaise base. Ça évite que ce bug se reproduise sur d'autres fonctions.
+### Action 1 — Retirer `shipping_mode` du SELECT (fix immédiat, 0 risque)
 
-### Rapport de limitation (comme tu me l'as demandé)
+Dans `frontend/supabase/functions/generate-shipping-labels/index.ts`, retirer `shipping_mode` de la liste du `select(...)` et le remplacer par une valeur par défaut côté JS :
 
-Tu as raison sur ce point aussi. Voici mes vraies limites que j'aurais dû annoncer plus tôt :
-1. **Je n'ai PAS accès à ta DB prod `vpt...yxf` ni à ta DB staging `wgi...ete`** (toutes deux self-hosted sur Coolify). Quand je dis "j'ai vérifié en SQL", j'interroge en réalité Lovable Cloud (`uog...zpu`), qui est un **3ème environnement** sans rapport.
-2. **Je n'ai PAS accès aux secrets configurés dans tes edge functions self-hosted** (Supabase Vault de tes instances).
-3. **Je ne peux PAS déployer directement** sur tes instances prod/staging — tout passe par GitHub Actions que toi seul peux déclencher.
+```ts
+// AVANT
+.select("id, order_ref, ..., shipping_mode")
 
-→ La seule chose que je peux faire, c'est modifier le code et te donner des instructions précises. Tout diagnostic doit passer par les logs que **toi** tu lis sur ton dashboard Supabase prod.
+// APRÈS
+.select("id, order_ref, ...")  // sans shipping_mode
 
-### Ce que je vais faire (mode default)
+// Plus bas dans le map :
+shippingMode: "",  // valeur par défaut, sera réactivée après migration
+```
 
-1. Ajouter le log `[v3] SUPABASE_URL=...` dans l'edge function `generate-shipping-labels`
-2. Ajouter le garde-fou `WRONG_ENV` (configurable via une variable `EXPECTED_SUPABASE_HOST`)
-3. Te donner les 2 commandes à lancer après ton push pour lire les logs prod
+Idem pour `shipping_email` par précaution — je vérifie d'abord si la colonne existe (si l'erreur ne mentionne que `shipping_mode`, alors `shipping_email` est OK et je le garde).
 
-### Ce que je ne ferai PAS
+### Action 2 — Créer la migration `shipping_mode` (à pousser séparément)
 
-- Aucune migration DB
-- Aucune modification de `client.ts`, `.env`, `types.ts`, `config.toml`
-- Aucun changement sur Lovable Cloud
-- Aucune modification de CORS ou d'auth
+Créer `frontend/supabase/migrations/<timestamp>_add_shipping_mode_to_orders.sql` :
 
-### Décision attendue
+```sql
+ALTER TABLE public.orders
+ADD COLUMN IF NOT EXISTS shipping_mode TEXT;
+```
 
-Confirme et j'ajoute les 2 lignes de log + le garde-fou. Tu pushes, tu retestes 1 fois, tu me colles le log `[v3] SUPABASE_URL=...` depuis ton dashboard Supabase prod, et on tranche définitivement en 1 itération.
+Cette migration sera appliquée sur prod via ton workflow GitHub Actions habituel. Une fois appliquée, je pourrai réintégrer `shipping_mode` dans le SELECT.
+
+### Action 3 — Garde-fou logs
+
+Garder les logs `[v2]` actuels et le log `[v3] SUPABASE_URL=...` (déjà en place) pour que la prochaine erreur de schéma soit diagnostiquée en 1 lecture de log au lieu de 5 itérations.
+
+## Ce que je NE ferai pas
+
+- Aucun changement CORS (déjà OK, logs le confirment)
+- Aucun changement `config.toml`, `client.ts`, `.env`, `types.ts`
+- Pas de modification Lovable Cloud
+
+## Pourquoi cette fois c'est définitif
+
+Les logs prod montrent **textuellement** l'erreur PostgreSQL : `column orders.shipping_mode does not exist`. Ce n'est plus une hypothèse — c'est la base de données prod qui parle. Le fix retire la cause exacte de cette erreur.
+
+## Décision attendue
+
+Confirme et je passe en exécution mode default :
+1. Patch edge function : retrait de `shipping_mode` du SELECT (+ valeur par défaut côté JS)
+2. Création de la migration SQL `ADD COLUMN IF NOT EXISTS shipping_mode`
+3. Tu pushes → la fonction marche immédiatement (avant même que la migration soit appliquée)
+4. Quand tu appliques la migration, on réactivera `shipping_mode` dans une PR séparée
 
