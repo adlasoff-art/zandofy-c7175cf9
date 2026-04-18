@@ -1,72 +1,44 @@
 
 
-## Diagnostic — "Edge Function returned a non-2xx status code"
+## Plan — Mémoriser définitivement la stack de production prioritaire
 
-### Ce que j'ai vérifié
-1. **L'edge function répond** : test direct avec un faux UUID → `404 + {"error":"Aucune commande trouvée"}`. Donc la fonction est déployée, l'auth marche, le routing marche.
-2. **Aucun log récent** dans `generate-shipping-labels` côté Supabase → la dernière invocation n'a même pas atteint la fonction OU le log a expiré.
-3. **Le client `supabase.functions.invoke`** considère **toute réponse non-2xx comme une exception** et masque le body JSON utile. Le frontend essaie bien d'extraire `error.context.response.json()` mais ça échoue silencieusement dans certains cas (response déjà consommée, CORS, etc.) → toast générique "Edge Function returned a non-2xx status code".
+### Objectif
+Inscrire dans la mémoire projet (Core + fichier dédié) que **toutes les corrections doivent cibler en priorité la stack de production GitHub → Vercel → Supabase.com personnel**, et que **Lovable Cloud n'est qu'un environnement de preview**, jamais la source de vérité.
 
-### Cause racine probable
-Deux problèmes qui se cumulent :
+### Ce que je vais faire (mode default)
 
-**A. Côté serveur (architectural)** : la fonction renvoie 401/403/404 sur erreur métier. C'est techniquement correct mais ça déclenche le wrapper d'erreur de `functions.invoke` qui mange le body. Le **pattern recommandé** (et utilisé partout sur Lovable) est de **toujours renvoyer 200** avec `{ ok: false, error: "..." }`.
+**1. Mettre à jour `mem://index.md` (Core)**
+Ajouter une règle Core en tête, visible à chaque action :
+> **Stack de production prioritaire** : GitHub (`main`) → Vercel (`zandofy.com`) → Supabase.com personnel. Toute correction cible d'abord cette stack. Lovable Cloud (`uogkklwfvwoxkifpkzpu`) = preview uniquement, jamais source de vérité. Sous-domaines `studio.zandofy.com` et `supabasa.zandofy.com` = supprimés/obsolètes.
 
-**B. Côté métier (vraie cause du 404)** : la fonction fait un `select ... in("id", orderIds)` avec `supabaseAdmin` (service role) → ça **ne peut pas** renvoyer 0 résultat si l'ID existe. Donc soit :
-   - Le frontend envoie un ID qui n'existe plus (suppression entre sélection et clic)
-   - Le store_id de la commande n'est pas dans la liste des stores autorisées (le contrôle d'accès renvoie 403, pas 404)
-   - **Plus probable** : la commande n'a pas de `store_id` valide ou la requête retourne `[]` à cause d'un filtre que je n'ai pas vu.
+**2. Mettre à jour `mem://architecture/environment-database-separation`**
+Réécrire pour refléter l'état réel :
+- Production = Supabase.com personnel (project ID fourni par l'utilisateur, à ne pas afficher en chat)
+- Lovable Cloud = preview/dev seulement
+- Retirer toute mention de `studio.zandofy.com` / `supabasa.zandofy.com`
 
-Je dois aussi vérifier si la commande sélectionnée a bien le statut requis pour l'impression (souvent les vendeurs essaient d'imprimer sur des commandes en `pending` alors que la fonction le bloque implicitement).
+**3. Mettre à jour `mem://architecture/deployment-workflow-sop`**
+Renforcer : edge functions et migrations doivent être déployées via le workflow GitHub Actions vers le Supabase de prod. Lovable ne déploie que sur Lovable Cloud (preview).
 
----
+**4. Créer `mem://constraint/production-priority-rule`** (type constraint)
+Règle absolue : ne jamais raisonner ou corriger sur la base des données Lovable Cloud quand le bug concerne la prod. Toujours considérer que la vraie DB est sur Supabase.com personnel et que les tests directs côté Lovable peuvent donner des faux négatifs (UUID introuvables, etc.).
 
-## Solution
+**5. Mettre à jour `mem://project/technical-identifiers`**
+Préciser que :
+- Domaine prod : `zandofy.com` uniquement
+- Stack : GitHub + Vercel + Supabase.com (compte personnel)
+- Lovable project ID = uniquement pour preview Lovable
+- Ne jamais confondre les deux
 
-### Correctif 1 — Refactoring "always 200, structured error"
-Dans `generate-shipping-labels/index.ts`, créer un helper `respond(ok, payload)` qui renvoie **toujours 200** avec :
-```ts
-{ ok: boolean, error?: string, errorCode?: string, labels?: [] }
-```
-Tous les `return new Response(..., { status: 4xx })` deviennent `respond(false, { error, errorCode })`. Le client lit alors le body de manière fiable.
-
-### Correctif 2 — Côté client : lire `data.ok` au lieu de `data.success`
-Dans `ShippingLabelPreview.tsx`, simplifier le `fetchLabels()` :
-```ts
-const { data, error } = await supabase.functions.invoke(...);
-if (error) { toast.error("Network error"); return; }
-if (!data?.ok) { toast.error(data?.error || "Erreur inconnue"); return; }
-if (!data.labels?.length) { toast.error("Aucune étiquette"); return; }
-setLabels(data.labels);
-```
-Ça fait disparaître le toast "non-2xx" pour de bon, et l'erreur réelle ("Vendeur non autorisé", "Commande introuvable", etc.) s'affiche enfin.
-
-### Correctif 3 — Diagnostic enrichi côté serveur
-Ajouter dans la fonction des `console.log` ciblés :
-- `userId`, `roles`, `orderIds reçus`, `orders trouvées (count)`, `store_ids vérifiés`
-Pour qu'au prochain bug on voie immédiatement dans les logs ce qui cloche, sans deviner.
-
-### Correctif 4 — Garder `success: true` en plus de `ok: true`
-Pour rester rétrocompatible si une autre partie du code (admin) lit encore `data.success`.
-
----
-
-### Tests post-correctif
-1. Sélectionner une commande valide → l'étiquette doit s'afficher.
-2. Sélectionner une commande sans `store_id` → toast "Commande introuvable" (clair).
-3. Sur un compte vendeur d'une boutique sans labels activés → toast "Étiquettes non activées pour cette boutique".
-4. Vérifier les logs côté serveur : on doit voir `userId`, `count orders`, etc.
+### Ce que je ne ferai pas
+- Aucune modification de code applicatif
+- Aucun déploiement
+- Aucune migration DB
+- Aucun changement aux fichiers `.env`, `client.ts`, ou edge functions
 
 ### Risques
-- Aucun. Le changement de status code n'a pas d'impact sécurité (l'auth reste vérifiée).
-- Le client gère la nouvelle forme de réponse (`ok`) mais on garde `success` en parallèle pour ne rien casser.
-- Aucune migration DB.
+Aucun. Mises à jour de mémoire uniquement.
 
-### Ordre d'exécution
-1. Refactor `generate-shipping-labels/index.ts` (helper `respond` + logs)
-2. Simplifier `ShippingLabelPreview.tsx` (lecture `data.ok`)
-3. Redéployer l'edge function
-4. Tester depuis l'UI vendeur → confirmer que l'erreur réelle s'affiche
-
-Confirme et je passe en exécution.
+### Validation
+Après exécution, à chaque future demande de correction, je raisonnerai automatiquement dans le bon référentiel (prod GitHub/Vercel/Supabase.com) et je n'irai plus tester sur Lovable Cloud comme si c'était la vérité.
 
