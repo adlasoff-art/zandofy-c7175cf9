@@ -106,6 +106,7 @@ Deno.serve(async (req) => {
     // For vendors: verify they own the store + labels enabled
     if (!isStaff) {
       const storeIds = [...new Set(orders.map((o: any) => o.store_id).filter(Boolean))];
+      console.log("[shipping-labels] vendor check storeIds:", storeIds);
 
       for (const sid of storeIds) {
         const { data: store } = await supabaseAdmin
@@ -126,10 +127,8 @@ Deno.serve(async (req) => {
             .limit(1);
 
           if (!collab || collab.length === 0) {
-            return new Response(
-              JSON.stringify({ error: "Accès refusé à cette boutique" }),
-              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
+            console.log("[shipping-labels] denied: not owner/collab for store", sid);
+            return respond(false, { error: "Accès refusé à cette boutique", errorCode: "FORBIDDEN_STORE" });
           }
         }
 
@@ -140,10 +139,8 @@ Deno.serve(async (req) => {
           .single();
 
         if (!pricing?.shipping_labels_enabled) {
-          return new Response(
-            JSON.stringify({ error: "Étiquettes d'expédition non activées pour cette boutique" }),
-            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          console.log("[shipping-labels] labels not enabled for store", sid);
+          return respond(false, { error: "Étiquettes d'expédition non activées pour cette boutique. Contactez l'administrateur pour activer cette fonctionnalité.", errorCode: "LABELS_DISABLED" });
         }
       }
     }
