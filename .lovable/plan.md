@@ -1,103 +1,78 @@
 
 
-L'utilisateur veut les 3 options : walkthrough visuel + activation popups + moteur d'envoi email/push. Je structure le plan en 3 phases claires.
+L'utilisateur a accédé à l'admin Automations et voit "Workflows (0) — Aucun workflow créé". C'est inattendu : la mémoire dit que 13 workflows pré-remplis existent (J0→J30), mais la liste est vide en prod.
 
-## Plan complet — Activation de l'automation marketing
+Hypothèses :
+1. Les 13 workflows ont été insérés en staging (`wgi...ete`) mais pas en prod (`vpt...yxf`)
+2. La migration de seed n'a jamais été appliquée en prod
+3. C'est cohérent avec le pattern récurrent : staging ≠ prod
 
-### Phase 1 — Walkthrough visuel (Option C, immédiat, 0 dev)
+Plan : seeder les 13 workflows en prod via une migration SQL idempotente, puis l'utilisateur active ceux qu'il veut.
 
-Je te guide pas à pas pour trouver et utiliser l'écran admin :
+## Situation actuelle
 
-**Accès :**
-1. Connecte-toi sur `https://zandofy.com` avec ton compte admin
-2. Va dans **Admin** (sidebar de gauche) → **Popups & Cookies**
-3. URL directe : `https://zandofy.com/admin/popups`
-4. Clique sur l'onglet **"Automations"** (icône éclair ⚡, entre "Annonces commerciales" et "Gestion cookies")
+Tu vois "Workflows (0)" parce que **les 13 workflows pré-remplis n'ont jamais été insérés en base de données prod** (`vpt...yxf`). Ils existent probablement en staging, mais la migration de seed n'a pas été appliquée en prod.
 
-**Ce que tu verras :**
-- Liste des 13 workflows pré-créés (J0 Bienvenue, J1 Découverte, J3 Premier achat, J7 Relance, J14, J21, J30, etc.)
-- Chaque ligne avec : nom, déclencheur, canal (popup/push/email), délai, statut (toggle on/off)
-- Flèche pour déplier et voir/éditer le contenu (titre, image, CTA, sujet email, message push)
-- Bouton "+ Nouveau workflow" en haut à droite
+Tu as 2 options pour avancer :
 
-### Phase 2 — Activation popups (Option A, 0 dev)
+### Option A — Créer manuellement tes workflows depuis l'écran (5 min)
 
-Pour tes ~50 nouveaux clients de la semaine :
+Le formulaire "+ Nouveau workflow" que tu vois marche déjà. Tu peux créer 1 ou 2 workflows simples maintenant pour tes 50 nouveaux clients :
 
-1. **Identifier les workflows pertinents** pour leur ancienneté (≤ 7 jours) :
-   - "J0 - Bienvenue après inscription"
-   - "J1 - Découverte catalogue"
-   - "J3 - Premier achat - Code promo"
-   - "J7 - Relance pas encore commandé"
+**Exemple workflow "Bienvenue J0" :**
+- Nom : `Bienvenue J0`
+- Déclencheur : `Visite sans compte` (ou `Compte créé` selon ta cible)
+- Canal : `Popup`
+- Délai jours : `0`
+- Fréquence : `Une seule fois`
+- Conditions : laisse "Indifférent"
+- Titre : `Bienvenue chez Zandofy !`
+- Contenu : `Découvrez notre sélection sino-africaine...`
+- Lien CTA : `/products`
+- Libellé CTA : `Découvrir`
+- Active le toggle après création
 
-2. **Pour chaque workflow** : déplier → vérifier le contenu (titre, image, lien CTA) → ajuster si besoin → activer le toggle
+Avantage : 0 dev, immédiat. Inconvénient : tu dois recréer les 13 manuellement.
 
-3. **Effet immédiat** : dès la prochaine visite des clients éligibles, le popup s'affiche selon les conditions (anti-spam : 1x/session ou 1x total selon `display_frequency`)
+### Option B — Seeder les 13 workflows pré-définis en prod (recommandé)
 
-**Aucun risque** : le système exclut automatiquement les utilisateurs déjà ciblés (table `automation_user_progress`).
+Je crée une migration SQL avec les 13 workflows J0→J30 pré-remplis (Bienvenue, Découverte, Premier achat, Relances J3/J7/J14/J21/J30, etc.). La migration utilise `INSERT ... ON CONFLICT DO NOTHING` pour être 100% idempotente — aucun risque même si tu as déjà créé des workflows manuellement.
 
-### Phase 3 — Moteur d'envoi email/push (Option B, dev nécessaire)
+**Étapes :**
+1. Je crée `frontend/supabase/migrations/<timestamp>_seed_automation_workflows.sql` avec les 13 INSERTs
+2. Tu pushes via GitHub Actions → migration appliquée en prod
+3. Tu rafraîchis `/admin/popups` → tu vois les 13 workflows
+4. Tu actives ceux que tu veux pour tes 50 clients
+5. Tous les workflows restent **inactifs par défaut** (sécurité)
 
-Pour que les workflows avec canal `email`, `push`, `popup_push`, `push_email` ou `all` envoient réellement les notifications (et pas seulement les popups) :
+**Contenu des 13 workflows seedés** (titre + canal + délai) :
+- J0 — Bienvenue après visite (popup, 0j)
+- J0 — Bienvenue après inscription (email, 0j)
+- J1 — Découverte catalogue (push, 1j)
+- J3 — Premier achat avec code promo (popup+email, 3j)
+- J5 — Relance produits vus (push, 5j)
+- J7 — Pas encore commandé (email, 7j)
+- J10 — Témoignages clients (popup, 10j)
+- J14 — Relance forte avec offre (email+push, 14j)
+- J18 — Quartier livré (push, 18j)
+- J21 — Dernière chance offre (email, 21j)
+- J25 — Sondage motivations (popup, 25j)
+- J30 — Désabonnement soft (email, 30j)
+- Trigger événementiel — Compte créé sans 1ère commande après 7j (email)
 
-#### Nouveau edge function : `process-automation-workflows`
-
-**Fonction** : Cron job déclenché toutes les heures qui :
-1. Liste les workflows actifs avec channel ≠ `popup`
-2. Pour chaque workflow, identifie les utilisateurs éligibles :
-   - Conditions remplies (`condition_has_account`, `condition_has_order`, `condition_max_days_since_signup`)
-   - Délai écoulé (`delay_days` depuis signup ou trigger)
-   - Pas encore traité (vérification dans `automation_user_progress`)
-   - Respect de `display_frequency` et `max_displays`
-3. Pour chaque utilisateur éligible :
-   - Si canal inclut `email` → appel `send-transactional-email` avec template du workflow
-   - Si canal inclut `push` → appel `push-notifications` avec titre/message du workflow
-   - Insert dans `automation_user_progress` (status `sent`)
-
-#### Planification pg_cron
-
-Job SQL toutes les heures :
-```sql
-SELECT cron.schedule(
-  'process-automation-hourly',
-  '0 * * * *',
-  $$ SELECT net.http_post(
-    url := 'https://vpttoqojmiqxgudknyxf.supabase.co/functions/v1/process-automation-workflows',
-    headers := '{"Authorization": "Bearer <ANON_KEY>"}'::jsonb
-  ) $$
-);
-```
-
-#### Sécurités intégrées
-
-- **Idempotence** : un utilisateur ne reçoit jamais 2x le même workflow (clé unique `(user_id, workflow_id)` dans `automation_user_progress`)
-- **Rate limit SMTP** : batching 10 emails / 20 min (déjà géré par `send-transactional-email`)
-- **Logs** : chaque envoi est tracé dans `automation_user_progress` avec `status` et `last_displayed_at`
-- **Désactivation propre** : suffit de couper le toggle d'un workflow → le cron l'ignore
-
-#### Fichiers à créer/modifier
-
-- `frontend/supabase/functions/process-automation-workflows/index.ts` (nouveau, ~250 lignes)
-- `frontend/supabase/config.toml` : ajouter bloc `[functions.process-automation-workflows]` avec `verify_jwt = false`
-- Migration SQL : création du cron job pg_cron (à appliquer une seule fois en prod)
-
-### Ordre d'exécution proposé
-
-1. **Aujourd'hui** : tu suis le walkthrough Phase 1, tu actives les popups Phase 2 → effet immédiat sur tes 50 clients
-2. **Cette semaine** : je code Phase 3, tu pushes via GitHub Actions, tu actives le cron en prod → les emails/push partent automatiquement
+Le contenu textuel (titre, message, image, CTA) sera générique en français — tu pourras éditer chaque workflow depuis l'écran admin avant activation.
 
 ### Ce que je NE ferai pas
 
-- Aucune modification des 13 workflows existants (contenu, conditions)
-- Aucune nouvelle table en base
-- Aucun changement sur Lovable Cloud
-- Aucune modification du hook `useAutomation` (popups continuent de marcher en parallèle)
+- Aucun changement code frontend (l'écran admin marche déjà)
+- Aucune modification de l'edge function `process-automation-workflows` (déjà déployée)
+- Aucune activation automatique — tous les workflows resteront `is_active = false`
 
 ### Décision attendue
 
-Confirme et je passe en exécution mode default :
-1. Création de `process-automation-workflows/index.ts`
-2. Ajout du bloc dans `config.toml`
-3. Création de la migration `cron.schedule` (à appliquer après push via Actions)
-4. Je te donne les instructions précises pour activer les workflows côté admin
+- **A** : tu crées manuellement 1-2 workflows maintenant (rapide, mais limité)
+- **B** : je seed les 13 workflows en prod via migration (recommandé, complet)
+- **A+B** : tu commences avec 1 workflow manuel pour tes 50 clients pendant que je prépare le seed des 13
+
+Dis-moi A, B ou A+B.
 
