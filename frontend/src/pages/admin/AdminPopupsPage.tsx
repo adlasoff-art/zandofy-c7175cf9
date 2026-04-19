@@ -130,7 +130,7 @@ export default function AdminPopupsPage() {
 
   return (
     <AdminLayout title="Popups & Cookies">
-      <div className="max-w-3xl space-y-6">
+      <div className={`${tab === "analytics" ? "max-w-6xl" : "max-w-3xl"} space-y-6`}>
         {/* Tabs */}
         <div className="flex gap-1 border-b border-border">
           {[

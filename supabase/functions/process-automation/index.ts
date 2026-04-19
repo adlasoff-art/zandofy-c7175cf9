@@ -87,6 +87,11 @@ Deno.serve(async (req) => {
               url: wf.popup_cta_link || "/",
             },
           });
+          await supabaseAdmin.from("automation_events").insert({
+            workflow_id: wf.id,
+            user_id: userId,
+            event_type: "delivered_push",
+          });
         } catch (pushErr) {
           console.error(`Push failed for user ${userId}:`, pushErr);
         }
@@ -130,9 +135,11 @@ Deno.serve(async (req) => {
           if (!profile?.email) continue;
 
           try {
-            const htmlContent = wf.email_html_content
+            let htmlContent = wf.email_html_content
               .replace(/\{\{first_name\}\}/g, profile.first_name || "")
               .replace(/\{\{email\}\}/g, profile.email);
+            // Rewrite all links to go through tracker
+            htmlContent = rewriteEmailLinks(htmlContent, wf.id, userId);
 
             await transporter.sendMail({
               from: `Zandofy <${fromEmail}>`,
@@ -150,9 +157,22 @@ Deno.serve(async (req) => {
               sent_at: new Date().toISOString(),
             });
 
+            await supabaseAdmin.from("automation_events").insert({
+              workflow_id: wf.id,
+              user_id: userId,
+              event_type: "delivered_email",
+              metadata: { email: profile.email },
+            });
+
             totalProcessed++;
-          } catch (emailErr) {
+          } catch (emailErr: any) {
             console.error(`Email failed for ${profile.email}:`, emailErr);
+            await supabaseAdmin.from("automation_events").insert({
+              workflow_id: wf.id,
+              user_id: userId,
+              event_type: "failed_email",
+              metadata: { error: String(emailErr?.message || emailErr) },
+            });
           }
 
           // Stagger: 2-3 min between emails (random 120-180s)
