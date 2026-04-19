@@ -7213,6 +7213,7 @@ export type Database = {
           converted_signup: boolean
           delivered_at: string
           user_email: string
+          user_full_name: string
           user_id: string
           workflow_id: string
           workflow_name: string

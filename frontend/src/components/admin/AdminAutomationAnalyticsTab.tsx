@@ -31,10 +31,20 @@ interface JourneyRow {
   user_id: string | null;
   anon_id: string | null;
   user_email: string | null;
+  user_full_name: string | null;
   delivered_at: string;
   clicked: boolean;
   converted_signup: boolean;
   converted_order: boolean;
+}
+
+function getUserIdentity(j: JourneyRow): { primary: string; secondary?: string } {
+  const shortId = (id: string) => id.replace(/-/g, "").slice(-4).toUpperCase();
+  if (j.user_full_name && j.user_full_name.trim()) return { primary: j.user_full_name.trim() };
+  if (j.user_email) return { primary: j.user_email };
+  if (j.user_id) return { primary: `Client #${shortId(j.user_id)}`, secondary: "compte sans nom" };
+  if (j.anon_id) return { primary: `Visiteur #${shortId(j.anon_id)}`, secondary: "non inscrit" };
+  return { primary: "—" };
 }
 
 const PERIOD_OPTIONS = [
@@ -199,10 +209,15 @@ export function AdminAutomationAnalyticsTab() {
                 <tbody>
                   {journey.length === 0 ? (
                     <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">Aucun parcours pour cette période.</td></tr>
-                  ) : journey.map((j, i) => (
+                  ) : journey.map((j, i) => {
+                    const identity = getUserIdentity(j);
+                    return (
                     <tr key={`${j.workflow_id}-${j.user_id || j.anon_id}-${i}`} className="border-b border-border/50">
-                      <td className="py-2 pr-3 truncate max-w-[180px]">
-                        {j.user_email || (j.anon_id ? `anon-${j.anon_id.slice(0, 8)}` : "—")}
+                      <td className="py-2 pr-3 max-w-[200px]">
+                        <div className="text-foreground truncate">{identity.primary}</div>
+                        {identity.secondary && (
+                          <div className="text-[10px] text-muted-foreground truncate">{identity.secondary}</div>
+                        )}
                       </td>
                       <td className="py-2 pr-3 text-muted-foreground truncate max-w-[180px]">{j.workflow_name}</td>
                       <td className="py-2 pr-3 text-muted-foreground">{new Date(j.delivered_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</td>
@@ -210,7 +225,8 @@ export function AdminAutomationAnalyticsTab() {
                       <td className="py-2 pr-3">{j.converted_signup ? "✅" : <X size={12} className="text-muted-foreground" />}</td>
                       <td className="py-2 pr-3">{j.converted_order ? "✅" : <X size={12} className="text-muted-foreground" />}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
