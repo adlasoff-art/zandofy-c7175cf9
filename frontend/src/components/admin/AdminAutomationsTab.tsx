@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Loader2, Save, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Loader2, Save, ChevronDown, ChevronUp, Pencil, Eye } from "lucide-react";
 
 interface WorkflowRow {
   id: string;
@@ -56,15 +56,37 @@ const FREQUENCY_LABELS: Record<string, string> = {
   once_per_session: "1x par session",
 };
 
-const DEFAULT_WORKFLOW = {
+type FormShape = {
+  name: string;
+  trigger_type: string;
+  delay_days: number;
+  delay_minutes: number;
+  channel: string;
+  condition_has_account: boolean | null;
+  condition_has_order: boolean | null;
+  condition_max_days_since_signup: number | null;
+  popup_title: string;
+  popup_content: string;
+  popup_image_url: string;
+  popup_cta_label: string;
+  popup_cta_link: string;
+  push_title: string;
+  push_body: string;
+  email_subject: string;
+  email_html_content: string;
+  display_frequency: string;
+  max_displays: number | null;
+};
+
+const DEFAULT_WORKFLOW: FormShape = {
   name: "",
   trigger_type: "visit_no_account",
   delay_days: 0,
   delay_minutes: 0,
   channel: "popup",
-  condition_has_account: null as boolean | null,
-  condition_has_order: null as boolean | null,
-  condition_max_days_since_signup: null as number | null,
+  condition_has_account: null,
+  condition_has_order: null,
+  condition_max_days_since_signup: null,
   popup_title: "",
   popup_content: "",
   popup_image_url: "",
@@ -75,91 +97,66 @@ const DEFAULT_WORKFLOW = {
   email_subject: "",
   email_html_content: "",
   display_frequency: "once",
-  max_displays: null as number | null,
+  max_displays: null,
 };
 
-export function AdminAutomationsTab() {
-  const { toast } = useToast();
-  const [workflows, setWorkflows] = useState<WorkflowRow[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ ...DEFAULT_WORKFLOW });
+const showsPopup = (ch: string) => ["popup", "popup_push", "all"].includes(ch);
+const showsPush = (ch: string) => ["push", "popup_push", "push_email", "all"].includes(ch);
+const showsEmail = (ch: string) => ["email", "push_email", "all"].includes(ch);
 
-  const inputClass = "w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20";
+const inputClass = "w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20";
 
-  useEffect(() => {
-    loadWorkflows();
-  }, []);
-
-  const loadWorkflows = async () => {
-    const { data } = await (supabase as any)
-      .from("automation_workflows")
-      .select("*")
-      .order("sort_order", { ascending: true });
-    setWorkflows(data || []);
+function workflowToForm(wf: WorkflowRow): FormShape {
+  return {
+    name: wf.name,
+    trigger_type: wf.trigger_type,
+    delay_days: wf.delay_days,
+    delay_minutes: wf.delay_minutes,
+    channel: wf.channel,
+    condition_has_account: wf.condition_has_account,
+    condition_has_order: wf.condition_has_order,
+    condition_max_days_since_signup: wf.condition_max_days_since_signup,
+    popup_title: wf.popup_title || "",
+    popup_content: wf.popup_content || "",
+    popup_image_url: wf.popup_image_url || "",
+    popup_cta_label: wf.popup_cta_label || "En savoir plus",
+    popup_cta_link: wf.popup_cta_link || "",
+    push_title: wf.push_title || "",
+    push_body: wf.push_body || "",
+    email_subject: wf.email_subject || "",
+    email_html_content: wf.email_html_content || "",
+    display_frequency: wf.display_frequency,
+    max_displays: wf.max_displays,
   };
+}
 
-  const showsPopup = (ch: string) => ["popup", "popup_push", "all"].includes(ch);
-  const showsPush = (ch: string) => ["push", "popup_push", "push_email", "all"].includes(ch);
-  const showsEmail = (ch: string) => ["email", "push_email", "all"].includes(ch);
-
-  const handleCreate = async () => {
-    if (!form.name) return;
-    setSaving(true);
-    const payload: any = {
-      name: form.name,
-      trigger_type: form.trigger_type,
-      delay_days: form.delay_days,
-      delay_minutes: form.delay_minutes,
-      channel: form.channel,
-      condition_has_account: form.condition_has_account,
-      condition_has_order: form.condition_has_order,
-      condition_max_days_since_signup: form.condition_max_days_since_signup,
-      display_frequency: form.display_frequency,
-      max_displays: form.max_displays,
-      is_active: false,
-    };
-    if (showsPopup(form.channel)) {
-      payload.popup_title = form.popup_title || null;
-      payload.popup_content = form.popup_content || null;
-      payload.popup_image_url = form.popup_image_url || null;
-      payload.popup_cta_label = form.popup_cta_label || null;
-      payload.popup_cta_link = form.popup_cta_link || null;
-    }
-    if (showsPush(form.channel)) {
-      payload.push_title = form.push_title || null;
-      payload.push_body = form.push_body || null;
-    }
-    if (showsEmail(form.channel)) {
-      payload.email_subject = form.email_subject || null;
-      payload.email_html_content = form.email_html_content || null;
-    }
-
-    const { error } = await (supabase as any).from("automation_workflows").insert(payload);
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Workflow créé" });
-      setForm({ ...DEFAULT_WORKFLOW });
-      setShowForm(false);
-      await loadWorkflows();
-    }
-    setSaving(false);
+function formToPayload(form: FormShape) {
+  const payload: any = {
+    name: form.name,
+    trigger_type: form.trigger_type,
+    delay_days: form.delay_days,
+    delay_minutes: form.delay_minutes,
+    channel: form.channel,
+    condition_has_account: form.condition_has_account,
+    condition_has_order: form.condition_has_order,
+    condition_max_days_since_signup: form.condition_max_days_since_signup,
+    display_frequency: form.display_frequency,
+    max_displays: form.max_displays,
+    popup_title: showsPopup(form.channel) ? form.popup_title || null : null,
+    popup_content: showsPopup(form.channel) ? form.popup_content || null : null,
+    popup_image_url: showsPopup(form.channel) ? form.popup_image_url || null : null,
+    popup_cta_label: showsPopup(form.channel) ? form.popup_cta_label || null : null,
+    popup_cta_link: showsPopup(form.channel) ? form.popup_cta_link || null : null,
+    push_title: showsPush(form.channel) ? form.push_title || null : null,
+    push_body: showsPush(form.channel) ? form.push_body || null : null,
+    email_subject: showsEmail(form.channel) ? form.email_subject || null : null,
+    email_html_content: showsEmail(form.channel) ? form.email_html_content || null : null,
   };
+  return payload;
+}
 
-  const toggleWorkflow = async (id: string, active: boolean) => {
-    await (supabase as any).from("automation_workflows").update({ is_active: active }).eq("id", id);
-    setWorkflows((prev) => prev.map((w) => (w.id === id ? { ...w, is_active: active } : w)));
-  };
-
-  const deleteWorkflow = async (id: string) => {
-    await (supabase as any).from("automation_workflows").delete().eq("id", id);
-    setWorkflows((prev) => prev.filter((w) => w.id !== id));
-    toast({ title: "Workflow supprimé" });
-  };
-
-  const renderFormFields = (values: typeof DEFAULT_WORKFLOW, onChange: (v: typeof DEFAULT_WORKFLOW) => void) => (
+function FormFields({ values, onChange }: { values: FormShape; onChange: (v: FormShape) => void }) {
+  return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
@@ -198,7 +195,6 @@ export function AdminAutomationsTab() {
         </div>
       </div>
 
-      {/* Conditions */}
       <div className="space-y-2">
         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Conditions</h4>
         <div className="grid grid-cols-3 gap-3">
@@ -240,7 +236,6 @@ export function AdminAutomationsTab() {
         </div>
       </div>
 
-      {/* Popup content */}
       {showsPopup(values.channel) && (
         <div className="space-y-2">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contenu Popup</h4>
@@ -269,7 +264,6 @@ export function AdminAutomationsTab() {
         </div>
       )}
 
-      {/* Push content */}
       {showsPush(values.channel) && (
         <div className="space-y-2">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contenu Push</h4>
@@ -286,7 +280,6 @@ export function AdminAutomationsTab() {
         </div>
       )}
 
-      {/* Email content */}
       {showsEmail(values.channel) && (
         <div className="space-y-2">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contenu Email</h4>
@@ -297,13 +290,125 @@ export function AdminAutomationsTab() {
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Contenu HTML</label>
-              <textarea value={values.email_html_content} onChange={(e) => onChange({ ...values, email_html_content: e.target.value })} className={inputClass + " min-h-[100px] resize-y font-mono text-xs"} />
+              <textarea value={values.email_html_content} onChange={(e) => onChange({ ...values, email_html_content: e.target.value })} className={inputClass + " min-h-[160px] resize-y font-mono text-xs"} />
             </div>
           </div>
         </div>
       )}
     </div>
   );
+}
+
+function PopupPreview({ form }: { form: FormShape }) {
+  if (!showsPopup(form.channel)) return null;
+  return (
+    <div className="border border-border rounded-xl overflow-hidden bg-background max-w-sm mx-auto">
+      {form.popup_image_url && (
+        <img src={form.popup_image_url} alt="" className="w-full h-40 object-cover" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
+      )}
+      <div className="p-4 space-y-2">
+        <h4 className="text-base font-semibold text-foreground">{form.popup_title || form.name || "Titre"}</h4>
+        {form.popup_content && <p className="text-sm text-muted-foreground">{form.popup_content}</p>}
+        <div className="flex gap-2 pt-1">
+          {form.popup_cta_link && (
+            <Button size="sm" className="flex-1 text-xs">{form.popup_cta_label || "En savoir plus"}</Button>
+          )}
+          <Button size="sm" variant="outline" className="text-xs">Fermer</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmailPreview({ form }: { form: FormShape }) {
+  if (!showsEmail(form.channel)) return null;
+  return (
+    <div className="border border-border rounded-xl overflow-hidden bg-background">
+      <div className="px-4 py-2 border-b border-border bg-muted/40">
+        <p className="text-xs text-muted-foreground">Sujet</p>
+        <p className="text-sm font-medium text-foreground">{form.email_subject || "(Sujet vide)"}</p>
+      </div>
+      <div className="p-4 max-h-[300px] overflow-y-auto bg-white text-black" dangerouslySetInnerHTML={{ __html: form.email_html_content || "<p style='color:#888'>(Contenu HTML vide)</p>" }} />
+    </div>
+  );
+}
+
+export function AdminAutomationsTab() {
+  const { toast } = useToast();
+  const [workflows, setWorkflows] = useState<WorkflowRow[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<FormShape>(DEFAULT_WORKFLOW);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createForm, setCreateForm] = useState<FormShape>({ ...DEFAULT_WORKFLOW });
+
+  useEffect(() => {
+    loadWorkflows();
+  }, []);
+
+  const loadWorkflows = async () => {
+    const { data } = await (supabase as any)
+      .from("automation_workflows")
+      .select("*")
+      .order("sort_order", { ascending: true });
+    setWorkflows(data || []);
+  };
+
+  const handleCreate = async () => {
+    if (!createForm.name) return;
+    setSaving(true);
+    const payload = { ...formToPayload(createForm), is_active: false };
+    const { error } = await (supabase as any).from("automation_workflows").insert(payload);
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Workflow créé" });
+      setCreateForm({ ...DEFAULT_WORKFLOW });
+      setShowCreateForm(false);
+      await loadWorkflows();
+    }
+    setSaving(false);
+  };
+
+  const startEditing = (wf: WorkflowRow) => {
+    setEditingId(wf.id);
+    setEditForm(workflowToForm(wf));
+    setPreviewId(null);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId) return;
+    setSaving(true);
+    const { error } = await (supabase as any)
+      .from("automation_workflows")
+      .update(formToPayload(editForm))
+      .eq("id", editingId);
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Workflow mis à jour" });
+      await loadWorkflows();
+      setEditingId(null);
+    }
+    setSaving(false);
+  };
+
+  const toggleWorkflow = async (id: string, active: boolean) => {
+    await (supabase as any).from("automation_workflows").update({ is_active: active }).eq("id", id);
+    setWorkflows((prev) => prev.map((w) => (w.id === id ? { ...w, is_active: active } : w)));
+  };
+
+  const deleteWorkflow = async (id: string) => {
+    if (!confirm("Supprimer définitivement ce workflow ?")) return;
+    await (supabase as any).from("automation_workflows").delete().eq("id", id);
+    setWorkflows((prev) => prev.filter((w) => w.id !== id));
+    toast({ title: "Workflow supprimé" });
+  };
 
   return (
     <div className="space-y-6">
@@ -313,14 +418,14 @@ export function AdminAutomationsTab() {
           <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Plus size={16} /> Nouveau workflow
           </h2>
-          <Button variant="ghost" size="sm" onClick={() => setShowForm(!showForm)}>
-            {showForm ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          <Button variant="ghost" size="sm" onClick={() => setShowCreateForm(!showCreateForm)}>
+            {showCreateForm ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </Button>
         </div>
-        {showForm && (
+        {showCreateForm && (
           <>
-            {renderFormFields(form, setForm)}
-            <Button onClick={handleCreate} disabled={saving || !form.name} size="sm" className="gap-1.5">
+            <FormFields values={createForm} onChange={setCreateForm} />
+            <Button onClick={handleCreate} disabled={saving || !createForm.name} size="sm" className="gap-1.5">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Créer
             </Button>
           </>
@@ -333,37 +438,82 @@ export function AdminAutomationsTab() {
         {workflows.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">Aucun workflow créé.</p>
         ) : (
-          workflows.map((wf) => (
-            <div key={wf.id} className="bg-card border border-border rounded-xl overflow-hidden">
-              <div className="p-4 flex items-center gap-4">
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpandedId(expandedId === wf.id ? null : wf.id)}>
-                  <p className="text-sm font-medium text-foreground truncate">{wf.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {TRIGGER_LABELS[wf.trigger_type] || wf.trigger_type} · {CHANNEL_LABELS[wf.channel] || wf.channel} · {FREQUENCY_LABELS[wf.display_frequency] || wf.display_frequency}
-                  </p>
-                  {(wf.delay_days > 0 || wf.delay_minutes > 0) && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      Délai : {wf.delay_days > 0 ? `${wf.delay_days}j` : ""}{wf.delay_minutes > 0 ? ` ${wf.delay_minutes}min` : ""}
+          workflows.map((wf) => {
+            const isEditing = editingId === wf.id;
+            const isPreview = previewId === wf.id;
+            return (
+              <div key={wf.id} className="bg-card border border-border rounded-xl overflow-hidden">
+                <div className="p-4 flex items-center gap-3 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{wf.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {TRIGGER_LABELS[wf.trigger_type] || wf.trigger_type} · {CHANNEL_LABELS[wf.channel] || wf.channel} · {FREQUENCY_LABELS[wf.display_frequency] || wf.display_frequency}
                     </p>
-                  )}
+                    {(wf.delay_days > 0 || wf.delay_minutes > 0) && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        Délai : {wf.delay_days > 0 ? `${wf.delay_days}j` : ""}{wf.delay_minutes > 0 ? ` ${wf.delay_minutes}min` : ""}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setPreviewId(isPreview ? null : wf.id)}
+                    className="text-muted-foreground hover:text-foreground p-1"
+                    title="Aperçu"
+                  >
+                    <Eye size={16} />
+                  </button>
+                  <button
+                    onClick={() => isEditing ? cancelEditing() : startEditing(wf)}
+                    className="text-muted-foreground hover:text-foreground p-1"
+                    title={isEditing ? "Annuler" : "Modifier"}
+                  >
+                    {isEditing ? <ChevronUp size={16} /> : <Pencil size={16} />}
+                  </button>
+                  <Switch checked={wf.is_active} onCheckedChange={(v) => toggleWorkflow(wf.id, v)} />
+                  <button onClick={() => deleteWorkflow(wf.id)} className="text-destructive hover:text-destructive/80 p-1">
+                    <Trash2 size={16} />
+                  </button>
                 </div>
-                <Switch checked={wf.is_active} onCheckedChange={(v) => toggleWorkflow(wf.id, v)} />
-                <button onClick={() => deleteWorkflow(wf.id)} className="text-destructive hover:text-destructive/80">
-                  <Trash2 size={16} />
-                </button>
+
+                {isPreview && !isEditing && (
+                  <div className="px-4 pb-4 border-t border-border pt-4 space-y-3">
+                    <PopupPreview form={workflowToForm(wf)} />
+                    <EmailPreview form={workflowToForm(wf)} />
+                    {showsPush(wf.channel) && (wf.push_title || wf.push_body) && (
+                      <div className="border border-border rounded-xl p-3 bg-background max-w-sm">
+                        <p className="text-xs text-muted-foreground mb-1">Notification push</p>
+                        <p className="text-sm font-medium text-foreground">{wf.push_title}</p>
+                        <p className="text-xs text-muted-foreground">{wf.push_body}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {isEditing && (
+                  <div className="px-4 pb-4 border-t border-border pt-4 space-y-3">
+                    <FormFields values={editForm} onChange={setEditForm} />
+                    <div className="flex gap-2">
+                      <Button onClick={handleSaveEdit} disabled={saving} size="sm" className="gap-1.5">
+                        {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Enregistrer
+                      </Button>
+                      <Button onClick={cancelEditing} disabled={saving} size="sm" variant="outline">
+                        Annuler
+                      </Button>
+                      <Button onClick={() => setPreviewId(isPreview ? null : wf.id)} size="sm" variant="ghost" className="gap-1.5 ml-auto">
+                        <Eye size={14} /> Aperçu
+                      </Button>
+                    </div>
+                    {isPreview && (
+                      <div className="space-y-3 pt-3 border-t border-border">
+                        <PopupPreview form={editForm} />
+                        <EmailPreview form={editForm} />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              {expandedId === wf.id && (
-                <div className="px-4 pb-4 border-t border-border pt-3 space-y-2 text-xs text-muted-foreground">
-                  {wf.popup_title && <p><span className="font-medium">Popup :</span> {wf.popup_title}</p>}
-                  {wf.push_title && <p><span className="font-medium">Push :</span> {wf.push_title}</p>}
-                  {wf.email_subject && <p><span className="font-medium">Email :</span> {wf.email_subject}</p>}
-                  {wf.condition_max_days_since_signup !== null && (
-                    <p>Max jours : {wf.condition_max_days_since_signup}</p>
-                  )}
-                </div>
-              )}
-            </div>
-          ))
+            );
+          })
         )}
       </section>
 

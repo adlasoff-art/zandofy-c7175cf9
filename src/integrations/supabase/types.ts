@@ -306,6 +306,44 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_events: {
+        Row: {
+          anon_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          user_id: string | null
+          workflow_id: string
+        }
+        Insert: {
+          anon_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+          workflow_id: string
+        }
+        Update: {
+          anon_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_events_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_user_progress: {
         Row: {
           anon_id: string | null
@@ -7146,6 +7184,48 @@ export type Database = {
           store_id: string
           store_name: string
           view_count: number
+        }[]
+      }
+      get_automation_daily_events: {
+        Args: { p_since?: string; p_workflow_id?: string }
+        Returns: {
+          clicked: number
+          converted: number
+          day: string
+          delivered: number
+        }[]
+      }
+      get_automation_kpis: {
+        Args: { p_since?: string; p_workflow_id?: string }
+        Returns: Json
+      }
+      get_automation_user_journey: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_since?: string
+          p_workflow_id?: string
+        }
+        Returns: {
+          anon_id: string
+          clicked: boolean
+          converted_order: boolean
+          converted_signup: boolean
+          delivered_at: string
+          user_email: string
+          user_id: string
+          workflow_id: string
+          workflow_name: string
+        }[]
+      }
+      get_automation_workflow_performance: {
+        Args: { p_since?: string }
+        Returns: {
+          clicked: number
+          converted: number
+          delivered: number
+          workflow_id: string
+          workflow_name: string
         }[]
       }
       get_category_top_sellers: {

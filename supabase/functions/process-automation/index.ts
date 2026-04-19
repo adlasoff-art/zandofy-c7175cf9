@@ -12,10 +12,22 @@ Deno.serve(async (req) => {
 
   try {
     const { createClient } = await import("npm:@supabase/supabase-js@2");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
+      SUPABASE_URL,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    // Helper: rewrite plain links in HTML to go through the tracker
+    const rewriteEmailLinks = (html: string, workflowId: string, userId: string): string => {
+      return html.replace(
+        /href=["'](https?:\/\/[^"'<>\s]+|\/[^"'<>\s]*)["']/gi,
+        (_match, url) => {
+          const trackerUrl = `${SUPABASE_URL}/functions/v1/track-automation-click?w=${workflowId}&u=${userId}&c=email&to=${encodeURIComponent(url)}`;
+          return `href="${trackerUrl}"`;
+        }
+      );
+    };
 
     // 1. Get active workflows with push/email channels and delay > 0
     const { data: workflows, error: wfErr } = await supabaseAdmin
@@ -75,6 +87,11 @@ Deno.serve(async (req) => {
               url: wf.popup_cta_link || "/",
             },
           });
+          await supabaseAdmin.from("automation_events").insert({
+            workflow_id: wf.id,
+            user_id: userId,
+            event_type: "delivered_push",
+          });
         } catch (pushErr) {
           console.error(`Push failed for user ${userId}:`, pushErr);
         }
@@ -118,9 +135,11 @@ Deno.serve(async (req) => {
           if (!profile?.email) continue;
 
           try {
-            const htmlContent = wf.email_html_content
+            let htmlContent = wf.email_html_content
               .replace(/\{\{first_name\}\}/g, profile.first_name || "")
               .replace(/\{\{email\}\}/g, profile.email);
+            // Rewrite all links to go through tracker
+            htmlContent = rewriteEmailLinks(htmlContent, wf.id, userId);
 
             await transporter.sendMail({
               from: `Zandofy <${fromEmail}>`,
@@ -138,9 +157,22 @@ Deno.serve(async (req) => {
               sent_at: new Date().toISOString(),
             });
 
+            await supabaseAdmin.from("automation_events").insert({
+              workflow_id: wf.id,
+              user_id: userId,
+              event_type: "delivered_email",
+              metadata: { email: profile.email },
+            });
+
             totalProcessed++;
-          } catch (emailErr) {
+          } catch (emailErr: any) {
             console.error(`Email failed for ${profile.email}:`, emailErr);
+            await supabaseAdmin.from("automation_events").insert({
+              workflow_id: wf.id,
+              user_id: userId,
+              event_type: "failed_email",
+              metadata: { error: String(emailErr?.message || emailErr) },
+            });
           }
 
           // Stagger: 2-3 min between emails (random 120-180s)
