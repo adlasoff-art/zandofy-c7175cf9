@@ -225,7 +225,8 @@ export function AdminAutomationAnalyticsTab() {
                       <td className="py-2 pr-3">{j.converted_signup ? "✅" : <X size={12} className="text-muted-foreground" />}</td>
                       <td className="py-2 pr-3">{j.converted_order ? "✅" : <X size={12} className="text-muted-foreground" />}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
