@@ -106,7 +106,10 @@ export default function AdminUsersPage() {
     const matchesSearch = !search ||
       `${u.first_name} ${u.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
       (u.email || "").toLowerCase().includes(search.toLowerCase());
-    const matchesRole = roleFilter === "all" || u.roles.includes(roleFilter);
+    const matchesRole =
+      roleFilter === "all" ||
+      (roleFilter === "customer" && u.roles.length === 0) ||
+      (roleFilter !== "customer" && u.roles.includes(roleFilter as AppRole));
     const matchesStatus =
       statusFilter === "all" ||
       (statusFilter === "banned" && u.is_banned) ||
@@ -326,19 +329,27 @@ export default function AdminUsersPage() {
 
       {/* Role filter chips */}
       <div className="flex gap-1.5 overflow-x-auto mb-4 pb-1">
-        {(["all", ...ALL_ROLES] as RoleFilter[]).map((r) => (
-          <button
-            key={r}
-            onClick={() => handleRoleFilter(r)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${
-              roleFilter === r
-                ? "bg-foreground text-background border-foreground"
-                : "bg-card text-foreground border-border hover:border-foreground"
-            }`}
-          >
-            {r === "all" ? `Tous (${profiles.length})` : roleLabels[r]}
-          </button>
-        ))}
+        {(["all", "customer", ...ALL_ROLES] as RoleFilter[]).map((r) => {
+          const count =
+            r === "all"
+              ? profiles.length
+              : r === "customer"
+              ? users.filter((u) => u.roles.length === 0).length
+              : users.filter((u) => u.roles.includes(r as AppRole)).length;
+          return (
+            <button
+              key={r}
+              onClick={() => handleRoleFilter(r)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${
+                roleFilter === r
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-card text-foreground border-border hover:border-foreground"
+              }`}
+            >
+              {r === "all" ? `Tous (${count})` : `${roleLabels[r]} (${count})`}
+            </button>
+          );
+        })}
       </div>
 
       {/* Table */}
