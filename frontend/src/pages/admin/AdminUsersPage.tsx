@@ -12,7 +12,7 @@ import { UserDetailDrawer } from "@/components/admin/UserDetailDrawer";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import type { AppRole } from "@/hooks/use-roles";
 
-type RoleFilter = "all" | AppRole;
+type RoleFilter = "all" | "customer" | AppRole;
 type StatusFilter = "all" | "active" | "banned" | "online" | "offline";
 type GenderFilter = "all" | "male" | "female" | "other";
 type AgeFilter = "all" | "18-25" | "26-35" | "36-45" | "46+";
