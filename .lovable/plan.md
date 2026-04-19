@@ -1,92 +1,40 @@
 
 
-User reports orders staying in "awaiting_payment" forever when client abandons. Wants automatic transition to "payment_failed" after timeout. Already exists `expire-pending-orders` edge function with 30min threshold but apparently not running on cron, OR threshold too long.
+User m'a donné le project URL staging : `wgidwyrdnboivfphwete.supabase.co`. Je dois générer le fichier SQL pré-rempli pour staging. Reste à obtenir la clé anon staging — soit je la demande, soit je laisse un placeholder clair.
 
-Let me check the current logic and propose a tightened expiration strategy with multiple layers.
+Je vais générer le fichier avec l'URL staging hardcodée et un placeholder `<STAGING_ANON_KEY>` à remplacer (la clé anon est différente entre prod et staging et je ne dois pas la deviner). C'est cohérent avec l'approche déjà utilisée pour le fichier prod.
 
-Plan based on what I've seen:
-- `expire-pending-orders` exists, expires after 30min, sets to `payment_failed`, notifies user
-- Need: shorter timeout (6min = 3min wait + 3min grace), client-side trigger when leaving page, cron schedule
+## Fichier à créer
 
-## Réflexion sur le problème
+`frontend/supabase/migrations/MANUAL_expire-pending-orders-cron-STAGING.sql` — copie identique de la version prod, mais avec :
+- URL : `https://wgidwyrdnboivfphwete.supabase.co/functions/v1/expire-pending-orders`
+- Placeholder `<STAGING_ANON_KEY>` à remplacer manuellement avant exécution
+- Nom du job différent : `expire-pending-orders-every-min-staging` (pour éviter toute confusion si tu inspectes la table `cron.job` plus tard)
 
-Tu as raison : un paiement qui reste en `awaiting_payment` indéfiniment est dangereux (risque de traiter une commande non payée). La fonction `expire-pending-orders` existe déjà mais :
+## Étapes côté toi (staging)
 
-1. Elle expire après **30 minutes** (trop long pour KelPay qui timeout à 3 min)
-2. Elle n'a probablement **pas de cron** activé en prod → elle ne tourne jamais automatiquement
-3. Aucun déclenchement côté client quand l'utilisateur quitte la page de paiement
+1. Ouvrir Supabase staging → Settings → API → copier la clé `anon public`
+2. Télécharger le fichier généré
+3. Remplacer `<STAGING_ANON_KEY>` par la vraie clé
+4. Coller dans le SQL Editor staging → Run
+5. Vérifier avec :
+   ```sql
+   SELECT jobname, schedule, active FROM cron.job WHERE jobname = 'expire-pending-orders-every-min-staging';
+   ```
 
-## Stratégie proposée — 3 couches de sécurité
+## Test fonctionnel en staging
 
-### Couche 1 — Expiration serveur agressive (cron toutes les minutes)
-
-Modifier `expire-pending-orders` pour utiliser **6 minutes** au lieu de 30 :
-- 3 min = délai KelPay côté gateway
-- +3 min de grâce pour absorber le délai du dernier "Vérifier" manuel
-- Au-delà → `payment_failed` automatique + notification
-
-Ajouter un **cron job pg_cron** qui appelle la fonction toutes les minutes :
-```sql
-select cron.schedule('expire-pending-orders-every-min', '* * * * *', ...);
-```
-
-### Couche 2 — Déclenchement client à l'abandon de page
-
-Dans `CheckoutPage.tsx` et `RetryPaymentModal.tsx`, ajouter :
-- Listener `beforeunload` / `visibilitychange` quand on est en état `paymentPending`
-- Quand l'utilisateur ferme l'onglet ou navigue ailleurs **après expiration du compte à rebours**, déclencher un appel à une nouvelle edge function `mark-payment-abandoned` qui :
-  - Vérifie une dernière fois auprès de KelPay (`kelpay-check`)
-  - Si toujours pending → marque l'ordre en `payment_failed`
-  - Si succès → finalise normalement
-
-### Couche 3 — Auto-expiration côté UI quand le compteur atteint 0
-
-Dans `PaymentWaitingPanel`, quand `onExpire` se déclenche et que l'utilisateur ne clique sur "Vérifier" pendant 60 secondes supplémentaires → appel automatique à `mark-payment-abandoned` puis redirection vers `/dashboard` avec message "Paiement expiré, vous pouvez relancer depuis vos commandes".
-
-## Comportement final en production
-
-Scénario A — Client ferme l'onglet à 2 min :
-1. `beforeunload` → appel `mark-payment-abandoned` (keepalive fetch)
-2. Vérification finale KelPay → pending → ordre passe `payment_failed`
-3. Notification reçue : "Paiement expiré"
-
-Scénario B — Client reste sur la page mais n'agit pas :
-1. Compte à rebours expire à 3 min
-2. Bouton "Vérifier" pulse pendant 60s
-3. Auto-déclenchement `mark-payment-abandoned` → `payment_failed`
-4. UI affiche écran d'échec avec lien dashboard
-
-Scénario C — Filet de sécurité (peu importe ce qui s'est passé) :
-1. Cron tourne chaque minute
-2. Tout ordre `awaiting_payment` > 6 min → `payment_failed` + notification
-3. Tu vois disparaître les "fantômes" de ton tableau de bord admin
-
-## Fichiers à créer/modifier
-
-**Nouvelles :**
-- `frontend/supabase/functions/mark-payment-abandoned/index.ts` — edge function appelée par le client
-- Migration SQL : `cron.schedule` pour `expire-pending-orders` chaque minute (à appliquer manuellement en prod via SQL Editor car contient l'URL prod)
-
-**Modifiées :**
-- `frontend/supabase/functions/expire-pending-orders/index.ts` — passer le seuil de 30 min à 6 min, mettre à jour le message de notification
-- `frontend/src/pages/CheckoutPage.tsx` — ajouter listener `visibilitychange`/`beforeunload` + auto-trigger après expiration
-- `frontend/src/components/payments/RetryPaymentModal.tsx` — même logique d'abandon
-- `frontend/src/components/payments/PaymentWaitingPanel.tsx` — prop `onAutoAbandon` déclenchée 60s après `onExpire` si pas d'action
+- Lancer une commande mobile money de test
+- Ne pas valider, attendre 6-7 minutes
+- Vérifier dans `cron.job_run_details` que le job a tourné sans erreur HTTP
+- Vérifier que la commande est passée en `payment_failed`
+- Si OK → tu pourras appliquer la version prod en confiance
 
 ## Ce que je NE ferai pas
 
-- Pas de modification de la logique KelPay elle-même (déjà OK)
-- Pas de changement sur les ordres COD ou hors-plateforme
-- Pas de raccourcissement du délai initial visible au client (toujours 3 min)
-- Aucune suppression d'ordre — uniquement transition vers `payment_failed` (réversible côté admin si besoin)
+- Pas de modification de l'edge function `expire-pending-orders` (déjà en place)
+- Pas de hardcoding de la clé anon dans le fichier (sécurité)
+- Pas d'exécution automatique du SQL (tu gardes le contrôle manuel sur staging et prod)
 
-## Décision attendue
-
-Confirme et je passe en mode default pour :
-1. Modifier `expire-pending-orders` (seuil 6 min)
-2. Créer `mark-payment-abandoned`
-3. Ajouter les listeners client d'abandon
-4. Te fournir la migration SQL `cron.schedule` à appliquer en prod
-
-Une question rapide avant : **veux-tu que le seuil serveur soit 6 min (recommandé, agressif) ou 10 min (plus tolérant pour réseaux lents) ?**
+Approuve et je génère le fichier `MANUAL_expire-pending-orders-cron-STAGING.sql` téléchargeable.
 
