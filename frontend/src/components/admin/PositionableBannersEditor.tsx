@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Image, Plus, Edit2, Trash2, Eye, EyeOff, Save, X, Upload, Loader2, MapPin,
 } from "lucide-react";
+import { sanitizeFilename } from "@/utils/sanitize-filename";
 
 const POSITIONS = [
   { value: "above_categories", label: "Au-dessus des catégories" },
@@ -72,7 +73,7 @@ export function PositionableBannersEditor() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const path = `banners/${Date.now()}_${file.name}`;
+    const path = `banners/${Date.now()}_${sanitizeFilename(file.name)}`;
     const { error } = await supabase.storage.from("cms-assets").upload(path, file, { cacheControl: "31536000" });
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });

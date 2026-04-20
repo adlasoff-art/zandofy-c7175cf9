@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { compressImage } from "@/utils/image-compress";
+import { sanitizeExtension } from "@/utils/sanitize-filename";
 import { ImageIcon, Plus, X, Loader2, Video, Play } from "lucide-react";
 import { toast } from "sonner";
 
@@ -35,7 +36,7 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
       const raw = files[i];
       const isVideo = raw.type.startsWith("video/");
       const file = isVideo ? raw : await compressImage(raw);
-      const ext = file.name.split(".").pop();
+      const ext = sanitizeExtension(file.name, isVideo ? "mp4" : "jpg");
       const path = `${storeId}/${Date.now()}-${i}.${ext}`;
 
       const { error } = await supabase.storage.from("product-media").upload(path, file, { cacheControl: "31536000" });

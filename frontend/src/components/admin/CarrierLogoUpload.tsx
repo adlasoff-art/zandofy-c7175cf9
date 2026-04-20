@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Upload, Trash2, Loader2 } from "lucide-react";
+import { sanitizeExtension } from "@/utils/sanitize-filename";
 
 export function CarrierLogoUpload() {
   const [logoUrl, setLogoUrl] = useState("");
@@ -40,7 +41,7 @@ export function CarrierLogoUpload() {
     }
 
     setUploading(true);
-    const ext = file.name.split(".").pop() || "png";
+    const ext = sanitizeExtension(file.name, "png");
     const path = `carrier-logos/carrier-logo-${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
