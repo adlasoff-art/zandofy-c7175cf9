@@ -1,59 +1,127 @@
 
 
-## Constat
+## Diagnostic
 
-Le HTML statique `frontend/index.html` contient un `<title>` et meta `description`/`og:*` codés en dur ("Zandofy — Mode Élégante & Accessible"). C'est ce que voient :
-- Googlebot via `meta-injector` sur la **homepage** (qui ne fait que pass-through pour `/`)
-- Tous les utilisateurs avant hydratation React
-- Les partages sociaux de la homepage
+**Erreur vendeur** : `Could not find the 'slug' column of 'products' in the schema cache`
 
-Côté admin, il existe **déjà** un onglet SEO complet : `frontend/src/components/admin/seo/SeoMetadataSection.tsx` (titre 60c, description 160c, keywords) + `SeoBrandingSection.tsx` (brand, tagline, OG image), stockés dans `platform_settings.seo_config`. Mais ces valeurs **ne sont jamais injectées dans le HTML servi aux bots** ni dans les pages publiques (home, /faq, /stores, /blog list, /category list, etc.) — uniquement les pages détail produit/store/category/blog passent par `meta-injector`.
+**Cause racine** : la colonne `slug` n'existe **pas** dans la base de **production** (`vpt...yxf`).
 
-→ Donc l'admin remplit le formulaire mais ça ne change rien à ce que Google et les utilisateurs voient.
+- Sur le **preview Lovable Cloud** (`uog...zpu`), `slug` existe bien (NOT NULL) — ajoutée par la migration `supabase/migrations/20260319120958_*.sql`.
+- Mais cette migration vit dans `supabase/migrations/` (dossier Lovable Cloud), **pas** dans `frontend/supabase/migrations/` qui est la source de vérité GitHub → Vercel → Supabase prod.
+- Conséquence : la prod n'a jamais reçu `ADD COLUMN slug`. Mon trigger `20260420100000_products_ensure_slug.sql` suppose que la colonne existe et **échoue silencieusement** (ou ne se déploie pas) en prod.
+- Le code frontend (`VendorProductManager.tsx`) tente d'écrire `slug: "..."` lors du `INSERT`, PostgREST inspecte sa schema cache, ne trouve pas la colonne, renvoie l'erreur affichée.
 
-## Solution
+C'est exactement la fracture documentée dans la memory `production-priority-rule` : **les migrations Lovable Cloud ne sont pas répliquées en prod automatiquement**.
 
-Étendre le `meta-injector` pour qu'il devienne **la source de vérité SEO de toute page publique**, en lisant `platform_settings.seo_config` (déjà géré par l'admin) :
+## Plan de correction (1 lot, urgent)
 
-### 1. Étendre `frontend/api/meta-injector.ts`
-- Charger `platform_settings.seo_config` au démarrage (cache 60s en mémoire Edge)
-- Ajouter le routage pour pages "globales" (titre + description issus de `seo_config`) :
-  - `/` (homepage)
-  - `/faq`, `/stores`, `/blog`, `/about`, `/contact`, `/careers`, `/help`
-- Pour ces routes : injecter `seo_config.site_title`, `seo_config.site_description`, `seo_config.default_og_image`, `seo_config.brand_name`, `seo_config.tagline`, `seo_config.keywords`
-- Garder le comportement actuel pour produit/boutique/catégorie/blog (priorité au contenu spécifique de l'item)
-- Étendre le `vercel.json` rewrite list pour inclure les routes ci-dessus pour les bots
+### 1. Nouvelle migration prod-safe : `frontend/supabase/migrations/20260420130000_products_add_slug_column.sql`
 
-### 2. Mettre à jour `frontend/index.html`
-- Remplacer les valeurs hardcodées par des **placeholders neutres** (fallback générique uniquement utilisé si l'edge function échoue) — ex: titre = `{{SITE_TITLE}}` n'est pas possible côté static, donc on garde un fallback minimal "Zandofy" + on compte sur l'injecteur pour servir le bon contenu aux bots et sur `SEOHead.tsx` (React) pour les humains
+Cette migration est **idempotente** et fait le boulot complet, prod ou preview :
 
-### 3. Améliorer `SEOHead.tsx` (côté client React)
-- Sur les pages "globales" listées ci-dessus, lire `seo_config` via le hook existant (`usePlatformBootstrap` qui charge déjà `seo_config`) et appliquer dynamiquement le `<title>` et meta tags dès le premier render React (humains voient aussi les valeurs admin)
-- Vérifier le hook qui charge déjà ces données via `platform-bootstrap` edge function
+```sql
+-- 1. Ajout colonne si absente
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS slug TEXT;
 
-### 4. Cache invalidation
-- Quand l'admin sauve dans `AdminSEOPage`, après save → ping fire-and-forget de `meta-injector` avec un header `x-purge-cache` pour réinitialiser le cache mémoire (ou simplement TTL court 60s)
+-- 2. Backfill depuis name_fr / name pour lignes vides
+--    (replicate la logique de 20260319120958_*.sql sans dépendre de unaccent côté prod)
+UPDATE public.products
+SET slug = lower(regexp_replace(
+  regexp_replace(
+    translate(coalesce(NULLIF(btrim(name_fr),''), name, 'produit'),
+              'àáâãäåèéêëìíîïòóôõöùúûüýÿñçÀÁÂÃÄÅÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜÝŸÑÇ',
+              'aaaaaaeeeeiiiiooooouuuuyyncAAAAAAEEEEIIIIOOOOOUUUUYYNC'),
+    '[^a-zA-Z0-9]+', '-', 'g'),
+  '-{2,}', '-', 'g'))
+WHERE slug IS NULL OR length(btrim(slug)) = 0;
+
+-- 3. Dédoublonnage des slugs résiduels (suffixe court basé sur id)
+WITH dups AS (
+  SELECT id, slug,
+         row_number() OVER (PARTITION BY slug ORDER BY created_at) AS rn
+  FROM public.products
+  WHERE slug <> ''
+)
+UPDATE public.products p
+SET slug = p.slug || '-' || substr(md5(p.id::text), 1, 5)
+FROM dups
+WHERE p.id = dups.id AND dups.rn > 1;
+
+-- 4. Index unique + NOT NULL + default ''
+CREATE UNIQUE INDEX IF NOT EXISTS idx_products_slug ON public.products(slug) WHERE slug <> '';
+ALTER TABLE public.products ALTER COLUMN slug SET DEFAULT '';
+ALTER TABLE public.products ALTER COLUMN slug SET NOT NULL;
+
+-- 5. Trigger d'auto-génération (réécrit ici, prod-safe, sans unaccent)
+CREATE OR REPLACE FUNCTION public.products_ensure_slug()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE base TEXT; cand TEXT; n INT; i INT := 0;
+BEGIN
+  IF NEW.slug IS NOT NULL AND length(btrim(NEW.slug)) > 0 THEN RETURN NEW; END IF;
+  base := coalesce(NULLIF(btrim(NEW.name_fr),''), NULLIF(btrim(NEW.name),''), 'produit');
+  base := translate(base,
+    'àáâãäåèéêëìíîïòóôõöùúûüýÿñçÀÁÂÃÄÅÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜÝŸÑÇ',
+    'aaaaaaeeeeiiiiooooouuuuyyncAAAAAAEEEEIIIIOOOOOUUUUYYNC');
+  base := lower(regexp_replace(base, '[^a-zA-Z0-9]+', '-', 'g'));
+  base := btrim(regexp_replace(base, '-{2,}', '-', 'g'), '-');
+  IF base = '' THEN base := 'produit'; END IF;
+  base := left(base, 80);
+  cand := base;
+  LOOP
+    SELECT count(*) INTO n FROM public.products
+     WHERE slug = cand AND (TG_OP='INSERT' OR id <> NEW.id);
+    EXIT WHEN n = 0 OR i >= 6;
+    i := i+1;
+    cand := base || '-' || substr(md5(random()::text||clock_timestamp()::text), 1, 5);
+  END LOOP;
+  IF n > 0 THEN cand := base || '-' || substr(md5(NEW.id::text||clock_timestamp()::text), 1, 8); END IF;
+  NEW.slug := cand;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_products_ensure_slug ON public.products;
+CREATE TRIGGER trg_products_ensure_slug
+BEFORE INSERT OR UPDATE OF name, name_fr, slug ON public.products
+FOR EACH ROW EXECUTE FUNCTION public.products_ensure_slug();
+```
+
+**Différences clés vs migration précédente** :
+- `ADD COLUMN IF NOT EXISTS slug` ← **manquait, c'est LA cause**
+- Pas de dépendance à `unaccent` (memory `postgresql-migration-constraints-supabase` rappelle que `unaccent` n'est pas garanti en prod) → on utilise `translate()` natif
+- Backfill + dédoublonnage avant `NOT NULL` → migration safe sur DB avec produits existants
+- Trigger identique à celui du preview pour comportement uniforme
+
+### 2. Appliquer aussi en preview Lovable Cloud (`uog...zpu`)
+
+Pour garder cohérence, je joue la même migration via le tool de migration → idempotent, ne casse rien (colonne et trigger déjà présents).
+
+### 3. Filet de sécurité côté frontend (`VendorProductManager.tsx`)
+
+Audit léger : si l'admin édite un produit avant que la migration soit en prod, le `.update({ slug })` échouera. Solution : envelopper l'écriture du `slug` dans un try/catch côté hook → si PostgREST retourne `PGRST204` (column not found), retry sans `slug`. **Ceci n'est nécessaire que si l'on craint un délai entre merge et déploiement prod**. À discuter — par défaut je ne l'ajoute pas (la migration fix le vrai problème).
+
+### 4. Vérification post-déploiement
+
+1. Vendeur : créer un produit "Téléphone Élégant Édition Spéciale" → URL = `/product/telephone-elegant-edition-speciale`
+2. `curl -A "Googlebot/2.1" https://zandofy.com/product/<slug>` → titre dynamique injecté
+3. Anciennes URL UUID continuent de fonctionner (fallback ID dans le resolver existant)
+4. `SELECT count(*) FROM products WHERE slug IS NULL OR slug = '';` → doit retourner 0
+
+## Hors scope (déjà OK)
+
+- `frontend/src/utils/productSlug.ts` — déjà créé
+- `VendorProductManager.tsx` — patch déjà appliqué pour générer `slug` à la création
+- Resolver `/product/:slugOrId` — déjà bilingue (slug ou UUID)
 
 ## Fichiers touchés
 
-| Fichier | Changement |
+| Fichier | Action |
 |---|---|
-| `frontend/api/meta-injector.ts` | Ajout résolveur `global` lisant `seo_config`, étendre matcher de path |
-| `frontend/vercel.json` | Ajouter routes `/`, `/faq`, `/stores`, `/blog`, `/about`, `/contact`, `/careers`, `/help` au bloc `has user-agent bot` |
-| `frontend/index.html` | Fallback générique sans claim marketing ("Zandofy" simple) |
-| `frontend/src/components/SEOHead.tsx` | Lire `seo_config` du context et l'appliquer pour pages globales sans override |
-| `frontend/src/pages/HomePage.tsx` (et autres pages globales) | S'assurer qu'elles n'imposent PAS un titre hardcodé (laisser le fallback `seo_config`) |
+| `frontend/supabase/migrations/20260420130000_products_add_slug_column.sql` | **Créer** (migration prod, idempotente) |
+| Migration tool sur preview (`uog...zpu`) | Rejouer la même migration pour cohérence |
 
-## Vérification finale
+## Pourquoi c'est urgent et faible risque
 
-1. Admin modifie "Titre du site" dans `/admin/seo` → save
-2. `curl -A "Googlebot/2.1" https://zandofy.com/` → nouveau titre dans `<title>`
-3. Recharge la home dans un navigateur → nouveau titre dans l'onglet
-4. Test partage Facebook/WhatsApp via debugger → nouveau OG title
-
-## Hors scope
-
-- Pas de migration SQL (`platform_settings.seo_config` existe déjà)
-- Pas de refonte de l'admin SEO (formulaire déjà en place)
-- Pas de toucher au cache du `platform-bootstrap` edge function (déjà 5min CDN)
+- **Bloque tout vendeur** essayant de créer/modifier un produit en prod actuellement.
+- Migration **idempotente** : `IF NOT EXISTS`, `OR REPLACE`, `DROP TRIGGER IF EXISTS`. Aucun risque sur la DB existante.
+- Aligne enfin la stack prod sur la stack preview, conforme à la memory `production-priority-rule`.
 
