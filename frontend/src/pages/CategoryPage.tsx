@@ -240,7 +240,7 @@ export default function CategoryPage() {
               <>
                 <BreadcrumbItem>
                   <BreadcrumbLink asChild>
-                    <Link to={`/category/${category.parent.name.toLowerCase()}`}>{category.parent.name_fr}</Link>
+                    <Link to={`/category/${slugify(category.parent.name)}`}>{category.parent.name_fr}</Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
@@ -271,7 +271,7 @@ export default function CategoryPage() {
               {category.subcategories.map((sub: any) => (
                 <Link
                   key={sub.id}
-                  to={`/category/${sub.name.toLowerCase()}`}
+                  to={`/category/${slugify(sub.name)}`}
                   className="px-4 py-2 text-sm rounded-full border border-border bg-card text-foreground hover:border-primary hover:text-primary transition-colors"
                 >
                   {sub.icon && <span className="mr-1">{sub.icon}</span>}
