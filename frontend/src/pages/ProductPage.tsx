@@ -38,6 +38,7 @@ import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimate";
 import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd } from "@/components/SEOHead";
 import { VariantOrderDrawer } from "@/components/VariantOrderDrawer";
+import { slugify } from "@/utils/slugify";
 
 // ─── Gallery from product_images ──────────────────────────────
 interface GalleryItem {
