@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { slugify } from "@/utils/slugify";
 
 interface DBCategory {
   id: string;
@@ -60,7 +61,7 @@ export function MegaMenu() {
             {parents.map((cat, i) => (
               <Link
                 key={cat.id}
-                to={`/category/${cat.name.toLowerCase()}`}
+                to={`/category/${slugify(cat.name)}`}
                 onMouseEnter={() => setActiveIndex(i)}
                 className={`w-full flex items-center gap-2 text-left px-3 py-2.5 text-[13px] font-medium rounded-md transition-colors ${
                   i === activeIndex
@@ -79,7 +80,7 @@ export function MegaMenu() {
             {active && (
               <>
                 <Link
-                  to={`/category/${active.name.toLowerCase()}`}
+                  to={`/category/${slugify(active.name)}`}
                   className="inline-flex items-center gap-1 text-xs text-primary font-medium mb-3 hover:underline"
                 >
                   Tout voir {active.name_fr} →
@@ -88,7 +89,7 @@ export function MegaMenu() {
                   {subcategories.map((sub) => (
                     <Link
                       key={sub.id}
-                      to={`/category/${sub.name.toLowerCase()}`}
+                      to={`/category/${slugify(sub.name)}`}
                       className="flex flex-col items-center gap-2 group py-2"
                     >
                       <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-border group-hover:border-primary transition-colors bg-muted flex items-center justify-center">
