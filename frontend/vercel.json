@@ -4,6 +4,32 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": null,
+  "redirects": [
+    { "source": "/boutique", "destination": "/stores", "statusCode": 301 },
+    { "source": "/boutique/:path*", "destination": "/stores", "statusCode": 301 },
+    { "source": "/shop", "destination": "/stores", "statusCode": 301 },
+    { "source": "/shop/:path*", "destination": "/stores", "statusCode": 301 },
+    { "source": "/support-client", "destination": "/faq", "statusCode": 301 },
+    { "source": "/support-client/:path*", "destination": "/faq", "statusCode": 301 },
+    { "source": "/contact", "destination": "/faq", "statusCode": 301 },
+    { "source": "/mon-compte", "destination": "/dashboard", "statusCode": 301 },
+    { "source": "/mon-compte/:path*", "destination": "/dashboard", "statusCode": 301 },
+    { "source": "/panier", "destination": "/cart", "statusCode": 301 },
+    { "source": "/commande", "destination": "/checkout", "statusCode": 301 },
+    { "source": "/wp-admin", "destination": "/", "statusCode": 301 },
+    { "source": "/wp-admin/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/wp-login.php", "destination": "/", "statusCode": 301 },
+    { "source": "/wp-content/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/wp-includes/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/feed", "destination": "/", "statusCode": 301 },
+    { "source": "/feed/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/category/:path*", "destination": "/category/:path*", "statusCode": 301 },
+    { "source": "/produit/:slug", "destination": "/product/:slug", "statusCode": 301 },
+    { "source": "/produits", "destination": "/", "statusCode": 301 },
+    { "source": "/a-propos", "destination": "/about", "statusCode": 301 },
+    { "source": "/conditions", "destination": "/terms", "statusCode": 301 },
+    { "source": "/confidentialite", "destination": "/privacy", "statusCode": 301 }
+  ],
   "rewrites": [
     {
       "source": "/sitemap-dynamic.xml",
@@ -26,6 +52,26 @@
       "source": "/icons/(.*)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=86400" }
+      ]
+    },
+    {
+      "source": "/og-default.jpg",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400" }
+      ]
+    },
+    {
+      "source": "/sitemap.xml",
+      "headers": [
+        { "key": "Content-Type", "value": "application/xml; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
+    },
+    {
+      "source": "/sitemap-dynamic.xml",
+      "headers": [
+        { "key": "Content-Type", "value": "application/xml; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
       ]
     },
     {
