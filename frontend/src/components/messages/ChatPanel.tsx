@@ -13,6 +13,7 @@ import { QuickRepliesManager } from "./QuickRepliesManager";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { sanitizeFilename, sanitizeExtension } from "@/utils/sanitize-filename";
 import type { ConversationItem } from "./ConversationList";
 import { renderChatMessageContent, mergeChatMessages } from "./chatMessageUtils";
 
@@ -274,7 +275,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
 
     setUploading(true);
     try {
-      const ext = file.name.split(".").pop();
+      const ext = sanitizeExtension(file.name, "bin");
       const filePath = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
       const { error: uploadError } = await supabase.storage
@@ -289,7 +290,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
       const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(filePath);
       const isPdf = file.type === "application/pdf";
       const content = isPdf
-        ? `[📄 PDF] ${file.name}\n${urlData.publicUrl}`
+        ? `[📄 PDF] ${sanitizeFilename(file.name)}\n${urlData.publicUrl}`
         : `[📷 Image]\n${urlData.publicUrl}`;
 
       const { data } = await supabase.from("messages").insert({

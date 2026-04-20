@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
 import { Camera, Upload, Loader2, FileImage, X, ChevronRight, ChevronLeft, ShieldCheck } from "lucide-react";
 import type { KycVerification } from "@/hooks/use-kyc";
+import { sanitizeExtension } from "@/utils/sanitize-filename";
 
 interface Props {
   existingKyc?: KycVerification | null;
@@ -64,7 +65,7 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
   }, [toast]);
 
   const uploadFile = async (file: File, folder: string): Promise<string> => {
-    const ext = file.name.split(".").pop() || "jpg";
+    const ext = sanitizeExtension(file.name, "jpg");
     const path = `${user!.id}/${folder}/${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("kyc-documents").upload(path, file, {
       contentType: file.type,

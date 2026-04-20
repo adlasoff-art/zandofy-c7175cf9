@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
+import { sanitizeExtension } from "@/utils/sanitize-filename";
 import {
   User, Store, FileCheck, Send, CheckCircle2, Upload, Trash2, Loader2, AlertCircle, Clock,
 } from "lucide-react";
@@ -417,7 +418,7 @@ export default function BecomeVendorPage() {
     if (!appId) appId = await saveProgress();
     if (!appId) { setUploading(null); return; }
 
-    const ext = file.name.split(".").pop();
+    const ext = sanitizeExtension(file.name, "jpg");
     const path = `${user.id}/${docType}_${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage.from("vendor-documents").upload(path, file, { cacheControl: "31536000" });
     if (upErr) {

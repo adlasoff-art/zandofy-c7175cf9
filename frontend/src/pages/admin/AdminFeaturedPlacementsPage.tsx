@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
+import { sanitizeExtension } from "@/utils/sanitize-filename";
 
 // ─── Active Placements Tab ────────────────────────────────────
 const emptyForm = {
@@ -50,7 +51,7 @@ function PlacementsTab() {
 
   const uploadImage = async (): Promise<string | null> => {
     if (!imageFile || !user) return null;
-    const ext = imageFile.name.split(".").pop();
+    const ext = sanitizeExtension(imageFile.name, "jpg");
     const path = `featured/admin/${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("cms-assets").upload(path, imageFile, { upsert: true });
     if (error) throw error;

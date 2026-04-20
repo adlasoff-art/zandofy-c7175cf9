@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PLATFORM_FONTS } from "@/hooks/usePlatformFont";
+import { sanitizeExtension } from "@/utils/sanitize-filename";
 
 interface BrandingConfig {
   header_logo_url: string | null;
@@ -75,7 +76,7 @@ function BrandingTab() {
 
   const uploadFile = async (file: File, field: keyof BrandingConfig) => {
     setUploading(field);
-    const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+    const ext = sanitizeExtension(file.name, "png");
     const path = `branding/${field}-${Date.now()}.${ext}`;
 
     const { error } = await supabase.storage.from("cms-assets").upload(path, file, {
