@@ -72,7 +72,85 @@ type MetaPayload = {
   image?: string;
   ogType?: "website" | "article" | "product";
   jsonLd?: Record<string, unknown>;
+  keywords?: string;
 };
+
+// ─── Global SEO config (admin-controlled via platform_settings.seo_config) ───
+type SeoConfig = {
+  site_title?: string;
+  site_description?: string;
+  default_keywords?: string[];
+  default_og_image?: string;
+  brand_name?: string;
+  tagline?: string;
+};
+
+let _seoCache: { value: SeoConfig | null; expiresAt: number } = { value: null, expiresAt: 0 };
+
+async function getSeoConfig(forcePurge = false): Promise<SeoConfig> {
+  const now = Date.now();
+  if (!forcePurge && _seoCache.value && _seoCache.expiresAt > now) {
+    return _seoCache.value;
+  }
+  try {
+    const rows = await sbFetch(
+      `platform_settings?key=eq.seo_config&select=value&limit=1`,
+    );
+    const value = (rows[0]?.value as SeoConfig) || {};
+    _seoCache = { value, expiresAt: now + 60_000 }; // 60s in-memory edge cache
+    return value;
+  } catch {
+    return _seoCache.value || {};
+  }
+}
+
+// Routes treated as "global" pages — title/description/og come from seo_config.
+const GLOBAL_ROUTES = new Set([
+  "/", "/faq", "/stores", "/blog", "/about", "/contact",
+  "/careers", "/help", "/pricing", "/privacy", "/terms",
+  "/popular", "/trends", "/search",
+]);
+
+async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
+  const cfg = await getSeoConfig();
+  const brand = cfg.brand_name || "Zandofy";
+  const baseTitle = cfg.site_title || `${brand} — Marketplace`;
+  const description = truncate(
+    cfg.site_description ||
+      cfg.tagline ||
+      `${brand} : marketplace mode et import. Livraison rapide en Afrique.`,
+  );
+  const image = cfg.default_og_image || `${SITE_URL}/og-default.jpg`;
+  const canonical = `${SITE_URL}${pathname === "/" ? "/" : pathname}`;
+
+  // For sub-pages add a humanised suffix; homepage keeps the bare site title.
+  const pageLabel: Record<string, string> = {
+    "/faq": "FAQ",
+    "/stores": "Boutiques",
+    "/blog": "Blog",
+    "/about": "À propos",
+    "/contact": "Contact",
+    "/careers": "Carrières",
+    "/help": "Centre d'aide",
+    "/pricing": "Tarifs",
+    "/privacy": "Confidentialité",
+    "/terms": "Conditions",
+    "/popular": "Populaires",
+    "/trends": "Tendances",
+    "/search": "Recherche",
+  };
+  const title =
+    pathname === "/" ? baseTitle : `${pageLabel[pathname] || ""} | ${brand}`.trim();
+
+  return {
+    title,
+    description,
+    canonical,
+    image,
+    ogType: "website",
+    keywords: Array.isArray(cfg.default_keywords) ? cfg.default_keywords.join(", ") : undefined,
+  };
+}
 
 async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
   // products.slug column may be null → we accept slug OR id
@@ -252,6 +330,9 @@ async function buildMetaForPath(pathname: string): Promise<MetaPayload | null> {
   const blogMatch = pathname.match(/^\/blog\/([^/?#]+)/i);
   if (blogMatch) return buildBlogMeta(decodeURIComponent(blogMatch[1]));
 
+  // Global / static pages — admin-controlled SEO config
+  if (GLOBAL_ROUTES.has(pathname)) return buildGlobalMeta(pathname);
+
   return null;
 }
 
@@ -278,6 +359,9 @@ function buildHeadInjection(meta: MetaPayload): string {
 <meta name="twitter:title" content="${t}" />
 <meta name="twitter:description" content="${d}" />
 <meta name="twitter:image" content="${img}" />`;
+  if (meta.keywords) {
+    html += `\n<meta name="keywords" content="${escapeHtml(meta.keywords)}" />`;
+  }
 
   if (meta.jsonLd) {
     html += `\n<script type="application/ld+json">${escapeJsonLd(JSON.stringify(meta.jsonLd))}</script>`;
@@ -302,6 +386,15 @@ function stripStaticSeo(head: string): string {
 export default async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const ua = req.headers.get("user-agent");
+
+  // Cache purge endpoint (called by admin after saving SEO config).
+  if (req.headers.get("x-purge-cache") === "1") {
+    _seoCache = { value: null, expiresAt: 0 };
+    return new Response(JSON.stringify({ purged: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   // Humans should never reach this fn (rewrite is bot-only), but be defensive.
   if (!isBot(ua)) {
