@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { sanitizeExtension } from "@/utils/sanitize-filename";
 
 interface EmailTemplate {
   id: string;
@@ -113,7 +114,7 @@ function LogoUploadField({ value, onChange }: { value: string; onChange: (url: s
       return;
     }
     setUploading(true);
-    const ext = file.name.split(".").pop() || "png";
+    const ext = sanitizeExtension(file.name, "png");
     const path = `email-logo.${ext}`;
     const { error } = await supabase.storage.from("seo-assets").upload(path, file, { upsert: true });
     if (error) {

@@ -6,6 +6,7 @@ import { Send, Loader2, MessageCircle, LogIn, FileText, Paperclip } from "lucide
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { renderChatMessageContent, mergeChatMessages } from "@/components/messages/chatMessageUtils";
+import { sanitizeFilename, sanitizeExtension } from "@/utils/sanitize-filename";
 
 interface ChatMessage {
   id: string;
@@ -223,7 +224,7 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
       const convId = await ensureConversation();
       if (!convId) { setUploading(false); return; }
 
-      const ext = file.name.split(".").pop();
+      const ext = sanitizeExtension(file.name, "bin");
       const filePath = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
       const { error: uploadError } = await supabase.storage
@@ -240,7 +241,7 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
       const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(filePath);
       const isPdf = file.type === "application/pdf";
       const content = isPdf
-        ? `[📄 PDF] ${file.name}\n${urlData.publicUrl}`
+        ? `[📄 PDF] ${sanitizeFilename(file.name)}\n${urlData.publicUrl}`
         : `[📷 Image]\n${urlData.publicUrl}`;
 
       const { data } = await supabase.from("messages").insert({

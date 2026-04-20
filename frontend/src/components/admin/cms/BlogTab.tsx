@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Eye, EyeOff, Search, Star, Users, Shield, X, Video, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { sanitizeExtension } from "@/utils/sanitize-filename";
 
 type SubTab = "posts" | "categories" | "comments" | "editors";
 
@@ -177,7 +178,7 @@ function PostsManager() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 3 * 1024 * 1024) return toast({ title: "Max 3MB", variant: "destructive" });
-    const ext = file.name.split(".").pop();
+    const ext = sanitizeExtension(file.name, "jpg");
     const path = `blog/${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("cms-assets").upload(path, file, { cacheControl: "31536000" });
     if (error) return toast({ title: "Erreur upload", variant: "destructive" });
