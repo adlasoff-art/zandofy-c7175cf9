@@ -17,6 +17,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { SlidersHorizontal, X } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { slugify } from "@/utils/slugify";
 
 function mapProduct(row: any) {
   const sortedImages = (row.product_images || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
