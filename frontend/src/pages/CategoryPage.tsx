@@ -17,6 +17,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { SlidersHorizontal, X } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { slugify } from "@/utils/slugify";
 
 function mapProduct(row: any) {
   const sortedImages = (row.product_images || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
@@ -81,15 +82,18 @@ export default function CategoryPage() {
       if (isSpecial) return { id: slug!, name: slug!, name_fr: slug === "nouveautes" ? "Nouveautés" : "Soldes", icon: slug === "nouveautes" ? "🆕" : "🔥", subcategories: [], parent: null };
       
       const decodedSlug = decodeURIComponent(slug || "").toLowerCase().trim();
+      const normalizedSlug = slugify(decodedSlug);
       const { data, error } = await supabase
         .from("categories")
         .select("id, name, name_fr, icon, parent_id, image_url")
         .order("name");
       if (error) throw error;
       const all = data || [];
-      // Match by name, name_fr, or ID — case-insensitive, trimmed
+      // Match by slugified name, slugified name_fr, raw name, name_fr, or ID
       const match = all.find(
         (c) =>
+          slugify(c.name) === normalizedSlug ||
+          slugify(c.name_fr) === normalizedSlug ||
           c.name.toLowerCase().trim() === decodedSlug ||
           c.name_fr.toLowerCase().trim() === decodedSlug ||
           c.id === slug
@@ -221,8 +225,8 @@ export default function CategoryPage() {
         canonical={`/category/${slug}`}
         jsonLd={buildBreadcrumbJsonLd([
           { name: "Accueil", url: "/" },
-          ...(category.parent ? [{ name: category.parent.name_fr || category.parent.name || "Catégorie", url: `/category/${category.parent.name.toLowerCase()}` }] : []),
-          { name: category.name_fr || category.name || slug, url: `/category/${slug}` },
+          ...(category.parent ? [{ name: category.parent.name_fr || category.parent.name || "Catégorie", url: `/category/${slugify(category.parent.name)}` }] : []),
+          { name: category.name_fr || category.name || slug, url: `/category/${slugify(category.name || slug || "")}` },
         ])}
       />
       <Header />
@@ -236,7 +240,7 @@ export default function CategoryPage() {
               <>
                 <BreadcrumbItem>
                   <BreadcrumbLink asChild>
-                    <Link to={`/category/${category.parent.name.toLowerCase()}`}>{category.parent.name_fr}</Link>
+                    <Link to={`/category/${slugify(category.parent.name)}`}>{category.parent.name_fr}</Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
@@ -267,7 +271,7 @@ export default function CategoryPage() {
               {category.subcategories.map((sub: any) => (
                 <Link
                   key={sub.id}
-                  to={`/category/${sub.name.toLowerCase()}`}
+                  to={`/category/${slugify(sub.name)}`}
                   className="px-4 py-2 text-sm rounded-full border border-border bg-card text-foreground hover:border-primary hover:text-primary transition-colors"
                 >
                   {sub.icon && <span className="mr-1">{sub.icon}</span>}

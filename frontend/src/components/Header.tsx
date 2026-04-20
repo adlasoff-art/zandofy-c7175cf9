@@ -21,6 +21,7 @@ import { useWishlist } from "@/contexts/WishlistContext";
 import { useI18n, LOCALES, CURRENCIES, type CurrencyCode } from "@/contexts/I18nContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useHeaderTheme } from "@/hooks/use-header-theme";
+import { slugify } from "@/utils/slugify";
 
 // Mini error boundary to prevent Radix crashes from taking down the whole page
 class SafeRadix extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
@@ -399,7 +400,7 @@ export function Header() {
                     {isExpanded && subs.length > 0 && (
                       <div className="bg-muted/30">
                         <Link
-                          to={`/category/${cat.name.toLowerCase()}`}
+                          to={`/category/${slugify(cat.name)}`}
                           onClick={() => setMobileOpen(false)}
                           className="block py-2 px-8 text-sm text-primary font-medium hover:bg-muted transition-colors"
                         >
@@ -408,7 +409,7 @@ export function Header() {
                         {subs.map((sub) => (
                           <Link
                             key={sub.id}
-                            to={`/category/${sub.name.toLowerCase()}`}
+                            to={`/category/${slugify(sub.name)}`}
                             onClick={() => setMobileOpen(false)}
                             className="block py-2 px-8 text-sm text-foreground hover:bg-muted hover:text-primary transition-colors"
                           >

@@ -38,6 +38,7 @@ import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimate";
 import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd } from "@/components/SEOHead";
 import { VariantOrderDrawer } from "@/components/VariantOrderDrawer";
+import { slugify } from "@/utils/slugify";
 
 // ─── Gallery from product_images ──────────────────────────────
 interface GalleryItem {
@@ -245,9 +246,10 @@ export default function ProductPage() {
     sku: product.sku,
     storeName: (product as any).store?.name,
   });
+  const categorySlug = slugify(product.category || product.categoryFr || "produit");
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
     { name: "Accueil", url: "/" },
-    { name: product.categoryFr || "Produit", url: `/category/${(product.categoryFr || "produit").toLowerCase()}` },
+    { name: product.categoryFr || "Produit", url: `/category/${categorySlug}` },
     { name: product.nameFr || "Produit", url: `/product/${product.slug || product.id}` },
   ]);
 
@@ -269,7 +271,7 @@ export default function ProductPage() {
           <BreadcrumbList>
             <BreadcrumbItem><BreadcrumbLink asChild><Link to="/">Accueil</Link></BreadcrumbLink></BreadcrumbItem>
             <BreadcrumbSeparator />
-            <BreadcrumbItem><BreadcrumbLink href="#">{product.categoryFr}</BreadcrumbLink></BreadcrumbItem>
+            <BreadcrumbItem><BreadcrumbLink asChild><Link to={`/category/${categorySlug}`}>{product.categoryFr}</Link></BreadcrumbLink></BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem><BreadcrumbPage>{product.nameFr}</BreadcrumbPage></BreadcrumbItem>
           </BreadcrumbList>
