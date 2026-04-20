@@ -25,7 +25,7 @@ export async function generateProductSlug(
   // Probe for collisions; we add a 5-char hex suffix when needed.
   let candidate = base;
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    let query = supabase
+    let query: any = (supabase as any)
       .from("products")
       .select("id", { count: "exact", head: true })
       .eq("slug", candidate);
