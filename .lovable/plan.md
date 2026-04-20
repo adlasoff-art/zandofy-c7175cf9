@@ -1,99 +1,59 @@
 
 
-## Diagnostic SEO complet (problèmes Google Search Console)
+## Constat
 
-### 1. Problème majeur : Zandofy est un SPA → Google reçoit du HTML vide
-Le HTML brut servi sur **TOUTES** les pages (home, produit, boutique, catégorie) contient les **mêmes** balises `<title>`, `og:title`, `og:image` (icône PWA 512px), `description`. La logique React de `SEOHead.tsx` ne s'exécute **que dans le navigateur après hydratation JS**, donc Googlebot voit partout :
-- Titre identique : "Zandofy — Mode Élégante & Accessible"
-- Aucune balise `<link rel="canonical">` dans le HTML statique
-- Image OG = icône 512×512 (pas conforme aux 1200×630 attendus)
-- Aucun JSON-LD Product/BreadcrumbList dans le HTML
+Le HTML statique `frontend/index.html` contient un `<title>` et meta `description`/`og:*` codés en dur ("Zandofy — Mode Élégante & Accessible"). C'est ce que voient :
+- Googlebot via `meta-injector` sur la **homepage** (qui ne fait que pass-through pour `/`)
+- Tous les utilisateurs avant hydratation React
+- Les partages sociaux de la homepage
 
-→ Conséquence directe : **142 pages "Détectée non indexée" + "Page en double sans canonique" + "Autre page avec balise canonique correcte"** dans la GSC. Google considère tous les produits comme des doublons.
+Côté admin, il existe **déjà** un onglet SEO complet : `frontend/src/components/admin/seo/SeoMetadataSection.tsx` (titre 60c, description 160c, keywords) + `SeoBrandingSection.tsx` (brand, tagline, OG image), stockés dans `platform_settings.seo_config`. Mais ces valeurs **ne sont jamais injectées dans le HTML servi aux bots** ni dans les pages publiques (home, /faq, /stores, /blog list, /category list, etc.) — uniquement les pages détail produit/store/category/blog passent par `meta-injector`.
 
-### 2. Anciennes URLs WordPress qui apparaissent encore (ex: `/boutique`, `/support-client/`)
-- `/boutique` n'existe plus dans `App.tsx` (seulement `/stores`)
-- Aucune redirection 301 → SPA fallback retourne 200 + page vide
-- → "Soft 404" + "Introuvable 404" dans GSC
+→ Donc l'admin remplit le formulaire mais ça ne change rien à ce que Google et les utilisateurs voient.
 
-### 3. Deux propriétés Search Console
-- **Domaine** (`zandofy.com`, créée le 10 avril) = recommandée, capture HTTP+HTTPS+sous-domaines
-- **Préfixe URL** (`https://zandofy.com/`, ancienne WordPress) = données historiques
-→ **Garder les deux**, mais **soumettre le sitemap dans la version Domaine** et configurer la version Domaine comme principale.
+## Solution
 
-### 4. Sitemap incomplet
-- Aucune balise `<lastmod>` sur les catégories/boutiques
-- Catégories utilisent encore `name` au lieu de `slug` → URLs encodées `auto%20%26%20engine`
-- Pas de `hreflang` dans le sitemap
+Étendre le `meta-injector` pour qu'il devienne **la source de vérité SEO de toute page publique**, en lisant `platform_settings.seo_config` (déjà géré par l'admin) :
 
-### 5. Breadcrumb fragile
-URL breadcrumb produit utilise `categoryFr.toLowerCase()` → ne correspond pas aux vrais slugs catégorie → liens 404 potentiels.
+### 1. Étendre `frontend/api/meta-injector.ts`
+- Charger `platform_settings.seo_config` au démarrage (cache 60s en mémoire Edge)
+- Ajouter le routage pour pages "globales" (titre + description issus de `seo_config`) :
+  - `/` (homepage)
+  - `/faq`, `/stores`, `/blog`, `/about`, `/contact`, `/careers`, `/help`
+- Pour ces routes : injecter `seo_config.site_title`, `seo_config.site_description`, `seo_config.default_og_image`, `seo_config.brand_name`, `seo_config.tagline`, `seo_config.keywords`
+- Garder le comportement actuel pour produit/boutique/catégorie/blog (priorité au contenu spécifique de l'item)
+- Étendre le `vercel.json` rewrite list pour inclure les routes ci-dessus pour les bots
 
----
+### 2. Mettre à jour `frontend/index.html`
+- Remplacer les valeurs hardcodées par des **placeholders neutres** (fallback générique uniquement utilisé si l'edge function échoue) — ex: titre = `{{SITE_TITLE}}` n'est pas possible côté static, donc on garde un fallback minimal "Zandofy" + on compte sur l'injecteur pour servir le bon contenu aux bots et sur `SEOHead.tsx` (React) pour les humains
 
-## Solution en 4 axes
+### 3. Améliorer `SEOHead.tsx` (côté client React)
+- Sur les pages "globales" listées ci-dessus, lire `seo_config` via le hook existant (`usePlatformBootstrap` qui charge déjà `seo_config`) et appliquer dynamiquement le `<title>` et meta tags dès le premier render React (humains voient aussi les valeurs admin)
+- Vérifier le hook qui charge déjà ces données via `platform-bootstrap` edge function
 
-### Axe 1 — Pre-rendering / SSR pour les pages publiques (CRITIQUE)
-Vercel supporte le **prerendering au build** via une stratégie statique. Deux options :
+### 4. Cache invalidation
+- Quand l'admin sauve dans `AdminSEOPage`, après save → ping fire-and-forget de `meta-injector` avec un header `x-purge-cache` pour réinitialiser le cache mémoire (ou simplement TTL court 60s)
 
-**A. Prerender script Node** (recommandé, sans changer de framework)
-- Script post-build qui parcourt `sitemap-dynamic.xml`, lance Puppeteer/Playwright headless, génère un HTML statique par URL avec balises meta correctes, sauve dans `dist/product/{slug}/index.html` etc.
-- Avantage : zéro refonte React, déploiement Vercel inchangé
-- Limites : build plus long (≈3-5 min pour 200 produits)
+## Fichiers touchés
 
-**B. Edge Function `meta-injector`** (plus léger, recommandé en complément)
-- Vercel Edge rewrite : intercepte requêtes Googlebot/Bingbot/Facebook (User-Agent) sur `/product/*`, `/category/*`, `/store/*`
-- Va chercher les méta dans Supabase et injecte dans `index.html` avant de servir
-- Tous les autres bots/users reçoivent le SPA normal
+| Fichier | Changement |
+|---|---|
+| `frontend/api/meta-injector.ts` | Ajout résolveur `global` lisant `seo_config`, étendre matcher de path |
+| `frontend/vercel.json` | Ajouter routes `/`, `/faq`, `/stores`, `/blog`, `/about`, `/contact`, `/careers`, `/help` au bloc `has user-agent bot` |
+| `frontend/index.html` | Fallback générique sans claim marketing ("Zandofy" simple) |
+| `frontend/src/components/SEOHead.tsx` | Lire `seo_config` du context et l'appliquer pour pages globales sans override |
+| `frontend/src/pages/HomePage.tsx` (et autres pages globales) | S'assurer qu'elles n'imposent PAS un titre hardcodé (laisser le fallback `seo_config`) |
 
-→ **Recommandation : Axe B (rapide à livrer, ~2 jours), puis Axe A en V2 si besoin.**
+## Vérification finale
 
-### Axe 2 — Nettoyage des anciennes URLs WordPress
-Ajouter dans `frontend/vercel.json` des **redirects 301** :
-```text
-/boutique           → /stores      (301)
-/support-client     → /faq         (301)
-/wp-admin/*         → /            (410 idéalement)
-/?p=*               → /            (301)
-```
-Identifier la liste exacte via export GSC "Pages non indexées > Introuvable 404".
+1. Admin modifie "Titre du site" dans `/admin/seo` → save
+2. `curl -A "Googlebot/2.1" https://zandofy.com/` → nouveau titre dans `<title>`
+3. Recharge la home dans un navigateur → nouveau titre dans l'onglet
+4. Test partage Facebook/WhatsApp via debugger → nouveau OG title
 
-### Axe 3 — Améliorer `index.html` (HTML statique amélioré, fallback)
-Tant que le pre-rendering n'est pas en place :
-- Mettre une vraie image OG 1200×630 (`/og-default.jpg`) au lieu de l'icône 512
-- Ajouter `<link rel="canonical" href="https://zandofy.com/">` dans le HTML statique
-- Ajouter le JSON-LD `Organization` + `WebSite` (sitelinks searchbox) **directement dans le HTML** (pas via React)
-- → Permet à Google d'afficher le panneau Knowledge à droite
+## Hors scope
 
-### Axe 4 — Sitemap & breadcrumb robustes
-**`generate-sitemap` (edge function)** :
-- Ajouter `<lastmod>` partout (catégories : `MAX(updated_at)` des produits de la catégorie)
-- Utiliser `categories.slug` au lieu de `name`
-- Ajouter `<image:image>` (extension Google) pour produits → boost richesse résultats
-
-**`ProductPage.tsx` breadcrumb** :
-- Lier au vrai slug catégorie (jointure DB), pas le `nameFr.toLowerCase()`
-- Garantir cohérence avec sitemap
-
----
-
-## Plan de livraison (3 lots)
-
-| Lot | Contenu | Effort | Impact GSC |
-|---|---|---|---|
-| **Lot 1 — Quick wins (1 jour)** | OG image 1200×630 statique + canonical + JSON-LD Organization dans `index.html` + redirects 301 anciennes URLs WP + sitemap avec `lastmod` et `slug` | S | Knowledge panel + 404 réduits |
-| **Lot 2 — Edge meta-injector (2 jours)** | Edge function Vercel qui détecte bots et injecte titre/desc/OG/JSON-LD dynamiques par URL produit/boutique/catégorie | M | Toutes pages indexables, fin du "doublon canonique" |
-| **Lot 3 — Polish (1 jour)** | Breadcrumb produit sur vrais slugs + correction `<image:image>` sitemap + soumission Sitemap dans propriété "Domaine" GSC + demande de réindexation manuelle des 19 pages | S | Indexation accélérée |
-
----
-
-## Ce que je propose maintenant
-
-Démarrer **Lot 1 immédiatement** (impact rapide, faible risque), puis on enchaîne Lot 2 dès validation. Concrètement Lot 1 modifie :
-- `frontend/index.html` — meta OG, canonical, JSON-LD Organization
-- `frontend/public/og-default.jpg` — nouvelle image 1200×630 (à fournir ou je génère via gradient brand)
-- `frontend/vercel.json` — bloc `redirects` 301
-- `supabase/functions/generate-sitemap/index.ts` — `lastmod`, `slug` catégories, balise `<image:image>`
-
-Pas de migration SQL nécessaire pour le Lot 1.
+- Pas de migration SQL (`platform_settings.seo_config` existe déjà)
+- Pas de refonte de l'admin SEO (formulaire déjà en place)
+- Pas de toucher au cache du `platform-bootstrap` edge function (déjà 5min CDN)
 
