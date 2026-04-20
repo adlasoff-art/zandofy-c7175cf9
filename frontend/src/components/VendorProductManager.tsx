@@ -15,6 +15,7 @@ import { ProductVariantsEditor, type SizeVariant, type ColorVariant, type Dynami
 import { PricingCalculator } from "@/components/vendor/PricingCalculator";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
+import { generateProductSlug } from "@/utils/productSlug";
 
 interface Supplier {
   id: string;
@@ -426,9 +427,19 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     }
     setSaving(true);
 
+    // Generate or refresh the URL slug from the (French) name so product
+    // pages render as /product/<slug> instead of /product/<uuid>.
+    const displayName = form.name_fr || form.name;
+    const needsNewSlug =
+      !editing || !(editing as any).slug || (editing as any).name_fr !== displayName;
+    const slug = needsNewSlug
+      ? await generateProductSlug(displayName, editing?.id)
+      : (editing as any).slug;
+
     const payload = {
       name: form.name || form.name_fr,
       name_fr: form.name_fr,
+      slug,
       price: form.price,
       original_price: form.original_price || null,
       currency: form.currency,
