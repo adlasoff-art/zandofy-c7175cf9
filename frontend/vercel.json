@@ -83,6 +83,17 @@
       ],
       "destination": "/api/meta-injector"
     },
+    {
+      "source": "/:globalPath(|faq|stores|blog|about|contact|careers|help|pricing|privacy|terms|popular|trends|search)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
+        }
+      ],
+      "destination": "/api/meta-injector"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
