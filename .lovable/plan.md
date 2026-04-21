@@ -1,55 +1,79 @@
 
 
-# Fix déploiement GitHub Actions — `submit-sourcing-request` orpheline
+# Audit sécurité — Fonctionnalité Sourcing
 
-## Diagnostic
+## Score sécurité Sourcing : **94/100** ✅
+Pas de faille critique. Quelques durcissements ciblés recommandés, sans blocage utilisateur.
 
-Le job GitHub Actions échoue parce que `frontend/supabase/config.toml` (ligne 70) déclare :
-```toml
-[functions.submit-sourcing-request]
-verify_jwt = true
+| Axe | Score | Constat |
+|---|---|---|
+| RLS tables | 96/100 | Policies strictes (`user_id = auth.uid()` + `has_role`), pas de `USING (true)` |
+| Storage bucket | 95/100 | `sourcing-images` privé, paths préfixés `{user_id}/`, signed URLs 1h |
+| Edge Functions | 92/100 | JWT vérifié, double check rôle (auth + DB), CORS large mais sans cookies |
+| Anti-abus | 95/100 | Trigger DB `enforce_sourcing_rate_limit` (5/jour) + `CHECK` images ≤ 2 |
+| XSS / injection | 96/100 | `escapeHtml` côté email, pas de `dangerouslySetInnerHTML`, Zod côté form |
+| Données sensibles | 90/100 | `responder_id` non FK, digest envoie tous les emails admin en clair (To:) |
+
+**Findings linter Supabase (6 WARN + 1 ERROR) = pré-existants hors Sourcing** : automation_progress, autres buckets publics. Pas dans le périmètre de cette feature, déjà connus.
+
+## Points à corriger (mineurs, non bloquants)
+
+### S1 — Email digest : éviter la divulgation croisée d'emails admin
+`supabase/functions/sourcing-email-digest/index.ts` ligne 124 : `to: adminEmails.join(",")` met tous les admins en `To:` → chaque admin voit l'email des autres. **Fix** : utiliser `bcc: adminEmails` et `to: fromEmail` (envoi à soi-même + BCC).
+
+### S2 — Image de réponse admin : valider le path côté client
+`SourcingResponseDialog.tsx` ligne 98 : le path est préfixé `{request.user_id}/response-…`. Bonne logique mais l'admin uploade dans le dossier du client. **Fix** : préfixer plutôt par `responses/{request.id}/…` pour clarté + audit, et ajuster la storage policy INSERT pour accepter ce préfixe quand `has_role('admin'/'manager')`.
+
+### S3 — Signed URLs régénérées à chaque render
+`SourcingRequestCard.tsx` et `AdminProductSourcingPage.tsx` régénèrent les signed URLs à chaque dépendance change → coût Storage + risque rate limit Supabase. **Fix** : cache mémoire simple (Map keyed by path, TTL 50 min).
+
+### S4 — Rate-limit trigger : compter aussi les rejets
+Le trigger compte les inserts réussis. Un user pourrait spammer des inserts qui échouent côté Storage avant l'INSERT DB. **Fix optionnel** : aucun, car le storage upload réussit avant l'insert et est lui-même limité par la taille fichier ; risque négligeable.
+
+### S5 — Cleanup function : ajouter une borne minimale
+`cleanup-sourcing/index.ts` ligne 53 accepte `older_than_days >= 1`. Pour éviter une suppression accidentelle de données fraîches, **min 7 jours** est plus sûr. **Fix** : `Math.max(7, ...)`.
+
+### S6 — Clé étrangère manquante sur `responder_id`
+Migration ligne 28 : `responder_id uuid NOT NULL` sans FK. **Fix** : ajouter `REFERENCES public.profiles(id) ON DELETE SET NULL` (et passer en nullable) pour intégrité référentielle.
+
+## Migration SQL à exécuter en prod (S2 + S6)
+
+```sql
+-- S6: FK responder_id
+ALTER TABLE public.product_sourcing_responses
+  ALTER COLUMN responder_id DROP NOT NULL;
+ALTER TABLE public.product_sourcing_responses
+  ADD CONSTRAINT product_sourcing_responses_responder_fk
+  FOREIGN KEY (responder_id) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+-- S2: Storage policy admin upload sous responses/
+DROP POLICY IF EXISTS sourcing_insert_admin_responses ON storage.objects;
+CREATE POLICY sourcing_insert_admin_responses ON storage.objects
+FOR INSERT TO authenticated
+WITH CHECK (
+  bucket_id = 'sourcing-images'
+  AND (storage.foldername(name))[1] = 'responses'
+  AND (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'manager'))
+);
+
+DROP POLICY IF EXISTS sourcing_update_admin ON storage.objects;
+CREATE POLICY sourcing_update_admin ON storage.objects
+FOR UPDATE TO authenticated
+USING (
+  bucket_id = 'sourcing-images'
+  AND (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'manager'))
+);
 ```
-…mais le dossier `frontend/supabase/functions/submit-sourcing-request/` n'existe pas. Le CLI Supabase essaie de bundler tout ce qui est déclaré → erreur fatale → tout le déploiement (~21 fonctions) est annulé.
 
-**Bonne nouvelle** : cette fonction n'est utilisée nulle part. Le formulaire client (`SourcingRequestForm.tsx`) écrit directement dans Supabase via le SDK, protégé par :
-- la RLS sur `product_sourcing_requests`
-- le trigger serveur `enforce_sourcing_rate_limit` (max 5/jour)
-- les policies Storage par dossier `{user_id}/`
-
-La défense est déjà serveur-side. La fonction Edge n'apporte rien.
-
-## Correctif (option retenue : suppression de la déclaration orpheline)
-
-**Un seul fichier à modifier** :
-
-### `frontend/supabase/config.toml`
-Retirer le bloc lignes 70-71 :
-```diff
-- [functions.submit-sourcing-request]
-- verify_jwt = true
-```
-
-Garder les 3 autres blocs (`notify-sourcing-response`, `cleanup-sourcing`, `sourcing-email-digest`) — ils ont bien leur fichier `index.ts`.
-
-### Pourquoi pas créer la fonction à la place ?
-- Aucun appel `supabase.functions.invoke("submit-sourcing-request")` dans le code.
-- Le rate-limit est déjà serveur (trigger BEFORE INSERT).
-- Le bucket est privé avec RLS par `auth.uid()`.
-- Ajouter une Edge Function dupliquerait la logique sans gain de sécurité.
-
-## Vérification post-fix
-
-Après le merge sur `main`, le workflow `deploy-edge-functions.yml` redéploiera proprement les ~21 fonctions, dont les 3 sourcing existantes.
-
-## Note prod
-
-Côté `supabase/config.toml` racine (Lovable Cloud), la déclaration orpheline existe peut-être aussi — à retirer également pour rester cohérent et éviter le même échec si un déploiement Cloud est tenté.
+## Fichiers à modifier
+- `supabase/functions/sourcing-email-digest/index.ts` (S1 — bcc)
+- `supabase/functions/cleanup-sourcing/index.ts` (S5 — min 7j)
+- `frontend/src/components/admin/sourcing/SourcingResponseDialog.tsx` (S2 — path `responses/{id}/`)
+- `frontend/src/components/sourcing/SourcingRequestCard.tsx` + `frontend/src/pages/admin/AdminProductSourcingPage.tsx` (S3 — cache signed URLs)
+- 1 migration SQL téléchargeable (S2 + S6)
 
 ## Détails techniques
-
-**Fichiers modifiés** :
-- `frontend/supabase/config.toml` (retrait bloc `[functions.submit-sourcing-request]`)
-- `supabase/config.toml` (idem si présent — à vérifier)
-
-**Aucune migration SQL, aucun changement de comportement runtime.** Le feature sourcing reste 100 % fonctionnel.
+- Aucune mesure agressive, aucun blocage checkout/UX, aucun rate-limit backend ajouté.
+- Score post-correctifs estimé : **97/100** sur le périmètre Sourcing.
+- Les 6 WARN du linter restent hors scope (préexistants, autres features).
 
