@@ -10,6 +10,16 @@ import { toast } from "sonner";
 import { ForwarderFormDialog, type Forwarder } from "./ForwarderFormDialog";
 import { ForwarderCoverageDialog } from "./ForwarderCoverageDialog";
 import { ForwarderTiersDialog } from "./ForwarderTiersDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const sb = supabase as any;
 
@@ -19,6 +29,7 @@ export function ForwardersList() {
   const [editing, setEditing] = useState<Forwarder | null>(null);
   const [coverageFor, setCoverageFor] = useState<Forwarder | null>(null);
   const [tiersFor, setTiersFor] = useState<Forwarder | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Forwarder | null>(null);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["admin-forwarders"],
@@ -114,9 +125,7 @@ export function ForwardersList() {
                     size="icon"
                     variant="ghost"
                     title="Supprimer"
-                    onClick={() => {
-                      if (confirm(`Supprimer le transitaire "${f.name}" ?`)) remove.mutate(f.id!);
-                    }}
+                    onClick={() => setDeleteTarget(f)}
                   >
                     <Trash2 size={14} className="text-destructive" />
                   </Button>
@@ -139,6 +148,30 @@ export function ForwardersList() {
           forwarderId={tiersFor?.id ?? null}
           forwarderName={tiersFor?.name}
         />
+        <AlertDialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer le transitaire ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Le transitaire « {deleteTarget?.name} » sera supprimé définitivement,
+                ainsi que sa couverture et ses paliers tarifaires.
+                Les commandes déjà assignées ne seront pas modifiées.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  if (deleteTarget?.id) remove.mutate(deleteTarget.id);
+                  setDeleteTarget(null);
+                }}
+              >
+                Supprimer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   );

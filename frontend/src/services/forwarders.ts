@@ -6,6 +6,7 @@ export interface EligibleForwarder {
   forwarder_slug: string;
   logo_url: string | null;
   tier: string;
+  mode: string;
   price_multiplier: number;
   transit_min_days: number | null;
   transit_max_days: number | null;

@@ -725,12 +725,17 @@ export default function CheckoutPage() {
 
         // Lot 3 — Create shipment_assignments row when a forwarder was selected
         if (selectedForwarder?.forwarder_id) {
+          // shipment_assignments: mode NOT NULL, status IN ('assigned', ...).
+          // Forwarders only handle air/sea; coerce other modes to 'air' as a safe default.
+          const assignmentMode =
+            shippingMode === "sea" || shippingMode === "air" ? shippingMode : "air";
           await (supabase as any).from("shipment_assignments").insert({
             order_id: order.id,
             forwarder_id: selectedForwarder.forwarder_id,
             tier: selectedForwarder.tier,
+            mode: assignmentMode,
             quoted_price: preciseRound(selectedForwarder.quoted_price * ratio, 2),
-            status: "pending",
+            status: "assigned",
           });
         }
       }

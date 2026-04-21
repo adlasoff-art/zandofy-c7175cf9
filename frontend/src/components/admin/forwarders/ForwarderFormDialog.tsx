@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Loader2, Upload, X } from "lucide-react";
+import { z } from "zod";
 
 export interface Forwarder {
   id?: string;
@@ -19,14 +20,22 @@ export interface Forwarder {
   description?: string | null;
   contact_email?: string | null;
   contact_phone?: string | null;
-  website_url?: string | null;
-  price_multiplier?: number;
   is_active?: boolean;
 }
 
 const slugify = (s: string) =>
   s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+
+// S1 — Zod schema (defense in depth; RLS already admin-only)
+const forwarderSchema = z.object({
+  name: z.string().trim().min(1, "Nom requis").max(100),
+  slug: z.string().trim().regex(/^[a-z0-9-]+$/, "Slug invalide (a-z, 0-9, -)").min(1).max(50),
+  logo_url: z.string().trim().max(500).nullable().optional(),
+  description: z.string().trim().max(500).nullable().optional(),
+  contact_email: z.string().trim().email("Email invalide").max(255).or(z.literal("")).nullable().optional(),
+  contact_phone: z.string().trim().max(32).nullable().optional(),
+});
 
 interface Props {
   open: boolean;
@@ -39,8 +48,7 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<Forwarder>({
     name: "", slug: "", logo_url: "", description: "",
-    contact_email: "", contact_phone: "", website_url: "",
-    price_multiplier: 1.0, is_active: true,
+    contact_email: "", contact_phone: "", is_active: true,
   });
   const [uploading, setUploading] = useState(false);
 
@@ -48,15 +56,25 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
     if (forwarder) setForm({ ...forwarder });
     else setForm({
       name: "", slug: "", logo_url: "", description: "",
-      contact_email: "", contact_phone: "", website_url: "",
-      price_multiplier: 1.0, is_active: true,
+      contact_email: "", contact_phone: "", is_active: true,
     });
   }, [forwarder, open]);
 
   const handleUpload = async (file: File) => {
+    // S2 — server-safe MIME + size + extension sanitization
+    const ALLOWED = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"];
+    if (!ALLOWED.includes(file.type)) {
+      toast.error("Format non supporté (PNG, JPEG, SVG, WebP uniquement)");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Fichier trop volumineux (max 2 Mo)");
+      return;
+    }
     setUploading(true);
     try {
-      const ext = file.name.split(".").pop() || "png";
+      const rawExt = (file.name.split(".").pop() || "png").toLowerCase();
+      const ext = /^[a-z0-9]{1,5}$/.test(rawExt) ? rawExt : "png";
       const path = `${form.slug || slugify(form.name) || "fwd"}-${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from("forwarder-logos").upload(path, file, { upsert: true });
       if (error) throw error;
@@ -72,15 +90,20 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
 
   const save = useMutation({
     mutationFn: async (payload: Forwarder) => {
-      const body = {
-        name: payload.name.trim(),
-        slug: (payload.slug || slugify(payload.name)).trim(),
+      const parsed = forwarderSchema.safeParse({
+        name: payload.name,
+        slug: payload.slug || slugify(payload.name),
         logo_url: payload.logo_url || null,
         description: payload.description || null,
         contact_email: payload.contact_email || null,
         contact_phone: payload.contact_phone || null,
-        website_url: payload.website_url || null,
-        price_multiplier: Number(payload.price_multiplier) || 1.0,
+      });
+      if (!parsed.success) {
+        throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
+      }
+      const body = {
+        ...parsed.data,
+        contact_email: parsed.data.contact_email === "" ? null : parsed.data.contact_email,
         is_active: !!payload.is_active,
       };
       if (payload.id) {
@@ -194,26 +217,8 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
             </div>
           </div>
 
-          <div>
-            <Label className="text-sm">Site web</Label>
-            <Input
-              value={form.website_url ?? ""}
-              onChange={(e) => setForm({ ...form, website_url: e.target.value })}
-              placeholder="https://"
-            />
-          </div>
-
-          <div>
-            <Label className="text-sm">Multiplicateur de prix</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0.1"
-              max="10"
-              value={form.price_multiplier ?? 1.0}
-              onChange={(e) => setForm({ ...form, price_multiplier: parseFloat(e.target.value) })}
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">1.0 = prix de base. 1.2 = +20%, 0.9 = −10%.</p>
+          <div className="text-[11px] text-muted-foreground px-1">
+            Le multiplicateur de prix est configuré par palier tarifaire (modes air/sea × tiers express/standard/vip) depuis l'icône <span className="font-semibold">$</span> de la liste.
           </div>
 
           <div className="flex items-center justify-between p-3 border border-border rounded-lg">

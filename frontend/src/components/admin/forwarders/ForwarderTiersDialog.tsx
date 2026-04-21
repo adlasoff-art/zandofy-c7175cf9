@@ -10,17 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Loader2, Plus, Trash2, DollarSign } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { z } from "zod";
 
 interface Tier {
   id: string;
   forwarder_id: string;
-  service_mode: string;
-  min_weight_kg: number | null;
-  max_weight_kg: number | null;
-  price_per_kg: number;
-  flat_fee: number;
-  delay_days_min: number | null;
-  delay_days_max: number | null;
+  mode: string;
+  tier: string;
+  price_multiplier: number;
+  transit_min_days: number | null;
+  transit_max_days: number | null;
 }
 
 interface Props {
@@ -33,19 +32,32 @@ interface Props {
 const MODES = [
   { value: "air", label: "Aérien" },
   { value: "sea", label: "Maritime" },
-  { value: "road", label: "Routier" },
+];
+
+const TIERS = [
   { value: "express", label: "Express" },
+  { value: "standard", label: "Standard" },
+  { value: "vip", label: "VIP" },
 ];
 
 const empty = {
-  service_mode: "air",
-  min_weight_kg: 0,
-  max_weight_kg: 100,
-  price_per_kg: 0,
-  flat_fee: 0,
-  delay_days_min: 5,
-  delay_days_max: 10,
+  mode: "air",
+  tier: "standard",
+  price_multiplier: 1.0,
+  transit_min_days: 5,
+  transit_max_days: 10,
 };
+
+const tierSchema = z.object({
+  mode: z.enum(["air", "sea"]),
+  tier: z.enum(["express", "standard", "vip"]),
+  price_multiplier: z.number().min(0.1).max(10),
+  transit_min_days: z.number().int().min(0).max(365),
+  transit_max_days: z.number().int().min(0).max(365),
+}).refine((d) => d.transit_max_days >= d.transit_min_days, {
+  message: "Délai max doit être ≥ délai min",
+  path: ["transit_max_days"],
+});
 
 export function ForwarderTiersDialog({ open, onOpenChange, forwarderId, forwarderName }: Props) {
   const qc = useQueryClient();
@@ -59,8 +71,8 @@ export function ForwarderTiersDialog({ open, onOpenChange, forwarderId, forwarde
         .from("forwarder_service_tiers")
         .select("*")
         .eq("forwarder_id", forwarderId)
-        .order("service_mode", { ascending: true })
-        .order("min_weight_kg", { ascending: true });
+        .order("mode", { ascending: true })
+        .order("tier", { ascending: true });
       if (error) throw error;
       return data as Tier[];
     },
@@ -70,9 +82,13 @@ export function ForwarderTiersDialog({ open, onOpenChange, forwarderId, forwarde
   const add = useMutation({
     mutationFn: async () => {
       if (!forwarderId) return;
+      const parsed = tierSchema.safeParse(form);
+      if (!parsed.success) {
+        throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
+      }
       const { error } = await sb.from("forwarder_service_tiers").insert({
         forwarder_id: forwarderId,
-        ...form,
+        ...parsed.data,
       });
       if (error) throw error;
     },
@@ -107,10 +123,10 @@ export function ForwarderTiersDialog({ open, onOpenChange, forwarderId, forwarde
         <div className="space-y-4">
           {/* Add form */}
           <div className="border border-border rounded-lg p-3 bg-muted/20 space-y-3">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
               <div>
                 <Label className="text-xs">Mode</Label>
-                <Select value={form.service_mode} onValueChange={(v) => setForm({ ...form, service_mode: v })}>
+                <Select value={form.mode} onValueChange={(v) => setForm({ ...form, mode: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {MODES.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
@@ -118,34 +134,28 @@ export function ForwarderTiersDialog({ open, onOpenChange, forwarderId, forwarde
                 </Select>
               </div>
               <div>
-                <Label className="text-xs">Poids min (kg)</Label>
-                <Input type="number" step="0.1" value={form.min_weight_kg}
-                  onChange={(e) => setForm({ ...form, min_weight_kg: parseFloat(e.target.value) || 0 })} />
+                <Label className="text-xs">Service</Label>
+                <Select value={form.tier} onValueChange={(v) => setForm({ ...form, tier: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TIERS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <Label className="text-xs">Poids max (kg)</Label>
-                <Input type="number" step="0.1" value={form.max_weight_kg}
-                  onChange={(e) => setForm({ ...form, max_weight_kg: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div>
-                <Label className="text-xs">Prix/kg ($)</Label>
-                <Input type="number" step="0.01" value={form.price_per_kg}
-                  onChange={(e) => setForm({ ...form, price_per_kg: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div>
-                <Label className="text-xs">Frais fixes ($)</Label>
-                <Input type="number" step="0.01" value={form.flat_fee}
-                  onChange={(e) => setForm({ ...form, flat_fee: parseFloat(e.target.value) || 0 })} />
+                <Label className="text-xs">Multiplicateur</Label>
+                <Input type="number" step="0.01" min="0.1" max="10" value={form.price_multiplier}
+                  onChange={(e) => setForm({ ...form, price_multiplier: parseFloat(e.target.value) || 0 })} />
               </div>
               <div>
                 <Label className="text-xs">Délai min (j)</Label>
-                <Input type="number" value={form.delay_days_min ?? 0}
-                  onChange={(e) => setForm({ ...form, delay_days_min: parseInt(e.target.value) || 0 })} />
+                <Input type="number" min="0" value={form.transit_min_days ?? 0}
+                  onChange={(e) => setForm({ ...form, transit_min_days: parseInt(e.target.value) || 0 })} />
               </div>
               <div>
                 <Label className="text-xs">Délai max (j)</Label>
-                <Input type="number" value={form.delay_days_max ?? 0}
-                  onChange={(e) => setForm({ ...form, delay_days_max: parseInt(e.target.value) || 0 })} />
+                <Input type="number" min="0" value={form.transit_max_days ?? 0}
+                  onChange={(e) => setForm({ ...form, transit_max_days: parseInt(e.target.value) || 0 })} />
               </div>
               <div className="flex items-end">
                 <Button onClick={() => add.mutate()} disabled={add.isPending} className="w-full">
@@ -154,6 +164,9 @@ export function ForwarderTiersDialog({ open, onOpenChange, forwarderId, forwarde
                 </Button>
               </div>
             </div>
+            <p className="text-[11px] text-muted-foreground">
+              Le prix final = prix de base × multiplicateur. Ex: 1.0 = standard, 1.3 = +30%, 0.9 = −10%.
+            </p>
           </div>
 
           {/* List */}
@@ -165,12 +178,11 @@ export function ForwarderTiersDialog({ open, onOpenChange, forwarderId, forwarde
             ) : (
               <div className="divide-y divide-border text-sm">
                 {rows.map((r) => (
-                  <div key={r.id} className="grid grid-cols-[80px_1fr_1fr_1fr_1fr_auto] gap-2 items-center px-3 py-2">
-                    <Badge variant="outline" className="capitalize w-fit">{r.service_mode}</Badge>
-                    <span>{r.min_weight_kg ?? 0}–{r.max_weight_kg ?? "∞"} kg</span>
-                    <span>${r.price_per_kg}/kg</span>
-                    <span>+${r.flat_fee} fixe</span>
-                    <span className="text-muted-foreground">{r.delay_days_min}-{r.delay_days_max} j</span>
+                  <div key={r.id} className="grid grid-cols-[70px_90px_1fr_1fr_auto] gap-2 items-center px-3 py-2">
+                    <Badge variant="outline" className="capitalize w-fit">{r.mode}</Badge>
+                    <Badge variant="secondary" className="capitalize w-fit">{r.tier}</Badge>
+                    <span>×{Number(r.price_multiplier).toFixed(2)}</span>
+                    <span className="text-muted-foreground">{r.transit_min_days ?? "?"}–{r.transit_max_days ?? "?"} j</span>
                     <Button size="icon" variant="ghost" onClick={() => remove.mutate(r.id)}>
                       <Trash2 size={14} className="text-destructive" />
                     </Button>
