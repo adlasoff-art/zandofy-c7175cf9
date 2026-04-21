@@ -103,6 +103,7 @@ const AdminCMSPage = lazyRetry(() => import("./pages/admin/AdminCMSPage"));
 const AdminCategoriesPage = lazyRetry(() => import("./pages/admin/AdminCategoriesPage"));
 const AdminOrdersPage = lazyRetry(() => import("./pages/admin/AdminOrdersPage"));
 const AdminLogisticsPage = lazyRetry(() => import("./pages/admin/AdminLogisticsPage"));
+const AdminForwardersPage = lazyRetry(() => import("./pages/admin/AdminForwardersPage"));
 const AdminNotificationsPage = lazyRetry(() => import("./pages/admin/AdminNotificationsPage"));
 const AdminSettingsPage = lazyRetry(() => import("./pages/admin/AdminSettingsPage"));
 const AdminShippingPage = lazyRetry(() => import("./pages/admin/AdminShippingPage"));
@@ -266,6 +267,7 @@ const App = () => (
                 <Route path="/admin/review-moderation" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminReviewModerationPage /></RoleGuard>} />
                 <Route path="/admin/support" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminSupportPage /></RoleGuard>} />
                 <Route path="/admin/logistics" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminLogisticsPage /></RoleGuard>} />
+                <Route path="/admin/forwarders" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminForwardersPage /></RoleGuard>} />
                 <Route path="/admin/notifications" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminNotificationsPage /></RoleGuard>} />
                 <Route path="/admin/settings" element={<RoleGuard allowedRoles={["admin"]}><AdminSettingsPage /></RoleGuard>} />
                 <Route path="/admin/shipping" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminShippingPage /></RoleGuard>} />
