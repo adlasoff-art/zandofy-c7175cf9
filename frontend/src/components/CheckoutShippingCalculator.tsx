@@ -6,6 +6,7 @@ import {
   searchCities, calculateDynamicQuote,
   type City, type DynamicQuoteResult,
 } from "@/services/dynamic-shipping";
+import { ForwarderSelector, type ForwarderChoice } from "@/components/checkout/ForwarderSelector";
 
 const MODE_META = {
   air:  { icon: Plane,     label: "Aérien",     localLabel: "Aérien local",  unit: "kg" },
@@ -39,6 +40,7 @@ interface Props {
   cartSubtotal?: number;
   selectedMode?: TransportMode;
   onShippingCostChange: (cost: number, mode: string) => void;
+  onForwarderChange?: (choice: ForwarderChoice | null, unassigned: boolean) => void;
 }
 
 function preciseRound(v: number, d: number): number {
@@ -52,6 +54,7 @@ export function CheckoutShippingCalculator({
   cartSubtotal = 0,
   selectedMode,
   onShippingCostChange,
+  onForwarderChange,
 }: Props) {
   const [products, setProducts] = useState<CartProductInfo[]>([]);
   const [destCity, setDestCity] = useState<City | null>(null);
@@ -69,6 +72,8 @@ export function CheckoutShippingCalculator({
     intl_transit_min: number; intl_transit_max: number;
   } | null>(null);
   const [isLocalStore, setIsLocalStore] = useState(false);
+  const [forwarderChoice, setForwarderChoice] = useState<ForwarderChoice | null>(null);
+  const [forwarderUnassigned, setForwarderUnassigned] = useState(false);
 
   // 1. Fetch product details (weight, dimensions, origin, category) for cart items
   useEffect(() => {
@@ -350,8 +355,20 @@ export function CheckoutShippingCalculator({
   // Notify parent of shipping cost changes
   useEffect(() => {
     const selected = modeTotals.get(activeMode);
-    onShippingCostChange(selected?.total || 0, activeMode);
-  }, [activeMode, modeTotals, onShippingCostChange]);
+    const base = selected?.total || 0;
+    const multiplier = forwarderChoice ? Number(forwarderChoice.price_multiplier || 1) : 1;
+    const adjusted = Math.round(base * multiplier * 100) / 100;
+    onShippingCostChange(adjusted, activeMode);
+  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice]);
+
+  const handleForwarderChange = useCallback(
+    (choice: ForwarderChoice | null, unassigned: boolean) => {
+      setForwarderChoice(choice);
+      setForwarderUnassigned(unassigned);
+      onForwarderChange?.(choice, unassigned);
+    },
+    [onForwarderChange],
+  );
 
   // Aggregate cart info
   const totalWeight = useMemo(() => 
@@ -557,6 +574,17 @@ export function CheckoutShippingCalculator({
           <Lightbulb size={12} className="text-primary shrink-0 mt-0.5" />
           <p className="text-[10px] text-muted-foreground">{optimizationTip.text}</p>
         </div>
+      )}
+
+      {/* Forwarder selection (feature-flagged via platform_settings.forwarders_config) */}
+      {destCity && modeTotals.get(activeMode) && (
+        <ForwarderSelector
+          country={destCity.country_code}
+          cityId={destCity.id}
+          mode={activeMode}
+          baseShippingCost={modeTotals.get(activeMode)?.total || 0}
+          onChange={handleForwarderChange}
+        />
       )}
     </div>
   );

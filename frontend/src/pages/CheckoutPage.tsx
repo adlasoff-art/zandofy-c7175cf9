@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckoutShippingCalculator } from "@/components/CheckoutShippingCalculator";
+import type { ForwarderChoice } from "@/components/checkout/ForwarderSelector";
 import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
 import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
@@ -156,6 +157,15 @@ export default function CheckoutPage() {
   // Dynamic shipping
   const [dynamicShippingCost, setDynamicShippingCost] = useState<number | null>(null);
   const [shippingMode, setShippingMode] = useState<string>("air");
+
+  // Forwarder selection (Lot 3)
+  const [selectedForwarder, setSelectedForwarder] = useState<ForwarderChoice | null>(null);
+  const [forwarderUnassigned, setForwarderUnassigned] = useState(false);
+
+  const handleForwarderChange = useCallback((choice: ForwarderChoice | null, unassigned: boolean) => {
+    setSelectedForwarder(choice);
+    setForwarderUnassigned(unassigned);
+  }, []);
 
   // Free shipping threshold from platform settings
   const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(50);
@@ -689,6 +699,11 @@ export default function CheckoutPage() {
           last_mile_fee: deliveryOption === "home_delivery" ? lastMileFee : 0,
           last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
           last_mile_payment_status: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? "deferred" : (lastMilePayment === "pay_with_shipping" ? "paid" : "deferred")) : null,
+          // Lot 3 — Forwarder assignment (silent fallback when no eligible forwarder)
+          forwarder_id: selectedForwarder?.forwarder_id ?? null,
+          forwarder_tier: selectedForwarder?.tier ?? null,
+          forwarder_quoted_price: selectedForwarder ? preciseRound(selectedForwarder.quoted_price * ratio, 2) : null,
+          forwarder_unassigned: !selectedForwarder && forwarderUnassigned,
         } as any)
         .select("id")
         .single();
@@ -707,6 +722,17 @@ export default function CheckoutPage() {
             size: item.size || null,
           }))
         );
+
+        // Lot 3 — Create shipment_assignments row when a forwarder was selected
+        if (selectedForwarder?.forwarder_id) {
+          await (supabase as any).from("shipment_assignments").insert({
+            order_id: order.id,
+            forwarder_id: selectedForwarder.forwarder_id,
+            tier: selectedForwarder.tier,
+            quoted_price: preciseRound(selectedForwarder.quoted_price * ratio, 2),
+            status: "pending",
+          });
+        }
       }
     }
 
@@ -1706,6 +1732,7 @@ export default function CheckoutPage() {
                     cartItems={items.map(i => ({ productId: i.productId, quantity: i.quantity }))}
                     cartSubtotal={subtotal}
                     onShippingCostChange={handleShippingCostChange}
+                    onForwarderChange={handleForwarderChange}
                   />
                 </div>
 
