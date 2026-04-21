@@ -217,26 +217,8 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
             </div>
           </div>
 
-          <div>
-            <Label className="text-sm">Site web</Label>
-            <Input
-              value={form.website_url ?? ""}
-              onChange={(e) => setForm({ ...form, website_url: e.target.value })}
-              placeholder="https://"
-            />
-          </div>
-
-          <div>
-            <Label className="text-sm">Multiplicateur de prix</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0.1"
-              max="10"
-              value={form.price_multiplier ?? 1.0}
-              onChange={(e) => setForm({ ...form, price_multiplier: parseFloat(e.target.value) })}
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">1.0 = prix de base. 1.2 = +20%, 0.9 = −10%.</p>
+          <div className="text-[11px] text-muted-foreground px-1">
+            Le multiplicateur de prix est configuré par palier tarifaire (modes air/sea × tiers express/standard/vip) depuis l'icône <span className="font-semibold">$</span> de la liste.
           </div>
 
           <div className="flex items-center justify-between p-3 border border-border rounded-lg">
