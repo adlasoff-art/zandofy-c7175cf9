@@ -3571,7 +3571,7 @@ export type Database = {
           price: number | null
           product_name: string
           request_id: string
-          responder_id: string
+          responder_id: string | null
           updated_at: string
         }
         Insert: {
@@ -3586,7 +3586,7 @@ export type Database = {
           price?: number | null
           product_name: string
           request_id: string
-          responder_id: string
+          responder_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -3601,7 +3601,7 @@ export type Database = {
           price?: number | null
           product_name?: string
           request_id?: string
-          responder_id?: string
+          responder_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -3610,6 +3610,13 @@ export type Database = {
             columns: ["request_id"]
             isOneToOne: true
             referencedRelation: "product_sourcing_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_sourcing_responses_responder_fk"
+            columns: ["responder_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
