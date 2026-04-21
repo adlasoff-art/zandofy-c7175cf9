@@ -52,6 +52,7 @@ const sidebarSections: SidebarSection[] = [
     icon: Truck,
     items: [
       { title: "Logistique", url: "/admin/logistics", icon: Truck },
+      { title: "Transitaires", url: "/admin/forwarders", icon: Truck },
       { title: "Tarification Fret", url: "/admin/shipping", icon: DollarSign },
       { title: "Plans de livraison", url: "/admin/delivery-plans", icon: Truck },
       { title: "Zones géographiques", url: "/admin/geography", icon: MapPin },
