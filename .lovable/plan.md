@@ -1,102 +1,137 @@
 
 
-# Audit Qualité & Sécurité — Forwarders (Lots 1-3)
+# Fonctionnalité « Trouvez-moi ce produit » (Product Sourcing Requests)
 
-## Score global de sécurité : **91/100** — Plateforme safe ✅
-Toggle OFF en prod → **aucun impact actuel** sur les 4000+ utilisateurs.
+Permettre aux clients connectés (mobile uniquement) de soumettre une demande de recherche pour un produit absent de la plateforme, et donner aux admins/managers un back-office pour répondre et nettoyer.
 
-| Axe | Score | Commentaire |
-|---|---|---|
-| DB / RLS | 95/100 | Policies solides, SECURITY DEFINER + search_path corrects |
-| Storage | 92/100 | Bucket public OK pour logos, writes admin/manager uniquement |
-| Frontend (checkout) | 88/100 | Pas de faille mais bugs fonctionnels bloquants |
-| Intégration | 75/100 | Décalages schéma ↔ UI qui empêchent le feature de fonctionner |
+## Vue d'ensemble du flux
 
-## 🔴 Bugs bloquants fonctionnels (non-sécurité mais à corriger avant activation)
-
-Ces décalages entre le schéma SQL (Lot 1) et l'UI (Lot 2/3) rendent le feature inutilisable dès qu'on active le toggle :
-
-### 1. `CheckoutPage.tsx` — insertion `shipment_assignments` cassée
-Le code insert `status: "pending"` et omet `mode` (NOT NULL).
-**DB attend** : `status IN ('assigned',…)`, `mode IN ('air','sea')` requis.
-**Fix** : `status: "assigned"`, ajouter `mode: shippingMode` (filtrer sur 'air'/'sea').
-
-### 2. `ForwarderTiersDialog.tsx` — mauvaises colonnes
-UI écrit : `service_mode`, `min_weight_kg`, `max_weight_kg`, `price_per_kg`, `flat_fee`, `delay_days_min/max`.
-DB attend : `mode`, `tier`, `price_multiplier`, `transit_min_days`, `transit_max_days`.
-**Fix** : refondre le dialog pour matcher le vrai schéma (modes `air`/`sea`, tiers `express`/`standard`/`vip`, multiplicateur au lieu de prix/kg).
-
-### 3. `ForwarderFormDialog.tsx` — colonnes inexistantes
-UI envoie `website_url`, `price_multiplier` sur `forwarders` — ces colonnes n'existent pas dans la table.
-**Fix** : retirer `website_url` et `price_multiplier` du payload (le multiplier vit sur `forwarder_service_tiers`).
-
-### 4. `ForwarderCoverageDialog.tsx` — champ `city` text vs `city_id` uuid
-UI écrit `city: "Kinshasa"` (texte libre), DB attend `city_id uuid REFERENCES cities(id)`.
-**Fix** : remplacer l'input texte par un Combobox de villes (table `cities`) + envoyer `city_id`.
-
-### 5. `services/forwarders.ts` — interface `EligibleForwarder` incomplète
-Il manque `mode` dans le type (retourné par la fonction SQL), utile pour persister le mode choisi.
-**Fix** : ajouter `mode: string`.
-
-## 🟡 Durcissements sécurité recommandés (non-bloquants)
-
-### S1. Validation Zod côté admin (défense en profondeur)
-Les formulaires Forwarder/Coverage/Tiers envoient les inputs bruts à Supabase. RLS protège déjà (admin only), mais ajouter un schéma Zod minimal :
-- `name` max 100, `slug` regex `/^[a-z0-9-]+$/`, `contact_email` email valide, `price_multiplier` entre 0.1 et 10.
-- Évite les erreurs DB silencieuses et le stockage de données malformées.
-
-### S2. Upload logo — MIME + taille serveur-side
-Actuellement `accept="image/..."` côté client uniquement. Ajouter :
-- Vérification `file.size < 2 MB` et `file.type` dans `handleUpload` avant `.upload()`.
-- Nom de fichier : actuel `${slug}-${Date.now()}.${ext}` → OK (pas d'injection path), mais sanitiser `ext` à `[a-z0-9]{1,5}`.
-
-### S3. `confirm()` natif pour suppression
-`ForwardersList.tsx` utilise `window.confirm` pour supprimer. Remplacer par `AlertDialog` shadcn — cohérence UX et empêche confirmations accidentelles sur mobile.
-
-### S4. Policy SELECT publique trop large
-`forwarders_select_public` autorise `SELECT * WHERE is_active = true` à tout le monde (anon inclus). Cela expose `contact_email`, `contact_phone`, `owner_user_id` publiquement.
-**Fix recommandé** : créer une **vue publique** `v_forwarders_public` exposant seulement `id, name, slug, logo_url, description, is_active`, et restreindre la policy SELECT de la table aux users authentifiés + owner + admin.
-
-### S5. `get_eligible_forwarders` — rate limiting implicite
-Fonction SECURITY DEFINER appelée sans auth (anon possible via checkout). Risque faible (lecture seule), mais logger les appels anormaux via les métriques existantes est suffisant.
-
-## 🟢 Points forts confirmés
-
-- ✅ RLS activé sur les 6 tables forwarders + storage bucket
-- ✅ `has_role()` utilisé partout (pas de récursion, SECURITY DEFINER propre)
-- ✅ `search_path = public` sur toutes les fonctions custom
-- ✅ Triggers `updated_at` cohérents avec le reste du projet
-- ✅ Notifications in-app sécurisées (via trigger, pas d'injection possible)
-- ✅ Pas de secret exposé côté frontend, pas de `dangerouslySetInnerHTML`
-- ✅ Toggle OFF par défaut → zéro risque sur la prod actuelle
-- ✅ Fallback silencieux (`forwarder_unassigned=true`) permet intervention admin post-commande
-- ✅ CHECK constraints et FK cohérents (CASCADE / SET NULL bien choisis)
-
-## Plan d'exécution proposé (ordre)
-
-1. **Fix bloquants 1→5** (1 migration SQL mineure + 4 fichiers TS)
-   - Un fichier SQL `20260421_forwarders_fixes.sql` pour aligner `shipment_assignments` (statut `pending` autorisé) ET/OU corriger le code TS pour utiliser `assigned`. Recommandation : **corriger le code TS** (plus rapide, pas de migration supplémentaire).
-2. **Durcissements S1→S4** (Zod, validation upload, AlertDialog, vue publique) — 1 migration SQL (vue + policy) + refactors TS.
-3. Ré-exécuter `supabase--linter` et `security--run_security_scan` pour confirmer 95+/100.
-
-## Détails techniques (pour revue)
-
-**Fichiers à modifier** :
-- `frontend/src/pages/CheckoutPage.tsx` (status + mode dans insert)
-- `frontend/src/components/admin/forwarders/ForwarderTiersDialog.tsx` (schéma complet)
-- `frontend/src/components/admin/forwarders/ForwarderFormDialog.tsx` (retirer champs orphelins)
-- `frontend/src/components/admin/forwarders/ForwarderCoverageDialog.tsx` (Combobox cities)
-- `frontend/src/services/forwarders.ts` (typage `mode`)
-- `frontend/src/components/admin/forwarders/ForwardersList.tsx` (AlertDialog)
-
-**Migration optionnelle S4** :
-```sql
-CREATE OR REPLACE VIEW public.v_forwarders_public
-WITH (security_invoker=on) AS
-SELECT id, name, slug, logo_url, description, is_active
-FROM public.forwarders WHERE is_active = true;
--- Restreindre SELECT direct aux authentifiés + revoke public
+```text
+CLIENT (mobile, connecté)              ADMIN / MANAGER
+─────────────────────────              ──────────────────
+Header → 🔍 icône (avant 🔔)           Sidebar → Catalogue → Demandes produits
+   ↓                                       ↓
+/sourcing → formulaire                  Liste paginée des demandes
+   • nom (optionnel)                       • voir images, nom, client
+   • 0-2 images (≤ 4 Mo total)             • répondre (form complet)
+   • max 5 soumissions / jour              • bouton "Nettoyer ≥ X jours"
+   ↓                                       ↓
+Soumission → notification admin         Réponse → notification + email opt-in
+   ↓                                                    au client
+"Mes demandes" dans /sourcing
+   • statut (en attente / répondue / fermée)
+   • détails de la réponse (prix, MOQ, couleurs, image)
 ```
 
-**Aucune mesure agressive** : pas de blocage checkout, pas de throttling strict, toggle reste OFF, RLS actuel préservé.
+## 1. Base de données (1 migration)
+
+### Tables
+- **`product_sourcing_requests`** — demande client
+  - `id`, `user_id` (FK profiles, NOT NULL), `product_name` (text, nullable, max 200), `note` (text, max 500), `images` (text[], max 2 URLs), `status` (`pending`/`answered`/`closed`), `created_at`, `updated_at`
+- **`product_sourcing_responses`** — réponse admin (1-1 avec request)
+  - `id`, `request_id` (FK CASCADE, unique), `responder_id`, `product_name`, `description`, `price`, `currency` (default 'USD'), `min_quantity` (int), `colors` (text[] limité à un set prédéfini), `image_url`, `notify_email_sent` (bool), `created_at`, `updated_at`
+
+### RLS (suit le pattern existant `has_role`)
+- **client** : `SELECT/INSERT` sur ses propres demandes uniquement (`user_id = auth.uid()`)
+- **client** : `SELECT` sur la réponse liée à ses demandes
+- **admin/manager** : `SELECT/UPDATE/DELETE` sur tout
+- **admin/manager** : `INSERT/UPDATE/DELETE` sur `product_sourcing_responses`
+
+### Trigger rate-limit (anti-spam serveur, défense en profondeur)
+- `BEFORE INSERT` sur `product_sourcing_requests` : refuse si `count(user_id, today) >= 5` → `RAISE EXCEPTION`. Aligné avec la limite UI 5/jour.
+
+### Fonction de nettoyage
+- `cleanup_sourcing_requests(p_older_than_days int)` SECURITY DEFINER, search_path public, restreinte via RLS d'appel (admin only via Edge Function ou check `has_role` interne) : supprime requests + responses + retire les fichiers du bucket via Storage API côté Edge Function.
+
+### Storage
+- Bucket **`sourcing-images`** privé (lecture admin + propriétaire), policies :
+  - INSERT : `auth.uid() = (storage.foldername(name))[1]::uuid` (path = `{user_id}/...`)
+  - SELECT : owner OR `has_role('admin'/'manager')`
+  - DELETE : admin/manager
+- Limite serveur via Edge Function de validation (taille cumulée 4 Mo, max 2 fichiers, MIME image only).
+
+### Notifications & email
+- Trigger `AFTER INSERT` sur la table → insère une `notifications` pour chaque admin (type `system`).
+- Email batché : Edge Function planifiée (cron 30 min) qui envoie 1 mail récapitulatif quand ≥ 5 nouvelles demandes non notifiées par email s'accumulent. Utilise l'infra email existante (Hostinger SMTP / `notify-*` pattern).
+
+## 2. Frontend client
+
+### Header (`Header.tsx`)
+- Nouvelle icône `PackageSearch` ou `Sparkles` insérée **juste avant** le bloc `NotificationCenter` (ligne ~245), affichée seulement si `user` (déjà le pattern existant).
+- Lien vers `/sourcing`.
+- Petit badge de point coloré si une de ses demandes est passée à `answered` et non lue.
+
+### MobileAccountMenu (`MobileAccountMenu.tsx`)
+- Nouvelle entrée dans la section « Paramètres du compte » (ou section dédiée « Aide produit ») : `{ to: "/sourcing", icon: PackageSearch, label: "Trouvez-moi ce produit" }`.
+
+### Page `/sourcing` (nouveau `SourcingPage.tsx`)
+- Protégée : redirige vers `/auth` si non connecté (pattern `AccountPage`).
+- 2 onglets : **Nouvelle demande** / **Mes demandes**.
+- Formulaire :
+  - Input nom (optionnel, max 200)
+  - Textarea note (optionnel, max 500)
+  - Upload max 2 images, validation client : `file.type.startsWith('image/')`, cumul ≤ 4 Mo. Compteur visible.
+  - Bouton « Envoyer » désactivé si quota atteint (fetch count du jour côté Supabase).
+  - Validation Zod (cohérent avec les durcissements forwarders récents).
+- Liste « Mes demandes » : carte avec statut, miniatures, et si `answered` → carte de la réponse (image, prix, MOQ, couleurs en pastilles).
+- Section explicative en bas : « À quoi sert cette page », icônes, exemples.
+
+### Route
+- Ajout dans `App.tsx` : `<Route path="/sourcing" element={<BanGuard><SourcingPage /></BanGuard>} />`
+
+## 3. Back-office admin
+
+### Page `AdminProductSourcingPage.tsx`
+- Accès via `RoleGuard allowedRoles={["admin","manager"]}`.
+- Sidebar : nouvelle entrée sous **Catalogue** (groupe existant) → « Demandes produits ».
+- UI :
+  - Liste paginée filtrable par statut + recherche.
+  - Détail latéral : nom, note, images (lightbox), profil client.
+  - Formulaire de réponse :
+    - nom produit, description, prix + devise, MOQ, image (upload bucket admin existant ou nouveau), couleurs via `Select` multi sur palette **25 nuances prédéfinies** (constante TS partagée `SOURCING_COLOR_PALETTE`).
+    - case « Notifier le client par email » (optionnelle, false par défaut) → déclenche Edge Function `notify-sourcing-response`.
+  - Bouton **Nettoyer** : ouvre `AlertDialog` (cohérent avec hardening forwarders), choix période (`7j` / `30j` / `90j` / custom date) → appelle Edge Function `cleanup-sourcing` qui supprime images Storage + lignes DB.
+
+## 4. Edge Functions (3)
+- **`submit-sourcing-request`** (verify_jwt=true) : validation Zod, check rate limit (defense en profondeur), upload images dans `sourcing-images/{user_id}/`, insert request, insert notif admins.
+- **`notify-sourcing-response`** (verify_jwt=true, admin only via `has_role`) : envoie email au client via SMTP existant si demandé.
+- **`cleanup-sourcing`** (verify_jwt=true, admin only) : reçoit `older_than_days`, liste les requests, supprime fichiers Storage par batch, puis DELETE en cascade.
+- Cron PG (existant `pg_cron`) : email digest admin (≥ 5 nouvelles non notifiées, max 1×/30 min).
+
+## 5. Sécurité (cohérent avec score actuel ~96/100)
+- RLS strict (client = ses lignes, admin/manager = tout).
+- Trigger rate-limit serveur en plus de la limite UI.
+- Bucket privé + policies par dossier `{user_id}`.
+- Validation Zod côté client + côté Edge Function (taille, MIME, longueurs).
+- Pas de `dangerouslySetInnerHTML`, pas de SQL brut, secrets non exposés.
+- Email digest batché → évite le spam, conforme à la mémoire `notification-segmentation`.
+- Cleanup admin-only via Edge Function (jamais SQL côté client).
+
+## 6. Détails techniques
+
+**Fichiers créés**
+- `frontend/src/pages/SourcingPage.tsx`
+- `frontend/src/pages/admin/AdminProductSourcingPage.tsx`
+- `frontend/src/components/sourcing/SourcingRequestForm.tsx`
+- `frontend/src/components/sourcing/SourcingRequestCard.tsx`
+- `frontend/src/components/admin/sourcing/SourcingResponseDialog.tsx`
+- `frontend/src/components/admin/sourcing/SourcingCleanupDialog.tsx`
+- `frontend/src/lib/sourcing-palette.ts` (25 couleurs)
+- `frontend/supabase/functions/submit-sourcing-request/index.ts`
+- `frontend/supabase/functions/notify-sourcing-response/index.ts`
+- `frontend/supabase/functions/cleanup-sourcing/index.ts`
+- `frontend/supabase/functions/sourcing-email-digest/index.ts` (cron)
+- `frontend/supabase/migrations/20260421130000_product_sourcing_init.sql`
+
+**Fichiers modifiés**
+- `frontend/src/components/Header.tsx` (icône avant Notification)
+- `frontend/src/components/MobileAccountMenu.tsx` (entrée menu)
+- `frontend/src/components/admin/AdminSidebar.tsx` (lien Catalogue)
+- `frontend/src/App.tsx` (routes `/sourcing` + `/admin/sourcing`)
+
+**Migration SQL téléchargeable** : un seul fichier `20260421130000_product_sourcing_init.sql` fourni en artifact pour exécution prod (cohérent avec la SOP : Lovable Cloud auto-déployée, prod via GitHub Actions / artifact manuel).
+
+**i18n** : toutes les chaînes via `t("sourcing.*")` ajoutées à `I18nContext.tsx` (FR/EN), conforme à la mémoire `centralized-i18n-refactor-logic`.
+
+**Toggle de sécurité** : pas de toggle nécessaire (feature isolée, n'impacte pas le checkout). Aucun risque pour les 4000 utilisateurs/jour.
 
