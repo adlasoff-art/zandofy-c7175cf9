@@ -67,9 +67,6 @@ verify_jwt = false
 [functions.process-automation-workflows]
 verify_jwt = false
 
-[functions.submit-sourcing-request]
-verify_jwt = true
-
 [functions.notify-sourcing-response]
 verify_jwt = true
 
