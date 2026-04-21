@@ -3508,6 +3508,109 @@ export type Database = {
           },
         ]
       }
+      product_sourcing_requests: {
+        Row: {
+          client_seen_response: boolean
+          created_at: string
+          email_digest_sent: boolean
+          id: string
+          images: string[]
+          note: string | null
+          product_name: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_seen_response?: boolean
+          created_at?: string
+          email_digest_sent?: boolean
+          id?: string
+          images?: string[]
+          note?: string | null
+          product_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_seen_response?: boolean
+          created_at?: string
+          email_digest_sent?: boolean
+          id?: string
+          images?: string[]
+          note?: string | null
+          product_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_sourcing_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_sourcing_responses: {
+        Row: {
+          colors: string[]
+          created_at: string
+          currency: string
+          description: string | null
+          id: string
+          image_url: string | null
+          min_quantity: number | null
+          notify_email_sent: boolean
+          price: number | null
+          product_name: string
+          request_id: string
+          responder_id: string
+          updated_at: string
+        }
+        Insert: {
+          colors?: string[]
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          min_quantity?: number | null
+          notify_email_sent?: boolean
+          price?: number | null
+          product_name: string
+          request_id: string
+          responder_id: string
+          updated_at?: string
+        }
+        Update: {
+          colors?: string[]
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          min_quantity?: number | null
+          notify_email_sent?: boolean
+          price?: number | null
+          product_name?: string
+          request_id?: string
+          responder_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_sourcing_responses_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "product_sourcing_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_variant_selections: {
         Row: {
           created_at: string
@@ -7085,6 +7188,13 @@ export type Database = {
       }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
       cleanup_rate_limit_entries: { Args: never; Returns: undefined }
+      cleanup_sourcing_requests: {
+        Args: { p_older_than_days: number }
+        Returns: {
+          deleted_count: number
+          image_paths: string[]
+        }[]
+      }
       compute_store_online_status: {
         Args: { p_store_id: string }
         Returns: boolean
