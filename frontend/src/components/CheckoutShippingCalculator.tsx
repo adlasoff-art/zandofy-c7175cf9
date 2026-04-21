@@ -575,6 +575,17 @@ export function CheckoutShippingCalculator({
           <p className="text-[10px] text-muted-foreground">{optimizationTip.text}</p>
         </div>
       )}
+
+      {/* Forwarder selection (feature-flagged via platform_settings.forwarders_config) */}
+      {destCity && modeTotals.get(activeMode) && (
+        <ForwarderSelector
+          country={destCity.country_code}
+          cityId={destCity.id}
+          mode={activeMode}
+          baseShippingCost={modeTotals.get(activeMode)?.total || 0}
+          onChange={handleForwarderChange}
+        />
+      )}
     </div>
   );
 }
