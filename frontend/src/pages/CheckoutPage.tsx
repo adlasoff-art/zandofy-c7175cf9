@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckoutShippingCalculator } from "@/components/CheckoutShippingCalculator";
+import type { ForwarderChoice } from "@/components/checkout/ForwarderSelector";
 import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
 import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
@@ -156,6 +157,15 @@ export default function CheckoutPage() {
   // Dynamic shipping
   const [dynamicShippingCost, setDynamicShippingCost] = useState<number | null>(null);
   const [shippingMode, setShippingMode] = useState<string>("air");
+
+  // Forwarder selection (Lot 3)
+  const [selectedForwarder, setSelectedForwarder] = useState<ForwarderChoice | null>(null);
+  const [forwarderUnassigned, setForwarderUnassigned] = useState(false);
+
+  const handleForwarderChange = useCallback((choice: ForwarderChoice | null, unassigned: boolean) => {
+    setSelectedForwarder(choice);
+    setForwarderUnassigned(unassigned);
+  }, []);
 
   // Free shipping threshold from platform settings
   const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(50);
@@ -1706,6 +1716,7 @@ export default function CheckoutPage() {
                     cartItems={items.map(i => ({ productId: i.productId, quantity: i.quantity }))}
                     cartSubtotal={subtotal}
                     onShippingCostChange={handleShippingCostChange}
+                    onForwarderChange={handleForwarderChange}
                   />
                 </div>
 
