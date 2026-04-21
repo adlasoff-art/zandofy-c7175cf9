@@ -81,7 +81,7 @@ export default function AdminProductSourcingPage() {
   const urlMap = useSignedUrls(allImagePaths);
 
   return (
-    <AdminLayout>
+    <AdminLayout title="Demandes de sourcing">
       <div className="space-y-4">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>

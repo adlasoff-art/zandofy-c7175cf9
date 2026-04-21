@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { PackageSearch, Sparkles, ShieldCheck, Clock, Mail } from "lucide-react";
+import { PackageSearch, Sparkles, ShieldCheck, Clock, Mail, Loader2 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2 } from "lucide-react";
 import { SourcingRequestForm } from "@/components/sourcing/SourcingRequestForm";
 import { SourcingRequestCard } from "@/components/sourcing/SourcingRequestCard";
 
