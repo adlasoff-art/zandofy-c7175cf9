@@ -6,6 +6,7 @@ import {
   searchCities, calculateDynamicQuote,
   type City, type DynamicQuoteResult,
 } from "@/services/dynamic-shipping";
+import { ForwarderSelector, type ForwarderChoice } from "@/components/checkout/ForwarderSelector";
 
 const MODE_META = {
   air:  { icon: Plane,     label: "Aérien",     localLabel: "Aérien local",  unit: "kg" },
@@ -39,6 +40,7 @@ interface Props {
   cartSubtotal?: number;
   selectedMode?: TransportMode;
   onShippingCostChange: (cost: number, mode: string) => void;
+  onForwarderChange?: (choice: ForwarderChoice | null, unassigned: boolean) => void;
 }
 
 function preciseRound(v: number, d: number): number {
@@ -52,6 +54,7 @@ export function CheckoutShippingCalculator({
   cartSubtotal = 0,
   selectedMode,
   onShippingCostChange,
+  onForwarderChange,
 }: Props) {
   const [products, setProducts] = useState<CartProductInfo[]>([]);
   const [destCity, setDestCity] = useState<City | null>(null);
