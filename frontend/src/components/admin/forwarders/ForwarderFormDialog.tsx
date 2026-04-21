@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+const sb = supabase as any;
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -83,10 +84,10 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
         is_active: !!payload.is_active,
       };
       if (payload.id) {
-        const { error } = await supabase.from("forwarders").update(body).eq("id", payload.id);
+        const { error } = await sb.from("forwarders").update(body).eq("id", payload.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("forwarders").insert(body);
+        const { error } = await sb.from("forwarders").insert(body);
         if (error) throw error;
       }
     },

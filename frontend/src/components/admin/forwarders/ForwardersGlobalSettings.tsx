@@ -44,7 +44,7 @@ export function ForwardersGlobalSettings() {
 
   const save = useMutation({
     mutationFn: async (next: FwdConfig) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("platform_settings")
         .upsert({ key: "forwarders_config", value: next as any }, { onConflict: "key" });
       if (error) throw error;

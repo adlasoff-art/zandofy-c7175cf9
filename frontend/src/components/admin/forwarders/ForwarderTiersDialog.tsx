@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+const sb = supabase as any;
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,7 +55,7 @@ export function ForwarderTiersDialog({ open, onOpenChange, forwarderId, forwarde
     queryKey: ["forwarder-tiers", forwarderId],
     queryFn: async () => {
       if (!forwarderId) return [];
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from("forwarder_service_tiers")
         .select("*")
         .eq("forwarder_id", forwarderId)
@@ -69,7 +70,7 @@ export function ForwarderTiersDialog({ open, onOpenChange, forwarderId, forwarde
   const add = useMutation({
     mutationFn: async () => {
       if (!forwarderId) return;
-      const { error } = await supabase.from("forwarder_service_tiers").insert({
+      const { error } = await sb.from("forwarder_service_tiers").insert({
         forwarder_id: forwarderId,
         ...form,
       });
@@ -85,7 +86,7 @@ export function ForwarderTiersDialog({ open, onOpenChange, forwarderId, forwarde
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("forwarder_service_tiers").delete().eq("id", id);
+      const { error } = await sb.from("forwarder_service_tiers").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

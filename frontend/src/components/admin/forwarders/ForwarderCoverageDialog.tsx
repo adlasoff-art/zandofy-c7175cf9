@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+const sb = supabase as any;
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,7 +36,7 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
     queryKey: ["forwarder-coverage", forwarderId],
     queryFn: async () => {
       if (!forwarderId) return [];
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from("forwarder_coverage")
         .select("*")
         .eq("forwarder_id", forwarderId)
@@ -52,7 +53,7 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
       if (!forwarderId) return;
       const cc = country.trim().toUpperCase();
       if (cc.length !== 2) throw new Error("Code pays ISO 2 lettres requis (ex: CD, CM, FR)");
-      const { error } = await supabase.from("forwarder_coverage").insert({
+      const { error } = await sb.from("forwarder_coverage").insert({
         forwarder_id: forwarderId,
         country_code: cc,
         city: city.trim() || null,
@@ -70,7 +71,7 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
 
   const toggle = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
-      const { error } = await supabase.from("forwarder_coverage").update({ is_active }).eq("id", id);
+      const { error } = await sb.from("forwarder_coverage").update({ is_active }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["forwarder-coverage", forwarderId] }),
@@ -78,7 +79,7 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("forwarder_coverage").delete().eq("id", id);
+      const { error } = await sb.from("forwarder_coverage").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
