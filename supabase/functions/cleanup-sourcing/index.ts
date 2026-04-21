@@ -50,7 +50,8 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const days = Math.max(1, Math.min(3650, parseInt(String(body?.older_than_days ?? "30"), 10) || 30));
+    // Safety floor: never delete data fresher than 7 days, even if a smaller value is passed.
+    const days = Math.max(7, Math.min(3650, parseInt(String(body?.older_than_days ?? "30"), 10) || 30));
     const cutoff = new Date(Date.now() - days * 86400_000).toISOString();
 
     // 1. Fetch requests to delete (to gather image paths)

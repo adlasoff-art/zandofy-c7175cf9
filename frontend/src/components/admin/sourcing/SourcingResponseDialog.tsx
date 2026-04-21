@@ -95,7 +95,8 @@ export function SourcingResponseDialog({ open, onOpenChange, request, existing, 
       let finalPath = imagePath;
       if (imageFile) {
         const ext = (imageFile.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5);
-        const path = `${request.user_id}/response-${Date.now()}.${ext}`;
+        // Admin/manager response images live under `responses/{request_id}/` for clear audit trail.
+        const path = `responses/${request.id}/response-${Date.now()}.${ext}`;
         const { error: upErr } = await supabase.storage.from("sourcing-images").upload(path, imageFile, {
           contentType: imageFile.type,
           upsert: true,

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Clock, CheckCircle2, XCircle, Image as ImageIcon } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { getSourcingColor } from "@/lib/sourcing-palette";
+import { getSourcingSignedUrls } from "@/lib/sourcing-signed-urls";
 
 interface SourcingRequest {
   id: string;
@@ -27,24 +27,15 @@ function useSignedUrls(paths: string[]) {
   const [urls, setUrls] = useState<string[]>([]);
   useEffect(() => {
     let alive = true;
-    const sign = async () => {
-      if (!paths.length) {
-        setUrls([]);
-        return;
-      }
-      const out: string[] = [];
-      for (const p of paths) {
-        if (!p) continue;
-        if (p.startsWith("http")) {
-          out.push(p);
-          continue;
-        }
-        const { data } = await supabase.storage.from("sourcing-images").createSignedUrl(p, 3600);
-        if (data?.signedUrl) out.push(data.signedUrl);
-      }
+    if (!paths.length) {
+      setUrls([]);
+      return () => {
+        alive = false;
+      };
+    }
+    getSourcingSignedUrls(paths).then((out) => {
       if (alive) setUrls(out);
-    };
-    sign();
+    });
     return () => {
       alive = false;
     };
