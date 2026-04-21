@@ -3510,6 +3510,7 @@ export type Database = {
       }
       product_sourcing_requests: {
         Row: {
+          admin_notified_email: boolean
           client_seen_response: boolean
           created_at: string
           email_digest_sent: boolean
@@ -3522,6 +3523,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          admin_notified_email?: boolean
           client_seen_response?: boolean
           created_at?: string
           email_digest_sent?: boolean
@@ -3534,6 +3536,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          admin_notified_email?: boolean
           client_seen_response?: boolean
           created_at?: string
           email_digest_sent?: boolean
