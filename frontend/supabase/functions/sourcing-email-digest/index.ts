@@ -121,7 +121,8 @@ Deno.serve(async (req) => {
 
     await transport.sendMail({
       from: fromEmail,
-      to: adminEmails.join(","),
+      to: fromEmail,
+      bcc: adminEmails,
       subject: `[Zandofy] ${pending.length} nouvelles demandes produits`,
       html,
     });

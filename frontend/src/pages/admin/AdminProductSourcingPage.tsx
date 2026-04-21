@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SourcingResponseDialog } from "@/components/admin/sourcing/SourcingResponseDialog";
 import { SourcingCleanupDialog } from "@/components/admin/sourcing/SourcingCleanupDialog";
+import { getSourcingSignedUrlMap } from "@/lib/sourcing-signed-urls";
 
 interface Row {
   id: string;
@@ -25,19 +26,9 @@ function useSignedUrls(paths: string[]) {
   const [urls, setUrls] = useState<Record<string, string>>({});
   useEffect(() => {
     let alive = true;
-    const work = async () => {
-      const out: Record<string, string> = {};
-      for (const p of paths) {
-        if (!p || p.startsWith("http")) {
-          if (p) out[p] = p;
-          continue;
-        }
-        const { data } = await supabase.storage.from("sourcing-images").createSignedUrl(p, 3600);
-        if (data?.signedUrl) out[p] = data.signedUrl;
-      }
+    getSourcingSignedUrlMap(paths).then((out) => {
       if (alive) setUrls(out);
-    };
-    work();
+    });
     return () => { alive = false; };
   }, [paths.join("|")]);
   return urls;
