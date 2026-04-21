@@ -72,6 +72,8 @@ export function CheckoutShippingCalculator({
     intl_transit_min: number; intl_transit_max: number;
   } | null>(null);
   const [isLocalStore, setIsLocalStore] = useState(false);
+  const [forwarderChoice, setForwarderChoice] = useState<ForwarderChoice | null>(null);
+  const [forwarderUnassigned, setForwarderUnassigned] = useState(false);
 
   // 1. Fetch product details (weight, dimensions, origin, category) for cart items
   useEffect(() => {
@@ -353,8 +355,20 @@ export function CheckoutShippingCalculator({
   // Notify parent of shipping cost changes
   useEffect(() => {
     const selected = modeTotals.get(activeMode);
-    onShippingCostChange(selected?.total || 0, activeMode);
-  }, [activeMode, modeTotals, onShippingCostChange]);
+    const base = selected?.total || 0;
+    const multiplier = forwarderChoice ? Number(forwarderChoice.price_multiplier || 1) : 1;
+    const adjusted = Math.round(base * multiplier * 100) / 100;
+    onShippingCostChange(adjusted, activeMode);
+  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice]);
+
+  const handleForwarderChange = useCallback(
+    (choice: ForwarderChoice | null, unassigned: boolean) => {
+      setForwarderChoice(choice);
+      setForwarderUnassigned(unassigned);
+      onForwarderChange?.(choice, unassigned);
+    },
+    [onForwarderChange],
+  );
 
   // Aggregate cart info
   const totalWeight = useMemo(() => 
