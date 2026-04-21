@@ -87,7 +87,7 @@ export function ForwardersGlobalSettings() {
         </div>
 
         {!cfg.enabled && (
-          <div className="flex items-start gap-2 p-3 border border-amber-500/30 rounded-lg bg-amber-500/5 text-xs text-amber-700 dark:text-amber-400">
+          <div className="flex items-start gap-2 p-3 border border-destructive/30 rounded-lg bg-destructive/5 text-xs text-destructive">
             <AlertTriangle size={14} className="shrink-0 mt-0.5" />
             <span>Système inactif — aucun impact sur le checkout en production.</span>
           </div>
