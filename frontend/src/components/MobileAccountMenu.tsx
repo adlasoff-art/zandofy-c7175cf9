@@ -26,6 +26,7 @@ import {
   Loader2,
   AlertTriangle,
   RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useCertification } from "@/hooks/use-certification";
@@ -95,6 +96,7 @@ export function MobileAccountMenu() {
         { to: "/dashboard?tab=subscriptions", icon: Award, label: "Mes abonnements" },
         { to: "/wishlist", icon: Heart, label: "Liste de souhaits" },
         { to: "/messages", icon: MessageSquare, label: "Messages" },
+        { to: "/sourcing", icon: Sparkles, label: "Trouvez-moi ce produit" },
         ...(isVendor && suppliersEnabled ? [{ to: "/vendor?tab=suppliers", icon: Package, label: "Fournisseurs" }] : []),
       ],
     },

@@ -143,6 +143,8 @@ const AdminDeliveryPlansPage = lazyRetry(() => import("./pages/admin/AdminDelive
 const AdminServicePackagesPage = lazyRetry(() => import("./pages/admin/AdminServicePackagesPage"));
 const AdminErrorReportsPage = lazyRetry(() => import("./pages/admin/AdminErrorReportsPage"));
 const ImpersonatePage = lazyRetry(() => import("./pages/ImpersonatePage"));
+const SourcingPage = lazyRetry(() => import("./pages/SourcingPage"));
+const AdminProductSourcingPage = lazyRetry(() => import("./pages/admin/AdminProductSourcingPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchOnWindowFocus: false } },
@@ -256,6 +258,7 @@ const App = () => (
                 <Route path="/blog/:slug" element={<BlogPostPage />} />
                 <Route path="/compare" element={<ComparePage />} />
                 <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/sourcing" element={<SourcingPage />} />
                 {/* Admin routes */}
                 <Route path="/admin" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDashboard /></RoleGuard>} />
                 <Route path="/admin/users" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminUsersPage /></RoleGuard>} />
@@ -278,6 +281,7 @@ const App = () => (
                 <Route path="/admin/vendor-pricing" element={<RoleGuard allowedRoles={["admin"]}><AdminVendorPricingPage /></RoleGuard>} />
                 <Route path="/admin/audit" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminAuditPage /></RoleGuard>} />
                 <Route path="/admin/error-reports" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminErrorReportsPage /></RoleGuard>} />
+                <Route path="/admin/sourcing" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminProductSourcingPage /></RoleGuard>} />
                 <Route path="/admin/loyalty" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminLoyaltyPage /></RoleGuard>} />
                 <Route path="/admin/points" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminPointsPage /></RoleGuard>} />
                 <Route path="/admin/coupons" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminCouponsPage /></RoleGuard>} />

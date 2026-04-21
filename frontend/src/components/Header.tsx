@@ -1,4 +1,4 @@
-import { Search, ShoppingBag, Heart, User, Menu, X, Headphones, Globe, ChevronRight, LogOut, MessageCircle, ChevronDown, PackageSearch, Sun, Moon, Monitor, Bell } from "lucide-react";
+import { Search, ShoppingBag, Heart, User, Menu, X, Headphones, Globe, ChevronRight, LogOut, MessageCircle, ChevronDown, PackageSearch, Sun, Moon, Monitor, Bell, Sparkles } from "lucide-react";
 import { useState, useRef, useEffect, Component, lazy, Suspense, type ReactNode, type ErrorInfo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -241,6 +241,17 @@ export function Header() {
             >
               <Search size={20} />
             </button>
+
+            {user && (
+              <Link
+                to="/sourcing"
+                className="p-2 text-foreground hover:text-primary transition-colors"
+                aria-label="Trouvez-moi ce produit"
+                title="Trouvez-moi ce produit"
+              >
+                <Sparkles size={20} />
+              </Link>
+            )}
 
             {user && (
               <SafeRadix fallback={<Link to="/dashboard" className="p-2 text-foreground hover:text-primary"><Bell size={20} /></Link>}>
