@@ -172,6 +172,19 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                   </select>
                 </div>
                 <div>
+                  <Label className="text-xs">Classe de service</Label>
+                  <select
+                    className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    value={draft.service_class ?? "standard"}
+                    onChange={e => setDraft({ ...draft, service_class: e.target.value as any })}
+                  >
+                    <option value="express">Express</option>
+                    <option value="standard">Standard</option>
+                    <option value="economy">Économique</option>
+                    <option value="vip">VIP</option>
+                  </select>
+                </div>
+                <div>
                   <Label className="text-xs">Pays (code ISO)</Label>
                   <Input
                     value={draft.country_code ?? ""}
@@ -215,6 +228,23 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                   <Label className="text-xs">Seuil acompte (CBM)</Label>
                   <Input type="number" value={draft.deposit_threshold_cbm ?? ""} onChange={e => setDraft({ ...draft, deposit_threshold_cbm: e.target.value ? +e.target.value : null })} placeholder="ex: 10" />
                 </div>
+                <div>
+                  <Label className="text-xs">Diviseur volumétrique</Label>
+                  <Input
+                    type="number"
+                    value={draft.volumetric_divisor ?? ""}
+                    onChange={e => setDraft({ ...draft, volumetric_divisor: e.target.value ? +e.target.value : null })}
+                    placeholder={draft.mode === "air" ? "6000" : draft.mode === "road" ? "5000" : "—"}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">Compte transporteur (override pour ce profil)</Label>
+                  <TransporterUserPicker
+                    value={draft.linked_transporter_user_id ?? null}
+                    onChange={(uid) => setDraft({ ...draft, linked_transporter_user_id: uid })}
+                    placeholder="Hériter du transitaire"
+                  />
+                </div>
               </div>
               <Button
                 size="sm"
@@ -222,7 +252,17 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                 onClick={() => {
                   create.mutate(draft);
                   setNewOpen(false);
-                  setDraft({ mode: "sea", country_code: "CD", city_id: null, currency: "USD", deposit_pct: 0, is_active: true });
+                  setDraft({
+                    mode: "sea",
+                    service_class: "standard",
+                    country_code: "CD",
+                    city_id: null,
+                    currency: "USD",
+                    deposit_pct: 0,
+                    volumetric_divisor: null,
+                    linked_transporter_user_id: null,
+                    is_active: true,
+                  });
                 }}
               >
                 Créer le profil
