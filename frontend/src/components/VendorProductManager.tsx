@@ -696,62 +696,60 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             <Field label="Taille du mannequin (ex: M, XL, 42)" value={form.model_size} onChange={(v) => setForm({ ...form, model_size: v })} />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground">Catégorie</label>
-            <select
-              className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md"
+            <SearchableCombobox
+              label="Catégorie"
+              placeholder="— Aucune —"
+              noneLabel="— Aucune —"
+              searchPlaceholder="Rechercher une catégorie..."
               value={form.category_id}
-              onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-            >
-              <option value="">— Aucune —</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name_fr}</option>
-              ))}
-            </select>
+              onChange={(v) => setForm({ ...form, category_id: v })}
+              options={categories.map((c) => ({ value: c.id, label: c.name_fr }))}
+            />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground">Tag Tendance</label>
-            <select
-              className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md"
+            <SearchableCombobox
+              label="Tag Tendance"
+              placeholder="— Aucun —"
+              noneLabel="— Aucun —"
+              searchPlaceholder="Rechercher un tag..."
               value={form.trend_tag_id}
-              onChange={(e) => setForm({ ...form, trend_tag_id: e.target.value })}
-            >
-              <option value="">— Aucun —</option>
-              {trendTags.map((t) => (
-                <option key={t.id} value={t.id}>{t.name_fr}</option>
-              ))}
-            </select>
+              onChange={(v) => setForm({ ...form, trend_tag_id: v })}
+              options={trendTags.map((t) => ({ value: t.id, label: t.name_fr }))}
+            />
           </div>
           {suppliersEnabled && (
           <div className="space-y-2">
-            <label className="text-xs text-muted-foreground">🏭 Fournisseur</label>
-            <div className="relative mt-1">
-              <select
-                className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md"
-                value={form.supplier_id}
-                onChange={(e) => {
-                  const newSupplierId = e.target.value;
-                  setForm({ ...form, supplier_id: newSupplierId, supplier_product_id: "" });
-                  if (newSupplierId) {
-                    setLoadingSupplierProducts(true);
-                    (supabase as any)
-                      .from("supplier_products")
-                      .select("id, label, product_url, image_url")
-                      .eq("supplier_id", newSupplierId)
-                      .order("position")
-                      .then(({ data }: any) => {
-                        setSupplierProductOptions(data || []);
-                        setLoadingSupplierProducts(false);
-                      });
-                  } else {
-                    setSupplierProductOptions([]);
-                  }
-                }}
-              >
-                <option value="">— Aucun —</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.agent_name}{s.platform_name ? ` (${s.platform_name})` : ""}</option>
-                ))}
-              </select>
+            <SearchableCombobox
+              label="🏭 Fournisseur"
+              placeholder="— Aucun —"
+              noneLabel="— Aucun —"
+              searchPlaceholder="Rechercher un fournisseur..."
+              value={form.supplier_id}
+              onChange={(newSupplierId) => {
+                setForm({ ...form, supplier_id: newSupplierId, supplier_product_id: "" });
+                if (newSupplierId) {
+                  setLoadingSupplierProducts(true);
+                  (supabase as any)
+                    .from("supplier_products")
+                    .select("id, label, product_url, image_url")
+                    .eq("supplier_id", newSupplierId)
+                    .order("position")
+                    .then(({ data }: any) => {
+                      setSupplierProductOptions(data || []);
+                      setLoadingSupplierProducts(false);
+                    });
+                } else {
+                  setSupplierProductOptions([]);
+                }
+              }}
+              options={suppliers.map((s) => ({
+                value: s.id,
+                label: s.agent_name,
+                sublabel: s.platform_name || undefined,
+                imageUrl: s.product_image_url || undefined,
+              }))}
+            />
+            <div className="relative">
               {/* Supplier thumbnail preview */}
               {form.supplier_id && (() => {
                 const sel = suppliers.find(s => s.id === form.supplier_id);
