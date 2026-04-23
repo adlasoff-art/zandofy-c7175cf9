@@ -227,6 +227,19 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
             Le multiplicateur de prix est configuré par palier tarifaire (modes air/sea × tiers express/standard/vip) depuis l'icône <span className="font-semibold">$</span> de la liste.
           </div>
 
+          <div className="space-y-1.5 p-3 border border-border rounded-lg bg-muted/20">
+            <Label className="text-sm">Compte transporteur lié (optionnel)</Label>
+            <TransporterUserPicker
+              value={form.linked_transporter_user_id ?? null}
+              onChange={(uid) => setForm({ ...form, linked_transporter_user_id: uid })}
+              placeholder="Rechercher un utilisateur…"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Si renseigné, le compte associé verra et gérera automatiquement les commandes assignées
+              à ce transitaire dans son espace transporteur.
+            </p>
+          </div>
+
           <div className="flex items-center justify-between p-3 border border-border rounded-lg">
             <Label className="text-sm">Actif</Label>
             <Switch checked={!!form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} />
