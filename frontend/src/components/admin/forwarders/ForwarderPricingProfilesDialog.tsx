@@ -131,10 +131,13 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
   const [newOpen, setNewOpen] = useState(false);
   const [draft, setDraft] = useState<Partial<Profile>>({
     mode: "sea",
+    service_class: "standard",
     country_code: "CD",
     city_id: null,
     currency: "USD",
     deposit_pct: 0,
+    volumetric_divisor: null,
+    linked_transporter_user_id: null,
     is_active: true,
   });
 
