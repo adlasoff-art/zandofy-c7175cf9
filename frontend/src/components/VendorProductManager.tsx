@@ -8,6 +8,7 @@ import {
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { toast } from "sonner";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
+import { SearchableCombobox } from "@/components/ui/SearchableCombobox";
 import { MediaUploader } from "@/components/vendor/MediaUploader";
 import { ShippingEstimator } from "@/components/vendor/ShippingEstimator";
 import { PromotionTimer } from "@/components/vendor/PromotionTimer";
