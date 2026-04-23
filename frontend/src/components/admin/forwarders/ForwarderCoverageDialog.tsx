@@ -28,6 +28,13 @@ interface City {
   id: string;
   name: string;
   country_code: string;
+  province_id?: string | null;
+}
+
+interface Province {
+  id: string;
+  name: string;
+  country_code: string;
 }
 
 interface Props {
@@ -40,6 +47,7 @@ interface Props {
 export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwarderName }: Props) {
   const qc = useQueryClient();
   const [country, setCountry] = useState("");
+  const [provinceId, setProvinceId] = useState<string | null>(null);
   const [cityId, setCityId] = useState<string | null>(null);
   const [cityPickerOpen, setCityPickerOpen] = useState(false);
 
@@ -62,7 +70,26 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
     enabled: !!forwarderId && open,
   });
 
-  // Cities for the selected country (only when a 2-letter ISO is typed)
+  // Provinces for the selected country
+  const { data: provinces = [] } = useQuery({
+    queryKey: ["provinces-by-country", country.toUpperCase()],
+    queryFn: async () => {
+      const cc = country.trim().toUpperCase();
+      if (cc.length !== 2) return [];
+      const { data, error } = await sb
+        .from("provinces")
+        .select("id,name,country_code")
+        .eq("country_code", cc)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Province[];
+    },
+    enabled: country.trim().length === 2,
+  });
+
+  // Cities for the selected country (filtered client-side by province if chosen)
   const { data: cities = [] } = useQuery({
     queryKey: ["cities-by-country", country.toUpperCase()],
     queryFn: async () => {
@@ -70,7 +97,7 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
       if (cc.length !== 2) return [];
       const { data, error } = await sb
         .from("cities")
-        .select("id,name,country_code")
+        .select("id,name,country_code,province_id")
         .eq("country_code", cc)
         .eq("is_active", true)
         .order("name", { ascending: true })
@@ -81,9 +108,14 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
     enabled: country.trim().length === 2,
   });
 
+  const filteredCities = useMemo(
+    () => provinceId ? cities.filter((c) => c.province_id === provinceId) : cities,
+    [cities, provinceId],
+  );
+
   const selectedCity = useMemo(
-    () => cities.find((c) => c.id === cityId) ?? null,
-    [cities, cityId],
+    () => filteredCities.find((c) => c.id === cityId) ?? null,
+    [filteredCities, cityId],
   );
 
   const add = useMutation({
