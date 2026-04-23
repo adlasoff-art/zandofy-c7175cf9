@@ -2189,6 +2189,219 @@ export type Database = {
           },
         ]
       }
+      forwarder_cbm_tiers: {
+        Row: {
+          created_at: string
+          id: string
+          is_quote_only: boolean
+          max_cbm: number | null
+          min_cbm: number
+          price_per_cbm: number | null
+          profile_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_quote_only?: boolean
+          max_cbm?: number | null
+          min_cbm?: number
+          price_per_cbm?: number | null
+          profile_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_quote_only?: boolean
+          max_cbm?: number | null
+          min_cbm?: number
+          price_per_cbm?: number | null
+          profile_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forwarder_cbm_tiers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "forwarder_pricing_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forwarder_cbm_tiers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_forwarder_profiles_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forwarder_piece_tiers: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          custom_label: string | null
+          id: string
+          includes_customs: boolean
+          min_quantity: number
+          price: number
+          pricing_unit: string
+          profile_id: string
+          sort_order: number
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          custom_label?: string | null
+          id?: string
+          includes_customs?: boolean
+          min_quantity?: number
+          price: number
+          pricing_unit?: string
+          profile_id: string
+          sort_order?: number
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          custom_label?: string | null
+          id?: string
+          includes_customs?: boolean
+          min_quantity?: number
+          price?: number
+          pricing_unit?: string
+          profile_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forwarder_piece_tiers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "forwarder_pricing_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forwarder_piece_tiers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_forwarder_profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fpt_category_fk"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forwarder_pricing_profiles: {
+        Row: {
+          city_id: string | null
+          country_code: string
+          created_at: string
+          currency: string
+          deposit_pct: number
+          deposit_threshold_cbm: number | null
+          forwarder_id: string
+          id: string
+          is_active: boolean
+          mode: string
+          notes: string | null
+          transit_max_days: number | null
+          transit_min_days: number | null
+          updated_at: string
+        }
+        Insert: {
+          city_id?: string | null
+          country_code: string
+          created_at?: string
+          currency?: string
+          deposit_pct?: number
+          deposit_threshold_cbm?: number | null
+          forwarder_id: string
+          id?: string
+          is_active?: boolean
+          mode: string
+          notes?: string | null
+          transit_max_days?: number | null
+          transit_min_days?: number | null
+          updated_at?: string
+        }
+        Update: {
+          city_id?: string | null
+          country_code?: string
+          created_at?: string
+          currency?: string
+          deposit_pct?: number
+          deposit_threshold_cbm?: number | null
+          forwarder_id?: string
+          id?: string
+          is_active?: boolean
+          mode?: string
+          notes?: string | null
+          transit_max_days?: number | null
+          transit_min_days?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fpp_city_fk"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forwarder_restrictions: {
+        Row: {
+          created_at: string
+          icon: string | null
+          id: string
+          label: string
+          profile_id: string
+          restriction_type: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          label: string
+          profile_id: string
+          restriction_type: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          label?: string
+          profile_id?: string
+          restriction_type?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forwarder_restrictions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "forwarder_pricing_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forwarder_restrictions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_forwarder_profiles_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gift_cards: {
         Row: {
           code: string
@@ -7168,6 +7381,62 @@ export type Database = {
         }
         Relationships: []
       }
+      v_forwarder_profiles_public: {
+        Row: {
+          city_id: string | null
+          country_code: string | null
+          created_at: string | null
+          currency: string | null
+          deposit_pct: number | null
+          deposit_threshold_cbm: number | null
+          forwarder_id: string | null
+          id: string | null
+          is_active: boolean | null
+          mode: string | null
+          transit_max_days: number | null
+          transit_min_days: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          city_id?: string | null
+          country_code?: string | null
+          created_at?: string | null
+          currency?: string | null
+          deposit_pct?: number | null
+          deposit_threshold_cbm?: number | null
+          forwarder_id?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          mode?: string | null
+          transit_max_days?: number | null
+          transit_min_days?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          city_id?: string | null
+          country_code?: string | null
+          created_at?: string | null
+          currency?: string | null
+          deposit_pct?: number | null
+          deposit_threshold_cbm?: number | null
+          forwarder_id?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          mode?: string | null
+          transit_max_days?: number | null
+          transit_min_days?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fpp_city_fk"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       add_guest_support_message: {
@@ -7420,6 +7689,10 @@ export type Database = {
       increment_helpful: { Args: { review_id: string }; Returns: undefined }
       is_kyc_order_blocked: { Args: { p_user_id: string }; Returns: boolean }
       is_kyc_verified: { Args: { p_user_id: string }; Returns: boolean }
+      quote_forwarder: {
+        Args: { p_items: Json; p_profile_id: string; p_total_cbm?: number }
+        Returns: Json
+      }
       refresh_store_online_status: {
         Args: { p_store_id: string }
         Returns: undefined

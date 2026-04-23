@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ForwarderFormDialog, type Forwarder } from "./ForwarderFormDialog";
 import { ForwarderCoverageDialog } from "./ForwarderCoverageDialog";
 import { ForwarderTiersDialog } from "./ForwarderTiersDialog";
+import { ForwarderPricingProfilesDialog } from "./ForwarderPricingProfilesDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +30,7 @@ export function ForwardersList() {
   const [editing, setEditing] = useState<Forwarder | null>(null);
   const [coverageFor, setCoverageFor] = useState<Forwarder | null>(null);
   const [tiersFor, setTiersFor] = useState<Forwarder | null>(null);
+  const [profilesFor, setProfilesFor] = useState<Forwarder | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Forwarder | null>(null);
 
   const { data: rows = [], isLoading } = useQuery({
@@ -115,8 +117,11 @@ export function ForwardersList() {
                   <Button size="icon" variant="ghost" title="Couverture" onClick={() => setCoverageFor(f)}>
                     <MapPin size={14} />
                   </Button>
-                  <Button size="icon" variant="ghost" title="Tarifs" onClick={() => setTiersFor(f)}>
+                  <Button size="icon" variant="ghost" title="Tarifs (paliers CBM, pièces, règles)" onClick={() => setProfilesFor(f)}>
                     <DollarSign size={14} />
+                  </Button>
+                  <Button size="icon" variant="ghost" title="Multiplicateurs (legacy)" onClick={() => setTiersFor(f)}>
+                    <span className="text-[10px] font-bold">×</span>
                   </Button>
                   <Button size="icon" variant="ghost" title="Modifier" onClick={() => { setEditing(f); setFormOpen(true); }}>
                     <Pencil size={14} />
@@ -147,6 +152,12 @@ export function ForwardersList() {
           onOpenChange={(v) => !v && setTiersFor(null)}
           forwarderId={tiersFor?.id ?? null}
           forwarderName={tiersFor?.name}
+        />
+        <ForwarderPricingProfilesDialog
+          open={!!profilesFor}
+          onOpenChange={(v) => !v && setProfilesFor(null)}
+          forwarderId={profilesFor?.id ?? null}
+          forwarderName={profilesFor?.name}
         />
         <AlertDialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
           <AlertDialogContent>
