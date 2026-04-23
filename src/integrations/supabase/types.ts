@@ -7588,6 +7588,24 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_get_user_label: {
+        Args: { p_user_id: string }
+        Returns: {
+          display_label: string
+          email: string
+          id: string
+        }[]
+      }
+      admin_search_users: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          display_label: string
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+        }[]
+      }
       can_access_store_orders: {
         Args: { _store_id: string; _user_id: string }
         Returns: boolean

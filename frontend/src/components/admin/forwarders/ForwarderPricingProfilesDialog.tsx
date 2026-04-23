@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { CbmTiersEditor } from "./CbmTiersEditor";
 import { PieceTiersEditor } from "./PieceTiersEditor";
 import { RestrictionsEditor } from "./RestrictionsEditor";
+import { TransporterUserPicker } from "./TransporterUserPicker";
 
 const sb = supabase as any;
 
@@ -32,6 +33,7 @@ interface Profile {
   id?: string;
   forwarder_id: string;
   mode: "sea" | "air" | "road" | "rail";
+  service_class: "express" | "standard" | "economy" | "vip";
   country_code: string;
   city_id: string | null;
   currency: string;
@@ -39,9 +41,18 @@ interface Profile {
   transit_max_days: number | null;
   deposit_pct: number;
   deposit_threshold_cbm: number | null;
+  volumetric_divisor: number | null;
+  linked_transporter_user_id: string | null;
   notes: string | null;
   is_active: boolean;
 }
+
+const SERVICE_LABEL: Record<string, string> = {
+  express: "Express",
+  standard: "Standard",
+  economy: "Économique",
+  vip: "VIP",
+};
 
 const MODE_ICON: Record<string, React.ReactNode> = {
   sea: <Ship size={12} />,
@@ -120,10 +131,13 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
   const [newOpen, setNewOpen] = useState(false);
   const [draft, setDraft] = useState<Partial<Profile>>({
     mode: "sea",
+    service_class: "standard",
     country_code: "CD",
     city_id: null,
     currency: "USD",
     deposit_pct: 0,
+    volumetric_divisor: null,
+    linked_transporter_user_id: null,
     is_active: true,
   });
 
@@ -155,6 +169,19 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                     <option value="air">Aérien</option>
                     <option value="road">Routier</option>
                     <option value="rail">Ferroviaire</option>
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-xs">Classe de service</Label>
+                  <select
+                    className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    value={draft.service_class ?? "standard"}
+                    onChange={e => setDraft({ ...draft, service_class: e.target.value as any })}
+                  >
+                    <option value="express">Express</option>
+                    <option value="standard">Standard</option>
+                    <option value="economy">Économique</option>
+                    <option value="vip">VIP</option>
                   </select>
                 </div>
                 <div>
@@ -201,6 +228,23 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                   <Label className="text-xs">Seuil acompte (CBM)</Label>
                   <Input type="number" value={draft.deposit_threshold_cbm ?? ""} onChange={e => setDraft({ ...draft, deposit_threshold_cbm: e.target.value ? +e.target.value : null })} placeholder="ex: 10" />
                 </div>
+                <div>
+                  <Label className="text-xs">Diviseur volumétrique</Label>
+                  <Input
+                    type="number"
+                    value={draft.volumetric_divisor ?? ""}
+                    onChange={e => setDraft({ ...draft, volumetric_divisor: e.target.value ? +e.target.value : null })}
+                    placeholder={draft.mode === "air" ? "6000" : draft.mode === "road" ? "5000" : "—"}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">Compte transporteur (override pour ce profil)</Label>
+                  <TransporterUserPicker
+                    value={draft.linked_transporter_user_id ?? null}
+                    onChange={(uid) => setDraft({ ...draft, linked_transporter_user_id: uid })}
+                    placeholder="Hériter du transitaire"
+                  />
+                </div>
               </div>
               <Button
                 size="sm"
@@ -208,7 +252,17 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                 onClick={() => {
                   create.mutate(draft);
                   setNewOpen(false);
-                  setDraft({ mode: "sea", country_code: "CD", city_id: null, currency: "USD", deposit_pct: 0, is_active: true });
+                  setDraft({
+                    mode: "sea",
+                    service_class: "standard",
+                    country_code: "CD",
+                    city_id: null,
+                    currency: "USD",
+                    deposit_pct: 0,
+                    volumetric_divisor: null,
+                    linked_transporter_user_id: null,
+                    is_active: true,
+                  });
                 }}
               >
                 Créer le profil
@@ -232,6 +286,9 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                       <div className="flex items-center gap-2 flex-1 text-left">
                         <Badge variant="outline" className="gap-1 text-[10px]">
                           {MODE_ICON[p.mode]} {MODE_LABEL[p.mode]}
+                        </Badge>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {SERVICE_LABEL[p.service_class] ?? p.service_class}
                         </Badge>
                         <span className="text-sm font-medium">
                           🌍 {p.country_code}{cityName ? ` · ${cityName}` : ""}
@@ -264,6 +321,46 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                           >
                             <Trash2 size={14} className="mr-1" /> Supprimer profil
                           </Button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 px-1">
+                          <div>
+                            <Label className="text-xs">Classe de service</Label>
+                            <select
+                              className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                              value={p.service_class ?? "standard"}
+                              onChange={e => update.mutate({ id: p.id!, patch: { service_class: e.target.value as any } })}
+                            >
+                              <option value="express">Express</option>
+                              <option value="standard">Standard</option>
+                              <option value="economy">Économique</option>
+                              <option value="vip">VIP</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Diviseur volumétrique</Label>
+                            <Input
+                              type="number"
+                              value={p.volumetric_divisor ?? ""}
+                              placeholder={p.mode === "air" ? "6000" : p.mode === "road" ? "5000" : "—"}
+                              onChange={e =>
+                                update.mutate({
+                                  id: p.id!,
+                                  patch: { volumetric_divisor: e.target.value ? +e.target.value : null },
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Label className="text-xs">Compte transporteur (override)</Label>
+                            <TransporterUserPicker
+                              value={p.linked_transporter_user_id ?? null}
+                              onChange={(uid) =>
+                                update.mutate({ id: p.id!, patch: { linked_transporter_user_id: uid } })
+                              }
+                              placeholder="Hériter du transitaire"
+                            />
+                          </div>
                         </div>
 
                         <CbmTiersEditor profileId={p.id!} currency={p.currency} />

@@ -28,6 +28,13 @@ interface City {
   id: string;
   name: string;
   country_code: string;
+  province_id?: string | null;
+}
+
+interface Province {
+  id: string;
+  name: string;
+  country_code: string;
 }
 
 interface Props {
@@ -40,6 +47,7 @@ interface Props {
 export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwarderName }: Props) {
   const qc = useQueryClient();
   const [country, setCountry] = useState("");
+  const [provinceId, setProvinceId] = useState<string | null>(null);
   const [cityId, setCityId] = useState<string | null>(null);
   const [cityPickerOpen, setCityPickerOpen] = useState(false);
 
@@ -62,7 +70,26 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
     enabled: !!forwarderId && open,
   });
 
-  // Cities for the selected country (only when a 2-letter ISO is typed)
+  // Provinces for the selected country
+  const { data: provinces = [] } = useQuery({
+    queryKey: ["provinces-by-country", country.toUpperCase()],
+    queryFn: async () => {
+      const cc = country.trim().toUpperCase();
+      if (cc.length !== 2) return [];
+      const { data, error } = await sb
+        .from("provinces")
+        .select("id,name,country_code")
+        .eq("country_code", cc)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Province[];
+    },
+    enabled: country.trim().length === 2,
+  });
+
+  // Cities for the selected country (filtered client-side by province if chosen)
   const { data: cities = [] } = useQuery({
     queryKey: ["cities-by-country", country.toUpperCase()],
     queryFn: async () => {
@@ -70,7 +97,7 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
       if (cc.length !== 2) return [];
       const { data, error } = await sb
         .from("cities")
-        .select("id,name,country_code")
+        .select("id,name,country_code,province_id")
         .eq("country_code", cc)
         .eq("is_active", true)
         .order("name", { ascending: true })
@@ -81,9 +108,14 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
     enabled: country.trim().length === 2,
   });
 
+  const filteredCities = useMemo(
+    () => provinceId ? cities.filter((c) => c.province_id === provinceId) : cities,
+    [cities, provinceId],
+  );
+
   const selectedCity = useMemo(
-    () => cities.find((c) => c.id === cityId) ?? null,
-    [cities, cityId],
+    () => filteredCities.find((c) => c.id === cityId) ?? null,
+    [filteredCities, cityId],
   );
 
   const add = useMutation({
@@ -101,7 +133,7 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
     },
     onSuccess: () => {
       toast.success("Couverture ajoutée");
-      setCountry(""); setCityId(null);
+      setCountry(""); setProvinceId(null); setCityId(null);
       qc.invalidateQueries({ queryKey: ["forwarder-coverage", forwarderId] });
     },
     onError: (e: any) => toast.error(e.message ?? "Erreur"),
@@ -136,15 +168,36 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-[110px_1fr_auto] gap-2 items-end">
+          <div className="grid grid-cols-[90px_1fr_1fr_auto] gap-2 items-end">
             <div>
               <Label className="text-xs">Code pays *</Label>
               <Input
                 value={country}
-                onChange={(e) => { setCountry(e.target.value.toUpperCase()); setCityId(null); }}
+                onChange={(e) => {
+                  setCountry(e.target.value.toUpperCase());
+                  setProvinceId(null);
+                  setCityId(null);
+                }}
                 placeholder="CD"
                 maxLength={2}
               />
+            </div>
+            <div>
+              <Label className="text-xs">Province (optionnel)</Label>
+              <select
+                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-50"
+                value={provinceId ?? ""}
+                disabled={country.trim().length !== 2 || provinces.length === 0}
+                onChange={(e) => {
+                  setProvinceId(e.target.value || null);
+                  setCityId(null);
+                }}
+              >
+                <option value="">— Toutes les provinces —</option>
+                {provinces.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <Label className="text-xs">Ville (optionnel)</Label>
@@ -175,7 +228,7 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
                           <Check size={14} className={cn("mr-2", !cityId ? "opacity-100" : "opacity-0")} />
                           <em className="text-muted-foreground">Tout le pays</em>
                         </CommandItem>
-                        {cities.map((c) => (
+                        {filteredCities.map((c) => (
                           <CommandItem
                             key={c.id}
                             value={c.name}

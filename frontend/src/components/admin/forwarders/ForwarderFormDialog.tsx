@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Loader2, Upload, X } from "lucide-react";
 import { z } from "zod";
+import { TransporterUserPicker } from "./TransporterUserPicker";
 
 export interface Forwarder {
   id?: string;
@@ -21,6 +22,7 @@ export interface Forwarder {
   contact_email?: string | null;
   contact_phone?: string | null;
   is_active?: boolean;
+  linked_transporter_user_id?: string | null;
 }
 
 const slugify = (s: string) =>
@@ -35,6 +37,7 @@ const forwarderSchema = z.object({
   description: z.string().trim().max(500).nullable().optional(),
   contact_email: z.string().trim().email("Email invalide").max(255).or(z.literal("")).nullable().optional(),
   contact_phone: z.string().trim().max(32).nullable().optional(),
+  linked_transporter_user_id: z.string().uuid().nullable().optional(),
 });
 
 interface Props {
@@ -49,6 +52,7 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
   const [form, setForm] = useState<Forwarder>({
     name: "", slug: "", logo_url: "", description: "",
     contact_email: "", contact_phone: "", is_active: true,
+    linked_transporter_user_id: null,
   });
   const [uploading, setUploading] = useState(false);
 
@@ -57,6 +61,7 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
     else setForm({
       name: "", slug: "", logo_url: "", description: "",
       contact_email: "", contact_phone: "", is_active: true,
+      linked_transporter_user_id: null,
     });
   }, [forwarder, open]);
 
@@ -97,6 +102,7 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
         description: payload.description || null,
         contact_email: payload.contact_email || null,
         contact_phone: payload.contact_phone || null,
+        linked_transporter_user_id: payload.linked_transporter_user_id || null,
       });
       if (!parsed.success) {
         throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
@@ -219,6 +225,19 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
 
           <div className="text-[11px] text-muted-foreground px-1">
             Le multiplicateur de prix est configuré par palier tarifaire (modes air/sea × tiers express/standard/vip) depuis l'icône <span className="font-semibold">$</span> de la liste.
+          </div>
+
+          <div className="space-y-1.5 p-3 border border-border rounded-lg bg-muted/20">
+            <Label className="text-sm">Compte transporteur lié (optionnel)</Label>
+            <TransporterUserPicker
+              value={form.linked_transporter_user_id ?? null}
+              onChange={(uid) => setForm({ ...form, linked_transporter_user_id: uid })}
+              placeholder="Rechercher un utilisateur…"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Si renseigné, le compte associé verra et gérera automatiquement les commandes assignées
+              à ce transitaire dans son espace transporteur.
+            </p>
           </div>
 
           <div className="flex items-center justify-between p-3 border border-border rounded-lg">
