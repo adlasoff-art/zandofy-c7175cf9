@@ -287,6 +287,9 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                         <Badge variant="outline" className="gap-1 text-[10px]">
                           {MODE_ICON[p.mode]} {MODE_LABEL[p.mode]}
                         </Badge>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {SERVICE_LABEL[p.service_class] ?? p.service_class}
+                        </Badge>
                         <span className="text-sm font-medium">
                           🌍 {p.country_code}{cityName ? ` · ${cityName}` : ""}
                         </span>
@@ -318,6 +321,46 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                           >
                             <Trash2 size={14} className="mr-1" /> Supprimer profil
                           </Button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 px-1">
+                          <div>
+                            <Label className="text-xs">Classe de service</Label>
+                            <select
+                              className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                              value={p.service_class ?? "standard"}
+                              onChange={e => update.mutate({ id: p.id!, patch: { service_class: e.target.value as any } })}
+                            >
+                              <option value="express">Express</option>
+                              <option value="standard">Standard</option>
+                              <option value="economy">Économique</option>
+                              <option value="vip">VIP</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Diviseur volumétrique</Label>
+                            <Input
+                              type="number"
+                              value={p.volumetric_divisor ?? ""}
+                              placeholder={p.mode === "air" ? "6000" : p.mode === "road" ? "5000" : "—"}
+                              onChange={e =>
+                                update.mutate({
+                                  id: p.id!,
+                                  patch: { volumetric_divisor: e.target.value ? +e.target.value : null },
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Label className="text-xs">Compte transporteur (override)</Label>
+                            <TransporterUserPicker
+                              value={p.linked_transporter_user_id ?? null}
+                              onChange={(uid) =>
+                                update.mutate({ id: p.id!, patch: { linked_transporter_user_id: uid } })
+                              }
+                              placeholder="Hériter du transitaire"
+                            />
+                          </div>
                         </div>
 
                         <CbmTiersEditor profileId={p.id!} currency={p.currency} />
