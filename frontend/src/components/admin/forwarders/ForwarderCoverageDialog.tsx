@@ -133,7 +133,7 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
     },
     onSuccess: () => {
       toast.success("Couverture ajoutée");
-      setCountry(""); setCityId(null);
+      setCountry(""); setProvinceId(null); setCityId(null);
       qc.invalidateQueries({ queryKey: ["forwarder-coverage", forwarderId] });
     },
     onError: (e: any) => toast.error(e.message ?? "Erreur"),
@@ -168,15 +168,36 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-[110px_1fr_auto] gap-2 items-end">
+          <div className="grid grid-cols-[90px_1fr_1fr_auto] gap-2 items-end">
             <div>
               <Label className="text-xs">Code pays *</Label>
               <Input
                 value={country}
-                onChange={(e) => { setCountry(e.target.value.toUpperCase()); setCityId(null); }}
+                onChange={(e) => {
+                  setCountry(e.target.value.toUpperCase());
+                  setProvinceId(null);
+                  setCityId(null);
+                }}
                 placeholder="CD"
                 maxLength={2}
               />
+            </div>
+            <div>
+              <Label className="text-xs">Province (optionnel)</Label>
+              <select
+                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-50"
+                value={provinceId ?? ""}
+                disabled={country.trim().length !== 2 || provinces.length === 0}
+                onChange={(e) => {
+                  setProvinceId(e.target.value || null);
+                  setCityId(null);
+                }}
+              >
+                <option value="">— Toutes les provinces —</option>
+                {provinces.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <Label className="text-xs">Ville (optionnel)</Label>
@@ -207,7 +228,7 @@ export function ForwarderCoverageDialog({ open, onOpenChange, forwarderId, forwa
                           <Check size={14} className={cn("mr-2", !cityId ? "opacity-100" : "opacity-0")} />
                           <em className="text-muted-foreground">Tout le pays</em>
                         </CommandItem>
-                        {cities.map((c) => (
+                        {filteredCities.map((c) => (
                           <CommandItem
                             key={c.id}
                             value={c.name}
