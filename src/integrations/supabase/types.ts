@@ -2199,6 +2199,7 @@ export type Database = {
           price_per_cbm: number | null
           profile_id: string
           sort_order: number
+          unit: string
         }
         Insert: {
           created_at?: string
@@ -2209,6 +2210,7 @@ export type Database = {
           price_per_cbm?: number | null
           profile_id: string
           sort_order?: number
+          unit?: string
         }
         Update: {
           created_at?: string
@@ -2219,6 +2221,7 @@ export type Database = {
           price_per_cbm?: number | null
           profile_id?: string
           sort_order?: number
+          unit?: string
         }
         Relationships: [
           {
@@ -2309,11 +2312,14 @@ export type Database = {
           forwarder_id: string
           id: string
           is_active: boolean
+          linked_transporter_user_id: string | null
           mode: string
           notes: string | null
+          service_class: string
           transit_max_days: number | null
           transit_min_days: number | null
           updated_at: string
+          volumetric_divisor: number | null
         }
         Insert: {
           city_id?: string | null
@@ -2325,11 +2331,14 @@ export type Database = {
           forwarder_id: string
           id?: string
           is_active?: boolean
+          linked_transporter_user_id?: string | null
           mode: string
           notes?: string | null
+          service_class?: string
           transit_max_days?: number | null
           transit_min_days?: number | null
           updated_at?: string
+          volumetric_divisor?: number | null
         }
         Update: {
           city_id?: string | null
@@ -2341,11 +2350,14 @@ export type Database = {
           forwarder_id?: string
           id?: string
           is_active?: boolean
+          linked_transporter_user_id?: string | null
           mode?: string
           notes?: string | null
+          service_class?: string
           transit_max_days?: number | null
           transit_min_days?: number | null
           updated_at?: string
+          volumetric_divisor?: number | null
         }
         Relationships: [
           {
@@ -2395,6 +2407,64 @@ export type Database = {
           },
           {
             foreignKeyName: "forwarder_restrictions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_forwarder_profiles_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forwarder_surcharges: {
+        Row: {
+          amount: number
+          category_id: string | null
+          created_at: string
+          currency: string
+          id: string
+          label: string
+          profile_id: string
+          sort_order: number
+          surcharge_type: string
+        }
+        Insert: {
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          label: string
+          profile_id: string
+          sort_order?: number
+          surcharge_type?: string
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          label?: string
+          profile_id?: string
+          sort_order?: number
+          surcharge_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forwarder_surcharges_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forwarder_surcharges_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "forwarder_pricing_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forwarder_surcharges_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "v_forwarder_profiles_public"
@@ -7393,9 +7463,12 @@ export type Database = {
           id: string | null
           is_active: boolean | null
           mode: string | null
+          notes: string | null
+          service_class: string | null
           transit_max_days: number | null
           transit_min_days: number | null
           updated_at: string | null
+          volumetric_divisor: number | null
         }
         Insert: {
           city_id?: string | null
@@ -7408,9 +7481,12 @@ export type Database = {
           id?: string | null
           is_active?: boolean | null
           mode?: string | null
+          notes?: string | null
+          service_class?: string | null
           transit_max_days?: number | null
           transit_min_days?: number | null
           updated_at?: string | null
+          volumetric_divisor?: number | null
         }
         Update: {
           city_id?: string | null
@@ -7423,9 +7499,12 @@ export type Database = {
           id?: string | null
           is_active?: boolean | null
           mode?: string | null
+          notes?: string | null
+          service_class?: string | null
           transit_max_days?: number | null
           transit_min_days?: number | null
           updated_at?: string | null
+          volumetric_divisor?: number | null
         }
         Relationships: [
           {
@@ -7765,7 +7844,13 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "manager" | "vendor" | "shipper" | "rider"
+      app_role:
+        | "admin"
+        | "manager"
+        | "vendor"
+        | "shipper"
+        | "rider"
+        | "forwarder"
       automation_channel:
         | "popup"
         | "push"
@@ -7931,7 +8016,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "vendor", "shipper", "rider"],
+      app_role: ["admin", "manager", "vendor", "shipper", "rider", "forwarder"],
       automation_channel: [
         "popup",
         "push",
