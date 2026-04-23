@@ -2367,6 +2367,13 @@ export type Database = {
             referencedRelation: "cities"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fpp_forwarder_fk"
+            columns: ["forwarder_id"]
+            isOneToOne: false
+            referencedRelation: "forwarders"
+            referencedColumns: ["id"]
+          },
         ]
       }
       forwarder_restrictions: {
@@ -2471,6 +2478,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      forwarders: {
+        Row: {
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          linked_transporter_user_id: string | null
+          logo_url: string | null
+          name: string
+          slug: string
+          sort_order: number
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          linked_transporter_user_id?: string | null
+          logo_url?: string | null
+          name: string
+          slug: string
+          sort_order?: number
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          linked_transporter_user_id?: string | null
+          logo_url?: string | null
+          name?: string
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: []
       }
       gift_cards: {
         Row: {
@@ -7512,6 +7567,13 @@ export type Database = {
             columns: ["city_id"]
             isOneToOne: false
             referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fpp_forwarder_fk"
+            columns: ["forwarder_id"]
+            isOneToOne: false
+            referencedRelation: "forwarders"
             referencedColumns: ["id"]
           },
         ]
