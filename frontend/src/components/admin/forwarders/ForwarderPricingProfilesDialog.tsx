@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { CbmTiersEditor } from "./CbmTiersEditor";
 import { PieceTiersEditor } from "./PieceTiersEditor";
 import { RestrictionsEditor } from "./RestrictionsEditor";
+import { TransporterUserPicker } from "./TransporterUserPicker";
 
 const sb = supabase as any;
 
@@ -32,6 +33,7 @@ interface Profile {
   id?: string;
   forwarder_id: string;
   mode: "sea" | "air" | "road" | "rail";
+  service_class: "express" | "standard" | "economy" | "vip";
   country_code: string;
   city_id: string | null;
   currency: string;
@@ -39,9 +41,18 @@ interface Profile {
   transit_max_days: number | null;
   deposit_pct: number;
   deposit_threshold_cbm: number | null;
+  volumetric_divisor: number | null;
+  linked_transporter_user_id: string | null;
   notes: string | null;
   is_active: boolean;
 }
+
+const SERVICE_LABEL: Record<string, string> = {
+  express: "Express",
+  standard: "Standard",
+  economy: "Économique",
+  vip: "VIP",
+};
 
 const MODE_ICON: Record<string, React.ReactNode> = {
   sea: <Ship size={12} />,
