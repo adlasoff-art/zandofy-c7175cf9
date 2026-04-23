@@ -7768,10 +7768,20 @@ export type Database = {
       increment_helpful: { Args: { review_id: string }; Returns: undefined }
       is_kyc_order_blocked: { Args: { p_user_id: string }; Returns: boolean }
       is_kyc_verified: { Args: { p_user_id: string }; Returns: boolean }
-      quote_forwarder: {
-        Args: { p_items: Json; p_profile_id: string; p_total_cbm?: number }
-        Returns: Json
-      }
+      quote_forwarder:
+        | {
+            Args: { p_items: Json; p_profile_id: string; p_total_cbm?: number }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_items: Json
+              p_profile_id: string
+              p_total_cbm?: number
+              p_total_weight_kg?: number
+            }
+            Returns: Json
+          }
       refresh_store_online_status: {
         Args: { p_store_id: string }
         Returns: undefined
