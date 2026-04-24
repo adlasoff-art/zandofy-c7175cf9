@@ -64,7 +64,8 @@ export async function searchProducts(filters: SearchFilters): Promise<Product[]>
       query = query.order("created_at", { ascending: false });
   }
 
-  const { data, error } = await query;
+  // Hard cap to protect DB I/O — search results are paginated client-side.
+  const { data, error } = await query.limit(96);
   if (error) {
     console.error("Search error:", error);
     return [];
