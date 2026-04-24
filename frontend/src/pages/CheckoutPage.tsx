@@ -732,6 +732,8 @@ export default function CheckoutPage() {
           forwarder_tier: selectedForwarder?.tier ?? null,
           forwarder_quoted_price: selectedForwarder ? preciseRound(selectedForwarder.quoted_price * ratio, 2) : null,
           forwarder_unassigned: !selectedForwarder && forwarderUnassigned,
+          // Lot 4D — Devis freight verrouillé (nouveau moteur Lot 3A)
+          freight_quote_id: lockedFreightQuoteId,
         } as any)
         .select("id")
         .single();
