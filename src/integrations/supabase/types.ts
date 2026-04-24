@@ -2315,13 +2315,19 @@ export type Database = {
           forwarder_id: string
           freight_quote_id: string | null
           id: string
+          intermediate_destination_city: string | null
           internal_notes: string | null
+          is_active: boolean
+          leg_index: number
           notification_payload: Json | null
           notified_at: string | null
           order_id: string
+          parent_handoff_id: string | null
           payment_currency: string
           payment_status: string
           profile_id: string | null
+          reassignment_reason: string | null
+          replaced_by_handoff_id: string | null
           status: string
           tracking_carrier: string | null
           tracking_number: string | null
@@ -2341,13 +2347,19 @@ export type Database = {
           forwarder_id: string
           freight_quote_id?: string | null
           id?: string
+          intermediate_destination_city?: string | null
           internal_notes?: string | null
+          is_active?: boolean
+          leg_index?: number
           notification_payload?: Json | null
           notified_at?: string | null
           order_id: string
+          parent_handoff_id?: string | null
           payment_currency?: string
           payment_status?: string
           profile_id?: string | null
+          reassignment_reason?: string | null
+          replaced_by_handoff_id?: string | null
           status?: string
           tracking_carrier?: string | null
           tracking_number?: string | null
@@ -2367,13 +2379,19 @@ export type Database = {
           forwarder_id?: string
           freight_quote_id?: string | null
           id?: string
+          intermediate_destination_city?: string | null
           internal_notes?: string | null
+          is_active?: boolean
+          leg_index?: number
           notification_payload?: Json | null
           notified_at?: string | null
           order_id?: string
+          parent_handoff_id?: string | null
           payment_currency?: string
           payment_status?: string
           profile_id?: string | null
+          reassignment_reason?: string | null
+          replaced_by_handoff_id?: string | null
           status?: string
           tracking_carrier?: string | null
           tracking_number?: string | null
@@ -2410,6 +2428,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "forwarder_handoffs_parent_handoff_id_fkey"
+            columns: ["parent_handoff_id"]
+            isOneToOne: false
+            referencedRelation: "forwarder_handoffs"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "forwarder_handoffs_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
@@ -2421,6 +2446,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "v_forwarder_profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forwarder_handoffs_replaced_by_handoff_id_fkey"
+            columns: ["replaced_by_handoff_id"]
+            isOneToOne: false
+            referencedRelation: "forwarder_handoffs"
             referencedColumns: ["id"]
           },
         ]
@@ -8117,6 +8149,15 @@ export type Database = {
         }
         Returns: Json
       }
+      add_intermediate_hub_handoff: {
+        Args: {
+          p_destination_city: string
+          p_hub_forwarder_id: string
+          p_order_id: string
+          p_reason?: string
+        }
+        Returns: string
+      }
       admin_get_user_label: {
         Args: { p_user_id: string }
         Returns: {
@@ -8404,6 +8445,15 @@ export type Database = {
             }
             Returns: Json
           }
+      reassign_forwarder: {
+        Args: {
+          p_actor_role?: string
+          p_handoff_id: string
+          p_new_forwarder_id: string
+          p_reason: string
+        }
+        Returns: string
+      }
       refresh_store_online_status: {
         Args: { p_store_id: string }
         Returns: undefined
