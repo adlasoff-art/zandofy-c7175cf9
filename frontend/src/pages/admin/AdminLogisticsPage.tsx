@@ -510,6 +510,75 @@ export default function AdminLogisticsPage() {
         </div>
       )}
 
+      {tab === "tracking" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Navigation size={16} className="text-primary" /> Suivi par commande
+            </h2>
+            <div className="relative w-full max-w-xs">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={trackingSearch}
+                onChange={(e) => setTrackingSearch(e.target.value)}
+                placeholder="Réf, téléphone, nom client…"
+                className="w-full pl-8 pr-3 py-2 text-xs bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
+          </div>
+
+          {activeDeliveries.length === 0 ? (
+            <div className="bg-card border border-border rounded-xl p-8 text-center">
+              <Bike size={28} className="mx-auto text-muted-foreground/40 mb-2" />
+              <p className="text-sm font-medium text-foreground">Aucune livraison en cours</p>
+              <p className="text-xs text-muted-foreground mt-1">Les livraisons en attente ou en cours apparaîtront ici.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {activeDeliveries
+                .filter((d: any) => {
+                  const q = trackingSearch.trim().toLowerCase();
+                  if (!q) return true;
+                  return (
+                    (d.order_ref || "").toLowerCase().includes(q) ||
+                    (d.customer_name || "").toLowerCase().includes(q) ||
+                    (d.customer_phone || "").toLowerCase().includes(q) ||
+                    (d.address || "").toLowerCase().includes(q)
+                  );
+                })
+                .map((d: any) => {
+                  const riderLoc = riderLocations.find((rl: any) => rl.rider_id === d.rider_id);
+                  const customerLoc = d.order_id ? customerLocations.find((cl: any) => cl.order_id === d.order_id) : null;
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setSelectedDelivery(d)}
+                      className="text-left bg-card border border-border rounded-xl p-4 space-y-2 hover:border-primary/50 hover:shadow-sm transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold font-mono text-foreground">{d.order_ref || `Manuel ${d.id.slice(0, 6)}`}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{statusLabels[d.status] || d.status}</span>
+                      </div>
+                      <p className="text-xs font-medium text-foreground">{d.customer_name}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{d.address}</p>
+                      <div className="flex items-center gap-3 pt-1 text-[10px] text-muted-foreground">
+                        <span className={riderLoc ? "text-primary" : ""}>● Livreur {riderLoc ? "GPS OK" : "hors ligne"}</span>
+                        <span className={customerLoc ? "text-primary" : ""}>● Client {customerLoc ? "GPS OK" : "hors ligne"}</span>
+                        <span className="ml-auto flex items-center gap-1 text-primary font-medium">
+                          <Navigation size={10} /> Suivre
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      )}
+
+      <OrderTrackingDrawer delivery={selectedDelivery} onClose={() => setSelectedDelivery(null)} />
+
       {/* Assign rider modal */}
       {assignModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setAssignModal(null)}>
