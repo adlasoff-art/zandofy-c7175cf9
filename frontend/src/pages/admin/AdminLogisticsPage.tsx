@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Truck, Bike, MapPin, CheckCircle, Package, Loader2, Store, Plus, X, Eye, UserPlus, ShoppingBag, Train } from "lucide-react";
+import { Truck, Bike, MapPin, CheckCircle, Package, Loader2, Store, Plus, X, Eye, UserPlus, ShoppingBag, Train, Search, Navigation } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -8,13 +8,15 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { DeliveryMap, type MapMarker } from "@/components/DeliveryMap";
 import { DeliveryProofLink } from "@/components/DeliveryProofImage";
+import { OrderTrackingDrawer } from "@/components/admin/logistics/OrderTrackingDrawer";
 
-type TabKey = "overview" | "deliveries" | "assign";
+type TabKey = "overview" | "deliveries" | "assign" | "tracking";
 
 export default function AdminLogisticsPage() {
   const [tab, setTab] = useState<TabKey>("overview");
   const [showCreate, setShowCreate] = useState(false);
-  const [selectedDelivery, setSelectedDelivery] = useState<string | null>(null);
+  const [selectedDelivery, setSelectedDelivery] = useState<any | null>(null);
+  const [trackingSearch, setTrackingSearch] = useState("");
   const queryClient = useQueryClient();
 
   // --- Shared queries ---
