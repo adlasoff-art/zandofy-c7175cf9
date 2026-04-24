@@ -166,6 +166,20 @@ const PRODUCT_SELECT_FALLBACK = `
   stores!products_store_id_fkey(id, name, is_verified, verified_years, created_at, is_online, sales_count, followers_count)
 `;
 
+// Lightweight SELECT for product LISTINGS (grids, carousels, search results).
+// Excludes heavy embeds (product_colors.image_url, full size measurements,
+// stores override fields) to drastically reduce seq_scan pressure on
+// product_images / product_colors / product_sizes in production.
+// Use PRODUCT_SELECT (above) only on the product detail page.
+export const PRODUCT_LIST_SELECT = `
+  *,
+  categories(name, name_fr),
+  product_images(image_url, position),
+  product_colors(color_hex, color_name),
+  product_sizes(size_label),
+  stores!products_store_id_fkey(id, name, is_verified, is_certified, is_online, shop_type)
+`;
+
 export async function fetchProducts(params?: {
   category?: string;
   limit?: number;
