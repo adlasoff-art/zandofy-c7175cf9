@@ -1,0 +1,189 @@
+/**
+ * freightQuoteCheckout.ts — Lot 4B
+ *
+ * Couche au-dessus de freightQuote.ts (Lot 3A) qui ajoute :
+ *  - récupération de TOUS les profils forwarder éligibles (destination + mode)
+ *  - composition d'un devis pour chaque profil
+ *  - persistance d'un devis verrouillé en base (table freight_quotes)
+ *  - consommation d'un devis lors de la création de commande
+ *
+ * Lecture seule sur forwarder_pricing_profiles / tiers (pas de mutation).
+ * Écriture uniquement sur freight_quotes (RLS user_id = auth.uid()).
+ */
+
+import { supabase } from "@/integrations/supabase/client";
+import {
+  composeFreightQuote,
+  fetchFreightProfileWithTiers,
+  type FreightItem,
+  type FreightQuoteResult,
+  type FreightProfile,
+} from "./freightQuote";
+
+export interface EligibleFreightOffer {
+  profile_id: string;
+  forwarder_id: string;
+  mode: string;
+  service_class: string;
+  country_code: string;
+  city_id: string | null;
+  quote: FreightQuoteResult;
+}
+
+export interface QuoteCheckoutInput {
+  destinationCountry: string;
+  destinationCityId?: string | null;
+  mode: string; // 'air' | 'sea' | 'express' | ...
+  items: FreightItem[];
+  totalCbm?: number;
+  totalWeightKg?: number;
+}
+
+/**
+ * Récupère tous les profils forwarder actifs pour la destination + mode,
+ * puis compose un devis pour chacun.
+ * Trié par prix croissant. Le premier est la "recommandation".
+ */
+export async function fetchEligibleFreightOffers(
+  input: QuoteCheckoutInput,
+): Promise<EligibleFreightOffer[]> {
+  // 1) Trouver les profils éligibles (lecture seule)
+  let query = (supabase as any)
+    .from("forwarder_pricing_profiles")
+    .select("id, forwarder_id, mode, service_class, country_code, city_id")
+    .eq("is_active", true)
+    .eq("country_code", input.destinationCountry)
+    .eq("mode", input.mode);
+
+  if (input.destinationCityId) {
+    // city_id NULL = profil pays-large ; cityId = profil ville-spécifique
+    query = query.or(`city_id.is.null,city_id.eq.${input.destinationCityId}`);
+  } else {
+    query = query.is("city_id", null);
+  }
+
+  const { data: profiles, error } = await query;
+  if (error || !profiles || profiles.length === 0) {
+    if (error) console.warn("[freightQuoteCheckout] eligible profiles fetch failed", error);
+    return [];
+  }
+
+  // 2) Composer un devis pour chaque profil (en parallèle)
+  const offers = await Promise.all(
+    (profiles as Array<{ id: string; forwarder_id: string; mode: string; service_class: string; country_code: string; city_id: string | null }>).map(
+      async (p) => {
+        const data = await fetchFreightProfileWithTiers(p.id);
+        if (!data) return null;
+        const quote = composeFreightQuote(data.profile, data.cbmTiers, data.pieceTiers, input.items, {
+          totalCbm: input.totalCbm,
+          totalWeightKg: input.totalWeightKg,
+        });
+        return {
+          profile_id: p.id,
+          forwarder_id: p.forwarder_id,
+          mode: p.mode,
+          service_class: p.service_class,
+          country_code: p.country_code,
+          city_id: p.city_id,
+          quote,
+        } satisfies EligibleFreightOffer;
+      },
+    ),
+  );
+
+  return offers
+    .filter((o): o is EligibleFreightOffer => o !== null)
+    .sort((a, b) => a.quote.total - b.quote.total);
+}
+
+/**
+ * Persiste un devis en base (status='locked') et renvoie son id.
+ * À appeler quand l'utilisateur valide son choix dans le checkout.
+ * RLS exige auth.uid() = user_id.
+ */
+export async function lockFreightQuote(params: {
+  userId: string;
+  offer: EligibleFreightOffer;
+  items: FreightItem[];
+  categoryId?: string | null;
+  restrictions?: Array<{ label: string; restriction_type: string; icon?: string | null }>;
+}): Promise<string | null> {
+  const { offer, userId, items, categoryId, restrictions } = params;
+  const piecesCount = items.reduce((acc, i) => acc + (i.quantity ?? 0), 0);
+
+  const { data, error } = await (supabase as any)
+    .from("freight_quotes")
+    .insert({
+      user_id: userId,
+      profile_id: offer.profile_id,
+      category_id: categoryId ?? null,
+      cbm: offer.quote.total_cbm,
+      weight_kg: offer.quote.total_chargeable_weight_kg,
+      pieces_count: piecesCount,
+      quoted_price: offer.quote.total,
+      currency: offer.quote.currency,
+      deposit_amount: offer.quote.deposit_amount,
+      deposit_pct: offer.quote.deposit_pct,
+      requires_deposit: offer.quote.deposit_required,
+      transit_min_days: offer.quote.transit_min_days,
+      transit_max_days: offer.quote.transit_max_days,
+      restrictions_snapshot: restrictions ?? [],
+      breakdown: {
+        lines: offer.quote.lines,
+        warnings: offer.quote.warnings,
+        forwarder_id: offer.forwarder_id,
+        mode: offer.mode,
+        service_class: offer.service_class,
+      },
+      status: "locked",
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (error || !data) {
+    console.warn("[freightQuoteCheckout] lockFreightQuote failed", error);
+    return null;
+  }
+  return (data as { id: string }).id;
+}
+
+/**
+ * Marque un devis comme consommé et le lie à une commande.
+ * À appeler juste après la création de l'order, dans la même transaction logique.
+ */
+export async function consumeFreightQuote(quoteId: string, orderId: string): Promise<boolean> {
+  const { error } = await (supabase as any)
+    .from("freight_quotes")
+    .update({ status: "consumed", order_id: orderId })
+    .eq("id", quoteId)
+    .eq("status", "locked");
+
+  if (error) {
+    console.warn("[freightQuoteCheckout] consumeFreightQuote failed", error);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Récupère un devis verrouillé pour vérification UI (rafraîchissement panier).
+ */
+export async function getFreightQuote(quoteId: string): Promise<{
+  id: string;
+  status: string;
+  quoted_price: number;
+  currency: string;
+  deposit_amount: number;
+  requires_deposit: boolean;
+  valid_until: string;
+} | null> {
+  const { data, error } = await (supabase as any)
+    .from("freight_quotes")
+    .select("id, status, quoted_price, currency, deposit_amount, requires_deposit, valid_until")
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data;
+}
+
+export type { FreightItem, FreightQuoteResult, FreightProfile };
