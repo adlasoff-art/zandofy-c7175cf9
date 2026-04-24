@@ -7,7 +7,7 @@ import {
   type City, type DynamicQuoteResult,
 } from "@/services/dynamic-shipping";
 import { ForwarderSelector, type ForwarderChoice } from "@/components/checkout/ForwarderSelector";
-import { FreightSelector } from "@/components/checkout/FreightSelector";
+import { FreightSelector, type ConsolidationChoice } from "@/components/checkout/FreightSelector";
 import type { EligibleFreightOffer } from "@/services/freightQuoteCheckout";
 
 const MODE_META = {
@@ -43,7 +43,8 @@ interface Props {
   selectedMode?: TransportMode;
   onShippingCostChange: (cost: number, mode: string) => void;
   onForwarderChange?: (choice: ForwarderChoice | null, unassigned: boolean) => void;
-  onFreightOfferChange?: (offer: EligibleFreightOffer | null) => void;
+  onFreightOfferChange?: (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => void;
+  onFreightAvailabilityChange?: (count: number) => void;
 }
 
 function preciseRound(v: number, d: number): number {
@@ -59,6 +60,7 @@ export function CheckoutShippingCalculator({
   onShippingCostChange,
   onForwarderChange,
   onFreightOfferChange,
+  onFreightAvailabilityChange,
 }: Props) {
   const [products, setProducts] = useState<CartProductInfo[]>([]);
   const [destCity, setDestCity] = useState<City | null>(null);
@@ -80,6 +82,7 @@ export function CheckoutShippingCalculator({
   const [forwarderUnassigned, setForwarderUnassigned] = useState(false);
   // Lot 4D — Nouveau moteur freight (coexistence conditionnelle avec legacy)
   const [freightOffer, setFreightOffer] = useState<EligibleFreightOffer | null>(null);
+  const [freightChoice, setFreightChoice] = useState<ConsolidationChoice>("split");
   const [hasEligibleFreight, setHasEligibleFreight] = useState(false);
 
   // 1. Fetch product details (weight, dimensions, origin, category) for cart items
@@ -363,7 +366,12 @@ export function CheckoutShippingCalculator({
   useEffect(() => {
     // Lot 4D — Si une offre freight (nouveau moteur) est sélectionnée, on l'utilise comme prix
     if (freightOffer) {
-      onShippingCostChange(freightOffer.quote.total, activeMode);
+      const co = freightOffer.consolidation_offer;
+      const effective =
+        freightChoice === "consolidated" && co?.available
+          ? co.consolidated_total
+          : (freightOffer.split_total ?? freightOffer.quote.total);
+      onShippingCostChange(effective, activeMode);
       return;
     }
     const selected = modeTotals.get(activeMode);
@@ -371,7 +379,7 @@ export function CheckoutShippingCalculator({
     const multiplier = forwarderChoice ? Number(forwarderChoice.price_multiplier || 1) : 1;
     const adjusted = Math.round(base * multiplier * 100) / 100;
     onShippingCostChange(adjusted, activeMode);
-  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice, freightOffer]);
+  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice, freightOffer, freightChoice]);
 
   const handleForwarderChange = useCallback(
     (choice: ForwarderChoice | null, unassigned: boolean) => {
@@ -383,10 +391,11 @@ export function CheckoutShippingCalculator({
   );
 
   const handleFreightOfferChange = useCallback(
-    (offer: EligibleFreightOffer | null) => {
+    (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => {
       setFreightOffer(offer);
+      setFreightChoice(choice ?? "split");
       setHasEligibleFreight(offer !== null);
-      onFreightOfferChange?.(offer);
+      onFreightOfferChange?.(offer, choice);
     },
     [onFreightOfferChange],
   );
@@ -621,6 +630,7 @@ export function CheckoutShippingCalculator({
             totalCbm={totalVolume}
             totalWeightKg={totalWeight / 1000}
             onChange={handleFreightOfferChange}
+            onAvailabilityChange={onFreightAvailabilityChange}
           />
           {!hasEligibleFreight && (
             <ForwarderSelector

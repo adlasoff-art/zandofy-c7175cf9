@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckoutShippingCalculator } from "@/components/CheckoutShippingCalculator";
 import type { ForwarderChoice } from "@/components/checkout/ForwarderSelector";
+import type { ConsolidationChoice } from "@/components/checkout/FreightSelector";
 import {
   lockFreightQuote,
   consumeFreightQuote,
@@ -174,8 +175,17 @@ export default function CheckoutPage() {
 
   // Lot 4D — Nouveau moteur freight (offre Lot 3A si profil éligible)
   const [selectedFreightOffer, setSelectedFreightOffer] = useState<EligibleFreightOffer | null>(null);
-  const handleFreightOfferChange = useCallback((offer: EligibleFreightOffer | null) => {
-    setSelectedFreightOffer(offer);
+  const [freightChoice, setFreightChoice] = useState<ConsolidationChoice>("split");
+  const [freightOffersAvailable, setFreightOffersAvailable] = useState(0);
+  const handleFreightOfferChange = useCallback(
+    (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => {
+      setSelectedFreightOffer(offer);
+      setFreightChoice(choice ?? "split");
+    },
+    [],
+  );
+  const handleFreightAvailabilityChange = useCallback((count: number) => {
+    setFreightOffersAvailable(count);
   }, []);
 
   // Free shipping threshold from platform settings
@@ -611,6 +621,16 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Lot 4G — Si des transitaires sont disponibles, le client doit en choisir un.
+    if (freightOffersAvailable > 0 && !selectedFreightOffer) {
+      toast({
+        title: "Transitaire requis",
+        description: "Veuillez sélectionner un transitaire avant de continuer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Save address if checked
     if (saveAddress && user) {
       const { error } = await supabase.from("saved_addresses").insert({
@@ -673,6 +693,7 @@ export default function CheckoutPage() {
           items: selectedFreightOffer.quote.lines.map((l: any) => ({
             quantity: l.quantity ?? 1,
           })),
+          consolidationChoice: freightChoice,
         });
       } catch (err) {
         console.warn("[CheckoutPage] lockFreightQuote failed (non-blocking)", err);
@@ -1779,6 +1800,7 @@ export default function CheckoutPage() {
                     onShippingCostChange={handleShippingCostChange}
                     onForwarderChange={handleForwarderChange}
                     onFreightOfferChange={handleFreightOfferChange}
+                    onFreightAvailabilityChange={handleFreightAvailabilityChange}
                   />
                 </div>
 

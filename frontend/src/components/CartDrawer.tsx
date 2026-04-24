@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Minus, Plus, Trash2, ShoppingBag, CheckSquare, Square } from "lucide-react";
 import { Link } from "react-router-dom";
 import { CartItemVariantEditor } from "@/components/CartItemVariantEditor";
+import { CartFreightPreview } from "@/components/cart/CartFreightPreview";
 
 export function CartDrawer() {
   const {
@@ -120,6 +121,14 @@ export function CartDrawer() {
                 <span className="text-muted-foreground">{t("cart.subtotal")} ({selectedCount} {t("cart.selected")})</span>
                 <span className="font-bold text-foreground">${selectedSubtotal.toFixed(2)}</span>
               </div>
+              {user && selectedCount > 0 && (
+                <CartFreightPreview
+                  userId={user.id}
+                  items={items
+                    .filter((i) => i.selected && i.productId)
+                    .map((i) => ({ productId: i.productId, quantity: i.quantity }))}
+                />
+              )}
               <p className="text-xs text-muted-foreground">{t("cart.shippingAtCheckout")}</p>
               {noneSelected ? (
                 <Button className="w-full h-12 font-bold" disabled>
