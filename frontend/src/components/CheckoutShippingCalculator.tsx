@@ -361,12 +361,17 @@ export function CheckoutShippingCalculator({
 
   // Notify parent of shipping cost changes
   useEffect(() => {
+    // Lot 4D — Si une offre freight (nouveau moteur) est sélectionnée, on l'utilise comme prix
+    if (freightOffer) {
+      onShippingCostChange(freightOffer.quote.total, activeMode);
+      return;
+    }
     const selected = modeTotals.get(activeMode);
     const base = selected?.total || 0;
     const multiplier = forwarderChoice ? Number(forwarderChoice.price_multiplier || 1) : 1;
     const adjusted = Math.round(base * multiplier * 100) / 100;
     onShippingCostChange(adjusted, activeMode);
-  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice]);
+  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice, freightOffer]);
 
   const handleForwarderChange = useCallback(
     (choice: ForwarderChoice | null, unassigned: boolean) => {
@@ -375,6 +380,15 @@ export function CheckoutShippingCalculator({
       onForwarderChange?.(choice, unassigned);
     },
     [onForwarderChange],
+  );
+
+  const handleFreightOfferChange = useCallback(
+    (offer: EligibleFreightOffer | null) => {
+      setFreightOffer(offer);
+      setHasEligibleFreight(offer !== null);
+      onFreightOfferChange?.(offer);
+    },
+    [onFreightOfferChange],
   );
 
   // Aggregate cart info
