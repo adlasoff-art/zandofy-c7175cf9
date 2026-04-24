@@ -12,9 +12,11 @@
  */
 
 import { useEffect, useState } from "react";
-import { Truck, Package, Layers, BadgeDollarSign, Clock, Loader2 } from "lucide-react";
+import { Truck, Package, Layers, BadgeDollarSign, Clock, Loader2, Repeat } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { InternationalShipmentTimeline } from "./InternationalShipmentTimeline";
+import { Button } from "@/components/ui/button";
+import { ReassignForwarderDialog } from "@/components/forwarder/ReassignForwarderDialog";
 
 interface SubpackageRow {
   supplier_id: string;
@@ -62,10 +64,22 @@ const MODE_LABELS: Record<string, string> = {
   express: "Express",
 };
 
-export function FreightDetailsPanel({ orderId }: { orderId: string }) {
+export function FreightDetailsPanel({
+  orderId,
+  actor,
+}: {
+  orderId: string;
+  /** Si défini, affiche le bouton "Changer transitaire". */
+  actor?: "vendor" | "admin";
+}) {
   const [loading, setLoading] = useState(true);
   const [quote, setQuote] = useState<FreightQuoteRow | null>(null);
   const [forwarderName, setForwarderName] = useState<string | null>(null);
+  const [activeHandoffId, setActiveHandoffId] = useState<string | null>(null);
+  const [shippingCountry, setShippingCountry] = useState<string | null>(null);
+  const [shippingCity, setShippingCity] = useState<string | null>(null);
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,11 +89,15 @@ export function FreightDetailsPanel({ orderId }: { orderId: string }) {
       // 1) Récupérer freight_quote_id depuis la commande
       const { data: order } = await (supabase as any)
         .from("orders")
-        .select("freight_quote_id")
+        .select("freight_quote_id, shipping_country, shipping_city")
         .eq("id", orderId)
         .maybeSingle();
 
       const quoteId = (order as any)?.freight_quote_id;
+      if (!cancelled) {
+        setShippingCountry((order as any)?.shipping_country ?? null);
+        setShippingCity((order as any)?.shipping_city ?? null);
+      }
       if (!quoteId) {
         if (!cancelled) {
           setQuote(null);
@@ -122,6 +140,18 @@ export function FreightDetailsPanel({ orderId }: { orderId: string }) {
         setForwarderName(fwName);
         setLoading(false);
       }
+
+      // 4) Charger le handoff actif (leg 0) pour réassignation
+      if (actor) {
+        const { data: ho } = await (supabase as any)
+          .from("forwarder_handoffs")
+          .select("id")
+          .eq("order_id", orderId)
+          .eq("is_active", true)
+          .eq("leg_index", 0)
+          .maybeSingle();
+        if (!cancelled) setActiveHandoffId((ho as any)?.id ?? null);
+      }
     })().catch(() => {
       if (!cancelled) setLoading(false);
     });
@@ -129,7 +159,7 @@ export function FreightDetailsPanel({ orderId }: { orderId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [orderId]);
+  }, [orderId, actor, reloadKey]);
 
   if (loading) {
     return (
@@ -177,6 +207,23 @@ export function FreightDetailsPanel({ orderId }: { orderId: string }) {
           </p>
         </div>
       </div>
+
+      {actor && (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-[11px] gap-1"
+            onClick={() => setReassignOpen(true)}
+            disabled={!activeHandoffId && actor === "vendor"}
+            title={!activeHandoffId && actor === "vendor" ? "Aucun handoff actif" : undefined}
+          >
+            <Repeat size={11} />
+            {actor === "admin" ? "Réassigner / router" : "Changer transitaire"}
+          </Button>
+        </div>
+      )}
 
       {/* Mode split / groupé */}
       <div className="flex items-center gap-2 text-[11px]">
@@ -257,6 +304,21 @@ export function FreightDetailsPanel({ orderId }: { orderId: string }) {
             </p>
           )}
         </details>
+      )}
+
+      {actor && (
+        <ReassignForwarderDialog
+          open={reassignOpen}
+          onOpenChange={setReassignOpen}
+          mode={actor}
+          orderId={orderId}
+          handoffId={activeHandoffId}
+          shippingCountry={shippingCountry}
+          shippingCity={shippingCity}
+          currentForwarderId={(bd.forwarder_id as string) ?? null}
+          freightMode={(bd.mode as string) ?? null}
+          onSuccess={() => setReloadKey((k) => k + 1)}
+        />
       )}
     </div>
   );
