@@ -1749,6 +1749,7 @@ export default function CheckoutPage() {
                     cartSubtotal={subtotal}
                     onShippingCostChange={handleShippingCostChange}
                     onForwarderChange={handleForwarderChange}
+                    onFreightOfferChange={handleFreightOfferChange}
                   />
                 </div>
 
