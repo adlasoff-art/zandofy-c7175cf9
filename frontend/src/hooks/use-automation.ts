@@ -50,11 +50,11 @@ export function useAutomation() {
 
     async function evaluate() {
       try {
-        // 1. Fetch active popup workflows
+        // 1. Fetch active popup workflows via la vue publique (n'expose pas
+        // email_html_content / push_body / email_subject — Lot Sécurité v4.2)
         const { data: workflows } = await (supabase as any)
-          .from("automation_workflows")
+          .from("automation_workflows_public")
           .select("*")
-          .eq("is_active", true)
           .in("channel", ["popup", "popup_push", "all"])
           .order("sort_order", { ascending: true });
 

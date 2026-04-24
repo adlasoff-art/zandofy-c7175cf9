@@ -483,13 +483,9 @@ export default function CheckoutPage() {
     setCouponLoading(true);
     const code = couponCode.trim().toUpperCase();
 
-    // 1. Try global coupons first
-    const { data: globalData } = await supabase
-      .from("coupons")
-      .select("code, discount_type, discount_value, min_order_amount, max_uses, current_uses, expires_at")
-      .eq("code", code)
-      .eq("is_active", true)
-      .maybeSingle();
+    // 1. Try global coupons first (via RPC sécurisée — la table n'est plus listable)
+    const { data: globalRows } = await supabase.rpc("validate_coupon", { p_code: code });
+    const globalData = Array.isArray(globalRows) && globalRows.length > 0 ? globalRows[0] : null;
 
     // 2. Try store coupons
     const { data: storeData } = await supabase
