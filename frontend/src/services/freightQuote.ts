@@ -36,6 +36,8 @@ export interface FreightProfile {
   transit_max_days: number | null;
   is_active: boolean;
   linked_transporter_user_id: string | null;
+  pickup_address?: string | null;
+  pickup_email?: string | null;
 }
 
 export interface CbmTier {
