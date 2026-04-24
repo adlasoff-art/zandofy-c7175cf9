@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
-import { Loader2, Factory, Plane, FileCheck2, PackageCheck, XCircle, Check, Hash, ExternalLink } from "lucide-react";
+import { Loader2, Factory, Plane, FileCheck2, PackageCheck, XCircle, Check, Hash, ExternalLink, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { HandoffEventsTimeline } from "@/components/forwarder/HandoffEventsTimeline";
 
 /**
  * InternationalShipmentTimeline — Lot 4K
@@ -25,6 +28,7 @@ type HandoffStatus =
   | "cancelled";
 
 interface HandoffRow {
+  id: string;
   status: HandoffStatus;
   notified_at: string | null;
   acknowledged_at: string | null;
@@ -95,7 +99,7 @@ export function InternationalShipmentTimeline({ orderId }: { orderId: string }) 
     (async () => {
       const { data } = await (supabase as any)
         .from("forwarder_handoffs")
-        .select("status, notified_at, acknowledged_at, updated_at, created_at, tracking_number, tracking_carrier, tracking_url")
+        .select("id, status, notified_at, acknowledged_at, updated_at, created_at, tracking_number, tracking_carrier, tracking_url")
         .eq("order_id", orderId)
         .order("updated_at", { ascending: false })
         .limit(1)
@@ -125,8 +129,11 @@ export function InternationalShipmentTimeline({ orderId }: { orderId: string }) 
 
   if (handoff.status === "cancelled") {
     return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 flex items-center gap-2 text-xs text-destructive">
-        <XCircle size={14} /> Expédition annulée par le transitaire.
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+        <div className="flex items-center gap-2 text-xs text-destructive">
+          <XCircle size={14} /> Expédition annulée par le transitaire.
+        </div>
+        <HistoryButton handoffId={handoff.id} />
       </div>
     );
   }
@@ -212,6 +219,31 @@ export function InternationalShipmentTimeline({ orderId }: { orderId: string }) 
           )}
         </div>
       )}
+
+      <div className="mt-3 pt-3 border-t border-border flex justify-end">
+        <HistoryButton handoffId={handoff.id} />
+      </div>
     </div>
+  );
+}
+
+function HistoryButton({ handoffId }: { handoffId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 text-[11px] gap-1.5">
+          <History size={12} /> Voir l'historique détaillé
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <History size={16} /> Historique de l'expédition
+          </DialogTitle>
+        </DialogHeader>
+        {open && <HandoffEventsTimeline handoffId={handoffId} />}
+      </DialogContent>
+    </Dialog>
   );
 }
