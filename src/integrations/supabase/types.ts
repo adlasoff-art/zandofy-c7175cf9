@@ -2243,7 +2243,14 @@ export type Database = {
       forwarder_handoffs: {
         Row: {
           acknowledged_at: string | null
+          balance_amount: number
+          balance_paid_amount: number
+          balance_paid_at: string | null
           created_at: string
+          deposit_amount: number
+          deposit_paid_amount: number
+          deposit_paid_at: string | null
+          deposit_required: boolean
           forwarder_id: string
           freight_quote_id: string | null
           id: string
@@ -2251,6 +2258,8 @@ export type Database = {
           notification_payload: Json | null
           notified_at: string | null
           order_id: string
+          payment_currency: string
+          payment_status: string
           profile_id: string | null
           status: string
           tracking_carrier: string | null
@@ -2260,7 +2269,14 @@ export type Database = {
         }
         Insert: {
           acknowledged_at?: string | null
+          balance_amount?: number
+          balance_paid_amount?: number
+          balance_paid_at?: string | null
           created_at?: string
+          deposit_amount?: number
+          deposit_paid_amount?: number
+          deposit_paid_at?: string | null
+          deposit_required?: boolean
           forwarder_id: string
           freight_quote_id?: string | null
           id?: string
@@ -2268,6 +2284,8 @@ export type Database = {
           notification_payload?: Json | null
           notified_at?: string | null
           order_id: string
+          payment_currency?: string
+          payment_status?: string
           profile_id?: string | null
           status?: string
           tracking_carrier?: string | null
@@ -2277,7 +2295,14 @@ export type Database = {
         }
         Update: {
           acknowledged_at?: string | null
+          balance_amount?: number
+          balance_paid_amount?: number
+          balance_paid_at?: string | null
           created_at?: string
+          deposit_amount?: number
+          deposit_paid_amount?: number
+          deposit_paid_at?: string | null
+          deposit_required?: boolean
           forwarder_id?: string
           freight_quote_id?: string | null
           id?: string
@@ -2285,6 +2310,8 @@ export type Database = {
           notification_payload?: Json | null
           notified_at?: string | null
           order_id?: string
+          payment_currency?: string
+          payment_status?: string
           profile_id?: string | null
           status?: string
           tracking_carrier?: string | null
