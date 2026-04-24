@@ -91,7 +91,7 @@ export function FreightSummary({ offer, restrictions }: Props) {
           {quote.warnings.map((w, idx) => (
             <div
               key={idx}
-              className="flex items-start gap-2 text-[10px] text-amber-600 dark:text-amber-400"
+              className="flex items-start gap-2 text-[10px] text-destructive"
             >
               <AlertTriangle size={10} className="shrink-0 mt-0.5" />
               <span>{w}</span>

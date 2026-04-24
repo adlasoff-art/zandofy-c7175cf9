@@ -189,7 +189,7 @@ function OfferCard({
           <p className="text-[10px] text-muted-foreground">Délai : {transitLabel}</p>
         )}
         {quote.warnings.length > 0 && (
-          <p className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-0.5">
+          <p className="text-[10px] text-destructive flex items-center gap-1 mt-0.5">
             <AlertTriangle size={9} />
             {quote.warnings[0]}
           </p>
