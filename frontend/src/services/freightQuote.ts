@@ -250,29 +250,87 @@ export function quoteByWeight(profile: FreightProfile, tiers: CbmTier[], totalCb
   };
 }
 
+/** Quote basé sur le poids facturable (réel vs volumétrique) et la grille KG (forwarder_kg_tiers). */
+export function quoteByKgTier(
+  profile: FreightProfile,
+  tiers: KgTier[],
+  totalCbm: number,
+  totalWeightKg: number,
+): QuoteLine | null {
+  if (tiers.length === 0) return null;
+  const billableRaw = chargeableWeightKg(totalWeightKg, totalCbm, profile.volumetric_divisor);
+  if (billableRaw <= 0) return null;
+  const tier = pickKgTier(tiers, billableRaw);
+  if (!tier) return null;
+  const billable = tier.round_up_to_kg ? Math.max(1, Math.ceil(billableRaw)) : billableRaw;
+  if (tier.is_quote_only) {
+    return {
+      type: "weight",
+      label: `Palier ${tier.min_kg}${tier.max_kg ? `–${tier.max_kg}` : "+"} kg (sur devis)`,
+      weight_kg: billable,
+      unit: "kg",
+      line_total: 0,
+      quote_only: true,
+    };
+  }
+  if (tier.flat_price != null) {
+    return {
+      type: "weight",
+      label: `Forfait palier ${tier.min_kg}${tier.max_kg ? `–${tier.max_kg}` : "+"} kg`,
+      weight_kg: billable,
+      unit: "kg",
+      line_total: round2(tier.flat_price),
+    };
+  }
+  if (tier.price_per_kg != null) {
+    return {
+      type: "weight",
+      label: `${billable} kg × ${tier.price_per_kg} (palier ${tier.min_kg}${tier.max_kg ? `–${tier.max_kg}` : "+"})`,
+      weight_kg: billable,
+      unit: "kg",
+      unit_price: tier.price_per_kg,
+      line_total: round2(billable * tier.price_per_kg),
+    };
+  }
+  return null;
+}
+
 /** Compose un quote complet (CBM + pièces) en respectant les seuils de deposit. */
 export function composeFreightQuote(
   profile: FreightProfile,
   cbmTiers: CbmTier[],
   pieceTiers: PieceTier[],
   items: FreightItem[],
-  opts?: { totalCbm?: number; totalWeightKg?: number },
+  opts?: { totalCbm?: number; totalWeightKg?: number; kgTiers?: KgTier[] },
 ): FreightQuoteResult {
   const warnings: string[] = [];
   const totalCbm = opts?.totalCbm ?? items.reduce((acc, i) => acc + (i.cbm ?? 0) * i.quantity, 0);
   const totalWeightKg = opts?.totalWeightKg ?? items.reduce((acc, i) => acc + (i.weight_kg ?? 0) * i.quantity, 0);
+  const kgTiers = opts?.kgTiers ?? [];
 
   const lines: QuoteLine[] = [];
 
-  const cbmLine = quoteByCBM(profile, cbmTiers, totalCbm);
-  if (cbmLine) lines.push(cbmLine);
-
+  // Lot 1 fix — Choix automatique de la grille appliquée :
+  //   1) lignes pièce/catégorie (si match), TOUJOURS additionnées
+  //   2) ligne principale = KG (poids facturable max(réel, volumétrique)) si paliers KG
+  //      définis pour ce profil, sinon repli sur CBM.
   const pieceLines = quoteByPiece(pieceTiers, items);
   lines.push(...pieceLines);
 
-  // Si CBM produit un quote_only, on ajoute une note explicite
-  if (cbmLine?.quote_only) {
-    warnings.push("Volume hors grille tarifaire — devis manuel requis.");
+  let mainLine: QuoteLine | null = null;
+  if (kgTiers.length > 0) {
+    mainLine = quoteByKgTier(profile, kgTiers, totalCbm, totalWeightKg);
+  }
+  if (!mainLine && cbmTiers.length > 0) {
+    mainLine = quoteByCBM(profile, cbmTiers, totalCbm);
+  }
+  if (mainLine) lines.push(mainLine);
+
+  if (mainLine?.quote_only) {
+    warnings.push("Hors grille tarifaire — devis manuel requis.");
+  }
+  if (!mainLine && pieceLines.length === 0) {
+    warnings.push("Aucun palier tarifaire applicable pour ce poids/volume.");
   }
 
   const total = round2(lines.reduce((acc, l) => acc + (l.line_total ?? 0), 0));
