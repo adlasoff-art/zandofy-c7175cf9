@@ -156,9 +156,18 @@ export async function lockFreightQuote(params: {
   items: FreightItem[];
   categoryId?: string | null;
   restrictions?: Array<{ label: string; restriction_type: string; icon?: string | null }>;
+  /** Lot 4G — Choix d'expédition retenu par le client (split par défaut). */
+  consolidationChoice?: "split" | "consolidated";
 }): Promise<string | null> {
-  const { offer, userId, items, categoryId, restrictions } = params;
+  const { offer, userId, items, categoryId, restrictions, consolidationChoice = "split" } = params;
   const piecesCount = items.reduce((acc, i) => acc + (i.quantity ?? 0), 0);
+
+  // Lot 4G — Si groupage choisi et offre dispo, on verrouille le total consolidé.
+  const co = offer.consolidation_offer;
+  const useConsolidated = consolidationChoice === "consolidated" && co?.available;
+  const lockedTotal = useConsolidated
+    ? co!.consolidated_total
+    : (offer.split_total ?? offer.quote.total);
 
   const { data, error } = await (supabase as any)
     .from("freight_quotes")
@@ -169,7 +178,7 @@ export async function lockFreightQuote(params: {
       cbm: offer.quote.total_cbm,
       weight_kg: offer.quote.total_chargeable_weight_kg,
       pieces_count: piecesCount,
-      quoted_price: offer.quote.total,
+      quoted_price: lockedTotal,
       currency: offer.quote.currency,
       deposit_amount: offer.quote.deposit_amount,
       deposit_pct: offer.quote.deposit_pct,
@@ -183,6 +192,10 @@ export async function lockFreightQuote(params: {
         forwarder_id: offer.forwarder_id,
         mode: offer.mode,
         service_class: offer.service_class,
+        consolidation_choice: consolidationChoice,
+        split_total: offer.split_total ?? offer.quote.total,
+        consolidation_offer: co ?? null,
+        subpackages: offer.subpackages ?? [],
       },
       status: "locked",
     })
