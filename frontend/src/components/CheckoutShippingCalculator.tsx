@@ -625,6 +625,7 @@ export function CheckoutShippingCalculator({
           <FreightSelector
             destinationCountry={destCity.country_code}
             destinationCityId={destCity.id}
+            destinationCityName={destCity.name}
             mode={activeMode}
             items={cartItems.map((ci) => {
               const p = products.find((pp) => pp.productId === ci.productId);
