@@ -66,10 +66,10 @@ export function FreightSelector({
       .then((res) => {
         if (cancelled) return;
         setOffers(res);
-        const recommended = res[0] ?? null;
-        setSelectedId(recommended?.profile_id ?? null);
+        // Lot 4G — Pas de pré-sélection : le client doit choisir activement.
+        setSelectedId(null);
         setConsolidationChoice("split");
-        onChange(recommended, "split");
+        onChange(null, "split");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -114,46 +114,41 @@ export function FreightSelector({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
-        <Truck size={11} className="text-primary" />
-        Transitaire recommandé
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
+          <Truck size={11} className="text-primary" />
+          {selectedId ? "Transitaire choisi" : "Choisissez un transitaire"}
+        </div>
+        {!selectedId && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 uppercase tracking-wide">
+            Requis
+          </span>
+        )}
       </div>
 
-      {recommended && (
-        <OfferCard
-          offer={recommended}
-          isSelected={selectedId === recommended.profile_id}
-          isRecommended
-          onSelect={() => handleSelect(recommended)}
-        />
-      )}
+      <div className="grid gap-1.5">
+        {(expanded ? offers : offers.slice(0, 1)).map((offer, idx) => (
+          <OfferCard
+            key={offer.profile_id}
+            offer={offer}
+            isSelected={selectedId === offer.profile_id}
+            isCheapest={idx === 0 && offers.length > 1}
+            onSelect={() => handleSelect(offer)}
+          />
+        ))}
+      </div>
 
       {alternatives.length > 0 && (
-        <>
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="flex items-center gap-1 text-[11px] text-primary hover:underline"
-          >
-            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            {expanded
-              ? "Masquer les alternatives"
-              : `Voir ${alternatives.length} alternative${alternatives.length > 1 ? "s" : ""}`}
-          </button>
-
-          {expanded && (
-            <div className="grid gap-1.5 pt-1">
-              {alternatives.map((offer) => (
-                <OfferCard
-                  key={offer.profile_id}
-                  offer={offer}
-                  isSelected={selectedId === offer.profile_id}
-                  onSelect={() => handleSelect(offer)}
-                />
-              ))}
-            </div>
-          )}
-        </>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-1 text-[11px] text-primary hover:underline"
+        >
+          {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          {expanded
+            ? "Masquer les alternatives"
+            : `Voir ${alternatives.length} alternative${alternatives.length > 1 ? "s" : ""}`}
+        </button>
       )}
 
       {selectedOffer?.consolidation_offer?.available && (
@@ -242,12 +237,12 @@ function ConsolidationChooser({
 function OfferCard({
   offer,
   isSelected,
-  isRecommended,
+  isCheapest,
   onSelect,
 }: {
   offer: EligibleFreightOffer;
   isSelected: boolean;
-  isRecommended?: boolean;
+  isCheapest?: boolean;
   onSelect: () => void;
 }) {
   const { quote, service_class } = offer;
@@ -272,9 +267,9 @@ function OfferCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs font-semibold text-foreground capitalize">{service_class}</span>
-          {isRecommended && (
+          {isCheapest && (
             <span className="text-[9px] px-1.5 py-0 rounded-full bg-primary/15 text-primary uppercase tracking-wide">
-              Recommandé
+              Le moins cher
             </span>
           )}
           {isSelected && <BadgeCheck size={11} className="text-primary" />}
