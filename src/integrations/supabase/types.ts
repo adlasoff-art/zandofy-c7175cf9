@@ -2374,6 +2374,13 @@ export type Database = {
             referencedRelation: "forwarders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fpp_forwarder_fk"
+            columns: ["forwarder_id"]
+            isOneToOne: false
+            referencedRelation: "forwarders_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       forwarder_restrictions: {
@@ -7278,6 +7285,45 @@ export type Database = {
       }
     }
     Views: {
+      forwarders_public: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string | null
+          is_active: boolean | null
+          logo_url: string | null
+          name: string | null
+          slug: string | null
+          sort_order: number | null
+          updated_at: string | null
+          website_url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          logo_url?: string | null
+          name?: string | null
+          slug?: string | null
+          sort_order?: number | null
+          updated_at?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          logo_url?: string | null
+          name?: string | null
+          slug?: string | null
+          sort_order?: number | null
+          updated_at?: string | null
+          website_url?: string | null
+        }
+        Relationships: []
+      }
       products_public: {
         Row: {
           auto_pricing_enabled: boolean | null
@@ -7514,23 +7560,34 @@ export type Database = {
       }
       stores_public: {
         Row: {
+          address: string | null
           banner_url: string | null
+          chat_links_allowed: boolean | null
+          chat_media_enabled: boolean | null
+          chat_phone_allowed: boolean | null
+          city: string | null
+          country: string | null
           created_at: string | null
           default_transit_days_max: number | null
           default_transit_days_min: number | null
           description: string | null
+          flash_timer_duration_hours: number | null
+          flash_timer_enabled: boolean | null
           followers_count: number | null
           followers_override: number | null
           fulfillment_type: string | null
           id: string | null
+          is_banned: boolean | null
           is_certified: boolean | null
           is_online: boolean | null
           is_platform_owned: boolean | null
+          is_suspended: boolean | null
           is_verified: boolean | null
           last_seen_at: string | null
           logo_url: string | null
+          meta_description: string | null
+          meta_title: string | null
           name: string | null
-          owner_id: string | null
           presence_visible: boolean | null
           products_count: number | null
           rating: number | null
@@ -7542,29 +7599,42 @@ export type Database = {
           sales_count: number | null
           sales_override: number | null
           sales_trend: string | null
+          seo_keywords: string[] | null
           shop_type: string | null
           slug: string | null
+          suspended_activities: string[] | null
           verified_years: number | null
           verified_years_override: number | null
         }
         Insert: {
+          address?: string | null
           banner_url?: string | null
+          chat_links_allowed?: boolean | null
+          chat_media_enabled?: boolean | null
+          chat_phone_allowed?: boolean | null
+          city?: string | null
+          country?: string | null
           created_at?: string | null
           default_transit_days_max?: number | null
           default_transit_days_min?: number | null
           description?: string | null
+          flash_timer_duration_hours?: number | null
+          flash_timer_enabled?: boolean | null
           followers_count?: number | null
           followers_override?: number | null
           fulfillment_type?: string | null
           id?: string | null
+          is_banned?: boolean | null
           is_certified?: boolean | null
           is_online?: boolean | null
           is_platform_owned?: boolean | null
+          is_suspended?: boolean | null
           is_verified?: boolean | null
           last_seen_at?: string | null
           logo_url?: string | null
+          meta_description?: string | null
+          meta_title?: string | null
           name?: string | null
-          owner_id?: string | null
           presence_visible?: boolean | null
           products_count?: number | null
           rating?: number | null
@@ -7576,29 +7646,42 @@ export type Database = {
           sales_count?: number | null
           sales_override?: number | null
           sales_trend?: string | null
+          seo_keywords?: string[] | null
           shop_type?: string | null
           slug?: string | null
+          suspended_activities?: string[] | null
           verified_years?: number | null
           verified_years_override?: number | null
         }
         Update: {
+          address?: string | null
           banner_url?: string | null
+          chat_links_allowed?: boolean | null
+          chat_media_enabled?: boolean | null
+          chat_phone_allowed?: boolean | null
+          city?: string | null
+          country?: string | null
           created_at?: string | null
           default_transit_days_max?: number | null
           default_transit_days_min?: number | null
           description?: string | null
+          flash_timer_duration_hours?: number | null
+          flash_timer_enabled?: boolean | null
           followers_count?: number | null
           followers_override?: number | null
           fulfillment_type?: string | null
           id?: string | null
+          is_banned?: boolean | null
           is_certified?: boolean | null
           is_online?: boolean | null
           is_platform_owned?: boolean | null
+          is_suspended?: boolean | null
           is_verified?: boolean | null
           last_seen_at?: string | null
           logo_url?: string | null
+          meta_description?: string | null
+          meta_title?: string | null
           name?: string | null
-          owner_id?: string | null
           presence_visible?: boolean | null
           products_count?: number | null
           rating?: number | null
@@ -7610,8 +7693,10 @@ export type Database = {
           sales_count?: number | null
           sales_override?: number | null
           sales_trend?: string | null
+          seo_keywords?: string[] | null
           shop_type?: string | null
           slug?: string | null
+          suspended_activities?: string[] | null
           verified_years?: number | null
           verified_years_override?: number | null
         }
@@ -7685,6 +7770,13 @@ export type Database = {
             columns: ["forwarder_id"]
             isOneToOne: false
             referencedRelation: "forwarders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fpp_forwarder_fk"
+            columns: ["forwarder_id"]
+            isOneToOne: false
+            referencedRelation: "forwarders_public"
             referencedColumns: ["id"]
           },
         ]
