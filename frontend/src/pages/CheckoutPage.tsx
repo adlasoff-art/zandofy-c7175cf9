@@ -768,6 +768,16 @@ export default function CheckoutPage() {
             status: "assigned",
           });
         }
+
+        // Lot 4D — Marquer le devis freight comme consumé et le lier à l'order
+        // (sur la 1re sous-order uniquement : un devis = une expédition logique)
+        if (lockedFreightQuoteId && idx === 0) {
+          try {
+            await consumeFreightQuote(lockedFreightQuoteId, order.id);
+          } catch (err) {
+            console.warn("[CheckoutPage] consumeFreightQuote failed (non-blocking)", err);
+          }
+        }
       }
     }
 
