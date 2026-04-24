@@ -92,10 +92,10 @@ export default function StorePage() {
       let data: any = null;
       let error: any = null;
       if (isUUID) {
-        const res = await supabase.from("stores").select("*").eq("id", id!).maybeSingle();
+        const res = await (supabase as any).from("stores_public").select("*").eq("id", id!).maybeSingle();
         data = res.data; error = res.error;
       } else {
-        const res = await (supabase as any).from("stores").select("*").eq("slug", id!).maybeSingle();
+        const res = await (supabase as any).from("stores_public").select("*").eq("slug", id!).maybeSingle();
         data = res.data; error = res.error;
       }
       if (error || !data) return null;
