@@ -2527,6 +2527,107 @@ export type Database = {
         }
         Relationships: []
       }
+      freight_quotes: {
+        Row: {
+          breakdown: Json
+          category_id: string | null
+          cbm: number
+          created_at: string
+          currency: string
+          deposit_amount: number
+          deposit_pct: number
+          id: string
+          order_id: string | null
+          pieces_count: number
+          profile_id: string
+          quoted_price: number
+          requires_deposit: boolean
+          restrictions_snapshot: Json
+          status: string
+          transit_max_days: number | null
+          transit_min_days: number | null
+          updated_at: string
+          user_id: string
+          valid_until: string
+          weight_kg: number
+        }
+        Insert: {
+          breakdown?: Json
+          category_id?: string | null
+          cbm?: number
+          created_at?: string
+          currency?: string
+          deposit_amount?: number
+          deposit_pct?: number
+          id?: string
+          order_id?: string | null
+          pieces_count?: number
+          profile_id: string
+          quoted_price?: number
+          requires_deposit?: boolean
+          restrictions_snapshot?: Json
+          status?: string
+          transit_max_days?: number | null
+          transit_min_days?: number | null
+          updated_at?: string
+          user_id: string
+          valid_until?: string
+          weight_kg?: number
+        }
+        Update: {
+          breakdown?: Json
+          category_id?: string | null
+          cbm?: number
+          created_at?: string
+          currency?: string
+          deposit_amount?: number
+          deposit_pct?: number
+          id?: string
+          order_id?: string | null
+          pieces_count?: number
+          profile_id?: string
+          quoted_price?: number
+          requires_deposit?: boolean
+          restrictions_snapshot?: Json
+          status?: string
+          transit_max_days?: number | null
+          transit_min_days?: number | null
+          updated_at?: string
+          user_id?: string
+          valid_until?: string
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "freight_quotes_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freight_quotes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freight_quotes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "forwarder_pricing_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freight_quotes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_forwarder_profiles_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gift_cards: {
         Row: {
           code: string
@@ -3089,6 +3190,7 @@ export type Database = {
           delivery_option: string | null
           delivery_time_requested: string | null
           discount_amount: number | null
+          freight_quote_id: string | null
           hub_pickup_proof_url: string | null
           id: string
           last_mile_fee: number | null
@@ -3144,6 +3246,7 @@ export type Database = {
           delivery_option?: string | null
           delivery_time_requested?: string | null
           discount_amount?: number | null
+          freight_quote_id?: string | null
           hub_pickup_proof_url?: string | null
           id?: string
           last_mile_fee?: number | null
@@ -3199,6 +3302,7 @@ export type Database = {
           delivery_option?: string | null
           delivery_time_requested?: string | null
           discount_amount?: number | null
+          freight_quote_id?: string | null
           hub_pickup_proof_url?: string | null
           id?: string
           last_mile_fee?: number | null
@@ -3243,6 +3347,13 @@ export type Database = {
             columns: ["assigned_driver_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_freight_quote_id_fkey"
+            columns: ["freight_quote_id"]
+            isOneToOne: false
+            referencedRelation: "freight_quotes"
             referencedColumns: ["id"]
           },
           {
@@ -7659,6 +7770,7 @@ export type Database = {
         Args: { months_limit?: number }
         Returns: number
       }
+      expire_old_freight_quotes: { Args: never; Returns: number }
       get_analytics_daily_extended: {
         Args: { p_since?: string }
         Returns: {
