@@ -51,6 +51,8 @@ interface Profile {
   consolidation_fee_flat?: number | null;
   consolidation_fee_per_kg?: number | null;
   consolidation_min_packages?: number;
+  pickup_address?: string | null;
+  pickup_email?: string | null;
 }
 
 const SERVICE_LABEL: Record<string, string> = {
