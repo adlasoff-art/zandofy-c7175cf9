@@ -12,12 +12,21 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Truck, ChevronDown, ChevronUp, BadgeCheck, AlertTriangle, Package, Boxes } from "lucide-react";
+import { Loader2, Truck, ChevronDown, ChevronUp, BadgeCheck, AlertTriangle, Package, Boxes, MapPin, Plane, Ship, TramFront } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   fetchEligibleFreightOffers,
   type EligibleFreightOffer,
   type QuoteCheckoutInput,
 } from "@/services/freightQuoteCheckout";
+
+const MODE_META: Record<string, { label: string; Icon: typeof Plane; cls: string }> = {
+  air: { label: "Aérien", Icon: Plane, cls: "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30" },
+  sea: { label: "Maritime", Icon: Ship, cls: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
+  road: { label: "Routier", Icon: Truck, cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" },
+  rail: { label: "Ferroviaire", Icon: TramFront, cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
+  express: { label: "Express", Icon: Plane, cls: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30" },
+};
 
 export type ConsolidationChoice = "split" | "consolidated";
 
