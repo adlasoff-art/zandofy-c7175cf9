@@ -1,11 +1,35 @@
 import { useEffect, useState } from "react";
-import { Loader2, Package, RefreshCw, CheckCircle2, Truck, PackageCheck, XCircle, Clock, Hash, Wallet } from "lucide-react";
+import { Loader2, Package, RefreshCw, CheckCircle2, Truck, PackageCheck, XCircle, Clock, Hash, Wallet, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { HandoffEventsTimeline } from "./HandoffEventsTimeline";
+import { useRef } from "react";
+
+/**
+ * Lazy wrapper: only mounts (and fetches) the timeline when the parent
+ * <details> element becomes open, to avoid N parallel queries on page load.
+ */
+function HandoffEventsTimelineLazy({ handoffId }: { handoffId: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const parent = ref.current?.closest("details") as HTMLDetailsElement | null;
+    if (!parent) return;
+    const sync = () => setOpen(parent.open);
+    sync();
+    parent.addEventListener("toggle", sync);
+    return () => parent.removeEventListener("toggle", sync);
+  }, []);
+  return (
+    <div ref={ref}>
+      {open && <HandoffEventsTimeline handoffId={handoffId} />}
+    </div>
+  );
+}
 
 /**
  * ForwarderHandoffsPanel — operational view for a linked transporter user.
@@ -517,6 +541,13 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
                       )}
                     </div>
                   </div>
+                </details>
+
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground flex items-center gap-2">
+                    <History size={11} /> Historique des événements
+                  </summary>
+                  <HandoffEventsTimelineLazy handoffId={row.id} />
                 </details>
               </div>
             );
