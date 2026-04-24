@@ -95,6 +95,7 @@ const OnboardingPage = lazyRetry(() => import("./pages/OnboardingPage"));
 const PricingPage = lazyRetry(() => import("./pages/PricingPage"));
 const TrendsPage = lazyRetry(() => import("./pages/TrendsPage"));
 const PopularPage = lazyRetry(() => import("./pages/PopularPage"));
+const CarrierDashboardPage = lazyRetry(() => import("./pages/CarrierDashboardPage"));
 
 // Admin pages
 const AdminDashboard = lazyRetry(() => import("./pages/admin/AdminDashboard"));
@@ -238,6 +239,7 @@ const App = () => (
                 <Route path="/vendor" element={<VendorDashboardPage />} />
                 <Route path="/shipper" element={<ShipperDashboardPage />} />
                 <Route path="/rider" element={<RiderDashboardPage />} />
+                <Route path="/carrier" element={<CarrierDashboardPage />} />
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/wishlist" element={<WishlistPage />} />
                 <Route path="/wishlist/shared/:userId" element={<SharedWishlistPage />} />
