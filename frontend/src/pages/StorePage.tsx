@@ -26,6 +26,7 @@ import { InternalChat } from "@/components/InternalChat";
 import { Progress } from "@/components/ui/progress";
 import { StoreReviewForm } from "@/components/reviews/StoreReviewForm";
 import { StoreReviewsList } from "@/components/reviews/StoreReviewsList";
+import { openStoreWhatsApp } from "@/lib/whatsapp";
 
 interface StoreData {
   id: string;

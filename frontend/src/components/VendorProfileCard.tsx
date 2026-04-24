@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { InternalChat } from "@/components/InternalChat";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
+import { openStoreWhatsApp } from "@/lib/whatsapp";
 
 interface VendorProfileCardProps {
   store: {
@@ -59,13 +60,10 @@ export function VendorProfileCard({ store, productName, productId, originCountry
   const [expanded, setExpanded] = useState(false);
   const isOnline = store.is_online ?? false;
 
-  // WhatsApp Business URL — only available for authenticated users
+  // WhatsApp click — fetched on-demand from the secure Edge Function (auth required)
   const productUrl = typeof window !== "undefined" ? `${window.location.origin}/product/${productId}` : "";
-  const whatsappUrl = user && store.whatsapp_number
-    ? `https://wa.me/${store.whatsapp_number.replace(/\D/g, "")}?text=${encodeURIComponent(
-        `Bonjour, je suis intéressé par votre produit "${productName}"${productSku ? `\nSKU : ${productSku}` : ""}${productPrice ? `\nPrix : ${productPrice}` : ""}\n${productUrl}`
-      )}`
-    : null;
+  const whatsappMessage = `Bonjour, je suis intéressé par votre produit "${productName}"${productSku ? `\nSKU : ${productSku}` : ""}${productPrice ? `\nPrix : ${productPrice}` : ""}\n${productUrl}`;
+  const canWhatsApp = !!user;
 
   return (
     <div className="border border-border rounded-sm overflow-hidden shadow-sm">
