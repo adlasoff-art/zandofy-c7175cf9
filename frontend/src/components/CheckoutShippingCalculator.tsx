@@ -639,7 +639,7 @@ export function CheckoutShippingCalculator({
             totalCbm={totalVolume}
             totalWeightKg={totalWeight / 1000}
             onChange={handleFreightOfferChange}
-            onAvailabilityChange={onFreightAvailabilityChange}
+            onAvailabilityChange={handleFreightAvailabilityChange}
           />
           {!hasEligibleFreight && (
             <ForwarderSelector
