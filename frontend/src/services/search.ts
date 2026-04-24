@@ -1,12 +1,14 @@
 import { supabase } from "@/integrations/supabase/client";
 import { mapProduct, type Product } from "@/services/api";
 
+/** Lightweight select for search results (kept inline to avoid coupling
+ *  with PRODUCT_LIST_SELECT — search needs colors/sizes for filtering). */
 const SEARCH_SELECT = `
   *,
   categories(name, name_fr),
   product_images(image_url, position),
   product_colors(color_hex, color_name),
-  product_sizes(size_label, region, bust_cm, waist_cm, hips_cm)
+  product_sizes(size_label)
 `;
 
 /** Escape PostgREST ilike wildcards (% and _) */
