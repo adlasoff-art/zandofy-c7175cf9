@@ -14,6 +14,7 @@
 import { useEffect, useState } from "react";
 import { Truck, Package, Layers, BadgeDollarSign, Clock, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { InternationalShipmentTimeline } from "./InternationalShipmentTimeline";
 
 interface SubpackageRow {
   supplier_id: string;
@@ -206,6 +207,9 @@ export function FreightDetailsPanel({ orderId }: { orderId: string }) {
           </p>
         </div>
       )}
+
+      {/* Timeline internationale (Lot 4K) */}
+      <InternationalShipmentTimeline orderId={orderId} />
 
       {/* Détail sous-colis */}
       {subpackages.length > 0 && (
