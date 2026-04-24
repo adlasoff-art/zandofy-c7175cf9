@@ -16,7 +16,7 @@ import {
   Box, UserCheck, Users, Gift, XCircle, RotateCcw, Bike, Home, Store, Hash, Train,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { mapInternalShipment, detectCarrier, type TrackingResult } from "@/lib/tracking-providers";
+import { mapInternalShipment, detectCarrier, fetchExternalTracking, type TrackingResult } from "@/lib/tracking-providers";
 import { STATUS_CONFIG, STATUS_FLOW, CUSTOMER_TRACKING_STEPS, getStepIndex } from "@/lib/order-status";
 import { useI18n } from "@/contexts/I18nContext";
 import { DeliveryMap } from "@/components/DeliveryMap";
@@ -615,12 +615,25 @@ export default function TrackingPage() {
         if (data && data.length > 0) setDelivery(data[0] as unknown as DeliveryResult);
         else setNotFound(true);
       } else if (tab === "global") {
+        // 1) Internal Zandofy shipment first (free, instant)
         const { data } = await supabase.rpc("track_shipment", { p_awb_bl: trimmed });
         if (data && data.length > 0) {
           setGlobalResult(mapInternalShipment(data[0] as unknown as ShipmentResult));
         } else {
-          detectCarrier(trimmed);
-          setNotFound(true);
+          // 2) Fallback to 17track edge function (international carriers)
+          const ext = await fetchExternalTracking(trimmed);
+          if (ext.result) {
+            setGlobalResult(ext.result);
+          } else {
+            if (ext.configured && ext.error) {
+              // Provider configured but couldn't find the number
+              toast.error(ext.error === "Tracking number not found"
+                ? "Numéro de suivi introuvable chez nos transporteurs partenaires."
+                : `Suivi externe : ${ext.error}`);
+            }
+            detectCarrier(trimmed);
+            setNotFound(true);
+          }
         }
       }
     } catch {
