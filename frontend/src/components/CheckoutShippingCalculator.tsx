@@ -597,15 +597,41 @@ export function CheckoutShippingCalculator({
         </div>
       )}
 
-      {/* Forwarder selection (feature-flagged via platform_settings.forwarders_config) */}
+      {/* Lot 4D — Coexistence conditionnelle :
+          1) FreightSelector (nouveau moteur Lot 3A : CBM/pièce/poids volumétrique + acompte)
+             affiché uniquement si des profils éligibles existent pour la destination + mode.
+          2) ForwarderSelector legacy en fallback silencieux dans le cas contraire,
+             pour ne rien casser tant que tous les transitaires n'ont pas migré. */}
       {destCity && modeTotals.get(activeMode) && (
-        <ForwarderSelector
-          country={destCity.country_code}
-          cityId={destCity.id}
-          mode={activeMode}
-          baseShippingCost={modeTotals.get(activeMode)?.total || 0}
-          onChange={handleForwarderChange}
-        />
+        <>
+          <FreightSelector
+            destinationCountry={destCity.country_code}
+            destinationCityId={destCity.id}
+            mode={activeMode}
+            items={cartItems.map((ci) => {
+              const p = products.find((pp) => pp.productId === ci.productId);
+              return {
+                quantity: ci.quantity,
+                weight_kg: p ? (p.weightGrams * ci.quantity) / 1000 : undefined,
+                cbm: p
+                  ? (p.lengthCm * p.widthCm * p.heightCm * ci.quantity) / 1_000_000
+                  : undefined,
+              };
+            })}
+            totalCbm={totalVolume}
+            totalWeightKg={totalWeight / 1000}
+            onChange={handleFreightOfferChange}
+          />
+          {!hasEligibleFreight && (
+            <ForwarderSelector
+              country={destCity.country_code}
+              cityId={destCity.id}
+              mode={activeMode}
+              baseShippingCost={modeTotals.get(activeMode)?.total || 0}
+              onChange={handleForwarderChange}
+            />
+          )}
+        </>
       )}
     </div>
   );
