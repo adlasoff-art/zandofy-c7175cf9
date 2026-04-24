@@ -1,1 +1,4 @@
 project_id = "uogkklwfvwoxkifpkzpu"
+
+[functions.notify-handoff-status-customer]
+verify_jwt = false
