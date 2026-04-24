@@ -956,11 +956,10 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
             📦 Photo du colis au Hub
           </p>
-          <img
-            src={order.hub_pickup_proof_url}
+          <DeliveryProofImage
+            pathOrUrl={order.hub_pickup_proof_url}
             alt="Photo du colis"
             className="w-full max-w-xs rounded-lg border border-border object-cover"
-            decoding="async"
           />
         </div>
       )}
