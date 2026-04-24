@@ -693,6 +693,7 @@ export default function CheckoutPage() {
           items: selectedFreightOffer.quote.lines.map((l: any) => ({
             quantity: l.quantity ?? 1,
           })),
+          consolidationChoice: freightChoice,
         });
       } catch (err) {
         console.warn("[CheckoutPage] lockFreightQuote failed (non-blocking)", err);
