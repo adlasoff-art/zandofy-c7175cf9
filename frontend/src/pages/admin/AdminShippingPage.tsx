@@ -752,15 +752,33 @@ const AdminShippingPage: React.FC = () => {
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Main Content */}
         <div className="flex-1 space-y-6">
-          <Tabs defaultValue="calculator">
-            <TabsList>
+          <Tabs defaultValue="profiles">
+            <TabsList className="flex-wrap h-auto">
+              <TabsTrigger value="profiles" className="gap-1">
+                ✨ Profils transitaires
+                <Badge variant="default" className="ml-1 h-4 px-1 text-[10px]">NOUVEAU</Badge>
+              </TabsTrigger>
               <TabsTrigger value="calculator"><Globe size={14} className="mr-1" />Calculateur</TabsTrigger>
-              <TabsTrigger value="routes">Tarifs & Routes</TabsTrigger>
-              <TabsTrigger value="zones">Zones</TabsTrigger>
+              <TabsTrigger value="routes" className="gap-1">
+                Tarifs & Routes
+                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">legacy</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="zones" className="gap-1">
+                Zones
+                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">legacy</Badge>
+              </TabsTrigger>
               <TabsTrigger value="cities"><MapPin size={14} className="mr-1" />Villes</TabsTrigger>
-              <TabsTrigger value="defaults">Défauts</TabsTrigger>
+              <TabsTrigger value="defaults" className="gap-1">
+                Défauts
+                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">legacy</Badge>
+              </TabsTrigger>
               <TabsTrigger value="surcharges">Surcharges</TabsTrigger>
             </TabsList>
+
+            {/* ── New: Forwarder Profiles (read-only consolidated view) ── */}
+            <TabsContent value="profiles" className="space-y-4">
+              <ForwarderProfilesAdminPanel />
+            </TabsContent>
 
             {/* ── Dynamic Calculator Tab ── */}
             <TabsContent value="calculator" className="space-y-4">
