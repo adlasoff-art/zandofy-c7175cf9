@@ -27,6 +27,7 @@ import { fr } from "date-fns/locale";
 import { getColorDisplay } from "@/utils/colorName";
 import { ShippingLabelPreview } from "@/components/shipping/ShippingLabelPreview";
 import { Checkbox } from "@/components/ui/checkbox";
+import { FreightDetailsPanel } from "@/components/orders/FreightDetailsPanel";
 
 interface OrderItem {
   id: string;
@@ -496,6 +497,9 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                     <span className="font-mono font-bold text-foreground">{order.tracking_number}</span>
                   </div>
                 )}
+
+                {/* Lot 4H — Détail freight (transitaire, sous-colis, mode split/groupé) */}
+                <FreightDetailsPanel orderId={order.id} />
 
                 {/* Edit tracking button — available when in_shipping or later, before delivered */}
                 {["in_shipping", "shipped", "assigning_rider", "rider_assigned", "out_for_delivery"].includes(order.status) && (
