@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Truck, ChevronDown, ChevronUp, BadgeCheck, AlertTriangle, Package, Boxes, MapPin, Plane, Ship, TramFront } from "lucide-react";
+import { Loader2, Truck, ChevronDown, ChevronUp, BadgeCheck, AlertTriangle, Package, Boxes, MapPin, Plane, Ship, TramFront, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   fetchEligibleFreightOffers,
@@ -40,6 +40,8 @@ interface Props {
   onChange: (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => void;
   /** Notifie le parent du nombre d'offres éligibles (pour gating "choix obligatoire"). */
   onAvailabilityChange?: (count: number) => void;
+  /** Nom de la ville (pour message d'état vide explicite). */
+  destinationCityName?: string | null;
 }
 
 export function FreightSelector({
@@ -51,6 +53,7 @@ export function FreightSelector({
   totalWeightKg,
   onChange,
   onAvailabilityChange,
+  destinationCityName,
 }: Props) {
   const [offers, setOffers] = useState<EligibleFreightOffer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -77,6 +80,23 @@ export function FreightSelector({
     })
       .then((res) => {
         if (cancelled) return;
+        // Lot 4G — Diagnostic : pourquoi pas/peu d'offres ?
+        // eslint-disable-next-line no-console
+        console.info("[FreightSelector] eligible offers", {
+          destinationCountry,
+          destinationCityId,
+          mode,
+          totalCbm,
+          totalWeightKg,
+          count: res.length,
+          offers: res.map((o) => ({
+            profile_id: o.profile_id,
+            mode: o.mode,
+            service_class: o.service_class,
+            total: o.quote.total,
+            currency: o.quote.currency,
+          })),
+        });
         setOffers(res);
         onAvailabilityChange?.(res.length);
         // Lot 4G — Pas de pré-sélection : le client doit choisir activement.
@@ -121,8 +141,20 @@ export function FreightSelector({
   }
 
   if (offers.length === 0) {
-    // Pas de profil — laisser le parent fallback
-    return null;
+    // Lot 4G — Empty-state explicite : informe le client qu'aucun transitaire
+    // ne couvre cette destination/mode et que le tarif standard sera appliqué.
+    return (
+      <div className="flex items-start gap-2 px-2.5 py-2 rounded-md border border-border bg-muted/40 text-[11px] text-muted-foreground">
+        <Info size={12} className="shrink-0 mt-0.5 text-primary" />
+        <span>
+          Aucun transitaire ne dessert encore
+          {destinationCityName ? ` ${destinationCityName}` : " cette destination"}
+          {" "}
+          en mode <span className="font-medium">{MODE_META[mode]?.label ?? mode}</span>.
+          Le tarif standard ci-dessus sera appliqué et un transitaire sera assigné après commande.
+        </span>
+      </div>
+    );
   }
 
   return (
