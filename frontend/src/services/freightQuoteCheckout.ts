@@ -135,7 +135,7 @@ export async function fetchEligibleFreightOffers(
           split_total,
           subpackages,
           consolidation_offer,
-        } satisfies EligibleFreightOffer;
+        } as EligibleFreightOffer;
       },
     ),
   );
