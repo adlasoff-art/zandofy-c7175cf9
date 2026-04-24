@@ -95,6 +95,7 @@ const OnboardingPage = lazyRetry(() => import("./pages/OnboardingPage"));
 const PricingPage = lazyRetry(() => import("./pages/PricingPage"));
 const TrendsPage = lazyRetry(() => import("./pages/TrendsPage"));
 const PopularPage = lazyRetry(() => import("./pages/PopularPage"));
+const CarrierDashboardPage = lazyRetry(() => import("./pages/CarrierDashboardPage"));
 
 // Admin pages
 const AdminDashboard = lazyRetry(() => import("./pages/admin/AdminDashboard"));
