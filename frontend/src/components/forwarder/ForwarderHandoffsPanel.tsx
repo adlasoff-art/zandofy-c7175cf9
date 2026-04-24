@@ -7,6 +7,29 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { HandoffEventsTimeline } from "./HandoffEventsTimeline";
+import { useRef } from "react";
+
+/**
+ * Lazy wrapper: only mounts (and fetches) the timeline when the parent
+ * <details> element becomes open, to avoid N parallel queries on page load.
+ */
+function HandoffEventsTimelineLazy({ handoffId }: { handoffId: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const parent = ref.current?.closest("details") as HTMLDetailsElement | null;
+    if (!parent) return;
+    const sync = () => setOpen(parent.open);
+    sync();
+    parent.addEventListener("toggle", sync);
+    return () => parent.removeEventListener("toggle", sync);
+  }, []);
+  return (
+    <div ref={ref}>
+      {open && <HandoffEventsTimeline handoffId={handoffId} />}
+    </div>
+  );
+}
 
 /**
  * ForwarderHandoffsPanel — operational view for a linked transporter user.
