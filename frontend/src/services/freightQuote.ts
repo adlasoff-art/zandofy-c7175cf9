@@ -371,12 +371,13 @@ export async function fetchFreightProfileWithTiers(profileId: string): Promise<{
   profile: FreightProfile;
   cbmTiers: CbmTier[];
   pieceTiers: PieceTier[];
+  kgTiers: KgTier[];
 } | null> {
-  const [profileRes, cbmRes, pieceRes] = await Promise.all([
+  const [profileRes, cbmRes, pieceRes, kgRes] = await Promise.all([
     (supabase as any)
       .from("forwarder_pricing_profiles")
       .select(
-        "id, forwarder_id, mode, service_class, country_code, city_id, currency, deposit_pct, deposit_threshold_cbm, volumetric_divisor, transit_min_days, transit_max_days, is_active, linked_transporter_user_id",
+        "id, forwarder_id, mode, service_class, country_code, city_id, currency, deposit_pct, deposit_threshold_cbm, volumetric_divisor, transit_min_days, transit_max_days, is_active, linked_transporter_user_id, pickup_address, pickup_email",
       )
       .eq("id", profileId)
       .eq("is_active", true)
@@ -389,6 +390,10 @@ export async function fetchFreightProfileWithTiers(profileId: string): Promise<{
       .from("forwarder_piece_tiers")
       .select("id, profile_id, category_id, custom_label, min_quantity, price, pricing_unit, includes_customs, sort_order")
       .eq("profile_id", profileId),
+    (supabase as any)
+      .from("forwarder_kg_tiers")
+      .select("id, profile_id, min_kg, max_kg, price_per_kg, flat_price, round_up_to_kg, is_quote_only, sort_order")
+      .eq("profile_id", profileId),
   ]);
 
   if (profileRes.error || !profileRes.data) {
@@ -397,11 +402,13 @@ export async function fetchFreightProfileWithTiers(profileId: string): Promise<{
   }
   if (cbmRes.error) console.warn("[freightQuote] cbm tiers fetch failed", cbmRes.error);
   if (pieceRes.error) console.warn("[freightQuote] piece tiers fetch failed", pieceRes.error);
+  if (kgRes.error) console.warn("[freightQuote] kg tiers fetch failed", kgRes.error);
 
   return {
     profile: profileRes.data as FreightProfile,
     cbmTiers: (cbmRes.data ?? []) as CbmTier[],
     pieceTiers: (pieceRes.data ?? []) as PieceTier[],
+    kgTiers: (kgRes.data ?? []) as KgTier[],
   };
 }
 
@@ -420,5 +427,6 @@ export async function quoteFreight(params: {
   return composeFreightQuote(data.profile, data.cbmTiers, data.pieceTiers, params.items, {
     totalCbm: params.totalCbm,
     totalWeightKg: params.totalWeightKg,
+    kgTiers: data.kgTiers,
   });
 }
