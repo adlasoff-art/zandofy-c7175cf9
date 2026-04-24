@@ -12,12 +12,14 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Truck, ChevronDown, ChevronUp, BadgeCheck, AlertTriangle } from "lucide-react";
+import { Loader2, Truck, ChevronDown, ChevronUp, BadgeCheck, AlertTriangle, Package, Boxes } from "lucide-react";
 import {
   fetchEligibleFreightOffers,
   type EligibleFreightOffer,
   type QuoteCheckoutInput,
 } from "@/services/freightQuoteCheckout";
+
+export type ConsolidationChoice = "split" | "consolidated";
 
 interface Props {
   destinationCountry: string;
@@ -26,7 +28,7 @@ interface Props {
   items: QuoteCheckoutInput["items"];
   totalCbm?: number;
   totalWeightKg?: number;
-  onChange: (offer: EligibleFreightOffer | null) => void;
+  onChange: (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => void;
 }
 
 export function FreightSelector({
@@ -42,6 +44,7 @@ export function FreightSelector({
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [consolidationChoice, setConsolidationChoice] = useState<ConsolidationChoice>("split");
 
   // Refetch on context change
   useEffect(() => {
@@ -65,7 +68,8 @@ export function FreightSelector({
         setOffers(res);
         const recommended = res[0] ?? null;
         setSelectedId(recommended?.profile_id ?? null);
-        onChange(recommended);
+        setConsolidationChoice("split");
+        onChange(recommended, "split");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -78,10 +82,20 @@ export function FreightSelector({
 
   const recommended = useMemo(() => offers[0] ?? null, [offers]);
   const alternatives = useMemo(() => offers.slice(1), [offers]);
+  const selectedOffer = useMemo(
+    () => offers.find((o) => o.profile_id === selectedId) ?? null,
+    [offers, selectedId],
+  );
 
   const handleSelect = (offer: EligibleFreightOffer) => {
     setSelectedId(offer.profile_id);
-    onChange(offer);
+    setConsolidationChoice("split");
+    onChange(offer, "split");
+  };
+
+  const handleConsolidationChange = (choice: ConsolidationChoice) => {
+    setConsolidationChoice(choice);
+    if (selectedOffer) onChange(selectedOffer, choice);
   };
 
   if (loading) {
@@ -140,6 +154,86 @@ export function FreightSelector({
             </div>
           )}
         </>
+      )}
+
+      {selectedOffer?.consolidation_offer?.available && (
+        <ConsolidationChooser
+          offer={selectedOffer}
+          choice={consolidationChoice}
+          onChange={handleConsolidationChange}
+        />
+      )}
+    </div>
+  );
+}
+
+function ConsolidationChooser({
+  offer,
+  choice,
+  onChange,
+}: {
+  offer: EligibleFreightOffer;
+  choice: ConsolidationChoice;
+  onChange: (c: ConsolidationChoice) => void;
+}) {
+  const co = offer.consolidation_offer;
+  if (!co?.available) return null;
+  const splitTotal = offer.split_total ?? offer.quote.total;
+  const delta = co.delta_vs_split;
+  const deltaLabel =
+    delta === 0
+      ? "même prix"
+      : delta > 0
+        ? `+${delta.toFixed(2)} ${offer.quote.currency}`
+        : `−${Math.abs(delta).toFixed(2)} ${offer.quote.currency}`;
+
+  return (
+    <div className="mt-2 space-y-1.5 rounded-md border border-border/60 bg-muted/30 p-2">
+      <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+        Mode d'expédition
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange("split")}
+        className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded text-left transition-colors ${
+          choice === "split"
+            ? "bg-primary/10 border border-primary"
+            : "bg-background border border-border hover:border-primary/50"
+        }`}
+      >
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Package size={11} className="text-muted-foreground shrink-0" />
+          <span className="text-[11px] font-medium">Expédition séparée</span>
+          <span className="text-[9px] text-muted-foreground">
+            {offer.subpackages?.length ?? 0} colis
+          </span>
+        </div>
+        <span className="text-[11px] font-semibold">
+          {offer.quote.currency} {splitTotal.toFixed(2)}
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("consolidated")}
+        className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded text-left transition-colors ${
+          choice === "consolidated"
+            ? "bg-primary/10 border border-primary"
+            : "bg-background border border-border hover:border-primary/50"
+        }`}
+      >
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Boxes size={11} className="text-muted-foreground shrink-0" />
+          <span className="text-[11px] font-medium">Groupage 1 colis</span>
+          <span className="text-[9px] text-muted-foreground">{deltaLabel}</span>
+        </div>
+        <span className="text-[11px] font-semibold">
+          {offer.quote.currency} {co.consolidated_total.toFixed(2)}
+        </span>
+      </button>
+      {co.consolidation_fee > 0 && (
+        <p className="text-[9px] text-muted-foreground px-1">
+          Frais de groupage inclus : {offer.quote.currency} {co.consolidation_fee.toFixed(2)}
+        </p>
       )}
     </div>
   );
