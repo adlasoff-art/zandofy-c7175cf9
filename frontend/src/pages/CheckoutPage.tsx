@@ -795,6 +795,16 @@ export default function CheckoutPage() {
         if (lockedFreightQuoteId && idx === 0) {
           try {
             await consumeFreightQuote(lockedFreightQuoteId, order.id);
+            // Lot 4I — Notifier le transitaire par email (non-bloquant).
+            // Le handoff + notif in-app sont déjà créés par le trigger DB
+            // (trg_create_forwarder_handoff sur freight_quotes.status='consumed').
+            try {
+              await supabase.functions.invoke("notify-forwarder-handoff", {
+                body: { orderId: order.id },
+              });
+            } catch (notifErr) {
+              console.warn("[CheckoutPage] notify-forwarder-handoff failed (non-blocking)", notifErr);
+            }
           } catch (err) {
             console.warn("[CheckoutPage] consumeFreightQuote failed (non-blocking)", err);
           }

@@ -2240,6 +2240,94 @@ export type Database = {
           },
         ]
       }
+      forwarder_handoffs: {
+        Row: {
+          acknowledged_at: string | null
+          created_at: string
+          forwarder_id: string
+          freight_quote_id: string | null
+          id: string
+          internal_notes: string | null
+          notification_payload: Json | null
+          notified_at: string | null
+          order_id: string
+          profile_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          created_at?: string
+          forwarder_id: string
+          freight_quote_id?: string | null
+          id?: string
+          internal_notes?: string | null
+          notification_payload?: Json | null
+          notified_at?: string | null
+          order_id: string
+          profile_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          created_at?: string
+          forwarder_id?: string
+          freight_quote_id?: string | null
+          id?: string
+          internal_notes?: string | null
+          notification_payload?: Json | null
+          notified_at?: string | null
+          order_id?: string
+          profile_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forwarder_handoffs_forwarder_id_fkey"
+            columns: ["forwarder_id"]
+            isOneToOne: false
+            referencedRelation: "forwarders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forwarder_handoffs_forwarder_id_fkey"
+            columns: ["forwarder_id"]
+            isOneToOne: false
+            referencedRelation: "forwarders_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forwarder_handoffs_freight_quote_id_fkey"
+            columns: ["freight_quote_id"]
+            isOneToOne: false
+            referencedRelation: "freight_quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forwarder_handoffs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forwarder_handoffs_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "forwarder_pricing_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forwarder_handoffs_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_forwarder_profiles_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forwarder_kg_tiers: {
         Row: {
           created_at: string
