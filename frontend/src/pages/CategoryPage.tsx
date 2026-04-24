@@ -3,6 +3,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
+import { PRODUCT_LIST_SELECT } from "@/services/api";
 import { Footer } from "@/components/Footer";
 import { ProductCard } from "@/components/ProductCard";
 import { FloatingActions } from "@/components/FloatingActions";
@@ -115,7 +116,7 @@ export default function CategoryPage() {
 
       let query = supabase
         .from("products")
-        .select(`*, categories(name, name_fr), product_images(image_url, position), product_colors(color_hex, color_name), product_sizes(size_label), stores!products_store_id_fkey(is_certified, is_verified)`)
+        .select(PRODUCT_LIST_SELECT)
         .eq("publish_status", "published");
 
       if (slug?.toLowerCase() === "nouveautes") {
@@ -132,7 +133,9 @@ export default function CategoryPage() {
         query = query.in("category_id", catIds);
       }
 
-      const { data, error } = await query.order("created_at", { ascending: false });
+      const { data, error } = await query
+        .order("created_at", { ascending: false })
+        .limit(48);
       if (error) throw error;
       return (data || []).map(mapProduct);
     },
