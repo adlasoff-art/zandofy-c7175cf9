@@ -662,6 +662,23 @@ export default function CheckoutPage() {
     const storeEntries = [...storeGroups.entries()];
     const needsSuffix = storeEntries.length > 1;
 
+    // Lot 4D — Lock le devis freight (nouveau moteur) AVANT création de l'order.
+    // Si pas d'offre éligible (legacy ForwarderSelector utilisé), on saute silencieusement.
+    let lockedFreightQuoteId: string | null = null;
+    if (selectedFreightOffer && user) {
+      try {
+        lockedFreightQuoteId = await lockFreightQuote({
+          userId: user.id,
+          offer: selectedFreightOffer,
+          items: selectedFreightOffer.quote.lines.map((l: any) => ({
+            quantity: l.quantity ?? 1,
+          })),
+        });
+      } catch (err) {
+        console.warn("[CheckoutPage] lockFreightQuote failed (non-blocking)", err);
+      }
+    }
+
     for (let idx = 0; idx < storeEntries.length; idx++) {
       const [storeId, storeItems] = storeEntries[idx];
       const orderSubtotal = storeItems.reduce((s, i) => s + i.price * i.quantity, 0);
