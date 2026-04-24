@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Factory, Plane, FileCheck2, PackageCheck, XCircle, Check } from "lucide-react";
+import { Loader2, Factory, Plane, FileCheck2, PackageCheck, XCircle, Check, Hash, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -30,6 +30,9 @@ interface HandoffRow {
   acknowledged_at: string | null;
   updated_at: string;
   created_at: string;
+  tracking_number: string | null;
+  tracking_carrier: string | null;
+  tracking_url: string | null;
 }
 
 interface Step {
@@ -92,7 +95,7 @@ export function InternationalShipmentTimeline({ orderId }: { orderId: string }) 
     (async () => {
       const { data } = await (supabase as any)
         .from("forwarder_handoffs")
-        .select("status, notified_at, acknowledged_at, updated_at, created_at")
+        .select("status, notified_at, acknowledged_at, updated_at, created_at, tracking_number, tracking_carrier, tracking_url")
         .eq("order_id", orderId)
         .order("updated_at", { ascending: false })
         .limit(1)
@@ -129,6 +132,7 @@ export function InternationalShipmentTimeline({ orderId }: { orderId: string }) 
   }
 
   const currentIdx = statusToIndex(handoff.status);
+  const hasTracking = !!handoff.tracking_number;
 
   return (
     <div className="rounded-lg border border-border bg-background/40 p-3">
@@ -182,6 +186,32 @@ export function InternationalShipmentTimeline({ orderId }: { orderId: string }) 
           );
         })}
       </ol>
+
+      {hasTracking && (
+        <div className="mt-3 pt-3 border-t border-border flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
+            <Hash size={12} className="text-primary shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                {handoff.tracking_carrier || "N° de suivi"}
+              </p>
+              <p className="text-xs font-mono font-semibold text-foreground truncate">
+                {handoff.tracking_number}
+              </p>
+            </div>
+          </div>
+          {handoff.tracking_url && (
+            <a
+              href={handoff.tracking_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+            >
+              Suivre <ExternalLink size={11} />
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }

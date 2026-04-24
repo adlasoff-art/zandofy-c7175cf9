@@ -2253,6 +2253,9 @@ export type Database = {
           order_id: string
           profile_id: string | null
           status: string
+          tracking_carrier: string | null
+          tracking_number: string | null
+          tracking_url: string | null
           updated_at: string
         }
         Insert: {
@@ -2267,6 +2270,9 @@ export type Database = {
           order_id: string
           profile_id?: string | null
           status?: string
+          tracking_carrier?: string | null
+          tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
         }
         Update: {
@@ -2281,6 +2287,9 @@ export type Database = {
           order_id?: string
           profile_id?: string | null
           status?: string
+          tracking_carrier?: string | null
+          tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
         }
         Relationships: [

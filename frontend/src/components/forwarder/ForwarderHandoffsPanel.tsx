@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Loader2, Package, RefreshCw, CheckCircle2, Truck, PackageCheck, XCircle, Clock } from "lucide-react";
+import { Loader2, Package, RefreshCw, CheckCircle2, Truck, PackageCheck, XCircle, Clock, Hash } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
 /**
@@ -29,6 +30,9 @@ interface HandoffRow {
   notified_at: string | null;
   acknowledged_at: string | null;
   internal_notes: string | null;
+  tracking_number: string | null;
+  tracking_carrier: string | null;
+  tracking_url: string | null;
   created_at: string;
   updated_at: string;
   forwarder_name?: string | null;
@@ -63,6 +67,9 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
   const [rows, setRows] = useState<HandoffRow[]>([]);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+  const [trackingDraft, setTrackingDraft] = useState<
+    Record<string, { number: string; carrier: string; url: string }>
+  >({});
 
   const fetchHandoffs = async () => {
     if (forwarderIds.length === 0) {
@@ -74,7 +81,7 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
     const { data, error } = await (supabase as any)
       .from("forwarder_handoffs")
       .select(
-        "id, order_id, forwarder_id, status, notification_payload, notified_at, acknowledged_at, internal_notes, created_at, updated_at",
+        "id, order_id, forwarder_id, status, notification_payload, notified_at, acknowledged_at, internal_notes, tracking_number, tracking_carrier, tracking_url, created_at, updated_at",
       )
       .in("forwarder_id", forwarderIds)
       .order("created_at", { ascending: false })
@@ -150,6 +157,35 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
       return;
     }
     toast.success("Note enregistrée");
+    fetchHandoffs();
+  };
+
+  const saveTracking = async (row: HandoffRow) => {
+    const draft = trackingDraft[row.id];
+    if (!draft) return;
+    const next = {
+      tracking_number: draft.number.trim() || null,
+      tracking_carrier: draft.carrier.trim() || null,
+      tracking_url: draft.url.trim() || null,
+    };
+    if (
+      next.tracking_number === (row.tracking_number ?? null) &&
+      next.tracking_carrier === (row.tracking_carrier ?? null) &&
+      next.tracking_url === (row.tracking_url ?? null)
+    ) {
+      return;
+    }
+    setSavingId(row.id);
+    const { error } = await (supabase as any)
+      .from("forwarder_handoffs")
+      .update(next)
+      .eq("id", row.id);
+    setSavingId(null);
+    if (error) {
+      toast.error("Tracking non enregistré", { description: error.message });
+      return;
+    }
+    toast.success("N° de tracking enregistré");
     fetchHandoffs();
   };
 
@@ -287,6 +323,71 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
                         Enregistrer la note
                       </Button>
                     </div>
+                  </div>
+                </details>
+
+                <details className="text-xs" open={!!row.tracking_number}>
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground flex items-center gap-1">
+                    <Hash size={11} /> N° de tracking (AWB / BL / conteneur)
+                    {row.tracking_number && (
+                      <Badge variant="outline" className="ml-2 text-[10px] font-mono">
+                        {row.tracking_number}
+                      </Badge>
+                    )}
+                  </summary>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <Input
+                      placeholder="N° de suivi (ex: AWB123456789)"
+                      defaultValue={row.tracking_number ?? ""}
+                      onChange={(e) =>
+                        setTrackingDraft((prev) => ({
+                          ...prev,
+                          [row.id]: {
+                            number: e.target.value,
+                            carrier: prev[row.id]?.carrier ?? row.tracking_carrier ?? "",
+                            url: prev[row.id]?.url ?? row.tracking_url ?? "",
+                          },
+                        }))
+                      }
+                    />
+                    <Input
+                      placeholder="Transporteur (DHL, Maersk…)"
+                      defaultValue={row.tracking_carrier ?? ""}
+                      onChange={(e) =>
+                        setTrackingDraft((prev) => ({
+                          ...prev,
+                          [row.id]: {
+                            number: prev[row.id]?.number ?? row.tracking_number ?? "",
+                            carrier: e.target.value,
+                            url: prev[row.id]?.url ?? row.tracking_url ?? "",
+                          },
+                        }))
+                      }
+                    />
+                    <Input
+                      placeholder="URL de suivi (https://…)"
+                      defaultValue={row.tracking_url ?? ""}
+                      onChange={(e) =>
+                        setTrackingDraft((prev) => ({
+                          ...prev,
+                          [row.id]: {
+                            number: prev[row.id]?.number ?? row.tracking_number ?? "",
+                            carrier: prev[row.id]?.carrier ?? row.tracking_carrier ?? "",
+                            url: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-end mt-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={savingId === row.id}
+                      onClick={() => saveTracking(row)}
+                    >
+                      Enregistrer le tracking
+                    </Button>
                   </div>
                 </details>
               </div>
