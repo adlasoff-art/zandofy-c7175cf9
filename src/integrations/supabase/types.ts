@@ -342,6 +342,13 @@ export type Database = {
             referencedRelation: "automation_workflows"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "automation_events_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_workflows_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       automation_user_progress: {
@@ -387,6 +394,13 @@ export type Database = {
             columns: ["workflow_id"]
             isOneToOne: false
             referencedRelation: "automation_workflows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_user_progress_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_workflows_public"
             referencedColumns: ["id"]
           },
         ]
@@ -7522,6 +7536,81 @@ export type Database = {
       }
     }
     Views: {
+      automation_workflows_public: {
+        Row: {
+          channel: Database["public"]["Enums"]["automation_channel"] | null
+          condition_has_account: boolean | null
+          condition_has_order: boolean | null
+          condition_max_days_since_signup: number | null
+          delay_days: number | null
+          delay_minutes: number | null
+          display_frequency:
+            | Database["public"]["Enums"]["automation_display_frequency"]
+            | null
+          id: string | null
+          is_active: boolean | null
+          max_displays: number | null
+          name: string | null
+          popup_content: string | null
+          popup_cta_label: string | null
+          popup_cta_link: string | null
+          popup_image_url: string | null
+          popup_title: string | null
+          sort_order: number | null
+          trigger_type:
+            | Database["public"]["Enums"]["automation_trigger_type"]
+            | null
+        }
+        Insert: {
+          channel?: Database["public"]["Enums"]["automation_channel"] | null
+          condition_has_account?: boolean | null
+          condition_has_order?: boolean | null
+          condition_max_days_since_signup?: number | null
+          delay_days?: number | null
+          delay_minutes?: number | null
+          display_frequency?:
+            | Database["public"]["Enums"]["automation_display_frequency"]
+            | null
+          id?: string | null
+          is_active?: boolean | null
+          max_displays?: number | null
+          name?: string | null
+          popup_content?: string | null
+          popup_cta_label?: string | null
+          popup_cta_link?: string | null
+          popup_image_url?: string | null
+          popup_title?: string | null
+          sort_order?: number | null
+          trigger_type?:
+            | Database["public"]["Enums"]["automation_trigger_type"]
+            | null
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["automation_channel"] | null
+          condition_has_account?: boolean | null
+          condition_has_order?: boolean | null
+          condition_max_days_since_signup?: number | null
+          delay_days?: number | null
+          delay_minutes?: number | null
+          display_frequency?:
+            | Database["public"]["Enums"]["automation_display_frequency"]
+            | null
+          id?: string | null
+          is_active?: boolean | null
+          max_displays?: number | null
+          name?: string | null
+          popup_content?: string | null
+          popup_cta_label?: string | null
+          popup_cta_link?: string | null
+          popup_image_url?: string | null
+          popup_title?: string | null
+          sort_order?: number | null
+          trigger_type?:
+            | Database["public"]["Enums"]["automation_trigger_type"]
+            | null
+        }
+        Relationships: []
+      }
       forwarders_public: {
         Row: {
           created_at: string | null
@@ -8381,6 +8470,20 @@ export type Database = {
           p_window_seconds?: number
         }
         Returns: boolean
+      }
+      validate_coupon: {
+        Args: { p_code: string }
+        Returns: {
+          code: string
+          current_uses: number
+          discount_type: string
+          discount_value: number
+          expires_at: string
+          max_uses: number
+          min_order_amount: number
+          target_city: string
+          target_country: string
+        }[]
       }
     }
     Enums: {
