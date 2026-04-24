@@ -85,7 +85,8 @@ export function HandoffEventsTimeline({ handoffId, enabled = true }: Props) {
     (async () => {
       setLoading(true);
       setError(null);
-      const { data, error: err } = await supabase
+      // Cast to any: table not yet in generated Database types
+      const { data, error: err } = await (supabase as any)
         .from("forwarder_handoff_events")
         .select("id, event_type, field_name, old_value, new_value, actor_role, metadata, created_at")
         .eq("handoff_id", handoffId)
@@ -96,7 +97,7 @@ export function HandoffEventsTimeline({ handoffId, enabled = true }: Props) {
         setError(err.message);
         setEvents([]);
       } else {
-        setEvents((data ?? []) as HandoffEvent[]);
+        setEvents((data ?? []) as unknown as HandoffEvent[]);
       }
       setLoading(false);
     })();
