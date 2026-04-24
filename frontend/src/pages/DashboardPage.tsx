@@ -28,6 +28,7 @@ import { ReturnsList } from "@/components/returns/ReturnsList";
 import { PaymentProofUpload } from "@/components/PaymentProofUpload";
 import { DeferredPaymentModal } from "@/components/payments/DeferredPaymentModal";
 import { ReturnRequestForm } from "@/components/returns/ReturnRequestForm";
+import { FreightDetailsPanel } from "@/components/orders/FreightDetailsPanel";
 import { DisputesList } from "@/components/disputes/DisputesList";
 import { DisputeForm } from "@/components/disputes/DisputeForm";
 import { formatDistanceToNow, format } from "date-fns";
@@ -842,6 +843,9 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           )}
         </div>
       )}
+
+      {/* Lot 4H — Détail du fret international (transitaire, sous-colis, mode) */}
+      <FreightDetailsPanel orderId={order.id} />
 
       {/* Assigned rider */}
       {order.assigned_rider_name && (
