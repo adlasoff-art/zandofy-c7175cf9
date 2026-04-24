@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Loader2, Package, RefreshCw, CheckCircle2, Truck, PackageCheck, XCircle, Clock, Hash, Wallet } from "lucide-react";
+import { Loader2, Package, RefreshCw, CheckCircle2, Truck, PackageCheck, XCircle, Clock, Hash, Wallet, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { HandoffEventsTimeline } from "./HandoffEventsTimeline";
 
 /**
  * ForwarderHandoffsPanel — operational view for a linked transporter user.
