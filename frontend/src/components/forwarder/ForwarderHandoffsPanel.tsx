@@ -519,6 +519,13 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
                     </div>
                   </div>
                 </details>
+
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground flex items-center gap-2">
+                    <History size={11} /> Historique des événements
+                  </summary>
+                  <HandoffEventsTimelineLazy handoffId={row.id} />
+                </details>
               </div>
             );
           })}
