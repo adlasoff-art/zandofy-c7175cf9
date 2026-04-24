@@ -8154,7 +8154,10 @@ export type Database = {
         Returns: boolean
       }
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
+      cleanup_old_analytics_events: { Args: never; Returns: number }
+      cleanup_old_read_notifications: { Args: never; Returns: number }
       cleanup_rate_limit_entries: { Args: never; Returns: undefined }
+      cleanup_resolved_error_reports: { Args: never; Returns: number }
       cleanup_sourcing_requests: {
         Args: { p_older_than_days: number }
         Returns: {
