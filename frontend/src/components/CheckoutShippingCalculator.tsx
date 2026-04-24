@@ -44,6 +44,7 @@ interface Props {
   onShippingCostChange: (cost: number, mode: string) => void;
   onForwarderChange?: (choice: ForwarderChoice | null, unassigned: boolean) => void;
   onFreightOfferChange?: (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => void;
+  onFreightAvailabilityChange?: (count: number) => void;
 }
 
 function preciseRound(v: number, d: number): number {
@@ -59,6 +60,7 @@ export function CheckoutShippingCalculator({
   onShippingCostChange,
   onForwarderChange,
   onFreightOfferChange,
+  onFreightAvailabilityChange,
 }: Props) {
   const [products, setProducts] = useState<CartProductInfo[]>([]);
   const [destCity, setDestCity] = useState<City | null>(null);
@@ -628,6 +630,7 @@ export function CheckoutShippingCalculator({
             totalCbm={totalVolume}
             totalWeightKg={totalWeight / 1000}
             onChange={handleFreightOfferChange}
+            onAvailabilityChange={onFreightAvailabilityChange}
           />
           {!hasEligibleFreight && (
             <ForwarderSelector
