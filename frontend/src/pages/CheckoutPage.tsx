@@ -13,6 +13,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckoutShippingCalculator } from "@/components/CheckoutShippingCalculator";
 import type { ForwarderChoice } from "@/components/checkout/ForwarderSelector";
+import {
+  lockFreightQuote,
+  consumeFreightQuote,
+  type EligibleFreightOffer,
+} from "@/services/freightQuoteCheckout";
 import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
 import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
@@ -165,6 +170,12 @@ export default function CheckoutPage() {
   const handleForwarderChange = useCallback((choice: ForwarderChoice | null, unassigned: boolean) => {
     setSelectedForwarder(choice);
     setForwarderUnassigned(unassigned);
+  }, []);
+
+  // Lot 4D — Nouveau moteur freight (offre Lot 3A si profil éligible)
+  const [selectedFreightOffer, setSelectedFreightOffer] = useState<EligibleFreightOffer | null>(null);
+  const handleFreightOfferChange = useCallback((offer: EligibleFreightOffer | null) => {
+    setSelectedFreightOffer(offer);
   }, []);
 
   // Free shipping threshold from platform settings
