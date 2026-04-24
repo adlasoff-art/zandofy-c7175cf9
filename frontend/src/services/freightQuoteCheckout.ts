@@ -20,6 +20,25 @@ import {
   type FreightProfile,
 } from "./freightQuote";
 
+export interface ConsolidationOffer {
+  available: boolean;
+  consolidated_billable_kg: number;
+  base_price: number;
+  consolidation_fee: number;
+  consolidated_total: number;
+  delta_vs_split: number;
+}
+
+export interface SubpackageBreakdown {
+  supplier_id: string;
+  real_weight_kg: number;
+  volumetric_weight_kg: number;
+  billable_weight_kg: number;
+  cbm: number;
+  tier_used: string;
+  line_total: number;
+}
+
 export interface EligibleFreightOffer {
   profile_id: string;
   forwarder_id: string;
@@ -28,6 +47,12 @@ export interface EligibleFreightOffer {
   country_code: string;
   city_id: string | null;
   quote: FreightQuoteResult;
+  /** Devis split (par sous-colis) renvoyé par le RPC `quote_forwarder`. */
+  split_total?: number;
+  /** Détail par fournisseur (poids facturable, palier utilisé, ligne). */
+  subpackages?: SubpackageBreakdown[];
+  /** Offre de groupage si le transitaire l'a activée et que ≥ N colis. */
+  consolidation_offer?: ConsolidationOffer | null;
 }
 
 export interface QuoteCheckoutInput {
@@ -78,6 +103,27 @@ export async function fetchEligibleFreightOffers(
           totalCbm: input.totalCbm,
           totalWeightKg: input.totalWeightKg,
         });
+
+        // 2bis) Appel RPC pour la logique segmentée (split + consolidation)
+        let split_total: number | undefined;
+        let subpackages: SubpackageBreakdown[] | undefined;
+        let consolidation_offer: ConsolidationOffer | null | undefined;
+        try {
+          const { data: rpcData, error: rpcErr } = await (supabase.rpc as any)("quote_forwarder", {
+            p_profile_id: p.id,
+            p_items: input.items,
+            p_total_cbm: input.totalCbm ?? null,
+            p_consolidation_choice: "split",
+          });
+          if (!rpcErr && rpcData) {
+            split_total = Number(rpcData.split_total ?? 0);
+            subpackages = (rpcData.subpackages ?? []) as SubpackageBreakdown[];
+            consolidation_offer = (rpcData.consolidation_offer ?? null) as ConsolidationOffer | null;
+          }
+        } catch (e) {
+          console.warn("[freightQuoteCheckout] quote_forwarder RPC failed", e);
+        }
+
         return {
           profile_id: p.id,
           forwarder_id: p.forwarder_id,
@@ -86,7 +132,10 @@ export async function fetchEligibleFreightOffers(
           country_code: p.country_code,
           city_id: p.city_id,
           quote,
-        } satisfies EligibleFreightOffer;
+          split_total,
+          subpackages,
+          consolidation_offer,
+        } as EligibleFreightOffer;
       },
     ),
   );
