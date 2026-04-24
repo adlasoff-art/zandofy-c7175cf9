@@ -301,7 +301,7 @@ export function VendorFreightSimulator() {
                     ))}
                   </div>
                   {offer.result.warnings.length > 0 && (
-                    <p className="text-[10px] text-amber-600 mt-1">⚠️ {offer.result.warnings.join(" · ")}</p>
+                    <p className="text-[10px] text-destructive mt-1">⚠️ {offer.result.warnings.join(" · ")}</p>
                   )}
                 </div>
                 <div className="text-right shrink-0">
