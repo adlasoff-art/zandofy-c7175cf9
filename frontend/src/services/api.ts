@@ -347,7 +347,7 @@ export async function fetchProductBySlug(
     product_images(image_url, position),
     product_colors(color_hex, color_name, image_url),
     product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
-    stores!products_store_id_fkey(id, name, logo_url, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, whatsapp_number, rating, response_rate, response_time)
+    stores!products_store_id_fkey(id, name, logo_url, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, rating, response_rate, response_time)
   `;
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
