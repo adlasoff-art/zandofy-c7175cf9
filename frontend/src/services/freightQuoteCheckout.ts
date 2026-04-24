@@ -47,6 +47,10 @@ export interface EligibleFreightOffer {
   country_code: string;
   city_id: string | null;
   quote: FreightQuoteResult;
+  /** Adresse de récupération/dépôt (visible client via tooltip). */
+  pickup_address?: string | null;
+  /** Email pickup dédié (sinon fallback côté admin sur forwarders.contact_email). */
+  pickup_email?: string | null;
   /** Devis split (par sous-colis) renvoyé par le RPC `quote_forwarder`. */
   split_total?: number;
   /** Détail par fournisseur (poids facturable, palier utilisé, ligne). */
@@ -102,6 +106,7 @@ export async function fetchEligibleFreightOffers(
         const quote = composeFreightQuote(data.profile, data.cbmTiers, data.pieceTiers, input.items, {
           totalCbm: input.totalCbm,
           totalWeightKg: input.totalWeightKg,
+          kgTiers: data.kgTiers,
         });
 
         // 2bis) Appel RPC pour la logique segmentée (split + consolidation)
@@ -132,6 +137,8 @@ export async function fetchEligibleFreightOffers(
           country_code: p.country_code,
           city_id: p.city_id,
           quote,
+          pickup_address: data.profile.pickup_address ?? null,
+          pickup_email: data.profile.pickup_email ?? null,
           split_total,
           subpackages,
           consolidation_offer,

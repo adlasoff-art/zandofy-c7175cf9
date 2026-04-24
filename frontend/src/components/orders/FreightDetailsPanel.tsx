@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Truck, Package, Layers, BadgeDollarSign, Clock, Loader2, Repeat } from "lucide-react";
+import { Truck, Package, Layers, BadgeDollarSign, Clock, Loader2, Repeat, MapPin, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { InternationalShipmentTimeline } from "./InternationalShipmentTimeline";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ interface FreightQuoteRow {
   cbm: number;
   weight_kg: number;
   pieces_count: number;
+  profile_id?: string | null;
   breakdown: {
     forwarder_id?: string;
     mode?: string;
@@ -75,6 +76,8 @@ export function FreightDetailsPanel({
   const [loading, setLoading] = useState(true);
   const [quote, setQuote] = useState<FreightQuoteRow | null>(null);
   const [forwarderName, setForwarderName] = useState<string | null>(null);
+  const [pickupAddress, setPickupAddress] = useState<string | null>(null);
+  const [pickupEmail, setPickupEmail] = useState<string | null>(null);
   const [activeHandoffId, setActiveHandoffId] = useState<string | null>(null);
   const [shippingCountry, setShippingCountry] = useState<string | null>(null);
   const [shippingCity, setShippingCity] = useState<string | null>(null);
@@ -110,7 +113,7 @@ export function FreightDetailsPanel({
       const { data: q } = await (supabase as any)
         .from("freight_quotes")
         .select(
-          "id, status, quoted_price, currency, deposit_amount, deposit_pct, requires_deposit, transit_min_days, transit_max_days, cbm, weight_kg, pieces_count, breakdown",
+          "id, status, quoted_price, currency, deposit_amount, deposit_pct, requires_deposit, transit_min_days, transit_max_days, cbm, weight_kg, pieces_count, profile_id, breakdown",
         )
         .eq("id", quoteId)
         .maybeSingle();
@@ -135,9 +138,25 @@ export function FreightDetailsPanel({
         fwName = (fw as any)?.name ?? null;
       }
 
+      // 3bis) Récupérer pickup_address/email depuis le profil (visible client + acteurs)
+      let pickupAddr: string | null = null;
+      let pickupMail: string | null = null;
+      const profileId = (q as any).profile_id;
+      if (profileId) {
+        const { data: prof } = await (supabase as any)
+          .from("forwarder_pricing_profiles")
+          .select("pickup_address, pickup_email")
+          .eq("id", profileId)
+          .maybeSingle();
+        pickupAddr = (prof as any)?.pickup_address ?? null;
+        pickupMail = (prof as any)?.pickup_email ?? null;
+      }
+
       if (!cancelled) {
         setQuote(q as FreightQuoteRow);
         setForwarderName(fwName);
+        setPickupAddress(pickupAddr);
+        setPickupEmail(pickupMail);
         setLoading(false);
       }
 
@@ -252,6 +271,22 @@ export function FreightDetailsPanel({
             Acompte fret : <strong>{quote.currency} {Number(quote.deposit_amount).toFixed(2)}</strong>
             <span className="text-muted-foreground"> ({quote.deposit_pct}%)</span>
           </p>
+        </div>
+      )}
+
+      {/* Adresse de récupération */}
+      {pickupAddress && (
+        <div className="flex items-start gap-2 px-2.5 py-1.5 rounded-md border border-border bg-background/40 text-[11px]">
+          <MapPin size={12} className="shrink-0 mt-0.5 text-primary" />
+          <div className="min-w-0">
+            <p className="font-semibold text-foreground">Adresse de récupération</p>
+            <p className="text-muted-foreground whitespace-pre-line">{pickupAddress}</p>
+            {pickupEmail && actor && (
+              <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
+                <Mail size={10} /> {pickupEmail}
+              </p>
+            )}
+          </div>
         </div>
       )}
 

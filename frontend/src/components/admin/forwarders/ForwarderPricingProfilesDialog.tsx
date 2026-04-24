@@ -51,6 +51,8 @@ interface Profile {
   consolidation_fee_flat?: number | null;
   consolidation_fee_per_kg?: number | null;
   consolidation_min_packages?: number;
+  pickup_address?: string | null;
+  pickup_email?: string | null;
 }
 
 const SERVICE_LABEL: Record<string, string> = {
@@ -365,6 +367,30 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                                 update.mutate({ id: p.id!, patch: { linked_transporter_user_id: uid } })
                               }
                               placeholder="Hériter du transitaire"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Label className="text-xs flex items-center gap-1">
+                              <MapPin size={11} className="text-primary" />
+                              Adresse de récupération (visible client)
+                            </Label>
+                            <Input
+                              value={p.pickup_address ?? ""}
+                              placeholder="Ex : 123 Avenue Lumumba, Kinshasa, Gombe"
+                              onChange={e =>
+                                update.mutate({ id: p.id!, patch: { pickup_address: e.target.value || null } })
+                              }
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Label className="text-xs">Email contact pickup (optionnel)</Label>
+                            <Input
+                              type="email"
+                              value={p.pickup_email ?? ""}
+                              placeholder="ex: pickup-kin@transitaire.com"
+                              onChange={e =>
+                                update.mutate({ id: p.id!, patch: { pickup_email: e.target.value || null } })
+                              }
                             />
                           </div>
                         </div>
