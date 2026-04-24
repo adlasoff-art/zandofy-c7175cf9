@@ -23,6 +23,7 @@ import {
 } from "@/lib/order-status";
 import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, DeliveryFeeModal } from "@/components/vendor/OrderTransitionModals";
 import { withOptionalOrderFields } from "@/lib/order-query";
+import { FreightDetailsPanel } from "@/components/orders/FreightDetailsPanel";
 
 export default function AdminOrdersPage() {
   const { user, loading: authLoading } = useAuth();
@@ -551,6 +552,9 @@ export default function AdminOrdersPage() {
                           <span className="font-mono font-bold text-primary text-sm">{o.confirmation_code}</span>
                         </div>
                       )}
+
+                      {/* Détail fret + bouton réassignation transitaire (admin) */}
+                      <FreightDetailsPanel orderId={o.id} actor="admin" />
 
                       {/* Next step button */}
                       {next && canAdvance && (

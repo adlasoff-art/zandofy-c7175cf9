@@ -500,7 +500,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                 )}
 
                 {/* Lot 4H — Détail freight (transitaire, sous-colis, mode split/groupé) */}
-                <FreightDetailsPanel orderId={order.id} />
+                <FreightDetailsPanel orderId={order.id} actor="vendor" />
 
                 {/* Edit tracking button — available when in_shipping or later, before delivered */}
                 {["in_shipping", "shipped", "assigning_rider", "rider_assigned", "out_for_delivery"].includes(order.status) && (
