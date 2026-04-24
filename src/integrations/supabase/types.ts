@@ -2240,6 +2240,60 @@ export type Database = {
           },
         ]
       }
+      forwarder_kg_tiers: {
+        Row: {
+          created_at: string
+          flat_price: number | null
+          id: string
+          is_quote_only: boolean
+          max_kg: number | null
+          min_kg: number
+          price_per_kg: number | null
+          profile_id: string
+          round_up_to_kg: boolean
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          flat_price?: number | null
+          id?: string
+          is_quote_only?: boolean
+          max_kg?: number | null
+          min_kg?: number
+          price_per_kg?: number | null
+          profile_id: string
+          round_up_to_kg?: boolean
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          flat_price?: number | null
+          id?: string
+          is_quote_only?: boolean
+          max_kg?: number | null
+          min_kg?: number
+          price_per_kg?: number | null
+          profile_id?: string
+          round_up_to_kg?: boolean
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forwarder_kg_tiers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "forwarder_pricing_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forwarder_kg_tiers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_forwarder_profiles_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forwarder_piece_tiers: {
         Row: {
           category_id: string | null
@@ -2304,6 +2358,10 @@ export type Database = {
       forwarder_pricing_profiles: {
         Row: {
           city_id: string | null
+          consolidation_enabled: boolean
+          consolidation_fee_flat: number | null
+          consolidation_fee_per_kg: number | null
+          consolidation_min_packages: number
           country_code: string
           created_at: string
           currency: string
@@ -2323,6 +2381,10 @@ export type Database = {
         }
         Insert: {
           city_id?: string | null
+          consolidation_enabled?: boolean
+          consolidation_fee_flat?: number | null
+          consolidation_fee_per_kg?: number | null
+          consolidation_min_packages?: number
           country_code: string
           created_at?: string
           currency?: string
@@ -2342,6 +2404,10 @@ export type Database = {
         }
         Update: {
           city_id?: string | null
+          consolidation_enabled?: boolean
+          consolidation_fee_flat?: number | null
+          consolidation_fee_per_kg?: number | null
+          consolidation_min_packages?: number
           country_code?: string
           created_at?: string
           currency?: string
@@ -8055,6 +8121,15 @@ export type Database = {
       quote_forwarder:
         | {
             Args: { p_items: Json; p_profile_id: string; p_total_cbm?: number }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_consolidation_choice?: string
+              p_items: Json
+              p_profile_id: string
+              p_total_cbm?: number
+            }
             Returns: Json
           }
         | {

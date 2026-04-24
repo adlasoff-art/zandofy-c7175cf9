@@ -19,6 +19,8 @@ import { CbmTiersEditor } from "./CbmTiersEditor";
 import { PieceTiersEditor } from "./PieceTiersEditor";
 import { RestrictionsEditor } from "./RestrictionsEditor";
 import { TransporterUserPicker } from "./TransporterUserPicker";
+import { KgTiersEditor } from "./KgTiersEditor";
+import { ConsolidationSettingsCard } from "./ConsolidationSettingsCard";
 
 const sb = supabase as any;
 
@@ -45,6 +47,10 @@ interface Profile {
   linked_transporter_user_id: string | null;
   notes: string | null;
   is_active: boolean;
+  consolidation_enabled?: boolean;
+  consolidation_fee_flat?: number | null;
+  consolidation_fee_per_kg?: number | null;
+  consolidation_min_packages?: number;
 }
 
 const SERVICE_LABEL: Record<string, string> = {
@@ -363,8 +369,26 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                           </div>
                         </div>
 
-                        <CbmTiersEditor profileId={p.id!} currency={p.currency} />
+                        {/* Tarification adaptée au mode :
+                            - air : KG mis en avant
+                            - sea : CBM mis en avant
+                            - road / rail : les deux */}
+                        {(p.mode === "air" || p.mode === "road" || p.mode === "rail") && (
+                          <KgTiersEditor profileId={p.id!} currency={p.currency} />
+                        )}
+                        {(p.mode === "sea" || p.mode === "road" || p.mode === "rail") && (
+                          <CbmTiersEditor profileId={p.id!} currency={p.currency} />
+                        )}
                         <PieceTiersEditor profileId={p.id!} currency={p.currency} />
+                        <ConsolidationSettingsCard
+                          profileId={p.id!}
+                          forwarderId={forwarderId!}
+                          currency={p.currency}
+                          consolidation_enabled={!!p.consolidation_enabled}
+                          consolidation_fee_flat={p.consolidation_fee_flat ?? null}
+                          consolidation_fee_per_kg={p.consolidation_fee_per_kg ?? null}
+                          consolidation_min_packages={p.consolidation_min_packages ?? 2}
+                        />
                         <RestrictionsEditor profileId={p.id!} />
                       </div>
                     </AccordionContent>
