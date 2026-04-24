@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { DynamicShippingCalculator } from "@/components/DynamicShippingCalculator";
 import { DeliveryZonesManager } from "@/components/admin/DeliveryZonesManager";
+import { ForwarderProfilesAdminPanel } from "@/components/admin/forwarders/ForwarderProfilesAdminPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
