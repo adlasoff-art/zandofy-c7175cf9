@@ -227,11 +227,11 @@ export async function fetchProducts(params?: {
   };
 
   // Try main query first
-  let { data, error } = await tryFetch(PRODUCT_SELECT);
+  let { data, error } = await tryFetch(PRODUCT_LIST_SELECT);
 
   // If main query fails (e.g. missing columns), try fallback
   if (error) {
-    console.warn("[fetchProducts] Primary query failed, trying fallback:", error.message);
+    console.warn("[fetchProducts] Light query failed, trying fallback:", error.message);
     const fallback = await tryFetch(PRODUCT_SELECT_FALLBACK);
     data = fallback.data;
     error = fallback.error;
