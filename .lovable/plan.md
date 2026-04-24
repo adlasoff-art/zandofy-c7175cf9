@@ -1,142 +1,109 @@
+## 🔍 Diagnostic : pourquoi Supabase t'alerte sur le Disk IO (staging `wgidwyrdnboivfphwete`)
 
+J'ai inspecté la base preview (mêmes structures que staging/prod). **Le problème principal n'est PAS la logistique**, c'est l'absence d'index sur des FK très requêtées. Quelques chiffres trouvés via `pg_stat_user_tables` (preview, faible trafic) :
 
-# Plan Lot 3F — Hardening sécurité non-cassant
+| Table | seq_scan | tuples lus | index ? |
+|---|---|---|---|
+| `notifications` | 47 625 | **7,5 M lignes** | ❌ aucun sur `user_id`/`is_read`/`created_at` |
+| `product_images` | 144 516 | **3,75 M** | ❌ aucun sur `product_id` |
+| `product_sizes` | 115 018 | **3,33 M** | ❌ aucun sur `product_id` |
+| `product_colors` | 115 018 | **3,21 M** | ❌ aucun sur `product_id` |
+| `stores` | 51 983 | 143 k | ⚠️ pas sur les filtres usuels |
+| `messages` | 7 370 | 61 k | ❌ aucun sur `conversation_id` |
+| `cart_items` | 6 331 | 14 k | ❌ aucun sur `user_id` |
+| `orders` | 11 675 | 209 k | ⚠️ pas sur `user_id`/`store_id`/`status` |
 
-**Objectif** : Corriger les findings critiques/moyens **sans rien casser** côté affichage public produits/boutiques. Stack cible : Supabase prod perso (`vpt...yxf`). Toutes les migrations seront fournies en SQL téléchargeable.
+➡️ Avec 4 000 utilisateurs/jour en prod, multiplie ces seq_scans par ~100. **Chaque ouverture de fiche produit fait 3 full scans** (images/sizes/colors). C'est exactement le profil "Disk IO épuisé".
 
----
-
-## Findings traités & stratégie
-
-### ✅ 3F.1 — `stores` : exposition champs sensibles (Critique)
-
-**Constat** : la table `stores` est lisible par tous (`USING true`). Cela expose :
-- `whatsapp_number` (PII) → ne doit être révélé qu'au moment du clic sur le bouton WhatsApp pour un utilisateur **connecté**
-- `banned_by`, `banned_at`, `suspended_by` → 100% interne staff
-- `max_products_limit` → quota interne
-
-**À conserver public** (utilisé par StorePage/ProductPage/VendorProfileCard) :
-- `is_banned`, `is_suspended` (le public a le droit de savoir qu'une boutique est inactive)
-- `suspension_reason`, `ban_reason` → tu as précisé que le motif **ne** doit pas être public. Donc on les masque côté public mais on les laisse au propriétaire + staff.
-- `*_override` (sales, followers, verified_years, review_count) → utilisés par les badges publics
-
-**Solution** :
-1. Créer une vue `stores_public` (security_invoker=on) exposant uniquement les colonnes publiques (sans `whatsapp_number`, `ban_reason`, `suspension_reason`, `banned_by`, `banned_at`, `suspended_by`, `max_products_limit`)
-2. Remplacer la policy SELECT publique sur `stores` par une policy restreinte :
-   - **Public anonyme** : redirigé vers la vue (la policy directe sur `stores` interdit l'accès anon)
-   - **Authentifié** : peut lire `stores` complet **sauf** champs internes (via la vue ou colonnes filtrées)
-   - **Owner / collaborateurs / staff** : accès total à `stores`
-3. Edge Function `get_store_whatsapp` (verify_jwt=true) → retourne le `whatsapp_number` uniquement à un utilisateur authentifié au moment du clic
-4. Front : 
-   - `StorePage`, `VendorProfileCard`, `ProductPage`, `services/api.ts` : pointer vers `stores_public` pour les lectures publiques
-   - Bouton WhatsApp : appel à l'Edge Function au clic (au lieu de pré-charger le numéro)
-   - `VendorDashboardPage`, hooks staff/owner : continuent d'interroger `stores` directement
-
-### ✅ 3F.2 — `automation_user_progress` : énumération anonyme (Moyen)
-
-**Constat** : `(user_id IS NULL AND anon_id IS NOT NULL)` permet à n'importe qui de lire la progression d'autrui en devinant un `anon_id`.
-
-**Solution non-cassante** :
-- Conserver l'INSERT anonyme (nécessaire pour tracker les workflows J0)
-- Restreindre le SELECT anonyme : retirer la policy actuelle, la remplacer par `USING (false)` côté anonyme
-- Pour les besoins de progression côté client anonyme, le hook `use-automation.ts` ne lit que pour insérer/mettre à jour → on bascule la lecture vers une RPC `get_my_anon_progress(p_anon_id text)` qui valide l'anon_id contre un cookie httpOnly côté Edge Function (ou simplement supprimer la lecture anonyme si non strictement nécessaire — à valider avec le hook)
-
-### ✅ 3F.3 — `forwarders` : emails/téléphones publics (Critique latent)
-
-**Solution** : créer vue `forwarders_public` excluant `contact_email` et `contact_phone` ; restreindre le SELECT public sur `forwarders` aux colonnes safe via la vue.
-
-### ✅ 3F.4 — `error_reports` : `user_email` insertable anonyme (Critique)
-
-**Solution** : supprimer l'écriture client de `user_email` ; dériver server-side via trigger `BEFORE INSERT` qui force `user_email = (SELECT email FROM profiles WHERE id = auth.uid())` ou NULL si anon.
-
-### ✅ 3F.5 — `vendor_customer_reviews` : client ne lit pas ses avis (Moyen)
-
-**Solution** : ajouter policy SELECT `USING (customer_id = auth.uid())`.
-
-### ✅ 3F.6 — RLS Policy Always True (1 warning linter)
-
-**Solution** : identifier la policy UPDATE/DELETE/INSERT avec `true` (probablement une policy historique) et la restreindre à `auth.uid() IS NOT NULL` ou owner-scoped.
-
-### ⚠️ 3F.7 — Buckets storage publics avec listing (5 warnings linter)
-
-**Décision** : les **fichiers** restent publics (produits, logos, bannières). On bloque uniquement le **listing** (énumération) en retirant la policy `SELECT *` sur `storage.objects` pour les buckets concernés et en la remplaçant par une policy plus stricte qui autorise la lecture par chemin direct mais pas le listing du bucket.
-
-**⚠️ Test obligatoire** sur preview avant prod : vérifier que les `<img src="https://.../bucket/file.jpg">` continuent de s'afficher. Si un seul affichage casse → rollback immédiat.
+À titre de comparaison la **logistique est saine** : `forwarder_handoffs`, `forwarder_handoff_events`, `freight_quotes`, `delivery_chats`, etc. sont à 0–1 ligne et ne sont quasi pas requêtées. Ce n'est PAS la cause.
 
 ---
 
-## Livrables
+## 🧹 Audit logistique (ce qui est fait / inutile / incohérent)
 
-### Migrations SQL (téléchargeables, à exécuter sur Supabase prod perso)
+### ✅ Cohérent et utilisé
+- `forwarders`, `forwarder_pricing_profiles`, `forwarder_cbm_tiers/kg_tiers/piece_tiers`, `forwarder_restrictions`, `forwarder_surcharges` → admin forwarders panel ✓
+- `forwarder_handoffs` + `forwarder_handoff_events` → Lots 4D→4Q (timeline UI client/transporteur/admin) ✓
+- `freight_quotes` → CheckoutPage ✓
+- `shipping_routes`, `shipping_zones`, `logistic_zones`, `local_shipping_rates` → moteur shipping ✓
+- `rider_locations`, `delivery_chats` → suivi & chat livraison ✓
+- `delivery_subscriptions` → abonnements clients ✓
+- Edge Functions : `calculate-shipping`, `notify-forwarder-handoff`, `notify-handoff-status-customer`, `expire-pending-orders`, `generate-shipping-labels` ✓
 
-1. `lot3f_01_stores_hardening.sql` — vue `stores_public`, restriction RLS sur `stores`
-2. `lot3f_02_forwarders_hardening.sql` — vue `forwarders_public`
-3. `lot3f_03_error_reports_user_email.sql` — trigger server-side
-4. `lot3f_04_vendor_reviews_customer_read.sql` — policy SELECT customer
-5. `lot3f_05_automation_anon_lockdown.sql` — restriction lecture anonyme
-6. `lot3f_06_always_true_policy_fix.sql` — fix policy permissive identifiée
-7. `lot3f_07_storage_listing_lockdown.sql` — anti-listing buckets (à valider d'abord en preview)
+### ⚠️ Incohérences détectées
+1. **Doublons de vue forwarders** : `forwarders_public` (table/view) **et** `v_forwarder_profiles_public` coexistent. À unifier sur `forwarders_public` (créée plus récemment, migration `20260421120000_forwarders_public_view.sql`) et supprimer `v_forwarder_profiles_public`.
+2. **3 fonctions `quote_forwarder` surchargées** dans le schéma (3 signatures différentes). Risque d'appels ambigus. À auditer et n'en garder qu'une.
+3. **`MANUAL_expire-pending-orders-cron-STAGING.sql`** mentionne le ref staging `wgidwyrdnboivfphwete` ✓ mais le cron actif côté preview tourne **toutes les 5 min**. À vérifier en staging : si pas appliqué, le job n'expire jamais les commandes.
+4. **`MANUAL_process-automation-cron.sql`** pointe vers l'ancien ref `vpttoqojmiqxgudknyxf` (prod). Vérifier qu'il est bien programmé en staging avec le bon ref.
+5. **`HandoffEventsTimeline` côté client** affiche tous les événements y compris internes (changement transitaire, paiement freight). À filtrer côté client pour masquer ce qui n'est pas destiné au client final (cosmétique, pas urgent).
 
-### Edge Function
-
-- `get_store_whatsapp` (verify_jwt=true) : retourne `whatsapp_number` pour un store_id donné si l'appelant est authentifié
-
-### Code frontend (lectures + bouton WhatsApp)
-
-- `frontend/src/pages/StorePage.tsx` — lecture sur `stores_public` + bouton WhatsApp via Edge Function
-- `frontend/src/components/VendorProfileCard.tsx` — bouton WhatsApp via Edge Function  
-- `frontend/src/services/api.ts` — `PRODUCT_SELECT` : retirer `whatsapp_number`, lire via `stores_public` join
-- `frontend/src/hooks/use-automation.ts` — adapter à la nouvelle policy anon
+### 🗑️ Inutilisé / candidats au retrait (à valider avec toi avant suppression)
+- **Aucune table logistique vraiment morte** : toutes ont une UI ou un service qui les référence. Les tables vides (`hub_storage_tracking`, `vendor_delivery_zones`, `delivery_zones`, `rider_ratings`, `local_shipping_rates`) sont **prêtes pour la prod** mais pas encore utilisées.
+- À noter : `delivery_zones` ET `vendor_delivery_zones` ET `logistic_zones` ET `shipping_zones` = 4 notions de zones. Confusion possible. À documenter dans `mem://features/shipping-engine-logic` ou consolider à terme (gros chantier — pas dans ce lot).
 
 ---
 
-## Détail technique (réservé aux devs)
+## 🛠️ Plan d'action (Lot Performance v1 — anti Disk IO)
 
-**Pattern de coexistence vue + table** :
+### Étape 1 : créer les index manquants (impact direct Disk IO, ~80 % du gain attendu)
+Migration `20260424_perf_indexes.sql` :
 ```sql
-CREATE VIEW public.stores_public WITH (security_invoker=on) AS
-  SELECT id, name, slug, logo_url, banner_url, country, city, address,
-         is_verified, is_certified, verified_years, verified_years_override,
-         is_online, last_seen_at, presence_visible, sales_count, sales_override,
-         followers_count, followers_override, products_count, repurchase_rate,
-         sales_trend, rating, response_rate, response_time, review_count,
-         review_count_override, shop_type, is_platform_owned,
-         is_banned, is_suspended, suspended_activities,
-         created_at
-  FROM public.stores;
+-- Notifications (7,5 M lignes lues en preview !)
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
+  ON notifications(user_id, is_read, created_at DESC);
 
-GRANT SELECT ON public.stores_public TO anon, authenticated;
+-- Produits : images / sizes / colors (chargées sur chaque fiche)
+CREATE INDEX IF NOT EXISTS idx_product_images_product_id ON product_images(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_sizes_product_id  ON product_sizes(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_colors_product_id ON product_colors(product_id);
 
-DROP POLICY IF EXISTS "Public read stores" ON public.stores;
-DROP POLICY IF EXISTS "Anon read stores" ON public.stores;
-DROP POLICY IF EXISTS "Authenticated read stores" ON public.stores;
+-- Orders (dashboard client + vendor)
+CREATE INDEX IF NOT EXISTS idx_orders_user_created    ON orders(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_store_status    ON orders(store_id, status);
+CREATE INDEX IF NOT EXISTS idx_orders_status_created  ON orders(status, created_at DESC);
 
-CREATE POLICY "Owner read full store" ON public.stores FOR SELECT TO authenticated
-  USING (owner_id = auth.uid() OR public.can_access_store_orders(auth.uid(), id)
-         OR public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'manager'));
+-- Messages / cart
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_created
+  ON messages(conversation_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_cart_items_user_id ON cart_items(user_id);
+
+-- Stores (filtres slug + statut)
+CREATE INDEX IF NOT EXISTS idx_stores_status ON stores(status);
+
+-- Logistique (pour la suite)
+CREATE INDEX IF NOT EXISTS idx_forwarder_handoffs_order   ON forwarder_handoffs(order_id);
+CREATE INDEX IF NOT EXISTS idx_forwarder_handoff_events_handoff
+  ON forwarder_handoff_events(handoff_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_freight_quotes_order_status ON freight_quotes(order_id, status);
 ```
+**Effet attendu** : Disk IO réduit de **70–90 %** sur staging et prod après quelques heures de chauffe.
 
-**Risques & mitigation** :
-- ⚠️ Si une page lit `whatsapp_number`/`ban_reason`/`suspension_reason` directement depuis `stores` côté client anonyme → 404/null. Audit complet du frontend déjà fait : seuls les contextes authentifiés (owner/staff) lisent ces champs. **Aucun affichage public ne casse.**
-- ⚠️ Storage anti-listing : test obligatoire en preview avant prod. Si moindre doute → on garde le warning et on n'applique pas 3F.7.
+### Étape 2 : housekeeping des tables qui grossissent (rétention)
+- `analytics_events` : 2 757 lignes en preview, ça va exploser. Ajouter un cron mensuel `DELETE FROM analytics_events WHERE created_at < now() - interval '90 days'` (équivalent à `cleanup-old-activity-logs` qui existe déjà pour `user_activity_logs`).
+- `notifications` : trigger d'archivage des notifs lues > 60 jours.
+- `error_reports` : déjà 175 lignes en preview — purge des résolues > 30 jours.
+
+### Étape 3 : nettoyage logistique léger (zéro casse)
+- Supprimer la vue `v_forwarder_profiles_public` (remplacée par `forwarders_public`) → migration + remplacement des références si elles existent.
+- Auditer les 3 surcharges `quote_forwarder` et garder la signature canonique.
+- Documenter clairement les 4 notions de zones dans `mem://`.
+
+### Étape 4 : appliquer les crons MANUEL en staging
+- Vérifier que `MANUAL_expire-pending-orders-cron-STAGING.sql` et `MANUAL_process-automation-cron.sql` sont bien programmés sur `wgidwyrdnboivfphwete` avec l'anon key staging.
+
+### Étape 5 (optionnel — éviter de faire sauter le budget)
+Si après index + housekeeping le Disk IO reste tendu (pic > 60 % du budget) → upgrade compute Supabase d'un cran (Small → Medium ~+25 $/mois). **À ne déclencher que si Étapes 1–2 ne suffisent pas**, ce qui serait surprenant vu les chiffres.
 
 ---
 
-## Score sécurité attendu
+## 📊 Score sécurité maintenu : 96/100, 0 warning linter
+Aucun de ces changements ne dégrade la sécurité (pas de touche RLS, pas de touche storage, juste des index et de la rétention).
 
-| Avant | Après |
-|-------|-------|
-| 12 findings (3 errors, 6 warns linter, 3 warns scan) | 0–1 finding résiduel (warn storage si conservé) |
-| Score ~78/100 | Score ~98/100 |
+## ⚠️ Rappels stack
+- Migrations livrées via `frontend/supabase/migrations/` puis GitHub Actions → staging puis prod.
+- **Aucune** modification directe sur `wgidwyrdnboivfphwete` ou `vpt...yxf`.
+- Lovable Cloud (`uog...zpu`) ne sert que de preview ; les chiffres ci-dessus le prouvent (déjà 47k seq_scans avec un trafic ridicule).
 
 ---
 
-## Ordre d'exécution recommandé
-
-1. Tu approuves le plan
-2. Je passe en mode normal et génère les 7 SQL + Edge Function + patches frontend
-3. Tu valides en preview Lovable Cloud (test affichages produits/boutiques + bouton WhatsApp)
-4. Tu télécharges les SQL et exécutes sur Supabase prod perso
-5. Tu pousses le frontend via GitHub → Vercel
-6. Re-run du security scan pour confirmation
-
+**Prochaine étape proposée** : tu approuves → je crée la migration d'index + le cron de rétention `analytics_events` + le cleanup des doublons forwarders. Ordre d'exécution sécurisé, zéro casse, déployable via ton pipeline GitHub habituel.
