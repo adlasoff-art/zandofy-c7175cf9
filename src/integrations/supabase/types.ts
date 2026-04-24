@@ -2240,6 +2240,53 @@ export type Database = {
           },
         ]
       }
+      forwarder_handoff_events: {
+        Row: {
+          actor_id: string | null
+          actor_role: string | null
+          created_at: string
+          event_type: string
+          field_name: string | null
+          handoff_id: string
+          id: string
+          metadata: Json | null
+          new_value: string | null
+          old_value: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          event_type: string
+          field_name?: string | null
+          handoff_id: string
+          id?: string
+          metadata?: Json | null
+          new_value?: string | null
+          old_value?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          event_type?: string
+          field_name?: string | null
+          handoff_id?: string
+          id?: string
+          metadata?: Json | null
+          new_value?: string | null
+          old_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forwarder_handoff_events_handoff_id_fkey"
+            columns: ["handoff_id"]
+            isOneToOne: false
+            referencedRelation: "forwarder_handoffs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forwarder_handoffs: {
         Row: {
           acknowledged_at: string | null
