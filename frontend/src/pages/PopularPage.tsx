@@ -4,20 +4,11 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
-import { mapProduct, type Product } from "@/services/api";
+import { mapProduct, type Product, PRODUCT_LIST_SELECT } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { Flame, Loader2 } from "lucide-react";
 
 const PAGE_SIZE = 24;
-
-const PRODUCT_SELECT = `
-  *,
-  categories(name, name_fr),
-  product_images(image_url, position),
-  product_colors(color_hex, color_name, image_url),
-  product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
-  stores!products_store_id_fkey(id, name, is_verified, is_certified, verified_years, verified_years_override, created_at, is_online, sales_count, sales_override, followers_count, followers_override, shop_type)
-`;
 
 export default function PopularPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -28,7 +19,7 @@ export default function PopularPage() {
   const fetchPage = useCallback(async (offset: number) => {
     const { data } = await supabase
       .from("products")
-      .select(PRODUCT_SELECT)
+      .select(PRODUCT_LIST_SELECT)
       .eq("publish_status", "published")
       .order("sales_count", { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);
