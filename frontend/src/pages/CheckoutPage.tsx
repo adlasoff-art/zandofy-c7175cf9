@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckoutShippingCalculator } from "@/components/CheckoutShippingCalculator";
 import type { ForwarderChoice } from "@/components/checkout/ForwarderSelector";
+import type { ConsolidationChoice } from "@/components/checkout/FreightSelector";
 import {
   lockFreightQuote,
   consumeFreightQuote,
@@ -174,8 +175,17 @@ export default function CheckoutPage() {
 
   // Lot 4D — Nouveau moteur freight (offre Lot 3A si profil éligible)
   const [selectedFreightOffer, setSelectedFreightOffer] = useState<EligibleFreightOffer | null>(null);
-  const handleFreightOfferChange = useCallback((offer: EligibleFreightOffer | null) => {
-    setSelectedFreightOffer(offer);
+  const [freightChoice, setFreightChoice] = useState<ConsolidationChoice>("split");
+  const [freightOffersAvailable, setFreightOffersAvailable] = useState(0);
+  const handleFreightOfferChange = useCallback(
+    (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => {
+      setSelectedFreightOffer(offer);
+      setFreightChoice(choice ?? "split");
+    },
+    [],
+  );
+  const handleFreightAvailabilityChange = useCallback((count: number) => {
+    setFreightOffersAvailable(count);
   }, []);
 
   // Free shipping threshold from platform settings
