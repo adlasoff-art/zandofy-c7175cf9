@@ -658,19 +658,14 @@ export function HubProofPhotoUpload({
         .upload(path, compressed, { contentType: "image/webp", upsert: true });
       if (uploadError) throw uploadError;
 
-      const { data: publicUrlData } = supabase.storage
-        .from("delivery-proofs")
-        .getPublicUrl(path);
-
-      const publicUrl = publicUrlData.publicUrl;
-
+      // Bucket privé : on stocke le path en DB.
       await (supabase as any)
         .from("orders")
-        .update({ hub_pickup_proof_url: publicUrl })
+        .update({ hub_pickup_proof_url: path })
         .eq("id", orderId);
 
-      setUrl(publicUrl);
-      onUploaded?.(publicUrl);
+      setUrl(path);
+      onUploaded?.(path);
     } catch (err: any) {
       console.error("Hub proof upload error:", err);
     } finally {

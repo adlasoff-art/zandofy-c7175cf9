@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { DeliveryMap, type MapMarker } from "@/components/DeliveryMap";
+import { DeliveryProofLink } from "@/components/DeliveryProofImage";
 
 type TabKey = "overview" | "deliveries" | "assign";
 
@@ -482,10 +483,10 @@ export default function AdminLogisticsPage() {
                         <td className="p-3 hidden lg:table-cell">
                           <div className="flex gap-1.5">
                             {d.signature_url && (
-                              <a href={d.signature_url} target="_blank" rel="noopener noreferrer" className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Signature</a>
+                              <DeliveryProofLink pathOrUrl={d.signature_url} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Signature</DeliveryProofLink>
                             )}
                             {d.proof_photo_url && (
-                              <a href={d.proof_photo_url} target="_blank" rel="noopener noreferrer" className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">Photo</a>
+                              <DeliveryProofLink pathOrUrl={d.proof_photo_url} className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">Photo</DeliveryProofLink>
                             )}
                             {!d.signature_url && !d.proof_photo_url && <span className="text-[10px] text-muted-foreground">—</span>}
                           </div>

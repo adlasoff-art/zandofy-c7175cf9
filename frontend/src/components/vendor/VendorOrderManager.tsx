@@ -5,6 +5,7 @@ import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User a
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { Button } from "@/components/ui/button";
 import { PaymentProofUpload } from "@/components/PaymentProofUpload";
+import { DeliveryProofImage } from "@/components/DeliveryProofImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
@@ -574,12 +575,15 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                     {order.shipping_payment_proof_url ? (
                       <div className="space-y-2">
                         <p className="text-xs text-muted-foreground">Le client a envoyé une preuve de paiement :</p>
-                        <img
-                          src={order.shipping_payment_proof_url}
+                        <DeliveryProofImage
+                          pathOrUrl={order.shipping_payment_proof_url}
                           alt="Preuve de paiement"
                           className="w-full max-w-xs rounded-lg border border-border object-cover cursor-pointer"
-                          onClick={() => window.open(order.shipping_payment_proof_url!, '_blank')}
-                          decoding="async"
+                          onClick={async () => {
+                            const { getDeliveryProofUrl } = await import("@/lib/delivery-proof-urls");
+                            const u = await getDeliveryProofUrl(order.shipping_payment_proof_url);
+                            if (u) window.open(u, '_blank');
+                          }}
                         />
                         <div className="flex gap-2">
                           <Button

@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { compressImage } from "@/utils/image-compress";
 import { Camera, Upload, Loader2, CheckCircle, X, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getDeliveryProofUrl } from "@/lib/delivery-proof-urls";
+import { useEffect } from "react";
 
 interface PaymentProofUploadProps {
   orderId: string;
@@ -14,10 +16,23 @@ interface PaymentProofUploadProps {
 
 export function PaymentProofUpload({ orderId, field, label = "Preuve de paiement", onUploaded, existingUrl }: PaymentProofUploadProps) {
   const [uploading, setUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(existingUrl || null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Résoudre l'URL signée pour la preuve existante (bucket privé)
+  useEffect(() => {
+    let cancelled = false;
+    if (existingUrl) {
+      getDeliveryProofUrl(existingUrl).then((u) => {
+        if (!cancelled) setPreviewUrl(u);
+      });
+    } else {
+      setPreviewUrl(null);
+    }
+    return () => { cancelled = true; };
+  }, [existingUrl]);
 
   const handleFile = async (file: File) => {
     if (!file) return;
@@ -48,22 +63,18 @@ export function PaymentProofUpload({ orderId, field, label = "Preuve de paiement
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage
-        .from("delivery-proofs")
-        .getPublicUrl(path);
-
-      const publicUrl = urlData.publicUrl;
-
-      // Update order with proof URL
+      // Bucket privé : on stocke le path en DB.
       const { error: updateError } = await supabase
         .from("orders")
-        .update({ [field]: publicUrl } as any)
+        .update({ [field]: path } as any)
         .eq("id", orderId);
 
       if (updateError) throw updateError;
 
-      setPreviewUrl(publicUrl);
-      onUploaded?.(publicUrl);
+      // Pour l'affichage immédiat, on génère une URL signée 24h.
+      const signed = await getDeliveryProofUrl(path);
+      setPreviewUrl(signed);
+      onUploaded?.(path);
     } catch (err: any) {
       setError(err.message || "Erreur lors de l'upload");
     } finally {

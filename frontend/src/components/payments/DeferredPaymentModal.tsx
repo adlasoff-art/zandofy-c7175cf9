@@ -202,8 +202,8 @@ export function DeferredPaymentModal({ orderId, orderRef, amount, paymentType, o
       const path = `payment-proofs/${orderId}/${proofField}-${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage.from("delivery-proofs").upload(path, compressed, { upsert: true, cacheControl: "31536000" });
       if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage.from("delivery-proofs").getPublicUrl(path);
-      await supabase.from("orders").update({ [proofField]: urlData.publicUrl } as any).eq("id", orderId);
+      // Bucket privé : on stocke le path. L'affichage utilise getDeliveryProofUrl().
+      await supabase.from("orders").update({ [proofField]: path } as any).eq("id", orderId);
       setProofUploaded(true);
       toast.success("Preuve de paiement envoyée. En attente de validation.");
     } catch (err: any) {
