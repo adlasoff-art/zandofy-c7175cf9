@@ -334,8 +334,8 @@ export default function RiderDashboardPage() {
         const path = `signatures/${id}-${Date.now()}.png`;
         const { error: sigErr } = await supabase.storage.from("delivery-proofs").upload(path, blob, { cacheControl: "31536000" });
         if (!sigErr) {
-          const { data: urlData } = supabase.storage.from("delivery-proofs").getPublicUrl(path);
-          updates.signature_url = urlData.publicUrl;
+          // Bucket privé : on stocke le path. L'affichage utilise getDeliveryProofUrl().
+          updates.signature_url = path;
         }
       }
 
@@ -344,8 +344,7 @@ export default function RiderDashboardPage() {
         const path = `photos/${id}-${Date.now()}.${ext}`;
         const { error: photoErr } = await supabase.storage.from("delivery-proofs").upload(path, proofPhoto, { cacheControl: "31536000" });
         if (!photoErr) {
-          const { data: urlData } = supabase.storage.from("delivery-proofs").getPublicUrl(path);
-          updates.proof_photo_url = urlData.publicUrl;
+          updates.proof_photo_url = path;
         }
       }
 
