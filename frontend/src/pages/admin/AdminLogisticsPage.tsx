@@ -226,6 +226,7 @@ export default function AdminLogisticsPage() {
           { key: "overview" as TabKey, label: "Vue d'ensemble" },
           { key: "assign" as TabKey, label: `Assignation (${assignableOrders.length})` },
           { key: "deliveries" as TabKey, label: `Livraisons (${deliveries.length})` },
+          { key: "tracking" as TabKey, label: `Suivi par commande (${activeDeliveries.length})` },
         ]).map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`px-4 py-2 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${tab === t.key ? "bg-foreground text-card border-foreground" : "bg-card text-foreground border-border hover:border-foreground"}`}>
