@@ -166,6 +166,20 @@ const PRODUCT_SELECT_FALLBACK = `
   stores!products_store_id_fkey(id, name, is_verified, verified_years, created_at, is_online, sales_count, followers_count)
 `;
 
+// Lightweight SELECT for product LISTINGS (grids, carousels, search results).
+// Excludes heavy embeds (product_colors.image_url, full size measurements,
+// stores override fields) to drastically reduce seq_scan pressure on
+// product_images / product_colors / product_sizes in production.
+// Use PRODUCT_SELECT (above) only on the product detail page.
+export const PRODUCT_LIST_SELECT = `
+  *,
+  categories(name, name_fr),
+  product_images(image_url, position),
+  product_colors(color_hex, color_name),
+  product_sizes(size_label),
+  stores!products_store_id_fkey(id, name, is_verified, is_certified, is_online, shop_type)
+`;
+
 export async function fetchProducts(params?: {
   category?: string;
   limit?: number;
@@ -213,11 +227,11 @@ export async function fetchProducts(params?: {
   };
 
   // Try main query first
-  let { data, error } = await tryFetch(PRODUCT_SELECT);
+  let { data, error } = await tryFetch(PRODUCT_LIST_SELECT);
 
   // If main query fails (e.g. missing columns), try fallback
   if (error) {
-    console.warn("[fetchProducts] Primary query failed, trying fallback:", error.message);
+    console.warn("[fetchProducts] Light query failed, trying fallback:", error.message);
     const fallback = await tryFetch(PRODUCT_SELECT_FALLBACK);
     data = fallback.data;
     error = fallback.error;
