@@ -621,6 +621,16 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Lot 4G — Si des transitaires sont disponibles, le client doit en choisir un.
+    if (freightOffersAvailable > 0 && !selectedFreightOffer) {
+      toast({
+        title: "Transitaire requis",
+        description: "Veuillez sélectionner un transitaire avant de continuer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Save address if checked
     if (saveAddress && user) {
       const { error } = await supabase.from("saved_addresses").insert({
