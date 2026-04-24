@@ -120,7 +120,7 @@ export function FreightSelector({
           {selectedId ? "Transitaire choisi" : "Choisissez un transitaire"}
         </div>
         {!selectedId && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 uppercase tracking-wide">
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive uppercase tracking-wide">
             Requis
           </span>
         )}
