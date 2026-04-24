@@ -151,6 +151,17 @@ export function pickCbmTier(tiers: CbmTier[], cbm: number): CbmTier | null {
   return null;
 }
 
+/** Trouve le palier KG applicable pour un poids facturable donné. */
+export function pickKgTier(tiers: KgTier[], kg: number): KgTier | null {
+  const sorted = [...tiers].sort((a, b) => a.sort_order - b.sort_order || a.min_kg - b.min_kg);
+  for (const t of sorted) {
+    const matchesMin = kg >= t.min_kg;
+    const matchesMax = t.max_kg == null || kg <= t.max_kg;
+    if (matchesMin && matchesMax) return t;
+  }
+  return null;
+}
+
 /**
  * Trouve le palier pièce applicable pour une catégorie + une quantité.
  * Priorité : match `category_id` exact, sinon match `custom_label`, sinon null.
