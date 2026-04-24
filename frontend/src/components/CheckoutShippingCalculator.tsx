@@ -7,7 +7,7 @@ import {
   type City, type DynamicQuoteResult,
 } from "@/services/dynamic-shipping";
 import { ForwarderSelector, type ForwarderChoice } from "@/components/checkout/ForwarderSelector";
-import { FreightSelector } from "@/components/checkout/FreightSelector";
+import { FreightSelector, type ConsolidationChoice } from "@/components/checkout/FreightSelector";
 import type { EligibleFreightOffer } from "@/services/freightQuoteCheckout";
 
 const MODE_META = {
@@ -43,7 +43,7 @@ interface Props {
   selectedMode?: TransportMode;
   onShippingCostChange: (cost: number, mode: string) => void;
   onForwarderChange?: (choice: ForwarderChoice | null, unassigned: boolean) => void;
-  onFreightOfferChange?: (offer: EligibleFreightOffer | null) => void;
+  onFreightOfferChange?: (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => void;
 }
 
 function preciseRound(v: number, d: number): number {
@@ -383,10 +383,10 @@ export function CheckoutShippingCalculator({
   );
 
   const handleFreightOfferChange = useCallback(
-    (offer: EligibleFreightOffer | null) => {
+    (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => {
       setFreightOffer(offer);
       setHasEligibleFreight(offer !== null);
-      onFreightOfferChange?.(offer);
+      onFreightOfferChange?.(offer, choice);
     },
     [onFreightOfferChange],
   );
