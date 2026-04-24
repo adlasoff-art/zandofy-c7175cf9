@@ -2590,6 +2590,8 @@ export type Database = {
           linked_transporter_user_id: string | null
           mode: string
           notes: string | null
+          pickup_address: string | null
+          pickup_email: string | null
           service_class: string
           transit_max_days: number | null
           transit_min_days: number | null
@@ -2613,6 +2615,8 @@ export type Database = {
           linked_transporter_user_id?: string | null
           mode: string
           notes?: string | null
+          pickup_address?: string | null
+          pickup_email?: string | null
           service_class?: string
           transit_max_days?: number | null
           transit_min_days?: number | null
@@ -2636,6 +2640,8 @@ export type Database = {
           linked_transporter_user_id?: string | null
           mode?: string
           notes?: string | null
+          pickup_address?: string | null
+          pickup_email?: string | null
           service_class?: string
           transit_max_days?: number | null
           transit_min_days?: number | null
