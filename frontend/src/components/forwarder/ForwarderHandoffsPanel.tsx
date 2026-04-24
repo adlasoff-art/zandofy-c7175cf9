@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Package, RefreshCw, CheckCircle2, Truck, PackageCheck, XCircle, Clock, Hash } from "lucide-react";
+import { Loader2, Package, RefreshCw, CheckCircle2, Truck, PackageCheck, XCircle, Clock, Hash, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,15 @@ interface HandoffRow {
   tracking_url: string | null;
   created_at: string;
   updated_at: string;
+  deposit_required: boolean;
+  deposit_amount: number;
+  deposit_paid_amount: number;
+  deposit_paid_at: string | null;
+  balance_amount: number;
+  balance_paid_amount: number;
+  balance_paid_at: string | null;
+  payment_status: "pending" | "deposit_paid" | "paid_in_full" | "not_required";
+  payment_currency: string;
   forwarder_name?: string | null;
   order_ref?: string | null;
   shipping_city?: string | null;
@@ -55,6 +64,13 @@ const NEXT_ACTIONS: Partial<Record<HandoffStatus, { to: HandoffStatus; label: st
   notified: [{ to: "acknowledged", label: "Marquer reçu" }],
   acknowledged: [{ to: "in_transit", label: "Marquer expédié" }],
   in_transit: [{ to: "delivered", label: "Marquer livré" }],
+};
+
+const PAY_META: Record<HandoffRow["payment_status"], { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+  pending: { label: "Acompte en attente", variant: "destructive" },
+  deposit_paid: { label: "Acompte payé", variant: "default" },
+  paid_in_full: { label: "Soldé", variant: "default" },
+  not_required: { label: "Pas d'acompte", variant: "secondary" },
 };
 
 interface Props {
@@ -81,7 +97,7 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
     const { data, error } = await (supabase as any)
       .from("forwarder_handoffs")
       .select(
-        "id, order_id, forwarder_id, status, notification_payload, notified_at, acknowledged_at, internal_notes, tracking_number, tracking_carrier, tracking_url, created_at, updated_at",
+        "id, order_id, forwarder_id, status, notification_payload, notified_at, acknowledged_at, internal_notes, tracking_number, tracking_carrier, tracking_url, created_at, updated_at, deposit_required, deposit_amount, deposit_paid_amount, deposit_paid_at, balance_amount, balance_paid_amount, balance_paid_at, payment_status, payment_currency",
       )
       .in("forwarder_id", forwarderIds)
       .order("created_at", { ascending: false })
@@ -186,6 +202,42 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
       return;
     }
     toast.success("N° de tracking enregistré");
+    fetchHandoffs();
+  };
+
+  const markDepositPaid = async (row: HandoffRow) => {
+    setSavingId(row.id);
+    const { error } = await (supabase as any)
+      .from("forwarder_handoffs")
+      .update({
+        deposit_paid_amount: row.deposit_amount,
+        deposit_paid_at: new Date().toISOString(),
+      })
+      .eq("id", row.id);
+    setSavingId(null);
+    if (error) {
+      toast.error("Encaissement non enregistré", { description: error.message });
+      return;
+    }
+    toast.success("Acompte marqué comme encaissé");
+    fetchHandoffs();
+  };
+
+  const markBalancePaid = async (row: HandoffRow) => {
+    setSavingId(row.id);
+    const { error } = await (supabase as any)
+      .from("forwarder_handoffs")
+      .update({
+        balance_paid_amount: row.balance_amount,
+        balance_paid_at: new Date().toISOString(),
+      })
+      .eq("id", row.id);
+    setSavingId(null);
+    if (error) {
+      toast.error("Solde non enregistré", { description: error.message });
+      return;
+    }
+    toast.success("Solde marqué comme encaissé");
     fetchHandoffs();
   };
 
@@ -388,6 +440,82 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
                     >
                       Enregistrer le tracking
                     </Button>
+                  </div>
+                </details>
+
+                <details
+                  className="text-xs"
+                  open={row.payment_status === "pending" || row.payment_status === "deposit_paid"}
+                >
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground flex items-center gap-2 flex-wrap">
+                    <Wallet size={11} /> Paiement fret
+                    <Badge variant={PAY_META[row.payment_status].variant} className="text-[10px]">
+                      {PAY_META[row.payment_status].label}
+                    </Badge>
+                  </summary>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="rounded-lg border border-border bg-muted/20 p-2 space-y-1">
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span>Acompte dû</span>
+                        <span className="font-semibold text-foreground">
+                          {row.deposit_required
+                            ? `${row.payment_currency} ${Number(row.deposit_amount).toFixed(2)}`
+                            : "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Encaissé</span>
+                        <span className="font-semibold text-foreground">
+                          {row.payment_currency} {Number(row.deposit_paid_amount).toFixed(2)}
+                          {row.deposit_paid_at && (
+                            <span className="ml-1 text-[10px] text-muted-foreground">
+                              · {new Date(row.deposit_paid_at).toLocaleDateString("fr-FR")}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      {row.deposit_required && row.deposit_paid_amount < row.deposit_amount && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full mt-1"
+                          disabled={savingId === row.id}
+                          onClick={() => markDepositPaid(row)}
+                        >
+                          Marquer acompte encaissé
+                        </Button>
+                      )}
+                    </div>
+                    <div className="rounded-lg border border-border bg-muted/20 p-2 space-y-1">
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span>Solde dû</span>
+                        <span className="font-semibold text-foreground">
+                          {row.payment_currency} {Number(row.balance_amount).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Encaissé</span>
+                        <span className="font-semibold text-foreground">
+                          {row.payment_currency} {Number(row.balance_paid_amount).toFixed(2)}
+                          {row.balance_paid_at && (
+                            <span className="ml-1 text-[10px] text-muted-foreground">
+                              · {new Date(row.balance_paid_at).toLocaleDateString("fr-FR")}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      {row.balance_amount > 0 && row.balance_paid_amount < row.balance_amount && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full mt-1"
+                          disabled={savingId === row.id || (row.deposit_required && row.deposit_paid_amount < row.deposit_amount)}
+                          onClick={() => markBalancePaid(row)}
+                        >
+                          Marquer solde encaissé
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </details>
               </div>
