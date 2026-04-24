@@ -1800,6 +1800,7 @@ export default function CheckoutPage() {
                     onShippingCostChange={handleShippingCostChange}
                     onForwarderChange={handleForwarderChange}
                     onFreightOfferChange={handleFreightOfferChange}
+                    onFreightAvailabilityChange={handleFreightAvailabilityChange}
                   />
                 </div>
 
