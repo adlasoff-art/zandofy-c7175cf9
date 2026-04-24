@@ -49,6 +49,18 @@ export interface CbmTier {
   sort_order: number;
 }
 
+export interface KgTier {
+  id: string;
+  profile_id: string;
+  min_kg: number;
+  max_kg: number | null;
+  price_per_kg: number | null;
+  flat_price: number | null;
+  round_up_to_kg: boolean;
+  is_quote_only: boolean;
+  sort_order: number;
+}
+
 export interface PieceTier {
   id: string;
   profile_id: string;
