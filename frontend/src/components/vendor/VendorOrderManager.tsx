@@ -5,6 +5,7 @@ import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User a
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { Button } from "@/components/ui/button";
 import { PaymentProofUpload } from "@/components/PaymentProofUpload";
+import { DeliveryProofImage } from "@/components/DeliveryProofImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
