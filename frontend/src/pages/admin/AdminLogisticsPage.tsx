@@ -303,13 +303,18 @@ export default function AdminLogisticsPage() {
                   const riderLoc = riderLocations.find((rl: any) => rl.rider_id === d.rider_id);
                   const customerLoc = d.order_id ? customerLocations.find((cl: any) => cl.order_id === d.order_id) : null;
                   return (
-                    <div key={d.id} className="border border-border rounded-lg p-3 space-y-2">
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setSelectedDelivery(d)}
+                      className="text-left border border-border rounded-lg p-3 space-y-2 hover:border-primary/50 hover:bg-muted/30 transition-colors"
+                    >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold font-mono text-foreground">{d.order_ref || "Manuel"}</span>
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{d.status}</span>
                       </div>
                       <p className="text-xs text-muted-foreground">{d.customer_name} · {d.address}</p>
-                      <div className="flex items-center gap-2 text-[10px]">
+                      <div className="flex items-center gap-2 text-[10px]" onClick={(e) => e.stopPropagation()}>
                         {riderLoc ? (
                           <span className="flex items-center gap-1 text-primary"><span className="w-2 h-2 rounded-full bg-primary animate-pulse" /> GPS Livreur OK</span>
                         ) : (
@@ -330,8 +335,9 @@ export default function AdminLogisticsPage() {
                             <MapPin size={10} /> Demander GPS client
                           </button>
                         ) : null}
+                        <span className="ml-auto flex items-center gap-1 text-primary"><Navigation size={10} /> Ouvrir le suivi</span>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
