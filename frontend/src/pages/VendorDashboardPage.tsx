@@ -26,10 +26,11 @@ import { VendorPaymentNumbers } from "@/components/vendor/VendorPaymentNumbers";
 import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
 import { VendorPricingTab } from "@/components/vendor/VendorPricingTab";
 import { VendorAutonomousTab } from "@/components/vendor/VendorAutonomousTab";
+import { VendorFreightSimulator } from "@/components/vendor/VendorFreightSimulator";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
-  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign,
+  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign, Calculator,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { ACTIVE_ORDER_STATUSES, NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
@@ -84,9 +85,21 @@ export default function VendorDashboardPage() {
   const [noStore, setNoStore] = useState(false);
   const [selectedConv, setSelectedConv] = useState<VendorConversation | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "team" | "suppliers" | "pricing" | "autonomous" | "settings">("catalogue");
+  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "team" | "suppliers" | "pricing" | "autonomous" | "freight_sim" | "settings">("catalogue");
   const [orderCounters, setOrderCounters] = useState<OrderCounters>({ total: 0, in_progress: 0, delivered: 0 });
   const [suppliersEnabled, setSuppliersEnabled] = useState(false);
+  const { data: vendorFeaturesConfig } = useQuery({
+    queryKey: ["vendor-features-config"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("platform_settings")
+        .select("value")
+        .eq("key", "vendor_features_config")
+        .maybeSingle();
+      return (data?.value as { freight_simulator_enabled?: boolean }) || {};
+    },
+  });
+  const freightSimEnabled = !!vendorFeaturesConfig?.freight_simulator_enabled;
 
   // Presence heartbeat — marks store as online while vendor is on dashboard
   useStorePresence(store?.id);
@@ -303,6 +316,7 @@ export default function VendorDashboardPage() {
     ...(suppliersEnabled ? [{ key: "suppliers" as const, label: "Fournisseurs", icon: Truck }] : []),
     { key: "pricing" as const, label: "Tarification", icon: DollarSign },
     { key: "autonomous" as const, label: "Autonome", icon: Globe },
+    ...(freightSimEnabled ? [{ key: "freight_sim" as const, label: "Simulateur fret", icon: Calculator }] : []),
     { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
     ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
     { key: "messages" as const, label: "Messages", icon: MessageCircle },
@@ -341,6 +355,7 @@ export default function VendorDashboardPage() {
       {activeTab === "suppliers" && <VendorSuppliersTab storeId={store!.id} />}
       {activeTab === "pricing" && <VendorPricingTab storeId={store!.id} />}
       {activeTab === "autonomous" && <VendorAutonomousTab storeId={store!.id} />}
+      {activeTab === "freight_sim" && freightSimEnabled && <VendorFreightSimulator />}
       {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
       {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
       {activeTab === "messages" && (
