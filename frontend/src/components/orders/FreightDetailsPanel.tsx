@@ -274,6 +274,22 @@ export function FreightDetailsPanel({
         </div>
       )}
 
+      {/* Adresse de récupération */}
+      {pickupAddress && (
+        <div className="flex items-start gap-2 px-2.5 py-1.5 rounded-md border border-border bg-background/40 text-[11px]">
+          <MapPin size={12} className="shrink-0 mt-0.5 text-primary" />
+          <div className="min-w-0">
+            <p className="font-semibold text-foreground">Adresse de récupération</p>
+            <p className="text-muted-foreground whitespace-pre-line">{pickupAddress}</p>
+            {pickupEmail && actor && (
+              <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
+                <Mail size={10} /> {pickupEmail}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Timeline internationale (Lot 4K) */}
       <InternationalShipmentTimeline orderId={orderId} />
 
