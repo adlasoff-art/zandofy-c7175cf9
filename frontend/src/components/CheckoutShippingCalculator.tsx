@@ -80,6 +80,7 @@ export function CheckoutShippingCalculator({
   const [forwarderUnassigned, setForwarderUnassigned] = useState(false);
   // Lot 4D — Nouveau moteur freight (coexistence conditionnelle avec legacy)
   const [freightOffer, setFreightOffer] = useState<EligibleFreightOffer | null>(null);
+  const [freightChoice, setFreightChoice] = useState<ConsolidationChoice>("split");
   const [hasEligibleFreight, setHasEligibleFreight] = useState(false);
 
   // 1. Fetch product details (weight, dimensions, origin, category) for cart items
@@ -363,7 +364,12 @@ export function CheckoutShippingCalculator({
   useEffect(() => {
     // Lot 4D — Si une offre freight (nouveau moteur) est sélectionnée, on l'utilise comme prix
     if (freightOffer) {
-      onShippingCostChange(freightOffer.quote.total, activeMode);
+      const co = freightOffer.consolidation_offer;
+      const effective =
+        freightChoice === "consolidated" && co?.available
+          ? co.consolidated_total
+          : (freightOffer.split_total ?? freightOffer.quote.total);
+      onShippingCostChange(effective, activeMode);
       return;
     }
     const selected = modeTotals.get(activeMode);
@@ -371,7 +377,7 @@ export function CheckoutShippingCalculator({
     const multiplier = forwarderChoice ? Number(forwarderChoice.price_multiplier || 1) : 1;
     const adjusted = Math.round(base * multiplier * 100) / 100;
     onShippingCostChange(adjusted, activeMode);
-  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice, freightOffer]);
+  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice, freightOffer, freightChoice]);
 
   const handleForwarderChange = useCallback(
     (choice: ForwarderChoice | null, unassigned: boolean) => {
@@ -385,6 +391,7 @@ export function CheckoutShippingCalculator({
   const handleFreightOfferChange = useCallback(
     (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => {
       setFreightOffer(offer);
+      setFreightChoice(choice ?? "split");
       setHasEligibleFreight(offer !== null);
       onFreightOfferChange?.(offer, choice);
     },
