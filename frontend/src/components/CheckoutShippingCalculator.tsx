@@ -7,6 +7,8 @@ import {
   type City, type DynamicQuoteResult,
 } from "@/services/dynamic-shipping";
 import { ForwarderSelector, type ForwarderChoice } from "@/components/checkout/ForwarderSelector";
+import { FreightSelector } from "@/components/checkout/FreightSelector";
+import type { EligibleFreightOffer } from "@/services/freightQuoteCheckout";
 
 const MODE_META = {
   air:  { icon: Plane,     label: "Aérien",     localLabel: "Aérien local",  unit: "kg" },
@@ -41,6 +43,7 @@ interface Props {
   selectedMode?: TransportMode;
   onShippingCostChange: (cost: number, mode: string) => void;
   onForwarderChange?: (choice: ForwarderChoice | null, unassigned: boolean) => void;
+  onFreightOfferChange?: (offer: EligibleFreightOffer | null) => void;
 }
 
 function preciseRound(v: number, d: number): number {
@@ -55,6 +58,7 @@ export function CheckoutShippingCalculator({
   selectedMode,
   onShippingCostChange,
   onForwarderChange,
+  onFreightOfferChange,
 }: Props) {
   const [products, setProducts] = useState<CartProductInfo[]>([]);
   const [destCity, setDestCity] = useState<City | null>(null);
@@ -74,6 +78,9 @@ export function CheckoutShippingCalculator({
   const [isLocalStore, setIsLocalStore] = useState(false);
   const [forwarderChoice, setForwarderChoice] = useState<ForwarderChoice | null>(null);
   const [forwarderUnassigned, setForwarderUnassigned] = useState(false);
+  // Lot 4D — Nouveau moteur freight (coexistence conditionnelle avec legacy)
+  const [freightOffer, setFreightOffer] = useState<EligibleFreightOffer | null>(null);
+  const [hasEligibleFreight, setHasEligibleFreight] = useState(false);
 
   // 1. Fetch product details (weight, dimensions, origin, category) for cart items
   useEffect(() => {
@@ -354,12 +361,17 @@ export function CheckoutShippingCalculator({
 
   // Notify parent of shipping cost changes
   useEffect(() => {
+    // Lot 4D — Si une offre freight (nouveau moteur) est sélectionnée, on l'utilise comme prix
+    if (freightOffer) {
+      onShippingCostChange(freightOffer.quote.total, activeMode);
+      return;
+    }
     const selected = modeTotals.get(activeMode);
     const base = selected?.total || 0;
     const multiplier = forwarderChoice ? Number(forwarderChoice.price_multiplier || 1) : 1;
     const adjusted = Math.round(base * multiplier * 100) / 100;
     onShippingCostChange(adjusted, activeMode);
-  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice]);
+  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice, freightOffer]);
 
   const handleForwarderChange = useCallback(
     (choice: ForwarderChoice | null, unassigned: boolean) => {
@@ -368,6 +380,15 @@ export function CheckoutShippingCalculator({
       onForwarderChange?.(choice, unassigned);
     },
     [onForwarderChange],
+  );
+
+  const handleFreightOfferChange = useCallback(
+    (offer: EligibleFreightOffer | null) => {
+      setFreightOffer(offer);
+      setHasEligibleFreight(offer !== null);
+      onFreightOfferChange?.(offer);
+    },
+    [onFreightOfferChange],
   );
 
   // Aggregate cart info
@@ -576,15 +597,41 @@ export function CheckoutShippingCalculator({
         </div>
       )}
 
-      {/* Forwarder selection (feature-flagged via platform_settings.forwarders_config) */}
+      {/* Lot 4D — Coexistence conditionnelle :
+          1) FreightSelector (nouveau moteur Lot 3A : CBM/pièce/poids volumétrique + acompte)
+             affiché uniquement si des profils éligibles existent pour la destination + mode.
+          2) ForwarderSelector legacy en fallback silencieux dans le cas contraire,
+             pour ne rien casser tant que tous les transitaires n'ont pas migré. */}
       {destCity && modeTotals.get(activeMode) && (
-        <ForwarderSelector
-          country={destCity.country_code}
-          cityId={destCity.id}
-          mode={activeMode}
-          baseShippingCost={modeTotals.get(activeMode)?.total || 0}
-          onChange={handleForwarderChange}
-        />
+        <>
+          <FreightSelector
+            destinationCountry={destCity.country_code}
+            destinationCityId={destCity.id}
+            mode={activeMode}
+            items={cartItems.map((ci) => {
+              const p = products.find((pp) => pp.productId === ci.productId);
+              return {
+                quantity: ci.quantity,
+                weight_kg: p ? (p.weightGrams * ci.quantity) / 1000 : undefined,
+                cbm: p
+                  ? (p.lengthCm * p.widthCm * p.heightCm * ci.quantity) / 1_000_000
+                  : undefined,
+              };
+            })}
+            totalCbm={totalVolume}
+            totalWeightKg={totalWeight / 1000}
+            onChange={handleFreightOfferChange}
+          />
+          {!hasEligibleFreight && (
+            <ForwarderSelector
+              country={destCity.country_code}
+              cityId={destCity.id}
+              mode={activeMode}
+              baseShippingCost={modeTotals.get(activeMode)?.total || 0}
+              onChange={handleForwarderChange}
+            />
+          )}
+        </>
       )}
     </div>
   );
