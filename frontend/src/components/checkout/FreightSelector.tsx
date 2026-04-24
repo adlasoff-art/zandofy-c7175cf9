@@ -29,6 +29,8 @@ interface Props {
   totalCbm?: number;
   totalWeightKg?: number;
   onChange: (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => void;
+  /** Notifie le parent du nombre d'offres éligibles (pour gating "choix obligatoire"). */
+  onAvailabilityChange?: (count: number) => void;
 }
 
 export function FreightSelector({
@@ -39,6 +41,7 @@ export function FreightSelector({
   totalCbm,
   totalWeightKg,
   onChange,
+  onAvailabilityChange,
 }: Props) {
   const [offers, setOffers] = useState<EligibleFreightOffer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -66,6 +69,7 @@ export function FreightSelector({
       .then((res) => {
         if (cancelled) return;
         setOffers(res);
+        onAvailabilityChange?.(res.length);
         // Lot 4G — Pas de pré-sélection : le client doit choisir activement.
         setSelectedId(null);
         setConsolidationChoice("split");
