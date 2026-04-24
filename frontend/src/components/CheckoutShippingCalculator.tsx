@@ -394,10 +394,19 @@ export function CheckoutShippingCalculator({
     (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => {
       setFreightOffer(offer);
       setFreightChoice(choice ?? "split");
-      setHasEligibleFreight(offer !== null);
       onFreightOfferChange?.(offer, choice);
     },
     [onFreightOfferChange],
+  );
+
+  // Lot 4G — `hasEligibleFreight` doit refléter la disponibilité d'offres,
+  // pas la sélection active (le client doit choisir manuellement).
+  const handleFreightAvailabilityChange = useCallback(
+    (count: number) => {
+      setHasEligibleFreight(count > 0);
+      onFreightAvailabilityChange?.(count);
+    },
+    [onFreightAvailabilityChange],
   );
 
   // Aggregate cart info
