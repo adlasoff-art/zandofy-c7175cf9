@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ForwarderHandoffsPanel } from "@/components/forwarder/ForwarderHandoffsPanel";
 
 /**
  * CarrierDashboardPage — read-only view for users linked to a forwarder
@@ -55,6 +56,7 @@ export default function CarrierDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [forwarders, setForwarders] = useState<ForwarderRow[]>([]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
+  const [linkedForwarderIds, setLinkedForwarderIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -68,6 +70,8 @@ export default function CarrierDashboardPage() {
         .from("forwarders")
         .select("id, name, slug, logo_url, description, contact_email, contact_phone, is_active")
         .eq("linked_transporter_user_id", user.id);
+
+      const directLinkedIds = (linkedForwarders ?? []).map((f: any) => f.id as string);
 
       // 2. Profiles overridden to me
       const { data: overrideProfiles } = await (supabase as any)
@@ -155,6 +159,7 @@ export default function CarrierDashboardPage() {
       if (!cancelled) {
         setForwarders(allForwarders);
         setProfiles(enriched);
+        setLinkedForwarderIds(directLinkedIds);
         setLoading(false);
       }
     })();
@@ -217,6 +222,16 @@ export default function CarrierDashboardPage() {
           </div>
         ) : (
           <div className="space-y-6">
+            {linkedForwarderIds.length > 0 && (
+              <ForwarderHandoffsPanel
+                forwarderIds={linkedForwarderIds}
+                forwarderNames={Object.fromEntries(
+                  forwarders
+                    .filter((f) => linkedForwarderIds.includes(f.id))
+                    .map((f) => [f.id, f.name]),
+                )}
+              />
+            )}
             {forwarders.map((fw) => {
               const fwProfiles = profiles.filter((p) => p.forwarder_id === fw.id);
               return (
