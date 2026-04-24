@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
-import { Loader2, Plane, Ship, Truck, TrainFront, Building2, Mail, Phone, ExternalLink, Info } from "lucide-react";
+import {
+  Loader2, Plane, Ship, Truck, TrainFront, Building2, Mail, Phone, ExternalLink, Info,
+  Package, Boxes, DollarSign, Wallet,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +60,13 @@ export default function CarrierDashboardPage() {
   const [forwarders, setForwarders] = useState<ForwarderRow[]>([]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [linkedForwarderIds, setLinkedForwarderIds] = useState<string[]>([]);
+  const [kpis, setKpis] = useState<{
+    activeCount: number;
+    totalCbm: number;
+    revenue: number;
+    outstanding: number;
+    currency: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -169,6 +179,66 @@ export default function CarrierDashboardPage() {
     };
   }, [user]);
 
+  // --- Lot 4P: KPIs (active orders, total CBM, revenue, outstanding) ---
+  useEffect(() => {
+    if (linkedForwarderIds.length === 0) {
+      setKpis(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+      const { data: handoffs } = await (supabase as any)
+        .from("forwarder_handoffs")
+        .select(
+          "status, deposit_amount, deposit_paid_amount, balance_amount, balance_paid_amount, payment_currency, freight_quote_id, created_at",
+        )
+        .in("forwarder_id", linkedForwarderIds)
+        .gte("created_at", since.toISOString());
+
+      const list = (handoffs ?? []) as Array<{
+        status: string;
+        deposit_amount: number;
+        deposit_paid_amount: number;
+        balance_amount: number;
+        balance_paid_amount: number;
+        payment_currency: string;
+        freight_quote_id: string | null;
+      }>;
+
+      const quoteIds = [...new Set(list.map((h) => h.freight_quote_id).filter(Boolean))] as string[];
+      let cbmMap = new Map<string, number>();
+      if (quoteIds.length > 0) {
+        const { data: quotes } = await (supabase as any)
+          .from("freight_quotes")
+          .select("id, cbm")
+          .in("id", quoteIds);
+        cbmMap = new Map((quotes ?? []).map((q: any) => [q.id, Number(q.cbm) || 0]));
+      }
+
+      const activeCount = list.filter((h) => !["delivered", "cancelled"].includes(h.status)).length;
+      const totalCbm = list.reduce((acc, h) => acc + (h.freight_quote_id ? (cbmMap.get(h.freight_quote_id) ?? 0) : 0), 0);
+      const revenue = list.reduce(
+        (acc, h) => acc + Number(h.deposit_paid_amount || 0) + Number(h.balance_paid_amount || 0),
+        0,
+      );
+      const outstanding = list.reduce((acc, h) => {
+        const total = Number(h.deposit_amount || 0) + Number(h.balance_amount || 0);
+        const paid = Number(h.deposit_paid_amount || 0) + Number(h.balance_paid_amount || 0);
+        return acc + Math.max(total - paid, 0);
+      }, 0);
+      const currency = list.find((h) => h.payment_currency)?.payment_currency ?? "USD";
+
+      if (!cancelled) {
+        setKpis({ activeCount, totalCbm, revenue, outstanding, currency });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [linkedForwarderIds.join(",")]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -222,6 +292,34 @@ export default function CarrierDashboardPage() {
           </div>
         ) : (
           <div className="space-y-6">
+            {kpis && linkedForwarderIds.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <KpiCard
+                  icon={<Package size={16} className="text-primary" />}
+                  label="Commandes en cours"
+                  value={kpis.activeCount.toString()}
+                  hint="30 derniers jours"
+                />
+                <KpiCard
+                  icon={<Boxes size={16} className="text-primary" />}
+                  label="CBM cumulé"
+                  value={`${kpis.totalCbm.toFixed(2)} m³`}
+                  hint="30 derniers jours"
+                />
+                <KpiCard
+                  icon={<DollarSign size={16} className="text-primary" />}
+                  label="CA généré"
+                  value={`${kpis.currency} ${kpis.revenue.toFixed(2)}`}
+                  hint="Encaissé sur la période"
+                />
+                <KpiCard
+                  icon={<Wallet size={16} className="text-primary" />}
+                  label="À encaisser"
+                  value={`${kpis.currency} ${kpis.outstanding.toFixed(2)}`}
+                  hint="Reste dû par les clients"
+                />
+              </div>
+            )}
             {linkedForwarderIds.length > 0 && (
               <ForwarderHandoffsPanel
                 forwarderIds={linkedForwarderIds}
@@ -342,6 +440,29 @@ export default function CarrierDashboardPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function KpiCard({
+  icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: JSX.Element;
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-3">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="mt-1 text-lg font-bold text-foreground">{value}</div>
+      {hint && <div className="text-[10px] text-muted-foreground mt-0.5">{hint}</div>}
     </div>
   );
 }
