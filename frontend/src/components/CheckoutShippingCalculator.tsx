@@ -7,6 +7,8 @@ import {
   type City, type DynamicQuoteResult,
 } from "@/services/dynamic-shipping";
 import { ForwarderSelector, type ForwarderChoice } from "@/components/checkout/ForwarderSelector";
+import { FreightSelector } from "@/components/checkout/FreightSelector";
+import type { EligibleFreightOffer } from "@/services/freightQuoteCheckout";
 
 const MODE_META = {
   air:  { icon: Plane,     label: "Aérien",     localLabel: "Aérien local",  unit: "kg" },
@@ -41,6 +43,7 @@ interface Props {
   selectedMode?: TransportMode;
   onShippingCostChange: (cost: number, mode: string) => void;
   onForwarderChange?: (choice: ForwarderChoice | null, unassigned: boolean) => void;
+  onFreightOfferChange?: (offer: EligibleFreightOffer | null) => void;
 }
 
 function preciseRound(v: number, d: number): number {
@@ -55,6 +58,7 @@ export function CheckoutShippingCalculator({
   selectedMode,
   onShippingCostChange,
   onForwarderChange,
+  onFreightOfferChange,
 }: Props) {
   const [products, setProducts] = useState<CartProductInfo[]>([]);
   const [destCity, setDestCity] = useState<City | null>(null);
@@ -74,6 +78,9 @@ export function CheckoutShippingCalculator({
   const [isLocalStore, setIsLocalStore] = useState(false);
   const [forwarderChoice, setForwarderChoice] = useState<ForwarderChoice | null>(null);
   const [forwarderUnassigned, setForwarderUnassigned] = useState(false);
+  // Lot 4D — Nouveau moteur freight (coexistence conditionnelle avec legacy)
+  const [freightOffer, setFreightOffer] = useState<EligibleFreightOffer | null>(null);
+  const [hasEligibleFreight, setHasEligibleFreight] = useState(false);
 
   // 1. Fetch product details (weight, dimensions, origin, category) for cart items
   useEffect(() => {
