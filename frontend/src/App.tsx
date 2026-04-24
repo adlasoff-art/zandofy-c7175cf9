@@ -239,6 +239,7 @@ const App = () => (
                 <Route path="/vendor" element={<VendorDashboardPage />} />
                 <Route path="/shipper" element={<ShipperDashboardPage />} />
                 <Route path="/rider" element={<RiderDashboardPage />} />
+                <Route path="/carrier" element={<CarrierDashboardPage />} />
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/wishlist" element={<WishlistPage />} />
                 <Route path="/wishlist/shared/:userId" element={<SharedWishlistPage />} />
