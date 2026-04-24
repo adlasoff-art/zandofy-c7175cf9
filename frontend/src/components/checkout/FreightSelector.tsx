@@ -258,7 +258,9 @@ function OfferCard({
   isCheapest?: boolean;
   onSelect: () => void;
 }) {
-  const { quote, service_class } = offer;
+  const { quote, service_class, mode, pickup_address } = offer;
+  const meta = MODE_META[mode] ?? { label: mode, Icon: Truck, cls: "bg-muted text-foreground border-border" };
+  const ModeIcon = meta.Icon;
   const transitLabel =
     quote.transit_min_days || quote.transit_max_days
       ? `${quote.transit_min_days ?? "?"}–${quote.transit_max_days ?? "?"} jours`
@@ -274,11 +276,14 @@ function OfferCard({
           : "border-border bg-background hover:border-primary/50"
       }`}
     >
-      <div className="h-7 w-7 rounded bg-muted flex items-center justify-center shrink-0">
-        <Truck size={12} className="text-muted-foreground" />
+      <div className={`h-7 w-7 rounded border flex items-center justify-center shrink-0 ${meta.cls}`}>
+        <ModeIcon size={13} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={`text-[9px] px-1.5 py-0 rounded-full border uppercase tracking-wide font-semibold ${meta.cls}`}>
+            {meta.label}
+          </span>
           <span className="text-xs font-semibold text-foreground capitalize">{service_class}</span>
           {isCheapest && (
             <span className="text-[9px] px-1.5 py-0 rounded-full bg-primary/15 text-primary uppercase tracking-wide">
@@ -286,6 +291,27 @@ function OfferCard({
             </span>
           )}
           {isSelected && <BadgeCheck size={11} className="text-primary" />}
+          {pickup_address && (
+            <TooltipProvider delayDuration={120}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                    aria-label="Adresse de récupération"
+                  >
+                    <MapPin size={9} />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[240px] text-[11px]">
+                  <p className="font-semibold mb-0.5">Adresse de récupération</p>
+                  <p className="whitespace-pre-line text-muted-foreground">{pickup_address}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
         {transitLabel && (
           <p className="text-[10px] text-muted-foreground">Délai : {transitLabel}</p>
