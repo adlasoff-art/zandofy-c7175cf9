@@ -179,10 +179,10 @@ export function FreightSelector({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
-          <Truck size={11} className="text-primary" />
+        <p className="text-sm font-medium text-foreground flex items-center gap-2">
+          <Truck size={14} className="text-primary" />
           {selectedId ? "Transitaire choisi" : "Choisissez un transitaire"}
-        </div>
+        </p>
         {!selectedId && (
           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive uppercase tracking-wide">
             Requis
