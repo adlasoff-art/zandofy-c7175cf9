@@ -57,6 +57,14 @@ export interface EligibleFreightOffer {
   subpackages?: SubpackageBreakdown[];
   /** Offre de groupage si le transitaire l'a activée et que ≥ N colis. */
   consolidation_offer?: ConsolidationOffer | null;
+  /** Lot Very Speed — Métadonnées transitaire (nom, logo, plateforme). */
+  forwarder_name?: string | null;
+  forwarder_logo_url?: string | null;
+  is_platform_owned?: boolean;
+  /** Lot Very Speed — true si un profil existe pour cette zone (false → carte grisée). */
+  has_profile_for_zone?: boolean;
+  /** Lot Very Speed — Message affiché quand le service plateforme n'est pas dispo. */
+  unavailable_message?: string | null;
 }
 
 export interface QuoteCheckoutInput {
