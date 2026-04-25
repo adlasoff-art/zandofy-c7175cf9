@@ -579,8 +579,8 @@ export function CheckoutShippingCalculator({
                 const maxH = deliveryDefaults.local_hours_max;
                 const fmtH = (h: number) => h < 1 ? `${Math.round(h * 60)}min` : `${h}h`;
                 return (
-                  <div className="flex items-center gap-1.5 text-[10px] text-primary font-medium pt-1 border-t border-border/50 mt-1">
-                    <CalendarDays size={11} className="shrink-0" />
+                  <div className="flex items-center gap-1.5 text-sm text-destructive font-semibold pt-1.5 border-t border-border/50 mt-1.5">
+                    <CalendarDays size={14} className="shrink-0" />
                     <span>🏪 Livraison estimée : {fmtH(minH)} – {fmtH(maxH)}</span>
                   </div>
                 );
@@ -597,8 +597,8 @@ export function CheckoutShippingCalculator({
               dateMax.setDate(dateMax.getDate() + totalMax);
               const fmt = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
               return (
-                <div className="flex items-center gap-1.5 text-[10px] text-primary font-medium pt-1 border-t border-border/50 mt-1">
-                  <CalendarDays size={11} className="shrink-0" />
+                <div className="flex items-center gap-1.5 text-sm text-destructive font-semibold pt-1.5 border-t border-border/50 mt-1.5">
+                  <CalendarDays size={14} className="shrink-0" />
                   <span>📦 Arrivée estimée : {fmt(dateMin)} – {fmt(dateMax)} {dateMax.getFullYear()}</span>
                 </div>
               );
