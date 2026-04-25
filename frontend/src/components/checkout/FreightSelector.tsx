@@ -324,7 +324,7 @@ function AdminDebugBanner({
               <div className="opacity-70 mb-0.5">Profils retenus :</div>
               {offers.map((o) => (
                 <div key={o.profile_id} className="truncate">
-                  • {o.forwarder_id.slice(0, 8)} / {o.mode} / {o.service_class} → {o.quote.currency} {o.quote.total.toFixed(2)}
+                  • {o.forwarder_name ?? o.forwarder_id.slice(0, 8)} / {o.mode} / {o.service_class} → {o.quote.currency} {o.quote.total.toFixed(2)}
                 </div>
               ))}
             </div>
