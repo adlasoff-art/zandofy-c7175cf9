@@ -43,6 +43,12 @@ interface Props {
   onAvailabilityChange?: (count: number) => void;
   /** Nom de la ville (pour message d'état vide explicite). */
   destinationCityName?: string | null;
+  /** Lot Very Speed — Tarif réel basé sur le poids/CBM (ancien moteur),
+   *  affiché à titre indicatif marketing sur la carte du transitaire plateforme.
+   *  Reste 0 ou undefined si non calculé. */
+  realPriceIndicative?: number;
+  /** Lot Very Speed — Poids total panier en kg (pour message "X pièces de plus"). */
+  totalWeightKgForMarketing?: number;
 }
 
 export function FreightSelector({
@@ -55,6 +61,8 @@ export function FreightSelector({
   onChange,
   onAvailabilityChange,
   destinationCityName,
+  realPriceIndicative,
+  totalWeightKgForMarketing,
 }: Props) {
   const [offers, setOffers] = useState<EligibleFreightOffer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -101,7 +109,12 @@ export function FreightSelector({
           })),
         });
         setOffers(res);
-        onAvailabilityChange?.(res.length);
+        // Lot Very Speed — On exclut les offres "plateforme grisées" (non sélectionnables)
+        // du compteur de disponibilité utilisé pour le gating obligatoire.
+        const selectableCount = res.filter(
+          (o) => o.has_profile_for_zone !== false,
+        ).length;
+        onAvailabilityChange?.(selectableCount);
         // Lot 4G — Pas de pré-sélection : le client doit choisir activement.
         setSelectedId(null);
         setConsolidationChoice("split");
