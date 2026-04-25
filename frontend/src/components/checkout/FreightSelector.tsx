@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Truck, ChevronDown, ChevronUp, BadgeCheck, AlertTriangle, Package, Boxes, MapPin, Plane, Ship, TramFront, Info } from "lucide-react";
+import { Loader2, Truck, ChevronDown, ChevronUp, BadgeCheck, AlertTriangle, Package, Boxes, MapPin, Plane, Ship, TramFront, Info, Sparkles, Lock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   fetchEligibleFreightOffers,
@@ -43,6 +43,12 @@ interface Props {
   onAvailabilityChange?: (count: number) => void;
   /** Nom de la ville (pour message d'état vide explicite). */
   destinationCityName?: string | null;
+  /** Lot Very Speed — Tarif réel basé sur le poids/CBM (ancien moteur),
+   *  affiché à titre indicatif marketing sur la carte du transitaire plateforme.
+   *  Reste 0 ou undefined si non calculé. */
+  realPriceIndicative?: number;
+  /** Lot Very Speed — Poids total panier en kg (pour message "X pièces de plus"). */
+  totalWeightKgForMarketing?: number;
 }
 
 export function FreightSelector({
@@ -55,6 +61,8 @@ export function FreightSelector({
   onChange,
   onAvailabilityChange,
   destinationCityName,
+  realPriceIndicative,
+  totalWeightKgForMarketing,
 }: Props) {
   const [offers, setOffers] = useState<EligibleFreightOffer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -101,7 +109,12 @@ export function FreightSelector({
           })),
         });
         setOffers(res);
-        onAvailabilityChange?.(res.length);
+        // Lot Very Speed — On exclut les offres "plateforme grisées" (non sélectionnables)
+        // du compteur de disponibilité utilisé pour le gating obligatoire.
+        const selectableCount = res.filter(
+          (o) => o.has_profile_for_zone !== false,
+        ).length;
+        onAvailabilityChange?.(selectableCount);
         // Lot 4G — Pas de pré-sélection : le client doit choisir activement.
         setSelectedId(null);
         setConsolidationChoice("split");
@@ -116,14 +129,31 @@ export function FreightSelector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destinationCountry, destinationCityId, mode, totalCbm, totalWeightKg, items.length]);
 
-  const recommended = useMemo(() => offers[0] ?? null, [offers]);
-  const alternatives = useMemo(() => offers.slice(1), [offers]);
+  // Lot Very Speed — Tri d'affichage :
+  //  1) Les offres réellement sélectionnables (has_profile_for_zone !== false)
+  //     en premier, par prix forfaitaire facturé croissant.
+  //  2) Les cartes "plateforme grisée" en bas (informationnelles).
+  //  Le badge "le moins cher" se base sur ce tri (sélectionnables uniquement).
+  const sortedOffers = useMemo(() => {
+    const selectable = offers
+      .filter((o) => o.has_profile_for_zone !== false)
+      .sort((a, b) => a.quote.total - b.quote.total);
+    const greyed = offers.filter((o) => o.has_profile_for_zone === false);
+    return [...selectable, ...greyed];
+  }, [offers]);
+  const cheapestSelectableId = useMemo(() => {
+    const first = sortedOffers.find((o) => o.has_profile_for_zone !== false);
+    return first?.profile_id ?? null;
+  }, [sortedOffers]);
+  const alternatives = useMemo(() => sortedOffers.slice(1), [sortedOffers]);
   const selectedOffer = useMemo(
-    () => offers.find((o) => o.profile_id === selectedId) ?? null,
-    [offers, selectedId],
+    () => sortedOffers.find((o) => o.profile_id === selectedId) ?? null,
+    [sortedOffers, selectedId],
   );
 
   const handleSelect = (offer: EligibleFreightOffer) => {
+    // Lot Very Speed — Carte plateforme grisée : non sélectionnable.
+    if (offer.has_profile_for_zone === false) return;
     setSelectedId(offer.profile_id);
     setConsolidationChoice("split");
     onChange(offer, "split");
@@ -179,10 +209,10 @@ export function FreightSelector({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
-          <Truck size={11} className="text-primary" />
+        <p className="text-sm font-medium text-foreground flex items-center gap-2">
+          <Truck size={14} className="text-primary" />
           {selectedId ? "Transitaire choisi" : "Choisissez un transitaire"}
-        </div>
+        </p>
         {!selectedId && (
           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive uppercase tracking-wide">
             Requis
@@ -191,13 +221,15 @@ export function FreightSelector({
       </div>
 
       <div className="grid gap-1.5">
-        {(expanded ? offers : offers.slice(0, 1)).map((offer, idx) => (
+        {(expanded ? sortedOffers : sortedOffers.slice(0, 1)).map((offer) => (
           <OfferCard
             key={offer.profile_id}
             offer={offer}
             isSelected={selectedId === offer.profile_id}
-            isCheapest={idx === 0 && offers.length > 1}
+            isCheapest={offer.profile_id === cheapestSelectableId && sortedOffers.filter(o => o.has_profile_for_zone !== false).length > 1}
             onSelect={() => handleSelect(offer)}
+            realPriceIndicative={realPriceIndicative}
+            totalWeightKgForMarketing={totalWeightKgForMarketing}
           />
         ))}
       </div>
@@ -385,13 +417,20 @@ function OfferCard({
   isSelected,
   isCheapest,
   onSelect,
+  realPriceIndicative,
+  totalWeightKgForMarketing,
 }: {
   offer: EligibleFreightOffer;
   isSelected: boolean;
   isCheapest?: boolean;
   onSelect: () => void;
+  realPriceIndicative?: number;
+  totalWeightKgForMarketing?: number;
 }) {
   const { quote, service_class, mode, pickup_address } = offer;
+  const isPlatform = offer.is_platform_owned === true;
+  const isPlatformGreyed = isPlatform && offer.has_profile_for_zone === false;
+  const forwarderName = offer.forwarder_name ?? null;
   const meta = MODE_META[mode] ?? { label: mode, Icon: Truck, cls: "bg-muted text-foreground border-border" };
   const ModeIcon = meta.Icon;
   const transitLabel =
@@ -399,6 +438,151 @@ function OfferCard({
       ? `${quote.transit_min_days ?? "?"}–${quote.transit_max_days ?? "?"} jours`
       : null;
 
+  // ───────────────── Cas 1 : Carte plateforme grisée (Very Speed indispo) ───
+  if (isPlatformGreyed) {
+    return (
+      <div
+        className="w-full flex items-start gap-2 px-2.5 py-2 rounded-md border border-dashed border-border bg-muted/30 text-left opacity-70 cursor-not-allowed"
+        aria-disabled="true"
+      >
+        {offer.forwarder_logo_url ? (
+          <img
+            src={offer.forwarder_logo_url}
+            alt={forwarderName ?? "Plateforme"}
+            className="h-7 w-7 rounded object-cover bg-muted shrink-0 grayscale"
+            loading="lazy"
+          />
+        ) : (
+          <div className="h-7 w-7 rounded bg-muted flex items-center justify-center shrink-0">
+            <Sparkles size={13} className="text-muted-foreground" />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-semibold text-foreground">
+              {forwarderName ?? "Service plateforme"}
+            </span>
+            <span className="text-[9px] px-1.5 py-0 rounded-full border border-border bg-background text-muted-foreground uppercase tracking-wide">
+              Plateforme
+            </span>
+            <Lock size={10} className="text-muted-foreground" />
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {offer.unavailable_message ?? "Service plateforme non disponible dans votre zone"}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ───────── Cas 2 : Carte plateforme active (tarif réel marketing + forfait) ─
+  if (isPlatform && realPriceIndicative && realPriceIndicative > 0) {
+    const flatPrice = quote.total;
+    const showRealVsFlat = realPriceIndicative < flatPrice; // typiquement sous le seuil 1 kg
+    const weightKg = totalWeightKgForMarketing ?? 0;
+    const remainingForOneKg = weightKg > 0 && weightKg < 1 ? 1 - weightKg : 0;
+    return (
+      <button
+        type="button"
+        onClick={onSelect}
+        className={`w-full flex items-start gap-2 px-2.5 py-2 rounded-md border-2 text-left transition-all ${
+          isSelected
+            ? "border-primary bg-primary/10"
+            : "border-primary/40 bg-primary/5 hover:border-primary"
+        }`}
+      >
+        {offer.forwarder_logo_url ? (
+          <img
+            src={offer.forwarder_logo_url}
+            alt={forwarderName ?? "Plateforme"}
+            className="h-7 w-7 rounded object-cover bg-background shrink-0"
+            loading="lazy"
+          />
+        ) : (
+          <div className="h-7 w-7 rounded bg-primary/15 flex items-center justify-center shrink-0">
+            <Sparkles size={13} className="text-primary" />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-semibold text-foreground">
+              {forwarderName ?? "Service plateforme"}
+            </span>
+            <span className="text-[9px] px-1.5 py-0 rounded-full bg-primary/15 text-primary uppercase tracking-wide font-semibold">
+              Plateforme
+            </span>
+            {isCheapest && (
+              <span className="text-[9px] px-1.5 py-0 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
+                Le moins cher
+              </span>
+            )}
+            {isSelected && <BadgeCheck size={11} className="text-primary" />}
+            {pickup_address && (
+              <TooltipProvider delayDuration={120}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                      aria-label="Adresse de récupération"
+                    >
+                      <MapPin size={9} />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-sm text-[11px] break-words">
+                    <p className="font-semibold mb-0.5">Adresse de récupération</p>
+                    <p className="whitespace-pre-line break-words text-muted-foreground">{pickup_address}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+          {showRealVsFlat ? (
+            <div className="mt-1 space-y-0.5">
+              <p className="text-[10px] text-muted-foreground">
+                Tarif réel basé sur votre poids ({weightKg.toFixed(2)} kg)
+              </p>
+              <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-snug">
+                ℹ️ Le transitaire vous facturera le forfait minimum de{" "}
+                <span className="font-semibold">{quote.currency} {flatPrice.toFixed(2)}</span>.
+              </p>
+              {remainingForOneKg > 0 && (
+                <p className="text-[10px] text-primary leading-snug">
+                  💡 Ajoutez encore {(remainingForOneKg * 1000).toFixed(0)}g pour atteindre 1 kg
+                  et rentabiliser ce tarif.
+                </p>
+              )}
+            </div>
+          ) : (
+            transitLabel && (
+              <p className="text-[10px] text-muted-foreground">Délai : {transitLabel}</p>
+            )
+          )}
+        </div>
+        <div className="text-right shrink-0">
+          {showRealVsFlat ? (
+            <>
+              <p className="text-[10px] text-muted-foreground line-through">
+                {quote.currency} {realPriceIndicative.toFixed(2)}
+              </p>
+              <p className="text-xs font-bold text-foreground">
+                {quote.currency} {flatPrice.toFixed(2)}
+              </p>
+              <p className="text-[9px] text-muted-foreground">facturé</p>
+            </>
+          ) : (
+            <p className="text-xs font-bold text-foreground">
+              {quote.currency} {flatPrice.toFixed(2)}
+            </p>
+          )}
+        </div>
+      </button>
+    );
+  }
+
+  // ───────────────── Cas 3 : Carte transitaire partenaire standard ──────────
   return (
     <button
       type="button"
@@ -409,15 +593,27 @@ function OfferCard({
           : "border-border bg-background hover:border-primary/50"
       }`}
     >
-      <div className={`h-7 w-7 rounded border flex items-center justify-center shrink-0 ${meta.cls}`}>
-        <ModeIcon size={13} />
-      </div>
+      {offer.forwarder_logo_url ? (
+        <img
+          src={offer.forwarder_logo_url}
+          alt={forwarderName ?? meta.label}
+          className="h-7 w-7 rounded object-cover bg-muted shrink-0"
+          loading="lazy"
+        />
+      ) : (
+        <div className={`h-7 w-7 rounded border flex items-center justify-center shrink-0 ${meta.cls}`}>
+          <ModeIcon size={13} />
+        </div>
+      )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
+          {forwarderName && (
+            <span className="text-xs font-semibold text-foreground truncate">{forwarderName}</span>
+          )}
           <span className={`text-[9px] px-1.5 py-0 rounded-full border uppercase tracking-wide font-semibold ${meta.cls}`}>
             {meta.label}
           </span>
-          <span className="text-xs font-semibold text-foreground capitalize">{service_class}</span>
+          <span className="text-[10px] text-muted-foreground capitalize">{service_class}</span>
           {isCheapest && (
             <span className="text-[9px] px-1.5 py-0 rounded-full bg-primary/15 text-primary uppercase tracking-wide">
               Le moins cher
@@ -438,9 +634,9 @@ function OfferCard({
                     <MapPin size={9} />
                   </span>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-[240px] text-[11px]">
+                <TooltipContent side="top" className="max-w-sm text-[11px] break-words">
                   <p className="font-semibold mb-0.5">Adresse de récupération</p>
-                  <p className="whitespace-pre-line text-muted-foreground">{pickup_address}</p>
+                  <p className="whitespace-pre-line break-words text-muted-foreground">{pickup_address}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
