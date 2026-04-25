@@ -324,7 +324,7 @@ function AdminDebugBanner({
               <div className="opacity-70 mb-0.5">Profils retenus :</div>
               {offers.map((o) => (
                 <div key={o.profile_id} className="truncate">
-                  • {o.forwarder_id.slice(0, 8)} / {o.mode} / {o.service_class} → {o.quote.currency} {o.quote.total.toFixed(2)}
+                  • {o.forwarder_name ?? o.forwarder_id.slice(0, 8)} / {o.mode} / {o.service_class} → {o.quote.currency} {o.quote.total.toFixed(2)}
                 </div>
               ))}
             </div>
@@ -541,13 +541,27 @@ function OfferCard({
           </div>
           {showRealVsFlat ? (
             <div className="mt-1 space-y-0.5">
-              <p className="text-[10px] text-muted-foreground">
-                Tarif réel basé sur votre poids ({weightKg.toFixed(2)} kg)
-              </p>
-              <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-snug">
-                ℹ️ Le transitaire vous facturera le forfait minimum de{" "}
-                <span className="font-semibold">{quote.currency} {flatPrice.toFixed(2)}</span>.
-              </p>
+              {/* Ligne 1 : tarif réel ↔ montant entre parenthèses (même taille) */}
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-[10px] text-muted-foreground">
+                  Tarif réel basé sur votre poids ({weightKg.toFixed(2)} kg)
+                </p>
+                <p className="text-[10px] text-muted-foreground whitespace-nowrap">
+                  ({quote.currency} {realPriceIndicative.toFixed(2)})
+                </p>
+              </div>
+              {/* Ligne 2 : forfait facturé ↔ montant en gras (aligné) */}
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-snug">
+                  ℹ️ Le transitaire vous facturera le forfait minimum de
+                </p>
+                <p className="text-xs font-bold text-foreground whitespace-nowrap">
+                  {quote.currency} {flatPrice.toFixed(2)}
+                </p>
+              </div>
+              {transitLabel && (
+                <p className="text-[10px] text-muted-foreground">Délai : {transitLabel}</p>
+              )}
               {remainingForOneKg > 0 && (
                 <p className="text-[10px] text-primary leading-snug">
                   💡 Ajoutez encore {(remainingForOneKg * 1000).toFixed(0)}g pour atteindre 1 kg
@@ -556,26 +570,16 @@ function OfferCard({
               )}
             </div>
           ) : (
-            transitLabel && (
-              <p className="text-[10px] text-muted-foreground">Délai : {transitLabel}</p>
-            )
-          )}
-        </div>
-        <div className="text-right shrink-0">
-          {showRealVsFlat ? (
             <>
-              <p className="text-[10px] text-muted-foreground line-through">
-                {quote.currency} {realPriceIndicative.toFixed(2)}
-              </p>
-              <p className="text-xs font-bold text-foreground">
-                {quote.currency} {flatPrice.toFixed(2)}
-              </p>
-              <p className="text-[9px] text-muted-foreground">facturé</p>
+              {transitLabel && (
+                <p className="text-[10px] text-muted-foreground">Délai : {transitLabel}</p>
+              )}
+              <div className="mt-0.5 flex justify-end">
+                <p className="text-xs font-bold text-foreground">
+                  {quote.currency} {flatPrice.toFixed(2)}
+                </p>
+              </div>
             </>
-          ) : (
-            <p className="text-xs font-bold text-foreground">
-              {quote.currency} {flatPrice.toFixed(2)}
-            </p>
           )}
         </div>
       </button>

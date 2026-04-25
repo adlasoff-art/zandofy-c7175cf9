@@ -373,9 +373,14 @@ export default function CheckoutPage() {
     setShippingMode(mode);
   }, []);
 
-  const shippingCost = dynamicShippingCost !== null
-    ? dynamicShippingCost
-    : (freeShippingEnabled && subtotal >= freeShippingThreshold ? 0 : FALLBACK_SHIPPING_COST);
+  // Lot Very Speed — Priorité absolue à l'offre transitaire sélectionnée par le client.
+  // Tant qu'aucune offre n'est sélectionnée, le shippingCost reste 0 (et le bouton
+  // "Payer maintenant" affichera "—" pour forcer le choix). Plus de fallback 5.99.
+  const shippingCost = selectedFreightOffer
+    ? Number(selectedFreightOffer.quote.total) || 0
+    : (dynamicShippingCost !== null
+        ? dynamicShippingCost
+        : (freeShippingEnabled && subtotal >= freeShippingThreshold ? 0 : 0));
 
   // Raw discount calculations
   const rawCouponPct = appliedCoupon
