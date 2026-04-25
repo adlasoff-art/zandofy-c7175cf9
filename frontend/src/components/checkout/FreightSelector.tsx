@@ -129,14 +129,31 @@ export function FreightSelector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destinationCountry, destinationCityId, mode, totalCbm, totalWeightKg, items.length]);
 
-  const recommended = useMemo(() => offers[0] ?? null, [offers]);
-  const alternatives = useMemo(() => offers.slice(1), [offers]);
+  // Lot Very Speed — Tri d'affichage :
+  //  1) Les offres réellement sélectionnables (has_profile_for_zone !== false)
+  //     en premier, par prix forfaitaire facturé croissant.
+  //  2) Les cartes "plateforme grisée" en bas (informationnelles).
+  //  Le badge "le moins cher" se base sur ce tri (sélectionnables uniquement).
+  const sortedOffers = useMemo(() => {
+    const selectable = offers
+      .filter((o) => o.has_profile_for_zone !== false)
+      .sort((a, b) => a.quote.total - b.quote.total);
+    const greyed = offers.filter((o) => o.has_profile_for_zone === false);
+    return [...selectable, ...greyed];
+  }, [offers]);
+  const cheapestSelectableId = useMemo(() => {
+    const first = sortedOffers.find((o) => o.has_profile_for_zone !== false);
+    return first?.profile_id ?? null;
+  }, [sortedOffers]);
+  const alternatives = useMemo(() => sortedOffers.slice(1), [sortedOffers]);
   const selectedOffer = useMemo(
-    () => offers.find((o) => o.profile_id === selectedId) ?? null,
-    [offers, selectedId],
+    () => sortedOffers.find((o) => o.profile_id === selectedId) ?? null,
+    [sortedOffers, selectedId],
   );
 
   const handleSelect = (offer: EligibleFreightOffer) => {
+    // Lot Very Speed — Carte plateforme grisée : non sélectionnable.
+    if (offer.has_profile_for_zone === false) return;
     setSelectedId(offer.profile_id);
     setConsolidationChoice("split");
     onChange(offer, "split");
@@ -204,13 +221,15 @@ export function FreightSelector({
       </div>
 
       <div className="grid gap-1.5">
-        {(expanded ? offers : offers.slice(0, 1)).map((offer, idx) => (
+        {(expanded ? sortedOffers : sortedOffers.slice(0, 1)).map((offer) => (
           <OfferCard
             key={offer.profile_id}
             offer={offer}
             isSelected={selectedId === offer.profile_id}
-            isCheapest={idx === 0 && offers.length > 1}
+            isCheapest={offer.profile_id === cheapestSelectableId && sortedOffers.filter(o => o.has_profile_for_zone !== false).length > 1}
             onSelect={() => handleSelect(offer)}
+            realPriceIndicative={realPriceIndicative}
+            totalWeightKgForMarketing={totalWeightKgForMarketing}
           />
         ))}
       </div>
