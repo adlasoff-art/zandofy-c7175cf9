@@ -641,6 +641,8 @@ export function CheckoutShippingCalculator({
             totalWeightKg={totalWeight / 1000}
             onChange={handleFreightOfferChange}
             onAvailabilityChange={handleFreightAvailabilityChange}
+            realPriceIndicative={modeTotals.get(activeMode)?.total ?? 0}
+            totalWeightKgForMarketing={totalWeight / 1000}
           />
           {!hasEligibleFreight && (
             <ForwarderSelector
