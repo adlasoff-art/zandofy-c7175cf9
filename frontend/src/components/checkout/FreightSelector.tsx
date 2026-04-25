@@ -19,6 +19,7 @@ import {
   type EligibleFreightOffer,
   type QuoteCheckoutInput,
 } from "@/services/freightQuoteCheckout";
+import { useRoles } from "@/hooks/use-roles";
 
 const MODE_META: Record<string, { label: string; Icon: typeof Plane; cls: string }> = {
   air: { label: "Aérien", Icon: Plane, cls: "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30" },
@@ -60,6 +61,8 @@ export function FreightSelector({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [consolidationChoice, setConsolidationChoice] = useState<ConsolidationChoice>("split");
+  const { isAdmin } = useRoles();
+  const [debugOpen, setDebugOpen] = useState(false);
 
   // Refetch on context change
   useEffect(() => {
@@ -144,15 +147,31 @@ export function FreightSelector({
     // Lot 4G — Empty-state explicite : informe le client qu'aucun transitaire
     // ne couvre cette destination/mode et que le tarif standard sera appliqué.
     return (
-      <div className="flex items-start gap-2 px-2.5 py-2 rounded-md border border-border bg-muted/40 text-[11px] text-muted-foreground">
-        <Info size={12} className="shrink-0 mt-0.5 text-primary" />
-        <span>
-          Aucun transitaire ne dessert encore
-          {destinationCityName ? ` ${destinationCityName}` : " cette destination"}
-          {" "}
-          en mode <span className="font-medium">{MODE_META[mode]?.label ?? mode}</span>.
-          Le tarif standard ci-dessus sera appliqué et un transitaire sera assigné après commande.
-        </span>
+      <div className="space-y-1.5">
+        <div className="flex items-start gap-2 px-2.5 py-2 rounded-md border border-border bg-muted/40 text-[11px] text-muted-foreground">
+          <Info size={12} className="shrink-0 mt-0.5 text-primary" />
+          <span>
+            Aucun transitaire ne dessert encore
+            {destinationCityName ? ` ${destinationCityName}` : " cette destination"}
+            {" "}
+            en mode <span className="font-medium">{MODE_META[mode]?.label ?? mode}</span>.
+            Le tarif standard ci-dessus sera appliqué et un transitaire sera assigné après commande.
+          </span>
+        </div>
+        {isAdmin && (
+          <AdminDebugBanner
+            destinationCountry={destinationCountry}
+            destinationCityId={destinationCityId}
+            destinationCityName={destinationCityName}
+            mode={mode}
+            totalCbm={totalCbm}
+            totalWeightKg={totalWeightKg}
+            offersCount={0}
+            offers={[]}
+            open={debugOpen}
+            onToggle={() => setDebugOpen((v) => !v)}
+          />
+        )}
       </div>
     );
   }
@@ -202,6 +221,88 @@ export function FreightSelector({
           choice={consolidationChoice}
           onChange={handleConsolidationChange}
         />
+      )}
+
+      {isAdmin && (
+        <AdminDebugBanner
+          destinationCountry={destinationCountry}
+          destinationCityId={destinationCityId}
+          destinationCityName={destinationCityName}
+          mode={mode}
+          totalCbm={totalCbm}
+          totalWeightKg={totalWeightKg}
+          offersCount={offers.length}
+          offers={offers}
+          open={debugOpen}
+          onToggle={() => setDebugOpen((v) => !v)}
+        />
+      )}
+    </div>
+  );
+}
+
+function AdminDebugBanner({
+  destinationCountry,
+  destinationCityId,
+  destinationCityName,
+  mode,
+  totalCbm,
+  totalWeightKg,
+  offersCount,
+  offers,
+  open,
+  onToggle,
+}: {
+  destinationCountry: string;
+  destinationCityId?: string | null;
+  destinationCityName?: string | null;
+  mode: string;
+  totalCbm?: number;
+  totalWeightKg?: number;
+  offersCount: number;
+  offers: EligibleFreightOffer[];
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="rounded-md border border-amber-500/40 bg-amber-500/5 text-[10px]">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between gap-2 px-2 py-1.5 text-amber-700 dark:text-amber-400 font-mono"
+      >
+        <span className="flex items-center gap-1.5">
+          <AlertTriangle size={11} />
+          DEBUG ADMIN — {offersCount} offre{offersCount > 1 ? "s" : ""} retournée{offersCount > 1 ? "s" : ""}
+        </span>
+        {open ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+      </button>
+      {open && (
+        <div className="px-2 pb-2 space-y-1 font-mono text-[10px] text-amber-800 dark:text-amber-300/90">
+          <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+            <span className="opacity-70">country_code</span><span>{destinationCountry || "∅"}</span>
+            <span className="opacity-70">city_id</span><span className="truncate">{destinationCityId || "∅"}</span>
+            <span className="opacity-70">city_name</span><span>{destinationCityName || "∅"}</span>
+            <span className="opacity-70">mode</span><span>{mode || "∅"}</span>
+            <span className="opacity-70">total_cbm</span><span>{totalCbm ?? "∅"}</span>
+            <span className="opacity-70">total_kg</span><span>{totalWeightKg ?? "∅"}</span>
+          </div>
+          {offers.length > 0 && (
+            <div className="pt-1 mt-1 border-t border-amber-500/30 space-y-0.5">
+              <div className="opacity-70 mb-0.5">Profils retenus :</div>
+              {offers.map((o) => (
+                <div key={o.profile_id} className="truncate">
+                  • {o.forwarder_id.slice(0, 8)} / {o.mode} / {o.service_class} → {o.quote.currency} {o.quote.total.toFixed(2)}
+                </div>
+              ))}
+            </div>
+          )}
+          {offers.length === 0 && (
+            <div className="pt-1 mt-1 border-t border-amber-500/30 opacity-80">
+              SQL : forwarder_pricing_profiles WHERE is_active=true AND country_code='{destinationCountry}' AND mode='{mode}' AND (city_id IS NULL OR city_id='{destinationCityId ?? "∅"}')
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
