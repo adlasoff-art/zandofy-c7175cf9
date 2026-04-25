@@ -438,9 +438,9 @@ function OfferCard({
                     <MapPin size={9} />
                   </span>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-[240px] text-[11px]">
+                <TooltipContent side="top" className="max-w-sm text-[11px] break-words">
                   <p className="font-semibold mb-0.5">Adresse de récupération</p>
-                  <p className="whitespace-pre-line text-muted-foreground">{pickup_address}</p>
+                  <p className="whitespace-pre-line break-words text-muted-foreground">{pickup_address}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
