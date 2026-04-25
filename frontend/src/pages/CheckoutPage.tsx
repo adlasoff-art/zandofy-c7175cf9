@@ -1276,15 +1276,28 @@ export default function CheckoutPage() {
                   ) : null}
 
                   {/* Deferred shipping payment option */}
-                  {shippingCost > 0 && (
+                  {shippingCost > 0 && (() => {
+                    // Lot Very Speed — Si un transitaire est requis (offres dispos) mais aucun
+                    // n'est sélectionné, ne pas afficher de montant fantôme : afficher "—".
+                    const awaitingForwarderChoice =
+                      freightOffersAvailable > 0 && !selectedFreightOffer;
+                    const amountLabel = awaitingForwarderChoice
+                      ? "—"
+                      : `$${shippingCost.toFixed(2)}`;
+                    return (
                     <div className="pt-3 border-t border-border space-y-2">
                       <p className="text-sm font-medium text-foreground flex items-center gap-2">
                         <Truck size={14} className="text-primary" /> Paiement des frais d'expédition
                       </p>
+                      {awaitingForwarderChoice && (
+                        <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                          Sélectionnez un transitaire ci-dessus pour voir le montant exact.
+                        </p>
+                      )}
                       <div className="space-y-2">
                         {[
-                          { key: "pay_now" as const, label: "Payer maintenant", desc: `Inclure $${shippingCost.toFixed(2)} dans le total` },
-                          { key: "pay_on_arrival" as const, label: "Payer à l'arrivée au Hub", desc: "Régler les frais d'expédition quand la commande arrive (obligatoire avant livraison)" },
+                          { key: "pay_now" as const, label: "Payer maintenant", desc: `Inclure ${amountLabel} dans le total` },
+                          { key: "pay_on_arrival" as const, label: "Payer à l'arrivée au Hub", desc: `Régler ${amountLabel} quand le colis arrive au hub (avant livraison)` },
                         ].map(opt => (
                           <button
                             key={opt.key}
@@ -1309,7 +1322,8 @@ export default function CheckoutPage() {
                         ))}
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Delivery option: home vs hub */}
                    <div className="pt-3 border-t border-border space-y-2">
