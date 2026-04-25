@@ -2783,11 +2783,13 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          is_platform_owned: boolean
           linked_transporter_user_id: string | null
           logo_url: string | null
           name: string
           slug: string
           sort_order: number
+          unavailable_message: string | null
           updated_at: string
           website_url: string | null
         }
@@ -2798,11 +2800,13 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          is_platform_owned?: boolean
           linked_transporter_user_id?: string | null
           logo_url?: string | null
           name: string
           slug: string
           sort_order?: number
+          unavailable_message?: string | null
           updated_at?: string
           website_url?: string | null
         }
@@ -2813,11 +2817,13 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          is_platform_owned?: boolean
           linked_transporter_user_id?: string | null
           logo_url?: string | null
           name?: string
           slug?: string
           sort_order?: number
+          unavailable_message?: string | null
           updated_at?: string
           website_url?: string | null
         }
@@ -8377,6 +8383,23 @@ export type Database = {
         Returns: {
           total_orders: number
           total_spent: number
+        }[]
+      }
+      get_eligible_forwarders: {
+        Args: { p_city_id: string; p_country: string; p_mode: string }
+        Returns: {
+          forwarder_id: string
+          forwarder_name: string
+          forwarder_slug: string
+          has_profile_for_zone: boolean
+          is_platform_owned: boolean
+          logo_url: string
+          mode: string
+          price_multiplier: number
+          tier: string
+          transit_max_days: number
+          transit_min_days: number
+          unavailable_message: string
         }[]
       }
       get_guest_support_ticket: {
