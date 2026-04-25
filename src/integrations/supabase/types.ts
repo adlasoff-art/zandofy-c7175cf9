@@ -2838,6 +2838,7 @@ export type Database = {
           profile_id: string
           quoted_price: number
           requires_deposit: boolean
+          requires_manual_assignment: boolean
           restrictions_snapshot: Json
           status: string
           transit_max_days: number | null
@@ -2846,6 +2847,7 @@ export type Database = {
           user_id: string
           valid_until: string
           weight_kg: number
+          zone_fallback_amount: number | null
         }
         Insert: {
           breakdown?: Json
@@ -2861,6 +2863,7 @@ export type Database = {
           profile_id: string
           quoted_price?: number
           requires_deposit?: boolean
+          requires_manual_assignment?: boolean
           restrictions_snapshot?: Json
           status?: string
           transit_max_days?: number | null
@@ -2869,6 +2872,7 @@ export type Database = {
           user_id: string
           valid_until?: string
           weight_kg?: number
+          zone_fallback_amount?: number | null
         }
         Update: {
           breakdown?: Json
@@ -2884,6 +2888,7 @@ export type Database = {
           profile_id?: string
           quoted_price?: number
           requires_deposit?: boolean
+          requires_manual_assignment?: boolean
           restrictions_snapshot?: Json
           status?: string
           transit_max_days?: number | null
@@ -2892,6 +2897,7 @@ export type Database = {
           user_id?: string
           valid_until?: string
           weight_kg?: number
+          zone_fallback_amount?: number | null
         }
         Relationships: [
           {
