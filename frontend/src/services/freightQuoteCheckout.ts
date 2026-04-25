@@ -84,13 +84,18 @@ export interface QuoteCheckoutInput {
 export async function fetchEligibleFreightOffers(
   input: QuoteCheckoutInput,
 ): Promise<EligibleFreightOffer[]> {
-  // 1) Trouver les profils éligibles (lecture seule)
+  // 1) Trouver les profils éligibles (lecture seule) — joint sur forwarders pour
+  //    récupérer nom/logo/flag plateforme.
   let query = (supabase as any)
     .from("forwarder_pricing_profiles")
-    .select("id, forwarder_id, mode, service_class, country_code, city_id")
+    .select(
+      "id, forwarder_id, mode, service_class, country_code, city_id, " +
+        "forwarder:forwarders!inner(id, name, logo_url, is_platform_owned, is_active)",
+    )
     .eq("is_active", true)
     .eq("country_code", input.destinationCountry)
-    .eq("mode", input.mode);
+    .eq("mode", input.mode)
+    .eq("forwarder.is_active", true);
 
   if (input.destinationCityId) {
     // city_id NULL = profil pays-large ; cityId = profil ville-spécifique
@@ -100,14 +105,28 @@ export async function fetchEligibleFreightOffers(
   }
 
   const { data: profiles, error } = await query;
-  if (error || !profiles || profiles.length === 0) {
-    if (error) console.warn("[freightQuoteCheckout] eligible profiles fetch failed", error);
-    return [];
+  if (error) {
+    console.warn("[freightQuoteCheckout] eligible profiles fetch failed", error);
   }
+  const profilesList = (profiles ?? []) as Array<{
+    id: string;
+    forwarder_id: string;
+    mode: string;
+    service_class: string;
+    country_code: string;
+    city_id: string | null;
+    forwarder: {
+      id: string;
+      name: string;
+      logo_url: string | null;
+      is_platform_owned: boolean;
+      is_active: boolean;
+    } | null;
+  }>;
 
   // 2) Composer un devis pour chaque profil (en parallèle)
   const offers = await Promise.all(
-    (profiles as Array<{ id: string; forwarder_id: string; mode: string; service_class: string; country_code: string; city_id: string | null }>).map(
+    profilesList.map(
       async (p) => {
         const data = await fetchFreightProfileWithTiers(p.id);
         if (!data) return null;
@@ -150,14 +169,68 @@ export async function fetchEligibleFreightOffers(
           split_total,
           subpackages,
           consolidation_offer,
+          forwarder_name: p.forwarder?.name ?? null,
+          forwarder_logo_url: p.forwarder?.logo_url ?? null,
+          is_platform_owned: p.forwarder?.is_platform_owned ?? false,
+          has_profile_for_zone: true,
+          unavailable_message: null,
         } as EligibleFreightOffer;
       },
     ),
   );
 
-  return offers
+  const validOffers = offers
     .filter((o): o is EligibleFreightOffer => o !== null)
     .sort((a, b) => a.quote.total - b.quote.total);
+
+  // 3) Lot Very Speed — Si AUCUN profil plateforme n'est présent dans les
+  //    offres ci-dessus pour cette zone+mode, ajouter une carte "plateforme grisée"
+  //    pour informer le client que le service plateforme n'est pas disponible.
+  const hasPlatformOffer = validOffers.some((o) => o.is_platform_owned);
+  if (!hasPlatformOffer) {
+    const { data: platformForwarders } = await (supabase as any)
+      .from("forwarders")
+      .select("id, name, logo_url, unavailable_message")
+      .eq("is_active", true)
+      .eq("is_platform_owned", true)
+      .limit(1);
+
+    const pf = (platformForwarders ?? [])[0] as
+      | { id: string; name: string; logo_url: string | null; unavailable_message: string | null }
+      | undefined;
+    if (pf) {
+      // Carte grisée — quote vide, non sélectionnable
+      validOffers.unshift({
+        profile_id: `platform-unavailable-${pf.id}`,
+        forwarder_id: pf.id,
+        mode: input.mode,
+        service_class: "platform",
+        country_code: input.destinationCountry,
+        city_id: input.destinationCityId ?? null,
+        quote: {
+          total: 0,
+          currency: "USD",
+          lines: [],
+          warnings: [],
+          deposit_required: false,
+          deposit_amount: 0,
+          deposit_pct: 0,
+          transit_min_days: null,
+          transit_max_days: null,
+          total_cbm: 0,
+          total_chargeable_weight_kg: 0,
+        } as unknown as FreightQuoteResult,
+        forwarder_name: pf.name,
+        forwarder_logo_url: pf.logo_url,
+        is_platform_owned: true,
+        has_profile_for_zone: false,
+        unavailable_message:
+          pf.unavailable_message ?? "Service plateforme non disponible dans votre zone",
+      });
+    }
+  }
+
+  return validOffers;
 }
 
 /**
