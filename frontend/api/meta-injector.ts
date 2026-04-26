@@ -434,11 +434,20 @@ export default async function handler(req: Request): Promise<Response> {
     }
   }
 
+  // Use a much shorter cache for product/store/category pages so image changes
+  // (or first-time scrapes) propagate quickly to social crawlers. Global pages
+  // (FAQ, About, etc.) keep the longer cache because they change rarely.
+  const isDynamic =
+    /^\/(product|store|category|blog)\//i.test(url.pathname);
+  const cacheControl = isDynamic
+    ? "public, max-age=60, s-maxage=60, stale-while-revalidate=300"
+    : "public, max-age=300, s-maxage=600, stale-while-revalidate=86400";
+
   return new Response(html, {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "public, max-age=300, s-maxage=600, stale-while-revalidate=86400",
+      "Cache-Control": cacheControl,
       "X-Robots-Tag": "index, follow",
       Vary: "User-Agent",
     },
