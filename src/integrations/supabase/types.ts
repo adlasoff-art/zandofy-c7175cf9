@@ -1672,6 +1672,255 @@ export type Database = {
           },
         ]
       }
+      delivery_operator_cities: {
+        Row: {
+          city: string
+          country_code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          operator_id: string
+        }
+        Insert: {
+          city: string
+          country_code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          operator_id: string
+        }
+        Update: {
+          city?: string
+          country_code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          operator_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_operator_cities_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_operators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_operator_cities_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
+          },
+        ]
+      }
+      delivery_operator_rates: {
+        Row: {
+          base_price: number
+          city: string
+          commune: string | null
+          country_code: string
+          created_at: string
+          currency: string
+          estimated_minutes: number
+          id: string
+          is_active: boolean
+          operator_id: string
+          price_per_km: number
+          quartier: string | null
+          surcharge: number
+          updated_at: string
+          zone_name: string
+        }
+        Insert: {
+          base_price: number
+          city: string
+          commune?: string | null
+          country_code: string
+          created_at?: string
+          currency?: string
+          estimated_minutes?: number
+          id?: string
+          is_active?: boolean
+          operator_id: string
+          price_per_km?: number
+          quartier?: string | null
+          surcharge?: number
+          updated_at?: string
+          zone_name: string
+        }
+        Update: {
+          base_price?: number
+          city?: string
+          commune?: string | null
+          country_code?: string
+          created_at?: string
+          currency?: string
+          estimated_minutes?: number
+          id?: string
+          is_active?: boolean
+          operator_id?: string
+          price_per_km?: number
+          quartier?: string | null
+          surcharge?: number
+          updated_at?: string
+          zone_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_operator_rates_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_operators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_operator_rates_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
+          },
+        ]
+      }
+      delivery_operator_riders: {
+        Row: {
+          activated_at: string | null
+          id: string
+          invited_at: string
+          operator_id: string
+          revoked_at: string | null
+          rider_user_id: string
+          status: string
+          vehicle_plate: string | null
+          vehicle_type: string
+        }
+        Insert: {
+          activated_at?: string | null
+          id?: string
+          invited_at?: string
+          operator_id: string
+          revoked_at?: string | null
+          rider_user_id: string
+          status?: string
+          vehicle_plate?: string | null
+          vehicle_type?: string
+        }
+        Update: {
+          activated_at?: string | null
+          id?: string
+          invited_at?: string
+          operator_id?: string
+          revoked_at?: string | null
+          rider_user_id?: string
+          status?: string
+          vehicle_plate?: string | null
+          vehicle_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_operator_riders_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_operators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_operator_riders_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
+          },
+        ]
+      }
+      delivery_operators: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          company_name: string
+          contact_email: string
+          contact_phone: string
+          created_at: string
+          declared_riders_count: number
+          headquarters_address: string | null
+          headquarters_city: string
+          headquarters_country: string
+          id: string
+          is_active: boolean
+          is_platform_owned: boolean
+          legal_name: string | null
+          logo_url: string | null
+          max_riders: number
+          owner_user_id: string
+          platform_commission_pct: number
+          rating_avg: number | null
+          registration_number: string | null
+          rejection_reason: string | null
+          status: string
+          tax_id: string | null
+          total_deliveries: number
+          updated_at: string
+          vehicle_types: Json
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          company_name: string
+          contact_email: string
+          contact_phone: string
+          created_at?: string
+          declared_riders_count?: number
+          headquarters_address?: string | null
+          headquarters_city: string
+          headquarters_country?: string
+          id?: string
+          is_active?: boolean
+          is_platform_owned?: boolean
+          legal_name?: string | null
+          logo_url?: string | null
+          max_riders?: number
+          owner_user_id: string
+          platform_commission_pct?: number
+          rating_avg?: number | null
+          registration_number?: string | null
+          rejection_reason?: string | null
+          status?: string
+          tax_id?: string | null
+          total_deliveries?: number
+          updated_at?: string
+          vehicle_types?: Json
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          company_name?: string
+          contact_email?: string
+          contact_phone?: string
+          created_at?: string
+          declared_riders_count?: number
+          headquarters_address?: string | null
+          headquarters_city?: string
+          headquarters_country?: string
+          id?: string
+          is_active?: boolean
+          is_platform_owned?: boolean
+          legal_name?: string | null
+          logo_url?: string | null
+          max_riders?: number
+          owner_user_id?: string
+          platform_commission_pct?: number
+          rating_avg?: number | null
+          registration_number?: string | null
+          rejection_reason?: string | null
+          status?: string
+          tax_id?: string | null
+          total_deliveries?: number
+          updated_at?: string
+          vehicle_types?: Json
+        }
+        Relationships: []
+      }
       delivery_subscriptions: {
         Row: {
           created_at: string
@@ -3384,6 +3633,127 @@ export type Database = {
         }
         Relationships: []
       }
+      operator_commission_ledger: {
+        Row: {
+          currency: string
+          delivery_fee: number
+          id: string
+          operator_id: string
+          operator_net_amount: number
+          order_id: string
+          paid_at: string | null
+          payout_status: string
+          platform_commission_amount: number
+          platform_commission_pct: number
+          recorded_at: string
+          rider_user_id: string | null
+        }
+        Insert: {
+          currency?: string
+          delivery_fee: number
+          id?: string
+          operator_id: string
+          operator_net_amount: number
+          order_id: string
+          paid_at?: string | null
+          payout_status?: string
+          platform_commission_amount: number
+          platform_commission_pct: number
+          recorded_at?: string
+          rider_user_id?: string | null
+        }
+        Update: {
+          currency?: string
+          delivery_fee?: number
+          id?: string
+          operator_id?: string
+          operator_net_amount?: number
+          order_id?: string
+          paid_at?: string | null
+          payout_status?: string
+          platform_commission_amount?: number
+          platform_commission_pct?: number
+          recorded_at?: string
+          rider_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_commission_ledger_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_operators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operator_commission_ledger_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
+          },
+          {
+            foreignKeyName: "operator_commission_ledger_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operator_quota_requests: {
+        Row: {
+          created_at: string
+          current_quota: number
+          id: string
+          justification: string | null
+          operator_id: string
+          rejection_reason: string | null
+          requested_quota: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          current_quota: number
+          id?: string
+          justification?: string | null
+          operator_id: string
+          rejection_reason?: string | null
+          requested_quota: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          current_quota?: number
+          id?: string
+          justification?: string | null
+          operator_id?: string
+          rejection_reason?: string | null
+          requested_quota?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_quota_requests_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_operators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operator_quota_requests_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           color: string | null
@@ -3495,6 +3865,7 @@ export type Database = {
           delivery_address_confirmed: string | null
           delivery_choice: string | null
           delivery_date_requested: string | null
+          delivery_operator_id: string | null
           delivery_option: string | null
           delivery_time_requested: string | null
           discount_amount: number | null
@@ -3551,6 +3922,7 @@ export type Database = {
           delivery_address_confirmed?: string | null
           delivery_choice?: string | null
           delivery_date_requested?: string | null
+          delivery_operator_id?: string | null
           delivery_option?: string | null
           delivery_time_requested?: string | null
           discount_amount?: number | null
@@ -3607,6 +3979,7 @@ export type Database = {
           delivery_address_confirmed?: string | null
           delivery_choice?: string | null
           delivery_date_requested?: string | null
+          delivery_operator_id?: string | null
           delivery_option?: string | null
           delivery_time_requested?: string | null
           discount_amount?: number | null
@@ -3656,6 +4029,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_operator_id_fkey"
+            columns: ["delivery_operator_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_operators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_operator_id_fkey"
+            columns: ["delivery_operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
           },
           {
             foreignKeyName: "orders_freight_quote_id_fkey"
@@ -8078,6 +8465,21 @@ export type Database = {
         }
         Relationships: []
       }
+      v_active_operators_by_city: {
+        Row: {
+          city: string | null
+          company_name: string | null
+          country_code: string | null
+          is_platform_owned: boolean | null
+          logo_url: string | null
+          min_eta_minutes: number | null
+          min_fee_preview: number | null
+          operator_id: string | null
+          rating_avg: number | null
+          total_deliveries: number | null
+        }
+        Relationships: []
+      }
       v_forwarder_profiles_public: {
         Row: {
           city_id: string | null
@@ -8457,6 +8859,14 @@ export type Database = {
       increment_helpful: { Args: { review_id: string }; Returns: undefined }
       is_kyc_order_blocked: { Args: { p_user_id: string }; Returns: boolean }
       is_kyc_verified: { Args: { p_user_id: string }; Returns: boolean }
+      is_operator_owner: {
+        Args: { _operator_id: string; _uid: string }
+        Returns: boolean
+      }
+      is_operator_rider: {
+        Args: { _operator_id: string; _uid: string }
+        Returns: boolean
+      }
       quote_forwarder:
         | {
             Args: { p_items: Json; p_profile_id: string; p_total_cbm?: number }
@@ -8559,6 +8969,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      user_owns_any_operator: { Args: { _uid: string }; Returns: boolean }
       validate_coupon: {
         Args: { p_code: string }
         Returns: {
