@@ -783,6 +783,17 @@ export default function TrackingPage() {
                 </div>
               )}
 
+              {/* Lot 11B Phase B4 — Opérateur de livraison (entreprise) */}
+              {orderResult.delivery_operator_name && (
+                <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-3 py-2">
+                  <Truck size={14} className="text-primary shrink-0" />
+                  <span className="text-muted-foreground">Transporteur :</span>
+                  <span className="font-semibold text-foreground">
+                    {orderResult.delivery_operator_name}
+                  </span>
+                </div>
+              )}
+
               {/* Assigned rider */}
               {orderResult.assigned_rider_name && (
                 <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-3 py-2">
