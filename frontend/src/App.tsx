@@ -351,6 +351,14 @@ const App = () => (
                   <Route path="billing" element={<OperatorBillingPage />} />
                   <Route path="settings" element={<OperatorSettingsPage />} />
                 </Route>
+                <Route
+                  path="/forwarder"
+                  element={
+                    <RoleGuard allowedRoles={["forwarder", "admin", "manager"]}>
+                      <ForwarderDashboardPage />
+                    </RoleGuard>
+                  }
+                />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
