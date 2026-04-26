@@ -7,9 +7,11 @@
  * Auth : utilisateur connecté (le client qui vient de passer commande).
  * Vérifie : la commande existe, lui appartient, contient un delivery_operator_id.
  * Insère : une notification in-app pour `delivery_operators.owner_user_id`.
+ * Envoie : un email transactionnel SMTP Hostinger à l'owner (best-effort).
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
+import nodemailer from "npm:nodemailer@6.9.16";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -92,7 +94,89 @@ Deno.serve(async (req) => {
       return json({ error: "Notification failed" }, 500);
     }
 
-    return json({ ok: true });
+    // Envoi email best-effort à l'owner
+    let emailSent = false;
+    try {
+      const { data: ownerProfile } = await svc
+        .from("profiles")
+        .select("email, first_name")
+        .eq("id", op.owner_user_id)
+        .maybeSingle();
+
+      const smtpHost = Deno.env.get("SMTP_HOST");
+      const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
+      const smtpUser = Deno.env.get("SMTP_USER");
+      const smtpPass = Deno.env.get("SMTP_PASS");
+      const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
+
+      if (
+        ownerProfile?.email &&
+        smtpHost &&
+        smtpUser &&
+        smtpPass &&
+        fromEmail
+      ) {
+        const transport = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: { user: smtpUser, pass: smtpPass },
+        });
+
+        const greeting = ownerProfile.first_name
+          ? `Bonjour ${ownerProfile.first_name},`
+          : "Bonjour,";
+        const html = `
+<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:24px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:600px;">
+        <tr><td style="background:#16a34a;padding:24px;text-align:center;">
+          <h1 style="color:#ffffff;margin:0;font-size:22px;">🚚 Nouvelle commande à livrer</h1>
+        </td></tr>
+        <tr><td style="padding:32px 28px;color:#1f2937;">
+          <p style="font-size:16px;margin:0 0 16px;">${greeting}</p>
+          <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">
+            Une nouvelle commande vient de vous être attribuée sur <strong>Zandofy</strong>.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:8px;margin:16px 0;">
+            <tr><td style="padding:16px;">
+              <p style="margin:0 0 8px;font-size:14px;"><strong>Référence :</strong> ${orderRef}</p>
+              <p style="margin:0 0 8px;font-size:14px;"><strong>Ville :</strong> ${order.shipping_city || "—"}</p>
+              <p style="margin:0;font-size:14px;"><strong>Frais last-mile :</strong> $${fee}</p>
+            </td></tr>
+          </table>
+          <p style="font-size:14px;color:#4b5563;margin:0 0 24px;">
+            Connectez-vous à votre tableau de bord opérateur pour assigner un livreur.
+          </p>
+          <table cellpadding="0" cellspacing="0"><tr><td style="background:#16a34a;border-radius:8px;">
+            <a href="https://zandofy.com/operator/orders" style="display:inline-block;padding:12px 24px;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;">
+              Voir la commande
+            </a>
+          </td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f9fafb;padding:16px;text-align:center;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;font-size:12px;color:#6b7280;">Zandofy — Plateforme multi-opérateurs de livraison</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`.trim();
+
+        await transport.sendMail({
+          from: fromEmail,
+          to: ownerProfile.email,
+          subject: `🚚 Nouvelle commande ${orderRef} à livrer`,
+          html,
+        });
+        emailSent = true;
+      }
+    } catch (emailErr) {
+      console.error("[notify-operator-new-order] email failed:", emailErr);
+      // Non bloquant : la notif in-app a déjà été créée
+    }
+
+    return json({ ok: true, emailSent });
   } catch (e) {
     console.error("[notify-operator-new-order] error:", e);
     return json({ error: (e as Error).message }, 500);
