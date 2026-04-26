@@ -32,7 +32,7 @@ function OrderItemsPanel({ orderId, order }: { orderId: string; order: any }) {
     queryFn: async () => {
       const { data, error: qErr } = await supabase
         .from("order_items")
-        .select("id, product_id, product_name, quantity, price, product_image, products:product_id(slug, images)")
+        .select("id, product_id, product_name, quantity, price, product_image, products:product_id(slug)")
         .eq("order_id", orderId);
       if (qErr) {
         console.error("[OrderItemsPanel] order_items fetch error:", qErr);
@@ -81,7 +81,7 @@ function OrderItemsPanel({ orderId, order }: { orderId: string; order: any }) {
         ) : (
           <ul className="divide-y divide-border">
             {items.map((it: any) => {
-              const img = it.product_image || (Array.isArray(it.products?.images) ? it.products.images[0] : null);
+              const img = it.product_image || null;
               const slug = it.products?.slug;
               const lineTotal = Number(it.price || 0) * Number(it.quantity || 0);
               return (
