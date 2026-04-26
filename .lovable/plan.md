@@ -1,134 +1,131 @@
-# Lot 11 — Cohérence Fret & Ouverture Last-Mile Multi-Opérateurs
+## 🎯 Lot 11B (révisé) — Modèle unifié "Delivery Operators" (suppression du self-delivery vendeur)
 
-Deux sujets distincts mais liés à la logistique. Je propose de les traiter en **deux sous-lots indépendants** : 11A urgent (bug d'affichage), 11B structurant (nouvelle architecture last-mile).
+### Décision d'architecture
 
----
+**Un seul modèle de last-mile : les Delivery Operators.**
 
-## 🔴 Lot 11A — Bug : `USD 0.00` dans le panneau Transport International
+- ❌ **Suppression** de `vendor_delivery_zones` + toggle `can_self_deliver` côté vendeur.
+- ✅ Un vendeur qui veut livrer ses propres commandes **s'enregistre comme Delivery Operator** (parcours identique aux entreprises tierces).
+- ✅ Zandofy Kinshasa = Delivery Operator "platform-owned" (seed initial).
+- ✅ Les vendeurs existants avec `can_self_deliver = true` sont **migrés automatiquement** en opérateur (1 opérateur par vendeur, couverture = ville actuelle de la boutique).
 
-### Diagnostic confirmé (lecture du code)
-
-Sur la commande `ZND-MOFRHBGT` :
-- **Sous-total bas** affiche `Expédition $15.50` → vient de `orders.shipping_cost` (champ rempli au checkout via `orderShippingCost = preciseRound(shippingCost * ratio, 2)` dans `CheckoutPage.tsx:720`)
-- **Bandeau haut** "Congo Queen Sarl · USD 0.00" → vient de `freight_quotes.quoted_price` (lu par `FreightDetailsPanel.tsx:222`)
-- **Écart de calcul** `$20.48 vs $4.98` → le total commande ($4.98) ne contient pas l'expédition, mais l'admin recalcule `subtotal + shipping + last_mile = 20.48`
-
-### Cause racine
-
-Dans `frontend/src/services/freightQuoteCheckout.ts:241-298` (`lockFreightQuote`) :
-```ts
-const lockedTotal = useConsolidated
-  ? co!.consolidated_total
-  : (offer.split_total ?? offer.quote.total);
-```
-Quand `offer.split_total` est `undefined/null` ET que `offer.quote.total` vaut 0 (cas du profil "platform-unavailable" injecté en haut de liste, ou quand le devis dynamique tombe à 0 pour un motif d'éligibilité), on persiste un devis **verrouillé à 0 USD** dans `freight_quotes` — alors que le checkout calcule en parallèle un `shippingCost` correct (15.50) qui finit dans `orders.shipping_cost`.
-
-→ Deux sources de vérité non synchronisées pour le même montant.
-
-### Plan de correction (Lot 11A)
-
-1. **Garde-fou côté `lockFreightQuote`** :
-   - Refuser de verrouiller un devis si `lockedTotal <= 0` (retour `null` + log warning).
-   - Empêcher la sélection côté UI d'une offre dont `quote.total === 0` ET `is_platform_owned === false` (aujourd'hui ces offres sont grisées seulement pour le cas `platform-unavailable`).
-
-2. **Source unique de vérité au checkout** :
-   - Quand `lockedFreightQuoteId` existe, **dériver `orders.shipping_cost` du devis verrouillé** (re-fetch après `lockFreightQuote`) au lieu de la variable locale `shippingCost`.
-   - Sinon (commande locale sans devis fret), garder `shippingCost` comme aujourd'hui.
-
-3. **Réconciliation visuelle dans `FreightDetailsPanel`** :
-   - Si `quote.quoted_price === 0` mais `orders.shipping_cost > 0` → afficher le `shipping_cost` de la commande avec un badge `⚠ devis désynchronisé` (plutôt que `0.00` muet).
-   - Bouton admin "Resynchroniser depuis la commande" qui met à jour `freight_quotes.quoted_price` pour les commandes existantes touchées.
-
-4. **Migration data (one-shot)** : script SQL d'audit listant toutes les commandes où `freight_quote_id IS NOT NULL` et `freight_quotes.quoted_price = 0` et `orders.shipping_cost > 0`, à corriger en bulk.
-
-5. **Documentation** : `mem/features/freight-quote-vs-shipping-cost-sync.md`.
+**Bénéfices :**
+- 1 seul tableau de bord à maintenir (`/operator`).
+- 1 seul flow checkout (sélection opérateur par ville).
+- 1 seul système RLS, KYB, commission, KPI.
+- Cohérence UX : le client voit toujours "livré par X" indépendamment de qui livre.
 
 ---
 
-## 🟢 Lot 11B — Ouverture du Last-Mile à des Opérateurs Tiers Autonomes
+### Phase B1 — Schéma SQL + RLS + Seed (1 fichier migration téléchargeable)
 
-### Vision exprimée
+**Nouvelles tables :**
 
-Aujourd'hui :
-- `local_shipping_rates` (par ville/zone) = défini par l'admin Zandofy uniquement.
-- Self-delivery vendeur = chaque vendeur peut livrer ses propres commandes via `vendor_delivery_zones`.
-- Kinshasa = seule ville couverte par la plateforme en livraison à domicile.
+| Table | Rôle |
+|-------|------|
+| `delivery_operators` | Profil entreprise (nom, KYB, owner_user_id, is_platform_owned, is_active, platform_commission_pct=25, max_riders=1, status: pending/approved/suspended) |
+| `delivery_operator_cities` | Couverture multi-ville (operator_id, country, city, is_active) |
+| `delivery_operator_rates` | Tarifs par opérateur (zone_name, commune, quartier, base_price, price_per_km) |
+| `delivery_operator_riders` | Flotte (operator_id, user_id, vehicle_type, kyc_status, is_active) |
+| `operator_quota_requests` | Demandes augmentation max_riders (1 → 5 → 10 → 30) avec validation admin |
+| `operator_commission_ledger` | Traçabilité commission plateforme par livraison |
 
-Souhaité :
-- **Permettre à des entreprises tierces** (sociétés de livraison locales, indépendantes de Zandofy et indépendantes des vendeurs) de **gérer leur propre dernier kilomètre par ville**.
-- Chaque opérateur dispose d'un **dashboard autonome** (comme self-delivery vendeur), avec :
-  - sa flotte (livreurs),
-  - ses tarifs par commune/quartier,
-  - ses zones de couverture,
-  - ses statistiques.
-- L'admin Zandofy garde la main globale (création de profil, modération, override tarifaire), mais l'opérateur configure lui-même ses prix.
-- Au checkout : si ville ≠ Kinshasa, le client choisit parmi les opérateurs tiers actifs dans sa ville (au lieu de "livraison indisponible").
+**Modifs `orders` :** Ajout `delivery_operator_id` (nullable, FK).
+**Modifs `app_role` enum :** ajout de `'operator'`.
 
-### Plan de correction (Lot 11B)
+**RLS (security definer functions) :**
+- `is_operator_owner(operator_id)` — owner d'un opérateur voit/édite ses lignes.
+- `is_operator_rider(operator_id)` — rider voit ses commandes assignées uniquement.
+- Admin/manager = lecture/écriture totale.
+- Client = lecture seule des opérateurs `is_active=true` actifs dans sa ville (via vue `v_active_operators_by_city`).
 
-#### Phase B1 — Modèle de données (migration SQL)
+**Triggers :**
+- `trg_operator_commission_on_delivered` : à chaque `orders.status = 'delivered'` avec `delivery_operator_id`, insère ligne dans `operator_commission_ledger`.
+- `trg_validate_max_riders` : refuse insertion `delivery_operator_riders` si `count >= max_riders`.
 
-Nouvelles tables :
-- `delivery_operators` : `id, name, logo_url, owner_user_id, contact_email, contact_phone, is_active, is_platform_owned (bool), created_at`
-  - `is_platform_owned = true` pour Zandofy Kinshasa (migration des données actuelles).
-- `delivery_operator_cities` : `operator_id, city, country, is_active` (zones de couverture).
-- `delivery_operator_rates` : variante par opérateur de `local_shipping_rates` (mêmes colonnes : `zone_name, base_price, price_per_km, commune, quartier`).
-- `delivery_operator_riders` : `operator_id, user_id, name, phone, vehicle_type, is_active`.
+**Seed :**
+- 1 opérateur "Zandofy Kinshasa" (`is_platform_owned=true`, ville = Kinshasa, max_riders=30).
+- Migration data : pour chaque store avec `can_self_deliver=true` → création auto d'un opérateur "Auto-livraison <store_name>" + copie des `local_shipping_rates`.
 
-Adaptation `orders` :
-- Ajout `delivery_operator_id` (nullable) pour identifier qui livre.
-- `assigned_driver_id` reste, mais référencé via `delivery_operator_riders` au lieu d'une table globale.
+**Dépréciation :**
+- `vendor_delivery_zones` : conservée 30 jours read-only, supprimée plus tard.
+- `stores.can_self_deliver` : conservée mais marquée DEPRECATED.
 
-RLS :
-- Owner d'un `delivery_operators` voit/modifie uniquement ses lignes (rates, riders, orders qui lui sont assignées).
-- Admin Zandofy voit tout.
-- Client final voit uniquement les opérateurs actifs dans sa ville (via vue `v_active_operators_by_city`).
+---
 
-#### Phase B2 — Dashboard opérateur (UI)
+### Phase B2 — Onboarding & Dashboard Opérateur
 
-Nouvelle route `/operator/...` (mirroir de `/vendor/`) :
-- `OperatorDashboardPage.tsx` (KPIs : livraisons jour/semaine, revenus, taux succès)
-- `OperatorRatesPage.tsx` (CRUD des `delivery_operator_rates`)
-- `OperatorFleetPage.tsx` (gestion riders)
-- `OperatorOrdersPage.tsx` (commandes assignées + assignation rider)
-- `OperatorCoveragePage.tsx` (villes couvertes)
+**Parcours `/become-operator` :** Connexion → KYC client → Formulaire KYB entreprise → Déclaration flotte → Sélection villes → Soumission `pending` → modération admin.
 
-Réutiliser un maximum les composants existants (`DeliveryZonesManager`, `RiderAssignmentDialog`, etc.).
+**Dashboard `/operator/*` :**
+- `OperatorDashboardPage` — KPIs (livraisons, revenus nets, commission retenue, taux succès)
+- `OperatorRatesPage` — CRUD tarifs (ville → commune → quartier)
+- `OperatorCoveragePage` — Activation par ville (multi-pays)
+- `OperatorFleetPage` — Liste riders + invitation (KYC obligatoire)
+- `OperatorOrdersPage` — Commandes assignées + assignation rider
+- `OperatorBillingPage` — Ledger commissions, payouts
+- `OperatorSettingsPage` — Profil + demande augmentation quota
 
-#### Phase B3 — Checkout & sélection client
+---
 
-Dans `CheckoutPage.tsx` (étape last-mile, ville sélectionnée) :
-- Query `delivery_operators` actifs pour `shipping.city`.
-- Affichage façon "ForwarderSelector" mais pour le last-mile : carte par opérateur avec logo, prix calculé selon ses rates, délai estimé.
-- Si Kinshasa → opérateur Zandofy par défaut + opérateurs tiers (si présents).
-- Si autre ville → uniquement opérateurs tiers actifs ; sinon fallback "Retrait au hub" comme aujourd'hui.
+### Phase B3 — Admin (modération & supervision)
 
-#### Phase B4 — Admin (modération)
+**`/admin/delivery-operators` :** Liste opérateurs (pending/approved/suspended), validation KYB, override commission, validation quota requests, vue consolidée par opérateur/ville, suspension avec motif.
 
-Page `/admin/delivery-operators` :
-- Création de profils opérateurs (avec assignation owner_user_id).
-- Suspension/activation.
-- Override tarifaire d'urgence.
-- Vue consolidée des commandes par opérateur.
+---
 
-#### Phase B5 — Documentation
+### Phase B4 — Intégration Checkout & Hub
+
+**Au checkout (`CheckoutPage.tsx`) :**
+- Étape last-mile : query `v_active_operators_by_city` pour `shipping.city`.
+- Si opérateurs disponibles → carte sélection (logo, prix calculé, délai).
+- Si aucun → fallback "Retrait au hub".
+- Si paiement différé → choix opérateur **différé jusqu'à arrivée hub**.
+
+**À l'arrivée au hub :**
+- Si `delivery_operator_id IS NULL` → modal "Choisir mode de livraison".
+- Sinon → assignation directe au rider de l'opérateur.
+
+---
+
+### Phase B5 — Documentation
 
 - `mem/features/delivery-operators-multi-tenant.md`
-- Mise à jour `mem/features/last-mile-pricing-logic.md` pour refléter le multi-opérateur.
-
-### Estimation
-
-- **11A** : 1 session (correction + migration data + tests).
-- **11B** : 3-4 sessions (gros chantier ; possible de découper B1+B2 en première itération, B3+B4 ensuite).
+- `mem/features/operator-onboarding-kyb-flow.md`
+- Mise à jour `mem/features/last-mile-pricing-logic.md` (déprécie self-delivery vendeur)
+- Mise à jour `mem/features/delivery-and-hub-logistics-workflow.md`
 
 ---
 
-## ❓ À valider avant exécution
+### 📦 Livrables par phase
 
-1. **Lot 11A seul d'abord** (urgent, débloque l'affichage en prod), puis on planifie 11B après ta présentation équipe ?  
-   Ou **bien tout enchaîner** (11A + démarrage B1+B2 dans la même session) ?
+| Phase | Livrable | Fichier téléchargeable ? |
+|-------|----------|--------------------------|
+| B1 | Migration SQL schema + RLS + triggers + seed + migration data | ✅ `lot11b_phase1_operators_schema.sql` |
+| B2 | Pages `/operator/*` + parcours `/become-operator` | — (code) |
+| B3 | Page `/admin/delivery-operators` + Edge Functions modération | — (code) |
+| B4 | Refonte étape last-mile checkout + modal hub | — (code) |
+| B5 | 4 fichiers `mem/` | — (code) |
 
-2. Pour 11B, OK pour le nom **"Delivery Operators"** comme entité distincte des vendeurs et des transitaires internationaux (forwarders) ?
+---
 
-3. Pour la migration data 11A, tu veux que je liste d'abord les commandes affectées en lecture (rapport CSV) avant tout `UPDATE`, ou OK pour patcher en aveugle (`shipping_cost > 0` ET `quoted_price = 0`) ?
+### 🔒 Sécurité (non négociable)
 
+- **PII client masquée** : opérateurs voient téléphone + adresse uniquement pour commandes actives assignées, masqué après livraison.
+- **Riders** voient uniquement leurs commandes assignées.
+- **Owner opérateur** ne voit jamais les commandes d'un autre opérateur.
+- **KYC obligatoire** pour tout rider avant activation.
+- **KYB obligatoire** pour création opérateur (validation admin manuelle).
+- **Edge Functions** : `verify_jwt=true`, validation Zod, rate-limiting sur invitations rider.
+
+---
+
+### ❓ Questions avant exécution
+
+1. **Vendeurs avec `can_self_deliver=true` actifs** : combien en prod ? Migration auto en opérateurs OK, ou tu préfères qu'ils refassent un onboarding KYB manuel (plus propre, mais perte capacité entre-temps) ?
+
+2. **Commission Zandofy Kinshasa** : 25% par défaut. Je l'applique aussi à Zandofy Kinshasa (comptabilité unifiée) ou 0% pour les opérateurs `is_platform_owned=true` ?
+
+3. **Quota riders initial** : 1 par défaut, ou 2 pour éviter frictions au lancement ?
+
+4. **Périmètre B1 immédiat** : je livre **uniquement** la migration SQL téléchargeable + seed + migration data vendeurs. Les pages `/operator/*` (B2) attendent ta validation après revue. OK ?
