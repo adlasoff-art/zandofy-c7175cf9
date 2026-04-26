@@ -109,8 +109,8 @@ export function OperatorSelector({
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
                   {q.rating_avg !== null && q.total_deliveries > 0 && (
-                    <span className="flex items-center gap-0.5">
-                      <Star size={9} className="fill-amber-400 text-amber-400" />
+                    <span className="flex items-center gap-0.5 text-foreground">
+                      <Star size={9} className="fill-current" />
                       {Number(q.rating_avg).toFixed(1)} ({q.total_deliveries})
                     </span>
                   )}
