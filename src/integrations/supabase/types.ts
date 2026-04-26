@@ -3633,6 +3633,72 @@ export type Database = {
         }
         Relationships: []
       }
+      operator_assignment_history: {
+        Row: {
+          created_at: string
+          id: string
+          new_operator_id: string | null
+          order_id: string
+          previous_operator_id: string | null
+          reason: string
+          triggered_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          new_operator_id?: string | null
+          order_id: string
+          previous_operator_id?: string | null
+          reason?: string
+          triggered_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          new_operator_id?: string | null
+          order_id?: string
+          previous_operator_id?: string | null
+          reason?: string
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_assignment_history_new_operator_id_fkey"
+            columns: ["new_operator_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_operators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operator_assignment_history_new_operator_id_fkey"
+            columns: ["new_operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
+          },
+          {
+            foreignKeyName: "operator_assignment_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operator_assignment_history_previous_operator_id_fkey"
+            columns: ["previous_operator_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_operators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operator_assignment_history_previous_operator_id_fkey"
+            columns: ["previous_operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
+          },
+        ]
+      }
       operator_commission_ledger: {
         Row: {
           currency: string
@@ -3876,6 +3942,12 @@ export type Database = {
           last_mile_payment_method: string | null
           last_mile_payment_proof_url: string | null
           last_mile_payment_status: string | null
+          operator_acceptance_status: string
+          operator_assigned_at: string | null
+          operator_decline_reason: string | null
+          operator_reassignment_count: number
+          operator_responded_at: string | null
+          operator_response_deadline: string | null
           order_ref: string
           payment_method: string | null
           review_reminder_count: number
@@ -3933,6 +4005,12 @@ export type Database = {
           last_mile_payment_method?: string | null
           last_mile_payment_proof_url?: string | null
           last_mile_payment_status?: string | null
+          operator_acceptance_status?: string
+          operator_assigned_at?: string | null
+          operator_decline_reason?: string | null
+          operator_reassignment_count?: number
+          operator_responded_at?: string | null
+          operator_response_deadline?: string | null
           order_ref: string
           payment_method?: string | null
           review_reminder_count?: number
@@ -3990,6 +4068,12 @@ export type Database = {
           last_mile_payment_method?: string | null
           last_mile_payment_proof_url?: string | null
           last_mile_payment_status?: string | null
+          operator_acceptance_status?: string
+          operator_assigned_at?: string | null
+          operator_decline_reason?: string | null
+          operator_reassignment_count?: number
+          operator_responded_at?: string | null
+          operator_response_deadline?: string | null
           order_ref?: string
           payment_method?: string | null
           review_reminder_count?: number
@@ -8866,6 +8950,10 @@ export type Database = {
       is_operator_rider: {
         Args: { _operator_id: string; _uid: string }
         Returns: boolean
+      }
+      operator_decide_order: {
+        Args: { p_decision: string; p_order_id: string; p_reason?: string }
+        Returns: Json
       }
       quote_forwarder:
         | {
