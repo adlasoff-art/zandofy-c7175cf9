@@ -21,6 +21,7 @@ import {
 type TabKey = "awaiting" | "pending" | "in_progress" | "delivered" | "cancelled";
 
 const TAB_FILTERS: Record<TabKey, (statuses: string[], rider: string | null) => boolean> = {
+  awaiting: () => false, // géré séparément (operator_acceptance_status === 'pending')
   pending: (s, r) => !r && (s.includes("confirmed") || s.includes("preparing") || s.includes("shipped") || s.includes("arrived")),
   in_progress: (s, r) => !!r && !s.includes("delivered") && !s.includes("cancelled"),
   delivered: (s) => s.includes("delivered"),
