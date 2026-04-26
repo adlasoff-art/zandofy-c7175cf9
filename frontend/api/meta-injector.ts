@@ -157,16 +157,20 @@ async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
   const filter = isUuid ? `id=eq.${slug}` : `slug=eq.${encodeURIComponent(slug)}`;
   const rows = await sbFetch(
-    `products?${filter}&publish_status=eq.published&select=id,name,slug,description,price,images,rating,review_count,store_id&limit=1`,
+    `products?${filter}&publish_status=eq.published&select=id,name,slug,description,price,rating,review_count,store_id,product_images(image_url,position)&limit=1`,
   );
   const p = rows[0];
   if (!p) return null;
 
   const canonical = `${SITE_URL}/product/${p.slug || p.id}`;
+  // Images live in `product_images` (relational), sorted by `position`.
+  const sortedImages = Array.isArray(p.product_images)
+    ? [...p.product_images].sort(
+        (a: any, b: any) => (a?.position ?? 0) - (b?.position ?? 0),
+      )
+    : [];
   const image =
-    Array.isArray(p.images) && p.images.length > 0
-      ? p.images[0]
-      : `${SITE_URL}/og-default.jpg`;
+    sortedImages[0]?.image_url || `${SITE_URL}/og-default.jpg`;
   const title = `${p.name} | Zandofy`;
   const description = truncate(
     p.description ||
