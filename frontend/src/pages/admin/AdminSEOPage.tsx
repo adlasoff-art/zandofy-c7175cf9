@@ -11,6 +11,7 @@ import { SeoVerificationSection } from "@/components/admin/seo/SeoVerificationSe
 import { SeoSerpPreview } from "@/components/admin/seo/SeoSerpPreview";
 import { SeoStoresSection } from "@/components/admin/seo/SeoStoresSection";
 import { SeoWatermarkSection } from "@/components/admin/seo/SeoWatermarkSection";
+import { SeoSocialRescrapeSection } from "@/components/admin/seo/SeoSocialRescrapeSection";
 
 interface SeoConfigState {
   site_title: string;
@@ -193,6 +194,8 @@ export default function AdminSEOPage() {
         <SeoStoresSection />
 
         <SeoWatermarkSection />
+
+        <SeoSocialRescrapeSection />
 
         <button
           onClick={handleSave}
