@@ -444,6 +444,11 @@ export default function CheckoutPage() {
       .catch(() => setLastMileLoading(false));
   }, [deliveryOption, shipping.commune, shipping.quartier, shipping.city, shipping.country]);
 
+  // Reset operator selection lorsque l'option de livraison ou l'adresse change
+  useEffect(() => {
+    setSelectedOperator(null);
+  }, [deliveryOption, shipping.city, shipping.commune, shipping.quartier, shipping.country]);
+
   // Load saved addresses
   useEffect(() => {
     if (!user) return;
