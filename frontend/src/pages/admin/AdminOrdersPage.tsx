@@ -434,6 +434,50 @@ export default function AdminOrdersPage() {
         </div>
       </div>
 
+      {/* Date filter */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <CalendarDays size={14} />
+          <span>Période :</span>
+        </div>
+        {([
+          { k: "all", l: "Toutes" },
+          { k: "today", l: "Aujourd'hui" },
+          { k: "7d", l: "7 jours" },
+          { k: "30d", l: "30 jours" },
+          { k: "custom", l: "Personnalisé" },
+        ] as { k: DateFilterKey; l: string }[]).map((opt) => (
+          <button
+            key={opt.k}
+            onClick={() => setDateFilter(opt.k)}
+            className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+              dateFilter === opt.k
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-card border-border hover:border-primary"
+            }`}
+          >
+            {opt.l}
+          </button>
+        ))}
+        {dateFilter === "custom" && (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+              className="px-2 py-1 text-xs bg-card border border-border rounded-md"
+            />
+            <span className="text-xs text-muted-foreground">→</span>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+              className="px-2 py-1 text-xs bg-card border border-border rounded-md"
+            />
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-1 overflow-x-auto pb-2 mb-4">
         {filterTabs.map((s) => (
           <button
