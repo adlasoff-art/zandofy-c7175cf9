@@ -1,7 +1,8 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { LocationHierarchyFilter, type LocationFilters } from "@/components/admin/LocationHierarchyFilter";
-import { Search, Loader2, ChevronDown, ChevronUp, MapPin, Truck, AlertTriangle, Download, Hash, Bike, DollarSign, Trash2, Printer } from "lucide-react";
-import { useState } from "react";
+import { Search, Loader2, ChevronDown, ChevronUp, MapPin, Truck, AlertTriangle, Download, Hash, Bike, DollarSign, Trash2, Printer, CalendarDays } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ShippingLabelPreview } from "@/components/shipping/ShippingLabelPreview";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
@@ -25,6 +26,10 @@ import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, Delive
 import { withOptionalOrderFields } from "@/lib/order-query";
 import { FreightDetailsPanel } from "@/components/orders/FreightDetailsPanel";
 
+type DateFilterKey = "all" | "today" | "7d" | "30d" | "custom";
+
+const TERMINAL_STATUSES = new Set(["payment_failed", "cancelled", "returned"]);
+
 export default function AdminOrdersPage() {
   const { user, loading: authLoading } = useAuth();
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all" | "payment_failed">("all");
@@ -36,6 +41,10 @@ export default function AdminOrdersPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [logisticsInfo, setLogisticsInfo] = useState<Record<string, { zones: DeliveryZoneMatch[]; usePlatform: boolean; riderAvailable: boolean; riderCount: number } | null>>({});
   const [loadingLogistics, setLoadingLogistics] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<DateFilterKey>("all");
+  const [customStart, setCustomStart] = useState<string>("");
+  const [customEnd, setCustomEnd] = useState<string>("");
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const queryClient = useQueryClient();
 
   // Modal states for admin
