@@ -1,175 +1,77 @@
-## Phase 10 — Finalisation UX Multi-opérateurs & Transitaires
+# Phase 10.1 — Stabilisation post-audit (multi-opérateurs + transitaires)
 
-### 🎯 Objectifs
-1. Corriger le bug du loader infini sur `/admin/operators-performance`.
-2. Rendre **visibles** les parcours « Devenir opérateur » et « Devenir transitaire » côté public.
-3. Permettre à l'**admin de créer manuellement** un opérateur (en parallèle du flux public auto-déclaratif).
-4. Créer la **page publique transitaire** (`/become-forwarder`) sur le même modèle que `/become-operator`.
-5. Garantir que les **tarifs s'affichent dans la devise active** du visiteur (USD par défaut, conversion via le moteur global existant).
+Objectif : corriger les 4 incohérences bloquantes prod identifiées et combler les manques UX/sécurité avant validation finale.
 
 ---
 
-### 1) 🐛 Bugfix — Loader infini Suspension auto
+## 🔴 Bloquants prod (à exécuter en priorité)
 
-**Fichier** : `frontend/src/pages/admin/AdminOperatorsPerformancePage.tsx`
+### 1. Relocaliser la migration KYB transitaires
+- **Action** : déplacer `supabase/migrations/20260426231512_*.sql` → `frontend/supabase/migrations/` (renommer avec timestamp courant si conflit).
+- **Pourquoi** : seule `frontend/supabase/migrations/` est déployée par GitHub Actions vers la prod (`vpt...yxf`). En l'état, prod n'aura jamais le bucket `forwarder-documents`, ni `forwarders.owner_user_id/status/documents`.
+- **Vérification** : `psql` sur prod après déploiement pour confirmer présence des colonnes.
 
-**Cause** : un `useMemo` est utilisé pour faire `setForm(...)` (side effect), ce qui déclenche un re-render en boucle et bloque le spinner.
+### 2. Corriger `forwarders.status DEFAULT 'approved'`
+- **Action** : nouvelle migration ALTER TABLE :
+  - `ALTER COLUMN status SET DEFAULT 'pending'`
+  - Ne pas toucher aux lignes existantes (forwarders legacy déjà en prod sont approved, normal).
+- **Pourquoi** : faille KYB — toute insertion sans `status` explicite échappe à la modération.
 
-**Correctif** :
-- Remplacer le `useMemo` problématique par un `useEffect` avec dépendance sur les seuils chargés.
-- Initialiser `form` avec `useState` à partir des valeurs par défaut, puis sync via `useEffect` quand la query résout.
-- Ajouter un état `isLoading` propre (skeleton plutôt que spinner infini si la query échoue).
-- S'assurer qu'un `enabled: !!session` est présent sur la query pour respecter la règle RBAC (cf. mem://auth/rbac-implementation).
+### 3. Créer la route `/forwarder` (Espace transitaire minimal)
+- **Action** : page `frontend/src/pages/forwarder/ForwarderDashboardPage.tsx` (lecture seule pour MVP) :
+  - Affiche statut KYB (`pending/approved/suspended/rejected`) + `rejection_reason`.
+  - Liste des routes couvertes + modes.
+  - Liste des documents soumis (download via signed URL).
+  - CTA `/forwarder/rates` (si déjà existant) ou message "à venir".
+- **Route** : ajouter dans `App.tsx` sous `<Route path="/forwarder" element={<RoleGuard role="forwarder"><ForwarderDashboardPage /></RoleGuard>} />`.
 
----
-
-### 2) 🧭 Navigation publique — Ajouter les entrées « Devenir opérateur / transitaire »
-
-#### 2.1 Header desktop — menu utilisateur (icône user)
-**Fichier** : `frontend/src/components/Header.tsx` (popover du bouton utilisateur, là où se trouvent « Espace vendeur » + « Devenir vendeur »)
-
-Ajouter, après les entrées vendeur :
-- `Espace opérateur` → `/operator` (visible si `roles.includes('operator')`)
-- `Devenir opérateur de livraison` → `/become-operator` (visible sinon)
-- `Espace transitaire` → `/forwarder` (visible si `roles.includes('forwarder')` — sinon masqué)
-- `Devenir transitaire` → `/become-forwarder` (visible sinon)
-
-Utiliser `t("nav.becomeOperator")`, `t("nav.operatorSpace")`, `t("nav.becomeForwarder")`, `t("nav.forwarderSpace")` (cf. mem://features/centralized-i18n-refactor-logic — pas de hardcoding).
-
-#### 2.2 Mobile Account Menu
-**Fichier** : `frontend/src/components/MobileAccountMenu.tsx`
-
-Mêmes 4 entrées, regroupées dans une section « Logistique & livraison » avec icônes `Truck` (opérateur) et `Ship` (transitaire).
-
-#### 2.3 Footer — colonne du milieu (À propos)
-**Fichier** : `frontend/src/components/Footer.tsx`
-
-Ajouter dans la colonne du milieu (à côté de « Vendre sur Zandofy ») :
-- `Devenir opérateur de livraison` → `/become-operator`
-- `Devenir transitaire` → `/become-forwarder`
+### 4. Brancher `admin-create-operator` dans AdminOperatorsPage
+- **Action** : ajouter bouton "Créer un opérateur" en haut de la page + Dialog `CreateOperatorDialog.tsx` :
+  - Champs : owner_user_id (autocomplete users via `profiles` search par email), company_name, contact_email/phone, headquarters_city/country, vehicle_types, declared_riders_count, cities couvertes, `is_platform_owned`, `platform_commission_pct`.
+  - Submit → `supabase.functions.invoke("admin-create-operator", { body })`.
+  - Refresh liste après succès.
 
 ---
 
-### 3) 👤 Création manuelle d'opérateur côté admin
+## 🟡 Améliorations qualité
 
-**Fichier** : `frontend/src/components/admin/operators/CreateOperatorDialog.tsx` (nouveau)
+### 5. Compléter la sidebar admin Logistique
+- Ajouter dans `AdminSidebar.tsx` (sous-menu Logistique) :
+  - `Caps tarifaires` → `/admin/operator-rate-caps`
+  - `Tarifs à modérer` → `/admin/operator-rates-pending`
 
-Dialog déclenché depuis `frontend/src/pages/admin/AdminOperatorsPage.tsx` (bouton « Créer un opérateur » dans le header de la liste).
+### 6. Liens "Espace opérateur / transitaire" pour les rôles existants
+- **Header.tsx** + **MobileAccountMenu.tsx** : afficher conditionnellement
+  - Si `roles.includes('operator')` → lien `/operator`
+  - Si `roles.includes('forwarder')` → lien `/forwarder`
+  - Cacher les liens "Devenir ..." correspondants si déjà le rôle.
 
-**Champs** (mêmes que le formulaire public + extras admin) :
-- Recherche utilisateur existant (autocomplete sur `profiles.email` / `profiles.full_name`) → `owner_user_id`
-- `company_name`, `legal_name`, `registration_number`, `tax_id`
-- `contact_email`, `contact_phone`
-- `headquarters_country`, `headquarters_city`, `headquarters_address`
-- `vehicle_types` (array typé), `declared_riders_count`, `max_riders`
-- `cities` (multi-villes de couverture)
-- **Toggle admin-only** : `status` directement à `approved` + `is_active=true` (pas de modération, l'admin certifie sur place)
-- **Toggle admin-only** : `is_platform_owned` (booléen, à ajouter dans la migration ci-dessous si absent — pour distinguer opérateurs internes Zandofy des opérateurs tiers)
+### 7. Investiguer le flood d'erreurs `useState/useContext null`
+- 30+ erreurs admin notifications entre 18h-22h aujourd'hui.
+- Vérifier : `lazyRetry` ne bypass pas la racine React, AuthContext n'est pas importé en haut de chunks lazy avant que React soit prêt.
+- Action : ajouter un ErrorBoundary plus haut (autour de `<Suspense>`) qui ne re-trigger PAS de notif admin pour les erreurs de chunk loading (filtrer `Failed to fetch dynamically imported module` et `Cannot read properties of null (reading 'useState'|'useContext')`).
+- Bénéfice : nettoyer le bruit dans le centre de notifications.
 
-**Edge Function nouvelle** : `admin-create-operator`
-- `verify_jwt = true`
-- Vérifie `has_role(auth.uid(), 'admin')`
-- Insère dans `delivery_operators`, `delivery_operator_cities`
-- Donne le rôle `operator` au `owner_user_id`
-- Notifie l'utilisateur ciblé (in-app + email) qu'il a été enregistré comme opérateur
-- Retourne l'ID de l'opérateur créé
-
-**Migration éventuelle** :
-- Ajouter colonne `is_platform_owned BOOLEAN NOT NULL DEFAULT false` sur `delivery_operators` si absente.
-- Mettre à jour la vue `v_active_operators_by_city` pour exposer ce flag (utile pour la priorisation au checkout — cf. règle « plateforme prioritaire » dans mem://features/multi-operator-delivery-system).
+### 8. Régénérer types Supabase
+- Après application des migrations relocalisées, supprimer les `(supabase as any)` dans :
+  - `AdminOperatorsPerformancePage.tsx`
+  - `BecomeForwarderPage.tsx`
+  - `become-forwarder-submit/index.ts` (types Deno auto)
 
 ---
 
-### 4) 🚢 Page publique « Devenir transitaire »
-
-#### 4.1 Page React
-**Fichier** : `frontend/src/pages/BecomeForwarderPage.tsx` (nouveau)
-
-Inspirée de `BecomeOperatorPage.tsx`. Sections :
-- Hero (pitch + bénéfices : commission, accès volumes Zandofy, dashboard tracking)
-- Comment ça marche (3 étapes : compte → KYB → activation)
-- Formulaire multi-step :
-  - **Étape 1** : Société (raison sociale, RCCM, NIF, SIRET)
-  - **Étape 2** : Contact (email, téléphone, siège pays/ville/adresse)
-  - **Étape 3** : Capacités (modes : Air / Sea / Road / Rail — cf. mem://features/shipping-engine-logic), routes desservies (origine → destination), volumes mensuels estimés
-  - **Étape 4** : Documents (upload registre commerce, agrément transitaire, attestation TVA — bucket `forwarder-documents` à créer si absent, RLS owner-only)
-  - **Étape 5** : Récap + soumission
-
-#### 4.2 Edge Function
-**Fichier** : `frontend/supabase/functions/become-forwarder-submit/index.ts`
-
-Pattern identique à `become-operator-submit` :
-- Auth requise (JWT en code)
-- Anti-doublon (1 demande active par user)
-- Insert dans `forwarders` (table existante — vérifier schéma) avec `status='pending'`
-- Insert routes dans `forwarder_routes` (table existante)
-- Donne rôle `forwarder` au user
-- Notifie admins (in-app)
-- Email accusé réception au demandeur (template SMTP Hostinger)
-
-#### 4.3 Routing
-- Ajouter route `/become-forwarder` dans `frontend/src/App.tsx` (lazy load)
-- Vérifier que la page de modération admin existante (`/admin/forwarders`) gère déjà les statuts `pending` (sinon ajouter onglet « Demandes en attente »)
-
-#### 4.4 i18n
-Ajouter ~15 clés dans `I18nContext.tsx` (FR + EN) : `becomeForwarder.hero.title`, `becomeForwarder.steps.*`, etc.
+## 🔒 Hors scope (à valider plus tard)
+- Page admin `/admin/forwarders` : vérifier qu'elle gère bien le workflow KYB (pending/approve/reject) — l'edit de statut existe ?
+- Edge function `admin-approve-forwarder` / `admin-reject-forwarder` : pas créées (équivalent opérateur). À ajouter dans une phase suivante.
+- Onboarding email transactionnel transitaire (template + trigger) — Phase 11.
 
 ---
 
-### 5) 💱 Affichage devise pour les tarifs
+## 📦 Livrable attendu
 
-**Vérification + ajustements** sur :
-- `frontend/src/pages/operator/OperatorRatesPage.tsx` (saisie tarifs en USD, libellé clair « Montants en USD »)
-- `frontend/src/components/checkout/OperatorSelector.tsx` (affichage du prix livraison via `formatPrice(amount, 'USD')` qui convertit selon la devise active du `CurrencyContext`)
-- `frontend/src/pages/forwarder/ForwarderRatesPage.tsx` (même règle)
-- Affichage admin dans `/admin/operators-performance` et `/admin/forwarders` : montants formatés via le hook global
-
-**Aucune migration** — la conversion utilise déjà le moteur existant (cf. mem://features/currency-conversion-engine).
-
----
-
-### 6) 🗂️ AdminSidebar — regroupement logistique
-
-**Fichier** : `frontend/src/components/admin/AdminSidebar.tsx`
-
-Regrouper sous un `SidebarGroup` « Logistique » (collapsible, ouvert par défaut si la route active commence par `/admin/operator` ou `/admin/forwarder` ou `/admin/logistics`) :
-- Logistique (existant)
-- Transitaires
-- Opérateurs livraison
-- Performance opérateurs
-- Quotas opérateurs
-
----
-
-### 📦 Récap fichiers
-
-**Créés**
-- `frontend/src/pages/BecomeForwarderPage.tsx`
-- `frontend/src/components/admin/operators/CreateOperatorDialog.tsx`
-- `frontend/supabase/functions/become-forwarder-submit/index.ts`
-- `frontend/supabase/functions/admin-create-operator/index.ts`
-- Migration : `is_platform_owned` sur `delivery_operators` (si absent) + refresh vue `v_active_operators_by_city` + bucket `forwarder-documents` + RLS
-
-**Modifiés**
-- `frontend/src/pages/admin/AdminOperatorsPerformancePage.tsx` (bugfix)
-- `frontend/src/pages/admin/AdminOperatorsPage.tsx` (bouton + dialog)
-- `frontend/src/components/Header.tsx`
-- `frontend/src/components/MobileAccountMenu.tsx`
-- `frontend/src/components/Footer.tsx`
-- `frontend/src/components/admin/AdminSidebar.tsx`
-- `frontend/src/App.tsx` (route `/become-forwarder`)
-- `frontend/src/contexts/I18nContext.tsx` (clés FR/EN)
-- `frontend/src/pages/operator/OperatorRatesPage.tsx` + `OperatorSelector.tsx` + équivalents transitaires (formatage devise)
-
-### ⚠️ Hors périmètre (volontairement)
-- Pas de seed Very Speed Kinshasa (tu créeras les tarifs à la main).
-- Pas de modification du moteur de pricing existant.
-- Pas de refonte de la page `/become-operator` existante (juste exposition dans la nav).
-- Pas de cron — déjà fait Phase 9.
-
-### ✅ Critères de succès
-- `/admin/operators-performance` affiche les seuils sans loader infini.
-- Un visiteur connecté voit « Devenir opérateur » et « Devenir transitaire » dans son menu utilisateur + footer.
-- Un admin peut créer un opérateur depuis `/admin/operators` en quelques clics, avec choix `is_platform_owned`.
-- `/become-forwarder` accessible publiquement, soumission fonctionnelle, demande visible dans `/admin/forwarders`.
-- Tarifs affichés dans la devise du visiteur (USD par défaut, conversion automatique).
+- 2 nouvelles migrations dans `frontend/supabase/migrations/` (relocalisation + fix default status).
+- 1 nouvelle page `ForwarderDashboardPage.tsx` + route.
+- 1 nouveau composant `CreateOperatorDialog.tsx` + intégration dans `AdminOperatorsPage`.
+- Patch `AdminSidebar.tsx`, `Header.tsx`, `MobileAccountMenu.tsx`.
+- Patch ErrorBoundary pour filtrer les chunk-load errors.
+- Validation : checklist en 6 points (migration prod OK, status default pending, /forwarder accessible, admin peut créer opérateur, sidebar complète, liens espace conditionnels).
