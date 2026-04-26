@@ -333,6 +333,37 @@ export default function AdminOrdersPage() {
     setExpandedId(null);
   };
 
+  const bulkDeleteTerminal = async () => {
+    const targets = orders.filter((o: any) => selectedOrders.includes(o.id) && TERMINAL_STATUSES.has(o.status));
+    if (targets.length === 0) {
+      toast.error("Aucune commande sélectionnée n'est en statut terminal (échec/annulée/retournée).");
+      return;
+    }
+    const skipped = selectedOrders.length - targets.length;
+    const msg = skipped > 0
+      ? `Supprimer définitivement ${targets.length} commande(s) terminale(s) ? ${skipped} commande(s) active(s) seront ignorées.`
+      : `Supprimer définitivement ${targets.length} commande(s) ? Cette action est irréversible.`;
+    if (!confirm(msg)) return;
+    setBulkDeleting(true);
+    let ok = 0, fail = 0;
+    for (const o of targets) {
+      try {
+        await (supabase.from("delivery_chats" as any) as any).delete().eq("order_id", o.id);
+        await (supabase.from("deliveries" as any) as any).delete().eq("order_id", o.id);
+        await (supabase.from("vendor_transactions" as any) as any).delete().eq("order_id", o.id);
+        await (supabase.from("point_transactions" as any) as any).delete().eq("order_id", o.id);
+        await supabase.from("order_items").delete().eq("order_id", o.id);
+        await supabase.from("order_status_history").delete().eq("order_id", o.id);
+        const { error } = await supabase.from("orders").delete().eq("id", o.id);
+        if (error) fail++; else ok++;
+      } catch { fail++; }
+    }
+    setBulkDeleting(false);
+    setSelectedOrders([]);
+    queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+    toast.success(`${ok} commande(s) supprimée(s)${fail ? `, ${fail} échec(s)` : ""}.`);
+  };
+
   const filterTabs: (OrderStatus | "all" | "payment_failed")[] = ["all", ...STATUS_FLOW, "cancelled", "returned", "payment_failed"];
 
   return (
