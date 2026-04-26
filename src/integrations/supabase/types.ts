@@ -3155,52 +3155,100 @@ export type Database = {
       }
       forwarders: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           contact_email: string | null
           contact_phone: string | null
+          coverage_routes: Json
           created_at: string
           description: string | null
+          documents: Json
+          estimated_monthly_volume_kg: number | null
+          headquarters_address: string | null
+          headquarters_city: string | null
+          headquarters_country: string | null
           id: string
           is_active: boolean
           is_platform_owned: boolean
+          legal_name: string | null
           linked_transporter_user_id: string | null
           logo_url: string | null
           name: string
+          owner_user_id: string | null
+          registration_number: string | null
+          rejection_reason: string | null
           slug: string
           sort_order: number
+          status: string
+          submitted_at: string | null
+          supported_modes: string[]
+          tax_id: string | null
           unavailable_message: string | null
           updated_at: string
           website_url: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           contact_email?: string | null
           contact_phone?: string | null
+          coverage_routes?: Json
           created_at?: string
           description?: string | null
+          documents?: Json
+          estimated_monthly_volume_kg?: number | null
+          headquarters_address?: string | null
+          headquarters_city?: string | null
+          headquarters_country?: string | null
           id?: string
           is_active?: boolean
           is_platform_owned?: boolean
+          legal_name?: string | null
           linked_transporter_user_id?: string | null
           logo_url?: string | null
           name: string
+          owner_user_id?: string | null
+          registration_number?: string | null
+          rejection_reason?: string | null
           slug: string
           sort_order?: number
+          status?: string
+          submitted_at?: string | null
+          supported_modes?: string[]
+          tax_id?: string | null
           unavailable_message?: string | null
           updated_at?: string
           website_url?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           contact_email?: string | null
           contact_phone?: string | null
+          coverage_routes?: Json
           created_at?: string
           description?: string | null
+          documents?: Json
+          estimated_monthly_volume_kg?: number | null
+          headquarters_address?: string | null
+          headquarters_city?: string | null
+          headquarters_country?: string | null
           id?: string
           is_active?: boolean
           is_platform_owned?: boolean
+          legal_name?: string | null
           linked_transporter_user_id?: string | null
           logo_url?: string | null
           name?: string
+          owner_user_id?: string | null
+          registration_number?: string | null
+          rejection_reason?: string | null
           slug?: string
           sort_order?: number
+          status?: string
+          submitted_at?: string | null
+          supported_modes?: string[]
+          tax_id?: string | null
           unavailable_message?: string | null
           updated_at?: string
           website_url?: string | null
