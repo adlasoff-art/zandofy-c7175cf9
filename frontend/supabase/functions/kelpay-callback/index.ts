@@ -85,6 +85,16 @@ Deno.serve(async (req) => {
           .eq("id", tx.order_id)
           .in("status", ["awaiting_payment", "pending"]);
 
+        // Logistique payée avec la commande
+        await supabase.from("orders")
+          .update({ shipping_payment_status: "paid" })
+          .eq("id", tx.order_id)
+          .eq("shipping_payment_status", "unpaid");
+        await supabase.from("orders")
+          .update({ last_mile_payment_status: "paid" })
+          .eq("id", tx.order_id)
+          .eq("last_mile_payment_status", "unpaid");
+
         if (orderUpdateError) {
           console.error("Order update after KelPay success failed:", orderUpdateError);
         } else {
