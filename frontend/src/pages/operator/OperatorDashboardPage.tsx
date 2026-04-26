@@ -10,6 +10,7 @@ import { fromTable } from "@/lib/supabase-helpers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Truck, Banknote, Percent, Users, Star, TrendingUp, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { OperatorPerformanceWidget } from "@/components/operator/OperatorPerformanceWidget";
 
 export default function OperatorDashboardPage() {
   const { operator } = useOperatorContext();
@@ -91,6 +92,9 @@ export default function OperatorDashboardPage() {
         <KpiCard icon={Percent} label="Commission retenue" value={`$${monthCommission.toFixed(2)}`} hint={`${operator.platform_commission_pct}% / course`} />
         <KpiCard icon={Users} label="Livreurs actifs" value={`${ridersCount}/${operator.max_riders}`} hint="Quota utilisé" />
       </div>
+
+      {/* B9 — Score de fiabilité */}
+      <OperatorPerformanceWidget operatorId={operator.id} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
