@@ -320,6 +320,24 @@ const App = () => (
                 <Route path="/admin/delivery-plans" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDeliveryPlansPage /></RoleGuard>} />
                 <Route path="/admin/service-packages" element={<RoleGuard allowedRoles={["admin"]}><AdminServicePackagesPage /></RoleGuard>} />
                 <Route path="/impersonate" element={<ImpersonatePage />} />
+                {/* Operator (Lot 11B Phase B2) */}
+                <Route path="/become-operator" element={<BecomeOperatorPage />} />
+                <Route
+                  path="/operator"
+                  element={
+                    <RoleGuard allowedRoles={["operator", "admin", "manager"]}>
+                      <OperatorLayout />
+                    </RoleGuard>
+                  }
+                >
+                  <Route index element={<OperatorDashboardPage />} />
+                  <Route path="orders" element={<OperatorOrdersPage />} />
+                  <Route path="fleet" element={<OperatorFleetPage />} />
+                  <Route path="coverage" element={<OperatorCoveragePage />} />
+                  <Route path="rates" element={<OperatorRatesPage />} />
+                  <Route path="billing" element={<OperatorBillingPage />} />
+                  <Route path="settings" element={<OperatorSettingsPage />} />
+                </Route>
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
