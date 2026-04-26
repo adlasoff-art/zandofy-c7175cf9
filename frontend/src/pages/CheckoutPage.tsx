@@ -20,6 +20,8 @@ import {
   type EligibleFreightOffer,
 } from "@/services/freightQuoteCheckout";
 import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
+import { OperatorSelector } from "@/components/checkout/OperatorSelector";
+import type { OperatorQuote } from "@/hooks/useOperatorQuotes";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
 import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
 import { useI18n } from "@/contexts/I18nContext";
