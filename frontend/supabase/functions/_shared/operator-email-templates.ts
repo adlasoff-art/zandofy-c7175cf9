@@ -99,3 +99,34 @@ export function clientOperatorReassignedEmail(args: {
 }
 
 export const OPERATOR_EMAIL_BRAND = { primary: BRAND_PRIMARY, warning: BRAND_WARNING };
+
+/** Email envoyé à l'owner opérateur lors d'une suspension automatique (B9). */
+export function operatorAutoSuspendEmail(args: {
+  greeting: string;
+  companyName: string;
+  reason: string;
+  score: string | null;
+  windowDays: number;
+}) {
+  return shell({
+    headerColor: "#dc2626",
+    headerTitle: "⚠️ Suspension automatique de votre compte opérateur",
+    bodyHtml: `
+      <p style="font-size:16px;margin:0 0 16px;">${args.greeting}</p>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">
+        Le compte opérateur <strong>${args.companyName}</strong> a été suspendu automatiquement sur ${SITE_NAME} pour préserver l'expérience client.
+      </p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef2f2;border-radius:8px;margin:16px 0;border:1px solid #fecaca;">
+        <tr><td style="padding:16px;">
+          <p style="margin:0 0 8px;font-size:14px;"><strong>Motif :</strong> ${args.reason}</p>
+          ${args.score !== null ? `<p style="margin:0 0 8px;font-size:14px;"><strong>Score de fiabilité :</strong> ${args.score}/100</p>` : ""}
+          <p style="margin:0;font-size:14px;"><strong>Fenêtre évaluée :</strong> ${args.windowDays} derniers jours</p>
+        </td></tr>
+      </table>
+      <p style="font-size:14px;color:#4b5563;margin:0 0 24px;">
+        Vous pouvez contacter l'équipe ${SITE_NAME} pour examiner votre dossier et demander une réactivation après mise en place d'un plan correctif.
+      </p>`,
+    ctaLabel: "Contacter le support",
+    ctaHref: `${SITE_URL}/contact`,
+  });
+}
