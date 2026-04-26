@@ -183,6 +183,21 @@ export default function CheckoutPage() {
   });
   const hasOperatorCoverage = (operatorQuotesForCoverage?.length ?? 0) > 0;
 
+  // Auto-fallback : si la zone perd sa couverture opérateur et que home_delivery était choisi,
+  // basculer en "none" et désélectionner l'opérateur précédent.
+  useEffect(() => {
+    if (deliveryOption === "home_delivery" && !operatorCoverageLoading && !hasOperatorCoverage) {
+      setDeliveryOption("none");
+      setSelectedOperator(null);
+      toast({
+        title: "Livraison à domicile indisponible",
+        description: "Aucun livreur partenaire ne dessert votre nouvelle zone. Choisissez le retrait au Hub.",
+        variant: "destructive",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasOperatorCoverage, operatorCoverageLoading]);
+
   const handleForwarderChange = useCallback((choice: ForwarderChoice | null, unassigned: boolean) => {
     setSelectedForwarder(choice);
     setForwarderUnassigned(unassigned);
