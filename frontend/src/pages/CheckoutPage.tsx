@@ -968,6 +968,8 @@ export default function CheckoutPage() {
             });
             if (checkData?.status === "success") {
               await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
+              await (supabase as any).from("orders").update({ shipping_payment_status: "paid" }).in("id", orderIds).eq("shipping_payment_status", "unpaid");
+              await (supabase as any).from("orders").update({ last_mile_payment_status: "paid" }).in("id", orderIds).eq("last_mile_payment_status", "unpaid");
               setPaymentPending(false);
               await removeSelectedItems();
               goToStep("confirmation");
