@@ -68,6 +68,18 @@ export default function AdminOperatorsPage() {
     },
   });
 
+  const { data: pendingRatesCount = 0 } = useQuery({
+    queryKey: ["admin-operator-rates-pending-count"],
+    queryFn: async () => {
+      const { count, error } = await (supabase as any)
+        .from("delivery_operator_rates")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
   const filtered = (operators || []).filter((o) => {
     if (!search) return true;
     const s = search.toLowerCase();
