@@ -15,7 +15,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle2, XCircle, PauseCircle, PlayCircle, Building2, Truck, MapPin, Users } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, Clock } from "lucide-react";
 
 type OperatorRow = {
   id: string;
@@ -133,6 +133,16 @@ export default function AdminOperatorsPage() {
             <Button asChild variant="outline" size="sm" className="gap-1">
               <Link to="/admin/operator-rate-caps">
                 <ShieldAlert size={14} /> Plafonds tarifaires
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm" className="gap-1">
+              <Link to="/admin/operator-rates-pending">
+                <Clock size={14} /> Tarifs en attente
+                {pendingRatesCount ? (
+                  <span className="ml-1 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 min-w-5">
+                    {pendingRatesCount}
+                  </span>
+                ) : null}
               </Link>
             </Button>
           </div>
