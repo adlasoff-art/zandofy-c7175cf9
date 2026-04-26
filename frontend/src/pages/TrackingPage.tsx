@@ -47,6 +47,8 @@ interface OrderTrackingResult {
   shipping_address: string | null; shipping_city: string | null; shipping_country: string | null;
   tracking_number: string | null;
   assigned_rider_name: string | null; assigned_rider_id: string | null;
+  delivery_operator_id: string | null;
+  delivery_operator_name: string | null;
   delivery_choice: string | null;
   last_mile_fee: number | null;
   last_mile_payment_method: string | null;
