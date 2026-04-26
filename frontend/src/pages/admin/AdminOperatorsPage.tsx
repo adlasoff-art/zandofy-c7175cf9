@@ -58,7 +58,7 @@ export default function AdminOperatorsPage() {
   const { data: operators, isLoading } = useQuery({
     queryKey: ["admin-operators", tab],
     queryFn: async () => {
-      let q = supabase.from("delivery_operators").select("*").order("created_at", { ascending: false });
+      let q = (supabase as any).from("delivery_operators").select("*").order("created_at", { ascending: false });
       if (tab !== "all") q = q.eq("status", tab);
       const { data, error } = await q;
       if (error) throw error;
@@ -120,7 +120,7 @@ export default function AdminOperatorsPage() {
   }, {});
 
   return (
-    <AdminLayout>
+    <AdminLayout title="Opérateurs de livraison">
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Opérateurs de livraison</h1>
