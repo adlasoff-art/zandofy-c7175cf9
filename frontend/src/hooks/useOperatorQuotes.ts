@@ -115,28 +115,11 @@ export function useOperatorQuotes({
 
       const quotes: OperatorQuote[] = ops.flatMap((op: any) => {
         const best = pickBestRate(ratesByOp[op.operator_id] || [], commune, quartier);
-        if (best) {
-          const fee =
-            (Number(best.base_price) || 0) + (Number(best.surcharge) || 0);
-          return [{
-            operator_id: op.operator_id,
-            company_name: op.company_name,
-            logo_url: op.logo_url,
-            rating_avg: op.rating_avg,
-            total_deliveries: op.total_deliveries,
-            is_platform_owned: op.is_platform_owned,
-            fee,
-            currency: best.currency || "USD",
-            estimated_minutes: best.estimated_minutes || 60,
-            zone_name: best.zone_name || null,
-            matched: true,
-          }];
-        }
-        // Pas de tarif approuvé pour cet opérateur sur cette zone : on l'écarte.
-        if (op.min_fee_preview === null || op.min_fee_preview === undefined) {
-          return [];
-        }
-        // Fallback : preview de la vue (min_fee_preview) si pas de rate fin.
+        // Phase B8 : on n'affiche un opérateur que s'il a un tarif approuvé
+        // (statut + is_active déjà filtrés dans la requête `rates`).
+        if (!best) return [];
+        const fee =
+          (Number(best.base_price) || 0) + (Number(best.surcharge) || 0);
         return [{
           operator_id: op.operator_id,
           company_name: op.company_name,
@@ -144,11 +127,11 @@ export function useOperatorQuotes({
           rating_avg: op.rating_avg,
           total_deliveries: op.total_deliveries,
           is_platform_owned: op.is_platform_owned,
-          fee: Number(op.min_fee_preview) || 0,
-          currency: "USD",
-          estimated_minutes: Number(op.min_eta_minutes) || 60,
-          zone_name: null,
-          matched: false,
+          fee,
+          currency: best.currency || "USD",
+          estimated_minutes: best.estimated_minutes || 60,
+          zone_name: best.zone_name || null,
+          matched: true,
         }];
       });
 
