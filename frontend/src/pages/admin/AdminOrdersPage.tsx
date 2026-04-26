@@ -771,6 +771,9 @@ export default function AdminOrdersPage() {
                       {/* Détail fret + bouton réassignation transitaire (admin) */}
                       <FreightDetailsPanel orderId={o.id} actor="admin" />
 
+                      {/* Produits + breakdown total */}
+                      <OrderItemsPanel orderId={o.id} order={o} />
+
                       {/* Next step button */}
                       {next && canAdvance && (
                         <button
