@@ -840,6 +840,17 @@ export default function CheckoutPage() {
           }))
         );
 
+        // Lot 11B Phase B4 — Notification opérateur (non-bloquant)
+        if (selectedOperator?.operator_id) {
+          try {
+            await supabase.functions.invoke("notify-operator-new-order", {
+              body: { order_id: order.id },
+            });
+          } catch (e) {
+            console.warn("[notify-operator-new-order] non-blocking error:", e);
+          }
+        }
+
         // Lot 3 — Create shipment_assignments row when a forwarder was selected
         if (selectedForwarder?.forwarder_id) {
           // shipment_assignments: mode NOT NULL, status IN ('assigned', ...).
