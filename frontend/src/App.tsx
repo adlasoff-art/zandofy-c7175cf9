@@ -142,6 +142,7 @@ const AdminOperatorsPage = lazyRetry(() => import("./pages/admin/AdminOperatorsP
 const AdminOperatorQuotaRequestsPage = lazyRetry(() => import("./pages/admin/AdminOperatorQuotaRequestsPage"));
 const AdminOperatorRateCapsPage = lazyRetry(() => import("./pages/admin/AdminOperatorRateCapsPage"));
 const AdminOperatorRatesPendingPage = lazyRetry(() => import("./pages/admin/AdminOperatorRatesPendingPage"));
+const AdminOperatorsPerformancePage = lazyRetry(() => import("./pages/admin/AdminOperatorsPerformancePage"));
 const AdminStoreChangeRequestsPage = lazyRetry(() => import("./pages/admin/AdminStoreChangeRequestsPage"));
 const AdminServicePlansPage = lazyRetry(() => import("./pages/admin/AdminServicePlansPage"));
 const AdminDeliveryPlansPage = lazyRetry(() => import("./pages/admin/AdminDeliveryPlansPage"));
@@ -323,6 +324,7 @@ const App = () => (
                 <Route path="/admin/operator-quota-requests" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminOperatorQuotaRequestsPage /></RoleGuard>} />
                 <Route path="/admin/operator-rate-caps" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminOperatorRateCapsPage /></RoleGuard>} />
                 <Route path="/admin/operator-rates-pending" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminOperatorRatesPendingPage /></RoleGuard>} />
+                <Route path="/admin/operators-performance" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminOperatorsPerformancePage /></RoleGuard>} />
                 <Route path="/admin/store-change-requests" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminStoreChangeRequestsPage /></RoleGuard>} />
                 <Route path="/admin/service-plans" element={<RoleGuard allowedRoles={["admin"]}><AdminServicePlansPage /></RoleGuard>} />
                 <Route path="/admin/delivery-plans" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDeliveryPlansPage /></RoleGuard>} />

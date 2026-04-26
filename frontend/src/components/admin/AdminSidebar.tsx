@@ -55,6 +55,7 @@ const sidebarSections: SidebarSection[] = [
       { title: "Logistique", url: "/admin/logistics", icon: Truck },
       { title: "Transitaires", url: "/admin/forwarders", icon: Truck },
       { title: "Opérateurs livraison", url: "/admin/operators", icon: Truck },
+      { title: "Performance opérateurs", url: "/admin/operators-performance", icon: Truck },
       { title: "Quotas opérateurs", url: "/admin/operator-quota-requests", icon: Users },
       { title: "Tarification Fret", url: "/admin/shipping", icon: DollarSign },
       { title: "Plans de livraison", url: "/admin/delivery-plans", icon: Truck },

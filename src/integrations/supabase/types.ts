@@ -1712,6 +1712,13 @@ export type Database = {
             referencedRelation: "v_active_operators_by_city"
             referencedColumns: ["operator_id"]
           },
+          {
+            foreignKeyName: "delivery_operator_cities_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_operator_performance"
+            referencedColumns: ["operator_id"]
+          },
         ]
       }
       delivery_operator_city_caps: {
@@ -1832,6 +1839,13 @@ export type Database = {
             referencedRelation: "v_active_operators_by_city"
             referencedColumns: ["operator_id"]
           },
+          {
+            foreignKeyName: "delivery_operator_rates_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_operator_performance"
+            referencedColumns: ["operator_id"]
+          },
         ]
       }
       delivery_operator_riders: {
@@ -1883,12 +1897,63 @@ export type Database = {
             referencedRelation: "v_active_operators_by_city"
             referencedColumns: ["operator_id"]
           },
+          {
+            foreignKeyName: "delivery_operator_riders_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_operator_performance"
+            referencedColumns: ["operator_id"]
+          },
         ]
+      }
+      delivery_operator_thresholds: {
+        Row: {
+          auto_suspend_enabled: boolean
+          created_at: string
+          id: string
+          is_active: boolean
+          max_decline_rate_pct: number
+          max_expiry_rate_pct: number
+          min_assignments: number
+          min_score: number
+          notes: string | null
+          updated_at: string
+          window_days: number
+        }
+        Insert: {
+          auto_suspend_enabled?: boolean
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          max_decline_rate_pct?: number
+          max_expiry_rate_pct?: number
+          min_assignments?: number
+          min_score?: number
+          notes?: string | null
+          updated_at?: string
+          window_days?: number
+        }
+        Update: {
+          auto_suspend_enabled?: boolean
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          max_decline_rate_pct?: number
+          max_expiry_rate_pct?: number
+          min_assignments?: number
+          min_score?: number
+          notes?: string | null
+          updated_at?: string
+          window_days?: number
+        }
+        Relationships: []
       }
       delivery_operators: {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          auto_suspended_at: string | null
+          auto_suspension_reason: string | null
           company_name: string
           contact_email: string
           contact_phone: string
@@ -1908,6 +1973,9 @@ export type Database = {
           rating_avg: number | null
           registration_number: string | null
           rejection_reason: string | null
+          reliability_computed_at: string | null
+          reliability_score: number | null
+          reliability_window_days: number | null
           status: string
           tax_id: string | null
           total_deliveries: number
@@ -1917,6 +1985,8 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          auto_suspended_at?: string | null
+          auto_suspension_reason?: string | null
           company_name: string
           contact_email: string
           contact_phone: string
@@ -1936,6 +2006,9 @@ export type Database = {
           rating_avg?: number | null
           registration_number?: string | null
           rejection_reason?: string | null
+          reliability_computed_at?: string | null
+          reliability_score?: number | null
+          reliability_window_days?: number | null
           status?: string
           tax_id?: string | null
           total_deliveries?: number
@@ -1945,6 +2018,8 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          auto_suspended_at?: string | null
+          auto_suspension_reason?: string | null
           company_name?: string
           contact_email?: string
           contact_phone?: string
@@ -1964,6 +2039,9 @@ export type Database = {
           rating_avg?: number | null
           registration_number?: string | null
           rejection_reason?: string | null
+          reliability_computed_at?: string | null
+          reliability_score?: number | null
+          reliability_window_days?: number | null
           status?: string
           tax_id?: string | null
           total_deliveries?: number
@@ -3728,6 +3806,13 @@ export type Database = {
             referencedColumns: ["operator_id"]
           },
           {
+            foreignKeyName: "operator_assignment_history_new_operator_id_fkey"
+            columns: ["new_operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_operator_performance"
+            referencedColumns: ["operator_id"]
+          },
+          {
             foreignKeyName: "operator_assignment_history_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -3746,6 +3831,13 @@ export type Database = {
             columns: ["previous_operator_id"]
             isOneToOne: false
             referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
+          },
+          {
+            foreignKeyName: "operator_assignment_history_previous_operator_id_fkey"
+            columns: ["previous_operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_operator_performance"
             referencedColumns: ["operator_id"]
           },
         ]
@@ -3809,6 +3901,13 @@ export type Database = {
             referencedColumns: ["operator_id"]
           },
           {
+            foreignKeyName: "operator_commission_ledger_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_operator_performance"
+            referencedColumns: ["operator_id"]
+          },
+          {
             foreignKeyName: "operator_commission_ledger_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: true
@@ -3867,6 +3966,13 @@ export type Database = {
             columns: ["operator_id"]
             isOneToOne: false
             referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
+          },
+          {
+            foreignKeyName: "operator_quota_requests_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_operator_performance"
             referencedColumns: ["operator_id"]
           },
         ]
@@ -4177,6 +4283,13 @@ export type Database = {
             columns: ["delivery_operator_id"]
             isOneToOne: false
             referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_operator_id_fkey"
+            columns: ["delivery_operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_operator_performance"
             referencedColumns: ["operator_id"]
           },
           {
@@ -8694,6 +8807,35 @@ export type Database = {
           },
         ]
       }
+      v_operator_performance: {
+        Row: {
+          acceptance_rate: number | null
+          accepted_count: number | null
+          auto_suspended_at: string | null
+          auto_suspension_reason: string | null
+          avg_response_minutes: number | null
+          company_name: string | null
+          customer_rating_avg: number | null
+          customer_rating_count: number | null
+          decline_rate: number | null
+          declined_count: number | null
+          delivered_count: number | null
+          expired_count: number | null
+          expiry_rate: number | null
+          is_active: boolean | null
+          is_platform_owned: boolean | null
+          operator_id: string | null
+          pending_count: number | null
+          rating_avg: number | null
+          reliability_computed_at: string | null
+          reliability_score: number | null
+          reliability_window_days: number | null
+          status: string | null
+          total_assignments: number | null
+          total_deliveries: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       add_guest_support_message: {
@@ -8759,6 +8901,26 @@ export type Database = {
         Returns: {
           deleted_count: number
           image_paths: string[]
+        }[]
+      }
+      compute_operator_reliability: {
+        Args: { p_operator_id: string; p_window_days?: number }
+        Returns: {
+          acceptance_rate: number
+          accepted_count: number
+          avg_response_minutes: number
+          customer_rating_avg: number
+          customer_rating_count: number
+          decline_rate: number
+          declined_count: number
+          delivered_count: number
+          expired_count: number
+          expiry_rate: number
+          operator_id: string
+          pending_count: number
+          score: number
+          total_assignments: number
+          window_days: number
         }[]
       }
       compute_store_online_status: {
@@ -9047,6 +9209,7 @@ export type Database = {
         }
         Returns: string
       }
+      refresh_all_operator_reliability: { Args: never; Returns: number }
       refresh_store_online_status: {
         Args: { p_store_id: string }
         Returns: undefined
