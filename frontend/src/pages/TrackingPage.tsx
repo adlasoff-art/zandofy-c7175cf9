@@ -515,7 +515,7 @@ export default function TrackingPage() {
   const fetchOrder = useCallback(async (orderRef: string) => {
     const { data: order } = await supabase
       .from("orders")
-      .select("id, order_ref, status, total, shipping_address, shipping_city, shipping_country, tracking_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, last_mile_payment_method, confirmation_code, created_at, updated_at, store_id")
+      .select("id, order_ref, status, total, shipping_address, shipping_city, shipping_country, tracking_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, last_mile_payment_method, confirmation_code, created_at, updated_at, store_id, delivery_operator_id")
       .eq("order_ref", orderRef)
       .maybeSingle();
 
@@ -525,6 +525,17 @@ export default function TrackingPage() {
     if (order.store_id) {
       const { data: store } = await supabase.from("stores").select("name").eq("id", order.store_id).single();
       storeName = store?.name || null;
+    }
+
+    // Lot 11B Phase B4 — Hub UI : nom de l'opérateur (entreprise de livraison) si attribué
+    let operatorName: string | null = null;
+    if ((order as any).delivery_operator_id) {
+      const { data: op } = await (supabase as any)
+        .from("delivery_operators")
+        .select("company_name")
+        .eq("id", (order as any).delivery_operator_id)
+        .maybeSingle();
+      operatorName = op?.company_name || null;
     }
 
     const { data: history } = await supabase
@@ -560,6 +571,8 @@ export default function TrackingPage() {
       store_name: storeName,
       history: (history || []) as OrderTrackingResult["history"],
       delivery_id: deliveryData?.id || null,
+      delivery_operator_id: (order as any).delivery_operator_id || null,
+      delivery_operator_name: operatorName,
     };
   }, []);
 
