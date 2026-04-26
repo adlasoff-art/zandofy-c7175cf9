@@ -27,13 +27,17 @@ import { withOptionalOrderFields } from "@/lib/order-query";
 import { FreightDetailsPanel } from "@/components/orders/FreightDetailsPanel";
 
 function OrderItemsPanel({ orderId, order }: { orderId: string; order: any }) {
-  const { data: items = [], isLoading } = useQuery({
+  const { data: items = [], isLoading, error } = useQuery({
     queryKey: ["admin-order-items", orderId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error: qErr } = await supabase
         .from("order_items")
         .select("id, product_id, product_name, quantity, price, product_image, products:product_id(slug, images)")
         .eq("order_id", orderId);
+      if (qErr) {
+        console.error("[OrderItemsPanel] order_items fetch error:", qErr);
+        throw qErr;
+      }
       return data || [];
     },
   });
@@ -56,6 +60,13 @@ function OrderItemsPanel({ orderId, order }: { orderId: string; order: any }) {
         {isLoading ? (
           <div className="p-3 flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 size={12} className="animate-spin" /> Chargement…
+          </div>
+        ) : error ? (
+          <div className="p-3 text-xs space-y-1">
+            <p className="text-destructive font-medium">
+              Erreur de lecture des articles (RLS ou réseau)
+            </p>
+            <p className="text-muted-foreground break-all">{(error as any)?.message || String(error)}</p>
           </div>
         ) : items.length === 0 ? (
           <div className="p-3 text-xs space-y-1">
