@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, eachDayOfInterval } from "date-fns";
 import { fr } from "date-fns/locale";
-import { BarChart, Bar, ComposedChart, Line, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { BarChart, Bar, AreaChart, ComposedChart, Line, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { PIE_COLORS, TOOLTIP_STYLE, statusLabels } from "./shared";
 import type { PeriodKey } from "./DashboardPeriodSelector";
 import { getPeriodDate } from "./DashboardPeriodSelector";
@@ -183,8 +183,9 @@ export function SalesTab({ period, geoFilters }: Props) {
               <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} className="text-muted-foreground" />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-              <Bar yAxisId="left" dataKey="revenue" name="Revenu ($)" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              <Bar yAxisId="right" dataKey="count" name="Commandes" fill="hsl(210, 70%, 50%)" radius={[4, 4, 0, 0]} />
+              <Bar yAxisId="left" dataKey="revenue" name="Revenu validé ($)" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              <Bar yAxisId="right" dataKey="validCount" name="Commandes valides" fill="hsl(210, 70%, 50%)" radius={[4, 4, 0, 0]} />
+              <Bar yAxisId="right" dataKey="failedCount" name="Échouées / annulées" fill="hsl(0, 75%, 55%)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -195,19 +196,22 @@ export function SalesTab({ period, geoFilters }: Props) {
         <h2 className="text-sm font-semibold text-foreground mb-4">Évolution du chiffre d'affaires (cumulatif)</h2>
         <div className="h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={cumulativeRevenue} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+            <ComposedChart data={cumulativeRevenue} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
               <defs>
-                <linearGradient id="gradCum" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                <linearGradient id="gradValid" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(142, 70%, 40%)" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(142, 70%, 40%)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis dataKey="date" tick={{ fontSize: 10 }} className="text-muted-foreground" interval={Math.max(0, Math.floor(cumulativeRevenue.length / 15))} />
               <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" />
-              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [`$${v.toLocaleString()}`, "CA cumulé"]} />
-              <Area type="monotone" dataKey="cumulative" stroke="hsl(var(--primary))" fill="url(#gradCum)" strokeWidth={2} />
-            </AreaChart>
+              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number, n: string) => [`$${Number(v).toLocaleString()}`, n]} />
+              <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+              <Area type="monotone" dataKey="cumValid" name="CA validé (perçu)" stroke="hsl(142, 70%, 40%)" fill="url(#gradValid)" strokeWidth={2} />
+              <Line type="monotone" dataKey="cumFailed" name="Échoué / annulé" stroke="hsl(0, 75%, 55%)" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="cumGross" name="Brut (tout cumulé)" stroke="hsl(0, 0%, 55%)" strokeDasharray="4 4" strokeWidth={1.5} dot={false} />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
@@ -222,8 +226,10 @@ export function SalesTab({ period, geoFilters }: Props) {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis type="number" tick={{ fontSize: 11 }} className="text-muted-foreground" />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} className="text-muted-foreground" width={130} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [`$${fmt(v)}`, "CA"]} />
-                <Bar dataKey="revenue" name="CA ($)" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number, n: string) => [`$${fmt(v)}`, n]} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="valid" name="Validé" fill="hsl(142, 70%, 40%)" radius={[0, 6, 6, 0]} />
+                <Bar dataKey="failed" name="Échoué / annulé" fill="hsl(0, 75%, 55%)" radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
