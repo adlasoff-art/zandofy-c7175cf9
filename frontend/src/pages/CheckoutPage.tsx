@@ -930,11 +930,11 @@ export default function CheckoutPage() {
               if (newStatus === "success") {
                 await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
                 // Logistique payée avec la commande : marquer "paid" maintenant
-                await supabase.from("orders")
+                await (supabase as any).from("orders")
                   .update({ shipping_payment_status: "paid" } as any)
                   .in("id", orderIds)
                   .eq("shipping_payment_status", "unpaid");
-                await supabase.from("orders")
+                await (supabase as any).from("orders")
                   .update({ last_mile_payment_status: "paid" } as any)
                   .in("id", orderIds)
                   .eq("last_mile_payment_status", "unpaid");
