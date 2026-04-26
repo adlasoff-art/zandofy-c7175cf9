@@ -682,6 +682,31 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Lot 11B Phase B8 — Le client doit choisir un mode de livraison
+    if (deliveryOption === "none") {
+      toast({
+        title: "Mode de livraison requis",
+        description: "Veuillez choisir entre la livraison à domicile ou le retrait au Hub.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Si livraison à domicile : un livreur doit être sélectionné (sauf abonnement actif)
+    if (
+      deliveryOption === "home_delivery" &&
+      !hasActiveDeliverySub &&
+      hasOperatorCoverage &&
+      !selectedOperator
+    ) {
+      toast({
+        title: "Livreur requis",
+        description: "Veuillez sélectionner un livreur pour finaliser votre livraison à domicile.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Save address if checked
     if (saveAddress && user) {
       const { error } = await supabase.from("saved_addresses").insert({
