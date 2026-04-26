@@ -178,6 +178,16 @@ Deno.serve(async (req) => {
               .eq("id", localTx.order_id)
               .in("status", ["awaiting_payment", "pending"]);
 
+            // Logistique payée avec la commande
+            await supabaseAdmin.from("orders")
+              .update({ shipping_payment_status: "paid" })
+              .eq("id", localTx.order_id)
+              .eq("shipping_payment_status", "unpaid");
+            await supabaseAdmin.from("orders")
+              .update({ last_mile_payment_status: "paid" })
+              .eq("id", localTx.order_id)
+              .eq("last_mile_payment_status", "unpaid");
+
             if (!orderUpdateError) {
               await fetch(`${supabaseUrl}/functions/v1/notify-order-status`, {
                 method: "POST",

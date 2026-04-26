@@ -753,12 +753,29 @@ export default function CheckoutPage() {
           order_ref: orderRef,
           coupon_code: appliedCoupon?.code || null,
           discount_amount: orderDiscount,
-          // Off-platform: force all logistics payments to deferred
-          shipping_payment_status: (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform) ? "deferred" : "paid",
+          // Off-platform: force all logistics payments to deferred.
+          // "Paid" est attribué SEULEMENT après confirmation du paiement (webhook KelPay / retour Keccel).
+          // En attendant : "unpaid" pour les paiements asynchrones, "paid" pour COD/cash où la commande
+          // n'attend pas de webhook (la livraison est facturée à l'arrivée).
+          shipping_payment_status:
+            (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform)
+              ? "deferred"
+              : (paymentMethod === "mobile_money" || paymentMethod === "card" || paymentMethod === "paypal" || paymentMethod === "stripe")
+                ? "unpaid"
+                : "paid",
           delivery_choice: deliveryOption !== "none" ? deliveryOption : null,
           last_mile_fee: deliveryOption === "home_delivery" ? lastMileFee : 0,
           last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
-          last_mile_payment_status: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? "deferred" : (lastMilePayment === "pay_with_shipping" ? "paid" : "deferred")) : null,
+          last_mile_payment_status:
+            deliveryOption === "home_delivery" && lastMileFee > 0
+              ? (isOffPlatform
+                  ? "deferred"
+                  : (lastMilePayment === "pay_with_shipping"
+                      ? ((paymentMethod === "mobile_money" || paymentMethod === "card" || paymentMethod === "paypal" || paymentMethod === "stripe")
+                          ? "unpaid"
+                          : "paid")
+                      : "deferred"))
+              : null,
           // Lot 3 — Forwarder assignment (silent fallback when no eligible forwarder)
           forwarder_id: selectedForwarder?.forwarder_id ?? null,
           forwarder_tier: selectedForwarder?.tier ?? null,
@@ -912,6 +929,15 @@ export default function CheckoutPage() {
               const newStatus = payload.new?.status;
               if (newStatus === "success") {
                 await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
+                // Logistique payée avec la commande : marquer "paid" maintenant
+                await (supabase as any).from("orders")
+                  .update({ shipping_payment_status: "paid" } as any)
+                  .in("id", orderIds)
+                  .eq("shipping_payment_status", "unpaid");
+                await (supabase as any).from("orders")
+                  .update({ last_mile_payment_status: "paid" } as any)
+                  .in("id", orderIds)
+                  .eq("last_mile_payment_status", "unpaid");
                 setPaymentPending(false);
                 removeSelectedItems();
                 goToStep("confirmation");
@@ -942,6 +968,8 @@ export default function CheckoutPage() {
             });
             if (checkData?.status === "success") {
               await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
+              await (supabase as any).from("orders").update({ shipping_payment_status: "paid" }).in("id", orderIds).eq("shipping_payment_status", "unpaid");
+              await (supabase as any).from("orders").update({ last_mile_payment_status: "paid" }).in("id", orderIds).eq("last_mile_payment_status", "unpaid");
               setPaymentPending(false);
               await removeSelectedItems();
               goToStep("confirmation");
@@ -1053,6 +1081,8 @@ export default function CheckoutPage() {
         if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
         if (paymentOrderIds.length > 0) {
           await supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
+          await (supabase as any).from("orders").update({ shipping_payment_status: "paid" }).in("id", paymentOrderIds).eq("shipping_payment_status", "unpaid");
+          await (supabase as any).from("orders").update({ last_mile_payment_status: "paid" }).in("id", paymentOrderIds).eq("last_mile_payment_status", "unpaid");
         }
         setPaymentPending(false);
         await removeSelectedItems();
@@ -1615,7 +1645,12 @@ export default function CheckoutPage() {
                                     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "payment_transactions", filter: `reference=eq.${data.reference}` },
                                       (payload: any) => {
                                         const ns = payload.new?.status;
-                                        if (ns === "success") { supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment"); setPaymentPending(false); removeSelectedItems(); goToStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel); }
+                                        if (ns === "success") {
+                                          supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
+                                          (supabase as any).from("orders").update({ shipping_payment_status: "paid" }).in("id", paymentOrderIds).eq("shipping_payment_status", "unpaid");
+                                          (supabase as any).from("orders").update({ last_mile_payment_status: "paid" }).in("id", paymentOrderIds).eq("last_mile_payment_status", "unpaid");
+                                          setPaymentPending(false); removeSelectedItems(); goToStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel);
+                                        }
                                         else if (ns === "failed") { supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds); setPaymentPending(false); toast({ title: "Paiement échoué", variant: "destructive" }); supabase.removeChannel(channel); }
                                       }
                                     ).subscribe();
