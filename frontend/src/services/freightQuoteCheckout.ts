@@ -253,9 +253,29 @@ export async function lockFreightQuote(params: {
   // Lot 4G — Si groupage choisi et offre dispo, on verrouille le total consolidé.
   const co = offer.consolidation_offer;
   const useConsolidated = consolidationChoice === "consolidated" && co?.available;
-  const lockedTotal = useConsolidated
-    ? co!.consolidated_total
-    : (offer.split_total ?? offer.quote.total);
+
+  // Lot 11A — Choisir le 1er montant > 0 dans l'ordre :
+  //   1. Total consolidé (si groupage retenu)
+  //   2. split_total (somme des sous-colis)
+  //   3. quote.total (total agrégé déjà affiché en UI checkout)
+  // Avant : `offer.split_total ?? offer.quote.total` faisait passer un split_total
+  // numérique mais à 0 (cas mono-colis ou sous-colis vides), persistant un devis
+  // verrouillé à 0 USD alors que orders.shipping_cost était correct.
+  const candidates: number[] = useConsolidated
+    ? [Number(co!.consolidated_total) || 0, Number(offer.quote.total) || 0]
+    : [Number(offer.split_total) || 0, Number(offer.quote.total) || 0];
+  const lockedTotal = candidates.find((v) => v > 0) ?? 0;
+
+  // Lot 11A — Garde-fou : refuser de persister un devis à 0 USD.
+  // Cela évitait des commandes affichant "USD 0.00" dans le panneau Transport
+  // International alors que orders.shipping_cost était correct.
+  if (lockedTotal <= 0) {
+    console.warn(
+      "[freightQuoteCheckout] lockFreightQuote refused: lockedTotal <= 0",
+      { offer_id: offer.profile_id, forwarder_id: offer.forwarder_id, candidates },
+    );
+    return null;
+  }
 
   const { data, error } = await (supabase as any)
     .from("freight_quotes")

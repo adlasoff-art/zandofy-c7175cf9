@@ -12,11 +12,12 @@
  */
 
 import { useEffect, useState } from "react";
-import { Truck, Package, Layers, BadgeDollarSign, Clock, Loader2, Repeat, MapPin, Mail } from "lucide-react";
+import { Truck, Package, Layers, BadgeDollarSign, Clock, Loader2, Repeat, MapPin, Mail, AlertTriangle, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { InternationalShipmentTimeline } from "./InternationalShipmentTimeline";
 import { Button } from "@/components/ui/button";
 import { ReassignForwarderDialog } from "@/components/forwarder/ReassignForwarderDialog";
+import { toast } from "sonner";
 
 interface SubpackageRow {
   supplier_id: string;
@@ -83,6 +84,9 @@ export function FreightDetailsPanel({
   const [shippingCity, setShippingCity] = useState<string | null>(null);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // Lot 11A — Détection de désynchro (quoted_price=0 mais orders.shipping_cost>0)
+  const [orderShippingCost, setOrderShippingCost] = useState<number>(0);
+  const [resyncing, setResyncing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +96,7 @@ export function FreightDetailsPanel({
       // 1) Récupérer freight_quote_id depuis la commande
       const { data: order } = await (supabase as any)
         .from("orders")
-        .select("freight_quote_id, shipping_country, shipping_city")
+        .select("freight_quote_id, shipping_country, shipping_city, shipping_cost")
         .eq("id", orderId)
         .maybeSingle();
 
@@ -100,6 +104,7 @@ export function FreightDetailsPanel({
       if (!cancelled) {
         setShippingCountry((order as any)?.shipping_country ?? null);
         setShippingCity((order as any)?.shipping_city ?? null);
+        setOrderShippingCost(Number((order as any)?.shipping_cost) || 0);
       }
       if (!quoteId) {
         if (!cancelled) {
@@ -200,6 +205,29 @@ export function FreightDetailsPanel({
       ? `${quote.transit_min_days ?? "?"}–${quote.transit_max_days ?? "?"} jours`
       : "Délai non communiqué";
 
+  // Lot 11A — Affichage robuste : si le devis est à 0 mais la commande a un
+  // shipping_cost > 0, on affiche le shipping_cost (source de vérité financière)
+  // avec un avertissement. Évite l'illusion d'une expédition gratuite.
+  const quotedPrice = Number(quote.quoted_price) || 0;
+  const isDesynced = quotedPrice <= 0 && orderShippingCost > 0;
+  const displayedPrice = isDesynced ? orderShippingCost : quotedPrice;
+
+  const handleResync = async () => {
+    if (!actor || actor !== "admin" || !isDesynced) return;
+    setResyncing(true);
+    const { error } = await (supabase as any)
+      .from("freight_quotes")
+      .update({ quoted_price: orderShippingCost })
+      .eq("id", quote.id);
+    setResyncing(false);
+    if (error) {
+      toast.error("Échec resync : " + error.message);
+    } else {
+      toast.success("Devis resynchronisé");
+      setReloadKey((k) => k + 1);
+    }
+  };
+
   return (
     <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
       {/* Header */}
@@ -219,13 +247,39 @@ export function FreightDetailsPanel({
         </div>
         <div className="text-right shrink-0">
           <p className="text-sm font-bold text-foreground">
-            {quote.currency} {Number(quote.quoted_price).toFixed(2)}
+            {quote.currency} {displayedPrice.toFixed(2)}
           </p>
           <p className="text-[10px] text-muted-foreground flex items-center gap-1 justify-end">
             <Clock size={9} /> {transitLabel}
           </p>
         </div>
       </div>
+
+      {isDesynced && (
+        <div className="flex items-start gap-2 px-2.5 py-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 text-[11px]">
+          <AlertTriangle size={12} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-foreground">Devis désynchronisé</p>
+            <p className="text-muted-foreground">
+              Devis verrouillé à 0 USD mais commande facturée à {quote.currency}{" "}
+              {orderShippingCost.toFixed(2)}. Le montant affiché est celui réellement facturé.
+            </p>
+            {actor === "admin" && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 mt-1.5 text-[10px] gap-1"
+                onClick={handleResync}
+                disabled={resyncing}
+              >
+                <RefreshCw size={10} className={resyncing ? "animate-spin" : ""} />
+                Resynchroniser le devis
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {actor && (
         <div className="flex justify-end">
