@@ -5,7 +5,7 @@
  * Tabs : à assigner / en cours / livrées / annulées.
  * Action : assigner à un rider de la flotte.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOperatorContext } from "@/hooks/use-operator-context";
 import { fromTable } from "@/lib/supabase-helpers";
@@ -13,9 +13,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Loader2, Truck, MapPin, Phone, Package, User } from "lucide-react";
+import {
+  Loader2, Truck, MapPin, Phone, Package, User,
+  CheckCircle2, XCircle, Clock,
+} from "lucide-react";
 
-type TabKey = "pending" | "in_progress" | "delivered" | "cancelled";
+type TabKey = "awaiting" | "pending" | "in_progress" | "delivered" | "cancelled";
 
 const TAB_FILTERS: Record<TabKey, (statuses: string[], rider: string | null) => boolean> = {
   pending: (s, r) => !r && (s.includes("confirmed") || s.includes("preparing") || s.includes("shipped") || s.includes("arrived")),
@@ -26,9 +29,17 @@ const TAB_FILTERS: Record<TabKey, (statuses: string[], rider: string | null) => 
 
 export default function OperatorOrdersPage() {
   const { operator } = useOperatorContext();
-  const [tab, setTab] = useState<TabKey>("pending");
+  const [tab, setTab] = useState<TabKey>("awaiting");
   const queryClient = useQueryClient();
   const [assigning, setAssigning] = useState<string | null>(null);
+  const [deciding, setDeciding] = useState<string | null>(null);
+  const [, setTick] = useState(0);
+
+  // Re-render every 30s pour le countdown
+  useEffect(() => {
+    const t = setInterval(() => setTick((v) => v + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["operator-orders", operator?.id],
@@ -39,7 +50,8 @@ export default function OperatorOrdersPage() {
         .select(`
           id, order_ref, status, total, last_mile_fee, shipping_first_name, shipping_last_name,
           shipping_phone, shipping_address, shipping_city, shipping_commune, shipping_quartier,
-          assigned_rider_id, assigned_rider_name, created_at
+          assigned_rider_id, assigned_rider_name, created_at,
+          operator_acceptance_status, operator_response_deadline
         `)
         .eq("delivery_operator_id", operator!.id)
         .order("created_at", { ascending: false })
@@ -62,7 +74,66 @@ export default function OperatorOrdersPage() {
     },
   });
 
-  const filtered = orders.filter((o) => TAB_FILTERS[tab]([o.status], o.assigned_rider_id));
+  // Awaiting = pending acceptance ; les autres tabs excluent ces commandes
+  const awaiting = orders.filter(
+    (o) => o.operator_acceptance_status === "pending",
+  );
+  const accepted = orders.filter(
+    (o) => o.operator_acceptance_status !== "pending",
+  );
+  const filtered =
+    tab === "awaiting"
+      ? awaiting
+      : accepted.filter((o) =>
+          TAB_FILTERS[tab as Exclude<TabKey, "awaiting">]([o.status], o.assigned_rider_id),
+        );
+
+  const decide = async (
+    orderId: string,
+    decision: "accepted" | "declined",
+  ) => {
+    if (decision === "declined") {
+      const reason = window.prompt("Motif du refus (optionnel) :") ?? undefined;
+      setDeciding(orderId);
+      try {
+        const { error } = await supabase.functions.invoke(
+          "operator-decide-order",
+          { body: { order_id: orderId, decision, reason } },
+        );
+        if (error) throw new Error(error.message);
+        toast.success("Commande refusée — réassignation déclenchée");
+        queryClient.invalidateQueries({ queryKey: ["operator-orders"] });
+      } catch (e: any) {
+        toast.error(e.message || "Échec");
+      } finally {
+        setDeciding(null);
+      }
+      return;
+    }
+    setDeciding(orderId);
+    try {
+      const { error } = await supabase.functions.invoke(
+        "operator-decide-order",
+        { body: { order_id: orderId, decision } },
+      );
+      if (error) throw new Error(error.message);
+      toast.success("Commande acceptée");
+      queryClient.invalidateQueries({ queryKey: ["operator-orders"] });
+    } catch (e: any) {
+      toast.error(e.message || "Échec");
+    } finally {
+      setDeciding(null);
+    }
+  };
+
+  const formatRemaining = (deadline: string | null) => {
+    if (!deadline) return null;
+    const ms = new Date(deadline).getTime() - Date.now();
+    if (ms <= 0) return "Expiré";
+    const mins = Math.floor(ms / 60_000);
+    if (mins < 60) return `${mins} min`;
+    return `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}`;
+  };
 
   const assign = async (orderId: string, riderId: string) => {
     setAssigning(orderId);
@@ -92,8 +163,14 @@ export default function OperatorOrdersPage() {
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border overflow-x-auto">
         {(Object.keys(TAB_FILTERS) as TabKey[]).map((t) => {
-          const count = orders.filter((o) => TAB_FILTERS[t]([o.status], o.assigned_rider_id)).length;
+          const count =
+            t === "awaiting"
+              ? awaiting.length
+              : accepted.filter((o) =>
+                  TAB_FILTERS[t as Exclude<TabKey, "awaiting">]([o.status], o.assigned_rider_id),
+                ).length;
           const labels: Record<TabKey, string> = {
+            awaiting: "À accepter",
             pending: "À assigner", in_progress: "En cours",
             delivered: "Livrées", cancelled: "Annulées",
           };
@@ -123,9 +200,11 @@ export default function OperatorOrdersPage() {
 
       <div className="space-y-2">
         {filtered.map((o) => {
-          const isPending = tab === "pending";
+          const isAssignTab = tab === "pending";
+          const isAwaiting = tab === "awaiting";
           const fullAddress = [o.shipping_address, o.shipping_quartier, o.shipping_commune, o.shipping_city]
             .filter(Boolean).join(", ");
+          const remaining = isAwaiting ? formatRemaining(o.operator_response_deadline) : null;
           return (
             <Card key={o.id}>
               <CardContent className="pt-4 pb-3">
@@ -149,8 +228,41 @@ export default function OperatorOrdersPage() {
                       <Package size={11} /> Assigné à {o.assigned_rider_name}
                     </p>
                   )}
+                  {isAwaiting && remaining && (
+                    <p className={`flex items-center gap-1.5 font-medium ${
+                      remaining === "Expiré" ? "text-destructive" : "text-amber-600"
+                    }`}>
+                      <Clock size={11} /> Réponse dans : {remaining}
+                    </p>
+                  )}
                 </div>
-                {isPending && (
+                {isAwaiting && (
+                  <div className="mt-3 pt-3 border-t border-border/50 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => decide(o.id, "accepted")}
+                      disabled={deciding === o.id}
+                      className="bg-[hsl(var(--operator-primary))] hover:bg-[hsl(var(--operator-primary))]/90"
+                    >
+                      {deciding === o.id ? (
+                        <Loader2 className="animate-spin" size={14} />
+                      ) : (
+                        <CheckCircle2 size={14} className="mr-1" />
+                      )}
+                      Accepter
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => decide(o.id, "declined")}
+                      disabled={deciding === o.id}
+                    >
+                      <XCircle size={14} className="mr-1" />
+                      Refuser
+                    </Button>
+                  </div>
+                )}
+                {isAssignTab && (
                   <div className="mt-3 pt-3 border-t border-border/50">
                     {riders.length === 0 ? (
                       <p className="text-xs text-amber-600">
