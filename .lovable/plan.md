@@ -1,90 +1,140 @@
-## Diagnostic
+# Lot 11B — Phase B8 : Couverture stricte + Tarifs encadrés
 
-Les erreurs SQL de la checklist B7 viennent de deux causes :
+## 🎯 Objectifs
 
-1. Les placeholders `<USER_ID>` et `<ORDER_ID>` ont été exécutés tels quels. Ce sont des exemples à remplacer par de vrais UUID, donc PostgreSQL renvoie `invalid input syntax for type uuid`.
-2. La checklist utilise d'anciens noms de colonnes (`ref`, `current_operator_id`, `operator_assignment_status`). Le schéma B7 réellement appliqué utilise :
-   - `order_ref`
-   - `delivery_operator_id`
-   - `operator_acceptance_status`
+1. **Couverture stricte** : "Livraison à domicile" désactivée si **aucun opérateur** ne couvre la commune/quartier du client.
+2. **Plafonds admin par ville** : l'admin définit `max_base_price` et `max_surcharge` par ville. Tout tarif opérateur au-dessus est rejeté.
+3. **Validation admin systématique** : chaque création/modification de tarif passe en `pending` → l'admin approuve ou refuse depuis `/admin/operators`.
+4. **Very Speed Delivery = référence** : tarifs admin (déjà géré), pas de validation pour l'opérateur plateforme.
 
-Ton audit B7 est rassurant : les colonnes appliquées existent (`operator_acceptance_status`, deadlines, response, etc.) et le nombre de policies est identique sur prod et staging (`orders=11`, `operator_assignment_history=2`, etc.). Donc il n'y a pas d'alerte RLS évidente dans ce que tu as partagé.
+---
 
-## Plan d'action propre
+## 🗄️ Phase 1 — Schéma DB (migration)
 
-### 1. Corriger les documents B7 générés
-Je vais produire une nouvelle version propre de la checklist E2E, par exemple :
-
-- `lot11b_b7_checklist_e2e_v2.md`
-- éventuellement `lot11b_b7_quick_sql_checks_v2.sql`
-
-Elle remplacera les mauvais noms de colonnes par les bons :
-
-```sql
-SELECT id, order_ref, delivery_operator_id, operator_acceptance_status,
-       operator_response_deadline
-FROM public.orders
-WHERE user_id = '<CLIENT_UUID>'
-ORDER BY created_at DESC
-LIMIT 1;
+### Nouvelle table `delivery_operator_city_caps`
+Plafonds tarifaires par ville, gérés par l'admin.
 ```
-
-et :
-
-```sql
-SELECT operator_acceptance_status, delivery_operator_id
-FROM public.orders
-WHERE id = '<ORDER_UUID>';
+- id uuid PK
+- country_code text NOT NULL
+- city text NOT NULL
+- max_base_price numeric NOT NULL  -- USD
+- max_surcharge numeric NOT NULL DEFAULT 0
+- max_estimated_minutes int DEFAULT 180
+- notes text
+- created_at, updated_at timestamptz
+- UNIQUE (country_code, city)
 ```
+RLS : SELECT public, INSERT/UPDATE/DELETE admin only.
 
-### 2. Rendre les vérifications exécutables sans faux placeholders
-Je vais ajouter des requêtes qui récupèrent automatiquement la dernière commande de test, pour éviter d'avoir à remplacer trop de valeurs manuellement, par exemple :
-
-```sql
-SELECT id, order_ref, user_id, delivery_operator_id, operator_acceptance_status,
-       operator_response_deadline, operator_responded_at, operator_decline_reason
-FROM public.orders
-WHERE delivery_operator_id IS NOT NULL
-   OR operator_acceptance_status IN ('pending','accepted','declined','expired','not_applicable')
-ORDER BY created_at DESC
-LIMIT 10;
+### Modifs `delivery_operator_rates`
+Ajouter colonnes de validation :
 ```
-
-Pour les tests ciblés par client/opérateur, la checklist indiquera clairement où coller un vrai UUID.
-
-### 3. Corriger les attentes de la checklist
-La version actuelle dit que le refus/expiration laisse `operator_assignment_status = declined/expired` avec `current_operator_id = NULL`.
-
-Mais le code actuel détache l'opérateur et remet la commande à :
-
-```text
-operator_acceptance_status = not_applicable
-delivery_operator_id = NULL
+- status text NOT NULL DEFAULT 'pending'    -- pending | approved | rejected
+- submitted_at timestamptz DEFAULT now()
+- reviewed_at timestamptz
+- reviewed_by uuid
+- rejection_reason text
 ```
+Backfill : tous les tarifs existants → `status='approved'` pour ne pas casser le checkout.
 
-L'historique garde la raison exacte :
+### Trigger `enforce_operator_rate_caps()` (BEFORE INSERT/UPDATE)
+- Si l'opérateur est `is_platform_owned=true` → bypass (Very Speed exempté).
+- Sinon : vérifie `base_price <= max_base_price` et `surcharge <= max_surcharge` selon la ville. Sinon : `RAISE EXCEPTION`.
 
-```text
-declined_by_operator...
-expired_no_response
-```
+### Trigger `force_pending_on_rate_change()` (BEFORE INSERT/UPDATE)
+- Si `is_platform_owned=false` et changement de prix → force `status='pending'`, reset `reviewed_*`.
 
-Je vais donc clarifier que :
-- l'état immédiat avant détachement est géré par la RPC / function,
-- l'état final réassignable est `not_applicable + delivery_operator_id NULL`,
-- la preuve du refus/expiration est dans `operator_assignment_history.reason`.
+### Vue `v_active_operators_by_city` — mise à jour
+Ne compter que les rates `is_active=true AND status='approved'`. Sinon un opérateur en attente de validation apparaîtrait à tort.
 
-### 4. Ajouter une section “ce qui reste vraiment à faire”
-Le document final indiquera clairement que, côté Lot 11B/B7, il reste uniquement :
+### Hook checkout — vue dédiée
+Nouvelle fonction `get_operator_coverage(country, city, commune, quartier)` qui retourne `boolean has_coverage` → utilisée par le front pour activer/désactiver "Livraison à domicile".
 
-1. exécuter les tests E2E staging avec la checklist corrigée ;
-2. vérifier les logs des 3 edge functions pendant ces tests ;
-3. faire un smoke test prod minimal après validation staging ;
-4. optionnel plus tard : vraie édition admin des templates email si on crée une table dédiée.
+---
 
-### 5. Pas de migration nécessaire pour ces erreurs
-Je ne prévois pas de migration pour corriger les erreurs que tu as montrées, car la base contient déjà les colonnes B7 correctes. Le problème est documentaire/checklist, pas structurel.
+## 🎨 Phase 2 — Front Checkout (couverture stricte)
 
-## Résultat attendu
+### `frontend/src/hooks/useOperatorQuotes.ts`
+Filtrer côté query : ne renvoyer que les rates `status='approved'`.
 
-Après exécution, tu auras une checklist B7 corrigée, cohérente avec le schéma réel, sans colonnes inexistantes, et avec des requêtes SQL sûres pour valider staging puis prod sans faux positifs.
+### `frontend/src/pages/CheckoutPage.tsx` (lignes 1430-1466)
+- Calculer `hasOperatorCoverage = (quotes?.length ?? 0) > 0` (depuis `useOperatorQuotes`).
+- Bouton "🚚 Livraison à domicile" : `disabled = !lastMileResult?.deliverable || !hasOperatorCoverage`.
+- Si `!hasOperatorCoverage && lastMileResult?.deliverable` → message *"Aucun livreur partenaire ne dessert encore votre quartier. Choisissez le retrait au Hub."*
+- Auto-fallback : si l'utilisateur avait coché home_delivery et que la commune/quartier change vers une zone sans couverture → `setDeliveryOption("none")` + toast.
+- Validation `handlePlaceOrder` : bloquer si `deliveryOption==="home_delivery" && !selectedOperator`.
+
+### `frontend/src/components/checkout/OperatorSelector.tsx`
+Supprimer le message "flotte interne" (plus pertinent — Very Speed est lui-même un opérateur listé). Si `quotes.length === 0` → ne rien afficher (le bouton parent est déjà désactivé).
+
+---
+
+## 🛠️ Phase 3 — Admin : plafonds par ville
+
+### Nouvelle page `/admin/operator-rate-caps`
+- Onglet ajouté dans `/admin/operators` ou page dédiée.
+- Table : pays / ville / max base / max surcharge / ETA max.
+- CRUD complet (form modal create + edit + delete).
+- Composant : `frontend/src/components/admin/operators/OperatorRateCapsTable.tsx`.
+
+---
+
+## ✅ Phase 4 — Admin : validation des tarifs
+
+### Nouvelle page `/admin/operator-rates-pending`
+- Liste tous les `delivery_operator_rates` en `status='pending'`.
+- Colonnes : opérateur, ville, zone/commune/quartier, base, surcharge, ETA, soumis le, plafond ville (rappel).
+- Actions : ✅ Approuver / ❌ Refuser (avec raison).
+- Edge functions : `admin-approve-operator-rate`, `admin-reject-operator-rate` (verify_jwt + has_role admin + RLS).
+- Badge compteur "X tarifs en attente" dans la sidebar admin.
+
+---
+
+## 👷 Phase 5 — Dashboard opérateur (`/operator/rates`)
+
+- Afficher status badge sur chaque tarif (pending / approved / rejected).
+- Si rejected → afficher `rejection_reason`.
+- Lors de la création/modification : toast *"Tarif soumis à validation admin — apparaîtra au checkout après approbation"*.
+- Afficher le plafond de la ville dans le formulaire (lecture seule, info contextuelle).
+- Bloquer le submit côté UI si `base_price > max_base_price` (UX, double check du trigger DB).
+
+---
+
+## 📧 Phase 6 — Notifications
+
+- Nouvelle approbation/refus tarif → in-app + email à l'owner opérateur.
+- Nouveau tarif soumis → in-app aux admins.
+- Edge function : étendre `notify-operator-new-order` ou créer `notify-rate-decision`.
+
+---
+
+## 🧪 Phase 7 — Tests & déploiement
+
+### Staging (Lovable preview + Supabase Lovable)
+1. Migration appliquée → vérifier backfill `status='approved'`.
+2. Créer un nouveau tarif comme opérateur tiers → doit passer pending.
+3. Tester checkout dans une commune sans couverture → bouton home_delivery grisé.
+4. Approuver le tarif depuis admin → vérifier qu'il apparaît au checkout.
+5. Tester un dépassement de plafond → trigger refuse l'INSERT.
+
+### Production (GitHub → Vercel + Supabase prod vpt...yxf)
+- Migration via GitHub Actions (`deploy-edge-functions.yml` + push sur main).
+- Smoke test : checkout réel sur Gombe + checkout sur une commune non couverte.
+
+---
+
+## 📝 Mémoire à mettre à jour
+
+`mem://features/multi-operator-delivery-system.md` → ajouter Phase B8 :
+- Couverture stricte (no-coverage = home_delivery disabled)
+- Caps admin par ville (`delivery_operator_city_caps`)
+- Workflow validation tarifs (`status` + triggers + admin pages)
+- Very Speed (platform-owned) exempté des caps et de la validation
+
+---
+
+## 🚫 Hors scope (à confirmer pour plus tard)
+
+- Suggestion automatique de communes voisines couvertes (option C de la Q1, pas retenue).
+- Toggle "Prépaiement obligatoire" par transitaire (sujet précédent — à traiter dans une phase distincte B9).
+- Workflow d'expiration auto si admin tarde à valider (à voir si besoin).
