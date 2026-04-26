@@ -1,4 +1,17 @@
-# Phase 10.1 — Stabilisation post-audit (multi-opérateurs + transitaires)
+# Phase 10.1 — Stabilisation post-audit (multi-opérateurs + transitaires) ✅ TERMINÉE
+
+## ✅ Livré
+- Migration KYB transitaires relocalisée dans `frontend/supabase/migrations/` (déployable prod) + `forwarders.status DEFAULT 'pending'`.
+- Route `/forwarder` + `ForwarderDashboardPage.tsx` (statut KYB, identité, couverture, documents signed URLs).
+- `CreateOperatorDialog.tsx` branché dans `AdminOperatorsPage` (autocomplete profiles, flotte, villes, commission).
+- `AdminSidebar.tsx` : ajout Plafonds tarifaires + Tarifs à modérer.
+- `Header.tsx` + `MobileAccountMenu.tsx` : liens Espace conditionnels (operator/forwarder), masquage des "Devenir" si déjà rôle.
+- `ErrorBoundary` / `error-reporter.ts` : filtre des chunk-load + null-context errors (notifications admin nettoyées).
+- TypeScript build OK.
+
+---
+
+# (Archive) Plan initial
 
 Objectif : corriger les 4 incohérences bloquantes prod identifiées et combler les manques UX/sécurité avant validation finale.
 
