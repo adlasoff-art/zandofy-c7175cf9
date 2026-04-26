@@ -104,7 +104,8 @@ export function useOperatorQuotes({
         .in("operator_id", operatorIds)
         .eq("country_code", cc)
         .ilike("city", c)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .eq("status", "approved");
 
       const ratesByOp: Record<string, any[]> = {};
       (rates || []).forEach((r: any) => {
