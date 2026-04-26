@@ -48,12 +48,8 @@ export function OperatorSelector({
   }
 
   if (!quotes || quotes.length === 0) {
-    return (
-      <div className="text-xs text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg">
-        Aucun livreur partenaire dans cette zone — la livraison sera
-        assurée par notre flotte interne.
-      </div>
-    );
+    // Le bouton parent "Livraison à domicile" est déjà désactivé en l'absence de couverture.
+    return null;
   }
 
   return (
