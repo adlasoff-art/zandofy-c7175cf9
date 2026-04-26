@@ -312,8 +312,16 @@ export function Header() {
                     <Link to="/messages" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.messages")} {unreadCount > 0 && `(${unreadCount})`}</Link>
                     <Link to="/vendor" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.vendorSpace")}</Link>
                     <Link to="/become-vendor" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">{t("header.becomeVendor")}</Link>
-                    <Link to="/become-operator" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">Devenir opérateur de livraison</Link>
-                    <Link to="/become-forwarder" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">Devenir transitaire</Link>
+                    {isOperator ? (
+                      <Link to="/operator" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">Espace opérateur</Link>
+                    ) : (
+                      <Link to="/become-operator" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">Devenir opérateur de livraison</Link>
+                    )}
+                    {isForwarder ? (
+                      <Link to="/forwarder" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">Espace transitaire</Link>
+                    ) : (
+                      <Link to="/become-forwarder" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">Devenir transitaire</Link>
+                    )}
                     {isStaff && <Link to="/admin" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.admin")}</Link>}
                     <button onClick={async () => { setUserMenuOpen(false); await signOut(); }} className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-muted transition-colors flex items-center gap-2">
                       <LogOut size={14} /> {t("header.logout")}
