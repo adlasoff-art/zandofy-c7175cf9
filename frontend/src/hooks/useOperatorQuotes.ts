@@ -113,12 +113,12 @@ export function useOperatorQuotes({
         ratesByOp[r.operator_id].push(r);
       });
 
-      const quotes: OperatorQuote[] = ops.map((op: any) => {
+      const quotes: OperatorQuote[] = ops.flatMap((op: any) => {
         const best = pickBestRate(ratesByOp[op.operator_id] || [], commune, quartier);
         if (best) {
           const fee =
             (Number(best.base_price) || 0) + (Number(best.surcharge) || 0);
-          return {
+          return [{
             operator_id: op.operator_id,
             company_name: op.company_name,
             logo_url: op.logo_url,
@@ -130,10 +130,14 @@ export function useOperatorQuotes({
             estimated_minutes: best.estimated_minutes || 60,
             zone_name: best.zone_name || null,
             matched: true,
-          };
+          }];
+        }
+        // Pas de tarif approuvé pour cet opérateur sur cette zone : on l'écarte.
+        if (op.min_fee_preview === null || op.min_fee_preview === undefined) {
+          return [];
         }
         // Fallback : preview de la vue (min_fee_preview) si pas de rate fin.
-        return {
+        return [{
           operator_id: op.operator_id,
           company_name: op.company_name,
           logo_url: op.logo_url,
@@ -145,7 +149,7 @@ export function useOperatorQuotes({
           estimated_minutes: Number(op.min_eta_minutes) || 60,
           zone_name: null,
           matched: false,
-        };
+        }];
       });
 
       // Tri : plateforme d'abord, puis par prix croissant.
