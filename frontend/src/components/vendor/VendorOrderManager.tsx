@@ -140,17 +140,14 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [showLabelPreview, setShowLabelPreview] = useState(false);
 
-  // Check if store has self-delivery
+  // Lot 11B Phase B4 — Cleanup vendeur :
+  // Le last-mile est désormais opéré exclusivement par les opérateurs de livraison
+  // tiers (table `delivery_operators`) ou par la flotte plateforme. Les vendeurs
+  // n'auto-livrent plus, donc on force `hasSelfDelivery = false`. L'ancien champ
+  // `vendor_subscriptions.can_self_deliver` est conservé pour rétro-compatibilité
+  // sur les écrans admin mais n'a plus d'effet côté vendeur.
   useEffect(() => {
-    async function check() {
-      const { data } = await supabase
-        .from("vendor_subscriptions")
-        .select("can_self_deliver")
-        .eq("store_id", storeId)
-        .maybeSingle();
-      setHasSelfDelivery(data?.can_self_deliver || false);
-    }
-    check();
+    setHasSelfDelivery(false);
   }, [storeId]);
 
   // Check if shipping labels are enabled for this store
