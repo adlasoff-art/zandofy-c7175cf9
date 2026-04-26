@@ -506,6 +506,15 @@ export default function AdminOrdersPage() {
               <Printer size={14} /> Imprimer étiquettes
             </button>
             <button
+              onClick={bulkDeleteTerminal}
+              disabled={bulkDeleting}
+              title="Supprimer uniquement les commandes en statut Échec / Annulée / Retournée"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 transition-colors disabled:opacity-50"
+            >
+              {bulkDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              Supprimer (terminales)
+            </button>
+            <button
               onClick={() => setSelectedOrders([])}
               className="px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-muted"
             >
