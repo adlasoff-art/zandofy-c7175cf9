@@ -129,6 +129,9 @@ export default function CheckoutPage() {
   const [lastMileResult, setLastMileResult] = useState<LastMileFeeResult | null>(null);
   const [lastMileLoading, setLastMileLoading] = useState(false);
 
+  // Lot 11B Phase B4 — Sélection d'opérateur de livraison (entreprise tierce ou plateforme)
+  const [selectedOperator, setSelectedOperator] = useState<OperatorQuote | null>(null);
+
   // Deferred payment retry state
   const [retryPhone, setRetryPhone] = useState("");
   const [retryProvider, setRetryProvider] = useState("orange_money");
