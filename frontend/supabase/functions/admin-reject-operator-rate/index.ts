@@ -8,6 +8,7 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
+import nodemailer from "npm:nodemailer@6.9.16";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -74,7 +75,7 @@ Deno.serve(async (req) => {
     try {
       const { data: op } = await svc
         .from("delivery_operators")
-        .select("owner_user_id, company_name")
+        .select("owner_user_id, company_name, contact_email")
         .eq("id", rate.operator_id)
         .maybeSingle();
       if (op?.owner_user_id) {
@@ -84,6 +85,41 @@ Deno.serve(async (req) => {
           title: "Tarif refusé",
           message: `Votre tarif pour ${rate.zone_name} (${rate.city}) a été refusé. Raison : ${reason}`,
           link: "/operator/rates",
+        });
+      }
+      // Phase 7 — email opérateur
+      const smtpHost = Deno.env.get("SMTP_HOST");
+      const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
+      const smtpUser = Deno.env.get("SMTP_USER");
+      const smtpPass = Deno.env.get("SMTP_PASS");
+      const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
+      const to = op?.contact_email;
+      if (smtpHost && smtpUser && smtpPass && fromEmail && to && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+        const transport = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: { user: smtpUser, pass: smtpPass },
+        });
+        const escapedReason = String(reason).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!));
+        const html = `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#ffffff;color:#111;">
+            <h2 style="margin:0 0 16px;color:#b91c1c;">Tarif refusé</h2>
+            <p>Bonjour <strong>${op?.company_name ?? ""}</strong>,</p>
+            <p>Votre tarif pour <strong>${rate.zone_name}</strong> (${rate.city}) n'a pas été approuvé.</p>
+            <div style="background:#fef2f2;border-left:4px solid #b91c1c;padding:12px 16px;margin:16px 0;border-radius:4px;">
+              <p style="margin:0;color:#7f1d1d;"><strong>Raison :</strong> ${escapedReason}</p>
+            </div>
+            <p>Vous pouvez ajuster vos prix puis soumettre un nouveau tarif depuis votre espace.</p>
+            <p><a href="https://zandofy.com/operator/rates" style="display:inline-block;background:#0f172a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Mettre à jour mes tarifs</a></p>
+            <p style="color:#888;font-size:12px;margin-top:32px;">Email automatique — plateforme Zandofy.</p>
+          </div>
+        `;
+        await transport.sendMail({
+          from: fromEmail,
+          to,
+          subject: `Zandofy — Tarif refusé (${rate.city} / ${rate.zone_name})`,
+          html,
         });
       }
     } catch (e) {
