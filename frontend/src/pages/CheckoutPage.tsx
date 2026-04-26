@@ -1450,6 +1450,18 @@ export default function CheckoutPage() {
                       </div>
                     )}
 
+                    {/* Lot 11B Phase B4 — Sélection d'un opérateur de livraison tiers */}
+                    {deliveryOption === "home_delivery" && !hasActiveDeliverySub && (
+                      <OperatorSelector
+                        city={shipping.city}
+                        countryCode={shipping.country}
+                        commune={shipping.commune}
+                        quartier={shipping.quartier}
+                        selectedOperatorId={selectedOperator?.operator_id ?? null}
+                        onSelect={setSelectedOperator}
+                      />
+                    )}
+
                     {/* Last-mile payment choice */}
                     {deliveryOption === "home_delivery" && lastMileResult?.deliverable && lastMileFee > 0 && !hasActiveDeliverySub && (
                       <div className="bg-muted/50 rounded-lg p-3 space-y-2 mt-2">
