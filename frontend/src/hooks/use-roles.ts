@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
-export type AppRole = "admin" | "manager" | "vendor" | "shipper" | "rider";
+export type AppRole = "admin" | "manager" | "vendor" | "shipper" | "rider" | "operator" | "forwarder";
 
 export function useRoles() {
   const { user, loading: authLoading } = useAuth();
@@ -61,7 +61,9 @@ export function useRoles() {
   const isVendor = hasRole("vendor");
   const isShipper = hasRole("shipper");
   const isRider = hasRole("rider");
+  const isOperator = hasRole("operator");
+  const isForwarder = hasRole("forwarder");
   const isStaff = isAdmin || isManager;
 
-  return { roles, loading, hasRole, isAdmin, isManager, isVendor, isShipper, isRider, isStaff };
+  return { roles, loading, hasRole, isAdmin, isManager, isVendor, isShipper, isRider, isOperator, isForwarder, isStaff };
 }

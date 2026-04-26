@@ -147,6 +147,17 @@ const ImpersonatePage = lazyRetry(() => import("./pages/ImpersonatePage"));
 const SourcingPage = lazyRetry(() => import("./pages/SourcingPage"));
 const AdminProductSourcingPage = lazyRetry(() => import("./pages/admin/AdminProductSourcingPage"));
 
+// Operator (Lot 11B Phase B2)
+const BecomeOperatorPage = lazyRetry(() => import("./pages/BecomeOperatorPage"));
+const OperatorLayout = lazyRetry(() => import("./layouts/OperatorLayout"));
+const OperatorDashboardPage = lazyRetry(() => import("./pages/operator/OperatorDashboardPage"));
+const OperatorOrdersPage = lazyRetry(() => import("./pages/operator/OperatorOrdersPage"));
+const OperatorFleetPage = lazyRetry(() => import("./pages/operator/OperatorFleetPage"));
+const OperatorCoveragePage = lazyRetry(() => import("./pages/operator/OperatorCoveragePage"));
+const OperatorRatesPage = lazyRetry(() => import("./pages/operator/OperatorRatesPage"));
+const OperatorBillingPage = lazyRetry(() => import("./pages/operator/OperatorBillingPage"));
+const OperatorSettingsPage = lazyRetry(() => import("./pages/operator/OperatorSettingsPage"));
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchOnWindowFocus: false } },
 });
@@ -309,6 +320,24 @@ const App = () => (
                 <Route path="/admin/delivery-plans" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDeliveryPlansPage /></RoleGuard>} />
                 <Route path="/admin/service-packages" element={<RoleGuard allowedRoles={["admin"]}><AdminServicePackagesPage /></RoleGuard>} />
                 <Route path="/impersonate" element={<ImpersonatePage />} />
+                {/* Operator (Lot 11B Phase B2) */}
+                <Route path="/become-operator" element={<BecomeOperatorPage />} />
+                <Route
+                  path="/operator"
+                  element={
+                    <RoleGuard allowedRoles={["operator", "admin", "manager"]}>
+                      <OperatorLayout />
+                    </RoleGuard>
+                  }
+                >
+                  <Route index element={<OperatorDashboardPage />} />
+                  <Route path="orders" element={<OperatorOrdersPage />} />
+                  <Route path="fleet" element={<OperatorFleetPage />} />
+                  <Route path="coverage" element={<OperatorCoveragePage />} />
+                  <Route path="rates" element={<OperatorRatesPage />} />
+                  <Route path="billing" element={<OperatorBillingPage />} />
+                  <Route path="settings" element={<OperatorSettingsPage />} />
+                </Route>
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

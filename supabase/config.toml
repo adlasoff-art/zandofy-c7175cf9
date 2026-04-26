@@ -5,3 +5,15 @@ verify_jwt = false
 
 [functions.watermark-image]
 verify_jwt = false
+
+[functions.become-operator-submit]
+verify_jwt = false
+
+[functions.operator-invite-rider]
+verify_jwt = false
+
+[functions.operator-assign-rider-to-order]
+verify_jwt = false
+
+[functions.operator-request-quota-increase]
+verify_jwt = false

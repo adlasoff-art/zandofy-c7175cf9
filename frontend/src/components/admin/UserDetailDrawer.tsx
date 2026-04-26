@@ -356,7 +356,7 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
   // Add/Remove role
   const addRoleMutation = useMutation({
     mutationFn: async (role: AppRole) => {
-      const { error } = await supabase.from("user_roles").insert({ user_id: user.id, role });
+      const { error } = await (supabase.from("user_roles") as any).insert({ user_id: user.id, role });
       if (error) throw error;
       await logAudit("add_role", user.id, { role });
     },
@@ -372,7 +372,7 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
 
   const removeRoleMutation = useMutation({
     mutationFn: async (role: AppRole) => {
-      const { error } = await supabase.from("user_roles").delete().eq("user_id", user.id).eq("role", role);
+      const { error } = await (supabase.from("user_roles") as any).delete().eq("user_id", user.id).eq("role", role);
       if (error) throw error;
       await logAudit("remove_role", user.id, { role });
     },
