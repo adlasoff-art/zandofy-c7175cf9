@@ -163,6 +163,7 @@ const OperatorCoveragePage = lazyRetry(() => import("./pages/operator/OperatorCo
 const OperatorRatesPage = lazyRetry(() => import("./pages/operator/OperatorRatesPage"));
 const OperatorBillingPage = lazyRetry(() => import("./pages/operator/OperatorBillingPage"));
 const OperatorSettingsPage = lazyRetry(() => import("./pages/operator/OperatorSettingsPage"));
+const ForwarderDashboardPage = lazyRetry(() => import("./pages/forwarder/ForwarderDashboardPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchOnWindowFocus: false } },
