@@ -32,7 +32,7 @@ function OrderItemsPanel({ orderId, order }: { orderId: string; order: any }) {
     queryFn: async () => {
       const { data } = await supabase
         .from("order_items")
-        .select("id, product_id, product_name, quantity, price, image_url, products:product_id(slug, image_url)")
+        .select("id, product_id, product_name, quantity, price, product_image, products:product_id(slug, images)")
         .eq("order_id", orderId);
       return data || [];
     },
@@ -62,7 +62,7 @@ function OrderItemsPanel({ orderId, order }: { orderId: string; order: any }) {
         ) : (
           <ul className="divide-y divide-border">
             {items.map((it: any) => {
-              const img = it.image_url || it.products?.image_url;
+              const img = it.product_image || (Array.isArray(it.products?.images) ? it.products.images[0] : null);
               const slug = it.products?.slug;
               const lineTotal = Number(it.price || 0) * Number(it.quantity || 0);
               return (
