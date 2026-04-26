@@ -803,6 +803,19 @@ export default function CheckoutPage() {
             deliveryOption === "home_delivery" && selectedOperator
               ? selectedOperator.operator_id
               : null,
+          // Lot 11B Phase B7 — workflow d'acceptation opérateur (30 min pour répondre)
+          operator_acceptance_status:
+            deliveryOption === "home_delivery" && selectedOperator
+              ? "pending"
+              : "not_applicable",
+          operator_assigned_at:
+            deliveryOption === "home_delivery" && selectedOperator
+              ? new Date().toISOString()
+              : null,
+          operator_response_deadline:
+            deliveryOption === "home_delivery" && selectedOperator
+              ? new Date(Date.now() + 30 * 60 * 1000).toISOString()
+              : null,
           last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
           last_mile_payment_status:
             deliveryOption === "home_delivery" && lastMileFee > 0
