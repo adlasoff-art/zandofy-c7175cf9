@@ -17,3 +17,15 @@ verify_jwt = false
 
 [functions.operator-request-quota-increase]
 verify_jwt = false
+
+[functions.admin-approve-operator]
+verify_jwt = false
+
+[functions.admin-reject-operator]
+verify_jwt = false
+
+[functions.admin-suspend-operator]
+verify_jwt = false
+
+[functions.admin-review-quota-request]
+verify_jwt = false
