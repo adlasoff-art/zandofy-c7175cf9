@@ -6,7 +6,7 @@
  *  - Édition des seuils (delivery_operator_thresholds) + activation suspension auto.
  *  - Bouton "Recalculer maintenant" → invoke auto-suspend-underperforming-operators.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminLayout } from "@/components/admin/AdminLayout";
@@ -104,8 +104,8 @@ export default function AdminOperatorsPerformancePage() {
   });
 
   const [form, setForm] = useState<Thresholds | null>(null);
-  // Sync form when thresholds load
-  useMemo(() => {
+  // Sync form when thresholds load — useEffect car side-effect (setState).
+  useEffect(() => {
     if (thresholds && !form) setForm(thresholds);
   }, [thresholds, form]);
 
