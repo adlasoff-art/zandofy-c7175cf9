@@ -63,7 +63,7 @@ export default function AdminOperatorRatesPendingPage() {
   const { data: rates, isLoading } = useQuery({
     queryKey: ["admin-operator-rates-pending"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("delivery_operator_rates")
         .select(
           "id, operator_id, zone_name, city, country_code, commune, quartier, base_price, surcharge, price_per_km, estimated_minutes, currency, submitted_at, is_active, delivery_operators(company_name, contact_email, is_platform_owned)"
@@ -78,11 +78,11 @@ export default function AdminOperatorRatesPendingPage() {
   const { data: caps } = useQuery({
     queryKey: ["admin-operator-rate-caps-lookup"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("delivery_operator_city_caps")
         .select("city, country_code, max_base_price, max_surcharge, max_estimated_minutes");
       if (error) throw error;
-      return (data ?? []) as CityCap[];
+      return (data ?? []) as unknown as CityCap[];
     },
   });
 
@@ -137,7 +137,7 @@ export default function AdminOperatorRatesPendingPage() {
   };
 
   return (
-    <AdminLayout>
+    <AdminLayout title="Tarifs opérateurs en attente">
       <div className="container mx-auto px-4 py-8 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -250,7 +250,7 @@ export default function AdminOperatorRatesPendingPage() {
                     </div>
 
                     {noCap && (
-                      <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300 rounded p-2">
+                      <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted rounded p-2">
                         <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                         Aucun plafond défini pour {r.city} ({r.country_code}). Pensez à en créer un dans
                         « Plafonds tarifaires ».
