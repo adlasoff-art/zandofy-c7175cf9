@@ -1,33 +1,78 @@
-## Contexte
 
-La commande **ZND-MO5HHBED** affichée dans la capture est une commande **production** (Supabase.com perso `vpt...yxf`). Le composant `OrderItemsPanel` est correctement implémenté — j'ai vérifié sur 10 commandes Lovable Cloud que chacune affiche bien ses items.
+# Lot 9 — Audit & Réconciliation RLS Production (héritage du split staging/prod)
 
-Le message "Aucun produit lié" apparaît car cette commande spécifique **n'a aucune ligne dans `order_items`** (commande historique antérieure à la stabilisation du checkout, ou insertion partielle). Les totaux ($1.99/$1.33/$0.00) s'affichent car ils sont sur la ligne `orders` directement.
+## 🎯 Objectif
 
-## Ce qui est déjà OK
-- Code de récupération `order_items` correct (jointure sur `products` pour slug + image)
-- Éclatement Sous-total / Expédition / Last-mile / Total
-- Lien cliquable vers `/products/{slug}` + thumbnail
+Les données `order_items` existent en prod (confirmé pour ZND-MO5HHBED) mais ne s'affichent pas dans l'admin. Hypothèse : **policies RLS admin/manager manquantes** sur la prod, conséquence du split historique d'un projet unique en deux projets séparés.
 
-## Lot 7 — Robustesse affichage produits commandés
+## 🔍 Contexte historique
 
-### Frontend `OrderItemsPanel` (AdminOrdersPage.tsx)
-1. **Message plus informatif** quand `items.length === 0` : remplacer "Aucun produit lié." par un encart explicite indiquant "Commande historique sans détail d'articles enregistré (sous-total $X.XX préservé)" — pour distinguer une vraie absence d'un bug.
-2. **Fallback de récupération** : si `order_items` vide, tenter de lire `payment_transactions` ou `cart_snapshots` (selon ce qui existe en prod) pour retrouver la composition d'origine.
+- Au départ : 1 seul projet Supabase + 1 seul projet Vercel (branche `main` directe).
+- Plus tard : split en `develop` (staging) + `main` (prod), avec création d'un **nouveau projet Supabase** pour la prod.
+- Conséquence probable : certaines migrations appliquées sur l'ancien projet (devenu staging) **n'ont pas été rejouées intégralement** sur le nouveau projet prod.
 
-### Audit SQL en prod (script à fournir, à exécuter sur `vpt...yxf`)
-Compter combien de commandes prod ont `subtotal > 0` mais 0 `order_items`. Si le volume est faible (< 1%), pas d'action. Si élevé, investiguer le checkout historique.
+## 📋 Étapes
+
+### Étape 1 — Audit RLS comparatif (READ ONLY)
+
+Exécuter sur **PROD** (Supabase perso `vpt...yxf`) ET **STAGING** :
 
 ```sql
-SELECT COUNT(*) AS orphan_orders
-FROM orders o
-LEFT JOIN order_items oi ON oi.order_id = o.id
-WHERE oi.id IS NULL AND o.subtotal > 0;
+SELECT tablename, policyname, cmd, roles, qual, with_check
+FROM pg_policies
+WHERE schemaname = 'public'
+  AND tablename IN ('orders', 'order_items', 'payment_transactions', 'reviews')
+ORDER BY tablename, policyname;
 ```
 
-## Lot 8 — Vérification graphiques (sera traité quand tu auras regardé)
+Comparer les deux listes pour identifier les policies présentes en staging mais absentes en prod (et inversement).
 
-Tu indiques vouloir d'abord vérifier les graphiques toi-même. J'attends ton retour pour ajuster `SalesTab.tsx` si besoin (couleurs, séries, légendes).
+### Étape 2 — Migration corrective ciblée
 
-## Hors scope (pas de migration nécessaire)
-Aucune modification DB requise pour Lot 7 — c'est uniquement de l'UX défensive côté admin.
+Créer `frontend/supabase/migrations/YYYYMMDD_rls_reconciliation_prod.sql` qui ajoute en `IF NOT EXISTS` (via `DROP POLICY IF EXISTS` + `CREATE POLICY`) les policies manquantes pour permettre aux **admins et managers** de lire :
+- `order_items` (toutes commandes)
+- `orders` (toutes commandes — déjà probablement OK)
+- `payment_transactions`
+- Tout ce qui ressort de la comparaison
+
+Modèle prévu (à ajuster selon résultat de l'étape 1) :
+
+```sql
+DROP POLICY IF EXISTS "Admins read all order items" ON public.order_items;
+CREATE POLICY "Admins read all order items"
+ON public.order_items FOR SELECT
+TO authenticated
+USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS "Managers read all order items" ON public.order_items;
+CREATE POLICY "Managers read all order items"
+ON public.order_items FOR SELECT
+TO authenticated
+USING (public.has_role(auth.uid(), 'manager'));
+```
+
+### Étape 3 — Validation
+
+1. Re-tester la commande **ZND-MO5HHBED** dans l'admin → l'éponge doit apparaître.
+2. Vérifier 2-3 autres commandes historiques.
+3. Confirmer que les vendeurs continuent de voir uniquement leurs propres `order_items` (non-régression).
+
+### Étape 4 — Documentation mémoire
+
+Ajouter une mémoire `mem://architecture/rls-staging-prod-divergence` documentant :
+- Le split historique projet unique → staging+prod.
+- L'obligation systématique de **rejouer toutes les migrations RLS sur prod** lors d'un futur fix RLS.
+- La procédure d'audit comparatif `pg_policies` à exécuter périodiquement.
+
+## ✅ Livrables
+
+- Résultat audit comparatif (collé en réponse).
+- Migration `rls_reconciliation_prod.sql` (générée après audit).
+- Mémoire architecturale ajoutée.
+- Confirmation visuelle dans l'admin que ZND-MO5HHBED affiche son article.
+
+## ⚠️ Garde-fous
+
+- **Aucune modification** des policies existantes restrictives (vendeurs/clients).
+- **Uniquement ajouts** de policies admin/manager via `DROP IF EXISTS` + `CREATE`.
+- Migration testée d'abord en staging, puis appliquée en prod via GitHub Actions (`deploy-edge-functions.yml` ou équivalent migrations).
