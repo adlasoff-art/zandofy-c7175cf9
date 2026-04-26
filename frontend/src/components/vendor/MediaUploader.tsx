@@ -45,6 +45,17 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
         continue;
       }
 
+      // Apply watermark (best-effort, non-blocking error)
+      if (!isVideo) {
+        try {
+          await supabase.functions.invoke("watermark-image", {
+            body: { bucket: "product-media", path },
+          });
+        } catch {
+          // silent: keep original if watermark fails
+        }
+      }
+
       const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
       newItems.push({
         url: urlData.publicUrl,

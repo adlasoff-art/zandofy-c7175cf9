@@ -75,3 +75,6 @@ verify_jwt = true
 
 [functions.sourcing-email-digest]
 verify_jwt = false
+
+[functions.watermark-image]
+verify_jwt = false
