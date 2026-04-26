@@ -20,6 +20,8 @@ import {
   type EligibleFreightOffer,
 } from "@/services/freightQuoteCheckout";
 import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
+import { OperatorSelector } from "@/components/checkout/OperatorSelector";
+import type { OperatorQuote } from "@/hooks/useOperatorQuotes";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
 import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
 import { useI18n } from "@/contexts/I18nContext";
@@ -126,6 +128,9 @@ export default function CheckoutPage() {
   const [lastMilePayment, setLastMilePayment] = useState<LastMilePayment>("pay_with_shipping");
   const [lastMileResult, setLastMileResult] = useState<LastMileFeeResult | null>(null);
   const [lastMileLoading, setLastMileLoading] = useState(false);
+
+  // Lot 11B Phase B4 — Sélection d'opérateur de livraison (entreprise tierce ou plateforme)
+  const [selectedOperator, setSelectedOperator] = useState<OperatorQuote | null>(null);
 
   // Deferred payment retry state
   const [retryPhone, setRetryPhone] = useState("");
@@ -413,7 +418,12 @@ export default function CheckoutPage() {
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
   // Last-mile fee calculation — waived if client has active delivery subscription
-  const rawLastMileFee = deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
+  // Si un opérateur tiers est sélectionné, son tarif prime sur le calcul commune/quartier.
+  const operatorFee =
+    deliveryOption === "home_delivery" && selectedOperator ? selectedOperator.fee : 0;
+  const fallbackLastMileFee =
+    deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
+  const rawLastMileFee = selectedOperator ? operatorFee : fallbackLastMileFee;
   const lastMileFee = hasActiveDeliverySub ? 0 : rawLastMileFee;
   const effectiveLastMile = deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping" ? lastMileFee : 0;
   
@@ -433,6 +443,11 @@ export default function CheckoutPage() {
       })
       .catch(() => setLastMileLoading(false));
   }, [deliveryOption, shipping.commune, shipping.quartier, shipping.city, shipping.country]);
+
+  // Reset operator selection lorsque l'option de livraison ou l'adresse change
+  useEffect(() => {
+    setSelectedOperator(null);
+  }, [deliveryOption, shipping.city, shipping.commune, shipping.quartier, shipping.country]);
 
   // Load saved addresses
   useEffect(() => {
@@ -783,6 +798,11 @@ export default function CheckoutPage() {
                 : "paid",
           delivery_choice: deliveryOption !== "none" ? deliveryOption : null,
           last_mile_fee: deliveryOption === "home_delivery" ? lastMileFee : 0,
+          // Lot 11B Phase B4 — opérateur de livraison sélectionné (NULL = flotte plateforme par défaut)
+          delivery_operator_id:
+            deliveryOption === "home_delivery" && selectedOperator
+              ? selectedOperator.operator_id
+              : null,
           last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
           last_mile_payment_status:
             deliveryOption === "home_delivery" && lastMileFee > 0
@@ -1428,6 +1448,18 @@ export default function CheckoutPage() {
                           ✅ Votre forfait <strong>{deliverySubName}</strong> est actif jusqu'au {deliverySubExpiry}. Livraison à domicile sans frais supplémentaires.
                         </p>
                       </div>
+                    )}
+
+                    {/* Lot 11B Phase B4 — Sélection d'un opérateur de livraison tiers */}
+                    {deliveryOption === "home_delivery" && !hasActiveDeliverySub && (
+                      <OperatorSelector
+                        city={shipping.city}
+                        countryCode={shipping.country}
+                        commune={shipping.commune}
+                        quartier={shipping.quartier}
+                        selectedOperatorId={selectedOperator?.operator_id ?? null}
+                        onSelect={setSelectedOperator}
+                      />
                     )}
 
                     {/* Last-mile payment choice */}
