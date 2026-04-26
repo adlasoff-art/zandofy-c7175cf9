@@ -26,6 +26,99 @@ import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, Delive
 import { withOptionalOrderFields } from "@/lib/order-query";
 import { FreightDetailsPanel } from "@/components/orders/FreightDetailsPanel";
 
+function OrderItemsPanel({ orderId, order }: { orderId: string; order: any }) {
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ["admin-order-items", orderId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("order_items")
+        .select("id, product_id, product_name, quantity, price, image_url, products:product_id(slug, image_url)")
+        .eq("order_id", orderId);
+      return data || [];
+    },
+  });
+
+  const itemsTotal = items.reduce((s: number, it: any) => s + Number(it.price || 0) * Number(it.quantity || 0), 0);
+  const subtotal = Number(order.subtotal ?? itemsTotal) || 0;
+  const shipping = Number(order.shipping_cost || 0);
+  const lastMile = Number(order.last_mile_fee || 0);
+  const discount = Number(order.discount_amount || 0);
+  const total = Number(order.total || 0);
+  const computed = subtotal + shipping + lastMile - discount;
+  const drift = Math.abs(computed - total);
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-md bg-card border border-border overflow-hidden">
+        <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/40">
+          Produits commandés
+        </div>
+        {isLoading ? (
+          <div className="p-3 flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 size={12} className="animate-spin" /> Chargement…
+          </div>
+        ) : items.length === 0 ? (
+          <p className="p-3 text-xs text-muted-foreground">Aucun produit lié.</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {items.map((it: any) => {
+              const img = it.image_url || it.products?.image_url;
+              const slug = it.products?.slug;
+              const lineTotal = Number(it.price || 0) * Number(it.quantity || 0);
+              return (
+                <li key={it.id} className="flex items-center gap-3 p-2.5 text-xs">
+                  <div className="w-12 h-12 rounded-md bg-muted overflow-hidden shrink-0 flex items-center justify-center">
+                    {img ? (
+                      <img src={img} alt={it.product_name} className="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <span className="text-[9px] text-muted-foreground">No img</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {slug ? (
+                      <Link
+                        to={`/products/${slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-foreground hover:text-primary truncate block"
+                      >
+                        {it.product_name}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-foreground truncate block">{it.product_name}</span>
+                    )}
+                    <span className="text-muted-foreground">
+                      {it.quantity} × ${Number(it.price || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <span className="font-semibold shrink-0">${lineTotal.toFixed(2)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <div className="rounded-md bg-card border border-border p-3 text-xs space-y-1">
+        <div className="flex justify-between"><span className="text-muted-foreground">Sous-total articles</span><span>${subtotal.toFixed(2)}</span></div>
+        {discount > 0 && (
+          <div className="flex justify-between text-emerald-600">
+            <span>Remise{order.coupon_code ? ` (${order.coupon_code})` : ""}</span>
+            <span>− ${discount.toFixed(2)}</span>
+          </div>
+        )}
+        <div className="flex justify-between"><span className="text-muted-foreground">Expédition</span><span>${shipping.toFixed(2)}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">Livraison dernier km</span><span>${lastMile.toFixed(2)}</span></div>
+        <div className="border-t border-border my-1.5" />
+        <div className="flex justify-between font-bold text-foreground"><span>Total</span><span className="text-primary">${total.toFixed(2)}</span></div>
+        {drift > 0.05 && (
+          <p className="text-[10px] text-amber-600 mt-1">⚠ Écart de calcul : ${computed.toFixed(2)} vs ${total.toFixed(2)}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 type DateFilterKey = "all" | "today" | "7d" | "30d" | "custom";
 
 const TERMINAL_STATUSES = new Set(["payment_failed", "cancelled", "returned"]);
