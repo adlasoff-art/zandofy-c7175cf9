@@ -1645,7 +1645,12 @@ export default function CheckoutPage() {
                                     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "payment_transactions", filter: `reference=eq.${data.reference}` },
                                       (payload: any) => {
                                         const ns = payload.new?.status;
-                                        if (ns === "success") { supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment"); setPaymentPending(false); removeSelectedItems(); goToStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel); }
+                                        if (ns === "success") {
+                                          supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
+                                          (supabase as any).from("orders").update({ shipping_payment_status: "paid" }).in("id", paymentOrderIds).eq("shipping_payment_status", "unpaid");
+                                          (supabase as any).from("orders").update({ last_mile_payment_status: "paid" }).in("id", paymentOrderIds).eq("last_mile_payment_status", "unpaid");
+                                          setPaymentPending(false); removeSelectedItems(); goToStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel);
+                                        }
                                         else if (ns === "failed") { supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds); setPaymentPending(false); toast({ title: "Paiement échoué", variant: "destructive" }); supabase.removeChannel(channel); }
                                       }
                                     ).subscribe();
