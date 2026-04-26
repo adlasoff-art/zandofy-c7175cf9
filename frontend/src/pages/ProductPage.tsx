@@ -444,7 +444,7 @@ export default function ProductPage() {
           {/* ─── RIGHT: Product Info (sticky) ─── */}
           <div className="lg:sticky lg:top-4 lg:self-start space-y-4">
             {/* Title + Share */}
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 pb-3 border-b border-border/50">
               <h1 className="text-lg md:text-xl font-semibold text-foreground leading-tight flex-1 line-clamp-2">{product.nameFr}</h1>
               <Popover>
                 <PopoverTrigger asChild>
