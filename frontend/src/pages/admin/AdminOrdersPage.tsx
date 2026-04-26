@@ -58,7 +58,15 @@ function OrderItemsPanel({ orderId, order }: { orderId: string; order: any }) {
             <Loader2 size={12} className="animate-spin" /> Chargement…
           </div>
         ) : items.length === 0 ? (
-          <p className="p-3 text-xs text-muted-foreground">Aucun produit lié.</p>
+          <div className="p-3 text-xs space-y-1">
+            <p className="text-amber-600 font-medium">
+              Commande historique sans détail d'articles enregistré.
+            </p>
+            <p className="text-muted-foreground">
+              Le sous-total <strong className="text-foreground">${subtotal.toFixed(2)}</strong> et les autres montants sont conservés sur la commande.
+              Cela concerne les commandes créées avant l'enregistrement systématique des lignes produits.
+            </p>
+          </div>
         ) : (
           <ul className="divide-y divide-border">
             {items.map((it: any) => {
