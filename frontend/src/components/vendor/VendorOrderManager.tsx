@@ -216,10 +216,31 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
       "hub_pickup_proof_url",
     ]);
 
-    setOrders(ordersWithOptionalFields.map((o) => ({
+    // Lot 11B Phase B4 — Hub UI : enrichir avec le nom de l'opérateur de livraison
+    const operatorIds = Array.from(
+      new Set(
+        ordersWithOptionalFields
+          .map((o: any) => o.delivery_operator_id)
+          .filter(Boolean),
+      ),
+    );
+    const operatorNameMap = new Map<string, string>();
+    if (operatorIds.length > 0) {
+      const { data: ops } = await (supabase as any)
+        .from("delivery_operators")
+        .select("id, company_name")
+        .in("id", operatorIds);
+      (ops || []).forEach((op: any) => operatorNameMap.set(op.id, op.company_name));
+    }
+
+    setOrders(ordersWithOptionalFields.map((o: any) => ({
       ...o,
       items: itemMap.get(o.id) || [],
       history: historyMap.get(o.id) || [],
+      delivery_operator_id: o.delivery_operator_id || null,
+      delivery_operator_name: o.delivery_operator_id
+        ? operatorNameMap.get(o.delivery_operator_id) || null
+        : null,
     })));
     setLoading(false);
   }, [storeId]);
