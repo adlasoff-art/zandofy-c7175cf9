@@ -173,6 +173,16 @@ export default function CheckoutPage() {
   const [selectedForwarder, setSelectedForwarder] = useState<ForwarderChoice | null>(null);
   const [forwarderUnassigned, setForwarderUnassigned] = useState(false);
 
+  // Lot 11B Phase B8 — Vérifier la couverture opérateur pour activer "Livraison à domicile"
+  const { data: operatorQuotesForCoverage, isLoading: operatorCoverageLoading } = useOperatorQuotes({
+    city: shipping.city,
+    countryCode: shipping.country,
+    commune: shipping.commune,
+    quartier: shipping.quartier,
+    enabled: !!shipping.city && !!shipping.country,
+  });
+  const hasOperatorCoverage = (operatorQuotesForCoverage?.length ?? 0) > 0;
+
   const handleForwarderChange = useCallback((choice: ForwarderChoice | null, unassigned: boolean) => {
     setSelectedForwarder(choice);
     setForwarderUnassigned(unassigned);
