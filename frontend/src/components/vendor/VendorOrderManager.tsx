@@ -542,6 +542,15 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   </div>
                 )}
 
+                {/* Lot 11B Phase B4 — Opérateur de livraison */}
+                {order.delivery_operator_name && (
+                  <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
+                    <Truck size={12} className="text-primary shrink-0" />
+                    <span className="text-muted-foreground">Transporteur :</span>
+                    <span className="font-bold text-foreground">{order.delivery_operator_name}</span>
+                  </div>
+                )}
+
                 {/* Delivery choice & fee */}
                 {order.last_mile_fee != null && Number(order.last_mile_fee) > 0 && (
                   <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
