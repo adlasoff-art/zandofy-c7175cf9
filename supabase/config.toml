@@ -32,3 +32,9 @@ verify_jwt = false
 
 [functions.notify-operator-new-order]
 verify_jwt = false
+
+[functions.operator-decide-order]
+verify_jwt = false
+
+[functions.expire-operator-assignments]
+verify_jwt = false
