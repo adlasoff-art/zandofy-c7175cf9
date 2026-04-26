@@ -1,7 +1,8 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { LocationHierarchyFilter, type LocationFilters } from "@/components/admin/LocationHierarchyFilter";
-import { Search, Loader2, ChevronDown, ChevronUp, MapPin, Truck, AlertTriangle, Download, Hash, Bike, DollarSign, Trash2, Printer } from "lucide-react";
-import { useState } from "react";
+import { Search, Loader2, ChevronDown, ChevronUp, MapPin, Truck, AlertTriangle, Download, Hash, Bike, DollarSign, Trash2, Printer, CalendarDays } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ShippingLabelPreview } from "@/components/shipping/ShippingLabelPreview";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
@@ -25,6 +26,103 @@ import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, Delive
 import { withOptionalOrderFields } from "@/lib/order-query";
 import { FreightDetailsPanel } from "@/components/orders/FreightDetailsPanel";
 
+function OrderItemsPanel({ orderId, order }: { orderId: string; order: any }) {
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ["admin-order-items", orderId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("order_items")
+        .select("id, product_id, product_name, quantity, price, product_image, products:product_id(slug, images)")
+        .eq("order_id", orderId);
+      return data || [];
+    },
+  });
+
+  const itemsTotal = items.reduce((s: number, it: any) => s + Number(it.price || 0) * Number(it.quantity || 0), 0);
+  const subtotal = Number(order.subtotal ?? itemsTotal) || 0;
+  const shipping = Number(order.shipping_cost || 0);
+  const lastMile = Number(order.last_mile_fee || 0);
+  const discount = Number(order.discount_amount || 0);
+  const total = Number(order.total || 0);
+  const computed = subtotal + shipping + lastMile - discount;
+  const drift = Math.abs(computed - total);
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-md bg-card border border-border overflow-hidden">
+        <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/40">
+          Produits commandés
+        </div>
+        {isLoading ? (
+          <div className="p-3 flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 size={12} className="animate-spin" /> Chargement…
+          </div>
+        ) : items.length === 0 ? (
+          <p className="p-3 text-xs text-muted-foreground">Aucun produit lié.</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {items.map((it: any) => {
+              const img = it.product_image || (Array.isArray(it.products?.images) ? it.products.images[0] : null);
+              const slug = it.products?.slug;
+              const lineTotal = Number(it.price || 0) * Number(it.quantity || 0);
+              return (
+                <li key={it.id} className="flex items-center gap-3 p-2.5 text-xs">
+                  <div className="w-12 h-12 rounded-md bg-muted overflow-hidden shrink-0 flex items-center justify-center">
+                    {img ? (
+                      <img src={img} alt={it.product_name} className="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <span className="text-[9px] text-muted-foreground">No img</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {slug ? (
+                      <Link
+                        to={`/products/${slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-foreground hover:text-primary truncate block"
+                      >
+                        {it.product_name}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-foreground truncate block">{it.product_name}</span>
+                    )}
+                    <span className="text-muted-foreground">
+                      {it.quantity} × ${Number(it.price || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <span className="font-semibold shrink-0">${lineTotal.toFixed(2)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <div className="rounded-md bg-card border border-border p-3 text-xs space-y-1">
+        <div className="flex justify-between"><span className="text-muted-foreground">Sous-total articles</span><span>${subtotal.toFixed(2)}</span></div>
+        {discount > 0 && (
+          <div className="flex justify-between text-emerald-600">
+            <span>Remise{order.coupon_code ? ` (${order.coupon_code})` : ""}</span>
+            <span>− ${discount.toFixed(2)}</span>
+          </div>
+        )}
+        <div className="flex justify-between"><span className="text-muted-foreground">Expédition</span><span>${shipping.toFixed(2)}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">Livraison dernier km</span><span>${lastMile.toFixed(2)}</span></div>
+        <div className="border-t border-border my-1.5" />
+        <div className="flex justify-between font-bold text-foreground"><span>Total</span><span className="text-primary">${total.toFixed(2)}</span></div>
+        {drift > 0.05 && (
+          <p className="text-[10px] text-amber-600 mt-1">⚠ Écart de calcul : ${computed.toFixed(2)} vs ${total.toFixed(2)}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type DateFilterKey = "all" | "today" | "7d" | "30d" | "custom";
+
+const TERMINAL_STATUSES = new Set(["payment_failed", "cancelled", "returned"]);
+
 export default function AdminOrdersPage() {
   const { user, loading: authLoading } = useAuth();
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all" | "payment_failed">("all");
@@ -36,6 +134,10 @@ export default function AdminOrdersPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [logisticsInfo, setLogisticsInfo] = useState<Record<string, { zones: DeliveryZoneMatch[]; usePlatform: boolean; riderAvailable: boolean; riderCount: number } | null>>({});
   const [loadingLogistics, setLoadingLogistics] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<DateFilterKey>("all");
+  const [customStart, setCustomStart] = useState<string>("");
+  const [customEnd, setCustomEnd] = useState<string>("");
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const queryClient = useQueryClient();
 
   // Modal states for admin
@@ -111,9 +213,38 @@ export default function AdminOrdersPage() {
     enabled: !authLoading && !!user,
   });
 
+  const dateFromTo = useMemo(() => {
+    const now = new Date();
+    if (dateFilter === "today") {
+      const start = new Date(now); start.setHours(0, 0, 0, 0);
+      return { from: start, to: null as Date | null };
+    }
+    if (dateFilter === "7d") {
+      const start = new Date(now); start.setDate(start.getDate() - 7);
+      return { from: start, to: null };
+    }
+    if (dateFilter === "30d") {
+      const start = new Date(now); start.setDate(start.getDate() - 30);
+      return { from: start, to: null };
+    }
+    if (dateFilter === "custom") {
+      return {
+        from: customStart ? new Date(customStart) : null,
+        to: customEnd ? new Date(`${customEnd}T23:59:59`) : null,
+      };
+    }
+    return { from: null, to: null };
+  }, [dateFilter, customStart, customEnd]);
+
   const filtered = orders.filter((o: any) => {
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
     if (!matchStatus) return false;
+    // Date filter
+    if (dateFromTo.from || dateFromTo.to) {
+      const created = new Date(o.created_at);
+      if (dateFromTo.from && created < dateFromTo.from) return false;
+      if (dateFromTo.to && created > dateFromTo.to) return false;
+    }
     // Location filters
     if (locationFilters.country && o.shipping_country !== locationFilters.country) return false;
     if (locationFilters.city && o.shipping_city !== locationFilters.city) return false;
@@ -295,6 +426,37 @@ export default function AdminOrdersPage() {
     setExpandedId(null);
   };
 
+  const bulkDeleteTerminal = async () => {
+    const targets = orders.filter((o: any) => selectedOrders.includes(o.id) && TERMINAL_STATUSES.has(o.status));
+    if (targets.length === 0) {
+      toast.error("Aucune commande sélectionnée n'est en statut terminal (échec/annulée/retournée).");
+      return;
+    }
+    const skipped = selectedOrders.length - targets.length;
+    const msg = skipped > 0
+      ? `Supprimer définitivement ${targets.length} commande(s) terminale(s) ? ${skipped} commande(s) active(s) seront ignorées.`
+      : `Supprimer définitivement ${targets.length} commande(s) ? Cette action est irréversible.`;
+    if (!confirm(msg)) return;
+    setBulkDeleting(true);
+    let ok = 0, fail = 0;
+    for (const o of targets) {
+      try {
+        await (supabase.from("delivery_chats" as any) as any).delete().eq("order_id", o.id);
+        await (supabase.from("deliveries" as any) as any).delete().eq("order_id", o.id);
+        await (supabase.from("vendor_transactions" as any) as any).delete().eq("order_id", o.id);
+        await (supabase.from("point_transactions" as any) as any).delete().eq("order_id", o.id);
+        await supabase.from("order_items").delete().eq("order_id", o.id);
+        await supabase.from("order_status_history").delete().eq("order_id", o.id);
+        const { error } = await supabase.from("orders").delete().eq("id", o.id);
+        if (error) fail++; else ok++;
+      } catch { fail++; }
+    }
+    setBulkDeleting(false);
+    setSelectedOrders([]);
+    queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+    toast.success(`${ok} commande(s) supprimée(s)${fail ? `, ${fail} échec(s)` : ""}.`);
+  };
+
   const filterTabs: (OrderStatus | "all" | "payment_failed")[] = ["all", ...STATUS_FLOW, "cancelled", "returned", "payment_failed"];
 
   return (
@@ -365,6 +527,50 @@ export default function AdminOrdersPage() {
         </div>
       </div>
 
+      {/* Date filter */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <CalendarDays size={14} />
+          <span>Période :</span>
+        </div>
+        {([
+          { k: "all", l: "Toutes" },
+          { k: "today", l: "Aujourd'hui" },
+          { k: "7d", l: "7 jours" },
+          { k: "30d", l: "30 jours" },
+          { k: "custom", l: "Personnalisé" },
+        ] as { k: DateFilterKey; l: string }[]).map((opt) => (
+          <button
+            key={opt.k}
+            onClick={() => setDateFilter(opt.k)}
+            className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+              dateFilter === opt.k
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-card border-border hover:border-primary"
+            }`}
+          >
+            {opt.l}
+          </button>
+        ))}
+        {dateFilter === "custom" && (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+              className="px-2 py-1 text-xs bg-card border border-border rounded-md"
+            />
+            <span className="text-xs text-muted-foreground">→</span>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+              className="px-2 py-1 text-xs bg-card border border-border rounded-md"
+            />
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-1 overflow-x-auto pb-2 mb-4">
         {filterTabs.map((s) => (
           <button
@@ -391,6 +597,15 @@ export default function AdminOrdersPage() {
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
             >
               <Printer size={14} /> Imprimer étiquettes
+            </button>
+            <button
+              onClick={bulkDeleteTerminal}
+              disabled={bulkDeleting}
+              title="Supprimer uniquement les commandes en statut Échec / Annulée / Retournée"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 transition-colors disabled:opacity-50"
+            >
+              {bulkDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              Supprimer (terminales)
             </button>
             <button
               onClick={() => setSelectedOrders([])}
@@ -555,6 +770,9 @@ export default function AdminOrdersPage() {
 
                       {/* Détail fret + bouton réassignation transitaire (admin) */}
                       <FreightDetailsPanel orderId={o.id} actor="admin" />
+
+                      {/* Produits + breakdown total */}
+                      <OrderItemsPanel orderId={o.id} order={o} />
 
                       {/* Next step button */}
                       {next && canAdvance && (

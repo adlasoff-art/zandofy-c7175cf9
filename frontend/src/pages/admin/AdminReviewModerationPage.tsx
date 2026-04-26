@@ -47,21 +47,27 @@ export default function AdminReviewModerationPage() {
 
   const approveMutation = useMutation({
     mutationFn: async (reviewId: string) => {
-      const { error } = await (supabase as any)
+      if (!user?.id) throw new Error("Session admin non chargée");
+      const { data, error } = await (supabase as any)
         .from("reviews")
         .update({
           is_approved: true,
           approved_by: user?.id,
           approved_at: new Date().toISOString(),
         })
-        .eq("id", reviewId);
+        .eq("id", reviewId)
+        .select("id, is_approved")
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("Mise à jour bloquée (permission ou avis introuvable)");
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Avis approuvé. Points bonus crédités si éligible.");
-      queryClient.invalidateQueries({ queryKey: ["admin-reviews"] });
+      await queryClient.invalidateQueries({ queryKey: ["admin-reviews"] });
+      await queryClient.refetchQueries({ queryKey: ["admin-reviews"] });
     },
-    onError: () => toast.error("Erreur lors de l'approbation"),
+    onError: (e: any) => toast.error(e?.message || "Erreur lors de l'approbation"),
   });
 
   const rejectMutation = useMutation({
