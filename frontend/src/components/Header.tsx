@@ -70,7 +70,7 @@ export function Header() {
   const megaTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const userMenuRef = useRef<HTMLDivElement>(null);
   const { user, signOut } = useAuth();
-  const { isStaff } = useRoles();
+  const { isStaff, isOperator, isForwarder } = useRoles();
   const { setDrawerOpen, itemCount } = useCart();
   const unreadCount = useUnreadMessages();
   const unreadSupportCount = useUnreadSupport();
