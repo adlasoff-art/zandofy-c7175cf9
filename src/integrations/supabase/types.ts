@@ -8582,6 +8582,7 @@ export type Database = {
         | "shipper"
         | "rider"
         | "forwarder"
+        | "operator"
       automation_channel:
         | "popup"
         | "push"
@@ -8747,7 +8748,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "vendor", "shipper", "rider", "forwarder"],
+      app_role: [
+        "admin",
+        "manager",
+        "vendor",
+        "shipper",
+        "rider",
+        "forwarder",
+        "operator",
+      ],
       automation_channel: [
         "popup",
         "push",
