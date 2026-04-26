@@ -8,6 +8,8 @@
  * Auth : verify_jwt = false (appelée par cron / admin tooling).
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
+import nodemailer from "npm:nodemailer@6.9.16";
+import { clientOperatorReassignedEmail } from "../_shared/operator-email-templates.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,6 +69,9 @@ Deno.serve(async (req) => {
         link: `/orders/${order.id}`,
       });
 
+      // 4) email client (best-effort)
+      await sendClientExpiredEmail(svc, order.user_id, ref, order.id);
+
       processed++;
     }
 
@@ -82,4 +87,48 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+async function sendClientExpiredEmail(
+  svc: ReturnType<typeof createClient>,
+  userId: string,
+  orderRef: string,
+  orderId: string,
+) {
+  try {
+    const { data: profile } = await svc
+      .from("profiles")
+      .select("email, first_name")
+      .eq("id", userId)
+      .maybeSingle();
+    const smtpHost = Deno.env.get("SMTP_HOST");
+    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
+    const smtpUser = Deno.env.get("SMTP_USER");
+    const smtpPass = Deno.env.get("SMTP_PASS");
+    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
+    if (!profile?.email || !smtpHost || !smtpUser || !smtpPass || !fromEmail) {
+      return;
+    }
+    const transport = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: { user: smtpUser, pass: smtpPass },
+    });
+    const greeting = profile.first_name ? `Bonjour ${profile.first_name},` : "Bonjour,";
+    const html = clientOperatorReassignedEmail({
+      greeting,
+      orderRef,
+      orderId,
+      cause: "expired",
+    });
+    await transport.sendMail({
+      from: fromEmail,
+      to: profile.email,
+      subject: `⏳ Recherche d'un transporteur pour votre commande ${orderRef}`,
+      html,
+    });
+  } catch (err) {
+    console.error("[expire-operator-assignments] client email failed:", err);
+  }
 }
