@@ -798,6 +798,11 @@ export default function CheckoutPage() {
                 : "paid",
           delivery_choice: deliveryOption !== "none" ? deliveryOption : null,
           last_mile_fee: deliveryOption === "home_delivery" ? lastMileFee : 0,
+          // Lot 11B Phase B4 — opérateur de livraison sélectionné (NULL = flotte plateforme par défaut)
+          delivery_operator_id:
+            deliveryOption === "home_delivery" && selectedOperator
+              ? selectedOperator.operator_id
+              : null,
           last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
           last_mile_payment_status:
             deliveryOption === "home_delivery" && lastMileFee > 0
