@@ -513,7 +513,7 @@ export default function TrackingPage() {
 
   // Fetch order + history
   const fetchOrder = useCallback(async (orderRef: string) => {
-    const { data: order } = await supabase
+    const { data: order } = await (supabase as any)
       .from("orders")
       .select("id, order_ref, status, total, shipping_address, shipping_city, shipping_country, tracking_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, last_mile_payment_method, confirmation_code, created_at, updated_at, store_id, delivery_operator_id")
       .eq("order_ref", orderRef)
