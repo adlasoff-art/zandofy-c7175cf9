@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOperatorContext } from "@/hooks/use-operator-context";
 import { fromTable } from "@/lib/supabase-helpers";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +55,10 @@ export default function OperatorRatesPage() {
     if (!operator || !form.city.trim() || !form.zone_name.trim()) { toast.error("Ville et zone obligatoires"); return; }
     if (formBlocked) { toast.error("Tarif au-dessus du plafond admin de la ville"); return; }
     setAdding(true);
-    const { error } = await fromTable("delivery_operator_rates").insert({ ...form, operator_id: operator.id, is_active: true });
+    const { data: inserted, error } = await fromTable("delivery_operator_rates")
+      .insert({ ...form, operator_id: operator.id, is_active: true })
+      .select("id, status")
+      .single();
     setAdding(false);
     if (error) toast.error(error.message);
     else {
@@ -63,6 +67,12 @@ export default function OperatorRatesPage() {
         : "Tarif soumis à validation admin — apparaîtra au checkout après approbation");
       setForm({ ...form, zone_name: "", commune: "", quartier: "", base_price: 0 });
       queryClient.invalidateQueries({ queryKey: ["operator-rates"] });
+      // Phase 6 — notify admins by email (in-app notif handled by DB trigger)
+      if (!isPlatform && inserted?.id && (inserted as any)?.status === "pending") {
+        supabase.functions
+          .invoke("notify-admin-operator-rate", { body: { rateId: (inserted as any).id } })
+          .catch((e) => console.warn("[notify-admin-operator-rate]", e));
+      }
     }
   };
 
