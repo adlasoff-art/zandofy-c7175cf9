@@ -154,6 +154,7 @@ const AdminProductSourcingPage = lazyRetry(() => import("./pages/admin/AdminProd
 
 // Operator (Lot 11B Phase B2)
 const BecomeOperatorPage = lazyRetry(() => import("./pages/BecomeOperatorPage"));
+const BecomeForwarderPage = lazyRetry(() => import("./pages/BecomeForwarderPage"));
 const OperatorLayout = lazyRetry(() => import("./layouts/OperatorLayout"));
 const OperatorDashboardPage = lazyRetry(() => import("./pages/operator/OperatorDashboardPage"));
 const OperatorOrdersPage = lazyRetry(() => import("./pages/operator/OperatorOrdersPage"));
@@ -332,6 +333,7 @@ const App = () => (
                 <Route path="/impersonate" element={<ImpersonatePage />} />
                 {/* Operator (Lot 11B Phase B2) */}
                 <Route path="/become-operator" element={<BecomeOperatorPage />} />
+                <Route path="/become-forwarder" element={<BecomeForwarderPage />} />
                 <Route
                   path="/operator"
                   element={

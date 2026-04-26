@@ -118,6 +118,8 @@ export function MobileAccountMenu() {
       title: "Opportunités",
       items: [
         { to: "/become-vendor", icon: Store, label: "Devenir vendeur" },
+        { to: "/become-operator", icon: Truck, label: "Devenir opérateur de livraison" },
+        { to: "/become-forwarder", icon: Package, label: "Devenir transitaire" },
       ],
     }] : []),
     {
