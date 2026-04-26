@@ -57,6 +57,8 @@ const sidebarSections: SidebarSection[] = [
       { title: "Opérateurs livraison", url: "/admin/operators", icon: Truck },
       { title: "Performance opérateurs", url: "/admin/operators-performance", icon: Truck },
       { title: "Quotas opérateurs", url: "/admin/operator-quota-requests", icon: Users },
+      { title: "Plafonds tarifaires", url: "/admin/operator-rate-caps", icon: DollarSign },
+      { title: "Tarifs à modérer", url: "/admin/operator-rates-pending", icon: DollarSign },
       { title: "Tarification Fret", url: "/admin/shipping", icon: DollarSign },
       { title: "Plans de livraison", url: "/admin/delivery-plans", icon: Truck },
       { title: "Zones géographiques", url: "/admin/geography", icon: MapPin },

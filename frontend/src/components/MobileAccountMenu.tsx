@@ -34,7 +34,7 @@ import { CertificationBadge } from "@/components/CertificationBadge";
 
 export function MobileAccountMenu() {
   const { user, loading: authLoading, signOut } = useAuth();
-  const { isAdmin, isManager, isVendor, isShipper, isRider, isStaff, loading: rolesLoading } = useRoles();
+  const { isAdmin, isManager, isVendor, isShipper, isRider, isOperator, isForwarder, isStaff, loading: rolesLoading } = useRoles();
   const { t } = useI18n();
   const { isCertified } = useCertification();
   const [suppliersEnabled, setSuppliersEnabled] = useState(false);
@@ -83,6 +83,8 @@ export function MobileAccountMenu() {
     { show: isVendor, to: "/vendor", icon: Store, label: "Espace Vendeur", color: "text-emerald-500" },
     { show: isShipper, to: "/shipper", icon: Truck, label: "Espace Expéditeur", color: "text-blue-500" },
     { show: isRider, to: "/rider", icon: Bike, label: "Espace Livreur", color: "text-orange-500" },
+    { show: isOperator, to: "/operator", icon: Truck, label: "Espace Opérateur", color: "text-cyan-500" },
+    { show: isForwarder, to: "/forwarder", icon: Package, label: "Espace Transitaire", color: "text-purple-500" },
   ];
 
   const visibleRoleLinks = roleLinks.filter((r) => r.show);
@@ -114,13 +116,13 @@ export function MobileAccountMenu() {
         { to: "/dashboard?tab=returns", icon: RotateCcw, label: "Retours" },
       ],
     },
-    ...(!isVendor ? [{
+    ...((!isVendor || !isOperator || !isForwarder) ? [{
       title: "Opportunités",
       items: [
-        { to: "/become-vendor", icon: Store, label: "Devenir vendeur" },
-        { to: "/become-operator", icon: Truck, label: "Devenir opérateur de livraison" },
-        { to: "/become-forwarder", icon: Package, label: "Devenir transitaire" },
-      ],
+        ...(!isVendor ? [{ to: "/become-vendor", icon: Store, label: "Devenir vendeur" }] : []),
+        ...(!isOperator ? [{ to: "/become-operator", icon: Truck, label: "Devenir opérateur de livraison" }] : []),
+        ...(!isForwarder ? [{ to: "/become-forwarder", icon: Package, label: "Devenir transitaire" }] : []),
+      ].filter(Boolean) as { to: string; icon: React.ElementType; label: string }[],
     }] : []),
     {
       title: "Paramètres du compte",

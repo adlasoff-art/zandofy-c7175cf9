@@ -13,9 +13,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, XCircle, PauseCircle, PlayCircle, Building2, Truck, MapPin, Users } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, PauseCircle, PlayCircle, Building2, Truck, MapPin, Users, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ShieldAlert, Clock } from "lucide-react";
+import { CreateOperatorDialog } from "@/components/admin/operators/CreateOperatorDialog";
 
 type OperatorRow = {
   id: string;
@@ -56,6 +57,7 @@ export default function AdminOperatorsPage() {
   const [actionType, setActionType] = useState<"approve" | "reject" | "suspend" | "reactivate" | null>(null);
   const [reason, setReason] = useState("");
   const [commissionPct, setCommissionPct] = useState<string>("");
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data: operators, isLoading } = useQuery({
     queryKey: ["admin-operators", tab],
@@ -142,6 +144,9 @@ export default function AdminOperatorsPage() {
             <p className="text-sm text-muted-foreground">Modération KYB des entreprises de livraison du dernier kilomètre.</p>
           </div>
           <div className="flex gap-2">
+            <Button size="sm" className="gap-1" onClick={() => setCreateOpen(true)}>
+              <Plus size={14} /> Créer un opérateur
+            </Button>
             <Button asChild variant="outline" size="sm" className="gap-1">
               <Link to="/admin/operator-rate-caps">
                 <ShieldAlert size={14} /> Plafonds tarifaires
@@ -318,6 +323,7 @@ export default function AdminOperatorsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CreateOperatorDialog open={createOpen} onOpenChange={setCreateOpen} />
     </AdminLayout>
   );
 }
