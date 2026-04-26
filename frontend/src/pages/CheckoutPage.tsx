@@ -1454,7 +1454,18 @@ export default function CheckoutPage() {
                     </p>
                     <div className="space-y-2">
                       {[
-                        { key: "home_delivery" as DeliveryOption, label: "🚚 Livraison à domicile", desc: lastMileLoading ? "Calcul en cours..." : lastMileResult && lastMileResult.fee > 0 ? `Frais estimés : $${lastMileResult.fee.toFixed(2)}` : "Recevez votre colis directement chez vous", disabled: lastMileResult ? !lastMileResult.deliverable : false },
+                        {
+                          key: "home_delivery" as DeliveryOption,
+                          label: "🚚 Livraison à domicile",
+                          desc: operatorCoverageLoading || lastMileLoading
+                            ? "Recherche des livreurs..."
+                            : !hasOperatorCoverage
+                              ? "Aucun livreur ne dessert encore votre quartier"
+                              : lastMileResult && lastMileResult.fee > 0
+                                ? `Frais estimés : $${lastMileResult.fee.toFixed(2)}`
+                                : "Recevez votre colis directement chez vous",
+                          disabled: (lastMileResult ? !lastMileResult.deliverable : false) || (!operatorCoverageLoading && !hasOperatorCoverage),
+                        },
                         { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait au Hub", desc: "Récupérez votre colis au point de collecte (gratuit)", disabled: false },
                       ].map(opt => (
                         <button
