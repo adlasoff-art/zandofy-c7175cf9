@@ -41,7 +41,7 @@ export function OperatorSelector({
       <div className="flex items-center justify-center py-3 bg-muted/30 rounded-lg">
         <Loader2 size={14} className="animate-spin text-muted-foreground mr-2" />
         <span className="text-xs text-muted-foreground">
-          Recherche des transporteurs disponibles...
+          Recherche des livreurs disponibles...
         </span>
       </div>
     );
@@ -50,7 +50,7 @@ export function OperatorSelector({
   if (!quotes || quotes.length === 0) {
     return (
       <div className="text-xs text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg">
-        Aucun transporteur partenaire dans cette zone — la livraison sera
+        Aucun livreur partenaire dans cette zone — la livraison sera
         assurée par notre flotte interne.
       </div>
     );
@@ -59,7 +59,7 @@ export function OperatorSelector({
   return (
     <div className="space-y-2 mt-2">
       <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
-        <Truck size={12} className="text-primary" /> Choisissez votre transporteur
+        <Truck size={12} className="text-primary" /> Choisissez votre livreur
       </p>
       <div className="space-y-1.5">
         {quotes.map((q) => {
