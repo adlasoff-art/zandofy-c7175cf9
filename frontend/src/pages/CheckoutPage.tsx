@@ -929,6 +929,15 @@ export default function CheckoutPage() {
               const newStatus = payload.new?.status;
               if (newStatus === "success") {
                 await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
+                // Logistique payée avec la commande : marquer "paid" maintenant
+                await supabase.from("orders")
+                  .update({ shipping_payment_status: "paid" } as any)
+                  .in("id", orderIds)
+                  .eq("shipping_payment_status", "unpaid");
+                await supabase.from("orders")
+                  .update({ last_mile_payment_status: "paid" } as any)
+                  .in("id", orderIds)
+                  .eq("last_mile_payment_status", "unpaid");
                 setPaymentPending(false);
                 removeSelectedItems();
                 goToStep("confirmation");
