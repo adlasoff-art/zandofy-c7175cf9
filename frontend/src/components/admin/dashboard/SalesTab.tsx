@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, eachDayOfInterval } from "date-fns";
 import { fr } from "date-fns/locale";
-import { BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { BarChart, Bar, ComposedChart, Line, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { PIE_COLORS, TOOLTIP_STYLE, statusLabels } from "./shared";
 import type { PeriodKey } from "./DashboardPeriodSelector";
 import { getPeriodDate } from "./DashboardPeriodSelector";
@@ -14,6 +14,10 @@ interface Props { period: PeriodKey; geoFilters?: GlobalFilters; }
 function fmt(n: number) {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+const FAILED_STATUSES = ["payment_failed", "cancelled", "returned"] as const;
+const isFailedOrder = (s: string) => FAILED_STATUSES.includes(s as any);
+const isValidOrder = (s: string) => !isFailedOrder(s) && s !== "awaiting_payment";
 
 export function SalesTab({ period, geoFilters }: Props) {
   const sinceDate = getPeriodDate(period) ?? new Date(new Date().getFullYear() - 5, 0, 1);
@@ -43,25 +47,51 @@ export function SalesTab({ period, geoFilters }: Props) {
 
   const dailySales = useMemo(() => {
     const days = eachDayOfInterval({ start: sinceDate, end: new Date() });
-    const map: Record<string, { date: string; revenue: number; count: number }> = {};
+    const map: Record<string, { date: string; revenue: number; validCount: number; failedCount: number }> = {};
     days.forEach((d) => {
       const key = format(d, "yyyy-MM-dd");
-      map[key] = { date: format(d, days.length > 60 ? "d/MM" : "d MMM", { locale: fr }), revenue: 0, count: 0 };
+      map[key] = { date: format(d, days.length > 60 ? "d/MM" : "d MMM", { locale: fr }), revenue: 0, validCount: 0, failedCount: 0 };
     });
     orders.forEach((o: any) => {
       const key = format(new Date(o.created_at), "yyyy-MM-dd");
       if (map[key]) {
-        map[key].count++;
-        if (o.status !== "cancelled" && o.status !== "returned") map[key].revenue += Number(o.total);
+        if (isFailedOrder(o.status)) {
+          map[key].failedCount++;
+        } else if (isValidOrder(o.status)) {
+          map[key].validCount++;
+          map[key].revenue += Number(o.total);
+        }
       }
     });
     return Object.values(map);
   }, [orders, sinceDate]);
 
   const cumulativeRevenue = useMemo(() => {
-    let cum = 0;
-    return dailySales.map((d) => { cum += d.revenue; return { ...d, cumulative: Math.round(cum) }; });
-  }, [dailySales]);
+    const days = eachDayOfInterval({ start: sinceDate, end: new Date() });
+    const map: Record<string, { date: string; valid: number; failed: number }> = {};
+    days.forEach((d) => {
+      const key = format(d, "yyyy-MM-dd");
+      map[key] = { date: format(d, days.length > 60 ? "d/MM" : "d MMM", { locale: fr }), valid: 0, failed: 0 };
+    });
+    orders.forEach((o: any) => {
+      const key = format(new Date(o.created_at), "yyyy-MM-dd");
+      if (!map[key]) return;
+      const t = Number(o.total) || 0;
+      if (isFailedOrder(o.status)) map[key].failed += t;
+      else if (isValidOrder(o.status)) map[key].valid += t;
+    });
+    let cumValid = 0, cumFailed = 0;
+    return Object.values(map).map((d) => {
+      cumValid += d.valid;
+      cumFailed += d.failed;
+      return {
+        date: d.date,
+        cumValid: Math.round(cumValid * 100) / 100,
+        cumFailed: Math.round(cumFailed * 100) / 100,
+        cumGross: Math.round((cumValid + cumFailed) * 100) / 100,
+      };
+    });
+  }, [orders, sinceDate]);
 
   const statusPie = useMemo(() => {
     const map: Record<string, number> = {};
@@ -81,21 +111,25 @@ export function SalesTab({ period, geoFilters }: Props) {
     }));
   }, [orders]);
 
-  // Cumulative revenue by vendor (top 10)
+  // CA cumulé par vendeur (top 10) — séparé validé / échoué
   const vendorCumulatives = useMemo(() => {
     const storeMap = new Map<string, string>(stores.map((s: any) => [s.id as string, s.name as string]));
-    const storeRevenues: Record<string, number> = {};
+    const agg: Record<string, { valid: number; failed: number }> = {};
     orders.forEach((o: any) => {
-      if (!o.store_id || o.status === "cancelled" || o.status === "returned") return;
+      if (!o.store_id) return;
       const name = storeMap.get(o.store_id as string) || "Inconnu";
-      storeRevenues[name] = (storeRevenues[name] || 0) + Number(o.total);
+      if (!agg[name]) agg[name] = { valid: 0, failed: 0 };
+      const t = Number(o.total) || 0;
+      if (isFailedOrder(o.status)) agg[name].failed += t;
+      else if (isValidOrder(o.status)) agg[name].valid += t;
     });
-    return Object.entries(storeRevenues)
-      .sort((a, b) => b[1] - a[1])
+    return Object.entries(agg)
+      .sort((a, b) => (b[1].valid + b[1].failed) - (a[1].valid + a[1].failed))
       .slice(0, 10)
-      .map(([name, revenue]) => ({
+      .map(([name, v]) => ({
         name: name.length > 18 ? name.slice(0, 18) + "…" : name,
-        revenue: Math.round(revenue * 100) / 100,
+        valid: Math.round(v.valid * 100) / 100,
+        failed: Math.round(v.failed * 100) / 100,
       }));
   }, [orders, stores]);
 
@@ -106,7 +140,7 @@ export function SalesTab({ period, geoFilters }: Props) {
     const storeNames = new Set<string>();
 
     orders.forEach((o: any) => {
-      if (!o.store_id || o.status === "cancelled" || o.status === "returned") return;
+      if (!o.store_id || !isValidOrder(o.status)) return;
       const day = format(new Date(o.created_at), "yyyy-MM-dd");
       const name = storeMap.get(o.store_id as string) || "Inconnu";
       storeNames.add(name);
