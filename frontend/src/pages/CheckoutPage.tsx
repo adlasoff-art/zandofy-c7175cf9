@@ -753,12 +753,29 @@ export default function CheckoutPage() {
           order_ref: orderRef,
           coupon_code: appliedCoupon?.code || null,
           discount_amount: orderDiscount,
-          // Off-platform: force all logistics payments to deferred
-          shipping_payment_status: (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform) ? "deferred" : "paid",
+          // Off-platform: force all logistics payments to deferred.
+          // "Paid" est attribué SEULEMENT après confirmation du paiement (webhook KelPay / retour Keccel).
+          // En attendant : "unpaid" pour les paiements asynchrones, "paid" pour COD/cash où la commande
+          // n'attend pas de webhook (la livraison est facturée à l'arrivée).
+          shipping_payment_status:
+            (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform)
+              ? "deferred"
+              : (paymentMethod === "mobile_money" || paymentMethod === "card" || paymentMethod === "paypal" || paymentMethod === "stripe")
+                ? "unpaid"
+                : "paid",
           delivery_choice: deliveryOption !== "none" ? deliveryOption : null,
           last_mile_fee: deliveryOption === "home_delivery" ? lastMileFee : 0,
           last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
-          last_mile_payment_status: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? "deferred" : (lastMilePayment === "pay_with_shipping" ? "paid" : "deferred")) : null,
+          last_mile_payment_status:
+            deliveryOption === "home_delivery" && lastMileFee > 0
+              ? (isOffPlatform
+                  ? "deferred"
+                  : (lastMilePayment === "pay_with_shipping"
+                      ? ((paymentMethod === "mobile_money" || paymentMethod === "card" || paymentMethod === "paypal" || paymentMethod === "stripe")
+                          ? "unpaid"
+                          : "paid")
+                      : "deferred"))
+              : null,
           // Lot 3 — Forwarder assignment (silent fallback when no eligible forwarder)
           forwarder_id: selectedForwarder?.forwarder_id ?? null,
           forwarder_tier: selectedForwarder?.tier ?? null,
