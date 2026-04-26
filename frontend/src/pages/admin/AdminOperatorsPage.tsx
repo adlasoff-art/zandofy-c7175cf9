@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle2, XCircle, PauseCircle, PlayCircle, Building2, Truck, MapPin, Users } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ShieldAlert } from "lucide-react";
 
 type OperatorRow = {
   id: string;
@@ -122,9 +124,18 @@ export default function AdminOperatorsPage() {
   return (
     <AdminLayout title="Opérateurs de livraison">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Opérateurs de livraison</h1>
-          <p className="text-sm text-muted-foreground">Modération KYB des entreprises de livraison du dernier kilomètre.</p>
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Opérateurs de livraison</h1>
+            <p className="text-sm text-muted-foreground">Modération KYB des entreprises de livraison du dernier kilomètre.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" size="sm" className="gap-1">
+              <Link to="/admin/operator-rate-caps">
+                <ShieldAlert size={14} /> Plafonds tarifaires
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <Tabs value={tab} onValueChange={setTab}>
