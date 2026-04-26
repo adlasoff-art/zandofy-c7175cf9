@@ -66,6 +66,8 @@ interface Order {
   supplier_order_number: string | null;
   assigned_rider_name: string | null;
   assigned_rider_id: string | null;
+  delivery_operator_id?: string | null;
+  delivery_operator_name?: string | null;
   delivery_choice: string | null;
   last_mile_fee: number | null;
   confirmation_code: string | null;
@@ -140,17 +142,14 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [showLabelPreview, setShowLabelPreview] = useState(false);
 
-  // Check if store has self-delivery
+  // Lot 11B Phase B4 — Cleanup vendeur :
+  // Le last-mile est désormais opéré exclusivement par les opérateurs de livraison
+  // tiers (table `delivery_operators`) ou par la flotte plateforme. Les vendeurs
+  // n'auto-livrent plus, donc on force `hasSelfDelivery = false`. L'ancien champ
+  // `vendor_subscriptions.can_self_deliver` est conservé pour rétro-compatibilité
+  // sur les écrans admin mais n'a plus d'effet côté vendeur.
   useEffect(() => {
-    async function check() {
-      const { data } = await supabase
-        .from("vendor_subscriptions")
-        .select("can_self_deliver")
-        .eq("store_id", storeId)
-        .maybeSingle();
-      setHasSelfDelivery(data?.can_self_deliver || false);
-    }
-    check();
+    setHasSelfDelivery(false);
   }, [storeId]);
 
   // Check if shipping labels are enabled for this store
@@ -170,7 +169,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected")
+      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected, delivery_operator_id")
       .eq("store_id", storeId)
       .not("status", "in", '("payment_failed")')
       .order("created_at", { ascending: false }) as any;
@@ -217,10 +216,31 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
       "hub_pickup_proof_url",
     ]);
 
-    setOrders(ordersWithOptionalFields.map((o) => ({
+    // Lot 11B Phase B4 — Hub UI : enrichir avec le nom de l'opérateur de livraison
+    const operatorIds = Array.from(
+      new Set(
+        ordersWithOptionalFields
+          .map((o: any) => o.delivery_operator_id)
+          .filter(Boolean),
+      ),
+    );
+    const operatorNameMap = new Map<string, string>();
+    if (operatorIds.length > 0) {
+      const { data: ops } = await (supabase as any)
+        .from("delivery_operators")
+        .select("id, company_name")
+        .in("id", operatorIds);
+      (ops || []).forEach((op: any) => operatorNameMap.set(op.id, op.company_name));
+    }
+
+    setOrders(ordersWithOptionalFields.map((o: any) => ({
       ...o,
       items: itemMap.get(o.id) || [],
       history: historyMap.get(o.id) || [],
+      delivery_operator_id: o.delivery_operator_id || null,
+      delivery_operator_name: o.delivery_operator_id
+        ? operatorNameMap.get(o.delivery_operator_id) || null
+        : null,
     })));
     setLoading(false);
   }, [storeId]);
@@ -519,6 +539,15 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                     <Bike size={12} className="text-primary shrink-0" />
                     <span className="text-muted-foreground">Livreur :</span>
                     <a href="/tracking" className="font-bold text-primary hover:underline">{order.assigned_rider_name}</a>
+                  </div>
+                )}
+
+                {/* Lot 11B Phase B4 — Opérateur de livraison */}
+                {order.delivery_operator_name && (
+                  <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
+                    <Truck size={12} className="text-primary shrink-0" />
+                    <span className="text-muted-foreground">Transporteur :</span>
+                    <span className="font-bold text-foreground">{order.delivery_operator_name}</span>
                   </div>
                 )}
 

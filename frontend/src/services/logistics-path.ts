@@ -13,9 +13,11 @@ export interface DeliveryZoneMatch {
 }
 
 /**
- * Given an order's shipping city and store, determine the delivery path:
- * 1. Check if the vendor has self-delivery zones matching the city
- * 2. Fall back to platform logistics (standard rider assignment)
+ * @deprecated Lot 11B Phase B4 — Le last-mile est désormais géré par les opérateurs
+ * de livraison tiers (table `delivery_operators`) ou par la flotte plateforme.
+ * Cette fonction reste exportée pour les anciens écrans admin (audit), mais ne doit
+ * plus piloter de choix de livraison dans les nouveaux flux. Voir
+ * `useOperatorQuotes` et `OperatorSelector` pour le nouveau moteur.
  */
 export async function resolveDeliveryPath(orderId: string): Promise<{
   selfDeliveryZones: DeliveryZoneMatch[];
