@@ -9,6 +9,7 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@6.9.16";
+import { clientOperatorReassignedEmail } from "../_shared/operator-email-templates.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -115,35 +116,12 @@ async function sendClientExpiredEmail(
       auth: { user: smtpUser, pass: smtpPass },
     });
     const greeting = profile.first_name ? `Bonjour ${profile.first_name},` : "Bonjour,";
-    const html = `
-<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:24px 0;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:600px;">
-        <tr><td style="background:#f59e0b;padding:24px;text-align:center;">
-          <h1 style="color:#ffffff;margin:0;font-size:22px;">⏳ Recherche d'un transporteur</h1>
-        </td></tr>
-        <tr><td style="padding:32px 28px;color:#1f2937;">
-          <p style="font-size:16px;margin:0 0 16px;">${greeting}</p>
-          <p style="font-size:15px;line-height:1.6;margin:0 0 12px;">
-            Le transporteur attribué à votre commande <strong>${orderRef}</strong> n'a pas confirmé la prise en charge dans le délai imparti.
-          </p>
-          <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Nous lui cherchons un remplaçant — votre commande reste valide.
-          </p>
-          <table cellpadding="0" cellspacing="0"><tr><td style="background:#16a34a;border-radius:8px;">
-            <a href="https://zandofy.com/orders/${orderId}" style="display:inline-block;padding:12px 24px;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;">
-              Suivre ma commande
-            </a>
-          </td></tr></table>
-        </td></tr>
-        <tr><td style="background:#f9fafb;padding:16px;text-align:center;border-top:1px solid #e5e7eb;">
-          <p style="margin:0;font-size:12px;color:#6b7280;">Zandofy — Marketplace sino-africaine</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`.trim();
+    const html = clientOperatorReassignedEmail({
+      greeting,
+      orderRef,
+      orderId,
+      cause: "expired",
+    });
     await transport.sendMail({
       from: fromEmail,
       to: profile.email,
