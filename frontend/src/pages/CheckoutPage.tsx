@@ -418,7 +418,12 @@ export default function CheckoutPage() {
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
   // Last-mile fee calculation — waived if client has active delivery subscription
-  const rawLastMileFee = deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
+  // Si un opérateur tiers est sélectionné, son tarif prime sur le calcul commune/quartier.
+  const operatorFee =
+    deliveryOption === "home_delivery" && selectedOperator ? selectedOperator.fee : 0;
+  const fallbackLastMileFee =
+    deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
+  const rawLastMileFee = selectedOperator ? operatorFee : fallbackLastMileFee;
   const lastMileFee = hasActiveDeliverySub ? 0 : rawLastMileFee;
   const effectiveLastMile = deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping" ? lastMileFee : 0;
   
