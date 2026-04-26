@@ -696,6 +696,7 @@ export default function CheckoutPage() {
     // Lot 4D — Lock le devis freight (nouveau moteur) AVANT création de l'order.
     // Si pas d'offre éligible (legacy ForwarderSelector utilisé), on saute silencieusement.
     let lockedFreightQuoteId: string | null = null;
+    let lockedFreightTotal: number | null = null;
     if (selectedFreightOffer && user) {
       try {
         lockedFreightQuoteId = await lockFreightQuote({
@@ -706,6 +707,20 @@ export default function CheckoutPage() {
           })),
           consolidationChoice: freightChoice,
         });
+        // Lot 11A — Source unique de vérité : si le devis est verrouillé,
+        // re-lire son quoted_price persisté pour aligner orders.shipping_cost.
+        // Évite la désynchro UI ($15.50) vs DB ($0.00) observée sur ZND-MOFRHBGT.
+        if (lockedFreightQuoteId) {
+          const { data: lockedQ } = await (supabase as any)
+            .from("freight_quotes")
+            .select("quoted_price")
+            .eq("id", lockedFreightQuoteId)
+            .maybeSingle();
+          const persisted = Number((lockedQ as any)?.quoted_price);
+          if (Number.isFinite(persisted) && persisted > 0) {
+            lockedFreightTotal = persisted;
+          }
+        }
       } catch (err) {
         console.warn("[CheckoutPage] lockFreightQuote failed (non-blocking)", err);
       }
@@ -717,7 +732,10 @@ export default function CheckoutPage() {
       
       // Proportional shipping & discount distribution
       const ratio = subtotal > 0 ? orderSubtotal / subtotal : 0;
-      const orderShippingCost = preciseRound(shippingCost * ratio, 2);
+      // Lot 11A — Préférer le total persisté du devis verrouillé (source unique
+      // de vérité côté DB). Fallback sur shippingCost local si pas de devis.
+      const baseShippingCost = lockedFreightTotal ?? shippingCost;
+      const orderShippingCost = preciseRound(baseShippingCost * ratio, 2);
       const orderDiscount = preciseRound(discountAmount * ratio, 2);
       const orderPointsDiscount = preciseRound(pointsDiscount * ratio, 2);
       
