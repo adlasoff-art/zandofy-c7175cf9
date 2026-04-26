@@ -120,9 +120,38 @@ export default function AdminOrdersPage() {
     enabled: !authLoading && !!user,
   });
 
+  const dateFromTo = useMemo(() => {
+    const now = new Date();
+    if (dateFilter === "today") {
+      const start = new Date(now); start.setHours(0, 0, 0, 0);
+      return { from: start, to: null as Date | null };
+    }
+    if (dateFilter === "7d") {
+      const start = new Date(now); start.setDate(start.getDate() - 7);
+      return { from: start, to: null };
+    }
+    if (dateFilter === "30d") {
+      const start = new Date(now); start.setDate(start.getDate() - 30);
+      return { from: start, to: null };
+    }
+    if (dateFilter === "custom") {
+      return {
+        from: customStart ? new Date(customStart) : null,
+        to: customEnd ? new Date(`${customEnd}T23:59:59`) : null,
+      };
+    }
+    return { from: null, to: null };
+  }, [dateFilter, customStart, customEnd]);
+
   const filtered = orders.filter((o: any) => {
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
     if (!matchStatus) return false;
+    // Date filter
+    if (dateFromTo.from || dateFromTo.to) {
+      const created = new Date(o.created_at);
+      if (dateFromTo.from && created < dateFromTo.from) return false;
+      if (dateFromTo.to && created > dateFromTo.to) return false;
+    }
     // Location filters
     if (locationFilters.country && o.shipping_country !== locationFilters.country) return false;
     if (locationFilters.city && o.shipping_city !== locationFilters.city) return false;
