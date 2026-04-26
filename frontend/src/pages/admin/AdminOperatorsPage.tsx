@@ -323,6 +323,7 @@ export default function AdminOperatorsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CreateOperatorDialog open={createOpen} onOpenChange={setCreateOpen} />
     </AdminLayout>
   );
 }
