@@ -66,6 +66,8 @@ interface Order {
   supplier_order_number: string | null;
   assigned_rider_name: string | null;
   assigned_rider_id: string | null;
+  delivery_operator_id?: string | null;
+  delivery_operator_name?: string | null;
   delivery_choice: string | null;
   last_mile_fee: number | null;
   confirmation_code: string | null;
