@@ -21,7 +21,7 @@ import {
 } from "@/services/freightQuoteCheckout";
 import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
 import { OperatorSelector } from "@/components/checkout/OperatorSelector";
-import type { OperatorQuote } from "@/hooks/useOperatorQuotes";
+import { useOperatorQuotes, type OperatorQuote } from "@/hooks/useOperatorQuotes";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
 import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
 import { useI18n } from "@/contexts/I18nContext";
@@ -172,6 +172,31 @@ export default function CheckoutPage() {
   // Forwarder selection (Lot 3)
   const [selectedForwarder, setSelectedForwarder] = useState<ForwarderChoice | null>(null);
   const [forwarderUnassigned, setForwarderUnassigned] = useState(false);
+
+  // Lot 11B Phase B8 — Vérifier la couverture opérateur pour activer "Livraison à domicile"
+  const { data: operatorQuotesForCoverage, isLoading: operatorCoverageLoading } = useOperatorQuotes({
+    city: shipping.city,
+    countryCode: shipping.country,
+    commune: shipping.commune,
+    quartier: shipping.quartier,
+    enabled: !!shipping.city && !!shipping.country,
+  });
+  const hasOperatorCoverage = (operatorQuotesForCoverage?.length ?? 0) > 0;
+
+  // Auto-fallback : si la zone perd sa couverture opérateur et que home_delivery était choisi,
+  // basculer en "none" et désélectionner l'opérateur précédent.
+  useEffect(() => {
+    if (deliveryOption === "home_delivery" && !operatorCoverageLoading && !hasOperatorCoverage) {
+      setDeliveryOption("none");
+      setSelectedOperator(null);
+      toast({
+        title: "Livraison à domicile indisponible",
+        description: "Aucun livreur partenaire ne dessert votre nouvelle zone. Choisissez le retrait au Hub.",
+        variant: "destructive",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasOperatorCoverage, operatorCoverageLoading]);
 
   const handleForwarderChange = useCallback((choice: ForwarderChoice | null, unassigned: boolean) => {
     setSelectedForwarder(choice);
@@ -652,6 +677,31 @@ export default function CheckoutPage() {
       toast({
         title: "Transitaire requis",
         description: "Veuillez sélectionner un transitaire avant de continuer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Lot 11B Phase B8 — Le client doit choisir un mode de livraison
+    if (deliveryOption === "none") {
+      toast({
+        title: "Mode de livraison requis",
+        description: "Veuillez choisir entre la livraison à domicile ou le retrait au Hub.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Si livraison à domicile : un livreur doit être sélectionné (sauf abonnement actif)
+    if (
+      deliveryOption === "home_delivery" &&
+      !hasActiveDeliverySub &&
+      hasOperatorCoverage &&
+      !selectedOperator
+    ) {
+      toast({
+        title: "Livreur requis",
+        description: "Veuillez sélectionner un livreur pour finaliser votre livraison à domicile.",
         variant: "destructive",
       });
       return;
@@ -1429,7 +1479,18 @@ export default function CheckoutPage() {
                     </p>
                     <div className="space-y-2">
                       {[
-                        { key: "home_delivery" as DeliveryOption, label: "🚚 Livraison à domicile", desc: lastMileLoading ? "Calcul en cours..." : lastMileResult && lastMileResult.fee > 0 ? `Frais estimés : $${lastMileResult.fee.toFixed(2)}` : "Recevez votre colis directement chez vous", disabled: lastMileResult ? !lastMileResult.deliverable : false },
+                        {
+                          key: "home_delivery" as DeliveryOption,
+                          label: "🚚 Livraison à domicile",
+                          desc: operatorCoverageLoading || lastMileLoading
+                            ? "Recherche des livreurs..."
+                            : !hasOperatorCoverage
+                              ? "Aucun livreur ne dessert encore votre quartier"
+                              : lastMileResult && lastMileResult.fee > 0
+                                ? `Frais estimés : $${lastMileResult.fee.toFixed(2)}`
+                                : "Recevez votre colis directement chez vous",
+                          disabled: (lastMileResult ? !lastMileResult.deliverable : false) || (!operatorCoverageLoading && !hasOperatorCoverage),
+                        },
                         { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait au Hub", desc: "Récupérez votre colis au point de collecte (gratuit)", disabled: false },
                       ].map(opt => (
                         <button

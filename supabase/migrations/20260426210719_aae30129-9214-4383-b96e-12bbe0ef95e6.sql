@@ -1,0 +1,1 @@
+ALTER VIEW public.v_active_operators_by_city SET (security_invoker = true);

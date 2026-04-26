@@ -1714,6 +1714,42 @@ export type Database = {
           },
         ]
       }
+      delivery_operator_city_caps: {
+        Row: {
+          city: string
+          country_code: string
+          created_at: string
+          id: string
+          max_base_price: number
+          max_estimated_minutes: number
+          max_surcharge: number
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          city: string
+          country_code: string
+          created_at?: string
+          id?: string
+          max_base_price: number
+          max_estimated_minutes?: number
+          max_surcharge?: number
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          city?: string
+          country_code?: string
+          created_at?: string
+          id?: string
+          max_base_price?: number
+          max_estimated_minutes?: number
+          max_surcharge?: number
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       delivery_operator_rates: {
         Row: {
           base_price: number
@@ -1728,6 +1764,11 @@ export type Database = {
           operator_id: string
           price_per_km: number
           quartier: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          submitted_at: string
           surcharge: number
           updated_at: string
           zone_name: string
@@ -1745,6 +1786,11 @@ export type Database = {
           operator_id: string
           price_per_km?: number
           quartier?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string
           surcharge?: number
           updated_at?: string
           zone_name: string
@@ -1762,6 +1808,11 @@ export type Database = {
           operator_id?: string
           price_per_km?: number
           quartier?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string
           surcharge?: number
           updated_at?: string
           zone_name?: string
@@ -8891,6 +8942,15 @@ export type Database = {
       get_guest_support_ticket: {
         Args: { p_requester_email: string; p_ticket_id: string }
         Returns: Json
+      }
+      get_operator_coverage: {
+        Args: {
+          p_city: string
+          p_commune?: string
+          p_country: string
+          p_quartier?: string
+        }
+        Returns: boolean
       }
       get_product_rating_summary: {
         Args: { p_product_id: string }
