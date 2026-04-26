@@ -12,11 +12,12 @@
  */
 
 import { useEffect, useState } from "react";
-import { Truck, Package, Layers, BadgeDollarSign, Clock, Loader2, Repeat, MapPin, Mail } from "lucide-react";
+import { Truck, Package, Layers, BadgeDollarSign, Clock, Loader2, Repeat, MapPin, Mail, AlertTriangle, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { InternationalShipmentTimeline } from "./InternationalShipmentTimeline";
 import { Button } from "@/components/ui/button";
 import { ReassignForwarderDialog } from "@/components/forwarder/ReassignForwarderDialog";
+import { toast } from "sonner";
 
 interface SubpackageRow {
   supplier_id: string;
@@ -83,6 +84,9 @@ export function FreightDetailsPanel({
   const [shippingCity, setShippingCity] = useState<string | null>(null);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // Lot 11A — Détection de désynchro (quoted_price=0 mais orders.shipping_cost>0)
+  const [orderShippingCost, setOrderShippingCost] = useState<number>(0);
+  const [resyncing, setResyncing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +96,7 @@ export function FreightDetailsPanel({
       // 1) Récupérer freight_quote_id depuis la commande
       const { data: order } = await (supabase as any)
         .from("orders")
-        .select("freight_quote_id, shipping_country, shipping_city")
+        .select("freight_quote_id, shipping_country, shipping_city, shipping_cost")
         .eq("id", orderId)
         .maybeSingle();
 
@@ -100,6 +104,7 @@ export function FreightDetailsPanel({
       if (!cancelled) {
         setShippingCountry((order as any)?.shipping_country ?? null);
         setShippingCity((order as any)?.shipping_city ?? null);
+        setOrderShippingCost(Number((order as any)?.shipping_cost) || 0);
       }
       if (!quoteId) {
         if (!cancelled) {
