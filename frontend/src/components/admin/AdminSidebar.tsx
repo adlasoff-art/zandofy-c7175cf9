@@ -166,6 +166,32 @@ export function AdminSidebar() {
     .join(" ")
     .trim() || "Administrateur";
 
+  // Lot 11C — Compteur des demandes de couverture en attente (delivery + forwarder).
+  const { data: coveragePending = 0 } = useQuery({
+    queryKey: ["admin-sidebar-coverage-pending"],
+    queryFn: async () => {
+      const [{ count: deliv }, { count: fwd }] = await Promise.all([
+        (supabase as any)
+          .from("delivery_coverage_requests")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "pending"),
+        (supabase as any)
+          .from("forwarder_coverage_requests")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "pending"),
+      ]);
+      return (deliv ?? 0) + (fwd ?? 0);
+    },
+    enabled: !!user?.id && isAdmin,
+    staleTime: 60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
+  });
+
+  const badgeFor = (key?: SidebarItem["badgeKey"]): number => {
+    if (key === "coverage-requests-pending") return coveragePending;
+    return 0;
+  };
+
   // Track which sections are open
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
