@@ -15,6 +15,7 @@ import { generateConfirmationCode } from "@/components/vendor/OrderTransitionMod
 import { STATUS_CONFIG } from "@/lib/order-status";
 import { DeliveryChat } from "@/components/delivery/DeliveryChat";
 import { fromTable } from "@/lib/supabase-helpers";
+import { PickupCodeWidget } from "@/components/logistics/PickupCodeWidget";
 
 type DeliveryStatus = "pending" | "in_progress" | "delivered";
 const statusLabels: Record<DeliveryStatus, string> = { pending: "À livrer", in_progress: "En cours", delivered: "Livré" };
@@ -591,6 +592,13 @@ export default function RiderDashboardPage() {
                                 <Banknote size={14} /> Confirmer paiement cash reçu
                               </button>
                             )}
+                          </div>
+                        )}
+
+                        {/* Pickup code (hub → rider handoff, Phase 10.5) */}
+                        {["arrived_at_hub", "ready_for_pickup", "at_hub"].includes(o.status) && (
+                          <div className="border-t border-border pt-3">
+                            <PickupCodeWidget orderId={o.id} mode="rider" />
                           </div>
                         )}
 
