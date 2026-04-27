@@ -119,3 +119,4 @@
 - [Marketing Automation v2](mem://features/marketing-automation-v2) — Lot 14 : géo/role targeting, A/B variants, RPC `get_automation_content`, cron horaire
 - [KYB/KYC v2](mem://features/kyb-kyc-v2) — Lot 15 : pack complet RCCM+ID+Adresse+NIF+RIB, scoring auto, queue admin manuelle
 - [Vendor Analytics Pro](mem://features/vendor-analytics-pro) — Lot 16 : 6 RPC analytics (KPIs/funnel/cohortes/top/export), filtres ville+méthode, exports CSV/PDF, cron email hebdo/mensuel
+- [Lot 17 Tech Debt & Perfs](mem://features/lot17-tech-debt-perf) — Hardening DB conservateur (REVOKE EXECUTE sur ~95 fonctions internes) + 9 indexes perfs (orders, payments, products, reviews, notifications). Linter 298→133 warnings.
