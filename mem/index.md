@@ -116,3 +116,6 @@
 - [Forwarder Origin Filtering](mem://features/forwarder-origin-filtering) — Lot 11C P1 : checkout filtre transitaires par `products.origin_country` via `coverage_routes` ; P2 = split panier multi-origines
 - [Customer Order Tracking](mem://features/customer-order-tracking) — Lot 12 : RPC `get_customer_tracking`, 10s polling, Leaflet+OSM, GPS rider live, escales internationales
 - [Disputes v2 SLA & Refunds](mem://features/disputes-v2-sla-refunds) — Lot 13 : SLA 48h/7j auto-escalade, remboursements (cash/wallet/négociation), preuves photo, `customer_wallets`, cron horaire
+- [Marketing Automation v2](mem://features/marketing-automation-v2) — Lot 14 : géo/role targeting, A/B variants, RPC `get_automation_content`, cron horaire
+- [KYB/KYC v2](mem://features/kyb-kyc-v2) — Lot 15 : pack complet RCCM+ID+Adresse+NIF+RIB, scoring auto, queue admin manuelle
+- [Vendor Analytics Pro](mem://features/vendor-analytics-pro) — Lot 16 : 6 RPC analytics (KPIs/funnel/cohortes/top/export), filtres ville+méthode, exports CSV/PDF, cron email hebdo/mensuel
