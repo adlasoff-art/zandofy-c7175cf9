@@ -321,6 +321,7 @@ export type Database = {
           id: string
           metadata: Json | null
           user_id: string | null
+          variant_label: string | null
           workflow_id: string
         }
         Insert: {
@@ -330,6 +331,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           user_id?: string | null
+          variant_label?: string | null
           workflow_id: string
         }
         Update: {
@@ -339,6 +341,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           user_id?: string | null
+          variant_label?: string | null
           workflow_id?: string
         }
         Relationships: [
@@ -356,11 +359,19 @@ export type Database = {
             referencedRelation: "automation_workflows_public"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "automation_events_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "v_automation_metrics"
+            referencedColumns: ["workflow_id"]
+          },
         ]
       }
       automation_user_progress: {
         Row: {
           anon_id: string | null
+          assigned_variant: string | null
           created_at: string
           display_count: number
           id: string
@@ -373,6 +384,7 @@ export type Database = {
         }
         Insert: {
           anon_id?: string | null
+          assigned_variant?: string | null
           created_at?: string
           display_count?: number
           id?: string
@@ -385,6 +397,7 @@ export type Database = {
         }
         Update: {
           anon_id?: string | null
+          assigned_variant?: string | null
           created_at?: string
           display_count?: number
           id?: string
@@ -410,14 +423,99 @@ export type Database = {
             referencedRelation: "automation_workflows_public"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "automation_user_progress_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "v_automation_metrics"
+            referencedColumns: ["workflow_id"]
+          },
+        ]
+      }
+      automation_workflow_variants: {
+        Row: {
+          created_at: string
+          email_html_content: string | null
+          email_subject: string | null
+          id: string
+          popup_content: string | null
+          popup_cta_label: string | null
+          popup_cta_link: string | null
+          popup_image_url: string | null
+          popup_title: string | null
+          push_body: string | null
+          push_title: string | null
+          updated_at: string
+          variant_label: string
+          workflow_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_html_content?: string | null
+          email_subject?: string | null
+          id?: string
+          popup_content?: string | null
+          popup_cta_label?: string | null
+          popup_cta_link?: string | null
+          popup_image_url?: string | null
+          popup_title?: string | null
+          push_body?: string | null
+          push_title?: string | null
+          updated_at?: string
+          variant_label: string
+          workflow_id: string
+        }
+        Update: {
+          created_at?: string
+          email_html_content?: string | null
+          email_subject?: string | null
+          id?: string
+          popup_content?: string | null
+          popup_cta_label?: string | null
+          popup_cta_link?: string | null
+          popup_image_url?: string | null
+          popup_title?: string | null
+          push_body?: string | null
+          push_title?: string | null
+          updated_at?: string
+          variant_label?: string
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_workflow_variants_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_workflows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_workflow_variants_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "automation_workflows_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_workflow_variants_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "v_automation_metrics"
+            referencedColumns: ["workflow_id"]
+          },
         ]
       }
       automation_workflows: {
         Row: {
+          ab_split_percent: number
+          ab_test_enabled: boolean
           channel: Database["public"]["Enums"]["automation_channel"]
+          condition_cities: string[] | null
+          condition_countries: string[] | null
           condition_has_account: boolean | null
           condition_has_order: boolean | null
           condition_max_days_since_signup: number | null
+          condition_roles: string[] | null
           created_at: string
           delay_days: number
           delay_minutes: number
@@ -440,10 +538,15 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ab_split_percent?: number
+          ab_test_enabled?: boolean
           channel?: Database["public"]["Enums"]["automation_channel"]
+          condition_cities?: string[] | null
+          condition_countries?: string[] | null
           condition_has_account?: boolean | null
           condition_has_order?: boolean | null
           condition_max_days_since_signup?: number | null
+          condition_roles?: string[] | null
           created_at?: string
           delay_days?: number
           delay_minutes?: number
@@ -466,10 +569,15 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ab_split_percent?: number
+          ab_test_enabled?: boolean
           channel?: Database["public"]["Enums"]["automation_channel"]
+          condition_cities?: string[] | null
+          condition_countries?: string[] | null
           condition_has_account?: boolean | null
           condition_has_order?: boolean | null
           condition_max_days_since_signup?: number | null
+          condition_roles?: string[] | null
           created_at?: string
           delay_days?: number
           delay_minutes?: number
@@ -8767,10 +8875,15 @@ export type Database = {
     Views: {
       automation_workflows_public: {
         Row: {
+          ab_split_percent: number | null
+          ab_test_enabled: boolean | null
           channel: Database["public"]["Enums"]["automation_channel"] | null
+          condition_cities: string[] | null
+          condition_countries: string[] | null
           condition_has_account: boolean | null
           condition_has_order: boolean | null
           condition_max_days_since_signup: number | null
+          condition_roles: string[] | null
           delay_days: number | null
           delay_minutes: number | null
           display_frequency:
@@ -8791,10 +8904,15 @@ export type Database = {
             | null
         }
         Insert: {
+          ab_split_percent?: number | null
+          ab_test_enabled?: boolean | null
           channel?: Database["public"]["Enums"]["automation_channel"] | null
+          condition_cities?: string[] | null
+          condition_countries?: string[] | null
           condition_has_account?: boolean | null
           condition_has_order?: boolean | null
           condition_max_days_since_signup?: number | null
+          condition_roles?: string[] | null
           delay_days?: number | null
           delay_minutes?: number | null
           display_frequency?:
@@ -8815,10 +8933,15 @@ export type Database = {
             | null
         }
         Update: {
+          ab_split_percent?: number | null
+          ab_test_enabled?: boolean | null
           channel?: Database["public"]["Enums"]["automation_channel"] | null
+          condition_cities?: string[] | null
+          condition_countries?: string[] | null
           condition_has_account?: boolean | null
           condition_has_order?: boolean | null
           condition_max_days_since_signup?: number | null
+          condition_roles?: string[] | null
           delay_days?: number | null
           delay_minutes?: number | null
           display_frequency?:
@@ -9272,6 +9395,22 @@ export type Database = {
         }
         Relationships: []
       }
+      v_automation_metrics: {
+        Row: {
+          channel: Database["public"]["Enums"]["automation_channel"] | null
+          clicks: number | null
+          conversion_percent: number | null
+          conversions: number | null
+          ctr_percent: number | null
+          dismissals: number | null
+          displays: number | null
+          is_active: boolean | null
+          name: string | null
+          variant_label: string | null
+          workflow_id: string | null
+        }
+        Relationships: []
+      }
       v_forwarder_profiles_public: {
         Row: {
           city_id: string | null
@@ -9458,6 +9597,10 @@ export type Database = {
         }
         Returns: Json
       }
+      assign_automation_variant: {
+        Args: { p_anon_id: string; p_user_id: string; p_workflow_id: string }
+        Returns: string
+      }
       can_access_store_orders: {
         Args: { _store_id: string; _user_id: string }
         Returns: boolean
@@ -9609,6 +9752,10 @@ export type Database = {
           store_name: string
           view_count: number
         }[]
+      }
+      get_automation_content: {
+        Args: { p_variant?: string; p_workflow_id: string }
+        Returns: Json
       }
       get_automation_daily_events: {
         Args: { p_since?: string; p_workflow_id?: string }
