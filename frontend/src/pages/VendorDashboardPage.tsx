@@ -322,6 +322,7 @@ export default function VendorDashboardPage() {
     ...(freightSimEnabled ? [{ key: "freight_sim" as const, label: "Simulateur fret", icon: Calculator }] : []),
     { key: "kyb" as const, label: "Vérification KYB", icon: ShieldCheck },
     { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
+    { key: "analytics_pro" as const, label: "Analytics Pro", icon: LineChart },
     ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
     { key: "messages" as const, label: "Messages", icon: MessageCircle },
     { key: "settings" as const, label: "Paramètres", icon: Settings },
@@ -362,6 +363,7 @@ export default function VendorDashboardPage() {
       {activeTab === "freight_sim" && freightSimEnabled && <VendorFreightSimulator />}
       {activeTab === "kyb" && <VendorKybV2Tab storeId={store!.id} />}
       {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
+      {activeTab === "analytics_pro" && <VendorAnalyticsProTab storeId={store!.id} />}
       {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
       {activeTab === "messages" && (
         <>
