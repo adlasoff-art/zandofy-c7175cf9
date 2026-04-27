@@ -131,7 +131,7 @@ export function FreightSelector({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [destinationCountry, destinationCityId, mode, totalCbm, totalWeightKg, items.length]);
+  }, [destinationCountry, destinationCityId, mode, totalCbm, totalWeightKg, items.length, originCountry]);
 
   // Lot Very Speed — Tri d'affichage :
   //  1) Les offres réellement sélectionnables (has_profile_for_zone !== false)
