@@ -9,6 +9,11 @@ Architecture multi-opérateurs (entreprises tierces) pour le last-mile.
 **Vues** : `v_active_operators_by_city`, `v_geo_coverage_status` (10.2).
 **orders** : `delivery_operator_id`, `operator_acceptance_status` (pending/accepted/declined/expired/not_applicable), `operator_assigned_at`, `operator_response_deadline` (30 min), `operator_responded_at`, `operator_decline_reason`, `operator_reassignment_count`.
 
+**Règle critique d'activation (Phase 10.4)** : un opérateur n'est visible côté checkout (vue `v_active_operators_by_city`) que s'il a au moins une ligne `delivery_operator_rates` avec `status='approved'` et `is_active=true` sur la ville desservie. Donc :
+- **Création admin** (`admin-create-operator`) DOIT insérer un tarif initial par ville couverte (champ `initial_rates` du body), puis ré-UPDATE pour passer `status='approved'` car le trigger `force_pending_on_rate_change` force pending à l'INSERT. Sinon "Livraison à domicile" reste désactivée au checkout avec "Aucun livreur ne dessert encore votre quartier".
+- **Demande publique** (`become-operator-submit`) : tarifs restent en `pending`, validés via la page admin "Tarifs en attente".
+- Opérateurs `is_platform_owned=true` : tarifs auto-approuvés par le trigger.
+
 **Phase 10.2 — Couverture & flotte enrichies** :
 - `delivery_operator_cities` : `province_id`, `commune_ids[]`, `quartier_ids[]` (granularité tarification).
 - `delivery_operators.fleet_vehicles jsonb` `[{type, plate_number, brand?, model?}]` validé par trigger `validate_fleet_vehicles` (plaques uniques + non vides).
