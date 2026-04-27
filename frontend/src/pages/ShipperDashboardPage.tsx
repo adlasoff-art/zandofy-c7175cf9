@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Package, Truck, MapPin, Clock, Ship, Plane, TruckIcon, Train, FileText, Search, Bell, User, Home, BarChart3, Loader2, DollarSign, CheckCircle, AlertTriangle, Plus } from "lucide-react";
+import { Package, Truck, MapPin, Clock, Ship, Plane, TruckIcon, Train, FileText, Search, Bell, User, Home, BarChart3, Loader2, DollarSign, CheckCircle, AlertTriangle, Plus, KeyRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRoles } from "@/hooks/use-roles";
 import { Navigate, NavLink } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { PickupCodeWidget } from "@/components/logistics/PickupCodeWidget";
 
 const modeIcons: Record<string, React.ElementType> = { air: Plane, sea: Ship, road: TruckIcon, rail: Train };
 const modeLabels: Record<string, string> = { air: "Aérien", sea: "Maritime", road: "Routier", rail: "Ferroviaire" };
@@ -17,7 +18,7 @@ const statusStyles: Record<string, string> = {
   arrived: "bg-primary/10 text-primary", loading: "bg-muted text-muted-foreground", delivered: "bg-primary/10 text-primary",
 };
 
-type TabKey = "shipments" | "stats" | "profile";
+type TabKey = "shipments" | "hub" | "stats" | "profile";
 
 export default function ShipperDashboardPage() {
   const { user, loading: authLoading } = useAuth();
@@ -27,6 +28,23 @@ export default function ShipperDashboardPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showAdd, setShowAdd] = useState(false);
   const queryClient = useQueryClient();
+
+  // Phase 10.5 — Commandes au hub avec code de remise actif
+  const { data: hubOrders = [], isLoading: hubLoading } = useQuery({
+    queryKey: ["shipper-hub-orders"],
+    enabled: !!user,
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id, order_ref, status, shipping_first_name, shipping_last_name, shipping_city, total")
+        .in("status", ["arrived_at_hub", "ready_for_pickup", "at_hub"])
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
   const { data: shipments = [], isLoading } = useQuery({
     queryKey: ["shipments"],
