@@ -1628,11 +1628,12 @@ function TrackingTab({ orders }: { orders: OrderRow[] }) {
   return (
     <div className="space-y-4">
       {activeOrders.map(order => (
-        <div key={order.id} className="bg-card border border-border rounded-lg p-5">
-          <div className="flex items-center justify-between mb-4">
+        <div key={order.id} className="bg-card border border-border rounded-lg p-5 space-y-4">
+          <div className="flex items-center justify-between">
             <span className="font-bold text-sm text-foreground">{order.order_ref}</span>
           </div>
           <TrackingStepper status={order.status} orderRef={order.order_ref} trackingNumber={order.tracking_number} />
+          <CustomerOrderTracker orderId={order.id} />
         </div>
       ))}
     </div>
