@@ -359,6 +359,7 @@ export default function VendorDashboardPage() {
       {activeTab === "pricing" && <VendorPricingTab storeId={store!.id} />}
       {activeTab === "autonomous" && <VendorAutonomousTab storeId={store!.id} />}
       {activeTab === "freight_sim" && freightSimEnabled && <VendorFreightSimulator />}
+      {activeTab === "kyb" && <VendorKybV2Tab storeId={store!.id} />}
       {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
       {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
       {activeTab === "messages" && (
