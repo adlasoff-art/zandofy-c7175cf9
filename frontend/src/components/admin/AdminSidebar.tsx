@@ -238,18 +238,24 @@ export function AdminSidebar() {
                       const isActive = item.url === "/admin"
                         ? location.pathname === "/admin"
                         : location.pathname.startsWith(item.url);
+                      const badge = badgeFor(item.badgeKey);
                       return (
                         <SidebarMenuItem key={item.url}>
                           <SidebarMenuButton asChild>
                             <Link
                               to={item.url}
                               className={cn(
-                                "flex items-center justify-center px-2 py-2 rounded-md text-muted-foreground hover:bg-muted/50 transition-colors",
+                                "relative flex items-center justify-center px-2 py-2 rounded-md text-muted-foreground hover:bg-muted/50 transition-colors",
                                 isActive && "bg-primary/10 text-primary"
                               )}
                               title={item.title}
                             >
                               <item.icon size={18} />
+                              {badge > 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
+                                  {badge > 99 ? "99+" : badge}
+                                </span>
+                              )}
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -277,6 +283,7 @@ export function AdminSidebar() {
                     const isActive = item.url === "/admin"
                       ? location.pathname === "/admin"
                       : location.pathname.startsWith(item.url);
+                    const badge = badgeFor(item.badgeKey);
                     return (
                       <SidebarMenuItem key={item.url}>
                         <SidebarMenuButton asChild>
@@ -288,7 +295,12 @@ export function AdminSidebar() {
                             )}
                           >
                             <item.icon size={16} />
-                            <span>{item.title}</span>
+                            <span className="flex-1">{item.title}</span>
+                            {badge > 0 && (
+                              <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                                {badge > 99 ? "99+" : badge}
+                              </span>
+                            )}
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
