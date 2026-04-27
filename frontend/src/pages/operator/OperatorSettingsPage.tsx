@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, Save, Building2, ShieldCheck, AlertCircle } from "lucide-react";
+import { OperatorKybUploader } from "@/components/operator/OperatorKybUploader";
 
 export default function OperatorSettingsPage() {
   const { operator, refetch } = useOperatorContext();
@@ -74,6 +75,8 @@ export default function OperatorSettingsPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <OperatorKybUploader operatorId={operator.id} />
     </div>
   );
 }

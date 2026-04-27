@@ -22,6 +22,7 @@ import {
 import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
 import { OperatorSelector } from "@/components/checkout/OperatorSelector";
 import { useOperatorQuotes, type OperatorQuote } from "@/hooks/useOperatorQuotes";
+import { RequestCoverageButton } from "@/components/checkout/RequestCoverageButton";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
 import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
 import { useI18n } from "@/contexts/I18nContext";
@@ -1524,6 +1525,30 @@ export default function CheckoutPage() {
                       <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded">
                         ⚠️ Livraison non disponible dans votre zone{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}. Veuillez choisir le retrait au Hub.
                       </p>
+                    )}
+
+                    {/* No operator coverage — proposer demande couverture + hub */}
+                    {!operatorCoverageLoading && !hasOperatorCoverage && shipping.city && shipping.country && (
+                      <div className="bg-muted/50 border border-border rounded-lg p-3 space-y-2">
+                        <p className="text-xs font-medium text-foreground">
+                          Aucun livreur ne dessert encore {shipping.quartier ? `${shipping.quartier}, ` : ""}
+                          {shipping.commune ? `${shipping.commune}, ` : ""}{shipping.city}.
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Vous pouvez choisir le retrait au Hub ou nous demander d'étendre la couverture.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="default" onClick={() => setDeliveryOption("hub_pickup")}>
+                            🏪 Choisir le retrait au Hub
+                          </Button>
+                          <RequestCoverageButton
+                            countryCode={shipping.country}
+                            city={shipping.city}
+                            commune={shipping.commune}
+                            quartier={shipping.quartier}
+                          />
+                        </div>
+                      </div>
                     )}
 
                     {/* Active delivery subscription banner */}
