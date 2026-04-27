@@ -78,6 +78,17 @@ Deno.serve(async (req) => {
       .eq("id", operator_id);
     if (updErr) return json({ error: "Update failed", details: updErr.message }, 500);
 
+    // Phase 10.5 — Grant rôle 'operator' au owner pour qu'il accède à /operator/*
+    if (op.owner_user_id) {
+      const { error: roleErr } = await svc
+        .from("user_roles")
+        .upsert(
+          { user_id: op.owner_user_id, role: "operator" },
+          { onConflict: "user_id,role" },
+        );
+      if (roleErr) console.warn("[admin-approve-operator] role grant failed", roleErr);
+    }
+
     // Audit log (best-effort)
     try {
       await svc.from("admin_audit_logs").insert({
