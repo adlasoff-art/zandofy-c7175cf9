@@ -833,6 +833,7 @@ export default function CheckoutPage() {
         .insert({
           user_id: user!.id,
           store_id: storeId !== "default" ? storeId : null,
+          origin_country: orderOriginCountry,
           status: (paymentMethod === "mobile_money" || paymentMethod === "off_platform") ? "awaiting_payment" : "pending",
           payment_method: paymentMethod,
           shipping_first_name: shipping.firstName,
