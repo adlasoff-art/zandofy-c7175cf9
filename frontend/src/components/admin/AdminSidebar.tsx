@@ -83,6 +83,7 @@ const sidebarSections: SidebarSection[] = [
       { title: "Packages services", url: "/admin/service-packages", icon: Package },
       { title: "Tarification boutiques", url: "/admin/vendor-pricing", icon: DollarSign },
       { title: "Vérification KYC", url: "/admin/kyc", icon: ShieldCheck },
+      { title: "KYB / KYC v2", url: "/admin/kyb-kyc-v2", icon: ShieldCheck },
       { title: "Comptabilité vendeurs", url: "/admin/vendor-accounting", icon: Receipt },
       { title: "Retraits", url: "/admin/withdrawals", icon: Banknote },
     ],
