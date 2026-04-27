@@ -1,85 +1,132 @@
-# Clarification : comment fonctionne aujourd'hui la livraison + ce qu'il faut corriger
+# Plan final — Multi-opérateurs : finalisation et nettoyage legacy
 
-## Réponses claires à vos questions
+## Décisions validées
 
-### Q1 — La "legacy" (zones géographiques + frais commune/quartier) existe-t-elle encore ?
-
-**Oui, elle existe toujours**, mais elle n'est **plus utilisée pour le calcul checkout** depuis Lot 11B. Concrètement :
-
-- Tables `communes.delivery_fee` et `quartiers.delivery_surcharge` → toujours en base, toujours éditables côté admin (Zones géographiques).
-- Code `frontend/src/lib/last-mile-fee.ts` (formule `commune.delivery_fee + quartier.delivery_surcharge`) → **n'est plus appelé par le checkout**. Il ne sert plus que de référence/legacy.
-- Le checkout utilise désormais **uniquement** `useOperatorQuotes` → vue `v_active_operators_by_city` + table `delivery_operator_rates`.
-
-**Conséquence** : si aucun opérateur n'a de tarif approuvé sur la commune/quartier du client, le checkout affiche **"Aucun livreur ne dessert encore votre quartier"** (ce que vous voyez sur votre capture). La legacy ne prend plus le relais en fallback.
-
-### Q2 — L'admin doit-il se reconnecter en tant qu'opérateur pour saisir les tarifs commune/quartier ?
-
-**Aujourd'hui : oui** — mais le système est incomplet. Voici la répartition actuelle des responsabilités :
-
-| Acteur | Où | Quoi |
-|---|---|---|
-| **Admin** (`/admin/operator-rate-caps`) | Plafonds par **ville** uniquement | Définit `max_base_price`, `max_surcharge`, `max_estimated_minutes` par ville. C'est un **plafond** (garde-fou), pas un tarif. |
-| **Admin** (création opérateur, étape 5) | Tarif initial par **ville couverte** | Saisit `base_price`, `surcharge`, `estimated_minutes` au niveau **ville** (pas commune ni quartier) |
-| **Opérateur** (`/operator/rates`) | CRUD tarifs par **zone / commune / quartier** | Peut créer N tarifs par ville avec granularité commune et quartier → soumis à validation admin |
-| **Admin** (`/admin/operator-rates-pending`) | Approbation | Approve/refuse les tarifs soumis par opérateurs (sauf opérateur plateforme = auto-approuvé) |
-
-**Ce qui manque dans l'UI admin** : pas d'écran qui permette à l'admin de saisir directement, pour le compte d'un opérateur, les tarifs **commune par commune et quartier par quartier**. L'admin ne saisit que le tarif **initial niveau ville**. Pour la granularité commune/quartier, il faut soit :
-- Se connecter en tant que propriétaire de l'opérateur sur `/operator/rates`, OU
-- Insérer en base via SQL, OU
-- Ajouter un écran admin "Gérer les tarifs de l'opérateur X" (recommandation).
-
-### Q3 — Pourquoi "aucun utilisateur trouvé" dans la recherche propriétaire ?
-
-J'ai vérifié la DB : la RLS `profiles` est correcte (admins lisent tout) et il y a 4 profils dont 3 ont un `first_name`. Donc **la RLS n'est pas en cause**.
-
-Causes probables :
-1. **Recherche par prénom/nom uniquement** (jamais email — c'est volontaire, PII-safe) → si vous tapez l'email, ça ne match rien.
-2. **Minimum 2 caractères** + debounce 300ms.
-3. La requête fait `OR(first_name.ilike.%term%, last_name.ilike.%term%)`. Si vous tapez "J Dupont", ça cherche literally "J Dupont" → 0 résultat.
-
-**Test à faire** : tapez juste un prénom (ex: "Jean") ou juste un nom. Si toujours 0 résultat alors qu'un profil existe, c'est un bug à creuser.
-
-### Q4 — Si la legacy reste opérationnelle, comment ça s'articule avec les opérateurs plateforme ?
-
-Aujourd'hui : **la legacy n'est plus opérationnelle au checkout**. Il n'y a plus deux moteurs en parallèle. Très Speed Delivery (l'opérateur plateforme) doit avoir ses tarifs dans `delivery_operator_rates` comme n'importe quel autre opérateur — c'est exactement ce qu'on vient de seeder pour Kinshasa.
-
-La seule différence opérateur plateforme vs tiers : pas de plafonds, validation auto, commission différente.
+1. **Recherche par email** : admin uniquement (PII-safe via RPC SECURITY DEFINER)
+2. **Tarifs commune/quartier saisissables par admin** au nom d'un opérateur (auto-approbation)
+3. **Legacy tarification** : suppression des champs prix dans Zone Géographique. Conservation de la Zone Géographique comme **référentiel d'adresses** uniquement
+4. **UX checkout** : message clair + alternatives (zone proche, retrait hub) quand aucun opérateur ne couvre
 
 ---
 
-## Décisions à prendre (proposées)
+## Fix 1 — Recherche propriétaire par email (admin only)
 
-Pour aller au bout du système multi-opérateurs proprement, voici ce que je propose. Validez/ajustez puis je passerai en build mode.
+**Backend** : nouvelle RPC `search_users_admin(term text)` SECURITY DEFINER
+- Vérifie `has_role(auth.uid(), 'admin')` au tout début, sinon `RAISE EXCEPTION`
+- Retourne : `user_id, first_name, last_name, email, city, is_kyc_verified, created_at`
+- Cherche dans `profiles.first_name`, `profiles.last_name`, ET `auth.users.email` (jointure)
+- Limite 8 résultats
 
-### Fix 1 — Recherche propriétaire opérateur
-- **Ajouter la recherche par email** dans `OperatorOwnerSearch` (passer par une RPC `search_users_admin(term)` SECURITY DEFINER pour rester PII-safe côté liste publique mais débloquer admin).
-- **Afficher un message plus clair** indiquant qu'on cherche par prénom OU nom OU email.
-
-### Fix 2 — Tarifs commune/quartier saisissables par admin
-- **Nouvelle page admin** `/admin/operators/:id/rates` permettant à l'admin de gérer les tarifs (zone/commune/quartier) **au nom d'un opérateur**, avec auto-approbation.
-- Réutilise les composants existants de `OperatorRatesPage` mais en mode admin.
-
-### Fix 3 — Décision sur la legacy commune/quartier
-Trois options :
-- **A) Supprimer la legacy** (`last-mile-fee.ts`, champs `delivery_fee`/`delivery_surcharge`) → propre, mono-moteur.
-- **B) Fallback legacy** : si aucun opérateur ne couvre, afficher la legacy comme "Livraison Zandofy directe" (ressuscite l'ancien moteur en dernier recours). Risque : confusion clients.
-- **C) Garder legacy comme outil de référence** pour l'admin (ex: pré-remplir les tarifs proposés aux opérateurs) sans l'utiliser au checkout.
-
-### Fix 4 — Améliorer le message UX checkout
-"Aucun livreur ne dessert encore votre quartier" → ajouter un CTA "Demander une livraison sur ma zone" qui notifie l'admin (signal de demande non-couverte).
+**Frontend** : `OperatorOwnerSearch.tsx`
+- Remplacer la requête directe `profiles` par appel `supabase.rpc('search_users_admin', { term })`
+- Afficher l'email dans les résultats (admin only — composant déjà admin-only)
+- Mettre à jour placeholder : "Ex: Jean, Dupont ou jean@email.com"
+- Mettre à jour le message d'aide en bas
 
 ---
 
-## Détails techniques
+## Fix 2 — Page admin de gestion des tarifs au nom d'un opérateur
 
-- **Tables actives** : `delivery_operators`, `delivery_operator_cities`, `delivery_operator_rates` (status pending/approved/rejected), `delivery_operator_city_caps`, vue `v_active_operators_by_city`.
-- **Tables legacy** : `communes.delivery_fee`, `quartiers.delivery_surcharge`, `quartiers.is_restricted` — toujours en base.
-- **Hook checkout** : `frontend/src/hooks/useOperatorQuotes.ts` (filtre `status=approved` + `is_active=true`).
-- **Edge functions** : `admin-create-operator`, `admin-approve-operator` (assigne rôle `operator`), `admin-reject-operator`, `admin-suspend-operator`, `notify-admin-operator-rate`.
+**Nouvelle route** : `/admin/operators/:operatorId/rates`
+
+**UI** : Réutilise les composants de `OperatorRatesPage.tsx` (formulaire ville/commune/quartier + base/surcharge/ETA), encapsulés dans `AdminOperatorRatesPage.tsx`.
+- En-tête : nom de l'opérateur, lien retour
+- Formulaire identique avec tous les champs déjà en place
+- Bouton "Enregistrer (auto-approuvé)"
+
+**Backend** : nouvelle Edge Function `admin-create-operator-rate` (verify_jwt=true)
+- Vérifie `has_role(admin)`
+- Insert dans `delivery_operator_rates` avec `status='approved'` et `approved_by=auth.uid()`
+- Vérifie le respect des `delivery_operator_city_caps` (sinon erreur 400 explicite)
+
+**Lien d'accès** : ajouter bouton "Gérer les tarifs" sur la page de détail/liste des opérateurs admin.
 
 ---
 
-**Questions pour vous** :
-1. Pour Fix 3, **Option A, B ou C** ?
-2. Voulez-vous Fix 1 + Fix 2 + Fix 4 dans ce sprint, ou seulement un sous-ensemble ?
-3. Pour la recherche owner : OK pour ajouter recherche par email côté admin (PII-safe via RPC) ?
+## Fix 3 — Nettoyage legacy tarification (Zone Géographique)
+
+### A. Migration SQL — retirer les champs de tarification
+
+```sql
+-- Backup defensive (optionnel : on garde 30j puis on drop)
+ALTER TABLE communes RENAME COLUMN delivery_fee TO delivery_fee_legacy_deprecated;
+ALTER TABLE quartiers RENAME COLUMN delivery_surcharge TO delivery_surcharge_legacy_deprecated;
+-- (drop dans une migration future après validation)
+```
+
+> Renommage plutôt que DROP immédiat pour permettre rollback rapide. Drop définitif planifié dans 30 jours.
+
+### B. UI Admin Zone Géographique
+Page : `/admin/geography` (ou équivalent — onglets Pays/Provinces/Villes/Communes/Quartiers)
+
+- **Communes** : retirer la colonne et le champ `delivery_fee` du formulaire
+- **Quartiers** : retirer la colonne et le champ `delivery_surcharge` du formulaire
+- Garder `is_restricted` (info utile : zone non desservie / dangereuse)
+- Ajouter une notice : "La tarification est désormais gérée par chaque opérateur depuis son espace ou par l'admin via /admin/operators/:id/rates"
+
+### C. Code legacy
+- `frontend/src/lib/last-mile-fee.ts` : marquer `@deprecated` en JSDoc, garder le fichier 30j puis suppression
+- Vérifier qu'aucun composant ne l'importe encore (rg sur `last-mile-fee`) — supprimer les imports résiduels
+
+---
+
+## Fix 4 — Message UX checkout amélioré
+
+`useOperatorQuotes.ts` retourne déjà 0 quotes quand non couvert. Améliorer le composant qui affiche le message :
+
+```
+"Aucun livreur ne dessert encore [quartier], [commune]"
+[CTA] Demander une livraison sur ma zone  → notifie admin
+[CTA] Choisir le retrait au hub le plus proche  → bascule sur pickup
+[Info] Zones proches couvertes : commune A, commune B  (suggestion automatique)
+```
+
+**Backend** : Edge function `request-delivery-coverage` (verify_jwt=true)
+- Reçoit : `{ commune_id, quartier_id, country, city }`
+- Insert dans nouvelle table `coverage_requests(user_id, location, requested_at, fulfilled)`
+- Notifie admins via le canal notifications existant
+
+**Migration** : créer `coverage_requests` avec RLS (user voit les siennes, admin voit tout).
+
+---
+
+## Fichiers impactés (résumé)
+
+**Migrations SQL** :
+- `*_add_search_users_admin_rpc.sql`
+- `*_rename_legacy_delivery_fees.sql`
+- `*_create_coverage_requests.sql`
+
+**Edge Functions** :
+- `admin-create-operator-rate/` (nouveau)
+- `request-delivery-coverage/` (nouveau)
+
+**Frontend** :
+- `OperatorOwnerSearch.tsx` (modifié — RPC + email)
+- `AdminOperatorRatesPage.tsx` (nouveau)
+- `App.tsx` (route)
+- `pages/admin/operators/...` (lien "Gérer les tarifs")
+- `pages/admin/geography/*` (retrait champs tarification)
+- `useOperatorQuotes.ts` consumers (composant checkout — message + CTAs)
+- `lib/last-mile-fee.ts` (deprecated)
+
+---
+
+## Hors-scope (à confirmer plus tard)
+- Suppression définitive (DROP) des colonnes legacy → dans 30j si tout va bien
+- Suggestion automatique "zones proches couvertes" : algorithme à affiner (proximité géographique vs. même ville)
+- Migration de données : doit-on convertir les anciens `delivery_fee` en tarifs initiaux pour les opérateurs existants ? **Question pour vous** ci-dessous.
+
+---
+
+## Une dernière question avant exécution
+
+Pour les opérateurs déjà créés (Very Speed Delivery + autres), souhaitez-vous :
+
+**(a)** Que je migre automatiquement les anciennes valeurs `communes.delivery_fee` / `quartiers.delivery_surcharge` en tarifs `delivery_operator_rates` pour Very Speed Delivery (l'opérateur plateforme), pour qu'il couvre immédiatement toutes les communes/quartiers historiques avec les anciens prix ?
+
+**(b)** Ou je laisse Very Speed Delivery avec uniquement le tarif Kinshasa déjà seedé ($5), et vous compléterez manuellement via la nouvelle page admin ?
+
+L'option (a) garantit une continuité de service immédiate sur tout le territoire historique. L'option (b) est plus propre mais nécessite que vous saisissiez chaque commune/quartier.
+
+**Validez le plan + répondez (a) ou (b), et je passe en mode build.**
