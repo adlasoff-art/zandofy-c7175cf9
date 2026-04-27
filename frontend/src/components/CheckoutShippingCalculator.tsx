@@ -9,6 +9,14 @@ import {
 import { ForwarderSelector, type ForwarderChoice } from "@/components/checkout/ForwarderSelector";
 import { FreightSelector, type ConsolidationChoice } from "@/components/checkout/FreightSelector";
 import type { EligibleFreightOffer } from "@/services/freightQuoteCheckout";
+import {
+  groupCartByOriginAndStore,
+  type CartOriginGroup,
+} from "@/services/freightQuoteCheckout";
+import {
+  MultiOriginFreightSelector,
+  type FreightGroupSelection,
+} from "@/components/checkout/MultiOriginFreightSelector";
 
 const MODE_META = {
   air:  { icon: Plane,     label: "Aérien",     localLabel: "Aérien local",  unit: "kg" },
@@ -45,6 +53,8 @@ interface Props {
   onForwarderChange?: (choice: ForwarderChoice | null, unassigned: boolean) => void;
   onFreightOfferChange?: (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => void;
   onFreightAvailabilityChange?: (count: number) => void;
+  /** Lot 11C Phase 2 — Mapping des sélections multi-groupes (1 par origine×store). */
+  onFreightGroupsChange?: (selections: Record<string, FreightGroupSelection>) => void;
 }
 
 function preciseRound(v: number, d: number): number {
@@ -61,6 +71,7 @@ export function CheckoutShippingCalculator({
   onForwarderChange,
   onFreightOfferChange,
   onFreightAvailabilityChange,
+  onFreightGroupsChange,
 }: Props) {
   const [products, setProducts] = useState<CartProductInfo[]>([]);
   const [destCity, setDestCity] = useState<City | null>(null);
@@ -84,6 +95,26 @@ export function CheckoutShippingCalculator({
   const [freightOffer, setFreightOffer] = useState<EligibleFreightOffer | null>(null);
   const [freightChoice, setFreightChoice] = useState<ConsolidationChoice>("split");
   const [hasEligibleFreight, setHasEligibleFreight] = useState(false);
+  // Lot 11C Phase 2 — Groupes (store_id × origin_country) du panier.
+  const [originGroups, setOriginGroups] = useState<CartOriginGroup[]>([]);
+  const [groupSelections, setGroupSelections] = useState<Record<string, FreightGroupSelection>>({});
+
+  // Recalcule les groupes à chaque changement de panier.
+  useEffect(() => {
+    if (cartItems.length === 0) {
+      setOriginGroups([]);
+      return;
+    }
+    let cancelled = false;
+    groupCartByOriginAndStore(cartItems).then((groups) => {
+      if (!cancelled) setOriginGroups(groups);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cartItems]);
+
+  const isMultiGroup = originGroups.length > 1;
 
   // 1. Fetch product details (weight, dimensions, origin, category) for cart items
   useEffect(() => {
@@ -364,6 +395,20 @@ export function CheckoutShippingCalculator({
 
   // Notify parent of shipping cost changes
   useEffect(() => {
+    // Lot 11C Phase 2 — Si multi-groupes, on agrège les devis sélectionnés.
+    if (isMultiGroup) {
+      const total = Object.values(groupSelections).reduce((s, sel) => {
+        if (!sel.offer) return s;
+        const co = sel.offer.consolidation_offer;
+        const v =
+          sel.choice === "consolidated" && co?.available
+            ? co.consolidated_total
+            : (sel.offer.split_total ?? sel.offer.quote.total);
+        return s + (Number(v) || 0);
+      }, 0);
+      onShippingCostChange(total, activeMode);
+      return;
+    }
     // Lot 4D — Si une offre freight (nouveau moteur) est sélectionnée, on l'utilise comme prix
     if (freightOffer) {
       const co = freightOffer.consolidation_offer;
@@ -379,7 +424,7 @@ export function CheckoutShippingCalculator({
     const multiplier = forwarderChoice ? Number(forwarderChoice.price_multiplier || 1) : 1;
     const adjusted = Math.round(base * multiplier * 100) / 100;
     onShippingCostChange(adjusted, activeMode);
-  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice, freightOffer, freightChoice]);
+  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice, freightOffer, freightChoice, isMultiGroup, groupSelections]);
 
   const handleForwarderChange = useCallback(
     (choice: ForwarderChoice | null, unassigned: boolean) => {
@@ -622,25 +667,23 @@ export function CheckoutShippingCalculator({
              pour ne rien casser tant que tous les transitaires n'ont pas migré. */}
       {destCity && modeTotals.get(activeMode) && (
         <>
-          {(() => {
-            // Lot 11C — Détection multi-origines : avertir le client si son panier
-            // contient des produits provenant de plusieurs pays (≥2 origines distinctes).
-            // À terme (Phase 2) ces commandes seront splittées par origine. En attendant
-            // on n'applique pas le filtre transitaire pour ne pas vider la liste à tort.
-            const origins = [...new Set(products.map((p) => (p.originCountry || "").toUpperCase()).filter(Boolean))];
-            if (origins.length > 1) {
-              return (
-                <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-md px-2.5 py-2">
-                  <Lightbulb size={12} className="text-amber-500 shrink-0 mt-0.5" />
-                  <p className="text-[10px] text-muted-foreground">
-                    Votre panier contient des produits de {origins.length} pays différents
-                    ({origins.join(", ")}). Le transport sera coordonné depuis chaque origine.
-                  </p>
-                </div>
-              );
-            }
-            return null;
-          })()}
+          {isMultiGroup ? (
+            <MultiOriginFreightSelector
+              groups={originGroups}
+              destinationCountry={destCity.country_code}
+              destinationCityId={destCity.id}
+              destinationCityName={destCity.name}
+              mode={activeMode}
+              onSelectionChange={(sels) => {
+                setGroupSelections(sels);
+                onFreightGroupsChange?.(sels);
+              }}
+              onAvailabilityChange={(totalCount) => {
+                setHasEligibleFreight(totalCount > 0);
+                onFreightAvailabilityChange?.(totalCount);
+              }}
+            />
+          ) : (
           <FreightSelector
             destinationCountry={destCity.country_code}
             destinationCityId={destCity.id}
@@ -668,7 +711,8 @@ export function CheckoutShippingCalculator({
             realPriceIndicative={modeTotals.get(activeMode)?.total ?? 0}
             totalWeightKgForMarketing={totalWeight / 1000}
           />
-          {!hasEligibleFreight && (
+          )}
+          {!isMultiGroup && !hasEligibleFreight && (
             <ForwarderSelector
               country={destCity.country_code}
               cityId={destCity.id}

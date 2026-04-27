@@ -19,6 +19,7 @@ import {
   consumeFreightQuote,
   type EligibleFreightOffer,
 } from "@/services/freightQuoteCheckout";
+import type { FreightGroupSelection } from "@/components/checkout/MultiOriginFreightSelector";
 import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
 import { OperatorSelector } from "@/components/checkout/OperatorSelector";
 import { useOperatorQuotes, type OperatorQuote } from "@/hooks/useOperatorQuotes";
@@ -218,6 +219,21 @@ export default function CheckoutPage() {
   const handleFreightAvailabilityChange = useCallback((count: number) => {
     setFreightOffersAvailable(count);
   }, []);
+
+  // Lot 11C Phase 2 — Mapping des sélections multi-groupes (1 par origine×store).
+  // Quand le panier contient ≥2 groupes (store × origine), chaque groupe doit avoir
+  // son propre transitaire. Si vide, on retombe sur le flux mono-offre legacy.
+  const [freightGroups, setFreightGroups] = useState<Record<string, FreightGroupSelection>>({});
+  const handleFreightGroupsChange = useCallback(
+    (sels: Record<string, FreightGroupSelection>) => {
+      setFreightGroups(sels);
+    },
+    [],
+  );
+  const isMultiGroupCheckout = Object.keys(freightGroups).length > 1;
+  const freightGroupsAllSelected =
+    isMultiGroupCheckout &&
+    Object.values(freightGroups).every((s) => !!s.offer);
 
   // Free shipping threshold from platform settings
   const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(50);
@@ -674,7 +690,19 @@ export default function CheckoutPage() {
     }
 
     // Lot 4G — Si des transitaires sont disponibles, le client doit en choisir un.
-    if (freightOffersAvailable > 0 && !selectedFreightOffer) {
+    // Lot 11C Phase 2 — En multi-groupes, exiger un transitaire pour CHAQUE groupe.
+    if (isMultiGroupCheckout) {
+      if (!freightGroupsAllSelected) {
+        const total = Object.keys(freightGroups).length;
+        const done = Object.values(freightGroups).filter((s) => s.offer).length;
+        toast({
+          title: "Transitaires requis",
+          description: `Veuillez choisir un transitaire pour chacun des ${total} colis (${done}/${total} choisis).`,
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (freightOffersAvailable > 0 && !selectedFreightOffer) {
       toast({
         title: "Transitaire requis",
         description: "Veuillez sélectionner un transitaire avant de continuer.",
@@ -743,32 +771,70 @@ export default function CheckoutPage() {
 
     const productIds = [...new Set(items.map((i) => i.productId).filter(Boolean))];
     const { data: prods } = productIds.length > 0
-      ? await supabase.from("products").select("id, store_id, origin_country").in("id", productIds)
+      ? await supabase.from("products").select("id, store_id, origin_country, store:stores(country)").in("id", productIds)
       : { data: [] };
     const storeMap = new Map((prods || []).map((p) => [p.id, p.store_id]));
     // Lot 11C — Map productId → pays d'origine (ISO2). Sert à persister
     // orders.origin_country pour la segmentation multi-origines (Phase 2).
+    // Origine effective = origin_country produit > stores.country (fallback).
     const originMap = new Map(
-      (prods || []).map((p: any) => [p.id, (p.origin_country || "").toUpperCase() || null]),
+      (prods || []).map((p: any) => [
+        p.id,
+        ((p.origin_country || p.store?.country || "") || "").toUpperCase() || null,
+      ]),
     );
 
+    // Lot 11C Phase 2 — Segmentation par (store_id, origin_country) si multi-groupes
+    // sélectionnés au checkout, sinon par store_id seul (legacy).
+    const useMultiGroup = isMultiGroupCheckout;
     const storeGroups = new Map<string, typeof items>();
     items.forEach((item) => {
       const sid = storeMap.get(item.productId) || "default";
-      const arr = storeGroups.get(sid) || [];
+      const origin = (originMap.get(item.productId) || "UNKNOWN") as string;
+      const groupKey = useMultiGroup ? `${sid}|${origin}` : sid;
+      const arr = storeGroups.get(groupKey) || [];
       arr.push(item);
-      storeGroups.set(sid, arr);
+      storeGroups.set(groupKey, arr);
     });
 
     const createdOrderIds: string[] = [];
     const storeEntries = [...storeGroups.entries()];
     const needsSuffix = storeEntries.length > 1;
 
-    // Lot 4D — Lock le devis freight (nouveau moteur) AVANT création de l'order.
-    // Si pas d'offre éligible (legacy ForwarderSelector utilisé), on saute silencieusement.
+    // Lot 4D / 11C Phase 2 — Lock des devis freight AVANT création des orders.
+    // Mono-groupe → 1 seul devis verrouillé pour la 1re sous-order.
+    // Multi-groupes → 1 devis verrouillé par groupe (mappé via groupKey).
     let lockedFreightQuoteId: string | null = null;
     let lockedFreightTotal: number | null = null;
-    if (selectedFreightOffer && user) {
+    const lockedQuotesByGroup = new Map<string, { quoteId: string; total: number; offer: EligibleFreightOffer }>();
+
+    if (useMultiGroup && user) {
+      for (const [groupKey, sel] of Object.entries(freightGroups)) {
+        if (!sel.offer) continue;
+        try {
+          const qid = await lockFreightQuote({
+            userId: user.id,
+            offer: sel.offer,
+            items: sel.offer.quote.lines.map((l: any) => ({ quantity: l.quantity ?? 1 })),
+            consolidationChoice: sel.choice,
+          });
+          if (qid) {
+            const { data: lockedQ } = await (supabase as any)
+              .from("freight_quotes")
+              .select("quoted_price")
+              .eq("id", qid)
+              .maybeSingle();
+            const persisted = Number((lockedQ as any)?.quoted_price);
+            const total = Number.isFinite(persisted) && persisted > 0
+              ? persisted
+              : Number(sel.offer.quote.total) || 0;
+            lockedQuotesByGroup.set(groupKey, { quoteId: qid, total, offer: sel.offer });
+          }
+        } catch (err) {
+          console.warn("[CheckoutPage] lockFreightQuote (group) failed", { groupKey, err });
+        }
+      }
+    } else if (selectedFreightOffer && user) {
       try {
         lockedFreightQuoteId = await lockFreightQuote({
           userId: user.id,
@@ -798,7 +864,9 @@ export default function CheckoutPage() {
     }
 
     for (let idx = 0; idx < storeEntries.length; idx++) {
-      const [storeId, storeItems] = storeEntries[idx];
+      const [groupKey, storeItems] = storeEntries[idx];
+      // En multi-groupes : groupKey = `${storeId}|${origin}`. Sinon : storeId seul.
+      const [storeId, groupOriginRaw] = useMultiGroup ? groupKey.split("|") : [groupKey, undefined];
       const orderSubtotal = storeItems.reduce((s, i) => s + i.price * i.quantity, 0);
       // Lot 11C — Origine effective de la sous-commande : si tous les produits
       // partagent la même origine, on la persiste ; sinon NULL (multi-origines).
@@ -809,14 +877,19 @@ export default function CheckoutPage() {
             .filter((c: any): c is string => !!c),
         ),
       ];
-      const orderOriginCountry = orderOrigins.length === 1 ? orderOrigins[0] : null;
+      const orderOriginCountry = useMultiGroup
+        ? (groupOriginRaw && groupOriginRaw !== "UNKNOWN" ? groupOriginRaw : null)
+        : (orderOrigins.length === 1 ? orderOrigins[0] : null);
       
       // Proportional shipping & discount distribution
       const ratio = subtotal > 0 ? orderSubtotal / subtotal : 0;
-      // Lot 11A — Préférer le total persisté du devis verrouillé (source unique
-      // de vérité côté DB). Fallback sur shippingCost local si pas de devis.
-      const baseShippingCost = lockedFreightTotal ?? shippingCost;
-      const orderShippingCost = preciseRound(baseShippingCost * ratio, 2);
+      // Lot 11C Phase 2 — En multi-groupes, le shipping = devis du groupe (pas de ratio).
+      // Sinon : ratio sur le total verrouillé (mono-devis).
+      const groupQuote = useMultiGroup ? lockedQuotesByGroup.get(groupKey) : null;
+      const orderShippingCost = useMultiGroup
+        ? preciseRound(groupQuote?.total ?? 0, 2)
+        : preciseRound((lockedFreightTotal ?? shippingCost) * ratio, 2);
+      const orderFreightQuoteId = useMultiGroup ? (groupQuote?.quoteId ?? null) : lockedFreightQuoteId;
       const orderDiscount = preciseRound(discountAmount * ratio, 2);
       const orderPointsDiscount = preciseRound(pointsDiscount * ratio, 2);
       
@@ -900,7 +973,7 @@ export default function CheckoutPage() {
           forwarder_quoted_price: selectedForwarder ? preciseRound(selectedForwarder.quoted_price * ratio, 2) : null,
           forwarder_unassigned: !selectedForwarder && forwarderUnassigned,
           // Lot 4D — Devis freight verrouillé (nouveau moteur Lot 3A)
-          freight_quote_id: lockedFreightQuoteId,
+          freight_quote_id: orderFreightQuoteId,
         } as any)
         .select("id")
         .single();
@@ -947,11 +1020,12 @@ export default function CheckoutPage() {
           });
         }
 
-        // Lot 4D — Marquer le devis freight comme consumé et le lier à l'order
-        // (sur la 1re sous-order uniquement : un devis = une expédition logique)
-        if (lockedFreightQuoteId && idx === 0) {
+        // Lot 4D / 11C Phase 2 — Consume le devis freight lié à cette sous-order.
+        // Multi-groupes : 1 devis = 1 sous-order. Mono : 1 devis sur la 1re sous-order.
+        const quoteToConsume = useMultiGroup ? orderFreightQuoteId : (idx === 0 ? lockedFreightQuoteId : null);
+        if (quoteToConsume) {
           try {
-            await consumeFreightQuote(lockedFreightQuoteId, order.id);
+            await consumeFreightQuote(quoteToConsume, order.id);
             // Lot 4I — Notifier le transitaire par email (non-bloquant).
             // Le handoff + notif in-app sont déjà créés par le trigger DB
             // (trg_create_forwarder_handoff sur freight_quotes.status='consumed').
@@ -2047,6 +2121,7 @@ export default function CheckoutPage() {
                     onForwarderChange={handleForwarderChange}
                     onFreightOfferChange={handleFreightOfferChange}
                     onFreightAvailabilityChange={handleFreightAvailabilityChange}
+                    onFreightGroupsChange={handleFreightGroupsChange}
                   />
                 </div>
 

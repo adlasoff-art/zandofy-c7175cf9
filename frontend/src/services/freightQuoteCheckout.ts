@@ -384,3 +384,117 @@ export async function getFreightQuote(quoteId: string): Promise<{
 }
 
 export type { FreightItem, FreightQuoteResult, FreightProfile };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lot 11C — Phase 2 : Segmentation panier par (store_id, origin_country)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Représente un groupe de produits du panier partageant la même boutique ET
+ * le même pays d'origine effectif. Chaque groupe = 1 sous-commande + 1 devis
+ * transitaire indépendant.
+ */
+export interface CartOriginGroup {
+  /** Clé unique stable : `${store_id}|${origin_country}`. */
+  key: string;
+  store_id: string;
+  /** ISO2 du pays d'origine effectif (origine produit > origine boutique). */
+  origin_country: string;
+  /** Nom de la boutique (pour affichage). */
+  store_name?: string | null;
+  /** Items appartenant à ce groupe (productId + quantity). */
+  items: Array<{
+    productId: string;
+    quantity: number;
+    weight_kg?: number;
+    cbm?: number;
+  }>;
+  /** Poids total du groupe en kg. */
+  total_weight_kg: number;
+  /** Volume total du groupe en CBM. */
+  total_cbm: number;
+  /** Modes communs supportés par tous les produits du groupe. */
+  supported_modes: Array<"air" | "sea">;
+}
+
+/**
+ * Construit la liste des groupes (store_id × origin_country) depuis le panier.
+ * Origine effective = `products.origin_country` (fallback : `stores.country`).
+ * Modes supportés = intersection des `can_ship_air` / `can_ship_sea` du groupe.
+ */
+export async function groupCartByOriginAndStore(
+  cartItems: Array<{ productId: string; quantity: number }>,
+): Promise<CartOriginGroup[]> {
+  if (cartItems.length === 0) return [];
+  const productIds = [...new Set(cartItems.map((i) => i.productId).filter(Boolean))];
+  if (productIds.length === 0) return [];
+
+  const { data: products } = await (supabase as any)
+    .from("products")
+    .select(
+      "id, store_id, origin_country, weight_grams, length_cm, width_cm, height_cm, can_ship_air, can_ship_sea, store:stores(id, name, country)",
+    )
+    .in("id", productIds);
+
+  type Row = {
+    id: string;
+    store_id: string | null;
+    origin_country: string | null;
+    weight_grams: number | null;
+    length_cm: number | null;
+    width_cm: number | null;
+    height_cm: number | null;
+    can_ship_air: boolean | null;
+    can_ship_sea: boolean | null;
+    store: { id: string; name: string | null; country: string | null } | null;
+  };
+  const rows = (products ?? []) as Row[];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+
+  const groups = new Map<string, CartOriginGroup>();
+  for (const ci of cartItems) {
+    const p = byId.get(ci.productId);
+    if (!p) continue;
+    const storeId = p.store_id ?? "default";
+    const originISO = ((p.origin_country ?? p.store?.country ?? "") || "").toUpperCase().trim();
+    const groupKey = `${storeId}|${originISO || "UNKNOWN"}`;
+
+    const wKg = ((p.weight_grams ?? 500) * ci.quantity) / 1000;
+    const cbm =
+      ((Number(p.length_cm ?? 30) * Number(p.width_cm ?? 20) * Number(p.height_cm ?? 10)) *
+        ci.quantity) /
+      1_000_000;
+
+    const existing = groups.get(groupKey);
+    if (existing) {
+      existing.items.push({ productId: ci.productId, quantity: ci.quantity, weight_kg: wKg, cbm });
+      existing.total_weight_kg += wKg;
+      existing.total_cbm += cbm;
+      // Intersection : on conserve un mode uniquement s'il est encore commun.
+      const stillSupported: Array<"air" | "sea"> = [];
+      if (existing.supported_modes.includes("air") && p.can_ship_air !== false) stillSupported.push("air");
+      if (existing.supported_modes.includes("sea") && p.can_ship_sea !== false) stillSupported.push("sea");
+      existing.supported_modes = stillSupported;
+    } else {
+      const supported: Array<"air" | "sea"> = [];
+      if (p.can_ship_air !== false) supported.push("air");
+      if (p.can_ship_sea !== false) supported.push("sea");
+      groups.set(groupKey, {
+        key: groupKey,
+        store_id: storeId,
+        origin_country: originISO,
+        store_name: p.store?.name ?? null,
+        items: [{ productId: ci.productId, quantity: ci.quantity, weight_kg: wKg, cbm }],
+        total_weight_kg: wKg,
+        total_cbm: cbm,
+        supported_modes: supported,
+      });
+    }
+  }
+
+  // Tri stable : par origine puis store pour rendu déterministe.
+  return [...groups.values()].sort((a, b) => {
+    if (a.origin_country !== b.origin_country) return a.origin_country.localeCompare(b.origin_country);
+    return a.store_id.localeCompare(b.store_id);
+  });
+}
