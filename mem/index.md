@@ -25,6 +25,7 @@
 
 ### E-commerce Features & Logistics
 - [Multi-Operator Delivery](mem://features/multi-operator-delivery-system) — Lot 11B last-mile par entreprises
+- [Customer Order Tracking](mem://features/customer-order-tracking) — Lot 12 RPC get_customer_tracking + polling 10s + carte Leaflet rider+destination
 - [Dual-Code Security](mem://features/dual-code-pickup-delivery-security) — pickup_code + delivery_code (Phase 10.5)
 - [Forwarders & Logistics](mem://features/forwarders-and-logistics-system)
 - [Order Workflow](mem://features/order-workflow)
