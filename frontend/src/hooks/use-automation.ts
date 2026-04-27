@@ -97,7 +97,7 @@ export function useAutomation() {
 
           const { data: profile } = await supabase
             .from("profiles")
-            .select("created_at, country, city")
+            .select("created_at, residence_country, residence_city")
             .eq("id", user.id)
             .maybeSingle();
           if (profile?.created_at) {
@@ -105,8 +105,8 @@ export function useAutomation() {
               (Date.now() - new Date(profile.created_at).getTime()) / (1000 * 60 * 60 * 24)
             );
           }
-          userCountry = (profile as any)?.country ?? null;
-          userCity = (profile as any)?.city ?? null;
+          userCountry = (profile as any)?.residence_country ?? null;
+          userCity = (profile as any)?.residence_city ?? null;
 
           const { data: roleRows } = await (supabase as any)
             .from("user_roles")
