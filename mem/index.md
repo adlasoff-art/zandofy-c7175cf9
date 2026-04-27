@@ -53,6 +53,7 @@
 - [Storage Upsert Policy](mem://architecture/supabase-storage-upsert-policy-constraint-logic)
 - [Service Worker Config](mem://architecture/service-worker-config-injection-logic)
 - [Cache Management Strategy](mem://architecture/cache-management-strategy)
+- [Playwright E2E Setup](mem://architecture/playwright-e2e-setup) — Specs `frontend/e2e/`, CI GH Actions. Sandbox Lovable ne peut PAS lancer Chromium.
 - [Data Privacy Views](mem://architecture/data-privacy-views-config)
 - [Environment CSP Strategy](mem://architecture/environment-aware-csp-strategy)
 - [Security Hardening V4](mem://architecture/advanced-security-hardening-v4-0)
