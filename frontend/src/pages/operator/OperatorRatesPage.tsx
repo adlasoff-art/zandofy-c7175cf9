@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { GeoFieldsRow } from "@/components/address/GeoFieldsRow";
 import { toast } from "sonner";
 import { Plus, Loader2, Trash2, Banknote, ShieldAlert, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 
@@ -96,12 +97,22 @@ export default function OperatorRatesPage() {
       <Card>
         <CardContent className="pt-4 space-y-3">
           <p className="text-sm font-medium flex items-center gap-1.5"><Plus size={14} />Ajouter un tarif</p>
+          <GeoFieldsRow
+            value={{ country: form.country_code, city: form.city, commune: form.commune, quartier: form.quartier }}
+            onChange={(patch) =>
+              setForm({
+                ...form,
+                country_code: patch.country ?? form.country_code,
+                city: patch.city !== undefined ? patch.city : (patch.country !== undefined ? "" : form.city),
+                commune: patch.commune !== undefined ? patch.commune : (patch.country !== undefined || patch.city !== undefined ? "" : form.commune),
+                quartier: patch.quartier !== undefined ? patch.quartier : (patch.country !== undefined || patch.city !== undefined || patch.commune !== undefined ? "" : form.quartier),
+              })
+            }
+            levels={["country", "city", "commune", "quartier"]}
+            required={["country", "city"]}
+          />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <div><Label>Pays</Label><Input value={form.country_code} maxLength={3} onChange={(e) => setForm({ ...form, country_code: e.target.value.toUpperCase() })} /></div>
-            <div><Label>Ville *</Label><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
             <div><Label>Zone *</Label><Input value={form.zone_name} onChange={(e) => setForm({ ...form, zone_name: e.target.value })} placeholder="Centre-ville" /></div>
-            <div><Label>Commune</Label><Input value={form.commune} onChange={(e) => setForm({ ...form, commune: e.target.value })} /></div>
-            <div><Label>Quartier</Label><Input value={form.quartier} onChange={(e) => setForm({ ...form, quartier: e.target.value })} /></div>
             <div><Label>Prix base ($)</Label><Input type="number" min={0} step={0.01} value={form.base_price} onChange={(e) => setForm({ ...form, base_price: parseFloat(e.target.value) || 0 })} /></div>
             <div><Label>Surcharge ($)</Label><Input type="number" min={0} step={0.01} value={form.surcharge} onChange={(e) => setForm({ ...form, surcharge: parseFloat(e.target.value) || 0 })} /></div>
             <div><Label>Prix/km ($)</Label><Input type="number" min={0} step={0.01} value={form.price_per_km} onChange={(e) => setForm({ ...form, price_per_km: parseFloat(e.target.value) || 0 })} /></div>
