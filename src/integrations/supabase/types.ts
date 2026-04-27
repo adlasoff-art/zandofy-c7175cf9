@@ -1968,6 +1968,9 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
           auto_suspended_at: string | null
           auto_suspension_reason: string | null
           company_name: string
@@ -2002,6 +2005,9 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           auto_suspended_at?: string | null
           auto_suspension_reason?: string | null
           company_name: string
@@ -2036,6 +2042,9 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           auto_suspended_at?: string | null
           auto_suspension_reason?: string | null
           company_name?: string
@@ -4174,6 +4183,10 @@ export type Database = {
           operator_response_deadline: string | null
           order_ref: string
           payment_method: string | null
+          pickup_code: string | null
+          pickup_code_generated_at: string | null
+          pickup_code_verified_at: string | null
+          pickup_verified_by: string | null
           review_reminder_count: number
           review_reminder_last: string | null
           rider_cash_collected: boolean | null
@@ -4237,6 +4250,10 @@ export type Database = {
           operator_response_deadline?: string | null
           order_ref: string
           payment_method?: string | null
+          pickup_code?: string | null
+          pickup_code_generated_at?: string | null
+          pickup_code_verified_at?: string | null
+          pickup_verified_by?: string | null
           review_reminder_count?: number
           review_reminder_last?: string | null
           rider_cash_collected?: boolean | null
@@ -4300,6 +4317,10 @@ export type Database = {
           operator_response_deadline?: string | null
           order_ref?: string
           payment_method?: string | null
+          pickup_code?: string | null
+          pickup_code_generated_at?: string | null
+          pickup_code_verified_at?: string | null
+          pickup_verified_by?: string | null
           review_reminder_count?: number
           review_reminder_last?: string | null
           rider_cash_collected?: boolean | null
@@ -9190,6 +9211,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      get_pickup_code_for_order: {
+        Args: { _order_id: string }
+        Returns: string
+      }
       get_product_rating_summary: {
         Args: { p_product_id: string }
         Returns: {
@@ -9370,6 +9395,10 @@ export type Database = {
           target_city: string
           target_country: string
         }[]
+      }
+      verify_order_pickup_code: {
+        Args: { _code: string; _order_id: string }
+        Returns: Json
       }
     }
     Enums: {
