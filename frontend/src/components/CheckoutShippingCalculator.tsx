@@ -395,6 +395,20 @@ export function CheckoutShippingCalculator({
 
   // Notify parent of shipping cost changes
   useEffect(() => {
+    // Lot 11C Phase 2 — Si multi-groupes, on agrège les devis sélectionnés.
+    if (isMultiGroup) {
+      const total = Object.values(groupSelections).reduce((s, sel) => {
+        if (!sel.offer) return s;
+        const co = sel.offer.consolidation_offer;
+        const v =
+          sel.choice === "consolidated" && co?.available
+            ? co.consolidated_total
+            : (sel.offer.split_total ?? sel.offer.quote.total);
+        return s + (Number(v) || 0);
+      }, 0);
+      onShippingCostChange(total, activeMode);
+      return;
+    }
     // Lot 4D — Si une offre freight (nouveau moteur) est sélectionnée, on l'utilise comme prix
     if (freightOffer) {
       const co = freightOffer.consolidation_offer;
@@ -410,7 +424,7 @@ export function CheckoutShippingCalculator({
     const multiplier = forwarderChoice ? Number(forwarderChoice.price_multiplier || 1) : 1;
     const adjusted = Math.round(base * multiplier * 100) / 100;
     onShippingCostChange(adjusted, activeMode);
-  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice, freightOffer, freightChoice]);
+  }, [activeMode, modeTotals, onShippingCostChange, forwarderChoice, freightOffer, freightChoice, isMultiGroup, groupSelections]);
 
   const handleForwarderChange = useCallback(
     (choice: ForwarderChoice | null, unassigned: boolean) => {
