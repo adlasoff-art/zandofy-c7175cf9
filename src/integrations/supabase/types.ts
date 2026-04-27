@@ -9320,6 +9320,18 @@ export type Database = {
         Returns: undefined
       }
       release_vendor_pending_funds: { Args: never; Returns: number }
+      search_users_admin: {
+        Args: { term: string }
+        Returns: {
+          city: string
+          created_at: string
+          email: string
+          first_name: string
+          is_kyc_verified: boolean
+          last_name: string
+          user_id: string
+        }[]
+      }
       set_store_offline: { Args: { p_store_id: string }; Returns: undefined }
       set_user_offline: { Args: { p_user_id: string }; Returns: undefined }
       track_delivery: {
