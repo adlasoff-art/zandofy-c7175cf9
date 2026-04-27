@@ -13,10 +13,12 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, XCircle, PauseCircle, PlayCircle, Building2, Truck, MapPin, Users, Plus, Archive } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, PauseCircle, PlayCircle, Building2, Truck, MapPin, Users, Plus, Archive, Pencil, DollarSign, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ShieldAlert, Clock } from "lucide-react";
 import { CreateOperatorDialog } from "@/components/admin/operators/CreateOperatorDialog";
+import { OperatorKybDocsPanel } from "@/components/admin/operators/OperatorKybDocsPanel";
+import { EditOperatorDialog } from "@/components/admin/operators/EditOperatorDialog";
 
 type OperatorRow = {
   id: string;
@@ -61,6 +63,8 @@ export default function AdminOperatorsPage() {
   const [reason, setReason] = useState("");
   const [commissionPct, setCommissionPct] = useState<string>("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<OperatorRow | null>(null);
+  const [drawerTab, setDrawerTab] = useState<"info" | "kyb">("info");
 
   const { data: operators, isLoading } = useQuery({
     queryKey: ["admin-operators", tab],
@@ -141,14 +145,15 @@ export default function AdminOperatorsPage() {
   const archiveMutation = useMutation({
     mutationFn: async () => {
       if (!archiveTarget) throw new Error("No target");
-      const { error } = await (supabase as any)
-        .from("delivery_operators")
-        .update({
-          archived_at: new Date().toISOString(),
-          archive_reason: archiveReason.trim() || null,
-        })
-        .eq("id", archiveTarget.id);
+      const { data, error } = await supabase.functions.invoke("admin-archive-operator", {
+        body: {
+          operator_id: archiveTarget.id,
+          archive_reason: archiveReason.trim() || undefined,
+        },
+      });
       if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data;
     },
     onSuccess: () => {
       toast({ title: "Opérateur archivé" });
@@ -255,6 +260,11 @@ export default function AdminOperatorsPage() {
                     </div>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => setSelected(op)}>Détails</Button>
+                    <Button asChild size="sm" variant="ghost">
+                      <Link to={`/admin/operators/${op.id}/rates`} title="Gérer les tarifs">
+                        <DollarSign size={14} />
+                      </Link>
+                    </Button>
                 </CardContent>
               </Card>
             ))}
@@ -271,6 +281,13 @@ export default function AdminOperatorsPage() {
                 <DialogTitle>{selected.company_name}</DialogTitle>
                 <DialogDescription>Dossier KYB opérateur — {STATUS_VARIANT[selected.status]?.label}</DialogDescription>
               </DialogHeader>
+              <Tabs value={drawerTab} onValueChange={(v) => setDrawerTab(v as "info" | "kyb")}>
+                <TabsList>
+                  <TabsTrigger value="info">Informations</TabsTrigger>
+                  <TabsTrigger value="kyb"><FileText size={12} className="mr-1" /> Documents KYB</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              {drawerTab === "info" ? (
               <div className="space-y-4 text-sm">
                 <Section title="Identité entreprise">
                   <Field k="Raison sociale" v={selected.legal_name || "—"} />
@@ -305,7 +322,18 @@ export default function AdminOperatorsPage() {
                   </Section>
                 )}
               </div>
+              ) : (
+                <OperatorKybDocsPanel operatorId={selected.id} />
+              )}
               <DialogFooter className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => setEditTarget(selected)}>
+                  <Pencil size={16} className="mr-1" /> Éditer
+                </Button>
+                <Button asChild variant="outline">
+                  <Link to={`/admin/operators/${selected.id}/rates`}>
+                    <DollarSign size={16} className="mr-1" /> Tarifs
+                  </Link>
+                </Button>
                 {selected.status === "pending" && (
                   <>
                     <Button variant="default" onClick={() => { setActionType("approve"); setCommissionPct(String(selected.platform_commission_pct)); }}>
@@ -382,6 +410,11 @@ export default function AdminOperatorsPage() {
         </DialogContent>
       </Dialog>
       <CreateOperatorDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <EditOperatorDialog
+        operator={editTarget}
+        open={!!editTarget}
+        onOpenChange={(o) => { if (!o) setEditTarget(null); }}
+      />
 
       {/* Archive confirmation */}
       <Dialog open={!!archiveTarget} onOpenChange={(o) => { if (!o) { setArchiveTarget(null); setArchiveReason(""); } }}>
