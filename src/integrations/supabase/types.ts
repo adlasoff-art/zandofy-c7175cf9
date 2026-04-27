@@ -1671,6 +1671,94 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_wallet_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          description: string | null
+          dispute_id: string | null
+          id: string
+          order_id: string | null
+          type: string
+          user_id: string
+          wallet_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          dispute_id?: string | null
+          id?: string
+          order_id?: string | null
+          type: string
+          user_id: string
+          wallet_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          dispute_id?: string | null
+          id?: string
+          order_id?: string | null
+          type?: string
+          user_id?: string
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_wallet_transactions_dispute_id_fkey"
+            columns: ["dispute_id"]
+            isOneToOne: false
+            referencedRelation: "disputes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_wallet_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_wallet_transactions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "customer_wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_wallets: {
+        Row: {
+          balance: number
+          created_at: string
+          currency: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       deliveries: {
         Row: {
           address: string
@@ -2325,50 +2413,95 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          escalated_at: string | null
+          escalated_reason: string | null
+          final_refund_amount: number | null
+          final_refund_method: string | null
           id: string
+          is_overdue: boolean
           order_id: string
           priority: string
+          proposed_refund_amount: number | null
+          proposed_refund_at: string | null
+          proposed_refund_by: string | null
+          proposed_refund_method: string | null
+          proposed_refund_status: string | null
           reason: string
+          refunded_at: string | null
+          refunded_by: string | null
           resolution: string | null
           resolved_at: string | null
           resolved_by: string | null
           return_request_id: string | null
+          sla_resolution_due_at: string | null
+          sla_response_due_at: string | null
           status: string
           store_id: string | null
           updated_at: string
           user_id: string
+          vendor_first_response_at: string | null
         }
         Insert: {
           created_at?: string
           description?: string | null
+          escalated_at?: string | null
+          escalated_reason?: string | null
+          final_refund_amount?: number | null
+          final_refund_method?: string | null
           id?: string
+          is_overdue?: boolean
           order_id: string
           priority?: string
+          proposed_refund_amount?: number | null
+          proposed_refund_at?: string | null
+          proposed_refund_by?: string | null
+          proposed_refund_method?: string | null
+          proposed_refund_status?: string | null
           reason?: string
+          refunded_at?: string | null
+          refunded_by?: string | null
           resolution?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           return_request_id?: string | null
+          sla_resolution_due_at?: string | null
+          sla_response_due_at?: string | null
           status?: string
           store_id?: string | null
           updated_at?: string
           user_id: string
+          vendor_first_response_at?: string | null
         }
         Update: {
           created_at?: string
           description?: string | null
+          escalated_at?: string | null
+          escalated_reason?: string | null
+          final_refund_amount?: number | null
+          final_refund_method?: string | null
           id?: string
+          is_overdue?: boolean
           order_id?: string
           priority?: string
+          proposed_refund_amount?: number | null
+          proposed_refund_at?: string | null
+          proposed_refund_by?: string | null
+          proposed_refund_method?: string | null
+          proposed_refund_status?: string | null
           reason?: string
+          refunded_at?: string | null
+          refunded_by?: string | null
           resolution?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           return_request_id?: string | null
+          sla_resolution_due_at?: string | null
+          sla_response_due_at?: string | null
           status?: string
           store_id?: string | null
           updated_at?: string
           user_id?: string
+          vendor_first_response_at?: string | null
         }
         Relationships: [
           {
@@ -9316,6 +9449,15 @@ export type Database = {
           last_name: string
         }[]
       }
+      apply_dispute_refund: {
+        Args: {
+          p_actor: string
+          p_amount: number
+          p_dispute_id: string
+          p_method: string
+        }
+        Returns: Json
+      }
       can_access_store_orders: {
         Args: { _store_id: string; _user_id: string }
         Returns: boolean
@@ -9647,6 +9789,7 @@ export type Database = {
         Args: { p_decision: string; p_order_id: string; p_reason?: string }
         Returns: Json
       }
+      process_dispute_sla: { Args: never; Returns: Json }
       quote_forwarder:
         | {
             Args: { p_items: Json; p_profile_id: string; p_total_cbm?: number }
