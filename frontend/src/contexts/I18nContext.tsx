@@ -1141,7 +1141,7 @@ interface I18nContextType {
   currency: CurrencyCode;
   setLocale: (l: Locale) => void;
   setCurrency: (c: CurrencyCode) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
   formatPrice: (usdPrice: number) => string;
   currencySymbol: string;
 }
@@ -1215,11 +1215,16 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const t = useCallback(
-    (key: string) => {
+    (key: string, params?: Record<string, string | number>) => {
       // CMS overrides take priority
       const cmsValue = cmsOverrides[locale]?.[key];
-      if (cmsValue) return cmsValue;
-      return translations[locale]?.[key] || translations.fr[key] || key;
+      const raw = cmsValue || translations[locale]?.[key] || translations.fr[key] || key;
+      if (!params) return raw;
+      // Lot 11C — interpolation simple {{name}}
+      return raw.replace(/\{\{(\w+)\}\}/g, (_m, k) => {
+        const v = params[k];
+        return v === undefined || v === null ? "" : String(v);
+      });
     },
     [locale, cmsOverrides]
   );
