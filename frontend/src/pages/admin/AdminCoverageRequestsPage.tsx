@@ -17,7 +17,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Loader2, MapPin, Check } from "lucide-react";
+import { Loader2, MapPin, Check, Truck } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -35,12 +35,27 @@ type CoverageRequest = {
   fulfilled_operator_id: string | null;
 };
 
+type ForwarderCoverageRequest = {
+  id: string;
+  user_id: string;
+  origin_country: string;
+  destination_country: string;
+  destination_city: string | null;
+  mode: string;
+  notes: string | null;
+  status: string;
+  requested_at: string;
+  resolved_at: string | null;
+};
+
 export default function AdminCoverageRequestsPage() {
   const qc = useQueryClient();
+  const [scope, setScope] = useState<"local" | "forwarder">("local");
   const [tab, setTab] = useState<"pending" | "fulfilled">("pending");
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-coverage-requests", tab],
+    enabled: scope === "local",
     queryFn: async () => {
       const q = (supabase as any)
         .from("coverage_requests")
@@ -52,6 +67,21 @@ export default function AdminCoverageRequestsPage() {
           : await q.not("fulfilled_at", "is", null);
       if (error) throw error;
       return (data || []) as CoverageRequest[];
+    },
+  });
+
+  const { data: fwdData, isLoading: fwdLoading } = useQuery({
+    queryKey: ["admin-forwarder-coverage-requests", tab],
+    enabled: scope === "forwarder",
+    queryFn: async () => {
+      const status = tab === "pending" ? ["pending", "notified"] : ["resolved", "dismissed"];
+      const { data, error } = await (supabase as any)
+        .from("forwarder_coverage_requests")
+        .select("*")
+        .in("status", status)
+        .order("requested_at", { ascending: false });
+      if (error) throw error;
+      return (data || []) as ForwarderCoverageRequest[];
     },
   });
 
@@ -74,6 +104,26 @@ export default function AdminCoverageRequestsPage() {
     onError: (e: any) => toast.error(e.message || "Erreur"),
   });
 
+  const resolveFwd = useMutation({
+    mutationFn: async (id: string) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const { error } = await (supabase as any)
+        .from("forwarder_coverage_requests")
+        .update({
+          status: "resolved",
+          resolved_at: new Date().toISOString(),
+          resolved_by: userData.user?.id ?? null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Demande marquée comme traitée");
+      qc.invalidateQueries({ queryKey: ["admin-forwarder-coverage-requests"] });
+    },
+    onError: (e: any) => toast.error(e.message || "Erreur"),
+  });
+
   return (
     <AdminLayout title="Demandes de couverture">
       <div className="space-y-6">
@@ -89,8 +139,19 @@ export default function AdminCoverageRequestsPage() {
             <TabsTrigger value="pending">En attente</TabsTrigger>
             <TabsTrigger value="fulfilled">Traitées</TabsTrigger>
           </TabsList>
+        </Tabs>
 
-          <TabsContent value={tab} className="mt-4">
+        <Tabs value={scope} onValueChange={(v) => setScope(v as any)}>
+          <TabsList>
+            <TabsTrigger value="local" className="gap-1.5">
+              <MapPin size={14} /> Livraison locale
+            </TabsTrigger>
+            <TabsTrigger value="forwarder" className="gap-1.5">
+              <Truck size={14} /> Transitaires
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="local" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -149,6 +210,78 @@ export default function AdminCoverageRequestsPage() {
                                 variant="ghost"
                                 onClick={() => fulfill.mutate(r.id)}
                                 disabled={fulfill.isPending}
+                              >
+                                <Check size={14} className="mr-1" /> Marquer traitée
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="forwarder" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Truck size={16} />
+                  {fwdData?.length ?? 0} demande{(fwdData?.length ?? 0) > 1 ? "s" : ""}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {fwdLoading ? (
+                  <div className="flex justify-center py-6">
+                    <Loader2 className="animate-spin" />
+                  </div>
+                ) : !fwdData || fwdData.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-6 text-center">
+                    Aucune demande {tab === "pending" ? "en attente" : "traitée"}.
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Route</TableHead>
+                        <TableHead>Mode</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {fwdData.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="text-xs">
+                            {formatDistanceToNow(new Date(r.requested_at), {
+                              addSuffix: true,
+                              locale: fr,
+                            })}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {r.origin_country} → {r.destination_country}
+                            {r.destination_city && <> · {r.destination_city}</>}
+                          </TableCell>
+                          <TableCell className="text-xs uppercase">{r.mode}</TableCell>
+                          <TableCell>
+                            {r.status === "resolved" ? (
+                              <Badge variant="secondary">Traitée</Badge>
+                            ) : r.status === "dismissed" ? (
+                              <Badge variant="outline">Rejetée</Badge>
+                            ) : (
+                              <Badge variant="outline">En attente</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {(r.status === "pending" || r.status === "notified") && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => resolveFwd.mutate(r.id)}
+                                disabled={resolveFwd.isPending}
                               >
                                 <Check size={14} className="mr-1" /> Marquer traitée
                               </Button>

@@ -10,7 +10,10 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Package, MapPin } from "lucide-react";
+import { Package, MapPin, MailPlus, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { FreightSelector, type ConsolidationChoice } from "./FreightSelector";
 import type { CartOriginGroup } from "@/services/freightQuoteCheckout";
 import type { EligibleFreightOffer } from "@/services/freightQuoteCheckout";
@@ -48,6 +51,8 @@ export function MultiOriginFreightSelector({
   const [selections, setSelections] = useState<Record<string, FreightGroupSelection>>({});
   // Disponibilité par groupe : groupKey → count
   const [availability, setAvailability] = useState<Record<string, number>>({});
+  // Demandes de couverture en cours / déjà envoyées par groupe.
+  const [coverageState, setCoverageState] = useState<Record<string, "idle" | "loading" | "sent">>({});
 
   // Reset quand la liste de groupes change (ex: panier modifié, mode changé).
   useEffect(() => {
@@ -84,6 +89,36 @@ export function MultiOriginFreightSelector({
 
   const handleGroupAvailability = (groupKey: string) => (count: number) => {
     setAvailability((prev) => (prev[groupKey] === count ? prev : { ...prev, [groupKey]: count }));
+  };
+
+  const requestCoverage = async (group: CartOriginGroup) => {
+    if (!group.origin_country) {
+      toast.error("Origine inconnue — impossible d'envoyer la demande.");
+      return;
+    }
+    setCoverageState((prev) => ({ ...prev, [group.key]: "loading" }));
+    try {
+      const { data, error } = await supabase.functions.invoke("request-forwarder-coverage", {
+        body: {
+          origin_country: group.origin_country,
+          destination_country: destinationCountry,
+          destination_city: destinationCityName,
+          destination_city_id: destinationCityId,
+          mode,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success(
+        (data as any)?.deduplicated
+          ? "Demande déjà enregistrée — un admin vous contactera dès qu'un transitaire couvre la route."
+          : "Demande envoyée — un admin vous contactera dès qu'un transitaire couvre la route.",
+      );
+      setCoverageState((prev) => ({ ...prev, [group.key]: "sent" }));
+    } catch (e: any) {
+      toast.error(e?.message || "Impossible d'envoyer la demande");
+      setCoverageState((prev) => ({ ...prev, [group.key]: "idle" }));
+    }
   };
 
   // Total agrégé pour affichage récap.
@@ -146,18 +181,46 @@ export function MultiOriginFreightSelector({
                 colis. Modes supportés : {group.supported_modes.join(", ") || "aucun"}.
               </div>
             ) : (
-              <FreightSelector
-                destinationCountry={destinationCountry}
-                destinationCityId={destinationCityId}
-                destinationCityName={destinationCityName}
-                mode={mode}
-                originCountry={group.origin_country || null}
-                items={group.items}
-                totalCbm={group.total_cbm}
-                totalWeightKg={group.total_weight_kg}
-                onChange={handleGroupChange(group.key, group)}
-                onAvailabilityChange={handleGroupAvailability(group.key)}
-              />
+              <>
+                <FreightSelector
+                  destinationCountry={destinationCountry}
+                  destinationCityId={destinationCityId}
+                  destinationCityName={destinationCityName}
+                  mode={mode}
+                  originCountry={group.origin_country || null}
+                  items={group.items}
+                  totalCbm={group.total_cbm}
+                  totalWeightKg={group.total_weight_kg}
+                  onChange={handleGroupChange(group.key, group)}
+                  onAvailabilityChange={handleGroupAvailability(group.key)}
+                />
+                {availability[group.key] === 0 && (
+                  <div className="mt-2 flex items-start justify-between gap-2 px-2.5 py-2 rounded-md border border-amber-500/30 bg-amber-500/5">
+                    <div className="text-[11px] text-amber-700 dark:text-amber-400 leading-snug">
+                      Aucun transitaire ne dessert encore{" "}
+                      <strong>
+                        {group.origin_country ? getCountryName(group.origin_country) : "cette origine"}
+                      </strong>{" "}
+                      → <strong>{getCountryName(destinationCountry)}</strong> en mode{" "}
+                      <strong>{mode}</strong>.
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 shrink-0"
+                      disabled={coverageState[group.key] === "loading" || coverageState[group.key] === "sent"}
+                      onClick={() => requestCoverage(group)}
+                    >
+                      {coverageState[group.key] === "loading" ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <MailPlus size={12} />
+                      )}
+                      {coverageState[group.key] === "sent" ? "Envoyé" : "Demander couverture"}
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         );

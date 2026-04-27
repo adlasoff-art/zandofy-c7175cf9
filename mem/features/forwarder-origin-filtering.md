@@ -34,10 +34,16 @@ Avant : `fetchEligibleFreightOffers` ne filtrait que sur destination + mode → 
 - Gating `handleShippingSubmit` : refuse de continuer si un groupe n'a pas de transitaire choisi.
 - Conflit air/sea géré : si `supported_modes` du groupe n'inclut pas le mode actif, encart amber bloquant (le client doit changer de mode ou retirer un article).
 
-## Reste à faire (post-Phase 2, non bloquant MVP)
+## ✅ Phase 3 (livrée) — Empty state "Demander couverture transitaire"
+- Table `public.forwarder_coverage_requests` (origin/destination/mode/status + RLS user-own + admin-all).
+- Edge Function `request-forwarder-coverage` (Zod, anti-spam 24h par route×mode×user, notif admins in-app `forwarder_coverage_request_new` → `/admin/coverage-requests`).
+- `MultiOriginFreightSelector` : quand `availability[group.key] === 0`, affiche encart amber + bouton "Demander couverture" (loader + état "Envoyé").
+- `AdminCoverageRequestsPage` : second onglet **Transitaires** listant les demandes (route, mode, statut) avec action "Marquer traitée".
+
+## Reste à faire (non bloquant MVP)
 - Brancher `get_eligible_forwarders_v2` côté UI (RPC) au lieu du filtre client en JS — gain perf si beaucoup de transitaires.
-- Empty state explicite par groupe avec bouton "Demander couverture transitaire" (équivalent `request-delivery-coverage`).
 - Tests unitaires `groupCartByOriginAndStore` (mocks Supabase nécessaires).
+- Empty state mono-flow (`FreightSelector` direct, hors multi-origines) — actuellement le selector affiche déjà un message "Aucun transitaire", mais sans bouton de demande.
 
 ## Règles métier
 - Origine produit (`products.origin_country`) > origine boutique (`stores.country`).
