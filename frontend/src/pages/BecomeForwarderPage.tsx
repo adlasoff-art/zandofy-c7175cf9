@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { GeoFieldsRow } from "@/components/address/GeoFieldsRow";
 import { toast } from "sonner";
 import { z } from "zod";
 import {
@@ -383,19 +384,19 @@ export default function BecomeForwarderPage() {
                     onChange={(e) => update("contact_phone", e.target.value)}
                     placeholder="+243..." />
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <Label htmlFor="hq_country">Pays siège *</Label>
-                    <Input id="hq_country" value={form.headquarters_country} maxLength={2}
-                      onChange={(e) => update("headquarters_country", e.target.value.toUpperCase())} />
-                  </div>
-                  <div className="col-span-2">
-                    <Label htmlFor="hq_city">Ville siège *</Label>
-                    <Input id="hq_city" value={form.headquarters_city}
-                      onChange={(e) => update("headquarters_city", e.target.value)}
-                      placeholder="Ex: Kinshasa" />
-                  </div>
-                </div>
+                <GeoFieldsRow
+                  value={{ country: form.headquarters_country, city: form.headquarters_city }}
+                  onChange={(patch) => {
+                    if (patch.country !== undefined) {
+                      update("headquarters_country", patch.country);
+                      update("headquarters_city", "");
+                    }
+                    if (patch.city !== undefined) update("headquarters_city", patch.city);
+                  }}
+                  levels={["country", "city"]}
+                  required={["country", "city"]}
+                  labels={{ country: "Pays siège", city: "Ville siège" }}
+                />
                 <div>
                   <Label htmlFor="hq_address">Adresse complète</Label>
                   <Input id="hq_address" value={form.headquarters_address ?? ""}
@@ -435,28 +436,42 @@ export default function BecomeForwarderPage() {
                   </div>
                   <div className="space-y-2">
                     {form.coverage_routes.map((r, i) => (
-                      <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                        <Input className="col-span-2" maxLength={2}
-                          value={r.origin_country}
-                          onChange={(e) => updateRoute(i, { origin_country: e.target.value.toUpperCase() })}
-                          placeholder="Pays" />
-                        <Input className="col-span-3" value={r.origin_city}
-                          onChange={(e) => updateRoute(i, { origin_city: e.target.value })}
-                          placeholder="Origine" />
-                        <span className="col-span-1 text-center text-xs text-muted-foreground">→</span>
-                        <Input className="col-span-2" maxLength={2}
-                          value={r.destination_country}
-                          onChange={(e) => updateRoute(i, { destination_country: e.target.value.toUpperCase() })}
-                          placeholder="Pays" />
-                        <Input className="col-span-3" value={r.destination_city}
-                          onChange={(e) => updateRoute(i, { destination_city: e.target.value })}
-                          placeholder="Destination" />
-                        <div className="col-span-1 flex justify-end">
+                      <div key={i} className="rounded-md border border-border/60 p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">Route #{i + 1}</span>
                           {form.coverage_routes.length > 1 && (
-                            <Button type="button" size="icon" variant="ghost" onClick={() => removeRoute(i)}>
+                            <Button type="button" size="sm" variant="ghost" onClick={() => removeRoute(i)}>
                               <X size={14} />
                             </Button>
                           )}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-[11px] text-muted-foreground mb-1">Origine</p>
+                            <GeoFieldsRow
+                              value={{ country: r.origin_country, city: r.origin_city }}
+                              onChange={(patch) => {
+                                const next: any = {};
+                                if (patch.country !== undefined) { next.origin_country = patch.country; next.origin_city = ""; }
+                                if (patch.city !== undefined) next.origin_city = patch.city;
+                                updateRoute(i, next);
+                              }}
+                              levels={["country", "city"]}
+                            />
+                          </div>
+                          <div>
+                            <p className="text-[11px] text-muted-foreground mb-1">Destination</p>
+                            <GeoFieldsRow
+                              value={{ country: r.destination_country, city: r.destination_city }}
+                              onChange={(patch) => {
+                                const next: any = {};
+                                if (patch.country !== undefined) { next.destination_country = patch.country; next.destination_city = ""; }
+                                if (patch.city !== undefined) next.destination_city = patch.city;
+                                updateRoute(i, next);
+                              }}
+                              levels={["country", "city"]}
+                            />
+                          </div>
                         </div>
                       </div>
                     ))}
