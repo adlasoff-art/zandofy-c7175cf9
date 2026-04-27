@@ -3994,6 +3994,197 @@ export type Database = {
         }
         Relationships: []
       }
+      kyb_audit_log: {
+        Row: {
+          action: string
+          actor_id: string
+          created_at: string
+          id: string
+          new_value: Json | null
+          notes: string | null
+          old_value: Json | null
+          submission_id: string
+          submission_type: string
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          created_at?: string
+          id?: string
+          new_value?: Json | null
+          notes?: string | null
+          old_value?: Json | null
+          submission_id: string
+          submission_type: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          created_at?: string
+          id?: string
+          new_value?: Json | null
+          notes?: string | null
+          old_value?: Json | null
+          submission_id?: string
+          submission_type?: string
+        }
+        Relationships: []
+      }
+      kyb_documents: {
+        Row: {
+          admin_notes: string | null
+          doc_type: Database["public"]["Enums"]["kyb_doc_type"]
+          file_name: string | null
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["kyb_doc_status"]
+          storage_path: string
+          submission_id: string
+          uploaded_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          doc_type: Database["public"]["Enums"]["kyb_doc_type"]
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["kyb_doc_status"]
+          storage_path: string
+          submission_id: string
+          uploaded_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          doc_type?: Database["public"]["Enums"]["kyb_doc_type"]
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["kyb_doc_status"]
+          storage_path?: string
+          submission_id?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kyb_documents_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "kyb_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kyb_submissions: {
+        Row: {
+          admin_notes: string | null
+          admin_score: number | null
+          approved_at: string | null
+          bank_account_holder: string | null
+          bank_account_number: string | null
+          bank_name: string | null
+          business_address: string | null
+          business_city: string | null
+          business_country: string | null
+          business_type: string | null
+          completeness_score: number | null
+          created_at: string
+          director_full_name: string | null
+          director_id_number: string | null
+          id: string
+          legal_name: string | null
+          rccm_number: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["kyb_status"]
+          store_id: string
+          submitted_at: string | null
+          submitted_by: string
+          tax_nif: string | null
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          admin_score?: number | null
+          approved_at?: string | null
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_name?: string | null
+          business_address?: string | null
+          business_city?: string | null
+          business_country?: string | null
+          business_type?: string | null
+          completeness_score?: number | null
+          created_at?: string
+          director_full_name?: string | null
+          director_id_number?: string | null
+          id?: string
+          legal_name?: string | null
+          rccm_number?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["kyb_status"]
+          store_id: string
+          submitted_at?: string | null
+          submitted_by: string
+          tax_nif?: string | null
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          admin_score?: number | null
+          approved_at?: string | null
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_name?: string | null
+          business_address?: string | null
+          business_city?: string | null
+          business_country?: string | null
+          business_type?: string | null
+          completeness_score?: number | null
+          created_at?: string
+          director_full_name?: string | null
+          director_id_number?: string | null
+          id?: string
+          legal_name?: string | null
+          rccm_number?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["kyb_status"]
+          store_id?: string
+          submitted_at?: string | null
+          submitted_by?: string
+          tax_nif?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kyb_submissions_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kyb_submissions_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kyc_audit_logs: {
         Row: {
           action: string
@@ -4034,6 +4225,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      kyc_submissions: {
+        Row: {
+          admin_notes: string | null
+          admin_score: number | null
+          approved_at: string | null
+          completeness_score: number | null
+          created_at: string
+          date_of_birth: string | null
+          full_name: string | null
+          id: string
+          id_document_path: string | null
+          id_number: string | null
+          id_type: string | null
+          nationality: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          selfie_path: string | null
+          status: Database["public"]["Enums"]["kyc_status_v2"]
+          submitted_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          admin_score?: number | null
+          approved_at?: string | null
+          completeness_score?: number | null
+          created_at?: string
+          date_of_birth?: string | null
+          full_name?: string | null
+          id?: string
+          id_document_path?: string | null
+          id_number?: string | null
+          id_type?: string | null
+          nationality?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_path?: string | null
+          status?: Database["public"]["Enums"]["kyc_status_v2"]
+          submitted_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          admin_score?: number | null
+          approved_at?: string | null
+          completeness_score?: number | null
+          created_at?: string
+          date_of_birth?: string | null
+          full_name?: string | null
+          id?: string
+          id_document_path?: string | null
+          id_number?: string | null
+          id_type?: string | null
+          nationality?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_path?: string | null
+          status?: Database["public"]["Enums"]["kyc_status_v2"]
+          submitted_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       kyc_verifications: {
         Row: {
@@ -9631,6 +9891,14 @@ export type Database = {
           image_paths: string[]
         }[]
       }
+      compute_kyb_completeness: {
+        Args: { _submission_id: string }
+        Returns: number
+      }
+      compute_kyc_completeness: {
+        Args: { _submission_id: string }
+        Returns: number
+      }
       compute_operator_reliability: {
         Args: { p_operator_id: string; p_window_days?: number }
         Returns: {
@@ -10101,6 +10369,21 @@ export type Database = {
         | "no_order_delay"
         | "referral_prompt"
         | "custom"
+      kyb_doc_status: "pending" | "approved" | "rejected"
+      kyb_doc_type:
+        | "rccm"
+        | "id_director"
+        | "proof_address"
+        | "tax_nif"
+        | "bank_rib"
+        | "other"
+      kyb_status:
+        | "draft"
+        | "submitted"
+        | "in_review"
+        | "approved"
+        | "rejected"
+        | "needs_changes"
       kyc_document_type:
         | "national_id"
         | "voter_card"
@@ -10112,6 +10395,13 @@ export type Database = {
         | "approved"
         | "rejected"
         | "resubmission_required"
+      kyc_status_v2:
+        | "draft"
+        | "submitted"
+        | "in_review"
+        | "approved"
+        | "rejected"
+        | "needs_changes"
       operator_kyb_doc_status: "pending" | "approved" | "rejected"
       operator_kyb_doc_type:
         | "rccm"
@@ -10287,6 +10577,23 @@ export const Constants = {
         "referral_prompt",
         "custom",
       ],
+      kyb_doc_status: ["pending", "approved", "rejected"],
+      kyb_doc_type: [
+        "rccm",
+        "id_director",
+        "proof_address",
+        "tax_nif",
+        "bank_rib",
+        "other",
+      ],
+      kyb_status: [
+        "draft",
+        "submitted",
+        "in_review",
+        "approved",
+        "rejected",
+        "needs_changes",
+      ],
       kyc_document_type: [
         "national_id",
         "voter_card",
@@ -10299,6 +10606,14 @@ export const Constants = {
         "approved",
         "rejected",
         "resubmission_required",
+      ],
+      kyc_status_v2: [
+        "draft",
+        "submitted",
+        "in_review",
+        "approved",
+        "rejected",
+        "needs_changes",
       ],
       operator_kyb_doc_status: ["pending", "approved", "rejected"],
       operator_kyb_doc_type: [
