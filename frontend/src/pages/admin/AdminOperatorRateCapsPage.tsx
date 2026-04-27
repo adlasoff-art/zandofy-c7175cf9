@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { GeoFieldsRow } from "@/components/address/GeoFieldsRow";
 import {
   Dialog,
   DialogContent,
@@ -296,29 +297,18 @@ export default function AdminOperatorRateCapsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-1">
-                <Label htmlFor="country_code">Pays (code)</Label>
-                <Input
-                  id="country_code"
-                  value={form.country_code}
-                  onChange={(e) =>
-                    setForm({ ...form, country_code: e.target.value.toUpperCase() })
-                  }
-                  maxLength={2}
-                  placeholder="CD"
-                />
-              </div>
-              <div className="col-span-2">
-                <Label htmlFor="city">Ville</Label>
-                <Input
-                  id="city"
-                  value={form.city}
-                  onChange={(e) => setForm({ ...form, city: e.target.value })}
-                  placeholder="Kinshasa"
-                />
-              </div>
-            </div>
+            <GeoFieldsRow
+              value={{ country: form.country_code, city: form.city }}
+              onChange={(patch) =>
+                setForm({
+                  ...form,
+                  country_code: patch.country ?? form.country_code,
+                  city: patch.city ?? (patch.country !== undefined ? "" : form.city),
+                })
+              }
+              levels={["country", "city"]}
+              required={["country", "city"]}
+            />
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label htmlFor="max_base_price">Prix base max ($)</Label>
