@@ -226,7 +226,7 @@ Deno.serve(async (req) => {
 
 async function getEligibleUsers(supabase: any, wf: any): Promise<string[]> {
   // Build query for profiles created within the workflow's time window
-  let query = supabase.from("profiles").select("id, created_at, country, city");
+  let query = supabase.from("profiles").select("id, created_at, residence_country, residence_city");
 
   // Filter by days since signup
   if (wf.delay_days > 0) {
@@ -252,11 +252,11 @@ async function getEligibleUsers(supabase: any, wf: any): Promise<string[]> {
   let filtered = profiles as any[];
   if (Array.isArray(wf.condition_countries) && wf.condition_countries.length > 0) {
     const set = new Set(wf.condition_countries.map((c: string) => c.toLowerCase()));
-    filtered = filtered.filter((p) => p.country && set.has(String(p.country).toLowerCase()));
+    filtered = filtered.filter((p) => p.residence_country && set.has(String(p.residence_country).toLowerCase()));
   }
   if (Array.isArray(wf.condition_cities) && wf.condition_cities.length > 0) {
     const set = new Set(wf.condition_cities.map((c: string) => c.toLowerCase()));
-    filtered = filtered.filter((p) => p.city && set.has(String(p.city).toLowerCase()));
+    filtered = filtered.filter((p) => p.residence_city && set.has(String(p.residence_city).toLowerCase()));
   }
 
   let userIds = filtered.map((p: any) => p.id);
