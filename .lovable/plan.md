@@ -1,148 +1,122 @@
 
-# Phase 10.2 — Création opérateur "production-grade"
+# Phase 10.3 — Standardisation Combobox Géographique partout
 
-Objectif : remplacer les saisies libres du `CreateOperatorDialog` par la **vraie cascade géographique de la plateforme** + sécuriser la recherche propriétaire (anti-PII) + ajouter les plaques d'immatriculation, avec réutilisation cohérente sur `BecomeOperatorPage`.
+## Objectif
 
----
+Éliminer toute saisie libre de **Pays / Province / Ville / Commune / Quartier** dans la plateforme. Chaque champ géographique doit être un **combobox** alimenté par la fonctionnalité **Zones Géographiques** admin (`countries`, `provinces`, `cities`, `communes`, `quartiers`). Les codes pays ISO ne doivent jamais être tapés à la main.
 
-## 1. Migration DB (`frontend/supabase/migrations/`)
+## Principe directeur
 
-**`delivery_operator_cities`** : passage en granularité fine
-- Ajouter `province_id uuid NULL REFERENCES provinces(id) ON DELETE SET NULL`
-- Ajouter `commune_ids uuid[] NOT NULL DEFAULT '{}'`
-- Ajouter `quartier_ids uuid[] NOT NULL DEFAULT '{}'`
-- Index GIN sur `commune_ids` et `quartier_ids` (lookup tarification)
-- Conserver `city` (texte) pour rétro-compat lecture
+> **Un seul composant à utiliser partout** : `CascadingAddressFields` (existant) ou un nouveau wrapper léger `GeoFieldsRow` (1 ligne, niveaux configurables) selon le contexte (formulaire complet vs ligne tabulaire compacte).
 
-**`delivery_operators`** : flotte détaillée
-- Ajouter `fleet_vehicles jsonb NOT NULL DEFAULT '[]'`
-  - Schéma : `[{ type, plate_number, brand?, model? }]`
-- Trigger `validate_fleet_vehicles()` : rejette les plaques en doublon (sur la même ligne) et impose `plate_number` non vide
-- Index unique partiel : `CREATE UNIQUE INDEX ... ON delivery_operators ((fleet_vehicles->>'plate_number'))` ❌ trop complexe → on fait la **dédup applicative + trigger jsonb**
+Tout formulaire qui touche au géographique doit :
+- Lister les pays via `CountryCombobox` (filtré par `activeCountryCodes`)
+- Cascader province → ville → commune → quartier via `useGeoData`
+- Bloquer la sélection si le pays/ville n'est pas configuré dans les zones géographiques admin
+- Stocker à la fois le **nom** (pour affichage/legacy) et l'**UUID** (pour cascade et FK)
 
-**Vue helper** : `v_geo_coverage_status(country_code text)` retourne `{has_provinces, has_cities, has_communes}` → utilisée pour bloquer le wizard si la plateforme n'a pas saisi les zones.
+## Audit — Formulaires à corriger
 
----
+Recherche exhaustive : 8 emplacements avec saisie libre identifiés.
 
-## 2. Edge function `admin-create-operator` (mise à jour)
+### 1. **AdminOperatorRateCapsPage** (capture d'écran fournie)
+Dialog "Nouveau plafond" → `country_code` et `city` sont des `<Input>` libres.
+→ Remplacer par `CountryCombobox` + `GeoCombobox` ville (filtrée sur le pays).
 
-- Schéma Zod enrichi :
-  - `cities[]` accepte désormais `{ country_code, city, province_id?, commune_ids: string[], quartier_ids: string[] }`
-  - `fleet_vehicles[]` requis : min 3 entrées, chacune avec `type` (enum) + `plate_number` (regex assoupli ≥4 chars)
-  - `declared_riders_count` min **3** (au lieu de 1)
-  - `owner_user_id` toujours optionnel (orphelin OK)
-- Insertion : on persiste `fleet_vehicles` + on dérive `vehicle_types` agrégé pour rétro-compat (groupBy type → count)
-- `delivery_operator_cities` insert avec les arrays commune/quartier
-- Vérif anti-doublon plaque côté serveur (cross-check avec autres opérateurs actifs → warning, pas blocage)
+### 2. **AdminShippingPage** — Dialog Zone d'expédition
+`country_code` (Input ISO) + `city` (Input). 
+→ Combobox pays + ville. Maintenir l'autocomplete `world-cities` en fallback uniquement pour villes hors zones admin.
 
----
+### 3. **OperatorRatesPage** (Dashboard opérateur)
+Form ajout tarif : `country_code`, `city`, `commune`, `quartier` tous en saisie libre.
+→ Cascade complète. Le `zone_name` reste libre (label métier).
 
-## 3. Composants partagés (nouveaux)
+### 4. **OperatorCoveragePage**
+`country` + `city` libres.
+→ Cascade pays → ville (multi-sélection villes optionnelle).
 
-### `OperatorOwnerSearch.tsx` (sécurisé PII)
-- Input "Prénom ou nom" (placeholder explicite, **pas d'email**)
-- Debounce 300ms, min 2 caractères
-- Query : `profiles.select(id,user_id,first_name,last_name,city,is_kyc_verified,created_at).or(first_name.ilike.%X%,last_name.ilike.%X%)` — **email NON sélectionné**
-- Affichage résultat : `Prénom Nom · ville · "membre depuis MMM YYYY" · badge KYC ✓`
-- Email **jamais affiché**, jamais retourné côté client
-- Toggle explicite "Aucun propriétaire (opérateur géré par Zandofy)" qui désactive le champ
+### 5. **BecomeForwarderPage**
+`headquarters_city` libre + lignes tarifaires `origin_country/city`, `destination_country/city` toutes libres.
+→ Cascade complète sur HQ ; pour les routes import (CN/TR/AE → CD), combobox pays origine + ville origine + combobox ville destination.
 
-### `OperatorCoveragePicker.tsx` (cascade réelle)
-- Pour chaque "zone de couverture" :
-  - **Pays** : `<CountryCombobox>` (filtré `activeCountryCodes`)
-  - **Province** : `<GeoCombobox>` cascadant (optionnel, label "si applicable")
-  - **Ville** : `<GeoCombobox>` (cities filtrées par province ou par pays)
-  - **Communes desservies** : multi-select avec `Checkbox` listant les communes de la ville (au moins 1)
-  - **Quartiers desservis** : multi-select cascading par commune cochée (vide = "tous les quartiers de la commune")
-- Si la ville n'a pas de communes en DB → message + lien `/admin/zones-geographiques?city=...` (bloque le bouton "Suivant")
-- Bouton "+ Ajouter une zone de couverture" (max 50)
+### 6. **ForwarderPricingProfilesDialog** (Admin)
+`country_code` Input manuel + filtre ville textuel.
+→ Combobox pays + combobox ville filtrée.
 
-### `OperatorFleetEditor.tsx`
-- Pour chaque véhicule :
-  - Type (select : moto, voiture, tricycle, camionnette, vélo)
-  - **Plaque d'immatriculation** (Input, **obligatoire**, min 4 chars, uppercase auto)
-  - Marque (optionnel), Modèle (optionnel)
-- Bouton "+ Ajouter véhicule"
-- Validation : min **3 véhicules**, plaques uniques dans la liste, sinon toast erreur
-- Compteur live : "Total flotte : 5 véhicules · 3 motos, 2 voitures"
+### 7. **ForwarderCoverageDialog**
+Déjà partiellement combobox (CommandInput) mais à harmoniser avec `CountryCombobox` standard.
 
----
+### 8. **GeoBlockingSettings** + autres pages mineures
+Vérifier et aligner si saisie libre détectée.
 
-## 4. Refonte `CreateOperatorDialog.tsx`
+## Composants à créer / réutiliser
 
-Découpage en sections claires (toujours dans le même Dialog scrollable) :
-1. **Propriétaire** → `<OperatorOwnerSearch>` + checkbox orphelin
-2. **Identité** : nom commercial, raison sociale, RCCM, NIF, email contact, téléphone
-3. **Siège social** → `<CascadingAddressFields>` (réutilise l'existant, juste sans `postal_code`)
-4. **Couverture** → `<OperatorCoveragePicker>` (1+ zones)
-5. **Flotte** → `<OperatorFleetEditor>` (≥3 véhicules)
-6. **Paramètres** : livreurs déclarés (min 3), quota max, commission %, switch "Opérateur plateforme"
+### Réutilisé (existants)
+- `CountryCombobox` — pays avec drapeaux + filtre `activeCountryCodes`
+- `GeoCombobox` — combobox générique pour province/ville/commune/quartier
+- `useGeoData` — cascade hook (déjà utilisé par `CascadingAddressFields` et `LocationHierarchyFilter`)
+- `LocationHierarchyFilter` — pour filtres en lecture (admin pages)
 
-Validations bloquantes affichées en bas avant le bouton "Créer & activer".
+### Nouveau composant
+**`GeoFieldsRow`** (`frontend/src/components/address/GeoFieldsRow.tsx`)
 
----
+Wrapper compact (1-2 lignes) pour formulaires courts (plafonds, tarifs, zones d'expédition) :
 
-## 5. Mise à jour `BecomeOperatorPage.tsx` (cohérence UX publique)
+```tsx
+<GeoFieldsRow
+  value={{ country, province_id, city, commune, quartier }}
+  onChange={(patch) => setForm({ ...form, ...patch })}
+  levels={["country", "city"]}        // configurable
+  required={["country", "city"]}
+  blockIfNotConfigured                 // empêche villes hors zones admin
+/>
+```
 
-- Étape 2 (couverture) : **remplacer** les Inputs libres par `<OperatorCoveragePicker>` (même composant)
-- Étape 1 (siège) : passer en `<CascadingAddressFields>`
-- Étape 3 (flotte) : `<OperatorFleetEditor>` (min 3 véhicules + plaques)
-- Min livreurs : **3** au lieu de 1
-- Garde-fou "pays non couvert" : check `v_geo_coverage_status` → si pays sans villes en DB, désactive le wizard avec lien contact
+- Réutilise `useGeoData` en interne
+- Niveaux à afficher passés en prop (`country`, `province`, `city`, `commune`, `quartier`)
+- Renvoie systématiquement nom + UUID
+- Affiche un message inline "Cette ville n'est pas configurée dans les zones géographiques admin" si bloqué
 
-→ Garantit qu'un opérateur créé manuellement (admin) et un opérateur auto-inscrit (KYB) ont la **même structure de données** en DB.
+## Plan d'exécution
 
----
+### Étape 1 — Composant `GeoFieldsRow`
+Créer le wrapper réutilisable. 1 fichier ~120 lignes.
 
-## 6. Edge function `become-operator-submit` (alignement)
+### Étape 2 — Refactor des 8 formulaires
+Pour chaque page listée, remplacer les `<Input>` Pays/Ville par `<GeoFieldsRow>` ou `CascadingAddressFields` selon densité.
 
-- Mettre à jour le schéma Zod pour accepter le nouveau format `cities[]` et `fleet_vehicles[]`
-- Min 3 véhicules avec plaque, min 3 livreurs
+| Fichier | Composant cible | Niveaux |
+|---|---|---|
+| `AdminOperatorRateCapsPage.tsx` | `GeoFieldsRow` | country, city |
+| `AdminShippingPage.tsx` (ZoneDialog) | `GeoFieldsRow` | country, city |
+| `OperatorRatesPage.tsx` | `GeoFieldsRow` | country, city, commune, quartier |
+| `OperatorCoveragePage.tsx` | `GeoFieldsRow` | country, city |
+| `BecomeForwarderPage.tsx` (HQ) | `CascadingAddressFields` | full |
+| `BecomeForwarderPage.tsx` (routes) | `GeoFieldsRow` ×2 | country, city |
+| `ForwarderPricingProfilesDialog.tsx` | `GeoFieldsRow` | country, city |
+| `ForwarderCoverageDialog.tsx` | harmonisation | country, city |
 
----
+### Étape 3 — UX bloquante
+Si une ville n'existe pas dans `cities` admin, afficher un message :
+> "Cette ville n'est pas configurée. Demandez à un admin de l'ajouter via Zones Géographiques."
 
-## 7. Hooks à compléter
+Et désactiver le bouton "Créer/Sauvegarder".
 
-- `useGeoData` : ajouter une variante `useCommunesForCity(cityName, countryCode)` retournant **toutes** les communes (incluant id) pour le multi-select
-- Nouveau hook `useQuartiersForCommunes(communeIds[])` qui fetch en batch les quartiers de plusieurs communes (pour le multi-select cascading)
+### Étape 4 — Vérification
+Recherche `<Input` couplée à `country_code|city` dans `frontend/src` — s'assurer qu'il ne reste plus aucun champ libre.
 
----
+## Détails techniques
 
-## 8. Garde-fous & sécurité
+- **Stockage** : on continue à stocker `country_code` (string ISO) et `city` (text name) en base pour rétro-compat avec toutes les tables existantes (`delivery_operator_rates`, `delivery_operator_city_caps`, `shipping_zones`, etc.). Le combobox renvoie le code ISO depuis sa sélection.
+- **Pas de migration DB** : c'est un refactor purement UI. Aucune table ni RLS à toucher.
+- **`useGeoData`** : déjà filtre `is_active = true` sur cities/communes/quartiers — pas de changement.
+- **Pays actifs** : `useActiveGeo().activeCountryCodes` filtre déjà `CountryCombobox` côté `CascadingAddressFields` ; `GeoFieldsRow` doit faire pareil.
+- **Performance** : les listes (provinces/cities) sont déjà cachées par requêtes Supabase ; si une page liste plusieurs `GeoFieldsRow` (ex: BecomeForwarder routes), partager un `useGeoData` parent ou laisser chaque ligne fetch (volumes OK : <500 villes par pays).
+- **Tests** : valider manuellement les 8 formulaires post-refactor (création + édition + soumission).
 
-- RLS sur `profiles` : vérifier que la query "search by name" est bien limitée aux admins (policy existante `profiles_admin_select` doit couvrir, sinon ajout)
-- L'edge function `admin-create-operator` reste protégée par `has_role('admin')`
-- Aucune donnée PII (email/téléphone) du `profiles` cible ne transite vers le client lors de la recherche
+## Livrables
 
----
-
-## 9. Tests post-implémentation
-
-- Créer un opérateur orphelin (sans owner) → OK
-- Créer un opérateur en cherchant "Christian" → résultats sans email visible
-- Tenter avec 2 véhicules → bloqué ("min 3")
-- Tenter avec 2 plaques identiques → bloqué
-- Couverture : choisir Kinshasa sans cocher de commune → bloqué
-- Wizard public : choisir un pays sans villes en DB → bloqué avec lien admin
-
----
-
-## 📦 Livrables
-
-**Migration** : 1 fichier `frontend/supabase/migrations/202604280000XX_operator_coverage_fleet_v2.sql`
-
-**Nouveaux composants** :
-- `frontend/src/components/admin/operators/OperatorOwnerSearch.tsx`
-- `frontend/src/components/operators/OperatorCoveragePicker.tsx`
-- `frontend/src/components/operators/OperatorFleetEditor.tsx`
-
-**Refactor** :
-- `frontend/src/components/admin/operators/CreateOperatorDialog.tsx`
-- `frontend/src/pages/BecomeOperatorPage.tsx`
-- `frontend/src/hooks/useGeoData.ts` (ajout helpers)
-
-**Edge functions** :
-- `frontend/supabase/functions/admin-create-operator/index.ts`
-- `frontend/supabase/functions/become-operator-submit/index.ts`
-
-**Mémoire** : update `mem://features/multi-operator-delivery-system` avec la nouvelle structure couverture + plaques.
+- 1 nouveau composant : `GeoFieldsRow.tsx`
+- 8 fichiers refactorés
+- 0 migration SQL
+- Documentation : note dans `mem://features/multi-operator-delivery-system.md` sur la règle "tous les champs géo = combobox lié aux zones admin"

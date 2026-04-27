@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GeoFieldsRow } from "@/components/address/GeoFieldsRow";
 import { toast } from "sonner";
 import {
   fetchShippingZones, fetchShippingRoutes, fetchShippingDefaults, fetchCategorySurcharges,
@@ -157,9 +158,23 @@ function ZoneDialog({ open, onClose, zone, onSave }: {
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Code pays (ISO)</Label><Input value={form.country_code} onChange={e => setForm(f => ({ ...f, country_code: e.target.value.toUpperCase() }))} placeholder="CN, CD, US" maxLength={3} /></div>
-            <div><Label>Ville</Label><Input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} placeholder="Kinshasa" /></div>
+          <div className="rounded-md border border-border/60 p-3 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Sélection liée aux Zones Géographiques admin (Pays → Ville).
+              Pour les villes internationales non encore référencées, utilisez la recherche ci-dessus.
+            </p>
+            <GeoFieldsRow
+              value={{ country: form.country_code, city: form.city }}
+              onChange={(patch) =>
+                setForm((f) => ({
+                  ...f,
+                  country_code: patch.country ?? f.country_code,
+                  city: patch.city !== undefined ? patch.city : (patch.country !== undefined ? "" : f.city),
+                  zone_type: "city",
+                }))
+              }
+              levels={["country", "city"]}
+            />
           </div>
         </div>
         <DialogFooter>

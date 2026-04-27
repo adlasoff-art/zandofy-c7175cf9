@@ -21,6 +21,7 @@ import { RestrictionsEditor } from "./RestrictionsEditor";
 import { TransporterUserPicker } from "./TransporterUserPicker";
 import { KgTiersEditor } from "./KgTiersEditor";
 import { ConsolidationSettingsCard } from "./ConsolidationSettingsCard";
+import { GeoFieldsRow } from "@/components/address/GeoFieldsRow";
 
 const sb = supabase as any;
 
@@ -192,29 +193,35 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                     <option value="vip">VIP</option>
                   </select>
                 </div>
-                <div>
-                  <Label className="text-xs">Pays (code ISO)</Label>
-                  <Input
-                    value={draft.country_code ?? ""}
-                    maxLength={2}
-                    onChange={e => setDraft({ ...draft, country_code: e.target.value.toUpperCase() })}
-                    placeholder="CD"
+                <div className="col-span-2">
+                  <GeoFieldsRow
+                    value={{
+                      country: draft.country_code ?? "",
+                      city: draft.city_id
+                        ? (cities.find(c => c.id === draft.city_id)?.name ?? "")
+                        : "",
+                    }}
+                    onChange={(patch) => {
+                      let next = { ...draft };
+                      if (patch.country !== undefined) {
+                        next.country_code = patch.country;
+                        next.city_id = null;
+                      }
+                      if (patch.city !== undefined) {
+                        if (!patch.city) {
+                          next.city_id = null;
+                        } else {
+                          const match = cities.find(
+                            c => c.name === patch.city && c.country_code === (next.country_code ?? "")
+                          );
+                          next.city_id = match?.id ?? null;
+                        }
+                      }
+                      setDraft(next);
+                    }}
+                    levels={["country", "city"]}
+                    labels={{ city: "Ville (optionnel)" }}
                   />
-                </div>
-                <div>
-                  <Label className="text-xs">Ville (optionnel)</Label>
-                  <select
-                    className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
-                    value={draft.city_id ?? ""}
-                    onChange={e => setDraft({ ...draft, city_id: e.target.value || null })}
-                  >
-                    <option value="">— Tout le pays —</option>
-                    {cities
-                      .filter(c => !draft.country_code || c.country_code === draft.country_code)
-                      .map(c => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                  </select>
                 </div>
                 <div>
                   <Label className="text-xs">Devise</Label>
