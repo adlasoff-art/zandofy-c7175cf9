@@ -30,7 +30,7 @@ export default function AdminKybKycV2Page() {
   const [selected, setSelected] = useState<KybQueueItem | null>(null);
 
   return (
-    <AdminLayout>
+    <AdminLayout title="KYB / KYC v2">
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <ShieldCheck className="text-primary" size={22} />
