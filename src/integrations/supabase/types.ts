@@ -1298,7 +1298,7 @@ export type Database = {
           city: string
           country_code: string
           created_at: string | null
-          delivery_fee: number | null
+          delivery_fee_legacy_deprecated: number | null
           id: string
           is_active: boolean | null
           is_deliverable: boolean | null
@@ -1308,7 +1308,7 @@ export type Database = {
           city: string
           country_code?: string
           created_at?: string | null
-          delivery_fee?: number | null
+          delivery_fee_legacy_deprecated?: number | null
           id?: string
           is_active?: boolean | null
           is_deliverable?: boolean | null
@@ -1318,7 +1318,7 @@ export type Database = {
           city?: string
           country_code?: string
           created_at?: string | null
-          delivery_fee?: number | null
+          delivery_fee_legacy_deprecated?: number | null
           id?: string
           is_active?: boolean | null
           is_deliverable?: boolean | null
@@ -1429,6 +1429,93 @@ export type Database = {
           target_country?: string | null
         }
         Relationships: []
+      }
+      coverage_requests: {
+        Row: {
+          city: string
+          commune: string | null
+          commune_id: string | null
+          country_code: string
+          created_at: string
+          fulfilled_at: string | null
+          fulfilled_by: string | null
+          fulfilled_operator_id: string | null
+          id: string
+          notes: string | null
+          quartier: string | null
+          quartier_id: string | null
+          requested_at: string
+          user_id: string
+        }
+        Insert: {
+          city: string
+          commune?: string | null
+          commune_id?: string | null
+          country_code?: string
+          created_at?: string
+          fulfilled_at?: string | null
+          fulfilled_by?: string | null
+          fulfilled_operator_id?: string | null
+          id?: string
+          notes?: string | null
+          quartier?: string | null
+          quartier_id?: string | null
+          requested_at?: string
+          user_id: string
+        }
+        Update: {
+          city?: string
+          commune?: string | null
+          commune_id?: string | null
+          country_code?: string
+          created_at?: string
+          fulfilled_at?: string | null
+          fulfilled_by?: string | null
+          fulfilled_operator_id?: string | null
+          id?: string
+          notes?: string | null
+          quartier?: string | null
+          quartier_id?: string | null
+          requested_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coverage_requests_commune_id_fkey"
+            columns: ["commune_id"]
+            isOneToOne: false
+            referencedRelation: "communes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coverage_requests_fulfilled_operator_id_fkey"
+            columns: ["fulfilled_operator_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_operators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coverage_requests_fulfilled_operator_id_fkey"
+            columns: ["fulfilled_operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
+          },
+          {
+            foreignKeyName: "coverage_requests_fulfilled_operator_id_fkey"
+            columns: ["fulfilled_operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_operator_performance"
+            referencedColumns: ["operator_id"]
+          },
+          {
+            foreignKeyName: "coverage_requests_quartier_id_fkey"
+            columns: ["quartier_id"]
+            isOneToOne: false
+            referencedRelation: "quartiers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customer_locations: {
         Row: {
@@ -3992,6 +4079,82 @@ export type Database = {
           },
         ]
       }
+      operator_kyb_documents: {
+        Row: {
+          created_at: string
+          doc_type: Database["public"]["Enums"]["operator_kyb_doc_type"]
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string
+          operator_id: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          size_bytes: number
+          status: Database["public"]["Enums"]["operator_kyb_doc_status"]
+          updated_at: string
+          uploaded_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          doc_type: Database["public"]["Enums"]["operator_kyb_doc_type"]
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type: string
+          operator_id: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          size_bytes: number
+          status?: Database["public"]["Enums"]["operator_kyb_doc_status"]
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          doc_type?: Database["public"]["Enums"]["operator_kyb_doc_type"]
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string
+          operator_id?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          size_bytes?: number
+          status?: Database["public"]["Enums"]["operator_kyb_doc_status"]
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_kyb_documents_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_operators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operator_kyb_documents_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
+          },
+          {
+            foreignKeyName: "operator_kyb_documents_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_operator_performance"
+            referencedColumns: ["operator_id"]
+          },
+        ]
+      }
       operator_quota_requests: {
         Row: {
           created_at: string
@@ -5606,7 +5769,7 @@ export type Database = {
         Row: {
           commune_id: string
           created_at: string | null
-          delivery_surcharge: number | null
+          delivery_surcharge_legacy_deprecated: number | null
           id: string
           is_active: boolean | null
           is_restricted: boolean | null
@@ -5616,7 +5779,7 @@ export type Database = {
         Insert: {
           commune_id: string
           created_at?: string | null
-          delivery_surcharge?: number | null
+          delivery_surcharge_legacy_deprecated?: number | null
           id?: string
           is_active?: boolean | null
           is_restricted?: boolean | null
@@ -5626,7 +5789,7 @@ export type Database = {
         Update: {
           commune_id?: string
           created_at?: string | null
-          delivery_surcharge?: number | null
+          delivery_surcharge_legacy_deprecated?: number | null
           id?: string
           is_active?: boolean | null
           is_restricted?: boolean | null
@@ -9453,6 +9616,15 @@ export type Database = {
         | "approved"
         | "rejected"
         | "resubmission_required"
+      operator_kyb_doc_status: "pending" | "approved" | "rejected"
+      operator_kyb_doc_type:
+        | "rccm"
+        | "nif"
+        | "id_card"
+        | "business_license"
+        | "insurance"
+        | "tax_clearance"
+        | "other"
       product_status: "draft" | "pending_approval" | "published" | "rejected"
       vendor_tier:
         | "beginner"
@@ -9631,6 +9803,16 @@ export const Constants = {
         "approved",
         "rejected",
         "resubmission_required",
+      ],
+      operator_kyb_doc_status: ["pending", "approved", "rejected"],
+      operator_kyb_doc_type: [
+        "rccm",
+        "nif",
+        "id_card",
+        "business_license",
+        "insurance",
+        "tax_clearance",
+        "other",
       ],
       product_status: ["draft", "pending_approval", "published", "rejected"],
       vendor_tier: [
