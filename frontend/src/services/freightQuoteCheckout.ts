@@ -132,24 +132,53 @@ export async function fetchEligibleFreightOffers(
     } | null;
   }>;
 
-  // Lot 11C — Filtrer par pays d'origine du produit. Un transitaire est
-  // éligible si au moins une de ses coverage_routes couvre la route
-  // origine→destination demandée. Le service plateforme (is_platform_owned)
-  // est conservé tel quel (couverture globale gérée côté admin).
+  // Lot 11C Phase 4 — Filtrer par pays d'origine du produit.
+  // Stratégie : on tente d'abord le RPC `get_eligible_forwarders_v2` (filtre
+  // JSONB côté Postgres + index GIN, plus rapide à grande échelle). Si le RPC
+  // est indisponible (preview/staging non migré, droits manquants, etc.), on
+  // retombe sur le filtre JS local. Le service plateforme reste toujours
+  // visible (couverture globale gérée côté admin).
   const originISO = (input.originCountry || "").toUpperCase().trim();
   const destISO = (input.destinationCountry || "").toUpperCase().trim();
-  const filteredProfiles = originISO
-    ? profilesList.filter((p) => {
-        if (p.forwarder?.is_platform_owned) return true;
-        const routes = p.forwarder?.coverage_routes ?? [];
-        const supports = p.forwarder?.supported_modes;
-        if (supports && supports.length > 0 && !supports.includes(input.mode)) return false;
-        return routes.some((r) =>
-          (r?.origin_country || "").toUpperCase() === originISO &&
-          (r?.destination_country || "").toUpperCase() === destISO,
+  let filteredProfiles = profilesList;
+  if (originISO) {
+    let allowedForwarderIds: Set<string> | null = null;
+    try {
+      const { data: rpcData, error: rpcErr } = await (supabase.rpc as any)(
+        "get_eligible_forwarders_v2",
+        {
+          p_origin_country: originISO,
+          p_destination_country: destISO,
+          p_destination_city_id: input.destinationCityId ?? null,
+          p_mode: input.mode,
+        },
+      );
+      if (!rpcErr && Array.isArray(rpcData)) {
+        allowedForwarderIds = new Set(
+          (rpcData as Array<{ forwarder_id?: string }>)
+            .map((r) => r?.forwarder_id)
+            .filter((id): id is string => Boolean(id)),
         );
-      })
-    : profilesList;
+      }
+    } catch (e) {
+      console.warn("[freightQuoteCheckout] get_eligible_forwarders_v2 unavailable, fallback JS", e);
+    }
+
+    filteredProfiles = profilesList.filter((p) => {
+      if (p.forwarder?.is_platform_owned) return true;
+      if (allowedForwarderIds) {
+        return allowedForwarderIds.has(p.forwarder_id);
+      }
+      // Fallback JS si le RPC est indisponible.
+      const routes = p.forwarder?.coverage_routes ?? [];
+      const supports = p.forwarder?.supported_modes;
+      if (supports && supports.length > 0 && !supports.includes(input.mode)) return false;
+      return routes.some((r) =>
+        (r?.origin_country || "").toUpperCase() === originISO &&
+        (r?.destination_country || "").toUpperCase() === destISO,
+      );
+    });
+  }
 
   // 2) Composer un devis pour chaque profil (en parallèle)
   const offers = await Promise.all(
