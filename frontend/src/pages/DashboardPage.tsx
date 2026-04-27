@@ -30,6 +30,7 @@ import { DeliveryProofImage } from "@/components/DeliveryProofImage";
 import { DeferredPaymentModal } from "@/components/payments/DeferredPaymentModal";
 import { ReturnRequestForm } from "@/components/returns/ReturnRequestForm";
 import { FreightDetailsPanel } from "@/components/orders/FreightDetailsPanel";
+import { CustomerOrderTracker } from "@/components/orders/CustomerOrderTracker";
 import { DisputesList } from "@/components/disputes/DisputesList";
 import { DisputeForm } from "@/components/disputes/DisputeForm";
 import { formatDistanceToNow, format } from "date-fns";
