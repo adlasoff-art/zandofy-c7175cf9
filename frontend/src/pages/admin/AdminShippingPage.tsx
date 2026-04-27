@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GeoFieldsRow } from "@/components/address/GeoFieldsRow";
 import { toast } from "sonner";
 import {
   fetchShippingZones, fetchShippingRoutes, fetchShippingDefaults, fetchCategorySurcharges,
