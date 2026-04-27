@@ -743,9 +743,14 @@ export default function CheckoutPage() {
 
     const productIds = [...new Set(items.map((i) => i.productId).filter(Boolean))];
     const { data: prods } = productIds.length > 0
-      ? await supabase.from("products").select("id, store_id").in("id", productIds)
+      ? await supabase.from("products").select("id, store_id, origin_country").in("id", productIds)
       : { data: [] };
     const storeMap = new Map((prods || []).map((p) => [p.id, p.store_id]));
+    // Lot 11C — Map productId → pays d'origine (ISO2). Sert à persister
+    // orders.origin_country pour la segmentation multi-origines (Phase 2).
+    const originMap = new Map(
+      (prods || []).map((p: any) => [p.id, (p.origin_country || "").toUpperCase() || null]),
+    );
 
     const storeGroups = new Map<string, typeof items>();
     items.forEach((item) => {
@@ -795,6 +800,16 @@ export default function CheckoutPage() {
     for (let idx = 0; idx < storeEntries.length; idx++) {
       const [storeId, storeItems] = storeEntries[idx];
       const orderSubtotal = storeItems.reduce((s, i) => s + i.price * i.quantity, 0);
+      // Lot 11C — Origine effective de la sous-commande : si tous les produits
+      // partagent la même origine, on la persiste ; sinon NULL (multi-origines).
+      const orderOrigins = [
+        ...new Set(
+          storeItems
+            .map((i: any) => originMap.get(i.productId))
+            .filter((c: any): c is string => !!c),
+        ),
+      ];
+      const orderOriginCountry = orderOrigins.length === 1 ? orderOrigins[0] : null;
       
       // Proportional shipping & discount distribution
       const ratio = subtotal > 0 ? orderSubtotal / subtotal : 0;
