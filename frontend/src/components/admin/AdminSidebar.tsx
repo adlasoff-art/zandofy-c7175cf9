@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, Image, FolderTree, Bell, Settings, ShieldCheck, Truck, Package, DollarSign, Store, PenLine, Crown, ScrollText, Heart, Coins, Ticket, Banknote, RotateCcw, AlertTriangle, ArrowLeftRight, Globe, Megaphone, Headphones, Layers, BarChart3, Mail, User, Receipt, Star, MapPin, Zap, Bug, PackageSearch,
+  LayoutDashboard, Users, Image, FolderTree, Bell, Settings, ShieldCheck, Truck, Package, DollarSign, Store, PenLine, Crown, ScrollText, Heart, Coins, Ticket, Banknote, RotateCcw, AlertTriangle, ArrowLeftRight, Globe, Megaphone, Headphones, Layers, BarChart3, Mail, User, Receipt, Star, MapPin, Zap, Bug, PackageSearch, MailQuestion,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useRoles } from "@/hooks/use-roles";
@@ -19,6 +19,8 @@ interface SidebarItem {
   title: string;
   url: string;
   icon: React.ElementType;
+  /** Lot 11C — Si défini, affiche un badge avec le compteur retourné par cette query. */
+  badgeKey?: "coverage-requests-pending";
 }
 
 interface SidebarSection {
@@ -61,6 +63,7 @@ const sidebarSections: SidebarSection[] = [
       { title: "Tarifs à modérer", url: "/admin/operator-rates-pending", icon: DollarSign },
       { title: "Tarification Fret", url: "/admin/shipping", icon: DollarSign },
       { title: "Plans de livraison", url: "/admin/delivery-plans", icon: Truck },
+      { title: "Demandes de couverture", url: "/admin/coverage-requests", icon: MailQuestion, badgeKey: "coverage-requests-pending" },
       { title: "Zones géographiques", url: "/admin/geography", icon: MapPin },
       { title: "Pays actifs", url: "/admin/countries", icon: Globe },
     ],
@@ -163,6 +166,26 @@ export function AdminSidebar() {
     .join(" ")
     .trim() || "Administrateur";
 
+  // Lot 11C — Compteur des demandes de couverture en attente (delivery + forwarder).
+  const { data: coveragePending = 0 } = useQuery({
+    queryKey: ["admin-sidebar-coverage-pending"],
+    queryFn: async () => {
+      const { count } = await (supabase as any)
+        .from("forwarder_coverage_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      return count ?? 0;
+    },
+    enabled: !!user?.id && isAdmin,
+    staleTime: 60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
+  });
+
+  const badgeFor = (key?: SidebarItem["badgeKey"]): number => {
+    if (key === "coverage-requests-pending") return coveragePending;
+    return 0;
+  };
+
   // Track which sections are open
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
@@ -209,18 +232,24 @@ export function AdminSidebar() {
                       const isActive = item.url === "/admin"
                         ? location.pathname === "/admin"
                         : location.pathname.startsWith(item.url);
+                      const badge = badgeFor(item.badgeKey);
                       return (
                         <SidebarMenuItem key={item.url}>
                           <SidebarMenuButton asChild>
                             <Link
                               to={item.url}
                               className={cn(
-                                "flex items-center justify-center px-2 py-2 rounded-md text-muted-foreground hover:bg-muted/50 transition-colors",
+                                "relative flex items-center justify-center px-2 py-2 rounded-md text-muted-foreground hover:bg-muted/50 transition-colors",
                                 isActive && "bg-primary/10 text-primary"
                               )}
                               title={item.title}
                             >
                               <item.icon size={18} />
+                              {badge > 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
+                                  {badge > 99 ? "99+" : badge}
+                                </span>
+                              )}
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -248,6 +277,7 @@ export function AdminSidebar() {
                     const isActive = item.url === "/admin"
                       ? location.pathname === "/admin"
                       : location.pathname.startsWith(item.url);
+                    const badge = badgeFor(item.badgeKey);
                     return (
                       <SidebarMenuItem key={item.url}>
                         <SidebarMenuButton asChild>
@@ -259,7 +289,12 @@ export function AdminSidebar() {
                             )}
                           >
                             <item.icon size={16} />
-                            <span>{item.title}</span>
+                            <span className="flex-1">{item.title}</span>
+                            {badge > 0 && (
+                              <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                                {badge > 99 ? "99+" : badge}
+                              </span>
+                            )}
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>

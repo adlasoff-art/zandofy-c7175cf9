@@ -567,6 +567,20 @@ const translations: Record<Locale, Record<string, string>> = {
     "label.sea": "Maritime",
     "label.items": "article(s)",
     "label.origin": "Origine",
+    // Lot 11C — Freight selector multi-origines
+    "freight.multiPackagesInfo": "Votre panier sera expédié en {{count}} colis distincts (selon l'origine et la boutique). Choisissez un transitaire pour chaque colis.",
+    "freight.packageFrom": "Colis depuis {{country}}",
+    "freight.originUnknown": "Origine inconnue",
+    "freight.modeIncompatible": "Le mode {{mode}} n'est pas compatible avec tous les produits de ce colis. Modes supportés : {{modes}}.",
+    "freight.modeNone": "aucun",
+    "freight.noForwarderRoute": "Aucun transitaire ne dessert encore {{origin}} → {{destination}} en mode {{mode}}.",
+    "freight.requestCoverage": "Demander couverture",
+    "freight.requestSent": "Envoyé",
+    "freight.requestError": "Impossible d'envoyer la demande",
+    "freight.requestSuccess": "Demande envoyée — un admin vous contactera dès qu'un transitaire couvre la route.",
+    "freight.requestDuplicate": "Demande déjà enregistrée — un admin vous contactera dès qu'un transitaire couvre la route.",
+    "freight.requestOriginMissing": "Origine inconnue — impossible d'envoyer la demande.",
+    "freight.totalTransport": "Total transport ({{selected}}/{{total}} colis)",
   },
   en: {
     // Header
@@ -1105,6 +1119,20 @@ const translations: Record<Locale, Record<string, string>> = {
     "label.sea": "Sea",
     "label.items": "item(s)",
     "label.origin": "Origin",
+    // Lot 11C — Freight selector multi-origin
+    "freight.multiPackagesInfo": "Your cart will be shipped as {{count}} separate packages (by origin and store). Choose a forwarder for each package.",
+    "freight.packageFrom": "Package from {{country}}",
+    "freight.originUnknown": "Unknown origin",
+    "freight.modeIncompatible": "{{mode}} mode is not compatible with all products in this package. Supported modes: {{modes}}.",
+    "freight.modeNone": "none",
+    "freight.noForwarderRoute": "No forwarder yet covers {{origin}} → {{destination}} in {{mode}} mode.",
+    "freight.requestCoverage": "Request coverage",
+    "freight.requestSent": "Sent",
+    "freight.requestError": "Could not send request",
+    "freight.requestSuccess": "Request sent — an admin will contact you as soon as a forwarder covers this route.",
+    "freight.requestDuplicate": "Request already recorded — an admin will contact you as soon as a forwarder covers this route.",
+    "freight.requestOriginMissing": "Unknown origin — cannot send the request.",
+    "freight.totalTransport": "Total shipping ({{selected}}/{{total}} packages)",
   },
 };
 
@@ -1113,7 +1141,7 @@ interface I18nContextType {
   currency: CurrencyCode;
   setLocale: (l: Locale) => void;
   setCurrency: (c: CurrencyCode) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
   formatPrice: (usdPrice: number) => string;
   currencySymbol: string;
 }
@@ -1187,11 +1215,16 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const t = useCallback(
-    (key: string) => {
+    (key: string, params?: Record<string, string | number>) => {
       // CMS overrides take priority
       const cmsValue = cmsOverrides[locale]?.[key];
-      if (cmsValue) return cmsValue;
-      return translations[locale]?.[key] || translations.fr[key] || key;
+      const raw = cmsValue || translations[locale]?.[key] || translations.fr[key] || key;
+      if (!params) return raw;
+      // Lot 11C — interpolation simple {{name}}
+      return raw.replace(/\{\{(\w+)\}\}/g, (_m, k) => {
+        const v = params[k];
+        return v === undefined || v === null ? "" : String(v);
+      });
     },
     [locale, cmsOverrides]
   );
@@ -1222,7 +1255,7 @@ const defaultI18n: I18nContextType = {
   currency: "USD",
   setLocale: () => {},
   setCurrency: () => {},
-  t: (key: string) => key,
+  t: (key: string, _params?: Record<string, string | number>) => key,
   formatPrice: (usdPrice: number) => `$${usdPrice.toFixed(2)}`,
   currencySymbol: "$",
 };
