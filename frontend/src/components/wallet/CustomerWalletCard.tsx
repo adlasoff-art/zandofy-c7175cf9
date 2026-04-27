@@ -5,6 +5,11 @@ import { Wallet, ArrowDownCircle, ArrowUpCircle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
+// supabase client typed loosely until types.ts is regenerated for the new tables
+const sb = supabase as unknown as {
+  from: (t: string) => any;
+};
+
 /**
  * Carte affichant le solde du portefeuille client + 5 dernières transactions.
  * Crédit alimenté principalement par les remboursements de litiges (Lot 13).
@@ -16,26 +21,32 @@ export function CustomerWalletCard() {
     queryKey: ["customer-wallet", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await sb
         .from("customer_wallets")
         .select("*")
         .eq("user_id", user!.id)
         .maybeSingle();
-      return data;
+      return data as { balance: number; currency: string } | null;
     },
   });
 
-  const { data: tx = [] } = useQuery({
+  const { data: tx = [] as any[] } = useQuery({
     queryKey: ["customer-wallet-tx", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await sb
         .from("customer_wallet_transactions")
         .select("*")
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false })
         .limit(5);
-      return data ?? [];
+      return (data ?? []) as Array<{
+        id: string;
+        amount: number;
+        type: string;
+        description: string | null;
+        created_at: string;
+      }>;
     },
   });
 
