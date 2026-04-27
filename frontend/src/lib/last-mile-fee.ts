@@ -1,6 +1,12 @@
 /**
  * Last-mile delivery fee calculation utility.
- * Computes total = commune.delivery_fee + quartier.delivery_surcharge
+ *
+ * @deprecated Depuis le Lot consolidation multi-opérateurs, la tarification
+ * du dernier kilomètre est gérée par opérateur via `delivery_operator_rates`
+ * (cf. `useOperatorQuotes`). Les colonnes `communes.delivery_fee` et
+ * `quartiers.delivery_surcharge` ont été renommées `*_legacy_deprecated`.
+ * Ce helper ne retourne plus que les flags `deliverable` / `restricted` et
+ * un `fee` à 0 (pour compatibilité avec l'ancien call site CheckoutPage).
  */
 import { supabase } from "@/integrations/supabase/client";
 
@@ -34,10 +40,10 @@ export async function calculateLastMileFee(
 
   if (!communeName || !cityName) return result;
 
-  // Lookup commune
+  // Lookup commune (sans frais : géré par opérateurs)
   const { data: commune } = await (supabase as any)
     .from("communes")
-    .select("id, delivery_fee, is_deliverable, is_active")
+    .select("id, is_deliverable, is_active")
     .eq("name", communeName)
     .eq("city", cityName)
     .eq("country_code", countryCode)
@@ -45,7 +51,7 @@ export async function calculateLastMileFee(
 
   if (!commune) return result;
 
-  result.communeFee = Number(commune.delivery_fee) || 0;
+  result.communeFee = 0;
   result.deliverable = commune.is_deliverable !== false && commune.is_active !== false;
 
   if (!result.deliverable) {
@@ -57,13 +63,13 @@ export async function calculateLastMileFee(
   if (quartierName && commune.id) {
     const { data: quartier } = await (supabase as any)
       .from("quartiers")
-      .select("delivery_surcharge, is_restricted, restriction_reason, is_active")
+      .select("is_restricted, restriction_reason, is_active")
       .eq("name", quartierName)
       .eq("commune_id", commune.id)
       .maybeSingle();
 
     if (quartier) {
-      result.quartierSurcharge = Number(quartier.delivery_surcharge) || 0;
+      result.quartierSurcharge = 0;
       result.restricted = !!quartier.is_restricted || quartier.is_active === false;
       result.restrictionReason = quartier.restriction_reason || null;
 
@@ -75,6 +81,6 @@ export async function calculateLastMileFee(
     }
   }
 
-  result.fee = result.communeFee + result.quartierSurcharge;
+  result.fee = 0;
   return result;
 }
