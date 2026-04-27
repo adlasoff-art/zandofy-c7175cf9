@@ -581,6 +581,13 @@ const translations: Record<Locale, Record<string, string>> = {
     "freight.requestDuplicate": "Demande déjà enregistrée — un admin vous contactera dès qu'un transitaire couvre la route.",
     "freight.requestOriginMissing": "Origine inconnue — impossible d'envoyer la demande.",
     "freight.totalTransport": "Total transport ({{selected}}/{{total}} colis)",
+    "vendor.origins.title": "Pays d'origine d'expédition",
+    "vendor.origins.subtitle": "Vos produits sont actuellement expédiables depuis ces pays. Cette information détermine les transitaires éligibles au checkout.",
+    "vendor.origins.loading": "Chargement…",
+    "vendor.origins.noProducts": "Aucun produit publié pour le moment.",
+    "vendor.origins.allMissing": "Aucun pays d'origine renseigné sur vos produits.",
+    "vendor.origins.missingWarning": "{{count}} produit(s) sans pays d'origine — ils risquent de ne pas être expédiables. Contactez l'équipe Zandofy.",
+    "vendor.origins.contactInfo": "Pour ajouter ou modifier un pays d'origine sur vos produits, contactez l'équipe Zandofy.",
   },
   en: {
     // Header
@@ -1133,6 +1140,13 @@ const translations: Record<Locale, Record<string, string>> = {
     "freight.requestDuplicate": "Request already recorded — an admin will contact you as soon as a forwarder covers this route.",
     "freight.requestOriginMissing": "Unknown origin — cannot send the request.",
     "freight.totalTransport": "Total shipping ({{selected}}/{{total}} packages)",
+    "vendor.origins.title": "Shipping origin countries",
+    "vendor.origins.subtitle": "Your products currently ship from these countries. This drives which forwarders are eligible at checkout.",
+    "vendor.origins.loading": "Loading…",
+    "vendor.origins.noProducts": "No published products yet.",
+    "vendor.origins.allMissing": "No origin country set on your products.",
+    "vendor.origins.missingWarning": "{{count}} product(s) without origin country — they may not be shippable. Contact the Zandofy team.",
+    "vendor.origins.contactInfo": "To add or change a product's origin country, contact the Zandofy team.",
   },
 };
 

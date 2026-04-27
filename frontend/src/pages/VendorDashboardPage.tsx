@@ -27,6 +27,7 @@ import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
 import { VendorPricingTab } from "@/components/vendor/VendorPricingTab";
 import { VendorAutonomousTab } from "@/components/vendor/VendorAutonomousTab";
 import { VendorFreightSimulator } from "@/components/vendor/VendorFreightSimulator";
+import VendorOriginCountriesCard from "@/components/vendor/VendorOriginCountriesCard";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
@@ -963,6 +964,9 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
           </button>
         </div>
       </div>
+
+      {/* ═══ PAYS D'ORIGINE D'EXPÉDITION ═══ */}
+      <VendorOriginCountriesCard storeId={store.id} />
 
       {/* ═══ PHOTO DE PROFIL & BANNIÈRE ═══ */}
       <div className="bg-card border border-border rounded-lg p-4 space-y-4">
