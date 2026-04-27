@@ -24,12 +24,20 @@ Avant : `fetchEligibleFreightOffers` ne filtrait que sur destination + mode → 
 - `CheckoutPage.createOrderForPayment` persiste `orders.origin_country` (ISO2 si unique pour la sous-commande, NULL sinon).
 
 ## À faire — Phase 2 (multi-origines = split)
-Aujourd'hui le panier se split par `store_id` uniquement. Phase 2 doit ajouter la dimension origine :
-- 1 sous-commande par couple (store_id, origin_country).
-- 1 `FreightSelector` par groupe avec son propre lock `freight_quotes`.
-- Total `shipping_cost` = somme des devis.
-- Branchement `get_eligible_forwarders_v2` côté UI (au lieu du filtre client).
-- Empêcher conflits air/sea entre articles d'un même groupe.
+## ✅ Phase 2 (livrée) — Multi-origines = split
+- `groupCartByOriginAndStore()` (`freightQuoteCheckout.ts`) : retourne `CartOriginGroup[]` avec poids/CBM agrégés et intersection `supported_modes` (air/sea).
+- `MultiOriginFreightSelector.tsx` : rend N `FreightSelector` (un par groupe), agrège le total et expose un mapping `groupKey → { offer, choice }` au parent.
+- `CheckoutShippingCalculator` : détecte `originGroups.length > 1` et bascule sur le multi-selector ; en mono-groupe le flux legacy est inchangé (zéro régression).
+- `CheckoutPage.createOrderForPayment` :
+  * Si multi-groupes → split par `${store_id}|${origin_country}`, lock 1 `freight_quote` par groupe, `orders.shipping_cost` = devis du groupe (pas de ratio), 1 sous-order par groupe avec `freight_quote_id` dédié.
+  * Si mono → comportement antérieur (1 devis verrouillé, ratio par store).
+- Gating `handleShippingSubmit` : refuse de continuer si un groupe n'a pas de transitaire choisi.
+- Conflit air/sea géré : si `supported_modes` du groupe n'inclut pas le mode actif, encart amber bloquant (le client doit changer de mode ou retirer un article).
+
+## Reste à faire (post-Phase 2, non bloquant MVP)
+- Brancher `get_eligible_forwarders_v2` côté UI (RPC) au lieu du filtre client en JS — gain perf si beaucoup de transitaires.
+- Empty state explicite par groupe avec bouton "Demander couverture transitaire" (équivalent `request-delivery-coverage`).
+- Tests unitaires `groupCartByOriginAndStore` (mocks Supabase nécessaires).
 
 ## Règles métier
 - Origine produit (`products.origin_country`) > origine boutique (`stores.country`).
