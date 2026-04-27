@@ -91,6 +91,7 @@ export function OperatorOwnerSearch({ value, onChange, orphan, onOrphanChange }:
               <div className="flex flex-col gap-1">
                 <span className="font-medium text-foreground">{fullName(value)}</span>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  {value.email && <span className="truncate">{value.email}</span>}
                   {value.city && <span className="inline-flex items-center gap-1"><MapPin size={11} />{value.city}</span>}
                   <span className="inline-flex items-center gap-1"><CalendarDays size={11} />Membre depuis {fmtDate(value.created_at)}</span>
                   {value.is_kyc_verified && (
