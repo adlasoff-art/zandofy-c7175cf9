@@ -9,6 +9,14 @@ import {
 import { ForwarderSelector, type ForwarderChoice } from "@/components/checkout/ForwarderSelector";
 import { FreightSelector, type ConsolidationChoice } from "@/components/checkout/FreightSelector";
 import type { EligibleFreightOffer } from "@/services/freightQuoteCheckout";
+import {
+  groupCartByOriginAndStore,
+  type CartOriginGroup,
+} from "@/services/freightQuoteCheckout";
+import {
+  MultiOriginFreightSelector,
+  type FreightGroupSelection,
+} from "@/components/checkout/MultiOriginFreightSelector";
 
 const MODE_META = {
   air:  { icon: Plane,     label: "Aérien",     localLabel: "Aérien local",  unit: "kg" },
@@ -45,6 +53,8 @@ interface Props {
   onForwarderChange?: (choice: ForwarderChoice | null, unassigned: boolean) => void;
   onFreightOfferChange?: (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => void;
   onFreightAvailabilityChange?: (count: number) => void;
+  /** Lot 11C Phase 2 — Mapping des sélections multi-groupes (1 par origine×store). */
+  onFreightGroupsChange?: (selections: Record<string, FreightGroupSelection>) => void;
 }
 
 function preciseRound(v: number, d: number): number {
@@ -61,6 +71,7 @@ export function CheckoutShippingCalculator({
   onForwarderChange,
   onFreightOfferChange,
   onFreightAvailabilityChange,
+  onFreightGroupsChange,
 }: Props) {
   const [products, setProducts] = useState<CartProductInfo[]>([]);
   const [destCity, setDestCity] = useState<City | null>(null);
@@ -84,6 +95,26 @@ export function CheckoutShippingCalculator({
   const [freightOffer, setFreightOffer] = useState<EligibleFreightOffer | null>(null);
   const [freightChoice, setFreightChoice] = useState<ConsolidationChoice>("split");
   const [hasEligibleFreight, setHasEligibleFreight] = useState(false);
+  // Lot 11C Phase 2 — Groupes (store_id × origin_country) du panier.
+  const [originGroups, setOriginGroups] = useState<CartOriginGroup[]>([]);
+  const [groupSelections, setGroupSelections] = useState<Record<string, FreightGroupSelection>>({});
+
+  // Recalcule les groupes à chaque changement de panier.
+  useEffect(() => {
+    if (cartItems.length === 0) {
+      setOriginGroups([]);
+      return;
+    }
+    let cancelled = false;
+    groupCartByOriginAndStore(cartItems).then((groups) => {
+      if (!cancelled) setOriginGroups(groups);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cartItems]);
+
+  const isMultiGroup = originGroups.length > 1;
 
   // 1. Fetch product details (weight, dimensions, origin, category) for cart items
   useEffect(() => {
