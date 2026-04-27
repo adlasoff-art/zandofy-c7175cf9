@@ -78,3 +78,22 @@ verify_jwt = false
 
 [functions.watermark-image]
 verify_jwt = false
+
+# Lot final consolidation multi-opérateurs
+[functions.admin-create-operator-rate]
+verify_jwt = true
+
+[functions.request-delivery-coverage]
+verify_jwt = true
+
+[functions.operator-upload-kyb-document]
+verify_jwt = true
+
+[functions.admin-review-kyb-document]
+verify_jwt = true
+
+[functions.admin-update-operator]
+verify_jwt = true
+
+[functions.admin-archive-operator]
+verify_jwt = true
