@@ -21,6 +21,7 @@ import { RestrictionsEditor } from "./RestrictionsEditor";
 import { TransporterUserPicker } from "./TransporterUserPicker";
 import { KgTiersEditor } from "./KgTiersEditor";
 import { ConsolidationSettingsCard } from "./ConsolidationSettingsCard";
+import { GeoFieldsRow } from "@/components/address/GeoFieldsRow";
 
 const sb = supabase as any;
 
