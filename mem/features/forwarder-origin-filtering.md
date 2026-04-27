@@ -40,8 +40,12 @@ Avant : `fetchEligibleFreightOffers` ne filtrait que sur destination + mode → 
 - `MultiOriginFreightSelector` : quand `availability[group.key] === 0`, affiche encart amber + bouton "Demander couverture" (loader + état "Envoyé").
 - `AdminCoverageRequestsPage` : second onglet **Transitaires** listant les demandes (route, mode, statut) avec action "Marquer traitée".
 
+## ✅ Phase 4 (livrée) — RPC v2 branché
+- `fetchEligibleFreightOffers` appelle d'abord `get_eligible_forwarders_v2(p_origin_country, p_destination_country, p_destination_city_id, p_mode)` pour obtenir la liste des `forwarder_id` autorisés (filtre JSONB + index GIN côté Postgres).
+- Fallback JS automatique si le RPC échoue (preview non migré, droits manquants).
+- Service plateforme (`is_platform_owned`) toujours conservé.
+
 ## Reste à faire (non bloquant MVP)
-- Brancher `get_eligible_forwarders_v2` côté UI (RPC) au lieu du filtre client en JS — gain perf si beaucoup de transitaires.
 - Tests unitaires `groupCartByOriginAndStore` (mocks Supabase nécessaires).
 - Empty state mono-flow (`FreightSelector` direct, hors multi-origines) — actuellement le selector affiche déjà un message "Aucun transitaire", mais sans bouton de demande.
 
