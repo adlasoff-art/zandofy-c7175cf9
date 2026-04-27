@@ -9527,6 +9527,7 @@ export type Database = {
           total_spent: number
         }[]
       }
+      get_customer_tracking: { Args: { p_order_id: string }; Returns: Json }
       get_eligible_forwarders: {
         Args: { p_city_id: string; p_country: string; p_mode: string }
         Returns: {
