@@ -16,15 +16,30 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const VehicleSchema = z.object({
-  type: z.enum(["moto", "voiture", "tricycle", "camionnette", "velo"]),
+const VEHICLE_TYPES = ["moto", "voiture", "tricycle", "camionnette", "velo"] as const;
+
+const VehicleAggSchema = z.object({
+  type: z.enum(VEHICLE_TYPES),
   count: z.number().int().min(1).max(50),
+});
+
+const FleetVehicleSchema = z.object({
+  type: z.enum(VEHICLE_TYPES),
+  plate_number: z.string().trim().min(3).max(20),
+  brand: z.string().trim().max(40).optional(),
+  model: z.string().trim().max(40).optional(),
 });
 
 const CitySchema = z.object({
   city: z.string().trim().min(1).max(80),
   country_code: z.string().trim().length(2),
+  province_id: z.string().uuid().optional().nullable(),
+  commune_ids: z.array(z.string().uuid()).min(1).max(100),
+  quartier_ids: z.array(z.string().uuid()).max(500).optional().default([]),
 });
+
+const MIN_FLEET = 3;
+const MIN_RIDERS = 3;
 
 const BodySchema = z.object({
   owner_user_id: z.string().uuid().optional().nullable(),
@@ -37,9 +52,10 @@ const BodySchema = z.object({
   headquarters_country: z.string().trim().length(2),
   headquarters_city: z.string().trim().min(1).max(80),
   headquarters_address: z.string().trim().max(255).optional().nullable(),
-  vehicle_types: z.array(VehicleSchema).min(1).max(6),
-  declared_riders_count: z.number().int().min(1).max(50),
-  max_riders: z.number().int().min(1).max(100).optional(),
+  fleet_vehicles: z.array(FleetVehicleSchema).min(MIN_FLEET).max(100),
+  vehicle_types: z.array(VehicleAggSchema).min(1).max(6).optional(),
+  declared_riders_count: z.number().int().min(MIN_RIDERS).max(50),
+  max_riders: z.number().int().min(MIN_RIDERS).max(100).optional(),
   cities: z.array(CitySchema).min(1).max(50),
   is_platform_owned: z.boolean().optional().default(false),
   platform_commission_pct: z.number().min(0).max(100).optional(),
@@ -80,6 +96,23 @@ Deno.serve(async (req) => {
     }
     const body = parsed.data;
 
+    // Vérification: plaques uniques dans la flotte
+    const plates = body.fleet_vehicles.map((v) => v.plate_number.trim().toUpperCase());
+    const dup = plates.find((p, i) => plates.indexOf(p) !== i);
+    if (dup) {
+      return json({ error: `Plaque dupliquée dans la flotte: ${dup}` }, 400);
+    }
+
+    // Dérive vehicle_types agrégé si absent
+    const vehicleTypesAgg = body.vehicle_types && body.vehicle_types.length > 0
+      ? body.vehicle_types
+      : Object.entries(
+          body.fleet_vehicles.reduce<Record<string, number>>((acc, v) => {
+            acc[v.type] = (acc[v.type] || 0) + 1;
+            return acc;
+          }, {})
+        ).map(([type, count]) => ({ type, count }));
+
     // Anti-doublon si owner_user_id fourni
     if (body.owner_user_id) {
       const { data: existing } = await svc
@@ -104,7 +137,13 @@ Deno.serve(async (req) => {
       headquarters_country: body.headquarters_country,
       headquarters_city: body.headquarters_city,
       headquarters_address: body.headquarters_address ?? null,
-      vehicle_types: body.vehicle_types,
+      vehicle_types: vehicleTypesAgg,
+      fleet_vehicles: body.fleet_vehicles.map((v) => ({
+        type: v.type,
+        plate_number: v.plate_number.trim().toUpperCase(),
+        ...(v.brand ? { brand: v.brand } : {}),
+        ...(v.model ? { model: v.model } : {}),
+      })),
       declared_riders_count: body.declared_riders_count,
       max_riders: body.max_riders ?? body.declared_riders_count,
       status: "approved",
@@ -133,6 +172,9 @@ Deno.serve(async (req) => {
           operator_id: op.id,
           city: c.city,
           country_code: c.country_code,
+          province_id: c.province_id ?? null,
+          commune_ids: c.commune_ids,
+          quartier_ids: c.quartier_ids ?? [],
           is_active: true,
         })),
       );
