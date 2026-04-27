@@ -15,6 +15,7 @@ Deno.serve(async (req) => {
     const userId = url.searchParams.get("u");
     const anonId = url.searchParams.get("a");
     const channel = url.searchParams.get("c") || "email"; // email | popup
+    const variant = url.searchParams.get("v"); // 'A' | 'B' | null
 
     if (workflowId) {
       const { createClient } = await import("npm:@supabase/supabase-js@2");
@@ -30,6 +31,7 @@ Deno.serve(async (req) => {
         user_id: userId || null,
         anon_id: anonId || null,
         event_type: eventType,
+        variant_label: (variant === "A" || variant === "B") ? variant : null,
         metadata: { destination: to },
       });
     }
