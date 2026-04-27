@@ -26,6 +26,7 @@ import { VendorPaymentNumbers } from "@/components/vendor/VendorPaymentNumbers";
 import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
 import { VendorPricingTab } from "@/components/vendor/VendorPricingTab";
 import { VendorAutonomousTab } from "@/components/vendor/VendorAutonomousTab";
+import { VendorKybV2Tab } from "@/components/vendor/VendorKybV2Tab";
 import { VendorFreightSimulator } from "@/components/vendor/VendorFreightSimulator";
 import VendorOriginCountriesCard from "@/components/vendor/VendorOriginCountriesCard";
 import { toast } from "sonner";
@@ -86,7 +87,7 @@ export default function VendorDashboardPage() {
   const [noStore, setNoStore] = useState(false);
   const [selectedConv, setSelectedConv] = useState<VendorConversation | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "team" | "suppliers" | "pricing" | "autonomous" | "freight_sim" | "settings">("catalogue");
+  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "team" | "suppliers" | "pricing" | "autonomous" | "freight_sim" | "kyb" | "settings">("catalogue");
   const [orderCounters, setOrderCounters] = useState<OrderCounters>({ total: 0, in_progress: 0, delivered: 0 });
   const [suppliersEnabled, setSuppliersEnabled] = useState(false);
   const { data: vendorFeaturesConfig } = useQuery({
@@ -318,6 +319,7 @@ export default function VendorDashboardPage() {
     { key: "pricing" as const, label: "Tarification", icon: DollarSign },
     { key: "autonomous" as const, label: "Autonome", icon: Globe },
     ...(freightSimEnabled ? [{ key: "freight_sim" as const, label: "Simulateur fret", icon: Calculator }] : []),
+    { key: "kyb" as const, label: "Vérification KYB", icon: ShieldCheck },
     { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
     ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
     { key: "messages" as const, label: "Messages", icon: MessageCircle },
