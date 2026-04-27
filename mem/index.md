@@ -111,3 +111,4 @@
 - [Market Positioning](mem://project/market-positioning-intent)
 - [Technical IDs](mem://project/technical-identifiers)
 - [Geo Fields Combobox Standard](mem://preference/geo-fields-combobox-standard)
+- [Forwarder Origin Filtering](mem://features/forwarder-origin-filtering) — Lot 11C P1 : checkout filtre transitaires par `products.origin_country` via `coverage_routes` ; P2 = split panier multi-origines
