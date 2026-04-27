@@ -38,6 +38,15 @@ const CitySchema = z.object({
   quartier_ids: z.array(z.string().uuid()).max(500).optional().default([]),
 });
 
+const RateSchema = z.object({
+  country_code: z.string().trim().length(2),
+  city: z.string().trim().min(1).max(80),
+  zone_name: z.string().trim().min(1).max(60).default("Standard"),
+  base_price: z.number().min(0).max(10000),
+  surcharge: z.number().min(0).max(10000).default(0),
+  estimated_minutes: z.number().int().min(1).max(1440).default(60),
+});
+
 const MIN_FLEET = 3;
 const MIN_RIDERS = 3;
 
@@ -57,6 +66,7 @@ const BodySchema = z.object({
   declared_riders_count: z.number().int().min(MIN_RIDERS).max(50),
   max_riders: z.number().int().min(MIN_RIDERS).max(100).optional(),
   cities: z.array(CitySchema).min(1).max(50),
+  initial_rates: z.array(RateSchema).max(50).optional().default([]),
   is_platform_owned: z.boolean().optional().default(false),
   platform_commission_pct: z.number().min(0).max(100).optional(),
 });
