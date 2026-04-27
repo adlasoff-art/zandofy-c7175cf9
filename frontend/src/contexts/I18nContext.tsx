@@ -1255,7 +1255,7 @@ const defaultI18n: I18nContextType = {
   currency: "USD",
   setLocale: () => {},
   setCurrency: () => {},
-  t: (key: string) => key,
+  t: (key: string, _params?: Record<string, string | number>) => key,
   formatPrice: (usdPrice: number) => `$${usdPrice.toFixed(2)}`,
   currencySymbol: "$",
 };
