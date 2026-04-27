@@ -8875,10 +8875,15 @@ export type Database = {
     Views: {
       automation_workflows_public: {
         Row: {
+          ab_split_percent: number | null
+          ab_test_enabled: boolean | null
           channel: Database["public"]["Enums"]["automation_channel"] | null
+          condition_cities: string[] | null
+          condition_countries: string[] | null
           condition_has_account: boolean | null
           condition_has_order: boolean | null
           condition_max_days_since_signup: number | null
+          condition_roles: string[] | null
           delay_days: number | null
           delay_minutes: number | null
           display_frequency:
@@ -8899,10 +8904,15 @@ export type Database = {
             | null
         }
         Insert: {
+          ab_split_percent?: number | null
+          ab_test_enabled?: boolean | null
           channel?: Database["public"]["Enums"]["automation_channel"] | null
+          condition_cities?: string[] | null
+          condition_countries?: string[] | null
           condition_has_account?: boolean | null
           condition_has_order?: boolean | null
           condition_max_days_since_signup?: number | null
+          condition_roles?: string[] | null
           delay_days?: number | null
           delay_minutes?: number | null
           display_frequency?:
@@ -8923,10 +8933,15 @@ export type Database = {
             | null
         }
         Update: {
+          ab_split_percent?: number | null
+          ab_test_enabled?: boolean | null
           channel?: Database["public"]["Enums"]["automation_channel"] | null
+          condition_cities?: string[] | null
+          condition_countries?: string[] | null
           condition_has_account?: boolean | null
           condition_has_order?: boolean | null
           condition_max_days_since_signup?: number | null
+          condition_roles?: string[] | null
           delay_days?: number | null
           delay_minutes?: number | null
           display_frequency?:
