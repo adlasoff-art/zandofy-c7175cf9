@@ -19,6 +19,7 @@ import {
   consumeFreightQuote,
   type EligibleFreightOffer,
 } from "@/services/freightQuoteCheckout";
+import type { FreightGroupSelection } from "@/components/checkout/MultiOriginFreightSelector";
 import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
 import { OperatorSelector } from "@/components/checkout/OperatorSelector";
 import { useOperatorQuotes, type OperatorQuote } from "@/hooks/useOperatorQuotes";
@@ -218,6 +219,21 @@ export default function CheckoutPage() {
   const handleFreightAvailabilityChange = useCallback((count: number) => {
     setFreightOffersAvailable(count);
   }, []);
+
+  // Lot 11C Phase 2 — Mapping des sélections multi-groupes (1 par origine×store).
+  // Quand le panier contient ≥2 groupes (store × origine), chaque groupe doit avoir
+  // son propre transitaire. Si vide, on retombe sur le flux mono-offre legacy.
+  const [freightGroups, setFreightGroups] = useState<Record<string, FreightGroupSelection>>({});
+  const handleFreightGroupsChange = useCallback(
+    (sels: Record<string, FreightGroupSelection>) => {
+      setFreightGroups(sels);
+    },
+    [],
+  );
+  const isMultiGroupCheckout = Object.keys(freightGroups).length > 1;
+  const freightGroupsAllSelected =
+    isMultiGroupCheckout &&
+    Object.values(freightGroups).every((s) => !!s.offer);
 
   // Free shipping threshold from platform settings
   const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(50);
