@@ -447,7 +447,7 @@ function QuartiersTab() {
   const [filterCommune, setFilterCommune] = useState("");
   const [provinces, setProvinces] = useState<ProvinceRow[]>([]);
   const [cities, setCities] = useState<string[]>([]);
-  const [form, setForm] = useState({ name: "", commune_id: "", is_restricted: false, restriction_reason: "", delivery_surcharge: "0" });
+  const [form, setForm] = useState({ name: "", commune_id: "", is_restricted: false, restriction_reason: "" });
   const [editId, setEditId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
 
@@ -486,7 +486,7 @@ function QuartiersTab() {
 
   const handleSave = async () => {
     if (!form.name || !form.commune_id) { toast.error("Nom et commune requis"); return; }
-    const payload = { name: form.name, commune_id: form.commune_id, is_restricted: form.is_restricted, restriction_reason: form.restriction_reason || null, delivery_surcharge: parseFloat(form.delivery_surcharge) || 0 };
+    const payload = { name: form.name, commune_id: form.commune_id, is_restricted: form.is_restricted, restriction_reason: form.restriction_reason || null };
     if (editId) {
       await (supabase as any).from("quartiers").update(payload).eq("id", editId);
     } else {
@@ -494,13 +494,13 @@ function QuartiersTab() {
     }
     setShowForm(false);
     setEditId(null);
-    setForm({ name: "", commune_id: filterCommune, is_restricted: false, restriction_reason: "", delivery_surcharge: "0" });
+    setForm({ name: "", commune_id: filterCommune, is_restricted: false, restriction_reason: "" });
     fetch();
     toast.success(editId ? "Quartier modifié" : "Quartier ajouté");
   };
 
   const handleEdit = (q: QuartierRow) => {
-    setForm({ name: q.name, commune_id: q.commune_id, is_restricted: q.is_restricted, restriction_reason: q.restriction_reason || "", delivery_surcharge: String(q.delivery_surcharge || 0) });
+    setForm({ name: q.name, commune_id: q.commune_id, is_restricted: q.is_restricted, restriction_reason: q.restriction_reason || "" });
     setEditId(q.id);
     setShowForm(true);
   };
@@ -540,7 +540,7 @@ function QuartiersTab() {
             {communes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.city})</option>)}
           </select>
         </div>
-        <Button size="sm" className="mt-5" onClick={() => { setShowForm(true); setEditId(null); setForm({ name: "", commune_id: filterCommune, is_restricted: false, restriction_reason: "", delivery_surcharge: "0" }); }}>
+        <Button size="sm" className="mt-5" onClick={() => { setShowForm(true); setEditId(null); setForm({ name: "", commune_id: filterCommune, is_restricted: false, restriction_reason: "" }); }}>
           <Plus size={14} className="mr-1" /> Ajouter
         </Button>
       </div>
@@ -551,7 +551,7 @@ function QuartiersTab() {
             <h4 className="text-sm font-bold">{editId ? "Modifier" : "Nouveau quartier / bloc"}</h4>
             <button onClick={() => { setShowForm(false); setEditId(null); }}><X size={16} className="text-muted-foreground" /></button>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div><Label className="text-xs">Nom *</Label><Input className="mt-1" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
             <div>
               <Label className="text-xs">Commune *</Label>
@@ -560,7 +560,6 @@ function QuartiersTab() {
                 {communes.map(c => <option key={c.id} value={c.id}>{c.name} ({c.city})</option>)}
               </select>
             </div>
-            <div><Label className="text-xs">Surcharge ($)</Label><Input className="mt-1" type="number" step="0.01" min="0" value={form.delivery_surcharge} onChange={e => setForm(f => ({ ...f, delivery_surcharge: e.target.value }))} /></div>
           </div>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-sm">
@@ -583,7 +582,6 @@ function QuartiersTab() {
             <TableRow>
               <TableHead>Quartier / Bloc</TableHead>
               <TableHead>Commune</TableHead>
-              <TableHead>Surcharge ($)</TableHead>
               <TableHead>Restreint</TableHead>
               <TableHead className="w-20">Actions</TableHead>
             </TableRow>
@@ -593,7 +591,6 @@ function QuartiersTab() {
               <TableRow key={q.id}>
                 <TableCell className="font-medium">{q.name}</TableCell>
                 <TableCell>{getCommuneName(q.commune_id)}</TableCell>
-                <TableCell>{(q.delivery_surcharge || 0).toFixed(2)}</TableCell>
                 <TableCell>
                   {q.is_restricted ? (
                     <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded">{q.restriction_reason || "Oui"}</span>
@@ -607,7 +604,7 @@ function QuartiersTab() {
                 </TableCell>
               </TableRow>
             ))}
-            {quartiers.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Aucun quartier</TableCell></TableRow>}
+            {quartiers.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Aucun quartier</TableCell></TableRow>}
           </TableBody>
         </Table>
       )}
