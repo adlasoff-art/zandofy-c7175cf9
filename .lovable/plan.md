@@ -1,122 +1,68 @@
+# Plan — Fix combobox plafonds + livraison à domicile inopérante
 
-# Phase 10.3 — Standardisation Combobox Géographique partout
+## Problème 1 — Combobox Pays/Ville s'ouvre "à côté" du Dialog
 
-## Objectif
+**Cause** : `GeoCombobox` rend sa liste avec `position: fixed` calculée à partir de `getBoundingClientRect()`. Dans une `Dialog` Radix (qui utilise un overlay et un transform), ce positionnement absolu sort du modal et apparaît décalé en bas à droite (visible sur la capture 1).
 
-Éliminer toute saisie libre de **Pays / Province / Ville / Commune / Quartier** dans la plateforme. Chaque champ géographique doit être un **combobox** alimenté par la fonctionnalité **Zones Géographiques** admin (`countries`, `provinces`, `cities`, `communes`, `quartiers`). Les codes pays ISO ne doivent jamais être tapés à la main.
+**Correctif** : repasser à un dropdown ancré **dans le flux du parent** (`position: absolute` relatif au bouton), avec un z-index élevé et un overflow correct. Le menu doit s'afficher **juste sous le champ Ville**, à l'intérieur du Dialog, avec recherche intégrée — comme attendu.
 
-## Principe directeur
+Détails techniques :
+- `frontend/src/components/address/GeoCombobox.tsx` : remplacer le bloc desktop `position: fixed + getBoundingClientRect` par `absolute top-full left-0 right-0 z-[60]` avec `mt-1`.
+- Garder le mode plein écran mobile (déjà OK).
+- Ajouter `pointer-events-auto` et tester dans le Dialog admin (Plafonds + Zones d'expédition).
 
-> **Un seul composant à utiliser partout** : `CascadingAddressFields` (existant) ou un nouveau wrapper léger `GeoFieldsRow` (1 ligne, niveaux configurables) selon le contexte (formulaire complet vs ligne tabulaire compacte).
+## Problème 2 — "Livraison à domicile" désactivée même avec opérateurs créés
 
-Tout formulaire qui touche au géographique doit :
-- Lister les pays via `CountryCombobox` (filtré par `activeCountryCodes`)
-- Cascader province → ville → commune → quartier via `useGeoData`
-- Bloquer la sélection si le pays/ville n'est pas configuré dans les zones géographiques admin
-- Stocker à la fois le **nom** (pour affichage/legacy) et l'**UUID** (pour cascade et FK)
+**Cause racine** (vérifiée dans `v_active_operators_by_city` v2 + `useOperatorQuotes`):
 
-## Audit — Formulaires à corriger
+Le checkout n'affiche un opérateur QUE si :
+1. `delivery_operators` : `is_active=true` ET `status='approved'`  ✅ (admin-create-operator le fait)
+2. `delivery_operator_cities` : `is_active=true` avec `country_code` + `city` correspondant à l'adresse client  ✅ (créé)
+3. **`delivery_operator_rates`** : au moins une ligne `is_active=true` ET `status='approved'` sur `(country_code, city)`  ❌ **JAMAIS CRÉÉE**
 
-Recherche exhaustive : 8 emplacements avec saisie libre identifiés.
+Aucune entrée n'est insérée dans `delivery_operator_rates` ni par `admin-create-operator` ni par `become-operator-submit`. Résultat : la vue retourne 0 ligne → `useOperatorQuotes` renvoie `[]` → `hasOperatorCoverage=false` → bouton désactivé avec "Aucun livreur ne dessert encore votre quartier".
 
-### 1. **AdminOperatorRateCapsPage** (capture d'écran fournie)
-Dialog "Nouveau plafond" → `country_code` et `city` sont des `<Input>` libres.
-→ Remplacer par `CountryCombobox` + `GeoCombobox` ville (filtrée sur le pays).
+**Logique métier à appliquer** (selon la règle énoncée par l'utilisateur) :
 
-### 2. **AdminShippingPage** — Dialog Zone d'expédition
-`country_code` (Input ISO) + `city` (Input). 
-→ Combobox pays + ville. Maintenir l'autocomplete `world-cities` en fallback uniquement pour villes hors zones admin.
-
-### 3. **OperatorRatesPage** (Dashboard opérateur)
-Form ajout tarif : `country_code`, `city`, `commune`, `quartier` tous en saisie libre.
-→ Cascade complète. Le `zone_name` reste libre (label métier).
-
-### 4. **OperatorCoveragePage**
-`country` + `city` libres.
-→ Cascade pays → ville (multi-sélection villes optionnelle).
-
-### 5. **BecomeForwarderPage**
-`headquarters_city` libre + lignes tarifaires `origin_country/city`, `destination_country/city` toutes libres.
-→ Cascade complète sur HQ ; pour les routes import (CN/TR/AE → CD), combobox pays origine + ville origine + combobox ville destination.
-
-### 6. **ForwarderPricingProfilesDialog** (Admin)
-`country_code` Input manuel + filtre ville textuel.
-→ Combobox pays + combobox ville filtrée.
-
-### 7. **ForwarderCoverageDialog**
-Déjà partiellement combobox (CommandInput) mais à harmoniser avec `CountryCombobox` standard.
-
-### 8. **GeoBlockingSettings** + autres pages mineures
-Vérifier et aligner si saisie libre détectée.
-
-## Composants à créer / réutiliser
-
-### Réutilisé (existants)
-- `CountryCombobox` — pays avec drapeaux + filtre `activeCountryCodes`
-- `GeoCombobox` — combobox générique pour province/ville/commune/quartier
-- `useGeoData` — cascade hook (déjà utilisé par `CascadingAddressFields` et `LocationHierarchyFilter`)
-- `LocationHierarchyFilter` — pour filtres en lecture (admin pages)
-
-### Nouveau composant
-**`GeoFieldsRow`** (`frontend/src/components/address/GeoFieldsRow.tsx`)
-
-Wrapper compact (1-2 lignes) pour formulaires courts (plafonds, tarifs, zones d'expédition) :
-
-```tsx
-<GeoFieldsRow
-  value={{ country, province_id, city, commune, quartier }}
-  onChange={(patch) => setForm({ ...form, ...patch })}
-  levels={["country", "city"]}        // configurable
-  required={["country", "city"]}
-  blockIfNotConfigured                 // empêche villes hors zones admin
-/>
-```
-
-- Réutilise `useGeoData` en interne
-- Niveaux à afficher passés en prop (`country`, `province`, `city`, `commune`, `quartier`)
-- Renvoie systématiquement nom + UUID
-- Affiche un message inline "Cette ville n'est pas configurée dans les zones géographiques admin" si bloqué
-
-## Plan d'exécution
-
-### Étape 1 — Composant `GeoFieldsRow`
-Créer le wrapper réutilisable. 1 fichier ~120 lignes.
-
-### Étape 2 — Refactor des 8 formulaires
-Pour chaque page listée, remplacer les `<Input>` Pays/Ville par `<GeoFieldsRow>` ou `CascadingAddressFields` selon densité.
-
-| Fichier | Composant cible | Niveaux |
+| Source de création | Statut opérateur | Statut tarif initial |
 |---|---|---|
-| `AdminOperatorRateCapsPage.tsx` | `GeoFieldsRow` | country, city |
-| `AdminShippingPage.tsx` (ZoneDialog) | `GeoFieldsRow` | country, city |
-| `OperatorRatesPage.tsx` | `GeoFieldsRow` | country, city, commune, quartier |
-| `OperatorCoveragePage.tsx` | `GeoFieldsRow` | country, city |
-| `BecomeForwarderPage.tsx` (HQ) | `CascadingAddressFields` | full |
-| `BecomeForwarderPage.tsx` (routes) | `GeoFieldsRow` ×2 | country, city |
-| `ForwarderPricingProfilesDialog.tsx` | `GeoFieldsRow` | country, city |
-| `ForwarderCoverageDialog.tsx` | harmonisation | country, city |
+| Admin (`admin-create-operator`) | `approved` immédiat | `approved` + `is_active=true` immédiat → **livraison opérationnelle dès création** |
+| Public (`become-operator-submit`) | `pending` (KYB à valider) | `pending` (validés en même temps que l'opérateur) |
 
-### Étape 3 — UX bloquante
-Si une ville n'existe pas dans `cities` admin, afficher un message :
-> "Cette ville n'est pas configurée. Demandez à un admin de l'ajouter via Zones Géographiques."
+### Correctifs
 
-Et désactiver le bouton "Créer/Sauvegarder".
+**A. Dialog admin "Créer un opérateur"** (`CreateOperatorDialog.tsx`)
+Ajouter une étape "Tarifs initiaux" obligatoire : pour chaque ville cochée, saisir au minimum `base_price` + `estimated_minutes` (surcharge optionnelle). Sans tarif, on bloque la création — sinon l'opérateur reste invisible côté client.
 
-### Étape 4 — Vérification
-Recherche `<Input` couplée à `country_code|city` dans `frontend/src` — s'assurer qu'il ne reste plus aucun champ libre.
+**B. Edge function `admin-create-operator`**
+Après l'INSERT dans `delivery_operator_cities`, INSERT dans `delivery_operator_rates` :
+```
+status = 'approved', is_active = true, approved_at = now(), approved_by = callerId
+```
+Une ligne par ville (zone par défaut "Standard"). Plafonds vérifiés par les triggers DB existants (Phase B8).
 
-## Détails techniques
+**C. Edge function `become-operator-submit`**
+Si la demande publique inclut des tarifs proposés, INSERT dans `delivery_operator_rates` avec `status='pending'`. Validation par l'admin via la page "Tarifs en attente" (déjà existante).
 
-- **Stockage** : on continue à stocker `country_code` (string ISO) et `city` (text name) en base pour rétro-compat avec toutes les tables existantes (`delivery_operator_rates`, `delivery_operator_city_caps`, `shipping_zones`, etc.). Le combobox renvoie le code ISO depuis sa sélection.
-- **Pas de migration DB** : c'est un refactor purement UI. Aucune table ni RLS à toucher.
-- **`useGeoData`** : déjà filtre `is_active = true` sur cities/communes/quartiers — pas de changement.
-- **Pays actifs** : `useActiveGeo().activeCountryCodes` filtre déjà `CountryCombobox` côté `CascadingAddressFields` ; `GeoFieldsRow` doit faire pareil.
-- **Performance** : les listes (provinces/cities) sont déjà cachées par requêtes Supabase ; si une page liste plusieurs `GeoFieldsRow` (ex: BecomeForwarder routes), partager un `useGeoData` parent ou laisser chaque ligne fetch (volumes OK : <500 villes par pays).
-- **Tests** : valider manuellement les 8 formulaires post-refactor (création + édition + soumission).
+**D. UI page admin opérateurs**
+Sur la fiche opérateur approuvée, afficher un avertissement visuel **"⚠️ Aucun tarif actif — invisible côté client"** si l'opérateur n'a pas de rate `approved+active`, avec lien direct vers l'éditeur de tarifs.
 
-## Livrables
+**E. Backfill (optionnel mais recommandé)**
+Pour les 2 opérateurs déjà créés (visibles sur capture 2), proposer un script de seed minimal : insérer un tarif de base pour Kinshasa (CD) avec `status='approved'`, `base_price` à définir par l'admin via le dialog, sinon laisser l'admin saisir manuellement via la page Tarifs.
 
-- 1 nouveau composant : `GeoFieldsRow.tsx`
-- 8 fichiers refactorés
-- 0 migration SQL
-- Documentation : note dans `mem://features/multi-operator-delivery-system.md` sur la règle "tous les champs géo = combobox lié aux zones admin"
+## Fichiers modifiés
+
+- `frontend/src/components/address/GeoCombobox.tsx` — repositionnement dropdown
+- `frontend/src/components/admin/operators/CreateOperatorDialog.tsx` — étape Tarifs initiaux
+- `frontend/supabase/functions/admin-create-operator/index.ts` — INSERT rates `approved`
+- `frontend/supabase/functions/become-operator-submit/index.ts` — INSERT rates `pending`
+- `frontend/src/pages/admin/AdminOperatorsPage.tsx` — badge "Aucun tarif actif"
+- `mem/features/multi-operator-delivery-system.md` — documenter la règle "création admin = tarif auto-approved"
+
+Aucune migration DB nécessaire (schémas et triggers existent déjà).
+
+## Validation post-implémentation
+
+1. Combobox Pays/Ville s'ouvre **dans** le Dialog Plafonds, juste sous le champ.
+2. Créer un opérateur via admin avec couverture Kinshasa + tarif 5$/60min → la livraison à domicile devient cliquable au checkout pour une adresse Kinshasa.
+3. Demande publique `/become-operator` reste en attente de validation.

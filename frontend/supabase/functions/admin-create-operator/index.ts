@@ -38,6 +38,15 @@ const CitySchema = z.object({
   quartier_ids: z.array(z.string().uuid()).max(500).optional().default([]),
 });
 
+const RateSchema = z.object({
+  country_code: z.string().trim().length(2),
+  city: z.string().trim().min(1).max(80),
+  zone_name: z.string().trim().min(1).max(60).default("Standard"),
+  base_price: z.number().min(0).max(10000),
+  surcharge: z.number().min(0).max(10000).default(0),
+  estimated_minutes: z.number().int().min(1).max(1440).default(60),
+});
+
 const MIN_FLEET = 3;
 const MIN_RIDERS = 3;
 
@@ -57,6 +66,7 @@ const BodySchema = z.object({
   declared_riders_count: z.number().int().min(MIN_RIDERS).max(50),
   max_riders: z.number().int().min(MIN_RIDERS).max(100).optional(),
   cities: z.array(CitySchema).min(1).max(50),
+  initial_rates: z.array(RateSchema).max(50).optional().default([]),
   is_platform_owned: z.boolean().optional().default(false),
   platform_commission_pct: z.number().min(0).max(100).optional(),
 });
@@ -178,6 +188,46 @@ Deno.serve(async (req) => {
           is_active: true,
         })),
       );
+    }
+
+    // Tarifs initiaux : INSERT puis UPDATE -> approved (création admin = approuvé d'office).
+    // Le trigger force_pending_on_rate_change force 'pending' à l'INSERT (sauf platform-owned),
+    // donc on ré-approuve explicitement avec reviewed_by pour rendre l'opérateur visible côté client.
+    if (body.initial_rates && body.initial_rates.length > 0) {
+      const ratesPayload = body.initial_rates.map((r) => ({
+        operator_id: op.id,
+        country_code: r.country_code.toUpperCase(),
+        city: r.city.trim(),
+        zone_name: r.zone_name || "Standard",
+        base_price: r.base_price,
+        surcharge: r.surcharge ?? 0,
+        estimated_minutes: r.estimated_minutes ?? 60,
+        currency: "USD",
+        is_active: true,
+      }));
+      const { data: insertedRates, error: ratesErr } = await svc
+        .from("delivery_operator_rates")
+        .insert(ratesPayload)
+        .select("id");
+      if (ratesErr) {
+        console.error("[admin-create-operator] rates insert error", ratesErr);
+        return json({
+          error: `Opérateur créé mais l'enregistrement des tarifs a échoué : ${ratesErr.message}`,
+          operator_id: op.id,
+        }, 500);
+      }
+      // Ré-approuver explicitement (skip si platform-owned, déjà approved par trigger)
+      if (!body.is_platform_owned && insertedRates && insertedRates.length > 0) {
+        const ids = insertedRates.map((r: any) => r.id);
+        await svc
+          .from("delivery_operator_rates")
+          .update({
+            status: "approved",
+            reviewed_by: callerId,
+            reviewed_at: new Date().toISOString(),
+          })
+          .in("id", ids);
+      }
     }
 
     // Grant rôle operator (si owner réel)
