@@ -28,7 +28,7 @@ export function useVendorAnalyticsKpis(f: AnalyticsFilters) {
   return useQuery({
     queryKey: ["va-kpis", f.storeId, f.start, f.end, f.categoryId, f.city, f.paymentMethod],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("vendor_analytics_kpis", {
+      const { data, error } = await (supabase as any).rpc("vendor_analytics_kpis", {
         p_store_id: f.storeId,
         p_start: f.start.toISOString(),
         p_end: f.end.toISOString(),
@@ -47,7 +47,7 @@ export function useVendorAnalyticsTimeseries(f: AnalyticsFilters) {
   return useQuery({
     queryKey: ["va-ts", f.storeId, f.start, f.end, f.categoryId, f.city, f.paymentMethod],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("vendor_analytics_timeseries", {
+      const { data, error } = await (supabase as any).rpc("vendor_analytics_timeseries", {
         p_store_id: f.storeId,
         p_start: f.start.toISOString(),
         p_end: f.end.toISOString(),
@@ -66,7 +66,7 @@ export function useVendorAnalyticsFunnel(f: Pick<AnalyticsFilters, "storeId" | "
   return useQuery({
     queryKey: ["va-funnel", f.storeId, f.start, f.end],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("vendor_analytics_funnel", {
+      const { data, error } = await (supabase as any).rpc("vendor_analytics_funnel", {
         p_store_id: f.storeId,
         p_start: f.start.toISOString(),
         p_end: f.end.toISOString(),
@@ -85,7 +85,7 @@ export function useVendorAnalyticsTopProducts(f: Pick<AnalyticsFilters, "storeId
   return useQuery({
     queryKey: ["va-top", f.storeId, f.start, f.end, limit],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("vendor_analytics_top_products", {
+      const { data, error } = await (supabase as any).rpc("vendor_analytics_top_products", {
         p_store_id: f.storeId,
         p_start: f.start.toISOString(),
         p_end: f.end.toISOString(),
@@ -105,7 +105,7 @@ export function useVendorAnalyticsCohorts(storeId: string, monthsBack = 6) {
   return useQuery({
     queryKey: ["va-cohorts", storeId, monthsBack],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("vendor_analytics_cohorts", {
+      const { data, error } = await (supabase as any).rpc("vendor_analytics_cohorts", {
         p_store_id: storeId,
         p_months_back: monthsBack,
       });
@@ -120,7 +120,7 @@ export function useVendorAnalyticsCohorts(storeId: string, monthsBack = 6) {
 }
 
 export async function fetchOrdersExport(f: AnalyticsFilters) {
-  const { data, error } = await supabase.rpc("vendor_analytics_orders_export", {
+  const { data, error } = await (supabase as any).rpc("vendor_analytics_orders_export", {
     p_store_id: f.storeId,
     p_start: f.start.toISOString(),
     p_end: f.end.toISOString(),
