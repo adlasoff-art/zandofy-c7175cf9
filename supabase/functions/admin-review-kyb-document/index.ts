@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
     try {
       const { data: op } = await svc
         .from("delivery_operators")
-        .select("owner_user_id, company_name")
+        .select("owner_user_id, company_name, contact_email")
         .eq("id", doc.operator_id)
         .maybeSingle();
       if (op?.owner_user_id) {
@@ -87,6 +87,72 @@ Deno.serve(async (req) => {
               : `Votre ${doc.doc_type.toUpperCase()} a été rejeté : ${rejection_reason}`,
           link: "/operator/settings",
         });
+      }
+
+      // Email transactionnel (best-effort, ne bloque jamais)
+      try {
+        const { data: profile } = await svc
+          .from("profiles")
+          .select("email")
+          .eq("id", op?.owner_user_id)
+          .maybeSingle();
+        const recipient = profile?.email || op?.contact_email;
+        if (recipient) {
+          const subject =
+            decision === "approved"
+              ? `✅ Document KYB approuvé — ${op?.company_name ?? ""}`
+              : `❌ Document KYB rejeté — ${op?.company_name ?? ""}`;
+          const docLabel = doc.doc_type.toUpperCase();
+          const html =
+            decision === "approved"
+              ? `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+                  <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px">
+                    <h2 style="color:#059669;margin:0 0 16px">✅ Document KYB approuvé</h2>
+                    <p style="color:#374151;line-height:1.6">Bonjour,</p>
+                    <p style="color:#374151;line-height:1.6">Votre document <strong>${docLabel}</strong> pour <strong>${op?.company_name ?? ""}</strong> a été validé par l'équipe Zandofy.</p>
+                    <p style="color:#374151;line-height:1.6">Vous pouvez consulter le statut de tous vos documents depuis votre espace opérateur.</p>
+                    <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0" />
+                    <p style="color:#9ca3af;font-size:12px;margin:0">Email automatique Zandofy. Ne pas répondre.</p>
+                  </div>
+                </div>`
+              : `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+                  <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px">
+                    <h2 style="color:#dc2626;margin:0 0 16px">❌ Document KYB rejeté</h2>
+                    <p style="color:#374151;line-height:1.6">Bonjour,</p>
+                    <p style="color:#374151;line-height:1.6">Votre document <strong>${docLabel}</strong> pour <strong>${op?.company_name ?? ""}</strong> n'a pas pu être validé.</p>
+                    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:16px 0">
+                      <p style="color:#991b1b;margin:0"><strong>Motif :</strong> ${rejection_reason}</p>
+                    </div>
+                    <p style="color:#374151;line-height:1.6">Merci de soumettre à nouveau un document conforme depuis votre espace opérateur.</p>
+                    <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0" />
+                    <p style="color:#9ca3af;font-size:12px;margin:0">Email automatique Zandofy. Ne pas répondre.</p>
+                  </div>
+                </div>`;
+
+          const SMTP_HOST = Deno.env.get("SMTP_HOST");
+          const SMTP_USER = Deno.env.get("SMTP_USER");
+          const SMTP_PASS = Deno.env.get("SMTP_PASS");
+          const SMTP_FROM = Deno.env.get("SMTP_FROM_EMAIL") || "noreply@zandofy.com";
+          const SMTP_PORT = parseInt(Deno.env.get("SMTP_PORT") || "587");
+
+          if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+            const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
+            const client = new SMTPClient({
+              connection: {
+                hostname: SMTP_HOST,
+                port: SMTP_PORT,
+                tls: SMTP_PORT === 465,
+                auth: { username: SMTP_USER, password: SMTP_PASS },
+              },
+            });
+            await client.send({ from: SMTP_FROM, to: recipient, subject, content: "auto", html });
+            await client.close();
+          } else {
+            console.warn("[admin-review-kyb-document] SMTP env missing, email skipped");
+          }
+        }
+      } catch (mailErr) {
+        console.warn("[admin-review-kyb-document] email send failed", mailErr);
       }
     } catch (e) {
       console.warn("[admin-review-kyb-document] notif failed", e);
