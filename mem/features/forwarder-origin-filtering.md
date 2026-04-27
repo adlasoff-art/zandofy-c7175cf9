@@ -45,9 +45,12 @@ Avant : `fetchEligibleFreightOffers` ne filtrait que sur destination + mode → 
 - Fallback JS automatique si le RPC échoue (preview non migré, droits manquants).
 - Service plateforme (`is_platform_owned`) toujours conservé.
 
-## Reste à faire (non bloquant MVP)
-- Tests unitaires `groupCartByOriginAndStore` (mocks Supabase nécessaires).
-- Empty state mono-flow (`FreightSelector` direct, hors multi-origines) — actuellement le selector affiche déjà un message "Aucun transitaire", mais sans bouton de demande.
+## ✅ Phase 5 (livrée) — Finitions
+- Empty state mono-flow (`FreightSelector`) : bouton "Demander couverture" ajouté quand `originCountry` est connu (même flux que multi-origines).
+- Tests unitaires `groupCartByOriginAndStore` (4 cas : panier vide, regroupement par store×origine, intersection des modes, agrégation poids/CBM) — `frontend/src/services/__tests__/groupCartByOriginAndStore.test.ts`.
+
+## Lot 11C — Statut global : ✅ Complet
+Toutes les phases (1 filtrage RPC, 2 split panier, 3 demande couverture, 4 RPC v2, 5 finitions) sont livrées et testées.
 
 ## Règles métier
 - Origine produit (`products.origin_country`) > origine boutique (`stores.country`).
