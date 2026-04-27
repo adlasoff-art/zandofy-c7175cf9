@@ -690,7 +690,19 @@ export default function CheckoutPage() {
     }
 
     // Lot 4G — Si des transitaires sont disponibles, le client doit en choisir un.
-    if (freightOffersAvailable > 0 && !selectedFreightOffer) {
+    // Lot 11C Phase 2 — En multi-groupes, exiger un transitaire pour CHAQUE groupe.
+    if (isMultiGroupCheckout) {
+      if (!freightGroupsAllSelected) {
+        const total = Object.keys(freightGroups).length;
+        const done = Object.values(freightGroups).filter((s) => s.offer).length;
+        toast({
+          title: "Transitaires requis",
+          description: `Veuillez choisir un transitaire pour chacun des ${total} colis (${done}/${total} choisis).`,
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (freightOffersAvailable > 0 && !selectedFreightOffer) {
       toast({
         title: "Transitaire requis",
         description: "Veuillez sélectionner un transitaire avant de continuer.",
