@@ -588,6 +588,22 @@ const translations: Record<Locale, Record<string, string>> = {
     "vendor.origins.allMissing": "Aucun pays d'origine renseigné sur vos produits.",
     "vendor.origins.missingWarning": "{{count}} produit(s) sans pays d'origine — ils risquent de ne pas être expédiables. Contactez l'équipe Zandofy.",
     "vendor.origins.contactInfo": "Pour ajouter ou modifier un pays d'origine sur vos produits, contactez l'équipe Zandofy.",
+    // Lot 12 — Customer order tracking
+    "tracking.live": "En direct",
+    "tracking.lastUpdate": "Dernière mise à jour",
+    "tracking.error": "Impossible de charger le suivi",
+    "tracking.gpsStale": "Position GPS ancienne",
+    "tracking.rider": "Livreur",
+    "tracking.destination": "Adresse de livraison",
+    "tracking.operatorLabel": "Entreprise de livraison",
+    "tracking.callOperator": "Appeler l'entreprise",
+    "tracking.internationalLegs": "Étapes internationales",
+    "tracking.carrier": "Transporteur",
+    "tracking.openCarrier": "Suivre",
+    "tracking.shipments": "Expéditions",
+    "tracking.eta": "ETA",
+    "tracking.pickupCode": "Code de retrait au hub",
+    "tracking.noLiveData": "Suivi en temps réel disponible dès la mise en livraison.",
   },
   en: {
     // Header
