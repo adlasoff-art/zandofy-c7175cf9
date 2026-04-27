@@ -37,7 +37,7 @@ export function useVendorAnalyticsKpis(f: AnalyticsFilters) {
         p_payment_method: f.paymentMethod ?? null,
       });
       if (error) throw error;
-      return data as unknown as KpisResponse;
+      return data  as any as KpisResponse;
     },
     enabled: !!f.storeId,
   });
@@ -56,7 +56,7 @@ export function useVendorAnalyticsTimeseries(f: AnalyticsFilters) {
         p_payment_method: f.paymentMethod ?? null,
       });
       if (error) throw error;
-      return (data ?? []) as Array<{ day: string; orders: number; revenue: number; margin: number }>;
+      return (data ?? []) as any as Array<{ day: string; orders: number; revenue: number; margin: number }>;
     },
     enabled: !!f.storeId,
   });
@@ -72,7 +72,7 @@ export function useVendorAnalyticsFunnel(f: Pick<AnalyticsFilters, "storeId" | "
         p_end: f.end.toISOString(),
       });
       if (error) throw error;
-      return data as unknown as {
+      return data  as any as {
         views: number; cart_additions: number; checkouts: number; paid: number;
         view_to_cart_pct: number; cart_to_checkout_pct: number; checkout_to_paid_pct: number; overall_cvr_pct: number;
       };
@@ -92,7 +92,7 @@ export function useVendorAnalyticsTopProducts(f: Pick<AnalyticsFilters, "storeId
         p_limit: limit,
       });
       if (error) throw error;
-      return (data ?? []) as Array<{
+      return (data ?? []) as any as Array<{
         product_id: string; product_name: string; units_sold: number; revenue: number; margin: number;
         current_stock: number; is_low_stock: boolean;
       }>;
@@ -110,7 +110,7 @@ export function useVendorAnalyticsCohorts(storeId: string, monthsBack = 6) {
         p_months_back: monthsBack,
       });
       if (error) throw error;
-      return (data ?? []) as Array<{
+      return (data ?? []) as any as Array<{
         cohort_month: string; customers: number; ltv: number;
         retention_d30_pct: number; retention_d60_pct: number; retention_d90_pct: number;
       }>;
@@ -129,5 +129,5 @@ export async function fetchOrdersExport(f: AnalyticsFilters) {
     p_payment_method: f.paymentMethod ?? null,
   });
   if (error) throw error;
-  return (data ?? []) as Array<Record<string, any>>;
+  return (data ?? []) as any as Array<Record<string, any>>;
 }
