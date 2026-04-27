@@ -2789,6 +2789,51 @@ export type Database = {
           },
         ]
       }
+      forwarder_coverage_requests: {
+        Row: {
+          destination_city: string | null
+          destination_city_id: string | null
+          destination_country: string
+          id: string
+          mode: string
+          notes: string | null
+          origin_country: string
+          requested_at: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          destination_city?: string | null
+          destination_city_id?: string | null
+          destination_country: string
+          id?: string
+          mode: string
+          notes?: string | null
+          origin_country: string
+          requested_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          destination_city?: string | null
+          destination_city_id?: string | null
+          destination_country?: string
+          id?: string
+          mode?: string
+          notes?: string | null
+          origin_country?: string
+          requested_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       forwarder_handoff_events: {
         Row: {
           actor_id: string | null
