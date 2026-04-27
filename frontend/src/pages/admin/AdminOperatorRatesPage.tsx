@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Loader2, MapPin } from "lucide-react";
+import { GeoFieldsRow, type GeoFieldsValue } from "@/components/address/GeoFieldsRow";
 
 type Rate = {
   id: string;
@@ -35,11 +36,7 @@ type Rate = {
 };
 
 const initialForm = {
-  country_code: "CD",
-  city: "",
   zone_name: "",
-  commune: "",
-  quartier: "",
   base_price: "",
   surcharge: "0",
   price_per_km: "0",
@@ -47,10 +44,13 @@ const initialForm = {
   estimated_minutes: "45",
 };
 
+const initialGeo: GeoFieldsValue = { country: "CD", city: "", commune: "", quartier: "" };
+
 export default function AdminOperatorRatesPage() {
   const { operatorId } = useParams<{ operatorId: string }>();
   const qc = useQueryClient();
   const [form, setForm] = useState(initialForm);
+  const [geo, setGeo] = useState<GeoFieldsValue>(initialGeo);
 
   const { data: operator } = useQuery({
     queryKey: ["admin-operator", operatorId],
@@ -83,15 +83,15 @@ export default function AdminOperatorRatesPage() {
   const createRate = useMutation({
     mutationFn: async () => {
       if (!operatorId) throw new Error("Missing operator");
-      if (!form.city.trim() || !form.zone_name.trim() || !form.base_price)
+      if (!geo.country || !geo.city?.trim() || !form.zone_name.trim() || !form.base_price)
         throw new Error("Ville, zone et tarif de base requis");
       const body = {
         operator_id: operatorId,
-        country_code: form.country_code.toUpperCase(),
-        city: form.city.trim(),
+        country_code: (geo.country || "").toUpperCase(),
+        city: geo.city.trim(),
         zone_name: form.zone_name.trim(),
-        commune: form.commune.trim() || null,
-        quartier: form.quartier.trim() || null,
+        commune: geo.commune?.trim() || null,
+        quartier: geo.quartier?.trim() || null,
         base_price: Number(form.base_price),
         surcharge: Number(form.surcharge) || 0,
         price_per_km: Number(form.price_per_km) || 0,
@@ -106,6 +106,7 @@ export default function AdminOperatorRatesPage() {
     onSuccess: () => {
       toast.success("Tarif créé et auto-approuvé");
       setForm(initialForm);
+      setGeo(initialGeo);
       qc.invalidateQueries({ queryKey: ["admin-operator-rates", operatorId] });
     },
     onError: (e: any) => toast.error(e.message || "Erreur"),
@@ -152,25 +153,17 @@ export default function AdminOperatorRatesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <Label>Pays (ISO)</Label>
-              <Input value={form.country_code} onChange={(e) => setForm({ ...form, country_code: e.target.value })} />
-            </div>
-            <div>
-              <Label>Ville *</Label>
-              <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Kinshasa" />
+            <div className="md:col-span-3">
+              <GeoFieldsRow
+                value={geo}
+                onChange={(patch) => setGeo({ ...geo, ...patch })}
+                levels={["country", "city", "commune", "quartier"]}
+                required={["country", "city"]}
+              />
             </div>
             <div>
               <Label>Nom de la zone *</Label>
               <Input value={form.zone_name} onChange={(e) => setForm({ ...form, zone_name: e.target.value })} placeholder="Centre-ville" />
-            </div>
-            <div>
-              <Label>Commune (optionnel)</Label>
-              <Input value={form.commune} onChange={(e) => setForm({ ...form, commune: e.target.value })} />
-            </div>
-            <div>
-              <Label>Quartier (optionnel)</Label>
-              <Input value={form.quartier} onChange={(e) => setForm({ ...form, quartier: e.target.value })} />
             </div>
             <div>
               <Label>Devise</Label>
