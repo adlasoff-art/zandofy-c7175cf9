@@ -23,6 +23,13 @@ type Props = {
 
 const MIN_RIDERS = 3;
 
+type RateInput = {
+  base_price: string;
+  surcharge: string;
+  estimated_minutes: string;
+};
+const emptyRate: RateInput = { base_price: "", surcharge: "0", estimated_minutes: "60" };
+
 const initialAddress = {
   country: "CD",
   province: "",
@@ -56,6 +63,9 @@ export function CreateOperatorDialog({ open, onOpenChange }: Props) {
   // Couverture multi-zones
   const [coverage, setCoverage] = useState<CoverageZone[]>([]);
 
+  // Tarif initial par ville couverte (clé = country_code|city)
+  const [rates, setRates] = useState<Record<string, RateInput>>({});
+
   // Flotte
   const [fleet, setFleet] = useState<FleetVehicle[]>([]);
 
@@ -70,13 +80,20 @@ export function CreateOperatorDialog({ open, onOpenChange }: Props) {
     setCompanyName(""); setLegalName(""); setRegistrationNumber(""); setTaxId("");
     setContactEmail(""); setContactPhone("");
     setHq({ ...initialAddress });
-    setCoverage([]); setFleet([]);
+    setCoverage([]); setFleet([]); setRates({});
     setDeclaredRiders(MIN_RIDERS); setMaxRiders(10);
     setIsPlatformOwned(false); setCommissionPct("15");
   };
 
   const updateHq = (field: keyof typeof initialAddress, value: string) =>
     setHq((prev) => ({ ...prev, [field]: value }));
+
+  const rateKey = (z: CoverageZone) => `${z.country_code}|${z.city}`;
+  const getRate = (z: CoverageZone): RateInput => rates[rateKey(z)] || emptyRate;
+  const setRate = (z: CoverageZone, patch: Partial<RateInput>) => {
+    const k = rateKey(z);
+    setRates(prev => ({ ...prev, [k]: { ...emptyRate, ...prev[k], ...patch } }));
+  };
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -96,6 +113,29 @@ export function CreateOperatorDialog({ open, onOpenChange }: Props) {
       if (fleetErr) throw new Error(fleetErr);
 
       if (declaredRiders < MIN_RIDERS) throw new Error(`Minimum ${MIN_RIDERS} livreurs déclarés.`);
+
+      // Tarif initial obligatoire par ville (sinon opérateur invisible côté client)
+      const cityRates = coverage
+        .filter(z => z.country_code && z.city)
+        .map(z => {
+          const r = getRate(z);
+          const base = parseFloat(r.base_price);
+          const sur = parseFloat(r.surcharge || "0");
+          const eta = parseInt(r.estimated_minutes || "60", 10);
+          if (Number.isNaN(base) || base < 0) {
+            throw new Error(`Tarif manquant ou invalide pour ${z.city}. Saisissez un prix de base.`);
+          }
+          if (Number.isNaN(sur) || sur < 0) throw new Error(`Surcharge invalide pour ${z.city}.`);
+          if (Number.isNaN(eta) || eta <= 0) throw new Error(`ETA invalide pour ${z.city}.`);
+          return {
+            country_code: z.country_code,
+            city: z.city,
+            zone_name: "Standard",
+            base_price: base,
+            surcharge: sur,
+            estimated_minutes: eta,
+          };
+        });
 
       const hqAddressLine = [hq.address, hq.quartier, hq.commune].filter(Boolean).join(", ");
 
@@ -126,6 +166,7 @@ export function CreateOperatorDialog({ open, onOpenChange }: Props) {
           commune_ids: z.commune_ids,
           quartier_ids: z.quartier_ids,
         })),
+        initial_rates: cityRates,
         is_platform_owned: isPlatformOwned,
       };
       const pct = parseFloat(commissionPct);
