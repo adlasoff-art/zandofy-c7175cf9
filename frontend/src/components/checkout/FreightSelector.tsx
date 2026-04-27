@@ -23,6 +23,7 @@ import {
   type QuoteCheckoutInput,
 } from "@/services/freightQuoteCheckout";
 import { useRoles } from "@/hooks/use-roles";
+import { useI18n } from "@/contexts/I18nContext";
 
 const MODE_META: Record<string, { label: string; Icon: typeof Plane; cls: string }> = {
   air: { label: "Aérien", Icon: Plane, cls: "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30" },
@@ -70,6 +71,7 @@ export function FreightSelector({
   totalWeightKgForMarketing,
   originCountry,
 }: Props) {
+  const { t } = useI18n();
   const [offers, setOffers] = useState<EligibleFreightOffer[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -96,12 +98,12 @@ export function FreightSelector({
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success(
         (data as any)?.deduplicated
-          ? "Demande déjà enregistrée — un admin vous contactera dès qu'un transitaire couvre la route."
-          : "Demande envoyée — un admin vous contactera dès qu'un transitaire couvre la route.",
+          ? t("freight.requestDuplicate")
+          : t("freight.requestSuccess"),
       );
       setCoverageState("sent");
     } catch (e: any) {
-      toast.error(e?.message || "Impossible d'envoyer la demande");
+      toast.error(e?.message || t("freight.requestError"));
       setCoverageState("idle");
     }
   };
@@ -237,7 +239,7 @@ export function FreightSelector({
               ) : (
                 <MailPlus size={11} />
               )}
-              {coverageState === "sent" ? "Envoyé" : "Demander couverture"}
+              {coverageState === "sent" ? t("freight.requestSent") : t("freight.requestCoverage")}
             </Button>
           </div>
         )}
