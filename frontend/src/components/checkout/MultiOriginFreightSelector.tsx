@@ -18,6 +18,7 @@ import { FreightSelector, type ConsolidationChoice } from "./FreightSelector";
 import type { CartOriginGroup } from "@/services/freightQuoteCheckout";
 import type { EligibleFreightOffer } from "@/services/freightQuoteCheckout";
 import { getCountryName } from "@/components/vendor/CountryCombobox";
+import { useI18n } from "@/contexts/I18nContext";
 
 export interface FreightGroupSelection {
   group: CartOriginGroup;
@@ -47,6 +48,7 @@ export function MultiOriginFreightSelector({
   onSelectionChange,
   onAvailabilityChange,
 }: Props) {
+  const { t } = useI18n();
   // Sélection courante : groupKey → { offer, choice }
   const [selections, setSelections] = useState<Record<string, FreightGroupSelection>>({});
   // Disponibilité par groupe : groupKey → count
@@ -93,7 +95,7 @@ export function MultiOriginFreightSelector({
 
   const requestCoverage = async (group: CartOriginGroup) => {
     if (!group.origin_country) {
-      toast.error("Origine inconnue — impossible d'envoyer la demande.");
+      toast.error(t("freight.requestOriginMissing"));
       return;
     }
     setCoverageState((prev) => ({ ...prev, [group.key]: "loading" }));
@@ -111,12 +113,12 @@ export function MultiOriginFreightSelector({
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success(
         (data as any)?.deduplicated
-          ? "Demande déjà enregistrée — un admin vous contactera dès qu'un transitaire couvre la route."
-          : "Demande envoyée — un admin vous contactera dès qu'un transitaire couvre la route.",
+          ? t("freight.requestDuplicate")
+          : t("freight.requestSuccess"),
       );
       setCoverageState((prev) => ({ ...prev, [group.key]: "sent" }));
     } catch (e: any) {
-      toast.error(e?.message || "Impossible d'envoyer la demande");
+      toast.error(e?.message || t("freight.requestError"));
       setCoverageState((prev) => ({ ...prev, [group.key]: "idle" }));
     }
   };
@@ -140,10 +142,7 @@ export function MultiOriginFreightSelector({
     <div className="space-y-3">
       <div className="flex items-start gap-2 px-2.5 py-2 rounded-md border border-primary/30 bg-primary/5 text-[11px] text-foreground">
         <Package size={12} className="shrink-0 mt-0.5 text-primary" />
-        <span>
-          Votre panier sera expédié en <strong>{groups.length} colis distincts</strong>{" "}
-          (selon l'origine et la boutique). Choisissez un transitaire pour chaque colis.
-        </span>
+        <span>{t("freight.multiPackagesInfo", { count: groups.length })}</span>
       </div>
 
       {groups.map((group, idx) => {
@@ -161,7 +160,9 @@ export function MultiOriginFreightSelector({
                 </span>
                 <MapPin size={12} className="text-primary shrink-0" />
                 <span className="text-xs font-semibold text-foreground truncate">
-                  Colis depuis {group.origin_country ? getCountryName(group.origin_country) : "Origine inconnue"}
+                  {t("freight.packageFrom", {
+                    country: group.origin_country ? getCountryName(group.origin_country) : t("freight.originUnknown"),
+                  })}
                 </span>
                 {group.store_name && (
                   <span className="text-[10px] text-muted-foreground truncate">
@@ -177,8 +178,10 @@ export function MultiOriginFreightSelector({
 
             {!compatible ? (
               <div className="text-[11px] text-amber-600 dark:text-amber-400 px-2 py-1.5 rounded bg-amber-500/10 border border-amber-500/30">
-                ⚠️ Le mode <strong>{mode}</strong> n'est pas compatible avec tous les produits de ce
-                colis. Modes supportés : {group.supported_modes.join(", ") || "aucun"}.
+                ⚠️ {t("freight.modeIncompatible", {
+                  mode,
+                  modes: group.supported_modes.join(", ") || t("freight.modeNone"),
+                })}
               </div>
             ) : (
               <>
@@ -197,12 +200,11 @@ export function MultiOriginFreightSelector({
                 {availability[group.key] === 0 && (
                   <div className="mt-2 flex items-start justify-between gap-2 px-2.5 py-2 rounded-md border border-amber-500/30 bg-amber-500/5">
                     <div className="text-[11px] text-amber-700 dark:text-amber-400 leading-snug">
-                      Aucun transitaire ne dessert encore{" "}
-                      <strong>
-                        {group.origin_country ? getCountryName(group.origin_country) : "cette origine"}
-                      </strong>{" "}
-                      → <strong>{getCountryName(destinationCountry)}</strong> en mode{" "}
-                      <strong>{mode}</strong>.
+                      {t("freight.noForwarderRoute", {
+                        origin: group.origin_country ? getCountryName(group.origin_country) : t("freight.originUnknown"),
+                        destination: getCountryName(destinationCountry),
+                        mode,
+                      })}
                     </div>
                     <Button
                       size="sm"
@@ -216,7 +218,7 @@ export function MultiOriginFreightSelector({
                       ) : (
                         <MailPlus size={12} />
                       )}
-                      {coverageState[group.key] === "sent" ? "Envoyé" : "Demander couverture"}
+                      {coverageState[group.key] === "sent" ? t("freight.requestSent") : t("freight.requestCoverage")}
                     </Button>
                   </div>
                 )}
@@ -229,7 +231,10 @@ export function MultiOriginFreightSelector({
       {aggregatedTotal > 0 && (
         <div className="flex items-center justify-between px-3 py-2 rounded-md bg-primary/10 border border-primary/30">
           <span className="text-xs font-medium text-foreground">
-            Total transport ({Object.values(selections).filter((s) => s.offer).length}/{groups.length} colis)
+            {t("freight.totalTransport", {
+              selected: Object.values(selections).filter((s) => s.offer).length,
+              total: groups.length,
+            })}
           </span>
           <span className="text-sm font-bold text-primary">
             ${aggregatedTotal.toFixed(2)}
