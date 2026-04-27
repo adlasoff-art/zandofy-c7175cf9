@@ -52,6 +52,13 @@ Avant : `fetchEligibleFreightOffers` ne filtrait que sur destination + mode → 
 ## Lot 11C — Statut global : ✅ Complet
 Toutes les phases (1 filtrage RPC, 2 split panier, 3 demande couverture, 4 RPC v2, 5 finitions) sont livrées et testées.
 
+## Affinements post-livraison
+- **i18n** : `freight.*` (FR/EN) + interpolation `{{count}}` ajoutée à `t()`.
+- **Badge admin sidebar** : compteur live des `forwarder_coverage_requests` pending (poll 2 min).
+- **Email admin** : `request-forwarder-coverage` envoie une alerte SMTP (nodemailer) aux admins à chaque nouvelle demande de couverture.
+- **Playwright E2E** : `frontend/playwright.config.ts` + specs `smoke` et `checkout-multi-origin` + workflow GitHub Actions `e2e-playwright.yml`. Sandbox Lovable ne peut pas exécuter Chromium → tests tournent en CI/local.
+- **Encart vendeur** : `VendorOriginCountriesCard` (Paramètres boutique `/vendor`) liste les pays d'origine agrégés depuis `products.origin_country` + drapeaux + alerte ambrée si produits sans origine + note "contacter Zandofy" pour modifier.
+
 ## Règles métier
 - Origine produit (`products.origin_country`) > origine boutique (`stores.country`).
 - Si aucun transitaire ne couvre la route → liste vide → futur encart "Demander couverture transitaire" (équivalent `request-delivery-coverage`).
