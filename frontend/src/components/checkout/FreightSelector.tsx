@@ -12,8 +12,11 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Truck, ChevronDown, ChevronUp, BadgeCheck, AlertTriangle, Package, Boxes, MapPin, Plane, Ship, TramFront, Info, Sparkles, Lock } from "lucide-react";
+import { Loader2, Truck, ChevronDown, ChevronUp, BadgeCheck, AlertTriangle, Package, Boxes, MapPin, Plane, Ship, TramFront, Info, Sparkles, Lock, MailPlus } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import {
   fetchEligibleFreightOffers,
   type EligibleFreightOffer,
@@ -74,6 +77,34 @@ export function FreightSelector({
   const [consolidationChoice, setConsolidationChoice] = useState<ConsolidationChoice>("split");
   const { isAdmin } = useRoles();
   const [debugOpen, setDebugOpen] = useState(false);
+  // Lot 11C — Empty-state mono-flow : bouton "Demander couverture transitaire".
+  const [coverageState, setCoverageState] = useState<"idle" | "loading" | "sent">("idle");
+
+  const requestCoverage = async () => {
+    setCoverageState("loading");
+    try {
+      const { data, error } = await supabase.functions.invoke("request-forwarder-coverage", {
+        body: {
+          origin_country: (originCountry || "").toUpperCase() || "XX",
+          destination_country: destinationCountry,
+          destination_city: destinationCityName,
+          destination_city_id: destinationCityId,
+          mode,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success(
+        (data as any)?.deduplicated
+          ? "Demande déjà enregistrée — un admin vous contactera dès qu'un transitaire couvre la route."
+          : "Demande envoyée — un admin vous contactera dès qu'un transitaire couvre la route.",
+      );
+      setCoverageState("sent");
+    } catch (e: any) {
+      toast.error(e?.message || "Impossible d'envoyer la demande");
+      setCoverageState("idle");
+    }
+  };
 
   // Refetch on context change
   useEffect(() => {
@@ -192,6 +223,24 @@ export function FreightSelector({
             Le tarif standard ci-dessus sera appliqué et un transitaire sera assigné après commande.
           </span>
         </div>
+        {originCountry && (
+          <div className="flex items-center justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1 h-7 text-[11px]"
+              disabled={coverageState === "loading" || coverageState === "sent"}
+              onClick={requestCoverage}
+            >
+              {coverageState === "loading" ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <MailPlus size={11} />
+              )}
+              {coverageState === "sent" ? "Envoyé" : "Demander couverture"}
+            </Button>
+          </div>
+        )}
         {isAdmin && (
           <AdminDebugBanner
             destinationCountry={destinationCountry}
