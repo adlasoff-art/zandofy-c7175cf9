@@ -2063,6 +2063,7 @@ export default function CheckoutPage() {
                     onForwarderChange={handleForwarderChange}
                     onFreightOfferChange={handleFreightOfferChange}
                     onFreightAvailabilityChange={handleFreightAvailabilityChange}
+                    onFreightGroupsChange={handleFreightGroupsChange}
                   />
                 </div>
 
