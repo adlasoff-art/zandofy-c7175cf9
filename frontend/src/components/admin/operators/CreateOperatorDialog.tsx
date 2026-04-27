@@ -251,13 +251,62 @@ export function CreateOperatorDialog({ open, onOpenChange }: Props) {
             <OperatorCoveragePicker value={coverage} onChange={setCoverage} restrictToActiveCountries />
           </Section>
 
+          {/* 4 bis. Tarifs initiaux */}
+          <Section icon={<Settings2 size={14} />} title="5. Tarifs initiaux par ville">
+            <p className="text-xs text-muted-foreground mb-2">
+              Saisissez au moins le prix de base par ville couverte. Sans tarif approuvé, l'opérateur reste invisible côté client.
+              {!isPlatformOwned && " Les plafonds tarifaires admin sont vérifiés automatiquement."}
+            </p>
+            {coverage.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">Ajoutez d'abord une zone de couverture ci-dessus.</p>
+            ) : (
+              <div className="space-y-2">
+                {coverage.filter(z => z.country_code && z.city).map((z, idx) => {
+                  const r = getRate(z);
+                  return (
+                    <div key={`${z.country_code}-${z.city}-${idx}`} className="rounded-md border border-border p-3">
+                      <div className="text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
+                        <MapPin size={12} className="text-primary" />
+                        {z.city} <span className="text-muted-foreground font-normal">({z.country_code})</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <Field label="Prix de base ($) *">
+                          <Input
+                            type="number" step="0.01" min={0}
+                            value={r.base_price}
+                            onChange={(e) => setRate(z, { base_price: e.target.value })}
+                            placeholder="3.50"
+                          />
+                        </Field>
+                        <Field label="Surcharge ($)">
+                          <Input
+                            type="number" step="0.01" min={0}
+                            value={r.surcharge}
+                            onChange={(e) => setRate(z, { surcharge: e.target.value })}
+                          />
+                        </Field>
+                        <Field label="Délai estimé (min)">
+                          <Input
+                            type="number" min={1}
+                            value={r.estimated_minutes}
+                            onChange={(e) => setRate(z, { estimated_minutes: e.target.value })}
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Section>
+
           {/* 5. Flotte */}
-          <Section icon={<Settings2 size={14} />} title="5. Flotte">
+          <Section icon={<Settings2 size={14} />} title="6. Flotte">
             <OperatorFleetEditor value={fleet} onChange={setFleet} />
           </Section>
 
           {/* 6. Paramètres */}
-          <Section icon={<Settings2 size={14} />} title="6. Paramètres">
+          <Section icon={<Settings2 size={14} />} title="7. Paramètres">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Field label={`Livreurs déclarés (min ${MIN_RIDERS})`}>
                 <Input
