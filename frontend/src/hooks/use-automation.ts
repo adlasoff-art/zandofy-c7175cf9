@@ -95,7 +95,7 @@ export function useAutomation() {
             .not("status", "in", '("cancelled","returned")');
           hasOrder = (count ?? 0) > 0;
 
-          const { data: profile } = await supabase
+          const { data: profile } = await (supabase as any)
             .from("profiles")
             .select("created_at, residence_country, residence_city")
             .eq("id", user.id)
