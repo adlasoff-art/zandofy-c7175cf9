@@ -19,6 +19,7 @@ export type OwnerProfile = {
   user_id: string;
   first_name: string | null;
   last_name: string | null;
+  email: string | null;
   city: string | null;
   is_kyc_verified: boolean | null;
   created_at: string | null;
@@ -45,13 +46,8 @@ export function OperatorOwnerSearch({ value, onChange, orphan, onOrphanChange }:
     if (q.length < 2) { setResults([]); return; }
     const handle = setTimeout(async () => {
       setLoading(true);
-      // PII-safe: on ne select PAS l'email
-      const { data, error } = await db
-        .from("profiles")
-        .select("user_id, first_name, last_name, city, is_kyc_verified, created_at")
-        .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%`)
-        .order("created_at", { ascending: false })
-        .limit(8);
+      // Recherche admin via RPC SECURITY DEFINER (email autorisé pour les admins)
+      const { data, error } = await db.rpc("search_users_admin", { term: q });
       if (!error) setResults((data || []) as OwnerProfile[]);
       setLoading(false);
       setTouched(true);
@@ -114,7 +110,7 @@ export function OperatorOwnerSearch({ value, onChange, orphan, onOrphanChange }:
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="pl-9"
-                  placeholder="Ex: Jean Dupont"
+                  placeholder="Nom, prénom ou email"
                   value={term}
                   onChange={(e) => setTerm(e.target.value)}
                   autoComplete="off"
@@ -140,6 +136,7 @@ export function OperatorOwnerSearch({ value, onChange, orphan, onOrphanChange }:
                       <div className="flex flex-col gap-0.5 min-w-0">
                         <span className="font-medium text-foreground truncate">{fullName(p)}</span>
                         <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                          {p.email && <span className="truncate">{p.email}</span>}
                           {p.city && <span>{p.city}</span>}
                           <span>· depuis {fmtDate(p.created_at)}</span>
                         </div>
@@ -154,7 +151,7 @@ export function OperatorOwnerSearch({ value, onChange, orphan, onOrphanChange }:
                 </div>
               )}
               <p className="text-[11px] text-muted-foreground">
-                Pour la confidentialité, les adresses e-mail ne sont jamais affichées dans les résultats.
+                Recherche admin (RPC sécurisée) — email visible pour faciliter l'identification.
               </p>
             </>
           )}
