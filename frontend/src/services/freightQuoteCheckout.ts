@@ -74,6 +74,12 @@ export interface QuoteCheckoutInput {
   items: FreightItem[];
   totalCbm?: number;
   totalWeightKg?: number;
+  /**
+   * Lot 11C — ISO2 du pays d'origine effectif des produits du panier
+   * (origine produit > origine boutique). Si fourni, restreint la liste
+   * aux transitaires couvrant la route origine→destination.
+   */
+  originCountry?: string | null;
 }
 
 /**
@@ -90,7 +96,7 @@ export async function fetchEligibleFreightOffers(
     .from("forwarder_pricing_profiles")
     .select(
       "id, forwarder_id, mode, service_class, country_code, city_id, " +
-        "forwarder:forwarders!inner(id, name, logo_url, is_platform_owned, is_active)",
+        "forwarder:forwarders!inner(id, name, logo_url, is_platform_owned, is_active, coverage_routes, supported_modes)",
     )
     .eq("is_active", true)
     .eq("country_code", input.destinationCountry)
@@ -121,12 +127,33 @@ export async function fetchEligibleFreightOffers(
       logo_url: string | null;
       is_platform_owned: boolean;
       is_active: boolean;
+      coverage_routes: Array<{ origin_country?: string; origin_city?: string; destination_country?: string; destination_city?: string }> | null;
+      supported_modes: string[] | null;
     } | null;
   }>;
 
+  // Lot 11C — Filtrer par pays d'origine du produit. Un transitaire est
+  // éligible si au moins une de ses coverage_routes couvre la route
+  // origine→destination demandée. Le service plateforme (is_platform_owned)
+  // est conservé tel quel (couverture globale gérée côté admin).
+  const originISO = (input.originCountry || "").toUpperCase().trim();
+  const destISO = (input.destinationCountry || "").toUpperCase().trim();
+  const filteredProfiles = originISO
+    ? profilesList.filter((p) => {
+        if (p.forwarder?.is_platform_owned) return true;
+        const routes = p.forwarder?.coverage_routes ?? [];
+        const supports = p.forwarder?.supported_modes;
+        if (supports && supports.length > 0 && !supports.includes(input.mode)) return false;
+        return routes.some((r) =>
+          (r?.origin_country || "").toUpperCase() === originISO &&
+          (r?.destination_country || "").toUpperCase() === destISO,
+        );
+      })
+    : profilesList;
+
   // 2) Composer un devis pour chaque profil (en parallèle)
   const offers = await Promise.all(
-    profilesList.map(
+    filteredProfiles.map(
       async (p) => {
         const data = await fetchFreightProfileWithTiers(p.id);
         if (!data) return null;

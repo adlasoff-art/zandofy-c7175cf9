@@ -163,6 +163,13 @@ export type Database = {
             referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "affiliate_links_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
+          },
         ]
       }
       affiliate_tiers: {
@@ -783,6 +790,13 @@ export type Database = {
             referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bundle_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
+          },
         ]
       }
       campaign_send_log: {
@@ -932,6 +946,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products_public"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cart_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -1368,6 +1389,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products_public"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "conversations_store_id_fkey"
@@ -2627,6 +2655,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "featured_placements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
+          },
+          {
             foreignKeyName: "featured_placements_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
@@ -2693,6 +2728,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products_public"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flash_sales_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -4275,6 +4317,13 @@ export type Database = {
             referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
+          },
         ]
       }
       order_status_history: {
@@ -4345,6 +4394,7 @@ export type Database = {
           operator_responded_at: string | null
           operator_response_deadline: string | null
           order_ref: string
+          origin_country: string | null
           payment_method: string | null
           pickup_code: string | null
           pickup_code_generated_at: string | null
@@ -4412,6 +4462,7 @@ export type Database = {
           operator_responded_at?: string | null
           operator_response_deadline?: string | null
           order_ref: string
+          origin_country?: string | null
           payment_method?: string | null
           pickup_code?: string | null
           pickup_code_generated_at?: string | null
@@ -4479,6 +4530,7 @@ export type Database = {
           operator_responded_at?: string | null
           operator_response_deadline?: string | null
           order_ref?: string
+          origin_country?: string | null
           payment_method?: string | null
           pickup_code?: string | null
           pickup_code_generated_at?: string | null
@@ -4977,6 +5029,13 @@ export type Database = {
             referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "product_colors_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
+          },
         ]
       }
       product_custom_variant_values: {
@@ -5015,6 +5074,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products_public"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_custom_variant_values_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_custom_variant_values_variant_type_id_fkey"
@@ -5058,6 +5124,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products_public"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_images_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -5104,6 +5177,13 @@ export type Database = {
             referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "product_pricing_tiers_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
+          },
         ]
       }
       product_sizes: {
@@ -5148,6 +5228,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products_public"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_sizes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -5300,6 +5387,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products_public"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_variant_selections_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_variant_selections_variant_option_id_fkey"
@@ -6029,6 +6123,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products_public"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "reviews_user_id_fkey"
@@ -7612,6 +7713,13 @@ export type Database = {
             referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "trending_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
+          },
         ]
       }
       user_activity_logs: {
@@ -8381,6 +8489,13 @@ export type Database = {
             referencedRelation: "products_public"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "wishlists_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_product_effective_origin"
+            referencedColumns: ["product_id"]
+          },
         ]
       }
       withdrawal_requests: {
@@ -9096,6 +9211,29 @@ export type Database = {
         }
         Relationships: []
       }
+      v_product_effective_origin: {
+        Row: {
+          effective_origin_country: string | null
+          product_id: string | null
+          store_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       add_guest_support_message: {
@@ -9359,6 +9497,28 @@ export type Database = {
           transit_max_days: number
           transit_min_days: number
           unavailable_message: string
+        }[]
+      }
+      get_eligible_forwarders_v2: {
+        Args: {
+          p_destination_city_id: string
+          p_destination_country: string
+          p_mode: string
+          p_origin_country: string
+        }
+        Returns: {
+          covers_origin_city: boolean
+          forwarder_id: string
+          forwarder_name: string
+          forwarder_slug: string
+          is_platform_owned: boolean
+          logo_url: string
+          origin_cities: string[]
+          profile_id: string
+          service_class: string
+          supported_modes: string[]
+          transit_max_days: number
+          transit_min_days: number
         }[]
       }
       get_guest_support_ticket: {

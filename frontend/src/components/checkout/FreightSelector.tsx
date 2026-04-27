@@ -49,6 +49,8 @@ interface Props {
   realPriceIndicative?: number;
   /** Lot Very Speed — Poids total panier en kg (pour message "X pièces de plus"). */
   totalWeightKgForMarketing?: number;
+  /** Lot 11C — ISO2 du pays d'origine effectif des produits (origine produit > origine boutique). */
+  originCountry?: string | null;
 }
 
 export function FreightSelector({
@@ -63,6 +65,7 @@ export function FreightSelector({
   destinationCityName,
   realPriceIndicative,
   totalWeightKgForMarketing,
+  originCountry,
 }: Props) {
   const [offers, setOffers] = useState<EligibleFreightOffer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -88,6 +91,7 @@ export function FreightSelector({
       items,
       totalCbm,
       totalWeightKg,
+      originCountry,
     })
       .then((res) => {
         if (cancelled) return;
@@ -127,7 +131,7 @@ export function FreightSelector({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [destinationCountry, destinationCityId, mode, totalCbm, totalWeightKg, items.length]);
+  }, [destinationCountry, destinationCityId, mode, totalCbm, totalWeightKg, items.length, originCountry]);
 
   // Lot Very Speed — Tri d'affichage :
   //  1) Les offres réellement sélectionnables (has_profile_for_zone !== false)

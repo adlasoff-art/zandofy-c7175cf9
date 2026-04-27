@@ -622,11 +622,35 @@ export function CheckoutShippingCalculator({
              pour ne rien casser tant que tous les transitaires n'ont pas migré. */}
       {destCity && modeTotals.get(activeMode) && (
         <>
+          {(() => {
+            // Lot 11C — Détection multi-origines : avertir le client si son panier
+            // contient des produits provenant de plusieurs pays (≥2 origines distinctes).
+            // À terme (Phase 2) ces commandes seront splittées par origine. En attendant
+            // on n'applique pas le filtre transitaire pour ne pas vider la liste à tort.
+            const origins = [...new Set(products.map((p) => (p.originCountry || "").toUpperCase()).filter(Boolean))];
+            if (origins.length > 1) {
+              return (
+                <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-md px-2.5 py-2">
+                  <Lightbulb size={12} className="text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-muted-foreground">
+                    Votre panier contient des produits de {origins.length} pays différents
+                    ({origins.join(", ")}). Le transport sera coordonné depuis chaque origine.
+                  </p>
+                </div>
+              );
+            }
+            return null;
+          })()}
           <FreightSelector
             destinationCountry={destCity.country_code}
             destinationCityId={destCity.id}
             destinationCityName={destCity.name}
             mode={activeMode}
+            originCountry={(() => {
+              const origins = [...new Set(products.map((p) => (p.originCountry || "").toUpperCase()).filter(Boolean))];
+              // Mono-origine → filtre actif. Multi-origines → pas de filtre (Phase 2 splittera).
+              return origins.length === 1 ? origins[0] : null;
+            })()}
             items={cartItems.map((ci) => {
               const p = products.find((pp) => pp.productId === ci.productId);
               return {

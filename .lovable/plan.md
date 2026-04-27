@@ -1,165 +1,97 @@
-# Plan final v2 — Multi-opérateurs : consolidation, KYB & gestion admin
 
-## Décisions validées (récap)
+# Filtrage des transitaires par origine produit + commandes multi-origines
 
-1. Recherche par email : **admin only** (RPC SECURITY DEFINER)
-2. Tarifs commune/quartier saisissables par admin au nom d'un opérateur (auto-approbation)
-3. Legacy tarification (`communes.delivery_fee`, `quartiers.delivery_surcharge`) : **renommée `*_legacy_deprecated`** + champs retirés de l'UI Zone Géographique
-4. UX checkout : message clair + CTAs (demander couverture, retrait hub) si aucun opérateur
-5. **Migration legacy → opérateur** : option (a) — auto-injection des anciens prix dans `delivery_operator_rates` du Very Speed conservé
-6. **Doublon Very Speed Delivery** : garder celui à commission 15% / max 10 riders / 3 riders déclarés. Archiver l'autre.
-7. **KYB upload (RCCM, NIF, statuts, etc.)** : nouveau module documents pour opérateurs
-8. **Gestion admin opérateurs** : édition + suppression (archivage logique)
+## Contexte / problème
 
----
+Aujourd'hui le checkout affiche **tous les transitaires actifs pour la destination + mode**, sans tenir compte du pays d'origine du produit. Quand on ouvrira Zandofy aux boutiques Turquie/Dubaï, un client commandant un produit turc verra des transitaires Chine→RDC dans la liste — incohérent et risque opérationnel majeur (le colis ne pourra pas être pris en charge).
 
-## Fix 1 — Recherche propriétaire par email (admin only)
+Bonne nouvelle : la donnée existe déjà côté DB.
+- `products.origin_country` (ISO2) → champ déjà éditable dans le formulaire produit (`CountryCombobox`).
+- `forwarders.coverage_routes` jsonb : tableau de `{origin_country, origin_city, destination_country, destination_city}` déjà saisi par chaque transitaire à l'inscription (`BecomeForwarderPage`).
+- `forwarders.supported_modes` (text[]) : air/sea/road/rail.
+- `products.can_ship_air` / `can_ship_sea` : déjà utilisés dans le formulaire produit (capture d'écran).
 
-- RPC `search_users_admin(term text)` SECURITY DEFINER, vérifie `has_role(auth.uid(), 'admin')`, jointure `profiles` ⨝ `auth.users`, retourne `user_id, first_name, last_name, email, city, is_kyc_verified, created_at`, limite 8.
-- `OperatorOwnerSearch.tsx` → utilise la RPC, affiche email, placeholder mis à jour.
+Ce qui manque : **utiliser `coverage_routes` au moment de filtrer les transitaires éligibles**, et **segmenter les commandes par pays d'origine** (en plus de la segmentation par `store_id` déjà en place).
 
-## Fix 2 — Page admin de gestion des tarifs au nom d'un opérateur
+## Stratégie produit
 
-- Route `/admin/operators/:operatorId/rates` → `AdminOperatorRatesPage.tsx`
-- Edge function `admin-create-operator-rate` (verify_jwt=true) : vérifie `has_role(admin)`, insert avec `status='approved'`, `approved_by=auth.uid()`, valide `delivery_operator_city_caps`.
-- Bouton "Gérer les tarifs" sur `AdminOperatorsPage`.
+### Règle 1 — Origine produit > Origine boutique
+L'origine effective d'un produit est `products.origin_country` si renseigné, sinon fallback sur `stores.country` (origine boutique). Une boutique chinoise peut donc vendre un article dont l'origine est Turquie ; le transitaire affiché sera celui qui couvre TR→destination.
 
-## Fix 3 — Nettoyage legacy + migration des prix vers l'opérateur conservé
+### Règle 2 — Filtrage transitaire au checkout
+Pour chaque produit du panier, ne proposer que les transitaires dont `coverage_routes` contient au moins une route `origin_country = origine_produit` ET `destination_country = pays_client` ET dont `supported_modes` couvre le mode demandé. Si un transitaire couvre la ville exacte d'origine (origine_city), il est priorisé/marqué "express collecte directe", sinon il est listé en "collecte pays".
 
-### A. Migration des prix legacy → tarifs opérateur (option a)
+### Règle 3 — Panier multi-origines = sous-commandes par origine
+Aujourd'hui le panier se split par `store_id` (mémoire `order-segmentation`). On ajoute une **deuxième dimension de split : `origin_country`**.
 
-Migration SQL idempotente :
-- Boucle sur `communes` ayant `delivery_fee > 0` : insert dans `delivery_operator_rates` (operator_id = Very Speed conservé, status='approved', city_id, commune_id, base_price = delivery_fee, surcharge=0).
-- Boucle sur `quartiers` ayant `delivery_surcharge > 0` : insert avec `quartier_id`, `surcharge = delivery_surcharge`, base = commune parent.
-- ON CONFLICT DO NOTHING (clé : operator_id + scope géo).
+Exemple concret :
+- Boutique A (Chine) vend produit X (origine CN) + produit Y (origine TR).
+- Boutique B (Dubaï) vend produit Z (origine AE).
+- Panier = X + Y + Z.
+- Génération : **3 sous-commandes** = (A·CN), (A·TR), (B·AE). Chacune avec son propre transitaire, son propre devis, son propre lock `freight_quotes.quoted_price`.
 
-> ⚠️ L'ID du Very Speed conservé doit être passé en paramètre du script SQL (cf. action utilisateur ci-dessous).
+Le client choisit donc jusqu'à N transitaires au checkout (un par groupe origine×boutique). UI : un bloc `FreightSelector` par groupe, libellé "Colis depuis 🇨🇳 Chine — Boutique A (1 article)".
 
-### B. Renommage colonnes legacy
+### Règle 4 — Mode d'expédition par groupe
+Le mode (air/sea) est aussi calculé par groupe : intersection des `can_ship_air/sea` de tous les produits du groupe. Si le groupe contient 1 article air-only et 1 article sea-only → conflit, on affiche un warning et on force le mode commun (ou on demande au client de retirer un article).
 
-```sql
-ALTER TABLE communes RENAME COLUMN delivery_fee TO delivery_fee_legacy_deprecated;
-ALTER TABLE quartiers RENAME COLUMN delivery_surcharge TO delivery_surcharge_legacy_deprecated;
-```
+### Règle 5 — Notifications & cloisonnement
+Chaque sous-commande générée alimente un `freight_quote` distinct → seul le transitaire choisi pour ce groupe reçoit la notification de prise en charge et voit la commande dans son dashboard. Aucun changement nécessaire côté notifications : le découpage actuel par `freight_quote_id` suffira automatiquement une fois le split en place.
 
-### C. UI Admin Zone Géographique
-Retrait des champs/colonnes `delivery_fee` et `delivery_surcharge`. Garder `is_restricted`. Ajouter notice : « La tarification est désormais gérée par opérateur. »
+## Implémentation technique
 
-### D. Code legacy
-`frontend/src/lib/last-mile-fee.ts` → JSDoc `@deprecated`, suppression imports résiduels.
+### Backend (1 migration SQL)
 
-## Fix 4 — UX checkout amélioré
+**Fichier** : `frontend/supabase/migrations/<timestamp>_forwarder_origin_filter.sql`
 
-- Composant checkout (consommateur de `useOperatorQuotes`) : message « Aucun livreur ne dessert [quartier], [commune] » + CTAs « Demander une couverture » et « Retrait au hub ».
-- Edge function `request-delivery-coverage` (verify_jwt=true) → insert dans nouvelle table `coverage_requests(user_id, country, city, commune_id, quartier_id, requested_at, fulfilled_at)` + notif admins.
-- Migration `coverage_requests` avec RLS (user voit les siens, admin voit tout).
+1. RPC `get_eligible_forwarders_v2(p_origin_country text, p_destination_country text, p_destination_city_id uuid, p_mode text)` :
+   - JOIN `forwarders` × `forwarder_pricing_profiles`.
+   - Filtre `coverage_routes @> '[{"origin_country":"<X>","destination_country":"<Y>"}]'::jsonb` (jsonb containment).
+   - Filtre `supported_modes @> ARRAY[p_mode]`.
+   - Filtre profil tarifaire actif sur destination + mode.
+   - Retourne en plus : `covers_origin_city boolean` (true si le transitaire couvre aussi la ville exacte de l'origine produit/boutique).
+2. Index GIN sur `forwarders.coverage_routes` pour perf : `CREATE INDEX IF NOT EXISTS idx_forwarders_coverage_routes_gin ON forwarders USING GIN (coverage_routes);`.
+3. Vue `v_product_effective_origin` : `SELECT p.id, COALESCE(p.origin_country, s.country) AS effective_origin_country FROM products p LEFT JOIN stores s ON s.id = p.store_id;`. Permet de remonter l'origine effective sans dupliquer la logique en TS.
 
----
+### Frontend
 
-## Fix 5 — Doublon Very Speed Delivery (action ciblée prod)
+**1. Service `freightQuoteCheckout.ts`** :
+   - Nouvelle fonction `groupCartByOriginAndStore(items)` : retourne `Array<{ store_id, origin_country, items, mode_intersection: ('air'|'sea')[] }>`.
+   - `fetchEligibleFreightOffers` accepte un `originCountry` et le passe à la nouvelle RPC.
+   - `lockFreightQuote` est appelé une fois par groupe.
 
-- L'utilisateur fournit l'ID du Very Speed à **conserver** (commission 15%, max_riders 10, 3 riders déclarés).
-- Script SQL d'archivage de l'autre : `UPDATE delivery_operators SET archived_at = now(), archive_reason = 'doublon — conservé l''opérateur configuré par owner', is_active = false, status = 'archived' WHERE id = '<id_doublon>';`
-- Vérifier qu'aucune commande active n'est rattachée au doublon avant archivage (warning si `delivery_assignments` non terminés).
+**2. `CheckoutPage.tsx`** :
+   - Remplace le bloc `FreightSelector` unique par une boucle sur les groupes.
+   - Pour chaque groupe : badge "Origine 🇨🇳 / Boutique X / Mode ✈️", liste des transitaires éligibles, bouton de validation indépendant.
+   - Empêche `Confirmer la commande` tant qu'un transitaire n'est pas choisi pour chaque groupe.
 
-> **Action utilisateur requise** : me fournir les **deux IDs** (`id_a_conserver` et `id_a_archiver`) depuis la prod (`SELECT id, company_name, platform_commission_pct, max_riders, declared_riders_count FROM delivery_operators WHERE company_name ILIKE '%very speed%';`).
+**3. `freightQuoteCheckout.ts → orders insert`** :
+   - L'insertion des `orders` se fait déjà par `store_id` ; on ajoute la dimension `origin_country` pour générer une `order` par couple (store, origin). Champ `orders.origin_country` à ajouter (migration).
 
----
+**4. `VendorProductManager.tsx`** :
+   - Aucune nouvelle UI, mais ajouter un texte d'aide sous "Origine du pays" : *"Détermine quel transitaire prendra en charge ce produit. Laissez vide pour utiliser l'origine de la boutique."*
+   - Validation à la sauvegarde : si la boutique vend des produits multi-origines, on n'impose rien — c'est volontaire.
 
-## Fix 6 — KYB Documents pour opérateurs (NOUVEAU)
+**5. `BecomeForwarderPage.tsx`** :
+   - Aucun changement structurel : le formulaire collecte déjà les `coverage_routes` correctement. On vérifie juste que le standard `GeoFieldsRow` est utilisé (déjà conforme).
 
-### A. Storage
-Bucket privé `operator-kyb-documents` (RLS : owner peut upload/lire ses docs ; admin peut tout lire).
+### Cas limites gérés
 
-### B. Schéma DB
-Table `operator_kyb_documents` :
-- `id`, `operator_id` (FK), `doc_type` (`rccm` | `nif` | `id_card` | `business_license` | `insurance` | `other`), `file_path`, `file_name`, `mime_type`, `size_bytes`, `uploaded_by`, `uploaded_at`, `verified_at`, `verified_by`, `rejection_reason`, `status` (`pending`|`approved`|`rejected`).
-- RLS : owner CRUD ses docs (status pending uniquement), admin/manager lecture + update verification.
+- **Aucun transitaire ne couvre une route** (ex : nouveau pays d'origine sans transitaire enregistré) → on affiche un encart "Aucun transitaire ne dessert encore 🇹🇷 Turquie → 🇨🇩 RDC" + bouton **Demander la couverture** (réutilise l'EF `request-delivery-coverage` ou crée un équivalent `request-forwarder-coverage`).
+- **Conflit air/sea dans un groupe** : warning bloquant, suggestion de scinder la commande.
+- **Origine produit non renseignée ET boutique sans country** : fallback sur `headquarters_country` du forwarder ou warning admin.
+- **Devis multiples = paiement** : le total `shipping_cost` à régler au checkout = somme des `quoted_price` lockés des N freight_quotes.
 
-### C. UI Opérateur (`OperatorSettingsPage.tsx`)
-Nouvelle section "Documents légaux" : drag&drop par type de document, statut affiché, possibilité de remplacer si `rejected`.
+## Étapes de livraison
 
-### D. UI Admin (`AdminOperatorsPage.tsx` — drawer détail)
-Nouvel onglet "Documents KYB" : liste, prévisualisation, boutons Approuver / Rejeter (avec motif).
+1. **Lot A — DB & RPC** : migration `get_eligible_forwarders_v2` + index GIN + vue origine effective + ajout colonne `orders.origin_country`.
+2. **Lot B — Service de groupage** : `groupCartByOriginAndStore` + tests unitaires (panier mono-origine, multi-origine, conflit modes).
+3. **Lot C — Checkout UI** : multi-`FreightSelector`, validation par groupe, total agrégé.
+4. **Lot D — UX vide** : encart "aucune couverture" + bouton demande de couverture transitaire.
+5. **Lot E — QA** : test E2E (panier 3 articles 2 origines 2 boutiques → 3 commandes générées avec 3 transitaires).
 
-### E. Edge functions
-- `operator-upload-kyb-document` (verify_jwt=true, owner-only) : valide MIME (pdf/jpg/png), taille ≤ 10MB, insert ligne.
-- `admin-review-kyb-document` (verify_jwt=true, admin-only) : update status + notif owner (in-app + email).
+## Hors scope (à confirmer en validation)
 
----
-
-## Fix 7 — Édition & suppression opérateur (admin)
-
-### A. Édition (drawer `AdminOperatorsPage`)
-Champs éditables : `company_name`, `legal_name`, `registration_number`, `tax_id`, `contact_email`, `contact_phone`, `headquarters_*`, `platform_commission_pct`, `max_riders`, `is_active`, `status`.
-- Edge function `admin-update-operator` (verify_jwt=true, admin-only) : audit log dans `activity_logs`.
-
-### B. Suppression (archivage logique)
-- Bouton "Archiver l'opérateur" (rouge, confirmation modale).
-- Edge function `admin-archive-operator` :
-  - Vérifie qu'aucun `delivery_assignments` actif (statut ≠ delivered/cancelled) → sinon refuse avec liste.
-  - Set `archived_at`, `archive_reason`, `is_active=false`, `status='archived'`.
-  - Désactive automatiquement tous les tarifs (`delivery_operator_rates.status='archived'`).
-  - Notifie owner.
-- Pas de DELETE physique (préserve historique commandes).
-
----
-
-## Fichiers impactés (résumé)
-
-**Migrations SQL** (frontend/supabase/migrations/) :
-- `*_add_search_users_admin_rpc.sql`
-- `*_migrate_legacy_fees_to_operator_rates.sql` (paramétré sur l'ID Very Speed conservé)
-- `*_rename_legacy_delivery_fees.sql`
-- `*_create_coverage_requests.sql`
-- `*_create_operator_kyb_documents.sql` (table + storage bucket + RLS)
-- `*_archive_duplicate_operator.sql` (à exécuter après confirmation des IDs)
-
-**Edge Functions** :
-- `admin-create-operator-rate/`
-- `request-delivery-coverage/`
-- `operator-upload-kyb-document/`
-- `admin-review-kyb-document/`
-- `admin-update-operator/`
-- `admin-archive-operator/`
-
-**Frontend** :
-- `OperatorOwnerSearch.tsx` (RPC + email)
-- `pages/admin/AdminOperatorRatesPage.tsx` (nouveau)
-- `pages/admin/AdminOperatorsPage.tsx` (édition + archivage + onglet KYB)
-- `pages/operator/OperatorSettingsPage.tsx` (section documents)
-- `App.tsx` (routes)
-- pages Géographie admin (retrait champs prix)
-- composants checkout (message + CTAs)
-- `lib/last-mile-fee.ts` (deprecated)
-
----
-
-## Workflow déploiement (rappel)
-
-1. Branch `feature/operators-consolidation-v2` depuis `develop`.
-2. SQL migrations + EF + frontend dans la même PR.
-3. Push → preview Lovable Cloud (test rapide structure).
-4. PR → `develop` → staging (tests fonctionnels).
-5. Migration legacy → opérateur **rejouée manuellement sur prod** (vpt...yxf) après validation staging, avec ID Very Speed conservé fourni par vous.
-6. Archivage du doublon **uniquement après** confirmation explicite.
-7. PR `develop` → `main` → prod (Vercel + GitHub Actions deploy edge functions).
-
----
-
-## Action utilisateur requise avant exécution
-
-Fournir depuis la prod :
-
-```sql
-SELECT id, company_name, platform_commission_pct, max_riders,
-       declared_riders_count, owner_user_id, contact_email, created_at
-FROM delivery_operators
-WHERE company_name ILIKE '%very speed%';
-```
-
-Puis indiquer :
-- **ID à conserver** : (celui à 15% / 10 max / 3 riders)
-- **ID à archiver** : (l'autre)
-
-Dès réception, je passe en build (toutes les fixes 1→7 en une PR).
+- Pas de changement du modèle de pricing (markup 45 % + commission 10 %) ni du moteur last-mile (opérateurs livraison reste indépendant).
+- Pas de modification des règles d'opérateur de livraison (déjà filtré par ville client, ok).
+- Pas d'unification des paiements en une seule transaction si ça doit rester N transactions (à confirmer — par défaut on garde le comportement actuel : 1 paiement par order).
