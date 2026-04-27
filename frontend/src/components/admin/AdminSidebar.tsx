@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, Image, FolderTree, Bell, Settings, ShieldCheck, Truck, Package, DollarSign, Store, PenLine, Crown, ScrollText, Heart, Coins, Ticket, Banknote, RotateCcw, AlertTriangle, ArrowLeftRight, Globe, Megaphone, Headphones, Layers, BarChart3, Mail, User, Receipt, Star, MapPin, Zap, Bug, PackageSearch,
+  LayoutDashboard, Users, Image, FolderTree, Bell, Settings, ShieldCheck, Truck, Package, DollarSign, Store, PenLine, Crown, ScrollText, Heart, Coins, Ticket, Banknote, RotateCcw, AlertTriangle, ArrowLeftRight, Globe, Megaphone, Headphones, Layers, BarChart3, Mail, User, Receipt, Star, MapPin, Zap, Bug, PackageSearch, MailQuestion,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useRoles } from "@/hooks/use-roles";
@@ -19,6 +19,8 @@ interface SidebarItem {
   title: string;
   url: string;
   icon: React.ElementType;
+  /** Lot 11C — Si défini, affiche un badge avec le compteur retourné par cette query. */
+  badgeKey?: "coverage-requests-pending";
 }
 
 interface SidebarSection {
@@ -61,6 +63,7 @@ const sidebarSections: SidebarSection[] = [
       { title: "Tarifs à modérer", url: "/admin/operator-rates-pending", icon: DollarSign },
       { title: "Tarification Fret", url: "/admin/shipping", icon: DollarSign },
       { title: "Plans de livraison", url: "/admin/delivery-plans", icon: Truck },
+      { title: "Demandes de couverture", url: "/admin/coverage-requests", icon: MailQuestion, badgeKey: "coverage-requests-pending" },
       { title: "Zones géographiques", url: "/admin/geography", icon: MapPin },
       { title: "Pays actifs", url: "/admin/countries", icon: Globe },
     ],
