@@ -132,6 +132,7 @@ const AdminVariantTypesPage = lazyRetry(() => import("./pages/admin/AdminVariant
 const AdminAnalyticsPage = lazyRetry(() => import("./pages/admin/AdminAnalyticsPage"));
 const AdminEmailTemplatesPage = lazyRetry(() => import("./pages/admin/AdminEmailTemplatesPage"));
 const AdminKycPage = lazyRetry(() => import("./pages/admin/AdminKycPage"));
+const AdminKybKycV2Page = lazyRetry(() => import("./pages/admin/AdminKybKycV2Page"));
 const AdminFeaturedPlacementsPage = lazyRetry(() => import("./pages/admin/AdminFeaturedPlacementsPage"));
 const AdminVendorAccountingPage = lazyRetry(() => import("./pages/admin/AdminVendorAccountingPage"));
 const AdminFlashSalesPage = lazyRetry(() => import("./pages/admin/AdminFlashSalesPage"));
