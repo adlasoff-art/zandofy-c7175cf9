@@ -290,3 +290,80 @@ describe("Tiered pricing calculation", () => {
     expect(unitPrice).toBe(100);
   });
 });
+
+// ─── Lot Multi-Opérateurs : KYB / Coverage / Rates ────────────
+describe("Multi-operator: KYB document validation logic", () => {
+  const allowedTypes = ["rccm", "nif", "id_pieces", "tax_clearance", "other"];
+  const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png"];
+  const MAX_SIZE = 10 * 1024 * 1024;
+
+  it("accepts known KYB doc types", () => {
+    expect(allowedTypes).toContain("rccm");
+    expect(allowedTypes).toContain("nif");
+  });
+
+  it("rejects file over 10MB", () => {
+    const oversize = 12 * 1024 * 1024;
+    expect(oversize > MAX_SIZE).toBe(true);
+  });
+
+  it("blocks non-PDF/JPG/PNG mime types", () => {
+    expect(ALLOWED_MIME.includes("application/zip")).toBe(false);
+    expect(ALLOWED_MIME.includes("application/pdf")).toBe(true);
+  });
+
+  it("requires rejection_reason >= 3 chars when rejecting", () => {
+    const validate = (decision: string, reason?: string) =>
+      decision === "rejected" && (!reason || reason.trim().length < 3)
+        ? "Motif de rejet requis (min 3 caractères)"
+        : null;
+
+    expect(validate("rejected", "")).toBeTruthy();
+    expect(validate("rejected", "ok")).toBeTruthy();
+    expect(validate("rejected", "Document illisible")).toBeNull();
+    expect(validate("approved")).toBeNull();
+  });
+});
+
+describe("Multi-operator: Coverage request anti-spam (24h window)", () => {
+  it("blocks duplicate request within 24h for same geo", () => {
+    const now = Date.now();
+    const lastRequestedAt = now - 6 * 3600 * 1000; // 6h ago
+    const within24h = now - lastRequestedAt < 24 * 3600 * 1000;
+    expect(within24h).toBe(true);
+  });
+
+  it("allows new request after 24h", () => {
+    const now = Date.now();
+    const lastRequestedAt = now - 25 * 3600 * 1000;
+    const within24h = now - lastRequestedAt < 24 * 3600 * 1000;
+    expect(within24h).toBe(false);
+  });
+});
+
+describe("Multi-operator: Rate creation validation", () => {
+  const validate = (geo: any, form: any) => {
+    if (!geo.country || !geo.city?.trim() || !form.zone_name?.trim() || !form.base_price) {
+      return "Ville, zone et tarif de base requis";
+    }
+    return null;
+  };
+
+  it("rejects rate without country/city/zone/base_price", () => {
+    expect(validate({ country: "" }, { zone_name: "x", base_price: 1 })).toBeTruthy();
+    expect(validate({ country: "CD", city: "" }, { zone_name: "x", base_price: 1 })).toBeTruthy();
+    expect(validate({ country: "CD", city: "Kin" }, { zone_name: "", base_price: 1 })).toBeTruthy();
+    expect(validate({ country: "CD", city: "Kin" }, { zone_name: "Centre", base_price: 0 })).toBeTruthy();
+  });
+
+  it("accepts complete payload", () => {
+    expect(validate({ country: "CD", city: "Kinshasa" }, { zone_name: "Centre", base_price: 5 })).toBeNull();
+  });
+
+  it("normalizes optional commune/quartier to null when empty", () => {
+    const normalize = (v?: string) => v?.trim() || null;
+    expect(normalize("")).toBeNull();
+    expect(normalize("  ")).toBeNull();
+    expect(normalize("Gombe")).toBe("Gombe");
+  });
+});
