@@ -1675,27 +1675,36 @@ export type Database = {
       delivery_operator_cities: {
         Row: {
           city: string
+          commune_ids: string[]
           country_code: string
           created_at: string
           id: string
           is_active: boolean
           operator_id: string
+          province_id: string | null
+          quartier_ids: string[]
         }
         Insert: {
           city: string
+          commune_ids?: string[]
           country_code: string
           created_at?: string
           id?: string
           is_active?: boolean
           operator_id: string
+          province_id?: string | null
+          quartier_ids?: string[]
         }
         Update: {
           city?: string
+          commune_ids?: string[]
           country_code?: string
           created_at?: string
           id?: string
           is_active?: boolean
           operator_id?: string
+          province_id?: string | null
+          quartier_ids?: string[]
         }
         Relationships: [
           {
@@ -1718,6 +1727,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_operator_performance"
             referencedColumns: ["operator_id"]
+          },
+          {
+            foreignKeyName: "delivery_operator_cities_province_id_fkey"
+            columns: ["province_id"]
+            isOneToOne: false
+            referencedRelation: "provinces"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1959,6 +1975,7 @@ export type Database = {
           contact_phone: string
           created_at: string
           declared_riders_count: number
+          fleet_vehicles: Json
           headquarters_address: string | null
           headquarters_city: string
           headquarters_country: string
@@ -1992,6 +2009,7 @@ export type Database = {
           contact_phone: string
           created_at?: string
           declared_riders_count?: number
+          fleet_vehicles?: Json
           headquarters_address?: string | null
           headquarters_city: string
           headquarters_country?: string
@@ -2025,6 +2043,7 @@ export type Database = {
           contact_phone?: string
           created_at?: string
           declared_riders_count?: number
+          fleet_vehicles?: Json
           headquarters_address?: string | null
           headquarters_city?: string
           headquarters_country?: string
@@ -8854,6 +8873,15 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_geo_coverage_status: {
+        Row: {
+          country_code: string | null
+          has_cities: boolean | null
+          has_communes: boolean | null
+          has_provinces: boolean | null
+        }
+        Relationships: []
       }
       v_operator_performance: {
         Row: {

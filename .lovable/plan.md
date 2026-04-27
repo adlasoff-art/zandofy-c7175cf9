@@ -1,90 +1,148 @@
-# Phase 10.1 — Stabilisation post-audit (multi-opérateurs + transitaires) ✅ TERMINÉE
 
-## ✅ Livré
-- Migration KYB transitaires relocalisée dans `frontend/supabase/migrations/` (déployable prod) + `forwarders.status DEFAULT 'pending'`.
-- Route `/forwarder` + `ForwarderDashboardPage.tsx` (statut KYB, identité, couverture, documents signed URLs).
-- `CreateOperatorDialog.tsx` branché dans `AdminOperatorsPage` (autocomplete profiles, flotte, villes, commission).
-- `AdminSidebar.tsx` : ajout Plafonds tarifaires + Tarifs à modérer.
-- `Header.tsx` + `MobileAccountMenu.tsx` : liens Espace conditionnels (operator/forwarder), masquage des "Devenir" si déjà rôle.
-- `ErrorBoundary` / `error-reporter.ts` : filtre des chunk-load + null-context errors (notifications admin nettoyées).
-- TypeScript build OK.
+# Phase 10.2 — Création opérateur "production-grade"
+
+Objectif : remplacer les saisies libres du `CreateOperatorDialog` par la **vraie cascade géographique de la plateforme** + sécuriser la recherche propriétaire (anti-PII) + ajouter les plaques d'immatriculation, avec réutilisation cohérente sur `BecomeOperatorPage`.
 
 ---
 
-# (Archive) Plan initial
+## 1. Migration DB (`frontend/supabase/migrations/`)
 
-Objectif : corriger les 4 incohérences bloquantes prod identifiées et combler les manques UX/sécurité avant validation finale.
+**`delivery_operator_cities`** : passage en granularité fine
+- Ajouter `province_id uuid NULL REFERENCES provinces(id) ON DELETE SET NULL`
+- Ajouter `commune_ids uuid[] NOT NULL DEFAULT '{}'`
+- Ajouter `quartier_ids uuid[] NOT NULL DEFAULT '{}'`
+- Index GIN sur `commune_ids` et `quartier_ids` (lookup tarification)
+- Conserver `city` (texte) pour rétro-compat lecture
 
----
+**`delivery_operators`** : flotte détaillée
+- Ajouter `fleet_vehicles jsonb NOT NULL DEFAULT '[]'`
+  - Schéma : `[{ type, plate_number, brand?, model? }]`
+- Trigger `validate_fleet_vehicles()` : rejette les plaques en doublon (sur la même ligne) et impose `plate_number` non vide
+- Index unique partiel : `CREATE UNIQUE INDEX ... ON delivery_operators ((fleet_vehicles->>'plate_number'))` ❌ trop complexe → on fait la **dédup applicative + trigger jsonb**
 
-## 🔴 Bloquants prod (à exécuter en priorité)
-
-### 1. Relocaliser la migration KYB transitaires
-- **Action** : déplacer `supabase/migrations/20260426231512_*.sql` → `frontend/supabase/migrations/` (renommer avec timestamp courant si conflit).
-- **Pourquoi** : seule `frontend/supabase/migrations/` est déployée par GitHub Actions vers la prod (`vpt...yxf`). En l'état, prod n'aura jamais le bucket `forwarder-documents`, ni `forwarders.owner_user_id/status/documents`.
-- **Vérification** : `psql` sur prod après déploiement pour confirmer présence des colonnes.
-
-### 2. Corriger `forwarders.status DEFAULT 'approved'`
-- **Action** : nouvelle migration ALTER TABLE :
-  - `ALTER COLUMN status SET DEFAULT 'pending'`
-  - Ne pas toucher aux lignes existantes (forwarders legacy déjà en prod sont approved, normal).
-- **Pourquoi** : faille KYB — toute insertion sans `status` explicite échappe à la modération.
-
-### 3. Créer la route `/forwarder` (Espace transitaire minimal)
-- **Action** : page `frontend/src/pages/forwarder/ForwarderDashboardPage.tsx` (lecture seule pour MVP) :
-  - Affiche statut KYB (`pending/approved/suspended/rejected`) + `rejection_reason`.
-  - Liste des routes couvertes + modes.
-  - Liste des documents soumis (download via signed URL).
-  - CTA `/forwarder/rates` (si déjà existant) ou message "à venir".
-- **Route** : ajouter dans `App.tsx` sous `<Route path="/forwarder" element={<RoleGuard role="forwarder"><ForwarderDashboardPage /></RoleGuard>} />`.
-
-### 4. Brancher `admin-create-operator` dans AdminOperatorsPage
-- **Action** : ajouter bouton "Créer un opérateur" en haut de la page + Dialog `CreateOperatorDialog.tsx` :
-  - Champs : owner_user_id (autocomplete users via `profiles` search par email), company_name, contact_email/phone, headquarters_city/country, vehicle_types, declared_riders_count, cities couvertes, `is_platform_owned`, `platform_commission_pct`.
-  - Submit → `supabase.functions.invoke("admin-create-operator", { body })`.
-  - Refresh liste après succès.
+**Vue helper** : `v_geo_coverage_status(country_code text)` retourne `{has_provinces, has_cities, has_communes}` → utilisée pour bloquer le wizard si la plateforme n'a pas saisi les zones.
 
 ---
 
-## 🟡 Améliorations qualité
+## 2. Edge function `admin-create-operator` (mise à jour)
 
-### 5. Compléter la sidebar admin Logistique
-- Ajouter dans `AdminSidebar.tsx` (sous-menu Logistique) :
-  - `Caps tarifaires` → `/admin/operator-rate-caps`
-  - `Tarifs à modérer` → `/admin/operator-rates-pending`
-
-### 6. Liens "Espace opérateur / transitaire" pour les rôles existants
-- **Header.tsx** + **MobileAccountMenu.tsx** : afficher conditionnellement
-  - Si `roles.includes('operator')` → lien `/operator`
-  - Si `roles.includes('forwarder')` → lien `/forwarder`
-  - Cacher les liens "Devenir ..." correspondants si déjà le rôle.
-
-### 7. Investiguer le flood d'erreurs `useState/useContext null`
-- 30+ erreurs admin notifications entre 18h-22h aujourd'hui.
-- Vérifier : `lazyRetry` ne bypass pas la racine React, AuthContext n'est pas importé en haut de chunks lazy avant que React soit prêt.
-- Action : ajouter un ErrorBoundary plus haut (autour de `<Suspense>`) qui ne re-trigger PAS de notif admin pour les erreurs de chunk loading (filtrer `Failed to fetch dynamically imported module` et `Cannot read properties of null (reading 'useState'|'useContext')`).
-- Bénéfice : nettoyer le bruit dans le centre de notifications.
-
-### 8. Régénérer types Supabase
-- Après application des migrations relocalisées, supprimer les `(supabase as any)` dans :
-  - `AdminOperatorsPerformancePage.tsx`
-  - `BecomeForwarderPage.tsx`
-  - `become-forwarder-submit/index.ts` (types Deno auto)
+- Schéma Zod enrichi :
+  - `cities[]` accepte désormais `{ country_code, city, province_id?, commune_ids: string[], quartier_ids: string[] }`
+  - `fleet_vehicles[]` requis : min 3 entrées, chacune avec `type` (enum) + `plate_number` (regex assoupli ≥4 chars)
+  - `declared_riders_count` min **3** (au lieu de 1)
+  - `owner_user_id` toujours optionnel (orphelin OK)
+- Insertion : on persiste `fleet_vehicles` + on dérive `vehicle_types` agrégé pour rétro-compat (groupBy type → count)
+- `delivery_operator_cities` insert avec les arrays commune/quartier
+- Vérif anti-doublon plaque côté serveur (cross-check avec autres opérateurs actifs → warning, pas blocage)
 
 ---
 
-## 🔒 Hors scope (à valider plus tard)
-- Page admin `/admin/forwarders` : vérifier qu'elle gère bien le workflow KYB (pending/approve/reject) — l'edit de statut existe ?
-- Edge function `admin-approve-forwarder` / `admin-reject-forwarder` : pas créées (équivalent opérateur). À ajouter dans une phase suivante.
-- Onboarding email transactionnel transitaire (template + trigger) — Phase 11.
+## 3. Composants partagés (nouveaux)
+
+### `OperatorOwnerSearch.tsx` (sécurisé PII)
+- Input "Prénom ou nom" (placeholder explicite, **pas d'email**)
+- Debounce 300ms, min 2 caractères
+- Query : `profiles.select(id,user_id,first_name,last_name,city,is_kyc_verified,created_at).or(first_name.ilike.%X%,last_name.ilike.%X%)` — **email NON sélectionné**
+- Affichage résultat : `Prénom Nom · ville · "membre depuis MMM YYYY" · badge KYC ✓`
+- Email **jamais affiché**, jamais retourné côté client
+- Toggle explicite "Aucun propriétaire (opérateur géré par Zandofy)" qui désactive le champ
+
+### `OperatorCoveragePicker.tsx` (cascade réelle)
+- Pour chaque "zone de couverture" :
+  - **Pays** : `<CountryCombobox>` (filtré `activeCountryCodes`)
+  - **Province** : `<GeoCombobox>` cascadant (optionnel, label "si applicable")
+  - **Ville** : `<GeoCombobox>` (cities filtrées par province ou par pays)
+  - **Communes desservies** : multi-select avec `Checkbox` listant les communes de la ville (au moins 1)
+  - **Quartiers desservis** : multi-select cascading par commune cochée (vide = "tous les quartiers de la commune")
+- Si la ville n'a pas de communes en DB → message + lien `/admin/zones-geographiques?city=...` (bloque le bouton "Suivant")
+- Bouton "+ Ajouter une zone de couverture" (max 50)
+
+### `OperatorFleetEditor.tsx`
+- Pour chaque véhicule :
+  - Type (select : moto, voiture, tricycle, camionnette, vélo)
+  - **Plaque d'immatriculation** (Input, **obligatoire**, min 4 chars, uppercase auto)
+  - Marque (optionnel), Modèle (optionnel)
+- Bouton "+ Ajouter véhicule"
+- Validation : min **3 véhicules**, plaques uniques dans la liste, sinon toast erreur
+- Compteur live : "Total flotte : 5 véhicules · 3 motos, 2 voitures"
 
 ---
 
-## 📦 Livrable attendu
+## 4. Refonte `CreateOperatorDialog.tsx`
 
-- 2 nouvelles migrations dans `frontend/supabase/migrations/` (relocalisation + fix default status).
-- 1 nouvelle page `ForwarderDashboardPage.tsx` + route.
-- 1 nouveau composant `CreateOperatorDialog.tsx` + intégration dans `AdminOperatorsPage`.
-- Patch `AdminSidebar.tsx`, `Header.tsx`, `MobileAccountMenu.tsx`.
-- Patch ErrorBoundary pour filtrer les chunk-load errors.
-- Validation : checklist en 6 points (migration prod OK, status default pending, /forwarder accessible, admin peut créer opérateur, sidebar complète, liens espace conditionnels).
+Découpage en sections claires (toujours dans le même Dialog scrollable) :
+1. **Propriétaire** → `<OperatorOwnerSearch>` + checkbox orphelin
+2. **Identité** : nom commercial, raison sociale, RCCM, NIF, email contact, téléphone
+3. **Siège social** → `<CascadingAddressFields>` (réutilise l'existant, juste sans `postal_code`)
+4. **Couverture** → `<OperatorCoveragePicker>` (1+ zones)
+5. **Flotte** → `<OperatorFleetEditor>` (≥3 véhicules)
+6. **Paramètres** : livreurs déclarés (min 3), quota max, commission %, switch "Opérateur plateforme"
+
+Validations bloquantes affichées en bas avant le bouton "Créer & activer".
+
+---
+
+## 5. Mise à jour `BecomeOperatorPage.tsx` (cohérence UX publique)
+
+- Étape 2 (couverture) : **remplacer** les Inputs libres par `<OperatorCoveragePicker>` (même composant)
+- Étape 1 (siège) : passer en `<CascadingAddressFields>`
+- Étape 3 (flotte) : `<OperatorFleetEditor>` (min 3 véhicules + plaques)
+- Min livreurs : **3** au lieu de 1
+- Garde-fou "pays non couvert" : check `v_geo_coverage_status` → si pays sans villes en DB, désactive le wizard avec lien contact
+
+→ Garantit qu'un opérateur créé manuellement (admin) et un opérateur auto-inscrit (KYB) ont la **même structure de données** en DB.
+
+---
+
+## 6. Edge function `become-operator-submit` (alignement)
+
+- Mettre à jour le schéma Zod pour accepter le nouveau format `cities[]` et `fleet_vehicles[]`
+- Min 3 véhicules avec plaque, min 3 livreurs
+
+---
+
+## 7. Hooks à compléter
+
+- `useGeoData` : ajouter une variante `useCommunesForCity(cityName, countryCode)` retournant **toutes** les communes (incluant id) pour le multi-select
+- Nouveau hook `useQuartiersForCommunes(communeIds[])` qui fetch en batch les quartiers de plusieurs communes (pour le multi-select cascading)
+
+---
+
+## 8. Garde-fous & sécurité
+
+- RLS sur `profiles` : vérifier que la query "search by name" est bien limitée aux admins (policy existante `profiles_admin_select` doit couvrir, sinon ajout)
+- L'edge function `admin-create-operator` reste protégée par `has_role('admin')`
+- Aucune donnée PII (email/téléphone) du `profiles` cible ne transite vers le client lors de la recherche
+
+---
+
+## 9. Tests post-implémentation
+
+- Créer un opérateur orphelin (sans owner) → OK
+- Créer un opérateur en cherchant "Christian" → résultats sans email visible
+- Tenter avec 2 véhicules → bloqué ("min 3")
+- Tenter avec 2 plaques identiques → bloqué
+- Couverture : choisir Kinshasa sans cocher de commune → bloqué
+- Wizard public : choisir un pays sans villes en DB → bloqué avec lien admin
+
+---
+
+## 📦 Livrables
+
+**Migration** : 1 fichier `frontend/supabase/migrations/202604280000XX_operator_coverage_fleet_v2.sql`
+
+**Nouveaux composants** :
+- `frontend/src/components/admin/operators/OperatorOwnerSearch.tsx`
+- `frontend/src/components/operators/OperatorCoveragePicker.tsx`
+- `frontend/src/components/operators/OperatorFleetEditor.tsx`
+
+**Refactor** :
+- `frontend/src/components/admin/operators/CreateOperatorDialog.tsx`
+- `frontend/src/pages/BecomeOperatorPage.tsx`
+- `frontend/src/hooks/useGeoData.ts` (ajout helpers)
+
+**Edge functions** :
+- `frontend/supabase/functions/admin-create-operator/index.ts`
+- `frontend/supabase/functions/become-operator-submit/index.ts`
+
+**Mémoire** : update `mem://features/multi-operator-delivery-system` avec la nouvelle structure couverture + plaques.

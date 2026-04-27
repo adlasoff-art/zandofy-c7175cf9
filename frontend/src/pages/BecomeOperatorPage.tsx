@@ -1,9 +1,9 @@
 /**
- * BecomeOperatorPage — Lot 11B Phase B2
+ * BecomeOperatorPage — Lot 11B Phase B2 (refonte 10.2)
  *
- * Parcours d'enregistrement KYB pour devenir opérateur de livraison.
- * Wizard 4 étapes : identité → couverture → flotte → quota & récap.
- * Soumission via edge function `become-operator-submit`.
+ * Wizard 4 étapes : identité → siège+couverture → flotte → récap.
+ * Utilise les composants partagés CascadingAddressFields, OperatorCoveragePicker,
+ * OperatorFleetEditor pour rester cohérent avec la création admin.
  */
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
@@ -14,42 +14,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { toast } from "sonner";
-import { z } from "zod";
+import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
 import {
-  Building2, MapPin, Truck, CheckCircle2, ArrowRight, ArrowLeft, Loader2, Plus, X,
+  OperatorCoveragePicker,
+  CoverageZone,
+  validateCoverage,
+} from "@/components/operators/OperatorCoveragePicker";
+import {
+  OperatorFleetEditor,
+  FleetVehicle,
+  validateFleet,
+  MIN_FLEET,
+} from "@/components/operators/OperatorFleetEditor";
+import { toast } from "sonner";
+import {
+  Building2, MapPin, Truck, CheckCircle2, ArrowRight, ArrowLeft, Loader2,
   ShieldCheck, AlertCircle,
 } from "lucide-react";
 
-const VEHICLE_TYPES = [
-  { value: "moto", label: "Moto" },
-  { value: "voiture", label: "Voiture" },
-  { value: "tricycle", label: "Tricycle" },
-  { value: "camionnette", label: "Camionnette" },
-];
+const MIN_RIDERS = 3;
 
-const formSchema = z.object({
-  company_name: z.string().trim().min(2, "Nom obligatoire").max(120),
-  legal_name: z.string().trim().max(160).optional(),
-  registration_number: z.string().trim().max(60).optional(),
-  tax_id: z.string().trim().max(60).optional(),
-  contact_email: z.string().trim().email("Email invalide"),
-  contact_phone: z.string().trim().min(6, "Téléphone obligatoire").max(30),
-  headquarters_country: z.string().min(2),
-  headquarters_city: z.string().trim().min(1, "Ville obligatoire"),
-  headquarters_address: z.string().trim().max(240).optional(),
-  cities: z.array(z.object({
-    country_code: z.string().min(2),
-    city: z.string().trim().min(1),
-  })).min(1, "Au moins une ville de couverture"),
-  vehicle_types: z.array(z.object({
-    type: z.string(),
-    count: z.number().int().min(1).max(50),
-  })).min(1, "Déclarez au moins un véhicule"),
-  declared_riders_count: z.number().int().min(1).max(30),
-});
-
-type FormState = z.infer<typeof formSchema>;
+const initialAddress = {
+  country: "CD",
+  province: "",
+  province_id: "",
+  city: "",
+  commune: "",
+  quartier: "",
+  address: "",
+  postal_code: "",
+};
 
 export default function BecomeOperatorPage() {
   const { user, loading: authLoading } = useAuth();
@@ -60,31 +54,35 @@ export default function BecomeOperatorPage() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const [form, setForm] = useState<FormState>({
-    company_name: "",
-    legal_name: "",
-    registration_number: "",
-    tax_id: "",
-    contact_email: user?.email ?? "",
-    contact_phone: "",
-    headquarters_country: "CD",
-    headquarters_city: "",
-    headquarters_address: "",
-    cities: [{ country_code: "CD", city: "" }],
-    vehicle_types: [{ type: "moto", count: 1 }],
-    declared_riders_count: 1,
-  });
+  // Identité
+  const [companyName, setCompanyName] = useState("");
+  const [legalName, setLegalName] = useState("");
+  const [registrationNumber, setRegistrationNumber] = useState("");
+  const [taxId, setTaxId] = useState("");
+  const [contactEmail, setContactEmail] = useState(user?.email ?? "");
+  const [contactPhone, setContactPhone] = useState("");
+
+  // Siège (cascade géo)
+  const [hq, setHq] = useState({ ...initialAddress });
+
+  // Couverture
+  const [coverage, setCoverage] = useState<CoverageZone[]>([]);
+
+  // Flotte
+  const [fleet, setFleet] = useState<FleetVehicle[]>([]);
+  const [declaredRiders, setDeclaredRiders] = useState(MIN_RIDERS);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth?redirect=/become-operator", { replace: true });
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
-    if (!opLoading && operator) {
-      // User est déjà opérateur → redirige vers dashboard
-      navigate("/operator", { replace: true });
-    }
+    if (!opLoading && operator) navigate("/operator", { replace: true });
   }, [opLoading, operator, navigate]);
+
+  useEffect(() => {
+    if (user?.email && !contactEmail) setContactEmail(user.email);
+  }, [user]);
 
   if (authLoading || opLoading) {
     return (
@@ -94,38 +92,26 @@ export default function BecomeOperatorPage() {
     );
   }
 
-  const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
-    setForm((f) => ({ ...f, [key]: value }));
-
-  const addCity = () =>
-    update("cities", [...form.cities, { country_code: "CD", city: "" }]);
-  const removeCity = (i: number) =>
-    update("cities", form.cities.filter((_, idx) => idx !== i));
-  const updateCity = (i: number, patch: Partial<{ country_code: string; city: string }>) =>
-    update("cities", form.cities.map((c, idx) => idx === i ? { ...c, ...patch } : c));
-
-  const addVehicle = () => {
-    const used = new Set(form.vehicle_types.map((v) => v.type));
-    const next = VEHICLE_TYPES.find((v) => !used.has(v.value));
-    if (next) update("vehicle_types", [...form.vehicle_types, { type: next.value, count: 1 }]);
-  };
-  const removeVehicle = (i: number) =>
-    update("vehicle_types", form.vehicle_types.filter((_, idx) => idx !== i));
-  const updateVehicle = (i: number, patch: Partial<{ type: string; count: number }>) =>
-    update("vehicle_types", form.vehicle_types.map((v, idx) => idx === i ? { ...v, ...patch } : v));
+  const updateHq = (field: keyof typeof initialAddress, value: string) =>
+    setHq((prev) => ({ ...prev, [field]: value }));
 
   const validateStep = (s: number): string | null => {
     if (s === 1) {
-      if (!form.company_name.trim()) return "Nom de l'entreprise obligatoire";
-      if (!form.contact_email.trim() || !form.contact_email.includes("@")) return "Email invalide";
-      if (!form.contact_phone.trim()) return "Téléphone obligatoire";
+      if (!companyName.trim()) return "Nom de l'entreprise obligatoire";
+      if (!contactEmail.trim() || !contactEmail.includes("@")) return "Email invalide";
+      if (!contactPhone.trim() || contactPhone.trim().length < 6) return "Téléphone obligatoire";
     }
     if (s === 2) {
-      if (!form.headquarters_city.trim()) return "Ville du siège obligatoire";
-      if (form.cities.some((c) => !c.city.trim())) return "Toutes les villes doivent être renseignées";
+      if (!hq.country) return "Pays du siège obligatoire";
+      if (!hq.city) return "Ville du siège obligatoire";
+      if (!hq.commune) return "Commune du siège obligatoire";
+      const covErr = validateCoverage(coverage);
+      if (covErr) return covErr;
     }
     if (s === 3) {
-      if (form.vehicle_types.some((v) => v.count < 1)) return "Quantité minimale : 1";
+      const fleetErr = validateFleet(fleet);
+      if (fleetErr) return fleetErr;
+      if (declaredRiders < MIN_RIDERS) return `Minimum ${MIN_RIDERS} livreurs déclarés.`;
     }
     return null;
   };
@@ -137,16 +123,39 @@ export default function BecomeOperatorPage() {
   };
 
   const submit = async () => {
-    const parsed = formSchema.safeParse(form);
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message);
-      return;
+    for (const s of [1, 2, 3]) {
+      const err = validateStep(s);
+      if (err) { setStep(s); toast.error(err); return; }
     }
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("become-operator-submit", {
-        body: parsed.data,
-      });
+      const hqAddressLine = [hq.address, hq.quartier, hq.commune].filter(Boolean).join(", ");
+      const body = {
+        company_name: companyName.trim(),
+        legal_name: legalName.trim() || null,
+        registration_number: registrationNumber.trim() || null,
+        tax_id: taxId.trim() || null,
+        contact_email: contactEmail.trim(),
+        contact_phone: contactPhone.trim(),
+        headquarters_country: hq.country,
+        headquarters_city: hq.city,
+        headquarters_address: hqAddressLine || null,
+        fleet_vehicles: fleet.map((v) => ({
+          type: v.type,
+          plate_number: v.plate_number.trim().toUpperCase(),
+          brand: v.brand?.trim() || undefined,
+          model: v.model?.trim() || undefined,
+        })),
+        declared_riders_count: declaredRiders,
+        cities: coverage.map((z) => ({
+          country_code: z.country_code,
+          city: z.city,
+          province_id: z.province_id,
+          commune_ids: z.commune_ids,
+          quartier_ids: z.quartier_ids,
+        })),
+      };
+      const { data, error } = await supabase.functions.invoke("become-operator-submit", { body });
       if (error) throw new Error(error.message);
       if ((data as any)?.error) throw new Error((data as any).error);
       setSuccess(true);
@@ -167,7 +176,7 @@ export default function BecomeOperatorPage() {
             <h1 className="text-xl font-bold mb-2">Demande envoyée</h1>
             <p className="text-sm text-muted-foreground mb-6">
               Votre dossier KYB a été reçu. L'équipe Zandofy l'examinera sous 48h ouvrées.
-              Vous recevrez un email à <strong>{form.contact_email}</strong> dès validation.
+              Vous recevrez un email à <strong>{contactEmail}</strong> dès validation.
             </p>
             <div className="flex gap-2 justify-center">
               <Button asChild variant="outline"><Link to="/">Retour à l'accueil</Link></Button>
@@ -182,7 +191,6 @@ export default function BecomeOperatorPage() {
   return (
     <div className="min-h-screen bg-background py-8 px-4">
       <div className="max-w-3xl mx-auto">
-        {/* Header */}
         <div className="mb-6 text-center">
           <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full bg-[hsl(var(--operator-primary))]/10 text-[hsl(var(--operator-primary))] text-xs font-medium">
             <ShieldCheck size={12} />
@@ -211,143 +219,74 @@ export default function BecomeOperatorPage() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               {step === 1 && <><Building2 size={18} />Identité de l'entreprise</>}
-              {step === 2 && <><MapPin size={18} />Couverture géographique</>}
-              {step === 3 && <><Truck size={18} />Flotte déclarée</>}
+              {step === 2 && <><MapPin size={18} />Siège et zones de couverture</>}
+              {step === 3 && <><Truck size={18} />Flotte et livreurs</>}
               {step === 4 && <><CheckCircle2 size={18} />Récapitulatif</>}
             </CardTitle>
             <CardDescription>
               {step === 1 && "Informations légales et contact"}
-              {step === 2 && "Adresse du siège et villes desservies"}
-              {step === 3 && "Types et quantité de véhicules"}
+              {step === 2 && "Adresse du siège et zones desservies (cascade géo plateforme)"}
+              {step === 3 && `Minimum ${MIN_FLEET} véhicules avec plaque + ${MIN_RIDERS} livreurs`}
               {step === 4 && "Vérifiez avant soumission"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {step === 1 && (
               <>
-                <div>
-                  <Label htmlFor="company_name">Nom commercial *</Label>
-                  <Input id="company_name" value={form.company_name}
-                    onChange={(e) => update("company_name", e.target.value)}
+                <Field label="Nom commercial *">
+                  <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)}
                     placeholder="Ex: Kinshasa Express Logistics" />
-                </div>
-                <div>
-                  <Label htmlFor="legal_name">Raison sociale</Label>
-                  <Input id="legal_name" value={form.legal_name ?? ""}
-                    onChange={(e) => update("legal_name", e.target.value)}
+                </Field>
+                <Field label="Raison sociale">
+                  <Input value={legalName} onChange={(e) => setLegalName(e.target.value)}
                     placeholder="Ex: KEL SARL" />
-                </div>
+                </Field>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="registration_number">N° RCCM</Label>
-                    <Input id="registration_number" value={form.registration_number ?? ""}
-                      onChange={(e) => update("registration_number", e.target.value)} />
-                  </div>
-                  <div>
-                    <Label htmlFor="tax_id">N° NIF</Label>
-                    <Input id="tax_id" value={form.tax_id ?? ""}
-                      onChange={(e) => update("tax_id", e.target.value)} />
-                  </div>
+                  <Field label="N° RCCM">
+                    <Input value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)} />
+                  </Field>
+                  <Field label="N° NIF">
+                    <Input value={taxId} onChange={(e) => setTaxId(e.target.value)} />
+                  </Field>
                 </div>
-                <div>
-                  <Label htmlFor="contact_email">Email de contact *</Label>
-                  <Input id="contact_email" type="email" value={form.contact_email}
-                    onChange={(e) => update("contact_email", e.target.value)} />
-                </div>
-                <div>
-                  <Label htmlFor="contact_phone">Téléphone *</Label>
-                  <Input id="contact_phone" value={form.contact_phone}
-                    onChange={(e) => update("contact_phone", e.target.value)}
-                    placeholder="+243..." />
-                </div>
+                <Field label="Email de contact *">
+                  <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
+                </Field>
+                <Field label="Téléphone *">
+                  <Input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="+243..." />
+                </Field>
               </>
             )}
 
             {step === 2 && (
               <>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <Label htmlFor="hq_country">Pays siège *</Label>
-                    <Input id="hq_country" value={form.headquarters_country} maxLength={3}
-                      onChange={(e) => update("headquarters_country", e.target.value.toUpperCase())} />
-                  </div>
-                  <div className="col-span-2">
-                    <Label htmlFor="hq_city">Ville siège *</Label>
-                    <Input id="hq_city" value={form.headquarters_city}
-                      onChange={(e) => update("headquarters_city", e.target.value)}
-                      placeholder="Ex: Kinshasa" />
-                  </div>
-                </div>
                 <div>
-                  <Label htmlFor="hq_address">Adresse complète</Label>
-                  <Input id="hq_address" value={form.headquarters_address ?? ""}
-                    onChange={(e) => update("headquarters_address", e.target.value)} />
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <Building2 size={14} /> Siège social
+                  </h3>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Sélectionnez via les listes Pays → Province → Ville → Commune → Quartier.
+                    Seul le numéro/avenue reste libre.
+                  </p>
+                  <CascadingAddressFields data={hq} onChange={updateHq} showPostalCode={false} />
                 </div>
-
                 <div className="pt-3 border-t border-border">
-                  <div className="flex items-center justify-between mb-2">
-                    <Label>Villes desservies *</Label>
-                    <Button type="button" size="sm" variant="outline" onClick={addCity}>
-                      <Plus size={14} /> Ajouter
-                    </Button>
-                  </div>
-                  <div className="space-y-2">
-                    {form.cities.map((c, i) => (
-                      <div key={i} className="flex gap-2 items-center">
-                        <Input value={c.country_code} maxLength={3} className="w-20"
-                          onChange={(e) => updateCity(i, { country_code: e.target.value.toUpperCase() })}
-                          placeholder="Pays" />
-                        <Input value={c.city} className="flex-1"
-                          onChange={(e) => updateCity(i, { city: e.target.value })}
-                          placeholder="Ville" />
-                        {form.cities.length > 1 && (
-                          <Button type="button" size="icon" variant="ghost" onClick={() => removeCity(i)}>
-                            <X size={14} />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <OperatorCoveragePicker value={coverage} onChange={setCoverage} restrictToActiveCountries />
                 </div>
               </>
             )}
 
             {step === 3 && (
               <>
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <Label>Véhicules déclarés *</Label>
-                    <Button type="button" size="sm" variant="outline" onClick={addVehicle}
-                      disabled={form.vehicle_types.length >= VEHICLE_TYPES.length}>
-                      <Plus size={14} /> Ajouter
-                    </Button>
-                  </div>
-                  <div className="space-y-2">
-                    {form.vehicle_types.map((v, i) => (
-                      <div key={i} className="flex gap-2 items-center">
-                        <select value={v.type} className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm"
-                          onChange={(e) => updateVehicle(i, { type: e.target.value })}>
-                          {VEHICLE_TYPES.map((vt) => <option key={vt.value} value={vt.value}>{vt.label}</option>)}
-                        </select>
-                        <Input type="number" min={1} max={50} value={v.count} className="w-24"
-                          onChange={(e) => updateVehicle(i, { count: Math.max(1, parseInt(e.target.value) || 1) })} />
-                        {form.vehicle_types.length > 1 && (
-                          <Button type="button" size="icon" variant="ghost" onClick={() => removeVehicle(i)}>
-                            <X size={14} />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
+                <OperatorFleetEditor value={fleet} onChange={setFleet} />
                 <div className="pt-3 border-t border-border">
-                  <Label htmlFor="declared_riders">Nombre de livreurs prévus *</Label>
-                  <Input id="declared_riders" type="number" min={1} max={30} value={form.declared_riders_count}
-                    onChange={(e) => update("declared_riders_count", Math.max(1, Math.min(30, parseInt(e.target.value) || 1)))} />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Quota initial accordé : 1 livreur. Vous pourrez demander plus après validation (jusqu'à 30).
-                  </p>
+                  <Field label={`Nombre de livreurs prévus * (min ${MIN_RIDERS})`}>
+                    <Input type="number" min={MIN_RIDERS} max={30} value={declaredRiders}
+                      onChange={(e) => setDeclaredRiders(Math.max(MIN_RIDERS, Math.min(30, parseInt(e.target.value) || MIN_RIDERS)))} />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Quota initial accordé après validation. Vous pourrez demander une extension plus tard (jusqu'à 30).
+                    </p>
+                  </Field>
                 </div>
               </>
             )}
@@ -361,12 +300,12 @@ export default function BecomeOperatorPage() {
                     chaque livraison. Ce taux peut être ajusté par Zandofy après validation.
                   </p>
                 </div>
-                <Recap label="Entreprise" value={form.company_name} />
-                <Recap label="Email / Téléphone" value={`${form.contact_email} · ${form.contact_phone}`} />
-                <Recap label="Siège" value={`${form.headquarters_city}, ${form.headquarters_country}`} />
-                <Recap label="Villes desservies" value={form.cities.map((c) => `${c.city} (${c.country_code})`).join(", ")} />
-                <Recap label="Flotte" value={form.vehicle_types.map((v) => `${v.count} ${v.type}`).join(", ")} />
-                <Recap label="Livreurs déclarés" value={String(form.declared_riders_count)} />
+                <Recap label="Entreprise" value={companyName} />
+                <Recap label="Email / Téléphone" value={`${contactEmail} · ${contactPhone}`} />
+                <Recap label="Siège" value={`${hq.address ? hq.address + ", " : ""}${hq.quartier ? hq.quartier + ", " : ""}${hq.commune}, ${hq.city}, ${hq.country}`} />
+                <Recap label="Zones couvertes" value={`${coverage.length} zone(s) · ${coverage.reduce((n, z) => n + z.commune_ids.length, 0)} commune(s)`} />
+                <Recap label="Flotte" value={`${fleet.length} véhicule(s) avec plaques`} />
+                <Recap label="Livreurs déclarés" value={String(declaredRiders)} />
               </div>
             )}
 
@@ -395,11 +334,20 @@ export default function BecomeOperatorPage() {
   );
 }
 
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">{label}</Label>
+      {children}
+    </div>
+  );
+}
+
 function Recap({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between py-1.5 border-b border-border/50 last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-right">{value}</span>
+    <div className="flex justify-between py-1.5 border-b border-border/50 last:border-0 gap-3">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className="font-medium text-right break-words">{value}</span>
     </div>
   );
 }

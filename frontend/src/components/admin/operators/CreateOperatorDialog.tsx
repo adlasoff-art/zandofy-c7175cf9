@@ -9,97 +9,123 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Plus, X, Search } from "lucide-react";
+import { Loader2, Building2, MapPin, Settings2 } from "lucide-react";
+import { OperatorOwnerSearch, OwnerProfile } from "./OperatorOwnerSearch";
+import { OperatorFleetEditor, FleetVehicle, validateFleet, deriveVehicleTypes, MIN_FLEET } from "@/components/operators/OperatorFleetEditor";
+import { OperatorCoveragePicker, CoverageZone, validateCoverage } from "@/components/operators/OperatorCoveragePicker";
 
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
 };
 
-type ProfileMatch = { id: string; user_id: string; first_name: string | null; last_name: string | null; email: string | null };
-type CityRow = { city: string; country_code: string };
-type VehicleRow = { type: string; count: number };
+const MIN_RIDERS = 3;
 
-const VEHICLES = ["moto", "voiture", "tricycle", "camionnette", "velo"] as const;
+const initialAddress = {
+  country: "CD",
+  province: "",
+  province_id: "",
+  city: "",
+  commune: "",
+  quartier: "",
+  address: "",
+  postal_code: "",
+};
 
 export function CreateOperatorDialog({ open, onOpenChange }: Props) {
   const qc = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
 
-  // Owner search
-  const [ownerSearch, setOwnerSearch] = useState("");
-  const [ownerMatches, setOwnerMatches] = useState<ProfileMatch[]>([]);
-  const [ownerSelected, setOwnerSelected] = useState<ProfileMatch | null>(null);
-  const [searching, setSearching] = useState(false);
+  // Owner
+  const [orphan, setOrphan] = useState(false);
+  const [owner, setOwner] = useState<OwnerProfile | null>(null);
 
-  // Form
+  // Identité
   const [companyName, setCompanyName] = useState("");
   const [legalName, setLegalName] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
-  const [hqCountry, setHqCountry] = useState("CD");
-  const [hqCity, setHqCity] = useState("");
-  const [hqAddress, setHqAddress] = useState("");
   const [registrationNumber, setRegistrationNumber] = useState("");
   const [taxId, setTaxId] = useState("");
-  const [declaredRiders, setDeclaredRiders] = useState(5);
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+
+  // Siège (cascade géo réelle)
+  const [hq, setHq] = useState({ ...initialAddress });
+
+  // Couverture multi-zones
+  const [coverage, setCoverage] = useState<CoverageZone[]>([]);
+
+  // Flotte
+  const [fleet, setFleet] = useState<FleetVehicle[]>([]);
+
+  // Paramètres
+  const [declaredRiders, setDeclaredRiders] = useState(MIN_RIDERS);
   const [maxRiders, setMaxRiders] = useState(10);
   const [isPlatformOwned, setIsPlatformOwned] = useState(false);
   const [commissionPct, setCommissionPct] = useState("15");
-  const [vehicles, setVehicles] = useState<VehicleRow[]>([{ type: "moto", count: 5 }]);
-  const [cities, setCities] = useState<CityRow[]>([{ city: "", country_code: "CD" }]);
 
   const reset = () => {
-    setOwnerSearch(""); setOwnerMatches([]); setOwnerSelected(null);
-    setCompanyName(""); setLegalName(""); setContactEmail(""); setContactPhone("");
-    setHqCountry("CD"); setHqCity(""); setHqAddress("");
-    setRegistrationNumber(""); setTaxId("");
-    setDeclaredRiders(5); setMaxRiders(10);
+    setOrphan(false); setOwner(null);
+    setCompanyName(""); setLegalName(""); setRegistrationNumber(""); setTaxId("");
+    setContactEmail(""); setContactPhone("");
+    setHq({ ...initialAddress });
+    setCoverage([]); setFleet([]);
+    setDeclaredRiders(MIN_RIDERS); setMaxRiders(10);
     setIsPlatformOwned(false); setCommissionPct("15");
-    setVehicles([{ type: "moto", count: 5 }]);
-    setCities([{ city: "", country_code: "CD" }]);
   };
 
-  const searchOwner = async () => {
-    if (ownerSearch.trim().length < 2) return;
-    setSearching(true);
-    const term = ownerSearch.trim();
-    const { data } = await (supabase as any)
-      .from("profiles")
-      .select("id, user_id, first_name, last_name, email")
-      .or(`email.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`)
-      .limit(8);
-    setOwnerMatches((data || []) as ProfileMatch[]);
-    setSearching(false);
-  };
+  const updateHq = (field: keyof typeof initialAddress, value: string) =>
+    setHq((prev) => ({ ...prev, [field]: value }));
 
   const submit = useMutation({
     mutationFn: async () => {
-      // validations basiques
-      if (companyName.trim().length < 2) throw new Error("Nom de société requis.");
-      if (!contactEmail.includes("@")) throw new Error("Email invalide.");
+      // Validations
+      if (!orphan && !owner) throw new Error("Sélectionnez un propriétaire ou cochez 'Aucun propriétaire'.");
+      if (companyName.trim().length < 2) throw new Error("Nom commercial requis.");
+      if (!contactEmail.includes("@")) throw new Error("Email de contact invalide.");
       if (contactPhone.trim().length < 6) throw new Error("Téléphone invalide.");
-      if (!hqCity.trim()) throw new Error("Ville du siège requise.");
-      if (vehicles.length === 0) throw new Error("Au moins un type de véhicule requis.");
-      const cleanCities = cities.filter((c) => c.city.trim().length > 0);
-      if (cleanCities.length === 0) throw new Error("Au moins une ville couverte requise.");
+      if (!hq.country) throw new Error("Pays du siège requis.");
+      if (!hq.city) throw new Error("Ville du siège requise.");
+      if (!hq.commune) throw new Error("Commune du siège requise.");
+
+      const covErr = validateCoverage(coverage);
+      if (covErr) throw new Error(covErr);
+
+      const fleetErr = validateFleet(fleet);
+      if (fleetErr) throw new Error(fleetErr);
+
+      if (declaredRiders < MIN_RIDERS) throw new Error(`Minimum ${MIN_RIDERS} livreurs déclarés.`);
+
+      const hqAddressLine = [hq.address, hq.quartier, hq.commune].filter(Boolean).join(", ");
 
       const body: Record<string, unknown> = {
-        owner_user_id: ownerSelected?.user_id ?? null,
+        owner_user_id: orphan ? null : owner?.user_id ?? null,
         company_name: companyName.trim(),
         legal_name: legalName.trim() || null,
         registration_number: registrationNumber.trim() || null,
         tax_id: taxId.trim() || null,
         contact_email: contactEmail.trim(),
         contact_phone: contactPhone.trim(),
-        headquarters_country: hqCountry.trim().toUpperCase(),
-        headquarters_city: hqCity.trim(),
-        headquarters_address: hqAddress.trim() || null,
-        vehicle_types: vehicles,
+        headquarters_country: hq.country,
+        headquarters_city: hq.city,
+        headquarters_address: hqAddressLine || null,
+        fleet_vehicles: fleet.map(v => ({
+          type: v.type,
+          plate_number: v.plate_number.trim().toUpperCase(),
+          brand: v.brand?.trim() || undefined,
+          model: v.model?.trim() || undefined,
+        })),
+        vehicle_types: deriveVehicleTypes(fleet),
         declared_riders_count: declaredRiders,
         max_riders: Math.max(maxRiders, declaredRiders),
-        cities: cleanCities.map((c) => ({ city: c.city.trim(), country_code: c.country_code.trim().toUpperCase() })),
+        cities: coverage.map(z => ({
+          country_code: z.country_code,
+          city: z.city,
+          province_id: z.province_id,
+          commune_ids: z.commune_ids,
+          quartier_ids: z.quartier_ids,
+        })),
         is_platform_owned: isPlatformOwned,
       };
       const pct = parseFloat(commissionPct);
@@ -127,7 +153,7 @@ export function CreateOperatorDialog({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Créer un opérateur de livraison</DialogTitle>
           <DialogDescription>
@@ -136,200 +162,90 @@ export function CreateOperatorDialog({ open, onOpenChange }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-2">
-          {/* Owner */}
-          <div className="space-y-2">
-            <Label>Propriétaire (optionnel)</Label>
-            {ownerSelected ? (
-              <div className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-sm">
-                <div>
-                  <span className="font-medium text-foreground">
-                    {[ownerSelected.first_name, ownerSelected.last_name].filter(Boolean).join(" ") || "—"}
-                  </span>
-                  <span className="text-muted-foreground"> · {ownerSelected.email}</span>
-                </div>
-                <Button size="sm" variant="ghost" onClick={() => setOwnerSelected(null)}>
-                  <X size={14} />
-                </Button>
-              </div>
-            ) : (
-              <>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Email, prénom ou nom…"
-                    value={ownerSearch}
-                    onChange={(e) => setOwnerSearch(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), searchOwner())}
-                  />
-                  <Button type="button" variant="outline" onClick={searchOwner} disabled={searching}>
-                    {searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-                  </Button>
-                </div>
-                {ownerMatches.length > 0 && (
-                  <div className="border border-border rounded-md divide-y divide-border max-h-48 overflow-y-auto">
-                    {ownerMatches.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition"
-                        onClick={() => { setOwnerSelected(p); setOwnerMatches([]); setOwnerSearch(""); }}
-                      >
-                        <div className="text-foreground">
-                          {[p.first_name, p.last_name].filter(Boolean).join(" ") || "(sans nom)"}
-                        </div>
-                        <div className="text-xs text-muted-foreground">{p.email}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Si vide → opérateur orphelin (administré par la plateforme).
-                </p>
-              </>
+        <div className="space-y-6 py-2">
+          {/* 1. Propriétaire */}
+          <Section icon={<Building2 size={14} />} title="1. Propriétaire">
+            <OperatorOwnerSearch value={owner} onChange={setOwner} orphan={orphan} onOrphanChange={setOrphan} />
+            {owner && (
+              <Badge variant="secondary" className="text-xs mt-1">
+                Le rôle <code className="mx-1">operator</code> sera attribué à {[owner.first_name, owner.last_name].filter(Boolean).join(" ") || "cet utilisateur"}.
+              </Badge>
             )}
-          </div>
+          </Section>
 
-          {/* Identity */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Nom commercial *</Label>
-              <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+          {/* 2. Identité */}
+          <Section icon={<Building2 size={14} />} title="2. Identité de l'entreprise">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Field label="Nom commercial *">
+                <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+              </Field>
+              <Field label="Raison sociale">
+                <Input value={legalName} onChange={(e) => setLegalName(e.target.value)} />
+              </Field>
+              <Field label="RCCM / Registre">
+                <Input value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)} />
+              </Field>
+              <Field label="N° Fiscal">
+                <Input value={taxId} onChange={(e) => setTaxId(e.target.value)} />
+              </Field>
+              <Field label="Email contact *">
+                <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
+              </Field>
+              <Field label="Téléphone *">
+                <Input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
+              </Field>
             </div>
-            <div className="space-y-1.5">
-              <Label>Raison sociale</Label>
-              <Input value={legalName} onChange={(e) => setLegalName(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>RCCM / Registre</Label>
-              <Input value={registrationNumber} onChange={(e) => setRegistrationNumber(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>N° Fiscal</Label>
-              <Input value={taxId} onChange={(e) => setTaxId(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Email contact *</Label>
-              <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Téléphone *</Label>
-              <Input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
-            </div>
-          </div>
+          </Section>
 
-          {/* HQ */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label>Pays (ISO 2) *</Label>
-              <Input maxLength={2} value={hqCountry} onChange={(e) => setHqCountry(e.target.value.toUpperCase())} />
-            </div>
-            <div className="space-y-1.5 md:col-span-2">
-              <Label>Ville du siège *</Label>
-              <Input value={hqCity} onChange={(e) => setHqCity(e.target.value)} />
-            </div>
-            <div className="space-y-1.5 md:col-span-3">
-              <Label>Adresse</Label>
-              <Input value={hqAddress} onChange={(e) => setHqAddress(e.target.value)} />
-            </div>
-          </div>
+          {/* 3. Siège (cascade) */}
+          <Section icon={<MapPin size={14} />} title="3. Siège social">
+            <p className="text-xs text-muted-foreground mb-2">
+              Sélectionnez via les listes Pays → Province → Ville → Commune → Quartier. Seul le numéro/avenue reste libre.
+            </p>
+            <CascadingAddressFields data={hq} onChange={updateHq} showPostalCode={false} />
+          </Section>
 
-          {/* Riders / commission */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label>Livreurs déclarés</Label>
-              <Input type="number" min={1} max={50} value={declaredRiders}
-                onChange={(e) => setDeclaredRiders(parseInt(e.target.value) || 1)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Quota max</Label>
-              <Input type="number" min={1} max={100} value={maxRiders}
-                onChange={(e) => setMaxRiders(parseInt(e.target.value) || 1)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Commission plateforme (%)</Label>
-              <Input type="number" min={0} max={100} step="0.5" value={commissionPct}
-                onChange={(e) => setCommissionPct(e.target.value)} />
-            </div>
-          </div>
+          {/* 4. Couverture */}
+          <Section icon={<MapPin size={14} />} title="4. Zones de couverture">
+            <OperatorCoveragePicker value={coverage} onChange={setCoverage} restrictToActiveCountries />
+          </Section>
 
-          <div className="flex items-center justify-between rounded-md border border-border p-3">
-            <div>
-              <Label className="cursor-pointer">Opérateur plateforme</Label>
-              <p className="text-xs text-muted-foreground">Coché si géré directement par Zandofy.</p>
-            </div>
-            <Switch checked={isPlatformOwned} onCheckedChange={setIsPlatformOwned} />
-          </div>
+          {/* 5. Flotte */}
+          <Section icon={<Settings2 size={14} />} title="5. Flotte">
+            <OperatorFleetEditor value={fleet} onChange={setFleet} />
+          </Section>
 
-          {/* Vehicles */}
-          <div className="space-y-2">
-            <Label>Flotte déclarée *</Label>
-            <div className="space-y-2">
-              {vehicles.map((v, i) => (
-                <div key={i} className="flex gap-2">
-                  <select
-                    className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={v.type}
-                    onChange={(e) => setVehicles((prev) => prev.map((p, idx) => idx === i ? { ...p, type: e.target.value } : p))}
-                  >
-                    {VEHICLES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <Input
-                    type="number" min={1} max={50} value={v.count}
-                    onChange={(e) => setVehicles((prev) => prev.map((p, idx) => idx === i ? { ...p, count: parseInt(e.target.value) || 1 } : p))}
-                  />
-                  {vehicles.length > 1 && (
-                    <Button size="icon" variant="ghost" onClick={() => setVehicles((prev) => prev.filter((_, idx) => idx !== i))}>
-                      <X size={14} />
-                    </Button>
-                  )}
-                </div>
-              ))}
-              {vehicles.length < 6 && (
-                <Button size="sm" variant="outline" onClick={() => setVehicles((p) => [...p, { type: "moto", count: 1 }])}>
-                  <Plus size={14} /> Ajouter
-                </Button>
-              )}
+          {/* 6. Paramètres */}
+          <Section icon={<Settings2 size={14} />} title="6. Paramètres">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Field label={`Livreurs déclarés (min ${MIN_RIDERS})`}>
+                <Input
+                  type="number" min={MIN_RIDERS} max={50} value={declaredRiders}
+                  onChange={(e) => setDeclaredRiders(Math.max(MIN_RIDERS, parseInt(e.target.value) || MIN_RIDERS))}
+                />
+              </Field>
+              <Field label="Quota max">
+                <Input
+                  type="number" min={MIN_RIDERS} max={100} value={maxRiders}
+                  onChange={(e) => setMaxRiders(parseInt(e.target.value) || MIN_RIDERS)}
+                />
+              </Field>
+              <Field label="Commission plateforme (%)">
+                <Input
+                  type="number" min={0} max={100} step="0.5" value={commissionPct}
+                  onChange={(e) => setCommissionPct(e.target.value)}
+                />
+              </Field>
             </div>
-          </div>
 
-          {/* Cities */}
-          <div className="space-y-2">
-            <Label>Villes couvertes *</Label>
-            <div className="space-y-2">
-              {cities.map((c, i) => (
-                <div key={i} className="flex gap-2">
-                  <Input
-                    placeholder="Ville"
-                    value={c.city}
-                    onChange={(e) => setCities((prev) => prev.map((p, idx) => idx === i ? { ...p, city: e.target.value } : p))}
-                  />
-                  <Input
-                    className="w-20"
-                    maxLength={2}
-                    placeholder="ISO"
-                    value={c.country_code}
-                    onChange={(e) => setCities((prev) => prev.map((p, idx) => idx === i ? { ...p, country_code: e.target.value.toUpperCase() } : p))}
-                  />
-                  {cities.length > 1 && (
-                    <Button size="icon" variant="ghost" onClick={() => setCities((prev) => prev.filter((_, idx) => idx !== i))}>
-                      <X size={14} />
-                    </Button>
-                  )}
-                </div>
-              ))}
-              {cities.length < 50 && (
-                <Button size="sm" variant="outline" onClick={() => setCities((p) => [...p, { city: "", country_code: "CD" }])}>
-                  <Plus size={14} /> Ajouter
-                </Button>
-              )}
+            <div className="flex items-center justify-between rounded-md border border-border p-3 mt-3">
+              <div>
+                <Label className="cursor-pointer">Opérateur plateforme</Label>
+                <p className="text-xs text-muted-foreground">Coché si géré directement par Zandofy.</p>
+              </div>
+              <Switch checked={isPlatformOwned} onCheckedChange={setIsPlatformOwned} />
             </div>
-          </div>
-
-          {ownerSelected && (
-            <Badge variant="secondary" className="text-xs">
-              Le rôle <code>operator</code> sera attribué à {ownerSelected.email}
-            </Badge>
-          )}
+          </Section>
         </div>
 
         <DialogFooter>
@@ -341,5 +257,25 @@ export function CreateOperatorDialog({ open, onOpenChange }: Props) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 pb-1 border-b border-border">
+        {icon} {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">{label}</Label>
+      {children}
+    </div>
   );
 }
