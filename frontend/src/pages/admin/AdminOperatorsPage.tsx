@@ -13,7 +13,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, XCircle, PauseCircle, PlayCircle, Building2, Truck, MapPin, Users, Plus } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, PauseCircle, PlayCircle, Building2, Truck, MapPin, Users, Plus, Archive } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ShieldAlert, Clock } from "lucide-react";
 import { CreateOperatorDialog } from "@/components/admin/operators/CreateOperatorDialog";
@@ -40,6 +40,7 @@ type OperatorRow = {
   rejection_reason: string | null;
   created_at: string;
   approved_at: string | null;
+  archived_at: string | null;
 };
 
 const STATUS_VARIANT: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -55,6 +56,8 @@ export default function AdminOperatorsPage() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<OperatorRow | null>(null);
   const [actionType, setActionType] = useState<"approve" | "reject" | "suspend" | "reactivate" | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<OperatorRow | null>(null);
+  const [archiveReason, setArchiveReason] = useState("");
   const [reason, setReason] = useState("");
   const [commissionPct, setCommissionPct] = useState<string>("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -63,7 +66,12 @@ export default function AdminOperatorsPage() {
     queryKey: ["admin-operators", tab],
     queryFn: async () => {
       let q = (supabase as any).from("delivery_operators").select("*").order("created_at", { ascending: false });
-      if (tab !== "all") q = q.eq("status", tab);
+      if (tab === "archived") {
+        q = q.not("archived_at", "is", null);
+      } else {
+        q = q.is("archived_at", null);
+        if (tab !== "all") q = q.eq("status", tab);
+      }
       const { data, error } = await q;
       if (error) throw error;
       return (data || []) as OperatorRow[];
@@ -130,6 +138,44 @@ export default function AdminOperatorsPage() {
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
+  const archiveMutation = useMutation({
+    mutationFn: async () => {
+      if (!archiveTarget) throw new Error("No target");
+      const { error } = await (supabase as any)
+        .from("delivery_operators")
+        .update({
+          archived_at: new Date().toISOString(),
+          archive_reason: archiveReason.trim() || null,
+        })
+        .eq("id", archiveTarget.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Opérateur archivé" });
+      qc.invalidateQueries({ queryKey: ["admin-operators"] });
+      setArchiveTarget(null);
+      setArchiveReason("");
+      setSelected(null);
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  const restoreArchive = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any)
+        .from("delivery_operators")
+        .update({ archived_at: null, archive_reason: null })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Opérateur restauré" });
+      qc.invalidateQueries({ queryKey: ["admin-operators"] });
+      setSelected(null);
+    },
+    onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
   const counts = (operators || []).reduce<Record<string, number>>((acc, o) => {
     acc[o.status] = (acc[o.status] || 0) + 1;
     return acc;
@@ -171,6 +217,7 @@ export default function AdminOperatorsPage() {
             <TabsTrigger value="approved">Approuvés</TabsTrigger>
             <TabsTrigger value="suspended">Suspendus</TabsTrigger>
             <TabsTrigger value="rejected">Refusés</TabsTrigger>
+            <TabsTrigger value="archived">Archivés</TabsTrigger>
             <TabsTrigger value="all">Tous</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -279,6 +326,17 @@ export default function AdminOperatorsPage() {
                     <PlayCircle size={16} className="mr-1" /> Réactiver
                   </Button>
                 )}
+                {!selected.archived_at && (
+                  <Button variant="outline" onClick={() => { setArchiveTarget(selected); }}>
+                    <Archive size={16} className="mr-1" /> Archiver
+                  </Button>
+                )}
+                {selected.archived_at && (
+                  <Button variant="default" onClick={() => restoreArchive.mutate(selected.id)} disabled={restoreArchive.isPending}>
+                    {restoreArchive.isPending && <Loader2 size={16} className="animate-spin mr-1" />}
+                    Restaurer
+                  </Button>
+                )}
               </DialogFooter>
             </>
           )}
@@ -324,6 +382,29 @@ export default function AdminOperatorsPage() {
         </DialogContent>
       </Dialog>
       <CreateOperatorDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      {/* Archive confirmation */}
+      <Dialog open={!!archiveTarget} onOpenChange={(o) => { if (!o) { setArchiveTarget(null); setArchiveReason(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Archiver {archiveTarget?.company_name}</DialogTitle>
+            <DialogDescription>
+              L'opérateur ne sera plus proposé au checkout ni visible dans les listes actives. L'historique des commandes est conservé. Vous pourrez le restaurer depuis l'onglet "Archivés".
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Motif d'archivage (optionnel)</Label>
+            <Textarea value={archiveReason} onChange={(e) => setArchiveReason(e.target.value)} rows={3} placeholder="Doublon, cessation d'activité, etc." />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setArchiveTarget(null); setArchiveReason(""); }}>Annuler</Button>
+            <Button variant="destructive" onClick={() => archiveMutation.mutate()} disabled={archiveMutation.isPending}>
+              {archiveMutation.isPending && <Loader2 size={16} className="animate-spin mr-1" />}
+              Archiver
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }
