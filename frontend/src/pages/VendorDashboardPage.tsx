@@ -27,6 +27,7 @@ import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
 import { VendorPricingTab } from "@/components/vendor/VendorPricingTab";
 import { VendorAutonomousTab } from "@/components/vendor/VendorAutonomousTab";
 import { VendorFreightSimulator } from "@/components/vendor/VendorFreightSimulator";
+import VendorOriginCountriesCard from "@/components/vendor/VendorOriginCountriesCard";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
