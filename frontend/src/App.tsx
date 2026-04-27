@@ -132,6 +132,7 @@ const AdminVariantTypesPage = lazyRetry(() => import("./pages/admin/AdminVariant
 const AdminAnalyticsPage = lazyRetry(() => import("./pages/admin/AdminAnalyticsPage"));
 const AdminEmailTemplatesPage = lazyRetry(() => import("./pages/admin/AdminEmailTemplatesPage"));
 const AdminKycPage = lazyRetry(() => import("./pages/admin/AdminKycPage"));
+const AdminKybKycV2Page = lazyRetry(() => import("./pages/admin/AdminKybKycV2Page"));
 const AdminFeaturedPlacementsPage = lazyRetry(() => import("./pages/admin/AdminFeaturedPlacementsPage"));
 const AdminVendorAccountingPage = lazyRetry(() => import("./pages/admin/AdminVendorAccountingPage"));
 const AdminFlashSalesPage = lazyRetry(() => import("./pages/admin/AdminFlashSalesPage"));
@@ -318,6 +319,7 @@ const App = () => (
                 <Route path="/admin/analytics" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminAnalyticsPage /></RoleGuard>} />
                 <Route path="/admin/email-templates" element={<RoleGuard allowedRoles={["admin"]}><AdminEmailTemplatesPage /></RoleGuard>} />
                 <Route path="/admin/kyc" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminKycPage /></RoleGuard>} />
+                <Route path="/admin/kyb-kyc-v2" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminKybKycV2Page /></RoleGuard>} />
                 <Route path="/admin/featured-placements" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminFeaturedPlacementsPage /></RoleGuard>} />
                 <Route path="/admin/vendor-accounting" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminVendorAccountingPage /></RoleGuard>} />
                 <Route path="/admin/flash-sales" element={<RoleGuard allowedRoles={["admin"]}><AdminFlashSalesPage /></RoleGuard>} />
