@@ -6,8 +6,15 @@ type: feature
 Architecture multi-opérateurs (entreprises tierces) pour le last-mile.
 
 **Tables clés** : `delivery_operators`, `delivery_operator_cities`, `delivery_operator_rates`, `delivery_operator_riders`, `operator_assignment_history` (B7).
-**Vues** : `v_active_operators_by_city`.
+**Vues** : `v_active_operators_by_city`, `v_geo_coverage_status` (10.2).
 **orders** : `delivery_operator_id`, `operator_acceptance_status` (pending/accepted/declined/expired/not_applicable), `operator_assigned_at`, `operator_response_deadline` (30 min), `operator_responded_at`, `operator_decline_reason`, `operator_reassignment_count`.
+
+**Phase 10.2 — Couverture & flotte enrichies** :
+- `delivery_operator_cities` : `province_id`, `commune_ids[]`, `quartier_ids[]` (granularité tarification).
+- `delivery_operators.fleet_vehicles jsonb` `[{type, plate_number, brand?, model?}]` validé par trigger `validate_fleet_vehicles` (plaques uniques + non vides).
+- Min **3 véhicules** + min **3 livreurs** (admin & KYB public).
+- Composants partagés : `OperatorOwnerSearch` (PII-safe, search par prénom/nom uniquement), `OperatorCoveragePicker` (cascade Pays→Province→Ville→Communes→Quartiers), `OperatorFleetEditor` (avec plaques).
+- `CreateOperatorDialog` (admin) + `BecomeOperatorPage` (public) utilisent les mêmes composants → structure DB identique.
 
 **Edge Functions** :
 - `become-operator-submit`, `operator-invite-rider`, `operator-assign-rider-to-order`, `operator-request-quota-increase`
