@@ -8402,6 +8402,66 @@ export type Database = {
         }
         Relationships: []
       }
+      vendor_analytics_email_schedules: {
+        Row: {
+          created_at: string
+          day_of_month: number | null
+          day_of_week: number | null
+          enabled: boolean
+          format: string
+          frequency: string
+          id: string
+          last_sent_at: string | null
+          next_run_at: string | null
+          recipient_email: string
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          enabled?: boolean
+          format: string
+          frequency: string
+          id?: string
+          last_sent_at?: string | null
+          next_run_at?: string | null
+          recipient_email: string
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          enabled?: boolean
+          format?: string
+          frequency?: string
+          id?: string
+          last_sent_at?: string | null
+          next_run_at?: string | null
+          recipient_email?: string
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_analytics_email_schedules_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_analytics_email_schedules_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_applications: {
         Row: {
           admin_notes: string | null
@@ -10333,6 +10393,87 @@ export type Database = {
           min_order_amount: number
           target_city: string
           target_country: string
+        }[]
+      }
+      vendor_analytics_cohorts: {
+        Args: { p_months_back?: number; p_store_id: string }
+        Returns: {
+          cohort_month: string
+          customers: number
+          ltv: number
+          retention_d30_pct: number
+          retention_d60_pct: number
+          retention_d90_pct: number
+        }[]
+      }
+      vendor_analytics_funnel: {
+        Args: { p_end: string; p_start: string; p_store_id: string }
+        Returns: Json
+      }
+      vendor_analytics_kpis: {
+        Args: {
+          p_category_id?: string
+          p_city?: string
+          p_end: string
+          p_payment_method?: string
+          p_start: string
+          p_store_id: string
+        }
+        Returns: Json
+      }
+      vendor_analytics_orders_export: {
+        Args: {
+          p_category_id?: string
+          p_city?: string
+          p_end: string
+          p_payment_method?: string
+          p_start: string
+          p_store_id: string
+        }
+        Returns: {
+          city: string
+          created_at: string
+          customer_name: string
+          items_count: number
+          order_ref: string
+          payment_method: string
+          shipping_cost: number
+          status: string
+          subtotal: number
+          total: number
+        }[]
+      }
+      vendor_analytics_timeseries: {
+        Args: {
+          p_category_id?: string
+          p_city?: string
+          p_end: string
+          p_payment_method?: string
+          p_start: string
+          p_store_id: string
+        }
+        Returns: {
+          day: string
+          margin: number
+          orders: number
+          revenue: number
+        }[]
+      }
+      vendor_analytics_top_products: {
+        Args: {
+          p_end: string
+          p_limit?: number
+          p_start: string
+          p_store_id: string
+        }
+        Returns: {
+          current_stock: number
+          is_low_stock: boolean
+          margin: number
+          product_id: string
+          product_name: string
+          revenue: number
+          units_sold: number
         }[]
       }
       verify_order_pickup_code: {
