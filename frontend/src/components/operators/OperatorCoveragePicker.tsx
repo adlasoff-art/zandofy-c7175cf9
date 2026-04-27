@@ -313,7 +313,7 @@ function CoverageBlocked({ title, message }: { title: string; message: string })
           <p className="font-medium text-amber-900 dark:text-amber-200">{title}</p>
           <p className="text-xs text-amber-800/80 dark:text-amber-200/80 mt-0.5">{message}</p>
           <Link
-            to="/admin/geographic-zones"
+            to="/admin/geography"
             className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-amber-900 dark:text-amber-200 underline"
           >
             Gérer les zones géographiques <ExternalLink size={11} />
