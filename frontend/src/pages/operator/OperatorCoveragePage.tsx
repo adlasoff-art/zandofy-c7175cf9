@@ -9,8 +9,7 @@ import { useOperatorContext } from "@/hooks/use-operator-context";
 import { fromTable } from "@/lib/supabase-helpers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { GeoFieldsRow } from "@/components/address/GeoFieldsRow";
 import { toast } from "sonner";
 import { MapPin, Plus, Loader2, Trash2 } from "lucide-react";
 
@@ -75,21 +74,20 @@ export default function OperatorCoveragePage() {
 
       <Card>
         <CardContent className="pt-4">
-          <div className="grid grid-cols-12 gap-2 items-end">
-            <div className="col-span-3">
-              <Label htmlFor="cc">Pays</Label>
-              <Input id="cc" value={country} maxLength={3}
-                onChange={(e) => setCountry(e.target.value.toUpperCase())} placeholder="CD" />
-            </div>
-            <div className="col-span-7">
-              <Label htmlFor="ci">Ville</Label>
-              <Input id="ci" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Lubumbashi" />
-            </div>
-            <div className="col-span-2">
-              <Button onClick={addCity} disabled={adding || !city.trim()} className="w-full">
-                {adding ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
-              </Button>
-            </div>
+          <div className="space-y-3">
+            <GeoFieldsRow
+              value={{ country, city }}
+              onChange={(patch) => {
+                if (patch.country !== undefined) { setCountry(patch.country); setCity(""); }
+                if (patch.city !== undefined) setCity(patch.city);
+              }}
+              levels={["country", "city"]}
+              required={["country", "city"]}
+            />
+            <Button onClick={addCity} disabled={adding || !city.trim() || !country} className="gap-1">
+              {adding ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
+              Ajouter la ville
+            </Button>
           </div>
         </CardContent>
       </Card>
