@@ -139,7 +139,7 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
 
   const [newOpen, setNewOpen] = useState(false);
   const [draft, setDraft] = useState<Partial<Profile>>({
-    mode: "sea",
+    mode: "air",
     service_class: "standard",
     country_code: "CD",
     city_id: null,
@@ -344,6 +344,34 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 px-1">
+                          <div className="col-span-2">
+                            <GeoFieldsRow
+                              value={{
+                                country: p.country_code ?? "",
+                                city: p.city_id
+                                  ? (cities.find(c => c.id === p.city_id)?.name ?? "")
+                                  : "",
+                              }}
+                              onChange={(patch) => {
+                                const next: Partial<Profile> = {};
+                                const nextCountry = patch.country ?? p.country_code;
+                                if (patch.country !== undefined) {
+                                  next.country_code = patch.country;
+                                  next.city_id = null;
+                                }
+                                if (patch.city !== undefined) {
+                                  const match = cities.find(
+                                    c => c.name === patch.city && c.country_code === nextCountry,
+                                  );
+                                  next.city_id = patch.city ? (match?.id ?? null) : null;
+                                }
+                                update.mutate({ id: p.id!, patch: next });
+                              }}
+                              levels={["country", "city"]}
+                              required={["city"]}
+                              labels={{ city: "Ville exacte checkout" }}
+                            />
+                          </div>
                           <div>
                             <Label className="text-xs">Classe de service</Label>
                             <select
