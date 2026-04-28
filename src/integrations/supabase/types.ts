@@ -7893,8 +7893,11 @@ export type Database = {
           chat_media_enabled: boolean | null
           chat_phone_allowed: boolean
           city: string | null
+          city_id: string | null
           collaborators_enabled: boolean
+          commune_id: string | null
           country: string | null
+          country_code: string | null
           created_at: string
           default_transit_days_max: number | null
           default_transit_days_min: number | null
@@ -7925,6 +7928,7 @@ export type Database = {
           pending_name: string | null
           presence_visible: boolean
           products_count: number | null
+          province_id: string | null
           rating: number | null
           repurchase_rate: string | null
           response_rate: string | null
@@ -7956,8 +7960,11 @@ export type Database = {
           chat_media_enabled?: boolean | null
           chat_phone_allowed?: boolean
           city?: string | null
+          city_id?: string | null
           collaborators_enabled?: boolean
+          commune_id?: string | null
           country?: string | null
+          country_code?: string | null
           created_at?: string
           default_transit_days_max?: number | null
           default_transit_days_min?: number | null
@@ -7988,6 +7995,7 @@ export type Database = {
           pending_name?: string | null
           presence_visible?: boolean
           products_count?: number | null
+          province_id?: string | null
           rating?: number | null
           repurchase_rate?: string | null
           response_rate?: string | null
@@ -8019,8 +8027,11 @@ export type Database = {
           chat_media_enabled?: boolean | null
           chat_phone_allowed?: boolean
           city?: string | null
+          city_id?: string | null
           collaborators_enabled?: boolean
+          commune_id?: string | null
           country?: string | null
+          country_code?: string | null
           created_at?: string
           default_transit_days_max?: number | null
           default_transit_days_min?: number | null
@@ -8051,6 +8062,7 @@ export type Database = {
           pending_name?: string | null
           presence_visible?: boolean
           products_count?: number | null
+          province_id?: string | null
           rating?: number | null
           repurchase_rate?: string | null
           response_rate?: string | null
@@ -8071,7 +8083,29 @@ export type Database = {
           verified_years_override?: number | null
           whatsapp_number?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "stores_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stores_commune_id_fkey"
+            columns: ["commune_id"]
+            isOneToOne: false
+            referencedRelation: "communes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stores_province_id_fkey"
+            columns: ["province_id"]
+            isOneToOne: false
+            referencedRelation: "provinces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscription_payments: {
         Row: {
