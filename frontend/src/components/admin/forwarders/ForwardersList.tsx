@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Plus, Pencil, MapPin, DollarSign, Trash2, Truck } from "lucide-react";
+import { Loader2, Plus, Pencil, MapPin, DollarSign, Trash2, Truck, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { ForwarderFormDialog, type Forwarder } from "./ForwarderFormDialog";
 import { ForwarderCoverageDialog } from "./ForwarderCoverageDialog";
@@ -51,6 +51,28 @@ export function ForwardersList() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-forwarders"] }),
+    onError: (e: any) => toast.error(e.message ?? "Erreur"),
+  });
+
+  // Bouton « Approuver et activer » — un clic pour débloquer un transitaire
+  // bloqué en status='pending' (auto-inscriptions futures, ou anciens créés
+  // avant le trigger d'auto-approbation).
+  const approve = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await sb
+        .from("forwarders")
+        .update({
+          status: "approved",
+          is_active: true,
+          approved_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Transitaire approuvé et activé");
+      qc.invalidateQueries({ queryKey: ["admin-forwarders"] });
+    },
     onError: (e: any) => toast.error(e.message ?? "Erreur"),
   });
 
@@ -102,6 +124,14 @@ export function ForwardersList() {
                       <p className="text-sm font-medium truncate">{f.name}</p>
                       <Badge variant="outline" className="text-[10px]">{f.slug}</Badge>
                       {!f.is_active && <Badge variant="secondary" className="text-[10px]">Inactif</Badge>}
+                      {(f as any).status === "pending" && (
+                        <Badge className="text-[10px] bg-amber-500/15 text-amber-700 border-amber-300 hover:bg-amber-500/20 dark:text-amber-400 dark:border-amber-700">
+                          En attente
+                        </Badge>
+                      )}
+                      {(f as any).status === "suspended" && (
+                        <Badge variant="destructive" className="text-[10px]">Suspendu</Badge>
+                      )}
                     </div>
                     {f.description && (
                       <p className="text-xs text-muted-foreground truncate mt-0.5">{f.description}</p>
@@ -110,6 +140,19 @@ export function ForwardersList() {
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0">
+                  {(f as any).status === "pending" && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="h-7 px-2 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"
+                      title="Approuver et activer immédiatement"
+                      onClick={() => f.id && approve.mutate(f.id)}
+                      disabled={approve.isPending}
+                    >
+                      <CheckCircle2 size={12} className="mr-1" />
+                      Approuver
+                    </Button>
+                  )}
                   <Switch
                     checked={!!f.is_active}
                     onCheckedChange={(v) => toggle.mutate({ id: f.id!, is_active: v })}
