@@ -435,7 +435,7 @@ export async function groupCartByOriginAndStore(
   const { data: products } = await (supabase as any)
     .from("products")
     .select(
-      "id, store_id, origin_country, weight_grams, length_cm, width_cm, height_cm, can_ship_air, can_ship_sea, store:stores(id, name, country)",
+      "id, store_id, origin_country, weight_grams, length_cm, width_cm, height_cm, can_ship_air, can_ship_sea, store:stores(id, name, country, country_code)",
     )
     .in("id", productIds);
 
@@ -449,7 +449,7 @@ export async function groupCartByOriginAndStore(
     height_cm: number | null;
     can_ship_air: boolean | null;
     can_ship_sea: boolean | null;
-    store: { id: string; name: string | null; country: string | null } | null;
+    store: { id: string; name: string | null; country: string | null; country_code: string | null } | null;
   };
   const rows = (products ?? []) as Row[];
   const byId = new Map(rows.map((r) => [r.id, r]));
@@ -459,7 +459,18 @@ export async function groupCartByOriginAndStore(
     const p = byId.get(ci.productId);
     if (!p) continue;
     const storeId = p.store_id ?? "default";
-    const originISO = ((p.origin_country ?? p.store?.country ?? "") || "").toUpperCase().trim();
+    // Priorité : produit.origin_country (ISO) > store.country_code (ISO structuré)
+    // > store.country (legacy texte, peut être un nom complet → on le rejette si > 2 chars)
+    const rawOrigin = (p.origin_country ?? p.store?.country_code ?? p.store?.country ?? "")
+      .toString()
+      .toUpperCase()
+      .trim();
+    // Garde-fou : un code ISO-2 valide doit faire exactement 2 caractères alpha.
+    // Sinon le matching forwarder échouera silencieusement (ex: "CHINE" vs "CN").
+    const originISO = /^[A-Z]{2}$/.test(rawOrigin) ? rawOrigin : "";
+    if (!originISO && rawOrigin) {
+      console.warn("[freightQuoteCheckout] origine non-ISO ignorée:", rawOrigin, "produit:", p.id);
+    }
     const groupKey = `${storeId}|${originISO || "UNKNOWN"}`;
 
     const wKg = ((p.weight_grams ?? 500) * ci.quantity) / 1000;
