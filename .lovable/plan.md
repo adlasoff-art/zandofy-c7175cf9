@@ -1,83 +1,123 @@
-Constat après lecture du code
 
-Le blocage ne vient plus du poids/CBM. Le message `DEBUG ADMIN — 0 offre retournée` indique que l’offre est rejetée avant le calcul du prix, pendant le filtrage d’éligibilité.
+# Plan : correction tarification, activation transitaires, et UX maritime
 
-Aujourd’hui le checkout exige simultanément :
+## Contexte
 
+Trois problèmes à corriger :
+1. **Tarification incorrecte** : 0,54 kg facturé 35,80 USD au lieu de 17,90 USD (le moteur double ou applique mal le forfait).
+2. **Transitaires invisibles** : 7 transitaires sur 8 bloqués en `pending` malgré leur création par l'admin.
+3. **Maritime mal géré** : visible sans contrôle clair du seuil minimum.
+
+## Règle de tarification (validée)
+
+**Cas A — Poids agrégé < 1 kg**
+→ Forfait fixe = prix du palier 1 kg (ex: 17,90 USD)
+- 250 g, 750 g, 999 g → tous facturés 17,90 USD
+
+**Cas B — Poids agrégé ≥ 1 kg**
+→ Facturé : `(poids_réel + 0,1) × prix_par_kg`
+- 1,2 kg → 1,3 × 17,90 = **23,27 USD**
+- 1,5 kg → 1,6 × 17,90 = **28,64 USD**
+- 2,0 kg → 2,1 × 17,90 = **37,59 USD**
+
+Le buffer de 100 g est une **marge de sécurité interne** (variations balance, emballage). Le client ne voit que le total final, jamais le buffer.
+
+**Agrégation** : le poids est sommé sur tous les articles du même groupe (même origine + même mode + même transitaire) AVANT d'appliquer la règle. Quatre articles de 250 g = 1,0 kg total → Cas B → (1,0 + 0,1) × 17,90 = 19,69 USD.
+
+## Changements
+
+### 1. Moteur de tarification
+
+**Fichiers** : `frontend/src/services/freightQuote.ts`, `frontend/src/services/freightQuoteCheckout.ts`
+
+- Remplacer la logique actuelle (qui itère par article et arrondit chaque sous-paquet) par une agrégation en deux passes :
+  1. Sommer `total_kg` et `total_cbm` de tous les articles du groupe.
+  2. Appliquer la règle Cas A / Cas B une seule fois sur le total.
+- Supprimer tout `Math.ceil` au niveau de l'article individuel.
+- Le prix unitaire `prix_par_kg` est lu depuis le palier 1 kg du transitaire (premier tier `kg_tiers`).
+- Pour les paliers > 1 kg configurés (ex: 5–10 kg avec un prix dégressif), appliquer le tier correspondant au poids réel + 0,1, pas au poids arrondi.
+
+### 2. Activation des transitaires (les deux à la fois)
+
+**Migration SQL** :
+- Trigger `BEFORE INSERT` sur `forwarders` : si l'utilisateur créateur est admin (`has_role(auth.uid(), 'admin')`), forcer `status = 'approved'` et `is_active = true`.
+- Migration ponctuelle : `UPDATE forwarders SET status = 'approved', is_active = true WHERE status = 'pending' AND is_platform_owned = true` pour débloquer les 7 transitaires actuels.
+
+**Fichiers UI** :
+- `frontend/src/components/admin/forwarders/ForwardersList.tsx` : ajouter un bouton vert "Approuver et activer" visible uniquement quand `status = 'pending'`. Un clic → mutation Supabase qui passe `status='approved'` + `is_active=true`.
+- `frontend/src/components/admin/forwarders/ForwarderFormDialog.tsx` : à la création par admin, pré-remplir et envoyer `status='approved'` + `is_active=true` côté front (ceinture + bretelles avec le trigger).
+
+### 3. Maritime sous seuil — onglet visible mais grisé
+
+**Fichier** : `frontend/src/components/CheckoutShippingCalculator.tsx` (et `FreightSelector.tsx`)
+
+- L'onglet "Maritime" reste **visible** dans la liste des modes mais est **disabled** (grisé, non cliquable) tant que `cart_subtotal < sea_mode_min_order` (ex: 49 USD).
+- Tooltip / message sous l'onglet : "Ajoutez X USD pour débloquer le fret maritime".
+- Les transitaires maritimes sont **masqués** de la liste des offres tant que le seuil n'est pas atteint, peu importe l'onglet sélectionné.
+- Quand le seuil est atteint, l'onglet redevient cliquable et les offres apparaissent normalement.
+
+### 4. Diagnostic admin enrichi
+
+**Fichier** : `frontend/src/components/checkout/FreightSelector.tsx` (bloc DEBUG ADMIN existant)
+
+Pour chaque transitaire en échec, afficher la raison exacte + action recommandée :
+- `status = 'pending'` → "Statut en attente — [Approuver maintenant]" (lien vers admin)
+- `is_active = false` → "Désactivé — réactiver dans l'admin"
+- Pas de route `origin → destination` → "Ajouter route CN→CD dans coverage_routes"
+- Mode non supporté → "Activer le mode 'sea' dans supported_modes"
+- Ville non couverte → "Ajouter Kinshasa aux villes desservies"
+
+### 5. Clarification UI des paliers KG
+
+**Fichier** : `frontend/src/components/admin/forwarders/KgTiersEditor.tsx` (ou équivalent)
+
+- Renommer clairement les colonnes : "Prix forfaitaire (palier 1 kg)" vs "Prix par kg additionnel".
+- Ajouter une note explicative : "Le palier 1 kg sert de forfait minimum pour tout poids < 1 kg. Au-delà, le poids réel + 100 g de marge est multiplié par le prix/kg du palier correspondant."
+
+## Détails techniques
+
+**Pseudo-code moteur** :
 ```text
-profil actif: country_code = CD
-mode = air
-city_id = 19ca38ca-93a9-4c54-b7ae-1d1fa98e7fcb
-transitaire actif + approved
-route JSON coverage_routes: origin_country CN -> destination_country CD
-supported_modes contient air
-puis prix > 0
+function quoteGroup(items, forwarder):
+  total_kg = sum(item.weight_kg for item in items)
+  total_cbm = sum(item.cbm for item in items)
+  base_tier = forwarder.kg_tiers[0]  // palier 1 kg
+
+  if total_kg < 1.0:
+    return base_tier.price_per_kg  // forfait
+
+  // Cas B : poids réel + buffer 100g
+  billable_kg = total_kg + 0.1
+  tier = findTierForWeight(forwarder.kg_tiers, billable_kg)
+  return billable_kg * tier.price_per_kg
 ```
 
-Le point fragile restant est le matching strict des routes JSON et du `city_id` exact. Si la route existe mais sous une forme légèrement différente, ou si le profil tarifaire est pays-large (`city_id IS NULL`) / une ville équivalente, le checkout renvoie 0 au lieu d’utiliser le transitaire plateforme.
-
-Plan de correction
-
-1. Remplacer le filtrage checkout par une version robuste
-   - Dans `fetchEligibleFreightOffers`, ne plus faire disparaître un transitaire dès qu’un filtre strict échoue sans diagnostic.
-   - Normaliser `country_code`, `origin_country`, `destination_country`, `mode` en majuscules/minuscules côté comparaison.
-   - Accepter en priorité le profil ville exacte Kinshasa.
-   - Si aucun profil ville exacte n’existe, autoriser un profil pays-large `city_id IS NULL` pour le même pays/mode, afin d’éviter de bloquer toute commande alors qu’un transitaire CD/air existe.
-   - Conserver la route CN→CD obligatoire quand `originCountry` est connu, mais rendre la comparaison tolérante aux formats JSON et à la casse.
-
-2. Mettre à jour le RPC SQL `get_eligible_forwarders_v2`
-   - Version SQL de même logique :
-     - transitaire actif et `status IN ('approved','active')`
-     - mode supporté
-     - route CN→CD présente
-     - profil actif CD/air
-     - préférence `city_id = Kinshasa`, sinon fallback `city_id IS NULL`
-   - Ajouter un tri pour choisir le profil le plus spécifique d’abord :
-
+**Trigger SQL** :
 ```text
-city_id exact > city_id NULL
+CREATE TRIGGER auto_approve_admin_forwarder
+BEFORE INSERT ON public.forwarders
+FOR EACH ROW EXECUTE FUNCTION auto_approve_if_admin();
 ```
 
-3. Ajouter un RPC de diagnostic admin, sans modifier les données
-   - Créer `debug_forwarder_checkout_eligibility(...)` qui retourne, pour chaque transitaire/profil candidat :
-     - `has_route`
-     - `supports_mode`
-     - `has_exact_city_profile`
-     - `has_country_profile`
-     - `has_kg_tier`
-     - `has_cbm_tier`
-     - `would_be_eligible`
-     - `reason_if_rejected`
-   - Le but est d’arrêter les suppositions : en prod, une seule requête dira exactement quelle condition rejette VERY SPEED.
+## Fichiers modifiés
 
-4. Corriger l’UI debug admin
-   - Dans `FreightSelector`, afficher le détail reçu du diagnostic au lieu du message générique “SQL strict”.
-   - Exemple attendu :
+- `frontend/src/services/freightQuote.ts`
+- `frontend/src/services/freightQuoteCheckout.ts`
+- `frontend/src/components/CheckoutShippingCalculator.tsx`
+- `frontend/src/components/checkout/FreightSelector.tsx`
+- `frontend/src/components/admin/forwarders/ForwardersList.tsx`
+- `frontend/src/components/admin/forwarders/ForwarderFormDialog.tsx`
+- `frontend/src/components/admin/forwarders/KgTiersEditor.tsx`
+- nouvelle migration SQL : trigger auto-approve + UPDATE des 7 pending
 
-```text
-VERY SPEED: route OK, mode OK, profil Kinshasa manquant, profil pays CD présent, tarif KG OK -> fallback pays utilisé
-```
+## Validation post-déploiement
 
-ou :
+1. Tester avec 0,54 kg → doit afficher **17,90 USD** exactement.
+2. Tester avec 1,2 kg → doit afficher **23,27 USD**.
+3. Tester avec 4 articles de 250 g → doit afficher **19,69 USD**.
+4. Vérifier que les 7 transitaires apparaissent dans le checkout.
+5. Créer un nouveau transitaire admin → doit être actif immédiatement.
+6. Panier < 49 USD → onglet Maritime grisé avec message.
+7. Panier ≥ 49 USD → onglet Maritime cliquable, transitaires maritimes visibles.
 
-```text
-VERY SPEED: route manquante CN->CD
-```
-
-5. Fournir le SQL directement dans le chat après implémentation
-   - Comme le téléchargement ne marche pas chez vous, je fournirai le bloc SQL complet directement dans le message final, prêt à copier-coller en production.
-   - Il inclura uniquement les fonctions/RPC nécessaires, pas de modification destructive de données.
-
-6. Corriger aussi l’erreur preview `No QueryClient set`
-   - L’erreur visible en preview vient de `Index.tsx` qui appelle `useQueryClient` alors que la page peut être rendue hors provider dans certains cas Lovable.
-   - Je déplacerai cette logique dans une zone sûre ou supprimerai cet appel si non indispensable, pour que la preview ne masque plus les tests checkout.
-
-Résultat attendu
-
-- Pour `origin_country=CN`, `country_code=CD`, `city_id=Kinshasa`, `mode=air`, `0.54 kg`, le transitaire plateforme doit apparaître si au moins :
-  - il est actif/approuvé,
-  - il supporte `air`,
-  - il a une route CN→CD,
-  - il a un profil tarifaire actif CD/air exact Kinshasa ou pays-large,
-  - il a un palier KG/CBM applicable.
-- Si une condition manque réellement, le debug admin affichera précisément laquelle, au lieu de “0 offre” générique.
+Approuve ce plan pour que je passe en mode build et applique les corrections.

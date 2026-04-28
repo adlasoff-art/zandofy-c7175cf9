@@ -513,8 +513,15 @@ export function CheckoutShippingCalculator({
       <div className="flex gap-1.5 flex-wrap">
         {(["air", "sea", "road", "rail"] as TransportMode[]).map(mode => {
           const data = modeTotals.get(mode);
-          if (!data || data.total <= 0) return null;
-          const isSeaDisabled = mode === "sea" && isSeaBlocked;
+          // Maritime : on garde l'onglet visible MÊME sans quote, en mode grisé,
+          // pour informer le client que ce mode existe mais nécessite d'atteindre
+          // le seuil de fret minimum. Pour les autres modes, on cache si pas de quote.
+          if (mode !== "sea" && (!data || data.total <= 0)) return null;
+          if (mode === "sea" && (!data || data.total <= 0) && !seaThreshold?.enabled) {
+            return null;
+          }
+          const seaNoQuote = mode === "sea" && (!data || data.total <= 0);
+          const isSeaDisabled = mode === "sea" && (isSeaBlocked || seaNoQuote);
           const Meta = MODE_META[mode];
           const Icon = Meta.icon;
           const isActive = activeMode === mode && !isSeaDisabled;
@@ -523,6 +530,11 @@ export function CheckoutShippingCalculator({
             <button
               key={mode}
               disabled={isSeaDisabled}
+              title={
+                seaNoQuote
+                  ? `Maritime : disponible une fois le seuil de fret de $${seaThreshold?.min_subtotal ?? 49} atteint`
+                  : undefined
+              }
               onClick={() => {
                 if (isSeaDisabled) return;
                 setUserHasSelected(true);
@@ -553,7 +565,11 @@ export function CheckoutShippingCalculator({
                   </span>
                 );
               })()}
-              <span className="font-bold">${data.total.toFixed(2)}</span>
+              {data && data.total > 0 ? (
+                <span className="font-bold">${data.total.toFixed(2)}</span>
+              ) : (
+                <span className="text-[10px] italic opacity-70">verrouillé</span>
+              )}
             </button>
           );
         })}
