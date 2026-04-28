@@ -215,14 +215,14 @@ export function FreightSelector({
     // ne couvre cette destination/mode et que le tarif standard sera appliqué.
     return (
       <div className="space-y-1.5">
-        <div className="flex items-start gap-2 px-2.5 py-2 rounded-md border border-border bg-muted/40 text-[11px] text-muted-foreground">
-          <Info size={12} className="shrink-0 mt-0.5 text-primary" />
+        <div className="flex items-start gap-2 px-2.5 py-2 rounded-md border border-destructive/40 bg-destructive/5 text-[11px] text-destructive">
+          <AlertTriangle size={12} className="shrink-0 mt-0.5" />
           <span>
-            Aucun transitaire ne dessert encore
+            Aucun transitaire ne dessert
             {destinationCityName ? ` ${destinationCityName}` : " cette destination"}
-            {" "}
-            en mode <span className="font-medium">{MODE_META[mode]?.label ?? mode}</span>.
-            Le tarif standard ci-dessus sera appliqué et un transitaire sera assigné après commande.
+            {" "}depuis l'origine du produit en mode{" "}
+            <span className="font-medium">{MODE_META[mode]?.label ?? mode}</span>.
+            Le checkout est bloqué pour cette commande — demandez une couverture ou modifiez l'adresse / le mode.
           </span>
         </div>
         {originCountry && (
