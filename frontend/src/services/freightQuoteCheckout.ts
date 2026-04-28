@@ -138,9 +138,24 @@ export async function fetchEligibleFreightOffers(
   // est indisponible (preview/staging non migré, droits manquants, etc.), on
   // retombe sur le filtre JS local. Le service plateforme reste toujours
   // visible (couverture globale gérée côté admin).
+  // FILTRAGE STRICT au checkout :
+  //  1. Pays d'origine effectif du produit (origine produit > origine boutique)
+  //  2. Pays de destination
+  //  3. Mode de transport demandé (présent dans coverage_routes ET supported_modes)
+  //  4. Profil tarifaire actif pour la VILLE EXACTE
+  // Le profil ville n'a PAS de fallback "pays-large" : un profil city_id=NULL est
+  // ignoré au checkout pour éviter qu'un transitaire d'une autre ville apparaisse.
+  // Le service plateforme (`is_platform_owned`) suit la même règle : aucune exception.
   const originISO = (input.originCountry || "").toUpperCase().trim();
   const destISO = (input.destinationCountry || "").toUpperCase().trim();
-  let filteredProfiles = profilesList;
+
+  // Étape A : ne garder que les profils dont la ville correspond exactement.
+  const cityScopedProfiles = input.destinationCityId
+    ? profilesList.filter((p) => p.city_id === input.destinationCityId)
+    : [];
+
+  // Étape B : si une origine produit est connue, filtrer par route + mode.
+  let filteredProfiles = cityScopedProfiles;
   if (originISO) {
     let allowedForwarderIds: Set<string> | null = null;
     try {
@@ -164,12 +179,12 @@ export async function fetchEligibleFreightOffers(
       console.warn("[freightQuoteCheckout] get_eligible_forwarders_v2 unavailable, fallback JS", e);
     }
 
-    filteredProfiles = profilesList.filter((p) => {
-      if (p.forwarder?.is_platform_owned) return true;
+    filteredProfiles = cityScopedProfiles.filter((p) => {
+      // Pas d'exception plateforme : même règle pour tous (couvre la route ET la ville).
       if (allowedForwarderIds) {
         return allowedForwarderIds.has(p.forwarder_id);
       }
-      // Fallback JS si le RPC est indisponible.
+      // Fallback JS : route + mode strictement présents dans le transitaire.
       const routes = p.forwarder?.coverage_routes ?? [];
       const supports = p.forwarder?.supported_modes;
       if (supports && supports.length > 0 && !supports.includes(input.mode)) return false;
@@ -237,55 +252,14 @@ export async function fetchEligibleFreightOffers(
 
   const validOffers = offers
     .filter((o): o is EligibleFreightOffer => o !== null)
+    // Garde-fou : aucun "USD 0.00" sélectionnable au checkout client.
+    .filter((o) => Number(o.quote.total) > 0)
     .sort((a, b) => a.quote.total - b.quote.total);
 
-  // 3) Lot Very Speed — Si AUCUN profil plateforme n'est présent dans les
-  //    offres ci-dessus pour cette zone+mode, ajouter une carte "plateforme grisée"
-  //    pour informer le client que le service plateforme n'est pas disponible.
-  const hasPlatformOffer = validOffers.some((o) => o.is_platform_owned);
-  if (!hasPlatformOffer) {
-    const { data: platformForwarders } = await (supabase as any)
-      .from("forwarders")
-      .select("id, name, logo_url, unavailable_message")
-      .eq("is_active", true)
-      .eq("is_platform_owned", true)
-      .limit(1);
-
-    const pf = (platformForwarders ?? [])[0] as
-      | { id: string; name: string; logo_url: string | null; unavailable_message: string | null }
-      | undefined;
-    if (pf) {
-      // Carte grisée — quote vide, non sélectionnable
-      validOffers.unshift({
-        profile_id: `platform-unavailable-${pf.id}`,
-        forwarder_id: pf.id,
-        mode: input.mode,
-        service_class: "platform",
-        country_code: input.destinationCountry,
-        city_id: input.destinationCityId ?? null,
-        quote: {
-          total: 0,
-          currency: "USD",
-          lines: [],
-          warnings: [],
-          deposit_required: false,
-          deposit_amount: 0,
-          deposit_pct: 0,
-          transit_min_days: null,
-          transit_max_days: null,
-          total_cbm: 0,
-          total_chargeable_weight_kg: 0,
-        } as unknown as FreightQuoteResult,
-        forwarder_name: pf.name,
-        forwarder_logo_url: pf.logo_url,
-        is_platform_owned: true,
-        has_profile_for_zone: false,
-        unavailable_message:
-          pf.unavailable_message ?? "Service plateforme non disponible dans votre zone",
-      });
-    }
-  }
-
+  // Plus de carte "plateforme grisée" injectée artificiellement : si la plateforme
+  // ne dessert pas la route/ville, elle n'apparaît pas du tout. L'empty state du
+  // FreightSelector affichera "Aucun transitaire ne dessert..." + bouton "Demander
+  // une couverture", ce qui est cohérent et évite les contradictions visuelles.
   return validOffers;
 }
 

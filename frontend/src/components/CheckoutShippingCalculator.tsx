@@ -712,15 +712,11 @@ export function CheckoutShippingCalculator({
             totalWeightKgForMarketing={totalWeight / 1000}
           />
           )}
-          {!isMultiGroup && !hasEligibleFreight && (
-            <ForwarderSelector
-              country={destCity.country_code}
-              cityId={destCity.id}
-              mode={activeMode}
-              baseShippingCost={modeTotals.get(activeMode)?.total || 0}
-              onChange={handleForwarderChange}
-            />
-          )}
+          {/* Fallback legacy ForwarderSelector retiré : il ré-affichait des
+              transitaires non couvrants (ville/origine ignorées) et causait
+              l'effet "transitaire apparaît puis disparaît" au refresh. Le
+              FreightSelector / MultiOriginFreightSelector est désormais la
+              seule source de vérité pour le choix transitaire au checkout. */}
         </>
       )}
     </div>
