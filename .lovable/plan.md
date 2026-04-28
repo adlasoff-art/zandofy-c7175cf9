@@ -1,170 +1,62 @@
-Tu as raison : le problème n’est pas seulement “un filtre SQL”. J’ai revu la chaîne checkout/transitaire de bout en bout. Le nœud est une combinaison de 3 choses, dont une critique en production.
+## Problème confirmé
 
-## Diagnostic ferme
+Sur **`frontend/src/pages/VendorDashboardPage.tsx`** (section "Localisation de la boutique", lignes 1088-1125), les trois champs **Adresse / Ville / Pays** sont des `<input>` libres. Cela viole la règle plateforme [Geo fields combobox standard](mem://preference/geo-fields-combobox-standard) qui impose des comboboxes connectés aux Zones Géographiques admin pour tous les champs Pays/Province/Ville/Commune/Quartier.
 
-### 1. La migration stricte précédente est au mauvais endroit pour la prod
-La correction SQL stricte existe ici :
+**Impact direct sur le bug transitaires** : la table `public.stores` en prod ne contient aujourd'hui que `address text`, `city text`, `country text`. Aucune colonne `country_code` (ISO), `city_id` (UUID `cities`), `province_id`. Donc :
 
-```text
-supabase/migrations/20260428190655_6509aa80-ad58-4788-9f31-aca9f0ccc5c4.sql
-```
+- Une boutique chinoise saisit "China" / "Chine" / "CN" en texte libre → impossible de matcher l'origine `CN` dans `coverage_routes` des transitaires.
+- Une boutique RDC saisit "Kinshasa" en texte libre → impossible de matcher `forwarder_pricing_profiles.city_id` (UUID exact requis depuis le durcissement RPC).
+- Résultat : checkout bloqué « Aucun transitaire ne dessert Kinshasa », même quand un transitaire est correctement configuré.
 
-Mais dans ce projet, la source de vérité DB documentée est :
+C'est **le nœud structurel** : sans `country_code` ISO et `city_id` UUID sur `stores`, l'éligibilité stricte des transitaires ne peut jamais matcher.
 
-```text
-frontend/supabase/migrations/
-```
+## Solution
 
-Donc si votre pipeline prod ne prend que `frontend/supabase/migrations/`, la prod continue probablement avec l’ancien comportement :
+### 1. Migration SQL (prod `vpt...yxf` via fichier téléchargeable)
 
-- fallback `city_id IS NULL`
-- carte plateforme/Very Speed possible même sans vraie couverture
-- RPC legacy permissive
-- écart entre preview et production
+Ajouter sur `public.stores` :
 
-C’est un point bloquant : la correction SQL doit être portée dans `frontend/supabase/migrations/`.
+- `country_code text` — ISO-2 (ex: `CN`, `CD`, `AE`)
+- `province_id uuid references public.provinces(id)`
+- `city_id uuid references public.cities(id)`
+- `commune_id uuid` (optionnel, nullable)
+- Index sur `(country_code)` et `(city_id)` pour le matching transitaires.
+- Backfill best-effort à partir des colonnes texte existantes : pour chaque store, tenter de résoudre `country` → `country_code` via `countries.name ILIKE country OR code = country`, puis `city` → `city_id` via `cities.name ILIKE city AND country_code = ...`. Les non-résolus restent `NULL` (le vendeur devra re-sélectionner via le combobox).
 
-### 2. Le checkout affiche encore un “fret standard” même quand aucun transitaire n’est éligible
-Dans `CheckoutShippingCalculator.tsx`, le moteur calcule toujours un prix indicatif via `calculateDynamicQuote()` :
+Le fichier sera fourni dans `/mnt/documents/` et copié dans `frontend/supabase/migrations/` pour le déploiement GitHub Actions.
 
-```text
-Chongqing (CN) → Kinshasa (CD) · tarif indicatif
-```
+### 2. Refactor du formulaire boutique
 
-Puis `FreightSelector` peut retourner 0 offre, mais l’UI affiche quand même :
+`VendorDashboardPage.tsx` (section Localisation) :
 
-```text
-Aucun transitaire ne dessert encore Kinshasa...
-Le tarif standard ci-dessus sera appliqué et un transitaire sera assigné après commande.
-```
+- Remplacer les 2 `<input>` Ville/Pays par un seul `<GeoFieldsRow levels={["country","province","city","commune"]} />` (déjà existant et conforme à la norme plateforme).
+- Garder le champ **Adresse** en `<input>` libre (numéro + rue) — conforme à la règle (l'adresse manuelle reste libre).
+- State : remplacer `storeCity`/`storeCountry` par un objet `geo: GeoFieldsValue` ; conserver `storeAddress`.
+- Chargement : `select` étendu à `country_code, province_id, city, commune` + résolution du nom de ville depuis `cities` pour pré-remplir le combobox.
+- Sauvegarde : update de `address`, `country_code`, `province_id`, `city_id`, `commune_id`. On continue d'écrire les colonnes texte legacy `country` / `city` (nom lisible) pour rétrocompat (étiquettes d'expédition, affichage page boutique, anciens scripts).
 
-C’est exactement ce qu’on voit sur ta capture :
+### 3. Vérification du checkout après correction
 
-```text
-DEBUG ADMIN — 0 offre retournée
-mais Aérien $10.64 affiché
-et checkout continue avec un tarif standard
-```
+Une fois qu'une boutique a `country_code='CN'` et `city_id` renseignés, et qu'un transitaire a :
+- `coverage_routes` contenant `{origin_country:"CN", destination_country:"CD"}`
+- `forwarder_pricing_profiles` actif avec le `city_id` de Kinshasa et `mode='air'`
 
-Donc le bug métier principal est là : le prix indicatif est traité comme une option expédiable alors qu’il ne prouve aucune couverture transitaire.
+…alors le RPC `get_eligible_forwarders_v2` retournera bien le transitaire et le checkout débloquera. On testera avec la boutique « Suzhou Golden Future » de la capture.
 
-### 3. La logique de disponibilité est incohérente entre mono-colis et multi-colis
-Dans `CheckoutPage.tsx` :
+### 4. Hors scope (à traiter séparément si besoin)
 
-- si `freightOffersAvailable > 0`, le client doit choisir un transitaire ;
-- si `freightOffersAvailable === 0`, le checkout laisse passer avec le tarif standard.
+- Audit des autres formulaires plateforme : déjà conformes selon le memo (AuthPage, CheckoutPage, BecomeForwarderPage, etc.). Aucun autre `<input>` ville/pays détecté côté vendeur dans ce balayage.
+- L'admin store creation dialog n'a pas de champs adresse aujourd'hui.
 
-Pour une marketplace en production, ce comportement est dangereux : si aucun transitaire ne couvre `origine produit -> destination client -> ville`, la commande ne devrait pas continuer comme si elle était livrable.
+## Détails techniques
 
-## Solution production à appliquer
+- Composant cible : `GeoFieldsRow` (`@/components/address/GeoFieldsRow`) — déjà utilisé partout ailleurs, supporte `country`, `province`, `city`, `commune`, `quartier`, gère les UUIDs.
+- Storage : `address text`, `country text` (legacy nom), `country_code text` (ISO), `province_id uuid`, `city text` (legacy nom), `city_id uuid`, `commune_id uuid`.
+- Le RPC `get_eligible_forwarders_v2` lit déjà `stores.city_id` (durcissement précédent) — aucune autre modif RPC nécessaire.
 
-### A. Corriger la source de vérité SQL prod
-Créer une migration dans :
+## Livrables
 
-```text
-frontend/supabase/migrations/YYYYMMDDHHMMSS_checkout_forwarders_strict_prod.sql
-```
-
-Elle doit contenir la correction stricte déjà préparée, avec ces règles :
-
-1. `get_eligible_forwarders_v2(origin, destination, city_id, mode)` retourne uniquement les transitaires qui ont :
-   - route explicite `coverage_routes.origin_country -> destination_country`
-   - mode dans `supported_modes`
-   - profil actif dans `forwarder_pricing_profiles`
-   - `city_id = destination_city_id` exact
-2. supprimer le fallback `city_id IS NULL` au checkout.
-3. supprimer l’exception plateforme/Very Speed.
-4. remettre aussi `get_eligible_forwarders` legacy en mode strict, ou mieux ne plus l’utiliser au checkout.
-
-### B. Changer le comportement checkout : pas de transitaire = pas de commande internationale
-Dans `FreightSelector.tsx`, remplacer le message actuel :
-
-```text
-Le tarif standard ci-dessus sera appliqué et un transitaire sera assigné après commande.
-```
-
-par un message bloquant :
-
-```text
-Aucun transitaire ne couvre actuellement cette route pour cette ville. Vous pouvez demander l’ouverture de couverture ou choisir une autre adresse/mode.
-```
-
-Le bouton “Demander couverture” reste utile, mais il ne doit pas permettre de commander immédiatement.
-
-### C. Bloquer la soumission quand aucune offre transitaire n’existe
-Dans `CheckoutPage.tsx`, ajouter un état explicite remonté par le calculateur :
-
-```ts
-freightStatus = "checking" | "available" | "unavailable"
-```
-
-Règle :
-
-```text
-Si panier international + freightStatus === unavailable : bloquer Continuer / Commander.
-```
-
-Ne plus laisser passer le cas `freightOffersAvailable === 0` comme fallback automatique.
-
-### D. Rendre `freightQuoteCheckout.ts` fermé par défaut
-Dans `fetchEligibleFreightOffers()` :
-
-- interroger uniquement les profils ville exacte : `city_id = destinationCityId`
-- ne plus démarrer avec `city_id IS NULL OR city_id = ...`
-- utiliser `get_eligible_forwarders_v2` comme filtre d’autorité
-- si le RPC strict est absent/erreur en production : retourner `[]`, pas un fallback permissif
-- garder le filtre anti-0 USD
-
-### E. Corriger la résolution de ville
-Actuellement `CheckoutShippingCalculator` fait :
-
-```ts
-searchCities(shippingCity, 1)
-```
-
-C’est trop fragile en prod, car ça cherche par nom seulement. Il faut résoudre la ville avec :
-
-```text
-country_code = shipping.country
-name = shipping.city
-province si disponible
-```
-
-À court terme : résolution stricte pays + ville.
-À moyen terme : ajouter `city_id`, `commune_id`, `quartier_id` dans `saved_addresses` pour ne plus dépendre du texte.
-
-## Résultat attendu après correction
-
-Pour le cas de ta capture :
-
-```text
-Client : Kinshasa
-Origine produit : CN
-Mode : air
-Offres transitaire : 0
-```
-
-Le checkout devra afficher :
-
-```text
-Aucun transitaire ne couvre CN -> CD / Kinshasa en aérien.
-Demander couverture
-```
-
-Et il ne devra plus :
-
-- afficher “tarif standard appliqué” comme solution réelle ;
-- afficher Very Speed à 0,00 $ ;
-- permettre de continuer la commande internationale sans transitaire ;
-- dépendre d’une migration placée hors du dossier prod.
-
-## Ce que je vais modifier si tu valides
-
-1. Créer la migration SQL dans `frontend/supabase/migrations/`.
-2. Durcir `frontend/src/services/freightQuoteCheckout.ts`.
-3. Modifier `frontend/src/components/checkout/FreightSelector.tsx` pour rendre l’état “aucune couverture” bloquant et non ambigu.
-4. Modifier `frontend/src/components/CheckoutShippingCalculator.tsx` pour remonter un vrai statut de disponibilité.
-5. Modifier `frontend/src/pages/CheckoutPage.tsx` pour bloquer la progression si aucun transitaire n’est disponible.
-6. Nettoyer l’ancien import/état legacy `ForwarderSelector` s’il n’est plus utilisé.
-
-C’est une correction de production : elle ferme le checkout sur les routes non couvertes au lieu de créer des commandes impossibles à exécuter.
+1. Fichier SQL téléchargeable dans `/mnt/documents/` : `stores_geo_columns.sql` (ALTER TABLE + index + backfill).
+2. Même fichier copié dans `frontend/supabase/migrations/` pour le pipeline GitHub Actions.
+3. Refactor `frontend/src/pages/VendorDashboardPage.tsx` avec `GeoFieldsRow`.
+4. Mise à jour du memo `mem://preference/geo-fields-combobox-standard` pour ajouter `VendorDashboardPage` à la liste des formulaires alignés.
