@@ -1161,35 +1161,24 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
         <p className="text-xs text-muted-foreground">
           Ces informations apparaissent sur votre page boutique et sur les étiquettes d'expédition.
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label className="text-xs text-muted-foreground block mb-1">Adresse</label>
-            <input
-              value={storeAddress}
-              onChange={(e) => setStoreAddress(e.target.value)}
-              placeholder="123 Avenue Commerce"
-              className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground block mb-1">Ville</label>
-            <input
-              value={storeCity}
-              onChange={(e) => setStoreCity(e.target.value)}
-              placeholder="Kinshasa"
-              className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground block mb-1">Pays</label>
-            <input
-              value={storeCountry}
-              onChange={(e) => setStoreCountry(e.target.value)}
-              placeholder="RD Congo"
-              className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Adresse (rue, numéro)</label>
+          <input
+            value={storeAddress}
+            onChange={(e) => setStoreAddress(e.target.value)}
+            placeholder="123 Avenue Commerce"
+            className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+          />
         </div>
+        <GeoFieldsRow
+          value={geo}
+          onChange={(patch) => setGeo((prev) => ({ ...prev, ...patch }))}
+          levels={["country", "province", "city", "commune"]}
+          required={["country", "city"]}
+        />
+        <p className="text-[11px] text-muted-foreground">
+          Le pays et la ville sont essentiels : ils déterminent les transitaires éligibles pour acheminer vos commandes vers les clients.
+        </p>
       </div>
 
       {/* WhatsApp Section */}
