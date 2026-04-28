@@ -845,7 +845,23 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             <label className="text-xs font-semibold text-foreground">📦 Poids & Dimensions (pour estimation fret)</label>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Poids (grammes)" type="number" value={String(form.weight_grams)} onChange={(v) => setForm({ ...form, weight_grams: Number(v) })} />
+            <div>
+              <Field
+                label="Poids unitaire en grammes (ex : 100 g = 0,1 kg)"
+                type="number"
+                value={String(form.weight_grams)}
+                onChange={(v) => setForm({ ...form, weight_grams: Number(v) })}
+              />
+              {form.weight_grams >= 1000 && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 flex items-start gap-1">
+                  <span>⚠️</span>
+                  <span>
+                    Vous avez saisi <strong>{form.weight_grams} g</strong> ({(form.weight_grams / 1000).toFixed(2)} kg) pour <em>une seule unité</em>.
+                    Si l'article pèse moins de 1 kg, divisez par 1000 (ex&nbsp;: 1 kg = 1000 g, 100 g = 100).
+                  </span>
+                </p>
+              )}
+            </div>
             <Field label="Longueur (cm)" type="number" value={String(form.length_cm)} onChange={(v) => setForm({ ...form, length_cm: Number(v) })} />
           </div>
           <div className="grid grid-cols-2 gap-3">

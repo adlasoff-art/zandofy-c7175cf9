@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Switch } from "@/components/ui/switch";
-import { Calculator, TrendingUp, Info } from "lucide-react";
+import { Calculator, TrendingUp, Info, BookmarkCheck } from "lucide-react";
 import {
   calculateSalePrice,
   calculateOldPrice,
@@ -130,7 +130,17 @@ export function PricingCalculator({
         <>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Coût d'achat réel ($)</label>
+              <label className="text-xs text-muted-foreground block mb-1 flex items-center gap-1">
+                <span>Coût d'achat réel ($)</span>
+                {costReal > 0 && (
+                  <span
+                    title="Ce montant est mémorisé et reste visible à chaque réouverture du produit pour comparer la marge réelle."
+                    className="inline-flex items-center gap-0.5 text-[9px] px-1 py-[1px] rounded-full bg-primary/10 text-primary border border-primary/20"
+                  >
+                    <BookmarkCheck size={9} /> Mémorisé
+                  </span>
+                )}
+              </label>
               <input
                 type="number"
                 min={0}
@@ -144,7 +154,9 @@ export function PricingCalculator({
                 className={inputClass}
                 placeholder="Ex: 3.50"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">Achat + transport fournisseur</p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Achat + transport fournisseur — référence conservée pour calculer une remise.
+              </p>
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Coût d'achat calcul ($)</label>
