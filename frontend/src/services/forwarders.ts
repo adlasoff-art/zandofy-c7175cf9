@@ -56,3 +56,48 @@ export async function fetchEligibleForwarders(params: {
   }
   return (data || []) as EligibleForwarder[];
 }
+
+export interface ForwarderEligibilityDebug {
+  forwarder_id: string;
+  forwarder_name: string;
+  status: string;
+  is_active: boolean;
+  supports_mode: boolean;
+  has_route: boolean;
+  has_exact_city_profile: boolean;
+  has_country_profile: boolean;
+  has_kg_tier: boolean;
+  has_cbm_tier: boolean;
+  has_piece_tier: boolean;
+  picked_profile_id: string | null;
+  would_be_eligible: boolean;
+  reason: string;
+}
+
+/**
+ * Admin-only : explique pour chaque transitaire pourquoi il est (ou non)
+ * proposé au checkout pour un couple (origine, destination, ville, mode).
+ * Renvoie [] si l'utilisateur n'est pas admin (RPC RAISE EXCEPTION).
+ */
+export async function debugForwarderEligibility(params: {
+  originCountry: string;
+  destinationCountry: string;
+  destinationCityId?: string | null;
+  mode: string;
+}): Promise<ForwarderEligibilityDebug[]> {
+  if (!params.originCountry || !params.destinationCountry || !params.mode) return [];
+  const { data, error } = await (supabase.rpc as any)(
+    "debug_forwarder_checkout_eligibility",
+    {
+      p_origin_country: params.originCountry.toUpperCase(),
+      p_destination_country: params.destinationCountry.toUpperCase(),
+      p_destination_city_id: params.destinationCityId ?? null,
+      p_mode: params.mode,
+    },
+  );
+  if (error) {
+    console.warn("[forwarders] debug_forwarder_checkout_eligibility failed", error);
+    return [];
+  }
+  return (data ?? []) as ForwarderEligibilityDebug[];
+}

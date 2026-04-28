@@ -22,6 +22,7 @@ import {
   type EligibleFreightOffer,
   type QuoteCheckoutInput,
 } from "@/services/freightQuoteCheckout";
+import { debugForwarderEligibility, type ForwarderEligibilityDebug } from "@/services/forwarders";
 import { useRoles } from "@/hooks/use-roles";
 import { useI18n } from "@/contexts/I18nContext";
 
@@ -355,6 +356,24 @@ function AdminDebugBanner({
   open: boolean;
   onToggle: () => void;
 }) {
+  const [diag, setDiag] = useState<ForwarderEligibilityDebug[] | null>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !originCountry || !destinationCountry || !mode) return;
+    let cancelled = false;
+    setDiagLoading(true);
+    debugForwarderEligibility({
+      originCountry,
+      destinationCountry,
+      destinationCityId,
+      mode,
+    })
+      .then((res) => { if (!cancelled) setDiag(res); })
+      .finally(() => { if (!cancelled) setDiagLoading(false); });
+    return () => { cancelled = true; };
+  }, [open, originCountry, destinationCountry, destinationCityId, mode]);
+
   return (
     <div className="rounded-md border border-amber-500/40 bg-amber-500/5 text-[10px]">
       <button
@@ -389,11 +408,23 @@ function AdminDebugBanner({
               ))}
             </div>
           )}
-          {offers.length === 0 && (
-            <div className="pt-1 mt-1 border-t border-amber-500/30 opacity-80">
-              SQL strict : profil actif country_code='{destinationCountry}' AND mode='{mode}' AND city_id='{destinationCityId ?? "∅"}' + transitaire actif/approved + route {originCountry || "∅"}→{destinationCountry} + supported_modes contient '{mode}'
+          <div className="pt-1 mt-1 border-t border-amber-500/30 space-y-0.5">
+            <div className="opacity-70 mb-0.5">
+              Diagnostic par transitaire {diagLoading && <Loader2 size={9} className="inline animate-spin ml-1" />}
             </div>
-          )}
+            {diag && diag.length === 0 && (
+              <div className="opacity-80">Aucun transitaire enregistré.</div>
+            )}
+            {diag && diag.map((d) => (
+              <div key={d.forwarder_id} className="flex items-start gap-1">
+                <span className={d.would_be_eligible ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}>
+                  {d.would_be_eligible ? "✓" : "✗"}
+                </span>
+                <span className="font-semibold">{d.forwarder_name}</span>
+                <span className="opacity-70">— {d.reason}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
