@@ -185,8 +185,12 @@ export function ForwarderSelector({ country, cityId, mode, baseShippingCost, onC
                 )}
               </div>
               <div className="text-right shrink-0">
-                <p className="text-xs font-bold text-foreground">${opt.finalPrice.toFixed(2)}</p>
-                {Number(opt.price_multiplier) !== 1 && (
+                {opt.finalPrice > 0 ? (
+                  <p className="text-xs font-bold text-foreground">${opt.finalPrice.toFixed(2)}</p>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground italic">Tarif sur devis</p>
+                )}
+                {opt.finalPrice > 0 && Number(opt.price_multiplier) !== 1 && (
                   <p className="text-[9px] text-muted-foreground">×{Number(opt.price_multiplier).toFixed(2)}</p>
                 )}
               </div>
