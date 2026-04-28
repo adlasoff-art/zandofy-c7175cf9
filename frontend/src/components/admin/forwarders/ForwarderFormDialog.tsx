@@ -36,6 +36,7 @@ export interface Forwarder {
   contact_email?: string | null;
   contact_phone?: string | null;
   is_active?: boolean;
+  status?: "pending" | "approved" | "rejected" | "suspended";
   linked_transporter_user_id?: string | null;
   supported_modes?: string[] | null;
   coverage_routes?: CoverageRoute[] | null;
@@ -53,6 +54,7 @@ const forwarderSchema = z.object({
   description: z.string().trim().max(500).nullable().optional(),
   contact_email: z.string().trim().email("Email invalide").max(255).or(z.literal("")).nullable().optional(),
   contact_phone: z.string().trim().max(32).nullable().optional(),
+  status: z.enum(["pending", "approved", "rejected", "suspended"]).default("approved"),
   linked_transporter_user_id: z.string().uuid().nullable().optional(),
   supported_modes: z.array(z.enum(["air", "sea", "road", "rail"])).default([]),
   coverage_routes: z
@@ -76,7 +78,7 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<Forwarder>({
     name: "", slug: "", logo_url: "", description: "",
-    contact_email: "", contact_phone: "", is_active: true,
+    contact_email: "", contact_phone: "", is_active: true, status: "approved",
     linked_transporter_user_id: null,
     supported_modes: [],
     coverage_routes: [],
@@ -93,7 +95,7 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
     });
     else setForm({
       name: "", slug: "", logo_url: "", description: "",
-      contact_email: "", contact_phone: "", is_active: true,
+      contact_email: "", contact_phone: "", is_active: true, status: "approved",
       linked_transporter_user_id: null,
       supported_modes: [],
       coverage_routes: [],
@@ -137,6 +139,7 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
         description: payload.description || null,
         contact_email: payload.contact_email || null,
         contact_phone: payload.contact_phone || null,
+        status: payload.status ?? "approved",
         linked_transporter_user_id: payload.linked_transporter_user_id || null,
         supported_modes: payload.supported_modes ?? [],
         coverage_routes: payload.coverage_routes ?? [],
