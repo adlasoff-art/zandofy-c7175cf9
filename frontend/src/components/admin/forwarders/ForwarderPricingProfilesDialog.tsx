@@ -220,7 +220,8 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                       setDraft(next);
                     }}
                     levels={["country", "city"]}
-                    labels={{ city: "Ville (optionnel)" }}
+                    required={["city"]}
+                    labels={{ city: "Ville exacte checkout" }}
                   />
                 </div>
                 <div>
@@ -265,10 +266,14 @@ export function ForwarderPricingProfilesDialog({ open, onOpenChange, forwarderId
                 size="sm"
                 className="w-full"
                 onClick={() => {
+                  if (!draft.city_id) {
+                    toast.error("Sélectionnez la ville exacte du checkout (ex: Kinshasa)");
+                    return;
+                  }
                   create.mutate(draft);
                   setNewOpen(false);
                   setDraft({
-                    mode: "sea",
+                    mode: "air",
                     service_class: "standard",
                     country_code: "CD",
                     city_id: null,
