@@ -296,6 +296,92 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
             Le multiplicateur de prix est configuré par palier tarifaire (modes air/sea × tiers express/standard/vip) depuis l'icône <span className="font-semibold">$</span> de la liste.
           </div>
 
+          <div className="space-y-2 p-3 border border-border rounded-lg bg-muted/20">
+            <Label className="text-sm flex items-center gap-1.5">
+              <Plane size={13} className="text-primary" /> Modes supportés *
+            </Label>
+            <p className="text-[11px] text-muted-foreground">
+              Cochez les modes pour lesquels ce transitaire propose un service. Doit correspondre aux profils tarifaires créés (icône $).
+            </p>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {MODES.map(({ key, label, Icon }) => {
+                const checked = (form.supported_modes ?? []).includes(key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleMode(key)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm transition-all ${
+                      checked
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                    }`}
+                  >
+                    <Icon size={14} className={checked ? "text-primary" : ""} />
+                    {label}
+                    {checked && <span className="ml-auto text-[10px] text-primary">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2 p-3 border border-border rounded-lg bg-muted/20">
+            <Label className="text-sm flex items-center gap-1.5">
+              <Route size={13} className="text-primary" /> Routes desservies (origine → destination) *
+            </Label>
+            <p className="text-[11px] text-muted-foreground">
+              Pays d'origine des marchandises que ce transitaire accepte d'acheminer vers une destination donnée. Sans route déclarée, le transitaire n'apparaît pour aucune commande.
+            </p>
+            <div className="grid grid-cols-[1fr_auto_1fr_auto] items-end gap-2 pt-1">
+              <div>
+                <Label className="text-[10px] uppercase text-muted-foreground">Origine</Label>
+                <Input
+                  value={newOrigin}
+                  onChange={(e) => setNewOrigin(e.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="CN"
+                  maxLength={2}
+                  className="font-mono uppercase"
+                />
+              </div>
+              <span className="pb-2 text-muted-foreground">→</span>
+              <div>
+                <Label className="text-[10px] uppercase text-muted-foreground">Destination</Label>
+                <Input
+                  value={newDest}
+                  onChange={(e) => setNewDest(e.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="CD"
+                  maxLength={2}
+                  className="font-mono uppercase"
+                />
+              </div>
+              <Button type="button" size="sm" onClick={addRoute} disabled={!newOrigin || !newDest}>
+                <Plus size={14} />
+              </Button>
+            </div>
+            {(form.coverage_routes ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-2">
+                {(form.coverage_routes ?? []).map((r, idx) => (
+                  <div
+                    key={`${r.origin_country}-${r.destination_country}-${idx}`}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-background text-xs font-mono"
+                  >
+                    <span>{r.origin_country}</span>
+                    <span className="text-muted-foreground">→</span>
+                    <span>{r.destination_country}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeRoute(idx)}
+                      className="ml-1 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="space-y-1.5 p-3 border border-border rounded-lg bg-muted/20">
             <Label className="text-sm">Compte transporteur lié (optionnel)</Label>
             <TransporterUserPicker
