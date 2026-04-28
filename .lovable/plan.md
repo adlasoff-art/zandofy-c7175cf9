@@ -1,121 +1,134 @@
-## Diagnostic confirmé (prod)
+Oui, j’ai compris le problème, et ta frustration est légitime : en production, le checkout mélange actuellement plusieurs couches de logique qui ne devraient pas se mélanger.
 
-Les 7 transitaires prod ont **tous** :
-- `coverage_routes = []` → écartés par le filtre origine du checkout (`FreightSelector` → RPC `get_eligible_forwarders_v2` → fallback JS sur `coverage_routes`).
-- `supported_modes = ["air"]` → écartés en plus pour toute commande `sea`, même quand un profil `sea` actif existe.
+Le comportement observé vient très probablement de trois incohérences combinées :
 
-→ Aucun transitaire ne s'affiche au checkout, pour aucune origine, parce que ces deux colonnes n'ont jamais été peuplées. Aucun bug code, aucune régression de migration : c'est une **donnée manquante** introduite par le Lot 4C / Lot 11C qui a ajouté ces deux filtres sans backfill.
+1. Le nouveau sélecteur `FreightSelector` filtre partiellement par origine produit et ville, mais il laisse toujours passer le transitaire plateforme (`is_platform_owned`, Very Speed) même si la route/ville ne correspond pas.
+2. Quand le nouveau sélecteur dit “aucune offre réellement disponible”, le checkout affiche encore l’ancien `ForwarderSelector` legacy en fallback, qui ne connaît pas l’origine produit et utilise un ancien RPC. Cela peut faire réapparaître des transitaires qui ne devraient plus être là.
+3. La règle `city_id IS NULL OR city_id = ville_client` autorise des profils “pays entier” à apparaître dans toutes les villes. Or pour votre modèle métier, un transitaire doit être affiché au checkout seulement s’il a un profil ville correspondant, sauf si vous avez explicitement créé un vrai profil national.
 
-Référence : `mem://features/forwarder-origin-filtering`, `mem://features/forwarders-and-logistics-system`.
+La nouvelle règle métier doit être stricte :
 
-## Réponse à votre question initiale
+```text
+Origine effective du produit
+= products.origin_country si renseigné
+= sinon stores.country
 
-> "Indique-moi la démarche pour utiliser les profils déjà créés, sans repartir à zéro."
-
-**Aucune recréation de profil nécessaire.** Vos 10 `forwarder_pricing_profiles` sont parfaitement valides. Il faut juste **compléter 2 colonnes manquantes** sur la table `forwarders` :
-
-1. `supported_modes` : ajouter `"sea"` aux 4 transitaires qui ont des profils `sea`.
-2. `coverage_routes` : déclarer pour chaque transitaire la liste des routes `origine produit → RDC` qu'il accepte.
-
-## Démarche recommandée — 2 voies au choix
-
-### Voie A — UI admin (votre demande explicite, à privilégier)
-
-Étape 1 : j'inspecte `frontend/src/components/admin/forwarders/` (`ForwardersList.tsx` et le dialog d'édition) pour vérifier si les champs **"Modes supportés"** et **"Routes desservies"** sont déjà éditables.
-
-- Si **oui** → je vous fournis la procédure step-by-step pour les remplir vous-même via `/admin/forwarders` sur prod.
-- Si **non** → je les ajoute dans le dialog d'édition (multi-select pour `supported_modes`, table éditable origine/destination pour `coverage_routes`), je commit, GitHub Actions déploie sur Vercel, vous remplissez ensuite à votre rythme.
-
-### Voie B — UPDATE SQL ciblé immédiat (déblocage urgent prod, optionnel)
-
-Si vous voulez débloquer le checkout **maintenant** pendant que l'UI est complétée, je vous prépare un seul `UPDATE` SQL par transitaire, à exécuter sur prod (Supabase.com perso `vpt...yxf`). Calqué sur les profils réels que vous avez fournis :
-
-```sql
--- CONGO QUEEN SARL : profils air (Lubumbashi, Kolwezi) + sea (Lubumbashi)
-UPDATE forwarders SET
-  supported_modes = ARRAY['air','sea'],
-  coverage_routes = '[
-    {"origin_country":"CN","destination_country":"CD"},
-    {"origin_country":"TR","destination_country":"CD"},
-    {"origin_country":"AE","destination_country":"CD"}
-  ]'::jsonb
-WHERE id = '4bf28ac7-2e08-4bcc-b765-7f54d4c6c1da';
-
--- HAM Groupe : profil sea (Kinshasa)
-UPDATE forwarders SET
-  supported_modes = ARRAY['sea'],
-  coverage_routes = '[
-    {"origin_country":"CN","destination_country":"CD"},
-    {"origin_country":"TR","destination_country":"CD"},
-    {"origin_country":"AE","destination_country":"CD"}
-  ]'::jsonb
-WHERE id = '9f67345b-74f1-4372-9474-cecf4f6ae9b5';
-
--- JH SOLUTION : profils air + sea (Kinshasa)
-UPDATE forwarders SET
-  supported_modes = ARRAY['air','sea'],
-  coverage_routes = '[
-    {"origin_country":"CN","destination_country":"CD"},
-    {"origin_country":"TR","destination_country":"CD"},
-    {"origin_country":"AE","destination_country":"CD"}
-  ]'::jsonb
-WHERE id = '124b8c30-876d-431e-bbc6-8ea411210ed5';
-
--- PIVOT YARD LOGISTICS : profils sea (Goma, Bukavu)
-UPDATE forwarders SET
-  supported_modes = ARRAY['sea'],
-  coverage_routes = '[
-    {"origin_country":"CN","destination_country":"CD"},
-    {"origin_country":"TR","destination_country":"CD"},
-    {"origin_country":"AE","destination_country":"CD"}
-  ]'::jsonb
-WHERE id = '752c73c6-b76c-4192-b563-719358cdaa9b';
-
--- SAIDI EXPRESS CARGO : profil air (Kinshasa)
-UPDATE forwarders SET
-  supported_modes = ARRAY['air'],
-  coverage_routes = '[
-    {"origin_country":"CN","destination_country":"CD"},
-    {"origin_country":"TR","destination_country":"CD"},
-    {"origin_country":"AE","destination_country":"CD"}
-  ]'::jsonb
-WHERE id = '6bd72abb-d5b1-4c86-b0cf-c51224096c27';
-
--- VERY SPEED : profil air (Kinshasa)
-UPDATE forwarders SET
-  supported_modes = ARRAY['air'],
-  coverage_routes = '[
-    {"origin_country":"CN","destination_country":"CD"},
-    {"origin_country":"TR","destination_country":"CD"},
-    {"origin_country":"AE","destination_country":"CD"}
-  ]'::jsonb
-WHERE id = '20872af4-5a50-4512-aaf5-358cb4389901';
-
--- BRECHE FREIGHT : aucun profil dans le diag fourni — à confirmer avec vous
--- (pas d'update tant que vous ne m'indiquez pas modes/routes)
+Puis filtrage checkout :
+1. origine effective produit -> pays destination
+2. mode de transport sélectionné
+3. profil tarifaire actif pour la ville client
+4. grille tarifaire applicable donnant un montant > 0
+5. aucune carte sélectionnable si ces conditions ne sont pas toutes vraies
 ```
 
-Les pays d'origine (`CN`, `TR`, `AE`) sont une **proposition par défaut** basée sur votre positionnement Sino-Africain. Je n'écrirai cet UPDATE qu'**après votre validation** de la liste des origines réelles par transitaire (chaque transitaire accepte-t-il vraiment ces 3 origines, ou seulement certaines ?).
+## Solution proposée
 
-## Action concrète que je propose en mode build
+### 1. Faire du profil ville la source de vérité de la desserte
+Au checkout, un transitaire ne sera sélectionnable que s’il possède un `forwarder_pricing_profiles` actif pour :
 
-1. **Lecture du code admin forwarders** pour savoir si `supported_modes` et `coverage_routes` sont déjà éditables via `/admin/forwarders` (10 min).
-2. **Réponse 1** : "champs déjà présents → voici comment les remplir" OU "champs absents → je les ajoute".
-3. **Si champs absents** : ajout dans `ForwardersList.tsx` / dialog d'édition (multi-select modes + éditeur de routes), zéro impact sur la logique checkout.
-4. **Vous demande explicitement** si vous voulez aussi la **Voie B** (UPDATE SQL immédiat) en parallèle, et avec **quelles origines exactes par transitaire** (CN seul ? CN+TR ? CN+TR+AE+autres ?).
+- `country_code = pays destination`, ex. `CD`
+- `city_id = ville client`, ex. Kinshasa ou Lubumbashi
+- `mode = air/sea/...`
+- `is_active = true`
 
-## Détails techniques
+Conséquence :
+- Very Speed configuré seulement Kinshasa n’apparaîtra plus comme offre sélectionnable à Lubumbashi.
+- Congo Queen Lubumbashi apparaîtra à Lubumbashi si son profil Lubumbashi existe.
+- JH / Saidi / Very Speed Kinshasa apparaîtront à Kinshasa si leurs profils Kinshasa existent.
 
-- Aucun changement de schéma (les colonnes existent déjà).
-- Aucune migration nécessaire pour la donnée — c'est de l'UPDATE en table `forwarders`.
-- Pour la Voie B, en mode build je passerais par le **insert tool** (qui gère INSERT/UPDATE/DELETE en données) ciblé sur la base **prod** uniquement, pas Lovable Cloud.
-- Aucun fichier de pricing engine, aucune RPC, aucun composant checkout n'est modifié. Logique stricte (pas d'éligibilité par défaut) **conservée**.
+### 2. Utiliser l’origine produit comme priorité absolue
+La logique restera :
 
-## Validation post-fix
+```text
+si products.origin_country existe -> utiliser ce pays
+sinon -> utiliser stores.country
+```
 
-Après remplissage (par UI ou SQL), au checkout :
-- Produit origine `CN` + livraison Kinshasa + mode `air` → doit afficher JH SOLUTION, SAIDI EXPRESS CARGO, VERY SPEED.
-- Produit origine `CN` + livraison Lubumbashi + mode `sea` → doit afficher CONGO QUEEN SARL.
-- Produit origine `CN` + livraison Goma + mode `sea` → doit afficher PIVOT YARD LOGISTICS.
+Donc une boutique basée en Chine avec un produit d’origine Turquie affichera les transitaires Turquie -> RDC, pas Chine -> RDC.
 
-Si ces 3 cas affichent les bons transitaires, le checkout est débloqué et la logique stricte est respectée à la lettre.
+### 3. Corriger le RPC `get_eligible_forwarders_v2`
+Je propose une migration SQL qui remplacera `get_eligible_forwarders_v2` pour qu’il retourne uniquement les profils réellement éligibles :
+
+- route `coverage_routes` contenant `origin_country -> destination_country`
+- mode inclus dans `supported_modes`
+- profil tarifaire actif pour la ville exacte demandée
+- plus de logique permissive qui laisse passer un profil national sauf règle explicitement prévue
+
+La version actuelle du RPC autorise `fpp.city_id IS NULL OR fpp.city_id = p_destination_city_id`. Je la remplacerai par une condition stricte sur `city_id = p_destination_city_id` pour le checkout.
+
+### 4. Corriger `fetchEligibleFreightOffers`
+Dans `frontend/src/services/freightQuoteCheckout.ts`, je vais :
+
+- supprimer l’exception qui garde toujours `is_platform_owned` visible comme offre sélectionnable ;
+- ne garder Very Speed que si son profil correspond vraiment à la ville et à l’origine ;
+- ignorer toute offre dont le calcul donne `quote.total <= 0` ou “sur devis” dans le checkout client ;
+- afficher l’état “aucun transitaire ne dessert cette route/ville” au lieu d’un transitaire à USD 0.00.
+
+### 5. Supprimer le fallback legacy contradictoire au checkout
+Dans `CheckoutShippingCalculator.tsx`, je vais empêcher l’ancien `ForwarderSelector` de s’afficher pour le flux international quand le nouveau moteur freight est actif.
+
+Aujourd’hui, c’est ce fallback qui peut expliquer :
+
+- les offres qui apparaissent puis disparaissent ;
+- Very Speed affiché deux fois ou contradictoirement ;
+- “Service plateforme non disponible dans votre zone” en haut, puis Very Speed sélectionnable en bas.
+
+Après correction : une seule source d’affichage au checkout pour les transitaires internationaux.
+
+### 6. Nettoyer l’affichage Very Speed indisponible
+Je propose de ne plus afficher une carte Very Speed grisée dans la liste “Choisissez un transitaire”.
+
+À la place :
+
+- si aucun transitaire réel ne couvre la route/ville, afficher un message clair + bouton “Demander une couverture” ;
+- si Very Speed est indisponible dans la zone, cela ne doit jamais apparaître comme une option sélectionnable.
+
+### 7. Ajouter un diagnostic admin utile
+Le bloc debug admin sera amélioré pour montrer :
+
+```text
+origine utilisée: CN / TR / AE
+pays destination: CD
+ville destination: Kinshasa / Lubumbashi
+mode: air / sea
+profils retenus: uniquement ceux passés par les 3 filtres
+raison d’exclusion: route, ville, mode ou tarif absent
+```
+
+Cela permettra de vérifier immédiatement pourquoi JH, Saidi, Congo Queen ou Very Speed apparaissent ou non.
+
+## Migration SQL à fournir
+
+Je fournirai un fichier SQL de migration, par exemple :
+
+```text
+frontend/supabase/migrations/YYYYMMDDHHMMSS_strict_forwarder_checkout_filtering.sql
+```
+
+Il contiendra principalement :
+
+- remplacement de `public.get_eligible_forwarders_v2(...)` ;
+- éventuellement remplacement de `public.get_eligible_forwarders(...)` legacy pour éviter qu’il continue à retourner des résultats incohérents s’il est encore appelé ;
+- commentaires explicites documentant la règle : origine produit > origine boutique, puis destination, puis ville exacte.
+
+## Résultat attendu
+
+Pour ton cas de test :
+
+- Produit origine Chine + adresse Kinshasa + aérien : seuls les transitaires Chine -> CD avec profil Kinshasa actif apparaissent.
+- Produit origine Chine + adresse Lubumbashi + aérien : Congo Queen apparaît si son profil Lubumbashi est actif ; Very Speed n’apparaît pas s’il n’a pas de profil Lubumbashi.
+- Produit origine Turquie + adresse Kinshasa/Lubumbashi : seuls les transitaires Turquie -> CD avec profil de la ville choisie apparaissent.
+- Aucun transitaire à `USD 0.00` ne sera sélectionnable.
+- Plus de double affichage “indisponible” + “sélectionnable”.
+- Plus d’apparition pendant une seconde puis disparition causée par le mélange nouveau moteur / fallback legacy.
+
+## Fichiers à modifier après validation
+
+- `frontend/src/services/freightQuoteCheckout.ts`
+- `frontend/src/components/CheckoutShippingCalculator.tsx`
+- `frontend/src/components/checkout/FreightSelector.tsx`
+- `frontend/src/services/forwarders.ts` si le legacy doit être durci
+- nouvelle migration SQL dans `frontend/supabase/migrations/`
+- idéalement un test unitaire ciblé sur le filtrage route + ville
+
+Je recommande de traiter ça comme hotfix production : corriger d’abord le filtrage strict et supprimer le fallback contradictoire, puis ajuster l’admin ensuite si nécessaire.
