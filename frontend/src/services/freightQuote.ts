@@ -262,54 +262,94 @@ export function quoteByKgTier(
   if (tiers.length === 0) return null;
   const billableRaw = chargeableWeightKg(totalWeightKg, totalCbm, profile.volumetric_divisor);
   if (billableRaw <= 0) return null;
-  // Hotfix : si AU MOINS un palier KG du profil active l'arrondi au kg supérieur,
-  // on calcule le poids facturable AVANT de chercher le palier. Sinon un colis
-  // de 0,8 kg arrondi à 1 kg pouvait sortir du palier "0,1 → 1" (borne stricte
-  // < max_kg) et le devis tombait à 0, ce qui cachait le profil au checkout.
-  const anyRoundUp = tiers.some((t) => t.round_up_to_kg);
-  const billableForLookup = anyRoundUp
-    ? Math.max(1, Math.ceil(billableRaw))
-    : billableRaw;
-  let tier = pickKgTier(tiers, billableForLookup);
-  // Filet de sécurité : si le poids dépasse tout palier borné, on prend le
-  // dernier palier ouvert (max_kg = null) s'il existe, sinon le palier le plus
-  // haut. Évite un null silencieux qui ferait disparaître le profil.
+
+  // ─── Règle de tarification Zandofy (validée client) ─────────────────────────
+  // Cas A — Poids agrégé < 1 kg
+  //   → Forfait fixe = prix du palier 1 kg (ex: 17,90 USD).
+  //     250 g, 750 g, 999 g sont tous facturés au tarif 1 kg.
+  //
+  // Cas B — Poids agrégé ≥ 1 kg
+  //   → Facturé : (poids_réel + 0,1) × prix_par_kg du palier applicable.
+  //     Le buffer de 100 g est une marge interne (variations balance, emballage,
+  //     arrondi transitaire). Le client ne le voit pas comme une ligne séparée :
+  //     seul le total final est affiché.
+  //
+  // L'agrégation des poids des articles du panier est faite EN AMONT par
+  // composeFreightQuote (totalWeightKg = somme du groupe), donc ici on raisonne
+  // toujours sur le poids total du groupe.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const sortedTiers = [...tiers].sort((a, b) => a.min_kg - b.min_kg);
+  // Le palier "1 kg" = palier dont la borne basse couvre 1 kg (premier palier
+  // dans 99 % des configs ; sinon on prend explicitement celui qui matche 1).
+  const baseTier = pickKgTier(sortedTiers, 1) ?? sortedTiers[0] ?? null;
+  if (!baseTier) return null;
+
+  // Cas A : forfait <1 kg
+  if (billableRaw < 1) {
+    if (baseTier.is_quote_only) {
+      return {
+        type: "weight",
+        label: `Palier 1 kg (sur devis)`,
+        weight_kg: 1,
+        unit: "kg",
+        line_total: 0,
+        quote_only: true,
+      };
+    }
+    const flat =
+      baseTier.flat_price != null
+        ? Number(baseTier.flat_price)
+        : baseTier.price_per_kg != null
+          ? Number(baseTier.price_per_kg) // prix/kg appliqué à 1 kg = forfait
+          : null;
+    if (flat == null) return null;
+    return {
+      type: "weight",
+      label: `Forfait minimum (poids < 1 kg)`,
+      weight_kg: 1,
+      unit: "kg",
+      line_total: round2(flat),
+    };
+  }
+
+  // Cas B : poids ≥ 1 kg → poids_réel + buffer 100 g, au prorata du prix/kg.
+  const billableWithBuffer = round2(billableRaw + 0.1);
+  let tier = pickKgTier(sortedTiers, billableWithBuffer);
   if (!tier) {
-    const sorted = [...tiers].sort((a, b) => a.min_kg - b.min_kg);
-    tier = sorted.find((t) => t.max_kg == null) ?? sorted[sorted.length - 1] ?? null;
+    tier = sortedTiers.find((t) => t.max_kg == null) ?? sortedTiers[sortedTiers.length - 1] ?? null;
   }
   if (!tier) return null;
-  const billable = tier.round_up_to_kg ? Math.max(1, Math.ceil(billableRaw)) : billableRaw;
+
   if (tier.is_quote_only) {
     return {
       type: "weight",
       label: `Palier ${tier.min_kg}${tier.max_kg ? `–${tier.max_kg}` : "+"} kg (sur devis)`,
-      weight_kg: billable,
+      weight_kg: billableWithBuffer,
       unit: "kg",
       line_total: 0,
       quote_only: true,
     };
   }
-  if (tier.flat_price != null) {
-    return {
-      type: "weight",
-      label: `Forfait palier ${tier.min_kg}${tier.max_kg ? `–${tier.max_kg}` : "+"} kg`,
-      weight_kg: billable,
-      unit: "kg",
-      line_total: round2(tier.flat_price),
-    };
-  }
+
+  // Pour le calcul prorata, on privilégie price_per_kg du palier matché.
+  // Si le palier n'a qu'un flat_price (cas exotique), on extrapole flat_price/min_kg.
+  let pricePerKg: number | null = null;
   if (tier.price_per_kg != null) {
-    return {
-      type: "weight",
-      label: `${billable} kg × ${tier.price_per_kg} (palier ${tier.min_kg}${tier.max_kg ? `–${tier.max_kg}` : "+"})`,
-      weight_kg: billable,
-      unit: "kg",
-      unit_price: tier.price_per_kg,
-      line_total: round2(billable * tier.price_per_kg),
-    };
+    pricePerKg = Number(tier.price_per_kg);
+  } else if (tier.flat_price != null && tier.min_kg > 0) {
+    pricePerKg = Number(tier.flat_price) / Number(tier.min_kg);
   }
-  return null;
+  if (pricePerKg == null) return null;
+
+  return {
+    type: "weight",
+    label: `${billableRaw.toFixed(2)} kg × ${pricePerKg.toFixed(2)} (palier ${tier.min_kg}${tier.max_kg ? `–${tier.max_kg}` : "+"})`,
+    weight_kg: billableRaw,
+    unit: "kg",
+    unit_price: pricePerKg,
+    line_total: round2(billableWithBuffer * pricePerKg),
+  };
 }
 
 /** Compose un quote complet (CBM + pièces) en respectant les seuils de deposit. */
