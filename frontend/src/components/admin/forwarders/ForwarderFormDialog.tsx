@@ -9,9 +9,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, Upload, X } from "lucide-react";
+import { Loader2, Upload, X, Plus, Trash2, Plane, Ship, Truck, TramFront, Route } from "lucide-react";
 import { z } from "zod";
 import { TransporterUserPicker } from "./TransporterUserPicker";
+
+type TransportMode = "air" | "sea" | "road" | "rail";
+
+interface CoverageRoute {
+  origin_country: string;
+  destination_country: string;
+}
+
+const MODES: { key: TransportMode; label: string; Icon: typeof Plane }[] = [
+  { key: "air", label: "Aérien", Icon: Plane },
+  { key: "sea", label: "Maritime", Icon: Ship },
+  { key: "road", label: "Routier", Icon: Truck },
+  { key: "rail", label: "Ferroviaire", Icon: TramFront },
+];
 
 export interface Forwarder {
   id?: string;
@@ -23,6 +37,8 @@ export interface Forwarder {
   contact_phone?: string | null;
   is_active?: boolean;
   linked_transporter_user_id?: string | null;
+  supported_modes?: string[] | null;
+  coverage_routes?: CoverageRoute[] | null;
 }
 
 const slugify = (s: string) =>
@@ -38,6 +54,15 @@ const forwarderSchema = z.object({
   contact_email: z.string().trim().email("Email invalide").max(255).or(z.literal("")).nullable().optional(),
   contact_phone: z.string().trim().max(32).nullable().optional(),
   linked_transporter_user_id: z.string().uuid().nullable().optional(),
+  supported_modes: z.array(z.enum(["air", "sea", "road", "rail"])).default([]),
+  coverage_routes: z
+    .array(
+      z.object({
+        origin_country: z.string().trim().length(2, "ISO 2 lettres").regex(/^[A-Z]{2}$/, "Majuscules ISO"),
+        destination_country: z.string().trim().length(2, "ISO 2 lettres").regex(/^[A-Z]{2}$/, "Majuscules ISO"),
+      }),
+    )
+    .default([]),
 });
 
 interface Props {
@@ -53,15 +78,25 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
     name: "", slug: "", logo_url: "", description: "",
     contact_email: "", contact_phone: "", is_active: true,
     linked_transporter_user_id: null,
+    supported_modes: [],
+    coverage_routes: [],
   });
   const [uploading, setUploading] = useState(false);
+  const [newOrigin, setNewOrigin] = useState("");
+  const [newDest, setNewDest] = useState("CD");
 
   useEffect(() => {
-    if (forwarder) setForm({ ...forwarder });
+    if (forwarder) setForm({
+      ...forwarder,
+      supported_modes: Array.isArray(forwarder.supported_modes) ? forwarder.supported_modes : [],
+      coverage_routes: Array.isArray(forwarder.coverage_routes) ? forwarder.coverage_routes : [],
+    });
     else setForm({
       name: "", slug: "", logo_url: "", description: "",
       contact_email: "", contact_phone: "", is_active: true,
       linked_transporter_user_id: null,
+      supported_modes: [],
+      coverage_routes: [],
     });
   }, [forwarder, open]);
 
@@ -103,6 +138,8 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
         contact_email: payload.contact_email || null,
         contact_phone: payload.contact_phone || null,
         linked_transporter_user_id: payload.linked_transporter_user_id || null,
+        supported_modes: payload.supported_modes ?? [],
+        coverage_routes: payload.coverage_routes ?? [],
       });
       if (!parsed.success) {
         throw new Error(parsed.error.issues[0]?.message ?? "Données invalides");
@@ -127,6 +164,38 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
     },
     onError: (e: any) => toast.error(e.message ?? "Erreur"),
   });
+
+  const toggleMode = (mode: TransportMode) => {
+    const current = new Set(form.supported_modes ?? []);
+    if (current.has(mode)) current.delete(mode);
+    else current.add(mode);
+    setForm({ ...form, supported_modes: [...current] });
+  };
+
+  const addRoute = () => {
+    const origin = newOrigin.trim().toUpperCase();
+    const dest = newDest.trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(origin) || !/^[A-Z]{2}$/.test(dest)) {
+      toast.error("Codes ISO 2 lettres requis (ex: CN, TR, AE → CD)");
+      return;
+    }
+    const routes = form.coverage_routes ?? [];
+    if (routes.some((r) => r.origin_country === origin && r.destination_country === dest)) {
+      toast.error("Cette route existe déjà");
+      return;
+    }
+    setForm({
+      ...form,
+      coverage_routes: [...routes, { origin_country: origin, destination_country: dest }],
+    });
+    setNewOrigin("");
+  };
+
+  const removeRoute = (idx: number) => {
+    const routes = [...(form.coverage_routes ?? [])];
+    routes.splice(idx, 1);
+    setForm({ ...form, coverage_routes: routes });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -225,6 +294,92 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
 
           <div className="text-[11px] text-muted-foreground px-1">
             Le multiplicateur de prix est configuré par palier tarifaire (modes air/sea × tiers express/standard/vip) depuis l'icône <span className="font-semibold">$</span> de la liste.
+          </div>
+
+          <div className="space-y-2 p-3 border border-border rounded-lg bg-muted/20">
+            <Label className="text-sm flex items-center gap-1.5">
+              <Plane size={13} className="text-primary" /> Modes supportés *
+            </Label>
+            <p className="text-[11px] text-muted-foreground">
+              Cochez les modes pour lesquels ce transitaire propose un service. Doit correspondre aux profils tarifaires créés (icône $).
+            </p>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {MODES.map(({ key, label, Icon }) => {
+                const checked = (form.supported_modes ?? []).includes(key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleMode(key)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm transition-all ${
+                      checked
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                    }`}
+                  >
+                    <Icon size={14} className={checked ? "text-primary" : ""} />
+                    {label}
+                    {checked && <span className="ml-auto text-[10px] text-primary">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2 p-3 border border-border rounded-lg bg-muted/20">
+            <Label className="text-sm flex items-center gap-1.5">
+              <Route size={13} className="text-primary" /> Routes desservies (origine → destination) *
+            </Label>
+            <p className="text-[11px] text-muted-foreground">
+              Pays d'origine des marchandises que ce transitaire accepte d'acheminer vers une destination donnée. Sans route déclarée, le transitaire n'apparaît pour aucune commande.
+            </p>
+            <div className="grid grid-cols-[1fr_auto_1fr_auto] items-end gap-2 pt-1">
+              <div>
+                <Label className="text-[10px] uppercase text-muted-foreground">Origine</Label>
+                <Input
+                  value={newOrigin}
+                  onChange={(e) => setNewOrigin(e.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="CN"
+                  maxLength={2}
+                  className="font-mono uppercase"
+                />
+              </div>
+              <span className="pb-2 text-muted-foreground">→</span>
+              <div>
+                <Label className="text-[10px] uppercase text-muted-foreground">Destination</Label>
+                <Input
+                  value={newDest}
+                  onChange={(e) => setNewDest(e.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="CD"
+                  maxLength={2}
+                  className="font-mono uppercase"
+                />
+              </div>
+              <Button type="button" size="sm" onClick={addRoute} disabled={!newOrigin || !newDest}>
+                <Plus size={14} />
+              </Button>
+            </div>
+            {(form.coverage_routes ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-2">
+                {(form.coverage_routes ?? []).map((r, idx) => (
+                  <div
+                    key={`${r.origin_country}-${r.destination_country}-${idx}`}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-background text-xs font-mono"
+                  >
+                    <span>{r.origin_country}</span>
+                    <span className="text-muted-foreground">→</span>
+                    <span>{r.destination_country}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeRoute(idx)}
+                      className="ml-1 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5 p-3 border border-border rounded-lg bg-muted/20">
