@@ -613,7 +613,21 @@ export function CheckoutShippingCalculator({
             )}
             {details?.[0] && (
               <div className="text-[10px] text-muted-foreground/60">
-                {details[0].origin_city} → {details[0].destination_city} · {details[0].distance_km.toLocaleString()} km
+                {(() => {
+                  // Affichage origine = PAYS uniquement (jamais une ville arbitraire)
+                  // La ville la plus peuplée n'est qu'un proxy interne pour le calcul Haversine.
+                  const originCC = details[0].origin_city.match(/\(([A-Z]{2})\)/)?.[1] ?? "";
+                  let originLabel = details[0].origin_city;
+                  if (originCC) {
+                    try {
+                      const dn = new Intl.DisplayNames(["fr"], { type: "region" });
+                      originLabel = dn.of(originCC) || originCC;
+                    } catch {
+                      originLabel = originCC;
+                    }
+                  }
+                  return `${originLabel} → ${details[0].destination_city}`;
+                })()} · {details[0].distance_km.toLocaleString()} km
                 {details[0].route_type === "default" && " · Tarif indicatif"}
               </div>
             )}
