@@ -10221,6 +10221,30 @@ export type Database = {
           ticket_reference: string
         }[]
       }
+      debug_forwarder_checkout_eligibility: {
+        Args: {
+          p_destination_city_id: string
+          p_destination_country: string
+          p_mode: string
+          p_origin_country: string
+        }
+        Returns: {
+          forwarder_id: string
+          forwarder_name: string
+          has_cbm_tier: boolean
+          has_country_profile: boolean
+          has_exact_city_profile: boolean
+          has_kg_tier: boolean
+          has_piece_tier: boolean
+          has_route: boolean
+          is_active: boolean
+          picked_profile_id: string
+          reason: string
+          status: string
+          supports_mode: boolean
+          would_be_eligible: boolean
+        }[]
+      }
       deduct_points: {
         Args: { p_amount: number; p_user_id: string }
         Returns: undefined
