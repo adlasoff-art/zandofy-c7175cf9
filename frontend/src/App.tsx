@@ -151,6 +151,7 @@ const AdminServicePlansPage = lazyRetry(() => import("./pages/admin/AdminService
 const AdminDeliveryPlansPage = lazyRetry(() => import("./pages/admin/AdminDeliveryPlansPage"));
 const AdminServicePackagesPage = lazyRetry(() => import("./pages/admin/AdminServicePackagesPage"));
 const AdminErrorReportsPage = lazyRetry(() => import("./pages/admin/AdminErrorReportsPage"));
+const AdminHealthPage = lazyRetry(() => import("./pages/admin/AdminHealthPage"));
 const ImpersonatePage = lazyRetry(() => import("./pages/ImpersonatePage"));
 const SourcingPage = lazyRetry(() => import("./pages/SourcingPage"));
 const AdminProductSourcingPage = lazyRetry(() => import("./pages/admin/AdminProductSourcingPage"));
