@@ -1653,6 +1653,39 @@ export type Database = {
           },
         ]
       }
+      cron_heartbeats: {
+        Row: {
+          expected_interval_minutes: number
+          failed_runs: number | null
+          job_name: string
+          last_error: string | null
+          last_status: string | null
+          last_tick_at: string
+          metadata: Json | null
+          total_runs: number | null
+        }
+        Insert: {
+          expected_interval_minutes?: number
+          failed_runs?: number | null
+          job_name: string
+          last_error?: string | null
+          last_status?: string | null
+          last_tick_at?: string
+          metadata?: Json | null
+          total_runs?: number | null
+        }
+        Update: {
+          expected_interval_minutes?: number
+          failed_runs?: number | null
+          job_name?: string
+          last_error?: string | null
+          last_status?: string | null
+          last_tick_at?: string
+          metadata?: Json | null
+          total_runs?: number | null
+        }
+        Relationships: []
+      }
       customer_locations: {
         Row: {
           id: string
@@ -3844,6 +3877,102 @@ export type Database = {
         }
         Relationships: []
       }
+      health_checks: {
+        Row: {
+          checked_at: string
+          component: string
+          component_type: string
+          error_message: string | null
+          http_status: number | null
+          id: string
+          latency_ms: number | null
+          metadata: Json | null
+          status: string
+        }
+        Insert: {
+          checked_at?: string
+          component: string
+          component_type: string
+          error_message?: string | null
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          metadata?: Json | null
+          status: string
+        }
+        Update: {
+          checked_at?: string
+          component?: string
+          component_type?: string
+          error_message?: string | null
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          metadata?: Json | null
+          status?: string
+        }
+        Relationships: []
+      }
+      health_incidents: {
+        Row: {
+          alert_channels_sent: string[] | null
+          closed_at: string | null
+          component: string
+          component_type: string
+          created_at: string
+          description: string | null
+          id: string
+          is_open: boolean | null
+          last_occurrence_at: string
+          metadata: Json | null
+          occurrences_count: number | null
+          opened_at: string
+          resolution_notes: string | null
+          resolved_by: string | null
+          severity: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          alert_channels_sent?: string[] | null
+          closed_at?: string | null
+          component: string
+          component_type: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_open?: boolean | null
+          last_occurrence_at?: string
+          metadata?: Json | null
+          occurrences_count?: number | null
+          opened_at?: string
+          resolution_notes?: string | null
+          resolved_by?: string | null
+          severity?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          alert_channels_sent?: string[] | null
+          closed_at?: string | null
+          component?: string
+          component_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_open?: boolean | null
+          last_occurrence_at?: string
+          metadata?: Json | null
+          occurrences_count?: number | null
+          opened_at?: string
+          resolution_notes?: string | null
+          resolved_by?: string | null
+          severity?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hub_storage_tracking: {
         Row: {
           arrived_at: string
@@ -4479,6 +4608,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      monitoring_settings: {
+        Row: {
+          alert_banner_enabled: boolean | null
+          alert_email_enabled: boolean | null
+          alert_emails: string[] | null
+          alert_push_enabled: boolean | null
+          ef_latency_threshold_ms: number | null
+          enabled: boolean | null
+          failure_rate_threshold_pct: number | null
+          id: number
+          kelpay_latency_threshold_ms: number | null
+          smtp_test_recipient: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          alert_banner_enabled?: boolean | null
+          alert_email_enabled?: boolean | null
+          alert_emails?: string[] | null
+          alert_push_enabled?: boolean | null
+          ef_latency_threshold_ms?: number | null
+          enabled?: boolean | null
+          failure_rate_threshold_pct?: number | null
+          id?: number
+          kelpay_latency_threshold_ms?: number | null
+          smtp_test_recipient?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          alert_banner_enabled?: boolean | null
+          alert_email_enabled?: boolean | null
+          alert_emails?: string[] | null
+          alert_push_enabled?: boolean | null
+          ef_latency_threshold_ms?: number | null
+          enabled?: boolean | null
+          failure_rate_threshold_pct?: number | null
+          id?: number
+          kelpay_latency_threshold_ms?: number | null
+          smtp_test_recipient?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -9871,6 +10045,21 @@ export type Database = {
           },
         ]
       }
+      v_system_health: {
+        Row: {
+          avg_latency_ok: number | null
+          component: string | null
+          component_type: string | null
+          down_checks: number | null
+          has_open_incident: boolean | null
+          last_check_at: string | null
+          last_status: string | null
+          ok_checks: number | null
+          total_checks: number | null
+          uptime_pct_24h: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       add_guest_support_message: {
@@ -10296,6 +10485,15 @@ export type Database = {
           p_reason: string
         }
         Returns: string
+      }
+      record_cron_heartbeat: {
+        Args: {
+          _error?: string
+          _expected_interval_minutes?: number
+          _job_name: string
+          _status?: string
+        }
+        Returns: undefined
       }
       refresh_all_operator_reliability: { Args: never; Returns: number }
       refresh_store_online_status: {
