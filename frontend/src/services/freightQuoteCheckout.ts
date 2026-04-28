@@ -276,7 +276,32 @@ export async function fetchEligibleFreightOffers(
 
   const validOffers = offers
     .filter((o): o is EligibleFreightOffer => o !== null)
-    // Garde-fou : aucun "USD 0.00" sélectionnable au checkout client.
+    // Hotfix : on garde TOUS les profils trouvés (route + ville + mode OK).
+    // Si le total local vaut 0 mais que le RPC serveur a renvoyé un split_total,
+    // on prend ce dernier comme total effectif. Sinon on logge clairement la
+    // raison (palier KG/CBM/pièce manquant) au lieu de faire disparaître le
+    // transitaire et d'afficher à tort « aucune couverture ».
+    .map((o) => {
+      const localTotal = Number(o.quote?.total) || 0;
+      const splitTotal = Number(o.split_total) || 0;
+      if (localTotal > 0) return o;
+      if (splitTotal > 0) {
+        return { ...o, quote: { ...o.quote, total: splitTotal } };
+      }
+      console.warn(
+        "[freightQuoteCheckout] Profil éligible mais devis = 0 — palier tarifaire non applicable",
+        {
+          profile_id: o.profile_id,
+          forwarder_id: o.forwarder_id,
+          forwarder_name: o.forwarder_name,
+          mode: o.mode,
+          city_id: o.city_id,
+          weight_kg: o.quote?.total_chargeable_weight_kg,
+          cbm: o.quote?.total_cbm,
+        },
+      );
+      return o;
+    })
     .filter((o) => Number(o.quote.total) > 0)
     .sort((a, b) => a.quote.total - b.quote.total);
 

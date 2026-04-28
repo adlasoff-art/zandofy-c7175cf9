@@ -262,7 +262,22 @@ export function quoteByKgTier(
   if (tiers.length === 0) return null;
   const billableRaw = chargeableWeightKg(totalWeightKg, totalCbm, profile.volumetric_divisor);
   if (billableRaw <= 0) return null;
-  const tier = pickKgTier(tiers, billableRaw);
+  // Hotfix : si AU MOINS un palier KG du profil active l'arrondi au kg supérieur,
+  // on calcule le poids facturable AVANT de chercher le palier. Sinon un colis
+  // de 0,8 kg arrondi à 1 kg pouvait sortir du palier "0,1 → 1" (borne stricte
+  // < max_kg) et le devis tombait à 0, ce qui cachait le profil au checkout.
+  const anyRoundUp = tiers.some((t) => t.round_up_to_kg);
+  const billableForLookup = anyRoundUp
+    ? Math.max(1, Math.ceil(billableRaw))
+    : billableRaw;
+  let tier = pickKgTier(tiers, billableForLookup);
+  // Filet de sécurité : si le poids dépasse tout palier borné, on prend le
+  // dernier palier ouvert (max_kg = null) s'il existe, sinon le palier le plus
+  // haut. Évite un null silencieux qui ferait disparaître le profil.
+  if (!tier) {
+    const sorted = [...tiers].sort((a, b) => a.min_kg - b.min_kg);
+    tier = sorted.find((t) => t.max_kg == null) ?? sorted[sorted.length - 1] ?? null;
+  }
   if (!tier) return null;
   const billable = tier.round_up_to_kg ? Math.max(1, Math.ceil(billableRaw)) : billableRaw;
   if (tier.is_quote_only) {

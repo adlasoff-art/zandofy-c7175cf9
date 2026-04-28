@@ -10489,29 +10489,15 @@ export type Database = {
         Returns: Json
       }
       process_dispute_sla: { Args: never; Returns: Json }
-      quote_forwarder:
-        | {
-            Args: { p_items: Json; p_profile_id: string; p_total_cbm?: number }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_consolidation_choice?: string
-              p_items: Json
-              p_profile_id: string
-              p_total_cbm?: number
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_items: Json
-              p_profile_id: string
-              p_total_cbm?: number
-              p_total_weight_kg?: number
-            }
-            Returns: Json
-          }
+      quote_forwarder: {
+        Args: {
+          p_consolidation_choice?: string
+          p_items: Json
+          p_profile_id: string
+          p_total_cbm?: number
+        }
+        Returns: Json
+      }
       reassign_forwarder: {
         Args: {
           p_actor_role?: string

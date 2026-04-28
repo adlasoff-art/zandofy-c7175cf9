@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Loader2, Upload, X, Plus, Trash2, Plane, Ship, Truck, TramFront, Route } from "lucide-react";
 import { z } from "zod";
 import { TransporterUserPicker } from "./TransporterUserPicker";
+import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
 
 type TransportMode = "air" | "sea" | "road" | "rail";
 
@@ -85,7 +86,7 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
   });
   const [uploading, setUploading] = useState(false);
   const [newOrigin, setNewOrigin] = useState("");
-  const [newDest, setNewDest] = useState("CD");
+  const [newDest, setNewDest] = useState<string>("CD");
 
   useEffect(() => {
     if (forwarder) setForm({
@@ -352,24 +353,22 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
             </p>
             <div className="grid grid-cols-[1fr_auto_1fr_auto] items-end gap-2 pt-1">
               <div>
-                <Label className="text-[10px] uppercase text-muted-foreground">Origine</Label>
-                <Input
+                <CountryCombobox
                   value={newOrigin}
-                  onChange={(e) => setNewOrigin(e.target.value.toUpperCase().slice(0, 2))}
-                  placeholder="CN"
-                  maxLength={2}
-                  className="font-mono uppercase"
+                  onChange={(v) => setNewOrigin(v)}
+                  label="Origine"
+                  placeholder="Pays d'origine..."
+                  showNone={false}
                 />
               </div>
               <span className="pb-2 text-muted-foreground">→</span>
               <div>
-                <Label className="text-[10px] uppercase text-muted-foreground">Destination</Label>
-                <Input
+                <CountryCombobox
                   value={newDest}
-                  onChange={(e) => setNewDest(e.target.value.toUpperCase().slice(0, 2))}
-                  placeholder="CD"
-                  maxLength={2}
-                  className="font-mono uppercase"
+                  onChange={(v) => setNewDest(v)}
+                  label="Destination"
+                  placeholder="Pays de destination..."
+                  showNone={false}
                 />
               </div>
               <Button type="button" size="sm" onClick={addRoute} disabled={!newOrigin || !newDest}>
@@ -381,11 +380,13 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
                 {(form.coverage_routes ?? []).map((r, idx) => (
                   <div
                     key={`${r.origin_country}-${r.destination_country}-${idx}`}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-background text-xs font-mono"
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-background text-xs"
                   >
-                    <span>{r.origin_country}</span>
+                    <span className="font-mono">{r.origin_country}</span>
+                    <span className="text-muted-foreground hidden sm:inline">{getCountryName(r.origin_country)}</span>
                     <span className="text-muted-foreground">→</span>
-                    <span>{r.destination_country}</span>
+                    <span className="font-mono">{r.destination_country}</span>
+                    <span className="text-muted-foreground hidden sm:inline">{getCountryName(r.destination_country)}</span>
                     <button
                       type="button"
                       onClick={() => removeRoute(idx)}
