@@ -149,19 +149,29 @@ export async function fetchEligibleFreightOffers(
   const originISO = (input.originCountry || "").toUpperCase().trim();
   const destISO = (input.destinationCountry || "").toUpperCase().trim();
 
-  // Étape A : ne garder que les profils dont la ville correspond exactement.
-  const cityScopedProfiles = input.destinationCityId
-    ? profilesList.filter((p) => p.city_id === input.destinationCityId)
-    : [];
+  // Étape A : pour chaque transitaire, garder le profil le plus spécifique
+  //  - priorité au profil city_id = destination
+  //  - sinon fallback profil pays-large (city_id IS NULL)
+  // Évite de bloquer le checkout si l'admin n'a pas créé de profil ville-
+  // spécifique mais a un profil pays/mode actif.
+  const byForwarder = new Map<string, typeof profilesList[number]>();
+  for (const p of profilesList) {
+    const isExact = !!input.destinationCityId && p.city_id === input.destinationCityId;
+    const existing = byForwarder.get(p.forwarder_id);
+    if (!existing) {
+      byForwarder.set(p.forwarder_id, p);
+      continue;
+    }
+    const existingIsExact =
+      !!input.destinationCityId && existing.city_id === input.destinationCityId;
+    if (isExact && !existingIsExact) byForwarder.set(p.forwarder_id, p);
+  }
+  const cityScopedProfiles = Array.from(byForwarder.values());
 
-  // Diagnostic : pourquoi 0 transitaire ? On loggue à chaque étape ce qu'on jette.
   if (cityScopedProfiles.length === 0 && profilesList.length > 0) {
     console.warn(
-      "[freightQuoteCheckout] Aucun profil avec city_id =",
-      input.destinationCityId,
-      "— profils existants pointent vers city_id:",
-      [...new Set(profilesList.map((p) => p.city_id))],
-      `(mode=${input.mode}, pays_dest=${input.destinationCountry})`,
+      "[freightQuoteCheckout] Aucun profil utilisable malgré profils chargés",
+      { destCity: input.destinationCityId, mode: input.mode, pays: input.destinationCountry },
     );
   }
 
