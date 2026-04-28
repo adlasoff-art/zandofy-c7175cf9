@@ -30,6 +30,7 @@ import { VendorKybV2Tab } from "@/components/vendor/VendorKybV2Tab";
 import { VendorAnalyticsProTab } from "@/components/vendor/VendorAnalyticsProTab";
 import { VendorFreightSimulator } from "@/components/vendor/VendorFreightSimulator";
 import VendorOriginCountriesCard from "@/components/vendor/VendorOriginCountriesCard";
+import { GeoFieldsRow, type GeoFieldsValue } from "@/components/address/GeoFieldsRow";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
