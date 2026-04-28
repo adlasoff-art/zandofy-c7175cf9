@@ -808,8 +808,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
 
   // Location fields
   const [storeAddress, setStoreAddress] = useState("");
-  const [storeCity, setStoreCity] = useState("");
-  const [storeCountry, setStoreCountry] = useState("");
+  const [geo, setGeo] = useState<GeoFieldsValue>({});
+  // legacy display values (kept in DB columns city/country for backwards compat)
+  const [legacyCity, setLegacyCity] = useState("");
+  const [legacyCountry, setLegacyCountry] = useState("");
 
   // SEO fields
   const [seoTitle, setSeoTitle] = useState("");
@@ -821,10 +823,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
     // Load banner_url + SEO + presence + location
     (supabase as any)
       .from("stores")
-      .select("meta_title, meta_description, seo_keywords, banner_url, presence_visible, address, city, country")
+      .select("meta_title, meta_description, seo_keywords, banner_url, presence_visible, address, city, country, country_code, province_id, city_id, commune_id")
       .eq("id", store.id)
       .single()
-      .then(({ data }: any) => {
+      .then(async ({ data }: any) => {
         if (data) {
           setSeoTitle(data.meta_title || "");
           setSeoDesc(data.meta_description || "");
@@ -832,8 +834,34 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
           setBannerPreview(data.banner_url || null);
           setPresenceVisible(data.presence_visible !== false);
           setStoreAddress(data.address || "");
-          setStoreCity(data.city || "");
-          setStoreCountry(data.country || "");
+          setLegacyCity(data.city || "");
+          setLegacyCountry(data.country || "");
+
+          // Hydrate combobox: resolve city / commune names from UUIDs
+          let cityName = "";
+          let communeName = "";
+          if (data.city_id) {
+            const { data: cityRow } = await (supabase as any)
+              .from("cities")
+              .select("name")
+              .eq("id", data.city_id)
+              .maybeSingle();
+            cityName = cityRow?.name || "";
+          }
+          if (data.commune_id) {
+            const { data: comRow } = await (supabase as any)
+              .from("communes")
+              .select("name")
+              .eq("id", data.commune_id)
+              .maybeSingle();
+            communeName = comRow?.name || "";
+          }
+          setGeo({
+            country: data.country_code || "",
+            province_id: data.province_id || "",
+            city: cityName,
+            commune: communeName,
+          });
         }
         setSeoLoading(false);
       });
@@ -899,6 +927,39 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   const handleSave = async () => {
     setSaving(true);
     const keywords = seoKeywords.split(",").map((k) => k.trim()).filter(Boolean);
+
+    // Resolve city_id, commune_id, country display name from combobox selections
+    let cityId: string | null = null;
+    let communeId: string | null = null;
+    let countryName: string = legacyCountry;
+
+    if (geo.country) {
+      const { data: countryRow } = await (supabase as any)
+        .from("countries")
+        .select("name")
+        .eq("code", geo.country)
+        .maybeSingle();
+      if (countryRow?.name) countryName = countryRow.name;
+    }
+    if (geo.country && geo.city) {
+      const { data: cityRow } = await (supabase as any)
+        .from("cities")
+        .select("id")
+        .eq("country_code", geo.country)
+        .ilike("name", geo.city)
+        .maybeSingle();
+      cityId = cityRow?.id || null;
+    }
+    if (cityId && geo.commune) {
+      const { data: comRow } = await (supabase as any)
+        .from("communes")
+        .select("id")
+        .eq("city_id", cityId)
+        .ilike("name", geo.commune)
+        .maybeSingle();
+      communeId = comRow?.id || null;
+    }
+
     const { error } = await (supabase as any)
       .from("stores")
       .update({
@@ -907,8 +968,14 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
         meta_description: seoDesc.trim() || null,
         seo_keywords: keywords.length > 0 ? keywords : null,
         address: storeAddress.trim() || null,
-        city: storeCity.trim() || null,
-        country: storeCountry.trim() || null,
+        // Structured (used by transitaires / forwarders matching)
+        country_code: geo.country || null,
+        province_id: geo.province_id || null,
+        city_id: cityId,
+        commune_id: communeId,
+        // Legacy text columns kept in sync for shipping labels & store page display
+        city: geo.city || null,
+        country: countryName || null,
       })
       .eq("id", store.id);
 
