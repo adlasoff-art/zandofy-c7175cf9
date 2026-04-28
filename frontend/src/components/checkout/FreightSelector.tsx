@@ -248,6 +248,7 @@ export function FreightSelector({
             destinationCountry={destinationCountry}
             destinationCityId={destinationCityId}
             destinationCityName={destinationCityName}
+            originCountry={originCountry}
             mode={mode}
             totalCbm={totalCbm}
             totalWeightKg={totalWeightKg}
@@ -315,6 +316,7 @@ export function FreightSelector({
           destinationCountry={destinationCountry}
           destinationCityId={destinationCityId}
           destinationCityName={destinationCityName}
+          originCountry={originCountry}
           mode={mode}
           totalCbm={totalCbm}
           totalWeightKg={totalWeightKg}
@@ -332,6 +334,7 @@ function AdminDebugBanner({
   destinationCountry,
   destinationCityId,
   destinationCityName,
+  originCountry,
   mode,
   totalCbm,
   totalWeightKg,
@@ -343,6 +346,7 @@ function AdminDebugBanner({
   destinationCountry: string;
   destinationCityId?: string | null;
   destinationCityName?: string | null;
+  originCountry?: string | null;
   mode: string;
   totalCbm?: number;
   totalWeightKg?: number;
@@ -370,6 +374,7 @@ function AdminDebugBanner({
             <span className="opacity-70">country_code</span><span>{destinationCountry || "∅"}</span>
             <span className="opacity-70">city_id</span><span className="truncate">{destinationCityId || "∅"}</span>
             <span className="opacity-70">city_name</span><span>{destinationCityName || "∅"}</span>
+            <span className="opacity-70">origin_country</span><span>{originCountry || "∅"}</span>
             <span className="opacity-70">mode</span><span>{mode || "∅"}</span>
             <span className="opacity-70">total_cbm</span><span>{totalCbm ?? "∅"}</span>
             <span className="opacity-70">total_kg</span><span>{totalWeightKg ?? "∅"}</span>
@@ -386,7 +391,7 @@ function AdminDebugBanner({
           )}
           {offers.length === 0 && (
             <div className="pt-1 mt-1 border-t border-amber-500/30 opacity-80">
-              SQL : forwarder_pricing_profiles WHERE is_active=true AND country_code='{destinationCountry}' AND mode='{mode}' AND (city_id IS NULL OR city_id='{destinationCityId ?? "∅"}')
+              SQL strict : profil actif country_code='{destinationCountry}' AND mode='{mode}' AND city_id='{destinationCityId ?? "∅"}' + transitaire actif/approved + route {originCountry || "∅"}→{destinationCountry} + supported_modes contient '{mode}'
             </div>
           )}
         </div>
