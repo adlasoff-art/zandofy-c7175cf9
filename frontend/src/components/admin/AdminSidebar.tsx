@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, Image, FolderTree, Bell, Settings, ShieldCheck, Truck, Package, DollarSign, Store, PenLine, Crown, ScrollText, Heart, Coins, Ticket, Banknote, RotateCcw, AlertTriangle, ArrowLeftRight, Globe, Megaphone, Headphones, Layers, BarChart3, Mail, User, Receipt, Star, MapPin, Zap, Bug, PackageSearch, MailQuestion,
+  LayoutDashboard, Users, Image, FolderTree, Bell, Settings, ShieldCheck, Truck, Package, DollarSign, Store, PenLine, Crown, ScrollText, Heart, Coins, Ticket, Banknote, RotateCcw, AlertTriangle, ArrowLeftRight, Globe, Megaphone, Headphones, Layers, BarChart3, Mail, User, Receipt, Star, MapPin, Zap, Bug, PackageSearch, MailQuestion, Activity,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useRoles } from "@/hooks/use-roles";
@@ -124,6 +124,7 @@ const sidebarSections: SidebarSection[] = [
     items: [
       { title: "Support client", url: "/admin/support", icon: Headphones },
       { title: "Rapports d'erreurs", url: "/admin/error-reports", icon: Bug },
+      { title: "Santé système", url: "/admin/health", icon: Activity },
       { title: "Journal d'audit", url: "/admin/audit", icon: ScrollText },
       { title: "Notifications", url: "/admin/notifications", icon: Bell },
       { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },

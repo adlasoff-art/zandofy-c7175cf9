@@ -9,6 +9,7 @@ import { OrdersTab } from "@/components/admin/dashboard/OrdersTab";
 import { LogisticsTab } from "@/components/admin/dashboard/LogisticsTab";
 import { VendorsTab } from "@/components/admin/dashboard/VendorsTab";
 import { ClientsTab } from "@/components/admin/dashboard/ClientsTab";
+import { SystemHealthWidget } from "@/components/admin/SystemHealthWidget";
 import { useQueryClient } from "@tanstack/react-query";
 import { LayoutDashboard, BarChart3, Truck, Store, Users, Receipt } from "lucide-react";
 
@@ -40,6 +41,9 @@ export default function AdminDashboard() {
 
   return (
     <AdminLayout title="Tableau de bord">
+      <div className="mb-4">
+        <SystemHealthWidget />
+      </div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <Tabs defaultValue="overview" className="w-full">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">

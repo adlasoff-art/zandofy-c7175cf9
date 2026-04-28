@@ -120,3 +120,4 @@
 - [KYB/KYC v2](mem://features/kyb-kyc-v2) — Lot 15 : pack complet RCCM+ID+Adresse+NIF+RIB, scoring auto, queue admin manuelle
 - [Vendor Analytics Pro](mem://features/vendor-analytics-pro) — Lot 16 : 6 RPC analytics (KPIs/funnel/cohortes/top/export), filtres ville+méthode, exports CSV/PDF, cron email hebdo/mensuel
 - [Lot 17 Tech Debt & Perfs](mem://features/lot17-tech-debt-perf) — Hardening DB conservateur (REVOKE EXECUTE sur ~95 fonctions internes) + 9 indexes perfs (orders, payments, products, reviews, notifications). Linter 298→133 warnings.
+- [Lot 18 Observability](mem://features/lot18-observability-monitoring) — Healthchecks 5min (KelPay, EFs critiques, SMTP, crons), incidents auto dédupliqués, alertes email/push/banner, page /admin/health (4 onglets) + widget AdminDashboard
