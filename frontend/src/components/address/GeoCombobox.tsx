@@ -9,6 +9,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 interface GeoOption {
   value: string;
   label: string;
+  id?: string;
 }
 
 interface GeoComboboxProps {
