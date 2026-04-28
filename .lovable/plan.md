@@ -1,134 +1,170 @@
-Oui, j’ai compris le problème, et ta frustration est légitime : en production, le checkout mélange actuellement plusieurs couches de logique qui ne devraient pas se mélanger.
+Tu as raison : le problème n’est pas seulement “un filtre SQL”. J’ai revu la chaîne checkout/transitaire de bout en bout. Le nœud est une combinaison de 3 choses, dont une critique en production.
 
-Le comportement observé vient très probablement de trois incohérences combinées :
+## Diagnostic ferme
 
-1. Le nouveau sélecteur `FreightSelector` filtre partiellement par origine produit et ville, mais il laisse toujours passer le transitaire plateforme (`is_platform_owned`, Very Speed) même si la route/ville ne correspond pas.
-2. Quand le nouveau sélecteur dit “aucune offre réellement disponible”, le checkout affiche encore l’ancien `ForwarderSelector` legacy en fallback, qui ne connaît pas l’origine produit et utilise un ancien RPC. Cela peut faire réapparaître des transitaires qui ne devraient plus être là.
-3. La règle `city_id IS NULL OR city_id = ville_client` autorise des profils “pays entier” à apparaître dans toutes les villes. Or pour votre modèle métier, un transitaire doit être affiché au checkout seulement s’il a un profil ville correspondant, sauf si vous avez explicitement créé un vrai profil national.
-
-La nouvelle règle métier doit être stricte :
+### 1. La migration stricte précédente est au mauvais endroit pour la prod
+La correction SQL stricte existe ici :
 
 ```text
-Origine effective du produit
-= products.origin_country si renseigné
-= sinon stores.country
-
-Puis filtrage checkout :
-1. origine effective produit -> pays destination
-2. mode de transport sélectionné
-3. profil tarifaire actif pour la ville client
-4. grille tarifaire applicable donnant un montant > 0
-5. aucune carte sélectionnable si ces conditions ne sont pas toutes vraies
+supabase/migrations/20260428190655_6509aa80-ad58-4788-9f31-aca9f0ccc5c4.sql
 ```
 
-## Solution proposée
-
-### 1. Faire du profil ville la source de vérité de la desserte
-Au checkout, un transitaire ne sera sélectionnable que s’il possède un `forwarder_pricing_profiles` actif pour :
-
-- `country_code = pays destination`, ex. `CD`
-- `city_id = ville client`, ex. Kinshasa ou Lubumbashi
-- `mode = air/sea/...`
-- `is_active = true`
-
-Conséquence :
-- Very Speed configuré seulement Kinshasa n’apparaîtra plus comme offre sélectionnable à Lubumbashi.
-- Congo Queen Lubumbashi apparaîtra à Lubumbashi si son profil Lubumbashi existe.
-- JH / Saidi / Very Speed Kinshasa apparaîtront à Kinshasa si leurs profils Kinshasa existent.
-
-### 2. Utiliser l’origine produit comme priorité absolue
-La logique restera :
+Mais dans ce projet, la source de vérité DB documentée est :
 
 ```text
-si products.origin_country existe -> utiliser ce pays
-sinon -> utiliser stores.country
+frontend/supabase/migrations/
 ```
 
-Donc une boutique basée en Chine avec un produit d’origine Turquie affichera les transitaires Turquie -> RDC, pas Chine -> RDC.
+Donc si votre pipeline prod ne prend que `frontend/supabase/migrations/`, la prod continue probablement avec l’ancien comportement :
 
-### 3. Corriger le RPC `get_eligible_forwarders_v2`
-Je propose une migration SQL qui remplacera `get_eligible_forwarders_v2` pour qu’il retourne uniquement les profils réellement éligibles :
+- fallback `city_id IS NULL`
+- carte plateforme/Very Speed possible même sans vraie couverture
+- RPC legacy permissive
+- écart entre preview et production
 
-- route `coverage_routes` contenant `origin_country -> destination_country`
-- mode inclus dans `supported_modes`
-- profil tarifaire actif pour la ville exacte demandée
-- plus de logique permissive qui laisse passer un profil national sauf règle explicitement prévue
+C’est un point bloquant : la correction SQL doit être portée dans `frontend/supabase/migrations/`.
 
-La version actuelle du RPC autorise `fpp.city_id IS NULL OR fpp.city_id = p_destination_city_id`. Je la remplacerai par une condition stricte sur `city_id = p_destination_city_id` pour le checkout.
-
-### 4. Corriger `fetchEligibleFreightOffers`
-Dans `frontend/src/services/freightQuoteCheckout.ts`, je vais :
-
-- supprimer l’exception qui garde toujours `is_platform_owned` visible comme offre sélectionnable ;
-- ne garder Very Speed que si son profil correspond vraiment à la ville et à l’origine ;
-- ignorer toute offre dont le calcul donne `quote.total <= 0` ou “sur devis” dans le checkout client ;
-- afficher l’état “aucun transitaire ne dessert cette route/ville” au lieu d’un transitaire à USD 0.00.
-
-### 5. Supprimer le fallback legacy contradictoire au checkout
-Dans `CheckoutShippingCalculator.tsx`, je vais empêcher l’ancien `ForwarderSelector` de s’afficher pour le flux international quand le nouveau moteur freight est actif.
-
-Aujourd’hui, c’est ce fallback qui peut expliquer :
-
-- les offres qui apparaissent puis disparaissent ;
-- Very Speed affiché deux fois ou contradictoirement ;
-- “Service plateforme non disponible dans votre zone” en haut, puis Very Speed sélectionnable en bas.
-
-Après correction : une seule source d’affichage au checkout pour les transitaires internationaux.
-
-### 6. Nettoyer l’affichage Very Speed indisponible
-Je propose de ne plus afficher une carte Very Speed grisée dans la liste “Choisissez un transitaire”.
-
-À la place :
-
-- si aucun transitaire réel ne couvre la route/ville, afficher un message clair + bouton “Demander une couverture” ;
-- si Very Speed est indisponible dans la zone, cela ne doit jamais apparaître comme une option sélectionnable.
-
-### 7. Ajouter un diagnostic admin utile
-Le bloc debug admin sera amélioré pour montrer :
+### 2. Le checkout affiche encore un “fret standard” même quand aucun transitaire n’est éligible
+Dans `CheckoutShippingCalculator.tsx`, le moteur calcule toujours un prix indicatif via `calculateDynamicQuote()` :
 
 ```text
-origine utilisée: CN / TR / AE
-pays destination: CD
-ville destination: Kinshasa / Lubumbashi
-mode: air / sea
-profils retenus: uniquement ceux passés par les 3 filtres
-raison d’exclusion: route, ville, mode ou tarif absent
+Chongqing (CN) → Kinshasa (CD) · tarif indicatif
 ```
 
-Cela permettra de vérifier immédiatement pourquoi JH, Saidi, Congo Queen ou Very Speed apparaissent ou non.
-
-## Migration SQL à fournir
-
-Je fournirai un fichier SQL de migration, par exemple :
+Puis `FreightSelector` peut retourner 0 offre, mais l’UI affiche quand même :
 
 ```text
-frontend/supabase/migrations/YYYYMMDDHHMMSS_strict_forwarder_checkout_filtering.sql
+Aucun transitaire ne dessert encore Kinshasa...
+Le tarif standard ci-dessus sera appliqué et un transitaire sera assigné après commande.
 ```
 
-Il contiendra principalement :
+C’est exactement ce qu’on voit sur ta capture :
 
-- remplacement de `public.get_eligible_forwarders_v2(...)` ;
-- éventuellement remplacement de `public.get_eligible_forwarders(...)` legacy pour éviter qu’il continue à retourner des résultats incohérents s’il est encore appelé ;
-- commentaires explicites documentant la règle : origine produit > origine boutique, puis destination, puis ville exacte.
+```text
+DEBUG ADMIN — 0 offre retournée
+mais Aérien $10.64 affiché
+et checkout continue avec un tarif standard
+```
 
-## Résultat attendu
+Donc le bug métier principal est là : le prix indicatif est traité comme une option expédiable alors qu’il ne prouve aucune couverture transitaire.
 
-Pour ton cas de test :
+### 3. La logique de disponibilité est incohérente entre mono-colis et multi-colis
+Dans `CheckoutPage.tsx` :
 
-- Produit origine Chine + adresse Kinshasa + aérien : seuls les transitaires Chine -> CD avec profil Kinshasa actif apparaissent.
-- Produit origine Chine + adresse Lubumbashi + aérien : Congo Queen apparaît si son profil Lubumbashi est actif ; Very Speed n’apparaît pas s’il n’a pas de profil Lubumbashi.
-- Produit origine Turquie + adresse Kinshasa/Lubumbashi : seuls les transitaires Turquie -> CD avec profil de la ville choisie apparaissent.
-- Aucun transitaire à `USD 0.00` ne sera sélectionnable.
-- Plus de double affichage “indisponible” + “sélectionnable”.
-- Plus d’apparition pendant une seconde puis disparition causée par le mélange nouveau moteur / fallback legacy.
+- si `freightOffersAvailable > 0`, le client doit choisir un transitaire ;
+- si `freightOffersAvailable === 0`, le checkout laisse passer avec le tarif standard.
 
-## Fichiers à modifier après validation
+Pour une marketplace en production, ce comportement est dangereux : si aucun transitaire ne couvre `origine produit -> destination client -> ville`, la commande ne devrait pas continuer comme si elle était livrable.
 
-- `frontend/src/services/freightQuoteCheckout.ts`
-- `frontend/src/components/CheckoutShippingCalculator.tsx`
-- `frontend/src/components/checkout/FreightSelector.tsx`
-- `frontend/src/services/forwarders.ts` si le legacy doit être durci
-- nouvelle migration SQL dans `frontend/supabase/migrations/`
-- idéalement un test unitaire ciblé sur le filtrage route + ville
+## Solution production à appliquer
 
-Je recommande de traiter ça comme hotfix production : corriger d’abord le filtrage strict et supprimer le fallback contradictoire, puis ajuster l’admin ensuite si nécessaire.
+### A. Corriger la source de vérité SQL prod
+Créer une migration dans :
+
+```text
+frontend/supabase/migrations/YYYYMMDDHHMMSS_checkout_forwarders_strict_prod.sql
+```
+
+Elle doit contenir la correction stricte déjà préparée, avec ces règles :
+
+1. `get_eligible_forwarders_v2(origin, destination, city_id, mode)` retourne uniquement les transitaires qui ont :
+   - route explicite `coverage_routes.origin_country -> destination_country`
+   - mode dans `supported_modes`
+   - profil actif dans `forwarder_pricing_profiles`
+   - `city_id = destination_city_id` exact
+2. supprimer le fallback `city_id IS NULL` au checkout.
+3. supprimer l’exception plateforme/Very Speed.
+4. remettre aussi `get_eligible_forwarders` legacy en mode strict, ou mieux ne plus l’utiliser au checkout.
+
+### B. Changer le comportement checkout : pas de transitaire = pas de commande internationale
+Dans `FreightSelector.tsx`, remplacer le message actuel :
+
+```text
+Le tarif standard ci-dessus sera appliqué et un transitaire sera assigné après commande.
+```
+
+par un message bloquant :
+
+```text
+Aucun transitaire ne couvre actuellement cette route pour cette ville. Vous pouvez demander l’ouverture de couverture ou choisir une autre adresse/mode.
+```
+
+Le bouton “Demander couverture” reste utile, mais il ne doit pas permettre de commander immédiatement.
+
+### C. Bloquer la soumission quand aucune offre transitaire n’existe
+Dans `CheckoutPage.tsx`, ajouter un état explicite remonté par le calculateur :
+
+```ts
+freightStatus = "checking" | "available" | "unavailable"
+```
+
+Règle :
+
+```text
+Si panier international + freightStatus === unavailable : bloquer Continuer / Commander.
+```
+
+Ne plus laisser passer le cas `freightOffersAvailable === 0` comme fallback automatique.
+
+### D. Rendre `freightQuoteCheckout.ts` fermé par défaut
+Dans `fetchEligibleFreightOffers()` :
+
+- interroger uniquement les profils ville exacte : `city_id = destinationCityId`
+- ne plus démarrer avec `city_id IS NULL OR city_id = ...`
+- utiliser `get_eligible_forwarders_v2` comme filtre d’autorité
+- si le RPC strict est absent/erreur en production : retourner `[]`, pas un fallback permissif
+- garder le filtre anti-0 USD
+
+### E. Corriger la résolution de ville
+Actuellement `CheckoutShippingCalculator` fait :
+
+```ts
+searchCities(shippingCity, 1)
+```
+
+C’est trop fragile en prod, car ça cherche par nom seulement. Il faut résoudre la ville avec :
+
+```text
+country_code = shipping.country
+name = shipping.city
+province si disponible
+```
+
+À court terme : résolution stricte pays + ville.
+À moyen terme : ajouter `city_id`, `commune_id`, `quartier_id` dans `saved_addresses` pour ne plus dépendre du texte.
+
+## Résultat attendu après correction
+
+Pour le cas de ta capture :
+
+```text
+Client : Kinshasa
+Origine produit : CN
+Mode : air
+Offres transitaire : 0
+```
+
+Le checkout devra afficher :
+
+```text
+Aucun transitaire ne couvre CN -> CD / Kinshasa en aérien.
+Demander couverture
+```
+
+Et il ne devra plus :
+
+- afficher “tarif standard appliqué” comme solution réelle ;
+- afficher Very Speed à 0,00 $ ;
+- permettre de continuer la commande internationale sans transitaire ;
+- dépendre d’une migration placée hors du dossier prod.
+
+## Ce que je vais modifier si tu valides
+
+1. Créer la migration SQL dans `frontend/supabase/migrations/`.
+2. Durcir `frontend/src/services/freightQuoteCheckout.ts`.
+3. Modifier `frontend/src/components/checkout/FreightSelector.tsx` pour rendre l’état “aucune couverture” bloquant et non ambigu.
+4. Modifier `frontend/src/components/CheckoutShippingCalculator.tsx` pour remonter un vrai statut de disponibilité.
+5. Modifier `frontend/src/pages/CheckoutPage.tsx` pour bloquer la progression si aucun transitaire n’est disponible.
+6. Nettoyer l’ancien import/état legacy `ForwarderSelector` s’il n’est plus utilisé.
+
+C’est une correction de production : elle ferme le checkout sur les routes non couvertes au lieu de créer des commandes impossibles à exécuter.
