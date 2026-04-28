@@ -22,6 +22,7 @@ import {
   type EligibleFreightOffer,
   type QuoteCheckoutInput,
 } from "@/services/freightQuoteCheckout";
+import { debugForwarderEligibility, type ForwarderEligibilityDebug } from "@/services/forwarders";
 import { useRoles } from "@/hooks/use-roles";
 import { useI18n } from "@/contexts/I18nContext";
 
