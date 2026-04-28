@@ -154,6 +154,17 @@ export async function fetchEligibleFreightOffers(
     ? profilesList.filter((p) => p.city_id === input.destinationCityId)
     : [];
 
+  // Diagnostic : pourquoi 0 transitaire ? On loggue à chaque étape ce qu'on jette.
+  if (cityScopedProfiles.length === 0 && profilesList.length > 0) {
+    console.warn(
+      "[freightQuoteCheckout] Aucun profil avec city_id =",
+      input.destinationCityId,
+      "— profils existants pointent vers city_id:",
+      [...new Set(profilesList.map((p) => p.city_id))],
+      `(mode=${input.mode}, pays_dest=${input.destinationCountry})`,
+    );
+  }
+
   // Étape B : si une origine produit est connue, filtrer par route + mode.
   let filteredProfiles = cityScopedProfiles;
   if (originISO) {
@@ -193,6 +204,19 @@ export async function fetchEligibleFreightOffers(
         (r?.destination_country || "").toUpperCase() === destISO,
       );
     });
+
+      if (filteredProfiles.length === 0 && cityScopedProfiles.length > 0) {
+        console.warn(
+          "[freightQuoteCheckout] Profils ville OK mais 0 transitaire couvre la route/mode :",
+          { originISO, destISO, mode: input.mode },
+          "— transitaires candidats :",
+          cityScopedProfiles.map((p) => ({
+            forwarder: p.forwarder?.name,
+            supported_modes: p.forwarder?.supported_modes,
+            routes: p.forwarder?.coverage_routes,
+          })),
+        );
+      }
   }
 
   // 2) Composer un devis pour chaque profil (en parallèle)
