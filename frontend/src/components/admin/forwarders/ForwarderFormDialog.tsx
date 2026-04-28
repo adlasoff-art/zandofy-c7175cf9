@@ -299,6 +299,20 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
             Le multiplicateur de prix est configuré par palier tarifaire (modes air/sea × tiers express/standard/vip) depuis l'icône <span className="font-semibold">$</span> de la liste.
           </div>
 
+          <div>
+            <Label className="text-sm">Statut checkout *</Label>
+            <select
+              className="w-full mt-1 h-9 rounded-md border border-input bg-background px-2 text-sm"
+              value={form.status ?? "approved"}
+              onChange={(e) => setForm({ ...form, status: e.target.value as Forwarder["status"] })}
+            >
+              <option value="approved">Approuvé — visible au checkout</option>
+              <option value="pending">En attente — exclu du checkout</option>
+              <option value="suspended">Suspendu — exclu du checkout</option>
+              <option value="rejected">Rejeté — exclu du checkout</option>
+            </select>
+          </div>
+
           <div className="space-y-2 p-3 border border-border rounded-lg bg-muted/20">
             <Label className="text-sm flex items-center gap-1.5">
               <Plane size={13} className="text-primary" /> Modes supportés *
