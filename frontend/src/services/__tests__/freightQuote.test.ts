@@ -155,7 +155,7 @@ describe("freightQuote — composeFreightQuote", () => {
 
   it("ajoute un warning quand le palier CBM est sur devis", () => {
     const res = composeFreightQuote(baseProfile, cbmTiers, pieceTiers, [], { totalCbm: 10 });
-    expect(res.warnings).toContain("Volume hors grille tarifaire — devis manuel requis.");
+    expect(res.warnings).toContain("Hors grille tarifaire — devis manuel requis.");
   });
 
   it("calcule le poids facturable (max réel/volumétrique)", () => {
