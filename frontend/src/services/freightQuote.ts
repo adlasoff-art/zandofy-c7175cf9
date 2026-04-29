@@ -260,19 +260,24 @@ export function quoteByKgTier(
   totalWeightKg: number,
 ): QuoteLine | null {
   if (tiers.length === 0) return null;
-  const billableRaw = chargeableWeightKg(totalWeightKg, totalCbm, profile.volumetric_divisor);
-  if (billableRaw <= 0) return null;
+  if (totalWeightKg <= 0) return null;
 
   // ─── Règle de tarification Zandofy (validée client) ─────────────────────────
-  // Cas A — Poids agrégé < 1 kg
+  // Cas A — Poids RÉEL agrégé < 1 kg
   //   → Forfait fixe = prix du palier 1 kg (ex: 17,90 USD).
   //     250 g, 750 g, 999 g sont tous facturés au tarif 1 kg.
   //
-  // Cas B — Poids agrégé ≥ 1 kg
+  // Cas B — Poids RÉEL agrégé ≥ 1 kg
   //   → Facturé : (poids_réel + 0,1) × prix_par_kg du palier applicable.
   //     Le buffer de 100 g est une marge interne (variations balance, emballage,
   //     arrondi transitaire). Le client ne le voit pas comme une ligne séparée :
   //     seul le total final est affiché.
+  //
+  // ⚠️ Important : on raisonne sur le POIDS RÉEL agrégé, jamais sur le poids
+  // facturable (max réel/volumétrique). Sinon un produit physiquement léger
+  // (ex: 540 g) avec un petit volume CBM non nul basculerait à tort en Cas B
+  // à cause du poids volumétrique gonflé par le diviseur aérien (6000), et
+  // serait facturé 20,58 USD au lieu du forfait 17,90 USD attendu.
   //
   // L'agrégation des poids des articles du panier est faite EN AMONT par
   // composeFreightQuote (totalWeightKg = somme du groupe), donc ici on raisonne
@@ -285,8 +290,8 @@ export function quoteByKgTier(
   const baseTier = pickKgTier(sortedTiers, 1) ?? sortedTiers[0] ?? null;
   if (!baseTier) return null;
 
-  // Cas A : forfait <1 kg
-  if (billableRaw < 1) {
+  // Cas A : forfait <1 kg (basé sur le poids RÉEL, pas le facturable)
+  if (totalWeightKg < 1) {
     if (baseTier.is_quote_only) {
       return {
         type: "weight",
@@ -313,8 +318,8 @@ export function quoteByKgTier(
     };
   }
 
-  // Cas B : poids ≥ 1 kg → poids_réel + buffer 100 g, au prorata du prix/kg.
-  const billableWithBuffer = round2(billableRaw + 0.1);
+  // Cas B : poids RÉEL ≥ 1 kg → poids_réel + buffer 100 g, au prorata du prix/kg.
+  const billableWithBuffer = round2(totalWeightKg + 0.1);
   let tier = pickKgTier(sortedTiers, billableWithBuffer);
   if (!tier) {
     tier = sortedTiers.find((t) => t.max_kg == null) ?? sortedTiers[sortedTiers.length - 1] ?? null;
@@ -344,8 +349,8 @@ export function quoteByKgTier(
 
   return {
     type: "weight",
-    label: `${billableRaw.toFixed(2)} kg × ${pricePerKg.toFixed(2)} (palier ${tier.min_kg}${tier.max_kg ? `–${tier.max_kg}` : "+"})`,
-    weight_kg: billableRaw,
+    label: `${totalWeightKg.toFixed(2)} kg × ${pricePerKg.toFixed(2)} (palier ${tier.min_kg}${tier.max_kg ? `–${tier.max_kg}` : "+"})`,
+    weight_kg: totalWeightKg,
     unit: "kg",
     unit_price: pricePerKg,
     line_total: round2(billableWithBuffer * pricePerKg),

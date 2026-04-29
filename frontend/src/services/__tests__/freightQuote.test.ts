@@ -8,9 +8,11 @@ import {
   quoteByCBM,
   quoteByPiece,
   composeFreightQuote,
+  quoteByKgTier,
   type FreightProfile,
   type CbmTier,
   type PieceTier,
+  type KgTier,
 } from "../freightQuote";
 
 const baseProfile: FreightProfile = {
@@ -153,7 +155,7 @@ describe("freightQuote — composeFreightQuote", () => {
 
   it("ajoute un warning quand le palier CBM est sur devis", () => {
     const res = composeFreightQuote(baseProfile, cbmTiers, pieceTiers, [], { totalCbm: 10 });
-    expect(res.warnings).toContain("Volume hors grille tarifaire — devis manuel requis.");
+    expect(res.warnings).toContain("Hors grille tarifaire — devis manuel requis.");
   });
 
   it("calcule le poids facturable (max réel/volumétrique)", () => {
@@ -163,5 +165,49 @@ describe("freightQuote — composeFreightQuote", () => {
     });
     // volumétrique = 0.024 × 1_000_000 / 6000 = 4 kg → max(3,4) = 4
     expect(res.total_chargeable_weight_kg).toBe(4);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Règle Zandofy : forfait <1 kg + buffer 100 g au-dessus
+// (cf. plan : Very Speed à 17,90 USD pour 540 g, pas 20,58 USD)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const verySpeedKgTiers: KgTier[] = [
+  { id: "k1", profile_id: "prof-1", min_kg: 0, max_kg: 1, price_per_kg: 17.9, flat_price: null, round_up_to_kg: true, is_quote_only: false, sort_order: 1 },
+  { id: "k2", profile_id: "prof-1", min_kg: 1, max_kg: null, price_per_kg: 17.9, flat_price: null, round_up_to_kg: false, is_quote_only: false, sort_order: 2 },
+];
+
+describe("freightQuote — quoteByKgTier (règle Zandofy)", () => {
+  it("Cas A : 0,540 kg sans CBM → forfait 17,90", () => {
+    const line = quoteByKgTier(baseProfile, verySpeedKgTiers, 0, 0.54);
+    expect(line?.line_total).toBe(17.9);
+    expect(line?.weight_kg).toBe(1);
+  });
+
+  it("Cas A : 0,540 kg AVEC CBM gonflant le volumétrique → toujours forfait 17,90 (régression)", () => {
+    // 0.008 cbm × 1_000_000 / 6000 = 1.33 kg volumétrique → avant fix : Cas B → 20,58
+    const line = quoteByKgTier(baseProfile, verySpeedKgTiers, 0.008, 0.54);
+    expect(line?.line_total).toBe(17.9);
+  });
+
+  it("Cas A : 0,999 kg → forfait 17,90", () => {
+    const line = quoteByKgTier(baseProfile, verySpeedKgTiers, 0, 0.999);
+    expect(line?.line_total).toBe(17.9);
+  });
+
+  it("Cas B : 1,000 kg → 1,1 × 17,90 = 19,69", () => {
+    const line = quoteByKgTier(baseProfile, verySpeedKgTiers, 0, 1.0);
+    expect(line?.line_total).toBe(19.69);
+  });
+
+  it("Cas B : 1,200 kg → 1,3 × 17,90 = 23,27", () => {
+    const line = quoteByKgTier(baseProfile, verySpeedKgTiers, 0, 1.2);
+    expect(line?.line_total).toBe(23.27);
+  });
+
+  it("Cas B : 4 articles × 250 g (totalWeightKg=1.0) → 19,69", () => {
+    const line = quoteByKgTier(baseProfile, verySpeedKgTiers, 0, 1.0);
+    expect(line?.line_total).toBe(19.69);
   });
 });
