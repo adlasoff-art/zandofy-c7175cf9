@@ -381,12 +381,13 @@ export async function fetchProductBySlug(
   const product = mapProduct(data);
   product.store = data.stores;
 
-  // Fallback robuste : la table `stores` est protégée par RLS (seuls owner/staff
-  // y accèdent en direct). Pour les visiteurs anonymes/clients, l'embed
-  // `stores!products_store_id_fkey` peut revenir vide. On recharge alors la
-  // boutique depuis la vue publique `stores_public` afin que l'encart
-  // fournisseur reste visible sur la fiche produit pour tout le monde.
-  if ((!product.store || !(product.store as any)?.id) && data.store_id) {
+  // La table `stores` est protégée par RLS (seuls owner/staff/admin la lisent
+  // directement). Pour les visiteurs anonymes/clients, l'embed
+  // `stores!products_store_id_fkey` revient quasi systématiquement vide. On
+  // recharge donc systématiquement la boutique depuis la vue publique
+  // `stores_public` dès qu'on a un `store_id`, afin que l'encart fournisseur
+  // (logo, badges, boutons de contact) reste visible pour tout le monde.
+  if (data.store_id) {
     try {
       const fullCols =
         "id, name, slug, logo_url, banner_url, description, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, rating, response_rate, response_time, shop_type";
@@ -406,6 +407,9 @@ export async function fetchProductBySlug(
           .eq("id", data.store_id)
           .maybeSingle();
         publicStore = safe.data;
+        if (safe.error) {
+          console.warn("stores_public fallback failed:", safe.error.message);
+        }
       } else {
         publicStore = res.data;
       }
