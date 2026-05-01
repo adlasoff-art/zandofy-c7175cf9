@@ -84,7 +84,8 @@ interface TrackingPayload {
   shipments: ShipmentRow[];
 }
 
-const POLL_INTERVAL_MS = 10_000;
+const POLL_INTERVAL_ACTIVE_MS = 15_000;
+const POLL_INTERVAL_HIDDEN_MS = 0; // stop polling when tab hidden
 const ACTIVE_STATUSES = new Set(["pending", "confirmed", "processing", "shipped", "ready_for_pickup", "out_for_delivery"]);
 
 function formatRelativeTime(iso: string, locale: string): string {
@@ -124,11 +125,25 @@ export function CustomerOrderTracker({ orderId }: { orderId: string }) {
     };
 
     load();
-    timer = window.setInterval(() => load(true), POLL_INTERVAL_MS);
+
+    const schedule = () => {
+      if (timer) { window.clearInterval(timer); timer = undefined; }
+      const ms = document.hidden ? POLL_INTERVAL_HIDDEN_MS : POLL_INTERVAL_ACTIVE_MS;
+      if (ms > 0) {
+        timer = window.setInterval(() => load(true), ms);
+      }
+    };
+    const onVisibility = () => {
+      schedule();
+      if (!document.hidden) load(true);
+    };
+    schedule();
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       mounted = false;
       if (timer) window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [orderId]);
 
