@@ -1,12 +1,16 @@
 import { useEffect, useRef } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useNotifications } from "@/hooks/use-notifications";
 import { playNotificationSound, setAppBadge } from "@/lib/notification-sounds";
 
+/**
+ * Joue un son et met à jour le badge OS quand le compteur non-lu augmente.
+ * Réutilise le poller centralisé `useNotifications` (10s focus / 30s hidden) au lieu
+ * de lancer un second polling indépendant — réduction du Disk IO sur la table notifications.
+ */
 export function NotificationListener() {
-  const { user } = useAuth();
+  const { unreadCount } = useNotifications();
   const hasInteracted = useRef(false);
-  const lastCountRef = useRef(0);
+  const lastCountRef = useRef<number | null>(null);
 
   // Track first user interaction to unlock audio
   useEffect(() => {
@@ -21,34 +25,14 @@ export function NotificationListener() {
     };
   }, []);
 
-  // Poll for new notifications (replaces Realtime for security)
   useEffect(() => {
-    if (!user) return;
-
-    const checkNotifications = async () => {
-      const { count } = await supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("is_read", false);
-
-      const newCount = count || 0;
-      // Play sound if count increased
-      if (newCount > lastCountRef.current && lastCountRef.current > 0 && hasInteracted.current) {
-        playNotificationSound();
-      }
-      lastCountRef.current = newCount;
-      setAppBadge(newCount);
-    };
-
-    // Initial check
-    checkNotifications();
-
-    // Poll every 10s
-    const interval = setInterval(checkNotifications, 10000);
-    return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+    const prev = lastCountRef.current;
+    if (prev !== null && unreadCount > prev && hasInteracted.current) {
+      playNotificationSound();
+    }
+    lastCountRef.current = unreadCount;
+    setAppBadge(unreadCount);
+  }, [unreadCount]);
 
   return null;
 }
