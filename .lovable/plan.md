@@ -1,5 +1,10 @@
 Diagnostic confirmé
 
+Status: hotfix SQL minimal créé (`frontend/supabase/migrations/20260501093000_stores_public_min_hotfix.sql`).
+Frontend déjà préparé (`fetchProductBySlug` recharge via `stores_public`).
+L'ancienne migration agressive avec `DROP VIEW ... CASCADE` a été supprimée.
+À FAIRE PAR L'UTILISATEUR : appliquer le SQL sur PRODUCTION puis STAGING via le SQL Editor de Supabase.com.
+
 1. Correction de contexte d’environnement
 - Tu as raison : la base utilisée par staging/production est sur Supabase.com, pas sur un sous-domaine `supabasa.*`.
 - Les anciens libellés/documentations internes qui parlent de `supabasa-staging.zandofy.com` / `supabasa.zandofy.com` sont obsolètes et ne doivent plus guider les décisions.
