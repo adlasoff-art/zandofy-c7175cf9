@@ -18,6 +18,7 @@ export function useVisibilityAwareInterval(
   cbRef.current = callback;
 
   const { activeMs, hiddenMs = 0, enabled = true, runOnFocus = true } = opts;
+  const runImmediately = (opts as any).runImmediately ?? true;
 
   useEffect(() => {
     if (!enabled) return;
@@ -48,6 +49,9 @@ export function useVisibilityAwareInterval(
     };
 
     schedule();
+    if (runImmediately && !document.hidden) {
+      try { void cbRef.current(); } catch { /* noop */ }
+    }
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("focus", onVisibility);
 
