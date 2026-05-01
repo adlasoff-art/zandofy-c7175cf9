@@ -388,13 +388,27 @@ export async function fetchProductBySlug(
   // fournisseur reste visible sur la fiche produit pour tout le monde.
   if ((!product.store || !(product.store as any)?.id) && data.store_id) {
     try {
-      const { data: publicStore } = await (supabase as any)
+      const fullCols =
+        "id, name, slug, logo_url, banner_url, description, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, rating, response_rate, response_time, shop_type";
+      let publicStore: any = null;
+      const res = await (supabase as any)
         .from("stores_public")
-        .select(
-          "id, name, slug, logo_url, banner_url, description, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, rating, response_rate, response_time, shop_type"
-        )
+        .select(fullCols)
         .eq("id", data.store_id)
         .maybeSingle();
+      if (res.error) {
+        // Fallback colonnes minimales si la vue déployée diffère
+        const safe = await (supabase as any)
+          .from("stores_public")
+          .select(
+            "id, name, slug, logo_url, is_verified, is_certified, verified_years, created_at, followers_count, products_count, sales_count, is_online, rating"
+          )
+          .eq("id", data.store_id)
+          .maybeSingle();
+        publicStore = safe.data;
+      } else {
+        publicStore = res.data;
+      }
       if (publicStore) {
         product.store = publicStore;
       }
