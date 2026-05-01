@@ -126,10 +126,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
       .eq("size", item.size || "")
       .maybeSingle();
 
+    let finalQty = item.quantity;
+    let wasExisting = false;
+
     if (existing) {
       // Increment quantity on existing item
       const newQty = existing.quantity + item.quantity;
       await supabase.from("cart_items").update({ quantity: newQty }).eq("id", existing.id);
+      finalQty = newQty;
+      wasExisting = true;
     } else {
       const { error } = await supabase.from("cart_items").insert({
         user_id: user.id,
@@ -150,7 +155,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
             .eq("size", item.size || "")
             .maybeSingle();
           if (dup) {
-            await supabase.from("cart_items").update({ quantity: dup.quantity + item.quantity }).eq("id", dup.id);
+            const merged = dup.quantity + item.quantity;
+            await supabase.from("cart_items").update({ quantity: merged }).eq("id", dup.id);
+            finalQty = merged;
+            wasExisting = true;
           }
         } else {
           toast({ title: "Erreur", description: error.message, variant: "destructive" });
@@ -161,7 +169,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     await fetchCart();
     setDrawerOpen(true);
-    toast({ title: "Ajouté au panier !" });
+    toast({
+      title: wasExisting
+        ? `Panier mis à jour — ${finalQty} pièces au total`
+        : `Ajouté au panier — ${finalQty} pièce${finalQty > 1 ? "s" : ""}`,
+    });
   };
 
   const updateVariant = async (id: string, color: string | null, size: string | null) => {
