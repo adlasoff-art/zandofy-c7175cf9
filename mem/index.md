@@ -121,3 +121,4 @@
 - [Vendor Analytics Pro](mem://features/vendor-analytics-pro) — Lot 16 : 6 RPC analytics (KPIs/funnel/cohortes/top/export), filtres ville+méthode, exports CSV/PDF, cron email hebdo/mensuel
 - [Lot 17 Tech Debt & Perfs](mem://features/lot17-tech-debt-perf) — Hardening DB conservateur (REVOKE EXECUTE sur ~95 fonctions internes) + 9 indexes perfs (orders, payments, products, reviews, notifications). Linter 298→133 warnings.
 - [Lot 18 Observability](mem://features/lot18-observability-monitoring) — Healthchecks 5min (KelPay, EFs critiques, SMTP, crons), incidents auto dédupliqués, alertes email/push/banner, page /admin/health (4 onglets) + widget AdminDashboard
+- [Lot 18B Disk IO Mitigation](mem://features/lot18b-disk-io-mitigation) — Hook `useVisibilityAwareInterval` (polling adaptatif focus/hidden) + 7 indexes (messages, notifications, orders, delivery_chats) pour absorber l'alerte Disk IO budget

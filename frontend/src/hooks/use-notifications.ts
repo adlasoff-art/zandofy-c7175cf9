@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useVisibilityAwareInterval } from "@/hooks/use-visibility-aware-interval";
 
 export interface Notification {
   id: string;
@@ -19,10 +20,16 @@ export function useNotifications() {
   const [loading, setLoading] = useState(true);
 
   const fetchNotifications = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setNotifications([]);
+      setUnreadCount(0);
+      setLoading(false);
+      return;
+    }
+    // Colonnes ciblées (au lieu de select *) pour réduire le Disk IO sur la table notifications.
     const { data } = await supabase
       .from("notifications")
-      .select("*")
+      .select("id, type, title, message, link, is_read, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -33,20 +40,12 @@ export function useNotifications() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  useEffect(() => {
-    if (!user) {
-      setNotifications([]);
-      setUnreadCount(0);
-      setLoading(false);
-      return;
-    }
-    fetchNotifications();
-
-    // Polling every 10s instead of Realtime (removed for security)
-    const interval = setInterval(fetchNotifications, 10000);
-    return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, fetchNotifications]);
+  // Initial fetch + polling adaptatif (10s focus / 30s hors focus).
+  useVisibilityAwareInterval(fetchNotifications, {
+    activeMs: 10_000,
+    hiddenMs: 30_000,
+    enabled: !!user,
+  });
 
   const markAsRead = async (id: string) => {
     await supabase.from("notifications").update({ is_read: true }).eq("id", id);

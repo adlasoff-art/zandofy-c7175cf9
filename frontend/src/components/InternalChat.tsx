@@ -98,17 +98,23 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
     initConversation();
   }, [user, storeId, productId]);
 
-  // Load messages when conversation exists + fast polling
+  // Load messages when conversation exists + incremental adaptive polling
+  // (3s focus, 8s hidden) avec colonnes ciblées pour réduire le Disk IO sur la table messages.
+  const MESSAGE_COLS = "id, sender_id, content, is_read, created_at";
+
   useEffect(() => {
     if (!conversationId) return;
+
+    let active = true;
 
     async function loadMessages() {
       const { data } = await supabase
         .from("messages")
-        .select("*")
+        .select(MESSAGE_COLS)
         .eq("conversation_id", conversationId!)
         .order("created_at", { ascending: true });
 
+      if (!active) return;
       if (data && data.length > 0) {
         setMessages(data as ChatMessage[]);
         lastFetchRef.current = data[data.length - 1].created_at;
@@ -118,14 +124,12 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
 
     loadMessages();
 
-    // Fast incremental polling (1.2s when tab focused)
-    let active = true;
     const poll = async () => {
-      if (!active || document.hidden) return;
+      if (!active) return;
       const since = lastFetchRef.current;
       let query = supabase
         .from("messages")
-        .select("*")
+        .select(MESSAGE_COLS)
         .eq("conversation_id", conversationId!)
         .order("created_at", { ascending: true });
 
@@ -134,6 +138,7 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
       }
 
       const { data } = await query;
+      if (!active) return;
       if (data && data.length > 0) {
         lastFetchRef.current = data[data.length - 1].created_at;
         setMessages(prev => mergeChatMessages(prev, data as ChatMessage[]));
@@ -141,14 +146,28 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
       }
     };
 
-    const interval = setInterval(poll, 1200);
-    const onFocus = () => poll();
-    window.addEventListener("focus", onFocus);
+    const ACTIVE_MS = 3_000;
+    const HIDDEN_MS = 8_000;
+
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const schedule = () => {
+      if (timer) clearInterval(timer);
+      const ms = document.hidden ? HIDDEN_MS : ACTIVE_MS;
+      timer = setInterval(poll, ms);
+    };
+    const onVisibility = () => {
+      schedule();
+      if (!document.hidden) poll();
+    };
+    schedule();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onVisibility);
 
     return () => {
       active = false;
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
+      if (timer) clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onVisibility);
     };
   }, [conversationId, scrollToBottom]);
 
