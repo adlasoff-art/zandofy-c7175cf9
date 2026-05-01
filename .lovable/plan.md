@@ -1,114 +1,111 @@
-Diagnostic confirmé
+## Plan — Réduction du Disk IO sur le projet Supabase.com staging (vpt…yxf)
 
-Status: hotfix SQL minimal créé (`frontend/supabase/migrations/20260501093000_stores_public_min_hotfix.sql`).
-Frontend déjà préparé (`fetchProductBySlug` recharge via `stores_public`).
-L'ancienne migration agressive avec `DROP VIEW ... CASCADE` a été supprimée.
-À FAIRE PAR L'UTILISATEUR : appliquer le SQL sur PRODUCTION puis STAGING via le SQL Editor de Supabase.com.
+Objectif : faire baisser durablement le Disk IO sans toucher à la production tant que rien n'est validé en staging. Trois axes : audit ciblé, correctifs frontend de polling, migration d'index DB.
 
-1. Correction de contexte d’environnement
-- Tu as raison : la base utilisée par staging/production est sur Supabase.com, pas sur un sous-domaine `supabasa.*`.
-- Les anciens libellés/documentations internes qui parlent de `supabasa-staging.zandofy.com` / `supabasa.zandofy.com` sont obsolètes et ne doivent plus guider les décisions.
-- Je vais traiter `zandofy-production` comme staging et `zandofy-live` comme production, avec leurs URLs Supabase.com natives.
+### 1. Diagnostic à exécuter sur la base ciblée (script SQL lecture seule)
 
-2. Cause réelle du fournisseur absent sur la fiche produit
-J’ai vérifié publiquement la page production et les appels REST production.
+Tu lanceras ce script dans le SQL Editor de **zandofy-production (staging, vpt…yxf)** pour confirmer les vraies causes avant de rien optimiser à l'aveugle.
 
-Constats :
-- Le produit de ta capture existe bien en production :
-  - `fde87e9a-7c37-48d5-89b0-f1d36ae44309`
-  - `ensemble-de-4-sacs-en-nylon-de-qualite`
-  - `store_id = f6808c6d-bbd7-49fb-a976-882eecd1b39e`
-- La requête publique directe vers `stores` retourne `[]`, ce qui est normal si la table est protégée par RLS.
-- La requête publique vers `stores_public` retourne aussi `[]`, ce qui n’est pas normal pour une vue publique.
-- L’embed produit vers boutique retourne `stores: null`.
-- Le bundle JavaScript actuellement servi en production ne contient pas encore la logique `stores_public` ajoutée précédemment.
-- Le workflow GitHub existant ne montre qu’un déploiement des Edge Functions ; il n’applique pas automatiquement les migrations SQL. Donc la phrase précédente disant que la migration SQL serait exécutée automatiquement au merge était incorrecte.
+Le script fera, en lecture seule :
 
-Conclusion : il y a deux blocages réels, pas un problème de cache navigateur :
+- top 30 requêtes par temps total (`pg_stat_statements`) ;
+- top 30 requêtes par lectures disque (`shared_blks_read`) ;
+- top tables par scans séquentiels et tuples lus (`pg_stat_user_tables`) ;
+- index inutilisés (`pg_stat_user_indexes` avec `idx_scan = 0`) ;
+- jobs `pg_cron` actifs et leur fréquence ;
+- taille des tables potentiellement chaudes (`messages`, `notifications`, `orders`, `analytics_events`, `product_views`, `audit_logs`).
+
+Aucune modification, aucun `EXPLAIN ANALYZE` sur table chaude. Le résultat dictera si on doit aller plus loin que les correctifs prévus ci-dessous.
+
+### 2. Correctifs frontend (polling et requêtes coûteuses)
+
+Cibles identifiées dans le code :
 
 ```text
-Produit publié
-  -> store_id existe
-  -> embed stores bloqué par RLS = stores null
-  -> stores_public retourne 0 ligne à cause de security_invoker/RLS
-  -> frontend production actuel ne recharge pas encore via stores_public
-  -> VendorProfileCard n’est pas rendu
+src/components/InternalChat.tsx           poll messages toutes les 1,2 s + select *
+src/components/messages/ChatPanel.tsx     polling additionnel
+src/components/delivery/DeliveryChat.tsx  polling
+src/components/OrderAlertListener.tsx     poll orders toutes les 15 s pour tout admin/manager/vendor
+src/hooks/use-notifications.ts            poll notifications toutes les 10 s + select *
+src/components/NotificationToast.tsx      poll notifications toutes les 10 s (DOUBLON)
+src/components/orders/CustomerOrderTracker.tsx  poll toutes les 10 s
+src/hooks/use-system-health.ts            select * toutes les 60 s sur 3 vues admin
 ```
 
-3. Correction urgente, minimale, sans ouvrir la table `stores`
+Changements concrets, sans régression fonctionnelle :
 
-Objectif : restaurer l’encart fournisseur sans rendre la table sensible `stores` lisible publiquement.
+1. **InternalChat** : passer le poll de 1,2 s à 3 s quand une conversation est active, 8 s quand l'onglet n'a pas le focus, et stopper net quand `document.hidden`. Restreindre `select *` aux colonnes vraiment affichées (`id, conversation_id, sender_id, body, attachments, created_at, read_at`). Garder le pattern incrémental `gt(created_at)`.
+2. **ChatPanel** : aligner sur la même cadence (3 s focus / 8 s hors focus) et même liste de colonnes.
+3. **DeliveryChat** : passer à 5 s focus, 15 s hors focus.
+4. **NotificationToast vs use-notifications** : supprimer le doublon. Garder un seul poller centralisé dans `use-notifications` (10 s focus, 30 s hors focus), et faire consommer le résultat par `NotificationToast` via le même hook au lieu d'un second `setInterval`.
+5. **use-notifications** : remplacer `select("*")` par les colonnes effectivement utilisées.
+6. **OrderAlertListener** : passer à 30 s focus / 90 s hors focus, ne lancer que si le rôle est réellement admin/manager/vendor avec stores, et limiter `select` à `order_ref, store_id, total, created_at`.
+7. **CustomerOrderTracker** : 15 s focus, stop hors focus.
+8. **use-system-health** : conserver 60 s mais cibler les colonnes utilisées par l'UI (pas `select *`) et n'activer le hook que sur les pages admin santé.
+9. Ajouter un petit utilitaire `useVisibilityAwareInterval(fn, { activeMs, hiddenMs })` dans `src/hooks/` pour standardiser le pattern focus/hidden, et l'utiliser dans tous les pollers ci-dessus.
 
-Je propose une correction en deux parties :
+Aucune logique métier modifiée. Aucun changement Realtime (la règle « pas de Realtime sur tables sensibles » reste respectée).
 
-A. Migration SQL minimale et sûre
-- Ne pas créer de policy publique sur `stores`.
-- Ne pas exposer `owner_id`, `whatsapp_number`, emails, données internes, etc.
-- Modifier uniquement la vue `public.stores_public` pour qu’elle redevienne lisible publiquement malgré les RLS strictes de `stores`.
-- Éviter si possible un `DROP VIEW ... CASCADE` en urgence, car cela peut impacter des dépendances.
+### 3. Migration SQL d'index ciblés (staging d'abord)
 
-SQL urgent à fournir/appliquer sur production puis staging :
+Fichier : `frontend/supabase/migrations/{timestamp}_perf_disk_io_indexes.sql`. Tous les index en `CREATE INDEX IF NOT EXISTS ... ;` (pas `CONCURRENTLY` car interdit dans les migrations transactionnelles Supabase, on garde la convention du projet).
+
+Index visés, alignés sur les pollers ci-dessus et sur les tables hot connues :
 
 ```sql
--- Hotfix minimal : restaurer la visibilité publique des boutiques via la vue sûre.
--- Ne rend PAS public l'accès direct à public.stores.
--- À appliquer sur Supabase.com production puis staging.
+-- Messages : poll incrémental "WHERE conversation_id = ? AND created_at > ?"
+CREATE INDEX IF NOT EXISTS idx_messages_conv_created
+  ON public.messages (conversation_id, created_at DESC);
 
-ALTER VIEW IF EXISTS public.stores_public
-SET (security_invoker = false);
+-- Notifications : poll par user "WHERE user_id = ? ORDER BY created_at DESC"
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created
+  ON public.notifications (user_id, created_at DESC);
 
-GRANT SELECT ON public.stores_public TO anon, authenticated;
+-- Orders alert : "WHERE created_at > cursor [AND store_id IN (...)]"
+CREATE INDEX IF NOT EXISTS idx_orders_created
+  ON public.orders (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_store_created
+  ON public.orders (store_id, created_at DESC);
+
+-- Customer order tracker : lookups par order_ref
+CREATE INDEX IF NOT EXISTS idx_orders_order_ref
+  ON public.orders (order_ref);
 ```
 
-Si l’instance refuse `security_invoker = false` ou si la vue n’existe pas dans un environnement, je fournirai une migration de fallback qui recrée la vue explicitement avec uniquement les colonnes publiques, mais je préfère commencer par l’ALTER minimal pour réduire le risque.
+Procédure :
 
-B. Correction frontend déjà ciblée mais à redéployer réellement en production
-- Garder la logique qui ne dépend plus de l’embed `stores!products_store_id_fkey`.
-- Sur la fiche produit, après chargement du produit, recharger systématiquement la boutique via `stores_public` avec `product.store_id`.
-- Si certaines colonnes de la vue diffèrent entre staging/prod, garder le fallback de colonnes minimales pour ne pas casser la page.
+- exécuter en staging via le SQL Editor (manuellement, comme le hotfix `stores_public`) ;
+- vérifier la baisse via le script d'audit (`pg_stat_user_tables` : seq_scan en baisse, `pg_stat_user_indexes` : idx_scan en hausse) sur 24 h ;
+- seulement après validation, rejouer **exactement** le même fichier sur production (vpt…yxf) — règle « RLS Staging/Prod Divergence » : on rejoue systématiquement sur les deux.
 
-4. Vérification après application
+### 4. Cron jobs DB
 
-Après SQL + déploiement frontend, vérifier :
+- Vérifier dans le résultat du script d'audit si `expire-pending-orders-every-min-staging` (chaque minute) est utile en staging. Si non, le désactiver (`cron.unschedule`) — fichier de désactivation séparé, fourni seulement après ta confirmation.
+- Ne pas toucher aux crons production tant que staging n'a pas démontré le gain.
 
-```sql
--- Doit retourner au moins une ligne
-select id, name, logo_url, is_verified, is_certified
-from public.stores_public
-where id = 'f6808c6d-bbd7-49fb-a976-882eecd1b39e';
+### 5. Ce que je ne ferai pas dans ce lot
+
+- Pas d'upgrade compute. À envisager seulement si après les correctifs et index, la base reste sous pression. Lovable Cloud propose un upgrade d'instance, mais ici la base est sur Supabase.com personnel donc l'upgrade se ferait depuis le dashboard Supabase, pas depuis Lovable.
+- Pas de migration de table, pas de partitionnement, pas de purge `analytics_events` ou `audit_logs` tant que le diagnostic ne le démontre pas.
+- Pas de changement Realtime.
+- Aucun changement appliqué automatiquement en production.
+
+### Livrables après ton approbation
+
+1. Script SQL d'audit lecture seule (`/mnt/documents/audit_disk_io_staging.sql`) à coller dans le SQL Editor staging.
+2. Migration `frontend/supabase/migrations/{timestamp}_perf_disk_io_indexes.sql`.
+3. Patches frontend : `useVisibilityAwareInterval` + mise à jour des 8 fichiers listés en section 2.
+4. Note de vérification (requêtes SQL de contrôle 24 h après application, et procédure de rejeu sur production).
+
+### Ordre d'exécution recommandé
+
+```text
+1. Toi : lancer le script d'audit en staging, me coller les résultats.
+2. Moi : ajuster les seuils de polling et la liste d'index si l'audit révèle d'autres hotspots.
+3. Toi : appliquer la migration d'index en staging via SQL Editor.
+4. Toi : merger develop -> main pour déployer les correctifs frontend.
+5. Observer 24 h le Disk IO budget en staging.
+6. Si OK, rejouer la même migration en production.
 ```
 
-Et côté navigateur public/incognito :
-- la fiche produit doit afficher l’encart fournisseur au-dessus de la galerie ;
-- le bouton Contacter doit réapparaître ;
-- le lien boutique doit fonctionner ;
-- `/stores` doit afficher les fournisseurs ;
-- la table directe `stores` doit rester protégée côté public.
-
-5. Alerte Disk IO sur staging
-
-L’alerte reçue concerne le projet staging `zandofy-production`, pas nécessairement la production. Mais il faut la traiter sérieusement.
-
-Plan d’audit sans toucher à la prod :
-- Identifier les requêtes les plus coûteuses sur staging via statistiques SQL.
-- Vérifier les scans séquentiels sur grosses tables : `products`, `product_images`, `product_colors`, `messages`, `orders`, `analytics_events`, `notifications`.
-- Vérifier si des jobs staging tournent trop souvent : sitemap, automation, campagnes, healthchecks.
-- Vérifier le polling chat : le code actuel interroge les messages toutes les 1,2 s quand un chat est ouvert, ce qui peut devenir coûteux si beaucoup d’onglets/utilisateurs testent.
-- Vérifier les endpoints ou fonctions qui font des `.select("*")` sur des tables volumineuses.
-- Fournir ensuite un script SQL d’audit en lecture seule pour Supabase.com staging, puis seulement après analyse proposer les indexes ou réductions de polling nécessaires.
-
-6. Nettoyage de la confusion d’environnement
-
-Après approbation, je corrigerai aussi les références obsolètes dans les règles/docs/mémoire du projet pour ne plus raisonner avec les sous-domaines `supabasa.*`. Le modèle retenu sera :
-- staging : projet Supabase.com `zandofy-production` ;
-- production : projet Supabase.com `zandofy-live` ;
-- pas de domaine custom Supabase pour les bases.
-
-Ce que je vais faire après ton approbation
-
-1. Remplacer la migration risquée existante par une migration SQL minimale `ALTER VIEW ... SET (security_invoker = false)` + `GRANT`.
-2. Conserver/ajuster le frontend pour utiliser `stores_public` sur la fiche produit.
-3. Fournir le fichier SQL exact à appliquer manuellement sur production et staging.
-4. Ajouter une note de vérification claire avec les requêtes SQL de contrôle.
-5. Corriger les références obsolètes `supabasa.*` dans la mémoire/docs concernées pour éviter que cette erreur revienne.
-6. Préparer un script SQL d’audit Disk IO staging en lecture seule, séparé de la correction fournisseur, pour éviter de mélanger urgence client et diagnostic performance.
+Confirme et je passe en mode build pour produire les 4 livrables.
