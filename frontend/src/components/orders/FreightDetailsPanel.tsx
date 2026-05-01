@@ -367,6 +367,14 @@ export function FreightDetailsPanel({
       {/* Timeline internationale (Lot 4K) */}
       <InternationalShipmentTimeline orderId={orderId} />
 
+      {/* Lot 18C — Bloc expédition transitaire (vendeur/admin only) */}
+      {actor && customerCtx && bd.forwarder_id && (
+        <ForwarderShippingCopyBlock
+          forwarderId={bd.forwarder_id as string}
+          customer={customerCtx}
+        />
+      )}
+
       {/* Détail sous-colis */}
       {subpackages.length > 0 && (
         <details className="group">
