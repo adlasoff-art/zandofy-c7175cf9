@@ -1,109 +1,186 @@
-## Bug confirmé (un seul)
+Diagnostic
 
-Very Speed : 0,540 kg réel → affiche **20,58 USD** au lieu de **17,90 USD** (forfait 1 kg).
+Le problème n’est très probablement pas un simple cache client.
 
-JH (19 $), Saidi (19 $), Congo Queen Lubumbashi (15,50 $) = **tarifs corrects** configurés par l'admin. Pas de bug.
+Ce que j’ai confirmé dans le code :
 
-## Cause racine
+1. La fiche produit affiche l’encart fournisseur uniquement si `product.store` existe :
 
-Dans `quoteByKgTier` (`frontend/src/services/freightQuote.ts`, lignes 263-289), le calcul utilise le **poids facturable** (`chargeableWeightKg = max(réel, volumétrique)`) pour décider Cas A vs Cas B :
-
-```text
-billableRaw = chargeableWeightKg(0.540, cbm, 6000)
-            = max(0.540, volumétrique)
-            = ex. 0.97 ou 1.05 selon le CBM
+```tsx
+{(product as any).store && (
+  <VendorProfileCard ... />
+)}
 ```
 
-Quand le poids volumétrique gonflé dépasse 1 kg → bascule en Cas B → `(billable + 0.1) × 17.90 ≈ 20,58`. Le client voit ça comme une arnaque.
+2. `product.store` est alimenté par `fetchProductBySlug()` dans `frontend/src/services/api.ts` via un embed direct de la table `stores` :
 
-## Règle métier (rappel client, validée)
-
-- **Poids RÉEL agrégé < 1 kg** → forfait fixe = prix palier 1 kg.
-- **Poids RÉEL agrégé ≥ 1 kg** → `(poids_réel + 0,1) × prix_par_kg` du palier matché.
-- Le **poids volumétrique ne doit PAS faire basculer en Cas B** pour un produit physiquement léger. Il reste utile uniquement pour des cas extrêmes (gros carton de plumes), à traiter via warning admin, pas via re-tarification automatique.
-
-## Correctif (chirurgical, 1 fichier)
-
-### `frontend/src/services/freightQuote.ts` — fonction `quoteByKgTier`
-
-Remplacer le test `if (billableRaw < 1)` par un test sur le **poids réel** :
-
-```text
-function quoteByKgTier(profile, tiers, totalCbm, totalWeightKg) {
-  if (tiers.length === 0) return null;
-  if (totalWeightKg <= 0) return null;
-
-  const sortedTiers = [...tiers].sort((a, b) => a.min_kg - b.min_kg);
-  const baseTier = pickKgTier(sortedTiers, 1) ?? sortedTiers[0] ?? null;
-  if (!baseTier) return null;
-
-  // Cas A : poids RÉEL < 1 kg → forfait 1 kg, peu importe le volumétrique
-  if (totalWeightKg < 1.0) {
-    const flat = baseTier.flat_price ?? baseTier.price_per_kg;
-    if (flat == null) return null;
-    return {
-      type: "weight",
-      label: "Forfait minimum (poids < 1 kg)",
-      weight_kg: 1,
-      unit: "kg",
-      line_total: round2(Number(flat)),
-    };
-  }
-
-  // Cas B : poids RÉEL ≥ 1 kg → (réel + 0.1) × prix/kg du palier matché
-  const billableForPricing = round2(totalWeightKg + 0.1);
-  let tier = pickKgTier(sortedTiers, billableForPricing)
-          ?? sortedTiers.find(t => t.max_kg == null)
-          ?? sortedTiers[sortedTiers.length - 1];
-  if (!tier || tier.is_quote_only) { /* gestion quote_only inchangée */ }
-
-  const pricePerKg = tier.price_per_kg ?? (tier.flat_price && tier.min_kg > 0 ? tier.flat_price / tier.min_kg : null);
-  if (pricePerKg == null) return null;
-
-  return {
-    type: "weight",
-    label: `${totalWeightKg.toFixed(2)} kg × ${pricePerKg.toFixed(2)} (palier ${tier.min_kg}${tier.max_kg ? `–${tier.max_kg}` : "+"})`,
-    weight_kg: totalWeightKg,
-    unit: "kg",
-    unit_price: pricePerKg,
-    line_total: round2(billableForPricing * pricePerKg),
-  };
-}
+```ts
+products
+  .select(`..., stores!products_store_id_fkey(...)`)
 ```
 
-**Différence clé** : on remplace `billableRaw` (= max réel/volumétrique) par `totalWeightKg` (= poids réel pur) dans le test du seuil ET dans le calcul prorata. Le poids volumétrique n'intervient plus.
+3. Une migration de hardening sécurité a ensuite changé l’accès à `stores` :
+- suppression des policies publiques directes sur `stores`
+- création de la vue publique `stores_public`
+- accès complet à `stores` réservé au propriétaire/collaborateur/staff
 
-### Garde-fou volumétrique (warning, pas re-tarification)
+Migration concernée :
+`supabase/migrations/20260424012442_4f6dd65d-55e7-4692-87b9-9689054e3c87.sql`
 
-Si `volumetricWeightKg(cbm, divisor) > totalWeightKg × 3`, ajouter dans `composeFreightQuote` un `warnings.push("Colis très volumineux par rapport au poids — vérification manuelle recommandée")`. Pure info admin, n'affecte pas le total.
+4. Conséquence : sur une vraie session client qui n’est pas propriétaire/collaborateur/admin de la boutique, l’embed `stores!products_store_id_fkey(...)` peut revenir vide/null selon les policies en prod. Donc la fiche produit charge bien le produit, mais n’a plus `product.store`, et l’encart fournisseur n’est pas rendu.
 
-### Tests
+5. Cela explique pourquoi toi tu pouvais encore voir l’encart dans ton navigateur habituel :
+- soit ancienne version JS/React Query/service worker encore en cache,
+- soit session/admin/staff avec droits différents,
+- soit données déjà en mémoire.
+Mais les nouveaux navigateurs / profils / clients voient l’état réel actuel.
 
-Mettre à jour `frontend/src/services/__tests__/freightQuote.test.ts` (la suite actuelle ne couvre pas `quoteByKgTier`) :
+6. La page `/stores` utilise déjà `stores_public`, donc elle peut fonctionner même quand la fiche produit est cassée. Le bug est donc surtout dans la fiche produit : elle continue à dépendre de `stores` au lieu de la vue publique prévue.
 
+Solution unique à appliquer
 
-| Cas                         | Réel  | CBM   | Divisor | Prix/kg | Attendu                       |
-| --------------------------- | ----- | ----- | ------- | ------- | ----------------------------- |
-| Forfait pur                 | 0,540 | 0     | 6000    | 17,90   | **17,90**                     |
-| Forfait malgré CBM gonflant | 0,540 | 0,008 | 6000    | 17,90   | **17,90** (avant fix : 20,58) |
-| Limite haute Cas A          | 0,999 | 0     | 6000    | 17,90   | **17,90**                     |
-| Seuil Cas B                 | 1,000 | 0     | 6000    | 17,90   | **19,69** (1,1 × 17,90)       |
-| Cas B standard              | 1,200 | 0     | 6000    | 17,90   | **23,27** (1,3 × 17,90)       |
-| 4 articles × 250 g          | 1,000 | 0     | 6000    | 17,90   | **17,90**                     |
+Objectif : remettre l’encart fournisseur exactement au bon endroit, sans réouvrir publiquement toute la table `stores` et sans exposer `whatsapp_number`.
 
+1. Modifier `frontend/src/services/api.ts`
 
-## Fichiers modifiés
+Dans `fetchProductBySlug()`, remplacer l’embed direct `stores!products_store_id_fkey(...)` par une logique robuste :
 
-- `frontend/src/services/freightQuote.ts` (~30 lignes dans `quoteByKgTier` + 4 lignes dans `composeFreightQuote` pour le warning)
-- `frontend/src/services/__tests__/freightQuote.test.ts` (6 nouveaux cas)
+- charger d’abord le produit avec ses données publiques produit/catégorie/images/variantes, sans dépendre de l’embed `stores` ;
+- ensuite charger la boutique publique associée via `stores_public`, en utilisant `data.store_id` ;
+- assigner ce résultat à `product.store`.
 
-## Hors scope (à voir demain comme convenu)
+Pseudo-structure :
 
-- Options de livraison (last-mile / pickup) qui ne fonctionnent pas correctement.
-- Pas de migration SQL nécessaire pour ce fix : pur calcul client.
+```ts
+const product = mapProduct(data);
 
-## Validation post-déploiement
+const { data: publicStore } = await supabase
+  .from("stores_public" as any)
+  .select("id, name, slug, logo_url, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, rating, response_rate, response_time")
+  .eq("id", data.store_id)
+  .maybeSingle();
 
-1. Recharger le checkout avec un produit 540 g → Very Speed doit afficher **17,90 $**.
-2. Tester un produit 1,2 kg → Very Speed doit afficher **23,27 $**.
-3. JH/Saidi restent à 19 $ (forfait inchangé), Congo Queen Lubumbashi à 15,50 $.
+product.store = publicStore ?? data.stores ?? null;
+```
+
+Points importants :
+- garder un fallback `data.stores` au cas où l’environnement preview/staging n’est pas exactement au même niveau ;
+- ne pas sélectionner `whatsapp_number` côté public ;
+- continuer à utiliser `openStoreWhatsApp(store.id, ...)`, qui récupère le numéro côté backend sécurisé au clic.
+
+2. Modifier `PRODUCT_SELECT` / `PRODUCT_LIST_SELECT` uniquement si nécessaire
+
+Pour éviter de casser d’autres listes, je ne vais pas réécrire tout le service produit.
+La correction prioritaire sera ciblée sur `fetchProductBySlug()` parce que c’est elle qui contrôle l’encart fournisseur de la fiche produit.
+
+Si je constate que `mapProduct()` dépend trop de `row.stores`, je ferai seulement un ajustement minimal :
+- permettre à `mapProduct()` d’utiliser `row.stores_public` ou `row.publicStore` si présent ;
+- garder la compatibilité avec `row.stores` pour toutes les listes existantes.
+
+3. Rendre l’UI plus résistante
+
+Dans `ProductPage.tsx`, ne pas afficher silencieusement rien si le produit a un `store_id` mais que la boutique publique n’a pas encore chargé.
+
+Option propre : `fetchProductBySlug()` doit déjà retourner `product.store`, donc `ProductPage` n’a normalement pas besoin d’une deuxième requête.
+Mais j’ajouterai une sécurité minimale si nécessaire :
+- si `product.storeId` existe mais `product.store` est absent, afficher une petite zone skeleton/fallback plutôt que supprimer toute la barre ;
+- l’objectif reste que l’encart revienne comme dans ta capture : logo, nom, origine, statut, badges, stats, bouton Contacter, bouton WhatsApp.
+
+4. Corriger/renforcer la page fournisseurs si l’état vide vient du même sujet
+
+La page `/stores` utilise déjà `stores_public`. Je vérifierai que la vue contient bien les colonnes utilisées :
+- `slug`
+- `logo_url`
+- `banner_url`
+- `description`
+- `is_verified`
+- `verified_years`
+- `followers_count`
+- `products_count`
+- `sales_count`
+- `rating`
+- `is_online`
+- `last_seen_at`
+- `created_at`
+- overrides
+
+Si une colonne utilisée côté front manque dans certaines bases, je fournirai aussi une migration SQL idempotente pour recréer `stores_public` avec toutes les colonnes publiques attendues.
+
+5. Migration SQL à prévoir pour prod si nécessaire
+
+Si la prod n’a pas la bonne vue publique, fournir/appliquer une migration du type :
+
+```sql
+DROP VIEW IF EXISTS public.stores_public CASCADE;
+
+CREATE VIEW public.stores_public
+WITH (security_invoker = on) AS
+SELECT
+  id,
+  name,
+  slug,
+  logo_url,
+  banner_url,
+  description,
+  country,
+  city,
+  address,
+  is_verified,
+  is_certified,
+  verified_years,
+  verified_years_override,
+  is_online,
+  last_seen_at,
+  presence_visible,
+  sales_count,
+  sales_override,
+  followers_count,
+  followers_override,
+  products_count,
+  repurchase_rate,
+  sales_trend,
+  rating,
+  response_rate,
+  response_time,
+  review_count_override,
+  shop_type,
+  fulfillment_type,
+  is_platform_owned,
+  is_banned,
+  is_suspended,
+  suspended_activities,
+  default_transit_days_min,
+  default_transit_days_max,
+  returns_enabled,
+  created_at
+FROM public.stores;
+
+GRANT SELECT ON public.stores_public TO anon, authenticated;
+```
+
+Important : cette vue ne doit pas inclure `whatsapp_number`, ni `owner_id`, ni données sensibles.
+
+6. Tests / vérification
+
+Je vérifierai :
+
+- fiche produit en mode non-admin/non-propriétaire : l’encart fournisseur apparaît ;
+- bouton `Contacter` ouvre le chat interne ;
+- bouton `WhatsApp` reste sécurisé et appelle `openStoreWhatsApp()` ;
+- page `/stores` affiche les fournisseurs ;
+- pas de réouverture publique directe de `stores` ;
+- pas de régression sur les listes produits.
+
+Ce que je ne recommande pas
+
+- Ne pas remettre une policy `Anon read stores USING (true)` sur toute la table `stores`. Cela ferait revenir l’affichage, mais réouvrirait des colonnes sensibles comme le numéro WhatsApp ou autres données internes.
+- Ne pas compter uniquement sur le bouton de purge cache. Le cache peut expliquer pourquoi toi tu vois encore l’ancien état, mais il ne réparera pas la dépendance actuelle du front à la table `stores` directe.
+
+Conclusion
+
+La correction propre est :
+
+- la fiche produit doit lire les infos fournisseur publiques depuis `stores_public`,
+- la table `stores` reste protégée,
+- WhatsApp reste récupéré à la demande via la fonction sécurisée,
+- l’encart fournisseur revient pour tous les clients, connectés ou non, sans exposer de données sensibles.

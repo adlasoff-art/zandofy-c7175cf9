@@ -381,6 +381,28 @@ export async function fetchProductBySlug(
   const product = mapProduct(data);
   product.store = data.stores;
 
+  // Fallback robuste : la table `stores` est protégée par RLS (seuls owner/staff
+  // y accèdent en direct). Pour les visiteurs anonymes/clients, l'embed
+  // `stores!products_store_id_fkey` peut revenir vide. On recharge alors la
+  // boutique depuis la vue publique `stores_public` afin que l'encart
+  // fournisseur reste visible sur la fiche produit pour tout le monde.
+  if ((!product.store || !(product.store as any)?.id) && data.store_id) {
+    try {
+      const { data: publicStore } = await (supabase as any)
+        .from("stores_public")
+        .select(
+          "id, name, slug, logo_url, banner_url, description, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, rating, response_rate, response_time, shop_type"
+        )
+        .eq("id", data.store_id)
+        .maybeSingle();
+      if (publicStore) {
+        product.store = publicStore;
+      }
+    } catch (e) {
+      // Silencieux : on garde l'embed (potentiellement null) sans casser la page.
+    }
+  }
+
   // Load dynamic variant selections with type info
   try {
     const { data: selections } = await (supabase as any)
