@@ -13,6 +13,7 @@ import { Loader2, Upload, X, Plus, Trash2, Plane, Ship, Truck, TramFront, Route 
 import { z } from "zod";
 import { TransporterUserPicker } from "./TransporterUserPicker";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
+import { ForwarderShippingTemplatesPanel } from "./ForwarderShippingTemplatesPanel";
 
 type TransportMode = "air" | "sea" | "road" | "rail";
 
@@ -417,6 +418,10 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
             <Label className="text-sm">Actif</Label>
             <Switch checked={!!form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} />
           </div>
+
+          {forwarder?.id && (
+            <ForwarderShippingTemplatesPanel forwarderId={forwarder.id} />
+          )}
         </div>
 
         <DialogFooter>
