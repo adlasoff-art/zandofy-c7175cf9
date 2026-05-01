@@ -18,6 +18,7 @@ import { InternationalShipmentTimeline } from "./InternationalShipmentTimeline";
 import { Button } from "@/components/ui/button";
 import { ReassignForwarderDialog } from "@/components/forwarder/ReassignForwarderDialog";
 import { toast } from "sonner";
+import { ForwarderShippingCopyBlock } from "./ForwarderShippingCopyBlock";
 
 interface SubpackageRow {
   supplier_id: string;
@@ -87,6 +88,14 @@ export function FreightDetailsPanel({
   // Lot 11A — Détection de désynchro (quoted_price=0 mais orders.shipping_cost>0)
   const [orderShippingCost, setOrderShippingCost] = useState<number>(0);
   const [resyncing, setResyncing] = useState(false);
+  // Lot 18C — contexte client pour bloc copiable transitaire (vendeur/admin only)
+  const [customerCtx, setCustomerCtx] = useState<{
+    customer_name: string;
+    phone: string;
+    city: string;
+    country: string;
+    order_ref: string;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,7 +105,7 @@ export function FreightDetailsPanel({
       // 1) Récupérer freight_quote_id depuis la commande
       const { data: order } = await (supabase as any)
         .from("orders")
-        .select("freight_quote_id, shipping_country, shipping_city, shipping_cost")
+        .select("freight_quote_id, shipping_country, shipping_city, shipping_cost, shipping_first_name, shipping_last_name, shipping_phone, order_ref")
         .eq("id", orderId)
         .maybeSingle();
 
@@ -105,6 +114,17 @@ export function FreightDetailsPanel({
         setShippingCountry((order as any)?.shipping_country ?? null);
         setShippingCity((order as any)?.shipping_city ?? null);
         setOrderShippingCost(Number((order as any)?.shipping_cost) || 0);
+        if (actor) {
+          const fn = (order as any)?.shipping_first_name ?? "";
+          const ln = (order as any)?.shipping_last_name ?? "";
+          setCustomerCtx({
+            customer_name: `${fn} ${ln}`.trim(),
+            phone: (order as any)?.shipping_phone ?? "",
+            city: (order as any)?.shipping_city ?? "",
+            country: (order as any)?.shipping_country ?? "",
+            order_ref: (order as any)?.order_ref ?? "",
+          });
+        }
       }
       if (!quoteId) {
         if (!cancelled) {
@@ -346,6 +366,14 @@ export function FreightDetailsPanel({
 
       {/* Timeline internationale (Lot 4K) */}
       <InternationalShipmentTimeline orderId={orderId} />
+
+      {/* Lot 18C — Bloc expédition transitaire (vendeur/admin only) */}
+      {actor && customerCtx && bd.forwarder_id && (
+        <ForwarderShippingCopyBlock
+          forwarderId={bd.forwarder_id as string}
+          customer={customerCtx}
+        />
+      )}
 
       {/* Détail sous-colis */}
       {subpackages.length > 0 && (

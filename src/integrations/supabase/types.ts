@@ -3571,6 +3571,57 @@ export type Database = {
           },
         ]
       }
+      forwarder_shipping_templates: {
+        Row: {
+          created_at: string
+          forwarder_id: string
+          id: string
+          is_default: boolean
+          label: string
+          package_info_template: string
+          sort_order: number
+          updated_at: string
+          warehouse_address: string
+        }
+        Insert: {
+          created_at?: string
+          forwarder_id: string
+          id?: string
+          is_default?: boolean
+          label: string
+          package_info_template?: string
+          sort_order?: number
+          updated_at?: string
+          warehouse_address: string
+        }
+        Update: {
+          created_at?: string
+          forwarder_id?: string
+          id?: string
+          is_default?: boolean
+          label?: string
+          package_info_template?: string
+          sort_order?: number
+          updated_at?: string
+          warehouse_address?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forwarder_shipping_templates_forwarder_id_fkey"
+            columns: ["forwarder_id"]
+            isOneToOne: false
+            referencedRelation: "forwarders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forwarder_shipping_templates_forwarder_id_fkey"
+            columns: ["forwarder_id"]
+            isOneToOne: false
+            referencedRelation: "forwarders_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forwarder_surcharges: {
         Row: {
           amount: number
