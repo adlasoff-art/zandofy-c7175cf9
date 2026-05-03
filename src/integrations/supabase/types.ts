@@ -1108,6 +1108,53 @@ export type Database = {
           },
         ]
       }
+      category_pricing_overrides: {
+        Row: {
+          active: boolean
+          category_id: string
+          created_at: string
+          description: string | null
+          id: string
+          inherit_to_children: boolean
+          margin_pct: number | null
+          multiplier: number | null
+          tiers: Json | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          inherit_to_children?: boolean
+          margin_pct?: number | null
+          multiplier?: number | null
+          tiers?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          inherit_to_children?: boolean
+          margin_pct?: number | null
+          multiplier?: number | null
+          tiers?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_pricing_overrides_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       category_surcharges: {
         Row: {
           category_id: string
