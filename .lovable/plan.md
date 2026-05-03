@@ -1,127 +1,94 @@
-# Plan — Panier (addition) + Bloc expédition transitaire
+# Plan — Tarification dégressive + override catégorie
 
-## Sujet 1 — Panier : addition + feedback explicite
+## Réponse directe à ta question
+**Oui, les deux solutions cohabitent sans conflit.** Solution 1 (dégressif par tranche) devient la logique **par défaut** appliquée partout. Solution 2 (override par catégorie) est livrée **inactive** : la table existe, l'UI admin existe, mais tant qu'aucune catégorie n'a d'override, c'est la Solution 1 qui s'applique. Tu actives au cas par cas plus tard, sans nouveau déploiement.
 
-**Comportement final retenu**
-- Ajout depuis la page produit d'une variante (product_id + color + size) **déjà présente** au panier → on **additionne** : `nouvelleQté = ancienneQté + qtéSaisie`.
-- Exemple : 1 dans le panier + 150 saisis = **151**.
-- L'utilisateur peut ensuite ajuster (±, supprimer) depuis le drawer.
+Ordre d'application du multiplicateur (premier trouvé gagne) :
+1. Override vendeur (`vendor_pricing_overrides.multiplier`) — si défini
+2. Override catégorie (`category_pricing_overrides.multiplier`) — si défini
+3. **Tranche dégressive** selon `cost_calc` — par défaut
 
-**Pourquoi ce choix (verrouillé en mémoire)**
-- Standard e-commerce, prévisible.
-- Évite la perte accidentelle d'une quantité déjà choisie.
-- Les ajustements à la baisse restent triviaux depuis le drawer.
+## Tranches Solution 1 (modifiables par l'admin)
 
-**Changements code**
-- `frontend/src/contexts/CartContext.tsx` : la logique additive existe déjà. On améliore uniquement le **toast** :
-  - Si la ligne existait : `"Panier mis à jour — {newQty} pièces au total"`.
-  - Sinon : `"Ajouté au panier — {qty} pièce(s)"`.
-  - Toast cliquable qui ouvre le drawer (action "Voir le panier").
-- `frontend/src/pages/ProductPage.tsx` : après `addItem`, déclencher l'ouverture du drawer (déjà en place, on vérifie) et **scroll + flash** sur la ligne mise à jour.
-- `frontend/src/components/cart/CartDrawer.tsx` (ou équivalent) : prop `highlightItemId` + classe Tailwind `animate-pulse` 1.2s sur la ligne ciblée.
+| `cost_calc` | Multiplicateur |
+|---|---|
+| < $10 | ×3.0 |
+| $10–$30 | ×2.5 |
+| $30–$80 | ×2.0 |
+| $80–$200 | ×1.5 |
+| **> $200** | **×1.3** ← ajusté selon ta demande |
 
-**Aucun changement DB. Aucun risque RLS.**
+Stocké dans `platform_settings.pricing_defaults.tiers` (JSON), donc 100% éditable depuis l'admin sans redeploy.
 
-## Sujet 2 — Bloc expédition transitaire (vendeur/admin only)
+## Solution 2 — neutre par défaut
 
-**Objectif métier**
-Quand un vendeur (ou admin) ouvre une commande dont le transitaire est sélectionné, il peut copier en **un clic** :
-1. Le **bloc "infos à imprimer sur le colis"** (nom client, téléphone, ville, pays, ref commande).
-2. L'**adresse de l'entrepôt du transitaire** (Chine / Turquie / etc.).
+- Nouvelle table `category_pricing_overrides` (category_id, margin_pct?, multiplier?, tiers?, description, active).
+- **Vide à la livraison** → aucun changement de comportement.
+- Page admin Catégories : un panneau "Tarification spécifique" par catégorie, avec champ description (ex : "Marge réduite 10% — produits high-tech compétitifs").
+- Si une catégorie a un override → utilisé pour tous les produits de cette catégorie (et sous-catégories si on coche "hériter").
 
-Le **client ne voit jamais** l'adresse entrepôt.
+## Côté vendeur — transparence
 
-**Modèle de données**
+Dans `PricingCalculator.tsx` (boutiques **plateforme uniquement**, `is_platform_owned=true`) :
+- Le vendeur saisit toujours son `cost_calc` avec le ×3 mental habituel (champ inchangé).
+- Sous le prix calculé, ajout d'un encart info :
+  > "Tarification plateforme appliquée : marge 15% × multiplicateur dégressif (×3 si <$10 … ×1.3 si >$200). Le prix final affiché reflète cette logique."
+- Pour boutiques **non plateforme** : encart masqué (leur ×3 reste figé comme aujourd'hui).
 
-Nouvelle table `forwarder_shipping_templates` :
+## Détails techniques
 
-```text
-id              uuid PK
-forwarder_id    uuid FK -> forwarders(id) ON DELETE CASCADE
-label           text         (ex: "Entrepôt Guangzhou", "Entrepôt Istanbul")
-warehouse_address text       (adresse complète multi-lignes)
-package_info_template text   (gabarit avec placeholders)
-is_default      boolean default false
-sort_order      int default 0
-created_at      timestamptz default now()
-updated_at      timestamptz default now()
+### Fichiers modifiés
+- `frontend/src/lib/pricing-utils.ts`
+  - `DEFAULT_PRICING.tiers = [{max:10,mult:3},{max:30,mult:2.5},{max:80,mult:2},{max:200,mult:1.5},{max:Infinity,mult:1.3}]`
+  - Nouveau `resolveMultiplier(costCalc, overrides?, categoryOverride?, tiers?)`
+  - `calculateSalePrice` accepte un paramètre `tiers` optionnel
+- `frontend/src/components/vendor/PricingCalculator.tsx` : passe les tiers résolus + affiche l'encart d'info conditionnel
+- `frontend/src/pages/admin/AdminVendorPricingPage.tsx` : éditeur de tranches (table avec add/remove/edit, validation `max` croissant)
+- `frontend/src/pages/admin/AdminCategoriesPage.tsx` (ou équivalent) : panneau override par catégorie
+- `frontend/src/hooks/use-vendor-analytics-pro.ts` : utilise la nouvelle résolution pour cohérence des marges affichées
+
+### Migration SQL
+```sql
+-- 1. Étendre pricing_defaults (JSON, donc juste un UPDATE)
+UPDATE platform_settings 
+SET value = value || jsonb_build_object('tiers', '[
+  {"max_cost":10,"multiplier":3.0},
+  {"max_cost":30,"multiplier":2.5},
+  {"max_cost":80,"multiplier":2.0},
+  {"max_cost":200,"multiplier":1.5},
+  {"max_cost":null,"multiplier":1.3}
+]'::jsonb)
+WHERE key = 'pricing_defaults';
+
+-- 2. Override par catégorie (vide à la livraison)
+CREATE TABLE category_pricing_overrides (
+  id uuid PK default gen_random_uuid(),
+  category_id uuid UNIQUE REFERENCES categories(id) ON DELETE CASCADE,
+  margin_pct numeric,        -- nullable: hérite si null
+  multiplier numeric,        -- nullable
+  tiers jsonb,               -- nullable: tranches custom
+  description text,          -- ex: "Marge 10% high-tech"
+  inherit_to_children bool DEFAULT true,
+  active bool DEFAULT true,
+  created_at, updated_at
+);
+-- RLS: SELECT public, ALL admin
 ```
 
-**Placeholders supportés** (validés) :
-`{{customer_name}}`, `{{phone}}`, `{{city}}`, `{{country}}`, `{{order_ref}}`
+### Non-impacts (confirmés)
+- Frais transitaires : **inchangés**
+- Last-mile / livraison domicile : **inchangés**
+- Programme fidélité / parrainage (5% sur 5 premières commandes) : **toujours basé sur la marge 15%**, pas sur le multiplicateur
+- Commission plateforme 10% : **inchangée**
 
-Gabarit par défaut proposé :
-```text
-{{customer_name}}
-Tel: {{phone}}
-{{city}}, {{country}}
-Ref: {{order_ref}}
-```
+## Plan de livraison
 
-**RLS (verrouillage strict)**
-- `SELECT` : `authenticated` ET (`has_role(auth.uid(),'admin')` OU `has_role(auth.uid(),'vendor')`).
-- `INSERT/UPDATE/DELETE` : `has_role(auth.uid(),'admin')` uniquement.
-- Aucune policy `anon`. Aucun client final n'a accès.
+1. Migration SQL (UPDATE pricing_defaults + nouvelle table)
+2. Refacto `pricing-utils.ts` + tests unitaires sur les tranches
+3. UI admin : éditeur tranches global
+4. UI admin : panneau override par catégorie (vide par défaut)
+5. UI vendeur : encart info dans `PricingCalculator` (boutiques plateforme)
+6. Vérif `use-vendor-analytics-pro` + `VendorAnalyticsProTab`
+7. Commit develop → PR vers main → migration prod via GitHub Actions
 
-**Frontend — Admin (gestion)**
-- `frontend/src/components/admin/ForwarderFormDialog.tsx` : nouvel onglet "Templates d'expédition" listant/CRUDant les `forwarder_shipping_templates` du transitaire (label, warehouse_address en textarea, package_info_template en textarea avec aide placeholders, is_default toggle).
-
-**Frontend — Vendeur/Admin (vue commande)**
-- Nouveau composant `frontend/src/components/orders/ForwarderShippingCopyBlock.tsx` :
-  - Props : `orderId`, `forwarderId`, `customer` (name, phone, city, country), `orderRef`.
-  - Charge les templates du transitaire.
-  - Si plusieurs templates → `<Select>` (pré-sélection `is_default`).
-  - Affiche 2 cartes côte à côte :
-    - **"Infos à coller sur le colis"** : texte résolu (placeholders remplacés) + bouton "Copier".
-    - **"Adresse entrepôt transitaire"** : `warehouse_address` brut + bouton "Copier".
-  - Bouton supplémentaire "Tout copier" (concatène les deux blocs séparés par une ligne).
-  - Toast `sonner` "Copié dans le presse-papier".
-- Monté **uniquement** dans :
-  - `frontend/src/pages/vendor/VendorOrderDetail.tsx` (ou route équivalente vendeur).
-  - `frontend/src/pages/admin/AdminOrderDetail.tsx` (ou équivalent admin).
-- **JAMAIS** dans `CustomerOrderTracker`, `CheckoutPage`, `ForwarderSelector` (côté client).
-
-**i18n**
-Ajouts dans `I18nContext.tsx` (FR/EN/...) :
-`shipping.copy.package_info`, `shipping.copy.warehouse_address`, `shipping.copy.copy_button`, `shipping.copy.copy_all`, `shipping.copy.copied_toast`, `shipping.copy.select_template`.
-
-## Schéma de l'écran vendeur (Sujet 2)
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│  Commande #ZF-2026-00123        [statut: en préparation]        │
-├─────────────────────────────────────────────────────────────────┤
-│  Client : Aïcha M. — +243 ... — Kinshasa, RDC                   │
-│  Transitaire : ChinaExpress  ▼ [Entrepôt Guangzhou ▾]           │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌──────────────────────────┐  ┌──────────────────────────┐     │
-│  │ 📋 Infos à coller        │  │ 🏬 Adresse entrepôt      │     │
-│  │    sur le colis          │  │    (vendeur uniquement)  │     │
-│  │                          │  │                          │     │
-│  │ Aïcha M.                 │  │ ChinaExpress Warehouse   │     │
-│  │ Tel: +243 ...            │  │ Building 7, Baiyun Dist. │     │
-│  │ Kinshasa, RDC            │  │ Guangzhou 510000, China  │     │
-│  │ Ref: ZF-2026-00123       │  │ Contact: +86 ...         │     │
-│  │                          │  │                          │     │
-│  │       [ Copier ]         │  │       [ Copier ]         │     │
-│  └──────────────────────────┘  └──────────────────────────┘     │
-│                      [ Tout copier ]                            │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-Côté client (`CustomerOrderTracker`, checkout) → **rien de tout ceci n'apparaît**. Le client voit uniquement : nom du transitaire, tarif, délai estimé.
-
-## Ordre d'exécution
-
-1. Migration SQL : table `forwarder_shipping_templates` + RLS + index `(forwarder_id, sort_order)`.
-2. Composant `ForwarderShippingCopyBlock` + intégration dans pages vendeur/admin.
-3. Onglet templates dans `ForwarderFormDialog`.
-4. Toast amélioré dans `CartContext` + highlight dans `CartDrawer`.
-5. Mémoire : note `mem://features/forwarders-and-logistics-system` mise à jour ("templates d'expédition vendeur/admin only, jamais client").
-
-## Hors scope (à confirmer plus tard si besoin)
-- Génération PDF étiquette (déjà couvert par "Thermal Shipping Labels").
-- Multi-langue du gabarit (1 seul texte par template pour l'instant).
-- Upload logo transitaire dans le bloc copié.
-
-Sur approbation, je passe en mode build et applique tout en une seule itération.
+Aucun produit existant n'est repricé automatiquement : les `sale_price` déjà saisis restent. La nouvelle logique s'applique uniquement aux **nouveaux calculs** (création produit ou recalcul manuel via le calculateur).

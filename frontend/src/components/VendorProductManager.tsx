@@ -655,6 +655,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             price={form.price}
             originalPrice={form.original_price}
             storeId={storeId}
+            categoryId={form.category_id || undefined}
             onCostRealChange={(v) => setForm((f) => ({ ...f, cost_real: v }))}
             onCostCalcChange={(v) => setForm((f) => ({ ...f, cost_calc: v }))}
             onAutoPricingChange={(v) => setForm((f) => ({ ...f, auto_pricing_enabled: v }))}
