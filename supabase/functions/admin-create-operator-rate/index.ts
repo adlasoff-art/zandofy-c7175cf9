@@ -109,9 +109,40 @@ Deno.serve(async (req) => {
         reviewed_at: new Date().toISOString(),
         reviewed_by: adminId,
       })
-      .select("id")
+      .select("*")
       .single();
     if (insErr) return json({ error: "Insert failed", details: insErr.message }, 500);
+
+    // Le trigger force_pending_on_rate_change peut forcer status='pending' à
+    // l'INSERT pour un opérateur non platform-owned. On force ici 'approved'
+    // explicitement (côté admin = auto-approuvé), puis on relit pour confirmer.
+    if (rate.status !== "approved") {
+      const { data: updated, error: updErr } = await svc
+        .from("delivery_operator_rates")
+        .update({
+          status: "approved",
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: adminId,
+          rejection_reason: null,
+        })
+        .eq("id", rate.id)
+        .select("*")
+        .single();
+      if (updErr) {
+        return json({ error: "Auto-approve failed", details: updErr.message }, 500);
+      }
+      Object.assign(rate, updated);
+    }
+
+    // Relire pour confirmer la persistance réelle (anti-faux-succès).
+    const { data: confirmed, error: confErr } = await svc
+      .from("delivery_operator_rates")
+      .select("*")
+      .eq("id", rate.id)
+      .maybeSingle();
+    if (confErr || !confirmed) {
+      return json({ error: "Rate inserted but not confirmed", details: confErr?.message ?? null }, 500);
+    }
 
     // Notif owner
     if (op.owner_user_id) {
@@ -124,7 +155,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return json({ success: true, rate_id: rate.id });
+    return json({ success: true, rate_id: confirmed.id, rate: confirmed });
   } catch (e) {
     console.error("[admin-create-operator-rate] error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown" }, 500);
