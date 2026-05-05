@@ -1,94 +1,58 @@
-# Plan — Tarification dégressive + override catégorie
+Diagnostic réel après vérification en lecture seule
 
-## Réponse directe à ta question
-**Oui, les deux solutions cohabitent sans conflit.** Solution 1 (dégressif par tranche) devient la logique **par défaut** appliquée partout. Solution 2 (override par catégorie) est livrée **inactive** : la table existe, l'UI admin existe, mais tant qu'aucune catégorie n'a d'override, c'est la Solution 1 qui s'applique. Tu actives au cas par cas plus tard, sans nouveau déploiement.
+1. Le tarif saisi n’est pas visible car il n’a pas été enregistré dans la base consultée.
+   - Pour l’opérateur `Very Speed Delivery`, la base actuelle contient seulement 1 tarif existant : `Standard`, Kinshasa, base 3.00 USD, surcharge 2.00 USD, approuvé/actif, créé le 27/04.
+   - Aucun tarif récent `Zone A`, `Gombe`, `Batetela`, `3.50 USD` n’existe dans `delivery_operator_rates`.
+   - Aucun enregistrement récent n’a été trouvé dans les logs de la fonction `admin-create-operator-rate`, ce qui indique que le toast “Tarif créé et auto-approuvé” peut être affiché côté interface sans que la liste locale confirme réellement l’insertion visible.
 
-Ordre d'application du multiplicateur (premier trouvé gagne) :
-1. Override vendeur (`vendor_pricing_overrides.multiplier`) — si défini
-2. Override catégorie (`category_pricing_overrides.multiplier`) — si défini
-3. **Tranche dégressive** selon `cost_calc` — par défaut
+2. Le problème principal est côté page admin des tarifs opérateurs.
+   - Après création, la page affiche toujours “Aucun tarif enregistré” si le rechargement de la requête ne ramène pas la donnée.
+   - La page ne fait pas de vérification post-création robuste : elle accepte la réponse de la fonction, réinitialise le formulaire, puis invalide la requête, mais ne confirme pas que le tarif est effectivement revenu dans la liste.
+   - La page ne dispose pas encore d’un mode “modifier le tarif”, seulement “désactiver/réactiver”. Votre besoin d’édition n’est donc pas encore couvert.
 
-## Tranches Solution 1 (modifiables par l'admin)
+3. Point de vigilance supplémentaire : séparation Lovable / production.
+   - Les outils de lecture disponibles ici consultent la base de preview Lovable, pas votre production réelle. Selon votre mémoire projet, la production `zandofy.com` reste la source de vérité. Il faudra que Cursor/GitHub applique la correction sur la stack production après validation, comme d’habitude.
 
-| `cost_calc` | Multiplicateur |
-|---|---|
-| < $10 | ×3.0 |
-| $10–$30 | ×2.5 |
-| $30–$80 | ×2.0 |
-| $80–$200 | ×1.5 |
-| **> $200** | **×1.3** ← ajusté selon ta demande |
+Plan de correction sans casser le système existant
 
-Stocké dans `platform_settings.pricing_defaults.tiers` (JSON), donc 100% éditable depuis l'admin sans redeploy.
+1. Corriger la page `AdminOperatorRatesPage`
+   - Ajouter un état clair de rechargement après création.
+   - Après création réussie, forcer un `refetch()` de la liste des tarifs au lieu de dépendre uniquement de `invalidateQueries`.
+   - Afficher une alerte si la fonction répond “success” mais que le tarif créé n’est pas retrouvé dans la liste après refetch. Cela évitera les faux positifs du type “créé” alors que rien n’apparaît.
+   - Ne pas toucher au checkout, aux frais transitaires, ni aux frais dernier kilomètre existants.
 
-## Solution 2 — neutre par défaut
+2. Ajouter la modification des tarifs existants côté admin
+   - Ajouter une action “Modifier” sur chaque tarif existant.
+   - Réutiliser les mêmes champs que la création : pays, ville, commune, quartier, zone, devise, tarif de base, surcharge, prix/km, délai estimé.
+   - À l’enregistrement admin : conserver `status='approved'`, `is_active` inchangé, et renseigner `reviewed_at/reviewed_by` pour éviter qu’un tarif plateforme/admin repasse en attente inutilement.
+   - Garder “Désactiver/Réactiver” séparé pour ne pas supprimer les tarifs par erreur.
 
-- Nouvelle table `category_pricing_overrides` (category_id, margin_pct?, multiplier?, tiers?, description, active).
-- **Vide à la livraison** → aucun changement de comportement.
-- Page admin Catégories : un panneau "Tarification spécifique" par catégorie, avec champ description (ex : "Marge réduite 10% — produits high-tech compétitifs").
-- Si une catégorie a un override → utilisé pour tous les produits de cette catégorie (et sous-catégories si on coche "hériter").
+3. Renforcer la fonction backend `admin-create-operator-rate`
+   - Retourner le tarif complet créé, pas seulement `rate_id`, afin que l’interface puisse l’insérer/valider immédiatement.
+   - Ajouter une vérification de cohérence après insertion : relire le tarif par son id avant de répondre success.
+   - Améliorer les erreurs pour distinguer : opérateur introuvable, blocage de plafond tarifaire, insertion échouée, lecture post-insertion échouée.
 
-## Côté vendeur — transparence
+4. Ajouter une fonction backend d’édition admin dédiée
+   - Créer `admin-update-operator-rate` pour modifier un tarif existant en sécurité.
+   - Vérifier que l’utilisateur est admin.
+   - Vérifier que le tarif et l’opérateur existent, que l’opérateur n’est pas archivé.
+   - Appliquer les mêmes validations de prix/plafonds que la création.
+   - Retourner le tarif complet modifié pour rafraîchir l’UI.
 
-Dans `PricingCalculator.tsx` (boutiques **plateforme uniquement**, `is_platform_owned=true`) :
-- Le vendeur saisit toujours son `cost_calc` avec le ×3 mental habituel (champ inchangé).
-- Sous le prix calculé, ajout d'un encart info :
-  > "Tarification plateforme appliquée : marge 15% × multiplicateur dégressif (×3 si <$10 … ×1.3 si >$200). Le prix final affiché reflète cette logique."
-- Pour boutiques **non plateforme** : encart masqué (leur ×3 reste figé comme aujourd'hui).
+5. Configuration et déploiement
+   - Ajouter la configuration de la nouvelle fonction dans `frontend/supabase/config.toml` avec JWT requis.
+   - Ne pas modifier les fichiers auto-générés `client.ts` / `types.ts`.
+   - Ne pas modifier les fichiers d’infrastructure sensibles.
 
-## Détails techniques
+6. Vérifications de non-régression
+   - Vérifier que la requête des tarifs existants affiche bien les tarifs actifs existants, y compris le tarif `Standard` déjà présent.
+   - Vérifier que la création d’un tarif admin affiche immédiatement la ligne créée.
+   - Vérifier que la modification d’un tarif met à jour la ligne sans supprimer ni dupliquer.
+   - Vérifier que le checkout continue d’utiliser uniquement les tarifs `approved` + `is_active=true` via `useOperatorQuotes` et `v_active_operators_by_city`.
+   - Vérifier que les autres modules restent inchangés : transitaires, livraison à domicile client, opérateur dashboard, commandes.
 
-### Fichiers modifiés
-- `frontend/src/lib/pricing-utils.ts`
-  - `DEFAULT_PRICING.tiers = [{max:10,mult:3},{max:30,mult:2.5},{max:80,mult:2},{max:200,mult:1.5},{max:Infinity,mult:1.3}]`
-  - Nouveau `resolveMultiplier(costCalc, overrides?, categoryOverride?, tiers?)`
-  - `calculateSalePrice` accepte un paramètre `tiers` optionnel
-- `frontend/src/components/vendor/PricingCalculator.tsx` : passe les tiers résolus + affiche l'encart d'info conditionnel
-- `frontend/src/pages/admin/AdminVendorPricingPage.tsx` : éditeur de tranches (table avec add/remove/edit, validation `max` croissant)
-- `frontend/src/pages/admin/AdminCategoriesPage.tsx` (ou équivalent) : panneau override par catégorie
-- `frontend/src/hooks/use-vendor-analytics-pro.ts` : utilise la nouvelle résolution pour cohérence des marges affichées
+Résultat attendu après correction
 
-### Migration SQL
-```sql
--- 1. Étendre pricing_defaults (JSON, donc juste un UPDATE)
-UPDATE platform_settings 
-SET value = value || jsonb_build_object('tiers', '[
-  {"max_cost":10,"multiplier":3.0},
-  {"max_cost":30,"multiplier":2.5},
-  {"max_cost":80,"multiplier":2.0},
-  {"max_cost":200,"multiplier":1.5},
-  {"max_cost":null,"multiplier":1.3}
-]'::jsonb)
-WHERE key = 'pricing_defaults';
-
--- 2. Override par catégorie (vide à la livraison)
-CREATE TABLE category_pricing_overrides (
-  id uuid PK default gen_random_uuid(),
-  category_id uuid UNIQUE REFERENCES categories(id) ON DELETE CASCADE,
-  margin_pct numeric,        -- nullable: hérite si null
-  multiplier numeric,        -- nullable
-  tiers jsonb,               -- nullable: tranches custom
-  description text,          -- ex: "Marge 10% high-tech"
-  inherit_to_children bool DEFAULT true,
-  active bool DEFAULT true,
-  created_at, updated_at
-);
--- RLS: SELECT public, ALL admin
-```
-
-### Non-impacts (confirmés)
-- Frais transitaires : **inchangés**
-- Last-mile / livraison domicile : **inchangés**
-- Programme fidélité / parrainage (5% sur 5 premières commandes) : **toujours basé sur la marge 15%**, pas sur le multiplicateur
-- Commission plateforme 10% : **inchangée**
-
-## Plan de livraison
-
-1. Migration SQL (UPDATE pricing_defaults + nouvelle table)
-2. Refacto `pricing-utils.ts` + tests unitaires sur les tranches
-3. UI admin : éditeur tranches global
-4. UI admin : panneau override par catégorie (vide par défaut)
-5. UI vendeur : encart info dans `PricingCalculator` (boutiques plateforme)
-6. Vérif `use-vendor-analytics-pro` + `VendorAnalyticsProTab`
-7. Commit develop → PR vers main → migration prod via GitHub Actions
-
-Aucun produit existant n'est repricé automatiquement : les `sale_price` déjà saisis restent. La nouvelle logique s'applique uniquement aux **nouveaux calculs** (création produit ou recalcul manuel via le calculateur).
+- Quand vous créez `Zone A / Kinshasa / Gombe / Batetela / 3.50 USD`, la ligne apparaît immédiatement dans “Tarifs existants”.
+- Vous pouvez ensuite cliquer “Modifier” pour ajuster le montant, la zone, la commune/quartier ou le délai.
+- Si une insertion échoue réellement, l’interface affiche une erreur claire au lieu d’un message de succès trompeur.
