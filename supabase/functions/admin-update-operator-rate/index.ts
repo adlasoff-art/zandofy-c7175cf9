@@ -1,8 +1,9 @@
 /**
- * admin-create-operator-rate — Lot final consolidation
+ * admin-update-operator-rate
  *
- * Permet à un admin de créer un tarif opérateur AU NOM de cet opérateur,
- * directement approuvé (status='approved'). Vérifie les caps si configurés.
+ * Permet à un admin de modifier un tarif opérateur existant en sécurité.
+ * Conserve status='approved' et is_active=true (sauf changement explicite),
+ * applique les caps si présents, retourne le tarif complet relu.
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
@@ -13,8 +14,8 @@ const corsHeaders = {
 };
 
 const BodySchema = z.object({
-  operator_id: z.string().uuid(),
-  country_code: z.string().min(2).max(3).default("CD"),
+  rate_id: z.string().uuid(),
+  country_code: z.string().min(2).max(3),
   city: z.string().min(1).max(100),
   zone_name: z.string().min(1).max(120),
   commune: z.string().max(120).nullable().optional(),
@@ -22,8 +23,8 @@ const BodySchema = z.object({
   base_price: z.number().min(0),
   surcharge: z.number().min(0).default(0),
   price_per_km: z.number().min(0).default(0),
-  currency: z.string().min(3).max(3).default("USD"),
-  estimated_minutes: z.number().int().min(1).max(720).default(45),
+  currency: z.string().min(3).max(3),
+  estimated_minutes: z.number().int().min(1).max(720),
 });
 
 Deno.serve(async (req) => {
@@ -56,16 +57,23 @@ Deno.serve(async (req) => {
     }
     const input = parsed.data;
 
-    // Vérifie l'existence + état de l'opérateur
+    // Charger le tarif et l'opérateur
+    const { data: existing, error: exErr } = await svc
+      .from("delivery_operator_rates")
+      .select("id, operator_id")
+      .eq("id", input.rate_id)
+      .maybeSingle();
+    if (exErr || !existing) return json({ error: "Tarif introuvable" }, 404);
+
     const { data: op, error: opErr } = await svc
       .from("delivery_operators")
-      .select("id, owner_user_id, company_name, status, archived_at")
-      .eq("id", input.operator_id)
+      .select("id, archived_at")
+      .eq("id", existing.operator_id)
       .maybeSingle();
     if (opErr || !op) return json({ error: "Opérateur introuvable" }, 404);
-    if (op.archived_at) return json({ error: "Opérateur archivé — impossible d'ajouter un tarif" }, 409);
+    if (op.archived_at) return json({ error: "Opérateur archivé — édition impossible" }, 409);
 
-    // Vérifie les caps si table présente
+    // Vérifier les caps si configurés
     try {
       const { data: cap } = await svc
         .from("delivery_operator_city_caps")
@@ -85,14 +93,11 @@ Deno.serve(async (req) => {
           }, 400);
         }
       }
-    } catch (_) {
-      // Pas bloquant si la table n'existe pas
-    }
+    } catch (_) { /* table absente = non bloquant */ }
 
-    const { data: rate, error: insErr } = await svc
+    const { error: updErr } = await svc
       .from("delivery_operator_rates")
-      .insert({
-        operator_id: input.operator_id,
+      .update({
         country_code: input.country_code,
         city: input.city,
         zone_name: input.zone_name,
@@ -103,61 +108,27 @@ Deno.serve(async (req) => {
         price_per_km: input.price_per_km,
         currency: input.currency,
         estimated_minutes: input.estimated_minutes,
-        is_active: true,
+        // Édition admin = reste approuvé (le trigger respecte status explicite)
         status: "approved",
-        submitted_at: new Date().toISOString(),
         reviewed_at: new Date().toISOString(),
         reviewed_by: adminId,
+        rejection_reason: null,
       })
-      .select("*")
-      .single();
-    if (insErr) return json({ error: "Insert failed", details: insErr.message }, 500);
+      .eq("id", input.rate_id);
+    if (updErr) return json({ error: "Update failed", details: updErr.message }, 500);
 
-    // Le trigger force_pending_on_rate_change peut forcer status='pending' à
-    // l'INSERT pour un opérateur non platform-owned. On force ici 'approved'
-    // explicitement (côté admin = auto-approuvé), puis on relit pour confirmer.
-    if (rate.status !== "approved") {
-      const { data: updated, error: updErr } = await svc
-        .from("delivery_operator_rates")
-        .update({
-          status: "approved",
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: adminId,
-          rejection_reason: null,
-        })
-        .eq("id", rate.id)
-        .select("*")
-        .single();
-      if (updErr) {
-        return json({ error: "Auto-approve failed", details: updErr.message }, 500);
-      }
-      Object.assign(rate, updated);
-    }
-
-    // Relire pour confirmer la persistance réelle (anti-faux-succès).
     const { data: confirmed, error: confErr } = await svc
       .from("delivery_operator_rates")
       .select("*")
-      .eq("id", rate.id)
+      .eq("id", input.rate_id)
       .maybeSingle();
     if (confErr || !confirmed) {
-      return json({ error: "Rate inserted but not confirmed", details: confErr?.message ?? null }, 500);
+      return json({ error: "Update non confirmé", details: confErr?.message ?? null }, 500);
     }
 
-    // Notif owner
-    if (op.owner_user_id) {
-      await svc.from("notifications").insert({
-        user_id: op.owner_user_id,
-        type: "operator_rate_created_by_admin",
-        title: "Nouveau tarif ajouté par l'administration",
-        message: `Un tarif pour ${input.zone_name} (${input.city}) a été créé pour votre compte.`,
-        link: "/operator/rates",
-      });
-    }
-
-    return json({ success: true, rate_id: confirmed.id, rate: confirmed });
+    return json({ success: true, rate: confirmed });
   } catch (e) {
-    console.error("[admin-create-operator-rate] error", e);
+    console.error("[admin-update-operator-rate] error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown" }, 500);
   }
 });

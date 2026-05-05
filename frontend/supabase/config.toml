@@ -83,6 +83,9 @@ verify_jwt = false
 [functions.admin-create-operator-rate]
 verify_jwt = true
 
+[functions.admin-update-operator-rate]
+verify_jwt = true
+
 [functions.request-delivery-coverage]
 verify_jwt = true
 

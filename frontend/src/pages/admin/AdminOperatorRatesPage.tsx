@@ -15,8 +15,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Loader2, MapPin } from "lucide-react";
+import { ArrowLeft, Plus, Loader2, MapPin, Pencil, RefreshCw } from "lucide-react";
 import { GeoFieldsRow, type GeoFieldsValue } from "@/components/address/GeoFieldsRow";
 
 type Rate = {
@@ -28,6 +29,7 @@ type Rate = {
   quartier: string | null;
   base_price: number;
   surcharge: number;
+  price_per_km: number;
   currency: string;
   estimated_minutes: number;
   status: string;
@@ -51,6 +53,9 @@ export default function AdminOperatorRatesPage() {
   const qc = useQueryClient();
   const [form, setForm] = useState(initialForm);
   const [geo, setGeo] = useState<GeoFieldsValue>(initialGeo);
+  const [editTarget, setEditTarget] = useState<Rate | null>(null);
+  const [editForm, setEditForm] = useState(initialForm);
+  const [editGeo, setEditGeo] = useState<GeoFieldsValue>(initialGeo);
 
   const { data: operator } = useQuery({
     queryKey: ["admin-operator", operatorId],
@@ -66,7 +71,7 @@ export default function AdminOperatorRatesPage() {
     },
   });
 
-  const { data: rates, isLoading } = useQuery({
+  const { data: rates, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["admin-operator-rates", operatorId],
     enabled: !!operatorId,
     queryFn: async () => {
@@ -101,12 +106,18 @@ export default function AdminOperatorRatesPage() {
       const { data, error } = await supabase.functions.invoke("admin-create-operator-rate", { body });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      return data;
+      return data as { success: boolean; rate_id: string; rate: Rate };
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       toast.success("Tarif créé et auto-approuvé");
       setForm(initialForm);
       setGeo(initialGeo);
+      // Refetch immédiat + vérification de présence (anti-faux-succès)
+      const result = await refetch();
+      const found = (result.data || []).some((r) => r.id === data.rate_id);
+      if (!found) {
+        toast.error("Tarif inséré mais introuvable après rechargement — vérifiez la base.");
+      }
       qc.invalidateQueries({ queryKey: ["admin-operator-rates", operatorId] });
     },
     onError: (e: any) => toast.error(e.message || "Erreur"),
@@ -127,12 +138,64 @@ export default function AdminOperatorRatesPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const updateRate = useMutation({
+    mutationFn: async () => {
+      if (!editTarget) throw new Error("Aucun tarif à modifier");
+      if (!editGeo.country || !editGeo.city?.trim() || !editForm.zone_name.trim() || !editForm.base_price)
+        throw new Error("Ville, zone et tarif de base requis");
+      const body = {
+        rate_id: editTarget.id,
+        country_code: (editGeo.country || "").toUpperCase(),
+        city: editGeo.city.trim(),
+        zone_name: editForm.zone_name.trim(),
+        commune: editGeo.commune?.trim() || null,
+        quartier: editGeo.quartier?.trim() || null,
+        base_price: Number(editForm.base_price),
+        surcharge: Number(editForm.surcharge) || 0,
+        price_per_km: Number(editForm.price_per_km) || 0,
+        currency: editForm.currency.toUpperCase(),
+        estimated_minutes: Number(editForm.estimated_minutes) || 45,
+      };
+      const { data, error } = await supabase.functions.invoke("admin-update-operator-rate", { body });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data;
+    },
+    onSuccess: async () => {
+      toast.success("Tarif mis à jour");
+      setEditTarget(null);
+      await refetch();
+    },
+    onError: (e: any) => toast.error(e.message || "Erreur"),
+  });
+
+  const openEdit = (r: Rate) => {
+    setEditTarget(r);
+    setEditForm({
+      zone_name: r.zone_name,
+      base_price: String(r.base_price),
+      surcharge: String(r.surcharge ?? 0),
+      price_per_km: String((r as any).price_per_km ?? 0),
+      currency: r.currency,
+      estimated_minutes: String(r.estimated_minutes),
+    });
+    setEditGeo({
+      country: r.country_code,
+      city: r.city,
+      commune: r.commune ?? "",
+      quartier: r.quartier ?? "",
+    });
+  };
+
   return (
     <AdminLayout title="Tarifs opérateur">
       <div className="space-y-6">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="sm">
             <Link to="/admin/operators"><ArrowLeft size={14} className="mr-1" /> Opérateurs</Link>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw size={14} className={`mr-1 ${isFetching ? "animate-spin" : ""}`} /> Rafraîchir
           </Button>
         </div>
 
@@ -236,9 +299,14 @@ export default function AdminOperatorRatesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button size="sm" variant="ghost" onClick={() => toggleActive.mutate(r)}>
-                          {r.is_active ? "Désactiver" : "Réactiver"}
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => openEdit(r)} title="Modifier">
+                            <Pencil size={14} />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => toggleActive.mutate(r)}>
+                            {r.is_active ? "Désactiver" : "Réactiver"}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -247,6 +315,58 @@ export default function AdminOperatorRatesPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Dialog édition */}
+        <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Modifier le tarif</DialogTitle>
+            </DialogHeader>
+            {editTarget && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-3">
+                  <GeoFieldsRow
+                    value={editGeo}
+                    onChange={(patch) => setEditGeo({ ...editGeo, ...patch })}
+                    levels={["country", "city", "commune", "quartier"]}
+                    required={["country", "city"]}
+                  />
+                </div>
+                <div>
+                  <Label>Nom de la zone *</Label>
+                  <Input value={editForm.zone_name} onChange={(e) => setEditForm({ ...editForm, zone_name: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Devise</Label>
+                  <Input value={editForm.currency} onChange={(e) => setEditForm({ ...editForm, currency: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Tarif de base *</Label>
+                  <Input type="number" step="0.01" min="0" value={editForm.base_price} onChange={(e) => setEditForm({ ...editForm, base_price: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Surcharge</Label>
+                  <Input type="number" step="0.01" min="0" value={editForm.surcharge} onChange={(e) => setEditForm({ ...editForm, surcharge: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Prix / km</Label>
+                  <Input type="number" step="0.01" min="0" value={editForm.price_per_km} onChange={(e) => setEditForm({ ...editForm, price_per_km: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Délai estimé (min)</Label>
+                  <Input type="number" min="1" value={editForm.estimated_minutes} onChange={(e) => setEditForm({ ...editForm, estimated_minutes: e.target.value })} />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditTarget(null)}>Annuler</Button>
+              <Button onClick={() => updateRate.mutate()} disabled={updateRate.isPending}>
+                {updateRate.isPending && <Loader2 size={14} className="animate-spin mr-1" />}
+                Enregistrer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );
