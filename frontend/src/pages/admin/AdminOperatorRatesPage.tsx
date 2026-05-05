@@ -109,16 +109,58 @@ export default function AdminOperatorRatesPage() {
       return data as { success: boolean; rate_id: string; rate: Rate };
     },
     onSuccess: async (data) => {
-      toast.success("Tarif créé et auto-approuvé");
+      const rateId = data.rate_id;
+      const fullRate = (data as any)?.rate as Rate | undefined;
+
+      // 1) Injection optimiste dans le cache si on a la ligne complète
+      if (fullRate) {
+        qc.setQueryData<Rate[]>(["admin-operator-rates", operatorId], (prev) => {
+          const list = prev || [];
+          if (list.some((r) => r.id === fullRate.id)) return list;
+          return [fullRate, ...list];
+        });
+      }
+
       setForm(initialForm);
       setGeo(initialGeo);
-      // Refetch immédiat + vérification de présence (anti-faux-succès)
+
+      // 2) Refetch normal
       const result = await refetch();
-      const found = (result.data || []).some((r) => r.id === data.rate_id);
-      if (!found) {
-        toast.error("Tarif inséré mais introuvable après rechargement — vérifiez la base.");
+      const foundInList = (result.data || []).some((r) => r.id === rateId);
+
+      if (foundInList) {
+        toast.success("Tarif créé et auto-approuvé");
+        return;
       }
-      qc.invalidateQueries({ queryKey: ["admin-operator-rates", operatorId] });
+
+      // 3) Vérification directe par id (bypass des filtres / caches)
+      const { data: byId, error: byIdErr } = await (supabase as any)
+        .from("delivery_operator_rates")
+        .select("*")
+        .eq("id", rateId)
+        .maybeSingle();
+
+      if (byIdErr) {
+        toast.error(`Tarif créé (id ${rateId.slice(0, 8)}…) mais lecture refusée : ${byIdErr.message}`);
+        return;
+      }
+
+      if (byId) {
+        // Ligne existe bien — on l'injecte manuellement dans la liste
+        qc.setQueryData<Rate[]>(["admin-operator-rates", operatorId], (prev) => {
+          const list = prev || [];
+          if (list.some((r) => r.id === byId.id)) return list;
+          return [byId as Rate, ...list];
+        });
+        toast.success("Tarif créé (ajouté manuellement à la liste — décalage de cache détecté)");
+        return;
+      }
+
+      // 4) Vraiment introuvable : mismatch d'environnement probable
+      toast.error(
+        `Tarif id ${rateId.slice(0, 8)}… introuvable dans cet environnement. ` +
+        `Probable décalage entre l'environnement d'écriture (Edge Function) et de lecture (REST).`
+      );
     },
     onError: (e: any) => toast.error(e.message || "Erreur"),
   });
