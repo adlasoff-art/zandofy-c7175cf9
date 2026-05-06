@@ -15,17 +15,17 @@
 begin;
 
 update cms_banners c
-   set image_url = b.image_url
+   set image_url = b.url
   from _backup_urls_20260506 b
  where b.t = 'cms_banners' and b.id::text = c.id::text;
 
 update categories c
-   set image_url = b.image_url
+   set image_url = b.url
   from _backup_urls_20260506 b
  where b.t = 'categories' and b.id::text = c.id::text;
 
 update product_images c
-   set image_url = b.image_url
+   set image_url = b.url
   from _backup_urls_20260506 b
  where b.t = 'product_images' and b.id::text = c.id::text;
 
