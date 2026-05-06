@@ -26,10 +26,33 @@ export default defineConfig(({ mode }) => ({
       "react-router-dom",
       "@tanstack/react-query",
       "@supabase/supabase-js",
-      "framer-motion",
-      "recharts",
     ],
     exclude: [],
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Dedicated vendor chunks. Critical: keep `recharts` and `framer-motion`
+        // out of the entry chunk so the home page doesn't ship them.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("recharts") || id.includes("d3-")) return "charts-vendor";
+          if (id.includes("framer-motion")) return "motion-vendor";
+          if (id.includes("@radix-ui")) return "radix-vendor";
+          if (id.includes("lucide-react")) return "lucide-vendor";
+          if (id.includes("@tanstack/react-query")) return "query-vendor";
+          if (id.includes("@supabase")) return "supabase-vendor";
+          if (
+            id.includes("/react/") ||
+            id.includes("/react-dom/") ||
+            id.includes("/react-router-dom/") ||
+            id.includes("/scheduler/")
+          )
+            return "react-vendor";
+          return undefined;
+        },
+      },
+    },
   },
   resolve: {
     dedupe: [
