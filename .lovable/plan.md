@@ -1,103 +1,69 @@
-## Diagnostic préalable
 
-**Stack ciblée** : Production = GitHub `main` → Vercel (`zandofy.com`) → Supabase perso (`vpt...yxf`). La preview Lovable Cloud (`uog...zpu`) ne sert qu'à tester l'UI.
+# Plan de performance mobile (Zandofy)
 
-**Ce qui existe déjà**
-- `openStoreWhatsApp()` (`frontend/src/lib/whatsapp.ts`) appelle l'edge function sécurisée `get-store-whatsapp` qui renvoie le numéro pour les utilisateurs connectés.
-- Bucket `chat-media` existe en prod (Supabase perso) avec 3 policies RLS (INSERT auth, SELECT participants, DELETE owner) — vérifié.
-- Le `ChatPanel` (`frontend/src/components/messages/ChatPanel.tsx`, lignes 439-449) affiche déjà l'image+nom+prix du produit dans son header — mais seulement si `conversation.product_image` est rempli. À vérifier côté vendeur (vue store-owner).
-- Listings produits utilisent déjà `PRODUCT_LIST_SELECT` allégé + `useLazyImage` avec IntersectionObserver.
+## Constat (PageSpeed mobile, 6 mai)
 
-**Causes probables des 3 problèmes signalés**
+- **Score Performance : 47/100** (rouge).
+- **CrUX terrain (28 j)** : LCP 7,6 s · FCP 4,7 s · INP 472 ms · CLS 0,17 · TTFB 1,3 s. Échec Core Web Vitals.
+- **Lighthouse lab** : LCP 9,9 s · FCP 4,3 s · TBT 400 ms · CLS 0,087.
+- **LCP breakdown** : 2 790 ms de "resource load delay" → l'image LCP attend la fin de la chaîne JS+CSS+API avant d'être déclenchée.
+- **Coupables identifiés** :
+  1. Préload LCP en dur dans `index.html` (Unsplash) qui ne correspond plus à la vraie image LCP servie par le hero CMS (`MÉGA SOLDE 2026` sur `vpttoqojmiqxgudknyxf.supabase.co`). Le preload Unsplash est gaspillé, le vrai LCP n'est pas préchargé.
+  2. `ipapi.co` bloque la chaîne critique (~2,3 s) pour de la géoloc non essentielle au premier rendu.
+  3. Bundle d'entrée : `charts-vendor` (111 Kio recharts), `motion-vendor` (44 Kio) et `radix-vendor` (44 Kio) chargés à la racine alors qu'ils ne sont pas nécessaires au LCP.
+  4. Préchargement de **5 familles Google Fonts** alors qu'une seule (Inter) suffit avant interaction. 32 Kio Outfit téléchargés inutilement.
+  5. Préconnect manquants : `wgidwyrdnboivfphwete.supabase.co` (CDN images legacy) et `vpttoqojmiqxgudknyxf.supabase.co` (déjà ok). Préconnect inutile : `fonts.googleapis.com` (déjà connecté indirectement).
+  6. CLS 0,087 : section catégories sans `min-height` correct, **logo header sans width/height** (signalé "Unsized image element").
+  7. `forced reflow` 333 ms dans `react-vendor` : layout effects qui mesurent la DOM (probablement carrousel hero). À profiler en lot 4.
+  8. Images produits servies parfois en **original `.webp` 453 Kio** (pas via `/render/image?width=…`) — `OptimizedImage` n'est pas encore branché partout.
+  9. Cache TTL 1 h sur les images Supabase Storage → faible. À pousser à 1 an pour les médias hashés.
 
-1. **Bouton WhatsApp inopérant**  
-   Suspects : (a) `window.open` bloqué par le navigateur car appelé après un `await` async (perte du "user gesture"), (b) edge function `get-store-whatsapp` qui renvoie 401 silencieusement si la session JWT est expirée, (c) `whatsapp_number` vide pour la boutique testée.
+## Principes
 
-2. **`Bucket not found` dans le chat interne**  
-   Le bucket existe en prod mais pas forcément sur tous les environnements. Symptômes possibles : (a) bucket absent sur l'instance interrogée, (b) policy SELECT trop restrictive bloquant le `getPublicUrl`, (c) requête routée vers la mauvaise instance Supabase. Le bucket est privé (`public=false`) mais le code utilise `getPublicUrl` → URL non signée → renvoie 404 si l'objet n'est pas accessible publiquement.
+- Aucun changement de schéma DB.
+- Aucun changement business / pricing / RLS.
+- 100 % côté frontend (`frontend/index.html`, `src/`) + 1 micro-tweak `vercel.json` (headers de cache).
+- Chaque lot est livrable et testable indépendamment, rollback trivial.
 
-3. **Lenteur images / pages produits (250 users, 549 produits)**  
-   Suspects : (a) pas d'`OptimizedImage` central avec `srcset`/`sizes`/`width`/`height` → CLS + downloads non-responsive, (b) les images `product_images` sont chargées sans transformation (pas de redimensionnement Supabase Storage), (c) pas de `fetchpriority=high` sur les LCP, (d) pas de cache HTTP long sur les médias, (e) preconnect manquant vers le CDN Supabase.
+## Lot 1 — LCP & critical path (impact attendu : LCP −3 à −4 s)
 
----
+1. **Supprimer le préload Unsplash obsolète** dans `frontend/index.html` (il ne matche plus la vraie image LCP) et le remplacer par un preload **dynamique** : un petit script inline qui lit la première bannière `hero_slide` depuis `localStorage` (stockée au précédent passage) et insère un `<link rel="preload" as="image" fetchpriority="high">` correspondant. Au premier passage : pas de regression, on bénéficie au 2ᵉ.
+2. **Ajouter les bons préconnect** : `https://wgidwyrdnboivfphwete.supabase.co` (CDN legacy, beaucoup d'images encore servies depuis là), retirer Unsplash (pas critique).
+3. **Différer `ipapi.co`** : déplacer l'appel `use-geo-detection` derrière un `requestIdleCallback` (fallback `setTimeout(…, 1500)`). Aucune feature ne dépend de la géo dans le above-the-fold.
+4. **Logo header** : ajouter `width`/`height` explicites dans `Header.tsx` (corrige "Unsized image element" → CLS).
 
-## Lot 1 — WhatsApp & bucket chat-media (priorité bloquante)
+## Lot 2 — Bundle splitting (impact attendu : FCP −1 s, TBT −150 ms)
 
-### 1.1 Bouton WhatsApp
-- Modifier `openStoreWhatsApp` pour **ouvrir l'onglet immédiatement** (pendant le user gesture) avec un placeholder, puis rediriger après réception du numéro :
-  ```text
-  const win = window.open("about:blank", "_blank");
-  ... fetch numéro ...
-  if (win) win.location = url; else fallback(url);
-  ```
-- Si l'edge function renvoie 401 → forcer un `supabase.auth.refreshSession()` puis retry une fois.
-- Toast clair si `whatsapp_number` est vide (« Cette boutique n'a pas configuré WhatsApp »).
-- Ajouter logging structuré dans l'edge function pour traquer les vrais 401/404.
+1. **Recharts dynamique** : convertir tous les imports `recharts` (admin/vendor analytics) en `React.lazy`. La home n'a aucun graphique, donc 111 Kio de moins au boot.
+2. **Framer-motion** : home n'utilise des animations que sur sections en dessous de la fold. Lazy-mount déjà en place via `LazyMount` ; vérifier que les composants animés sont bien dans des `lazy()` (FlashSales, RecommendationsSection, TopTrends sont déjà `lazy`, mais `Index.tsx` importe encore certains modules motion top-level — à auditer).
+3. **Manualchunks Vite** : configurer `build.rollupOptions.output.manualChunks` pour isoler `recharts` dans un chunk **seulement** chargé par les pages admin/vendor (déjà partiel, à compléter pour qu'il ne soit jamais en `entry`).
+4. **Polices** : retirer le bloc preload des 5 familles secondaires d'`index.html`. Ne charger Outfit/DM Sans/etc. **que** si l'admin a configuré une police personnalisée via `usePlatformFont` (déjà côté JS). Garder uniquement Inter render-blocking.
 
-### 1.2 Bucket chat-media
-- **Migration SQL idempotente** qui :
-  - crée le bucket `chat-media` s'il n'existe pas (privé),
-  - rejoue les 3 policies RLS (INSERT auth, SELECT participants conversation, DELETE owner) sur staging + prod.
-- **Côté frontend** : remplacer `getPublicUrl` (incompatible bucket privé) par `createSignedUrl(filePath, 60*60*24*7)` au moment de l'envoi du message — le contenu stocké dans `messages.content` deviendra une signed URL longue durée. Pour la rétrocompatibilité, ajouter un helper `resolveChatMediaUrl()` qui détecte les URLs `/object/public/chat-media/...` et les re-signe à la volée à l'affichage.
-- Audit similaire sur les autres buckets cités via `getPublicUrl` (`product-media`, `cms-assets`, etc.) — ceux qui sont déjà publics ne sont pas concernés.
+## Lot 3 — Images & cache (impact attendu : LCP −1 s, transferts −1 Mo)
 
----
+1. **Brancher `OptimizedImage` partout** où il manque encore : bannières hero (`HeroBanner`), catégories CMS, vitrine produits sur la home. Aujourd'hui plusieurs images produits sont servies en original (453 Kio + 413 Kio visibles dans le rapport).
+2. **Largeurs ciblées** : sur mobile, le srcset doit inclure `200/400/600` (déjà fait dans `OptimizedImage`) — vérifier qu'on ne demande pas `quality=70` sur des images déjà compressées par le watermark (perte qualité visible). Bumper à `quality=75` pour les hero (LCP).
+3. **Cache headers** dans `frontend/vercel.json` : ajouter `Cache-Control: public, max-age=31536000, immutable` pour `/assets/*` (Vite hash) — déjà probablement là, à vérifier. Ne pas toucher au TTL Storage (géré par Supabase).
+4. **Format AVIF** : `OptimizedImage` peut ajouter un `<picture>` avec `format=avif` pour les navigateurs récents (Supabase Storage le supporte via `?format=avif`). −20 % de poids moyen.
 
-## Lot 2 — Bandeau produit côté vendeur dans le chat
+## Lot 4 — INP, CLS & DOM (impact attendu : INP −150 ms, CLS −0,05)
 
-- Vérifier que `ConversationList.loadConversations` enrichit déjà `product_image`/`product_name`/`product_price` pour les conversations où `is_store_owner=true` (le code actuel le fait : la jointure `products` est commune aux deux cas — à confirmer en lecture).
-- S'assurer que le header du `ChatPanel` rend l'image produit même quand `conversation.is_store_owner=true` (suppression d'un éventuel garde conditionnel).
-- Ajouter dans le header un petit lien « Voir le produit » qui pointe vers la page produit (utile aux vendeurs pour répondre).
-- Ajouter le mini-bandeau produit également dans `ConversationList` (déjà partiellement présent ligne 315-325) pour les conversations vendeur.
+1. **Forced reflow react-vendor 333 ms** : profiler avec `browser--start_profiling` sur la home, identifier le composant fautif (très probablement le carrousel `HeroBanner` qui mesure `offsetWidth` dans un `useLayoutEffect`). Remplacer par CSS pur `scroll-snap` ou par `ResizeObserver`.
+2. **DOM 6 818 nodes** : la grille catégories rend 113 enfants dans un seul scroller. Mettre en place un rendu paginé (charge initiale 18, "voir plus" pour le reste) sur mobile.
+3. **CLS section catégories** : remplacer `min-height: 180px` inline par une grille avec `aspect-ratio` calculé pour éviter le saut quand les images chargent.
+4. **Préchauffer `<Index>`** déjà via Vite — vérifier que `prefetch` est activé sur les routes secondaires (Header `<Link>`).
 
----
+## Détails techniques (réservé tech)
 
-## Lot 3 — Audit performance & images (sans rien casser)
+- Préload dynamique LCP : script inline ~10 lignes, lit `localStorage['lcp-hero-url']`, set par `HeroBanner` après premier rendu via `useEffect`.
+- `use-geo-detection` : enrober l'appel fetch dans `if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 2000 }); else setTimeout(run, 1500);`. Aucun consommateur (use-customer-location, useGeoBlocking) n'est synchrone à l'init.
+- Vite `manualChunks` : forcer `if (id.includes('recharts')) return 'charts-vendor';` mais le retirer de `optimizeDeps.include` pour qu'il ne soit pas pré-bundlé en entry.
+- AVIF Supabase : `?format=avif&width=…&quality=75` ; fallback automatique via `<picture>`.
+- Aucun changement DB, RLS, Edge Function. Aucun changement i18n. Aucun changement de tarification.
 
-### 3.1 Composant image central
-- Créer `OptimizedImage` (wrapper sur `<img>`) avec :
-  - `loading="lazy"` (sauf premier viewport ⇒ `eager` + `fetchpriority="high"`),
-  - `decoding="async"`,
-  - `width` et `height` explicites pour éviter le CLS,
-  - support automatique de `srcset` à partir des transformations Supabase Storage : `?width=400&quality=70` / `?width=800` / `?width=1200`,
-  - placeholder couleur dominante / blur-up.
-- Migrer `ProductCard`, `HeroBanner`, `CategoryBanner`, `RecommendationsSection`, `FeaturedSidebar`, `BlogPostPage` vers `OptimizedImage` (rétrocompatible : si pas de transformation possible, fallback `<img>` simple).
+## Validation
 
-### 3.2 Listings & requêtes
-- Audit des appels `fetchProducts` sans `limit` → forcer une pagination par défaut (24) sur toutes les pages qui n'en demandent pas.
-- Vérifier qu'aucune page n'appelle `PRODUCT_SELECT` (lourd) là où `PRODUCT_LIST_SELECT` suffit.
-- Ajouter un index composite manquant si nécessaire (`products(publish_status, created_at desc)`) — à valider avec `EXPLAIN ANALYZE` avant migration.
+- Après chaque lot : relancer PageSpeed mobile sur `https://zandofy.com/` et comparer LCP/FCP/INP/CLS.
+- Smoke test manuel : home, page produit, panier, login. Aucun e2e n'est touché.
+- Cible globale : Performance ≥ 75 (lab) et CrUX LCP < 4 s d'ici 28 j.
 
-### 3.3 Cache, CDN et preconnect
-- Ajouter `<link rel="preconnect">` vers `vpt...supabase.co` dans `frontend/index.html`.
-- Vérifier que les images uploadées passent bien par les transformations Storage avec `cacheControl: "31536000"` (déjà présent côté chat-media, à étendre à `product-media` à l'upload).
-- Vérifier dans `frontend/public/sw.js` la stratégie de cache des images produits (long-terme, hors `index.html`).
-
-### 3.4 Profilage avant/après
-- Lancer `browser--performance_profile` sur la page d'accueil et une page boutique avant et après chaque sous-lot pour mesurer LCP / nombre de requêtes / poids transféré.
-
----
-
-## Détails techniques
-
-```text
-Ordre de déploiement recommandé :
-  1. PR Lot 1.1 (WhatsApp)              → frontend only, pas de migration
-  2. PR Lot 1.2 (chat-media)            → migration SQL + frontend
-  3. PR Lot 2   (bandeau vendeur)       → frontend only
-  4. PR Lot 3.1+3.3 (images + preconnect) → frontend only
-  5. PR Lot 3.2 (pagination + indexes)  → frontend + éventuelle migration
-```
-
-**Garde-fous**
-- Aucune modification de `src/integrations/supabase/{client,types}.ts`.
-- Toute migration SQL est idempotente (`IF NOT EXISTS`, `DROP POLICY IF EXISTS`).
-- Les anciennes URLs publiques `chat-media` restent affichables grâce au resolver côté lecture.
-- Aucune API publique modifiée → pas de régression côté Vercel/edge functions existantes.
-- Mesure systématique avant/après via le profileur navigateur.
-
-**Validation**
-- Test WhatsApp : connecté + boutique avec numéro → ouvre wa.me. Boutique sans numéro → toast explicite. Anonyme → bouton « Se connecter ».
-- Test chat upload : image PNG/JPG/WEBP/PDF jusqu'à 3 Mo, lecture par les deux parties.
-- Test bandeau vendeur : ouvrir une conversation côté store-owner, voir nom + image + prix produit.
-- Perf : LCP page d'accueil < 2,5 s sur 4G simulée.
