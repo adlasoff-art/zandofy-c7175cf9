@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Send, Loader2, MessageCircle, Paperclip, Search, X,
-  Check, CheckCheck, ChevronDown, Trash2, ArrowLeft,
+  Check, CheckCheck, ChevronDown, Trash2, ArrowLeft, ExternalLink,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { QuickReplies } from "./QuickReplies";
 import { QuickRepliesManager } from "./QuickRepliesManager";
 import { toast } from "sonner";
@@ -438,15 +439,37 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
             </p>
           )}
           {conversation.product_name && (
-            <div className="flex items-center gap-1.5 mt-0.5">
-              {conversation.product_image && (
-                <img src={conversation.product_image} alt="" className="w-5 h-5 rounded-sm object-cover border border-border shrink-0" />
-              )}
-              <p className="text-[11px] text-primary truncate">
-                {conversation.product_name}
-                {conversation.product_price ? ` · $${conversation.product_price.toFixed(2)}` : ""}
-              </p>
-            </div>
+            (() => {
+              const ProductInfo = (
+                <>
+                  {conversation.product_image && (
+                    <img
+                      src={conversation.product_image}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="w-5 h-5 rounded-sm object-cover border border-border shrink-0"
+                    />
+                  )}
+                  <span className="text-[11px] text-primary truncate">
+                    {conversation.product_name}
+                    {conversation.product_price ? ` · $${conversation.product_price.toFixed(2)}` : ""}
+                  </span>
+                </>
+              );
+              return conversation.product_slug ? (
+                <Link
+                  to={`/product/${conversation.product_slug}`}
+                  className="flex items-center gap-1.5 mt-0.5 hover:opacity-80"
+                  title="Voir le produit"
+                >
+                  {ProductInfo}
+                  <ExternalLink size={10} className="text-muted-foreground shrink-0" />
+                </Link>
+              ) : (
+                <div className="flex items-center gap-1.5 mt-0.5">{ProductInfo}</div>
+              );
+            })()
           )}
         </div>
         <button
