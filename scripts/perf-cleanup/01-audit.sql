@@ -1,6 +1,8 @@
 -- ============================================================
 -- AUDIT — URLs pointant encore vers le projet staging Supabase
 -- À exécuter sur le projet PROD (vpttoqojmiqxgudknyxf), read-only.
+-- Schéma confirmé : pas de products.main_image_url, pas de
+-- platform_settings exposée, cms_menu_items utilise `url`.
 -- ============================================================
 
 -- 1) Compteurs par table
@@ -19,18 +21,8 @@ select 'product_images    ',
        count(*)
 from product_images
 union all
-select 'products          ',
-       count(*) filter (where main_image_url like '%wgidwyrdnboivfphwete%'),
-       count(*)
-from products
-union all
-select 'platform_settings ',
-       count(*) filter (where value::text like '%wgidwyrdnboivfphwete%'),
-       count(*)
-from platform_settings
-union all
 select 'cms_menu_items    ',
-       count(*) filter (where coalesce(image_url,'') like '%wgidwyrdnboivfphwete%'),
+       count(*) filter (where coalesce(url,'') like '%wgidwyrdnboivfphwete%'),
        count(*)
 from cms_menu_items
 union all
@@ -44,9 +36,7 @@ select 'cms_banners' as src, id::text, image_url from cms_banners
   where image_url like '%wgidwyrdnboivfphwete%' limit 10;
 select 'categories' as src, id::text, image_url from categories
   where image_url like '%wgidwyrdnboivfphwete%' limit 10;
-select 'products' as src, id::text, main_image_url as image_url from products
-  where main_image_url like '%wgidwyrdnboivfphwete%' limit 10;
 select 'product_images' as src, id::text, image_url from product_images
   where image_url like '%wgidwyrdnboivfphwete%' limit 10;
-select 'platform_settings' as src, key::text as id, value::text as image_url
-  from platform_settings where value::text like '%wgidwyrdnboivfphwete%' limit 10;
+select 'cms_menu_items' as src, id::text, url as image_url from cms_menu_items
+  where url like '%wgidwyrdnboivfphwete%' limit 10;
