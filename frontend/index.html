@@ -52,6 +52,12 @@
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
 
+  <!-- Outfit (logo word "Zandofy"): non-blocking, swap so initial paint isn't delayed.
+       Only 400/700 weights — minimal payload. -->
+  <link rel="stylesheet" media="print" onload="this.media='all'"
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" /></noscript>
+
   <!-- Canonical (default home; per-page React overrides via SEOHead) -->
   <link rel="canonical" href="https://zandofy.com/" />
 
