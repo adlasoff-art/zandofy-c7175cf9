@@ -129,3 +129,33 @@ Gain estimé : -6 à -8 requêtes au boot, -300 à -500 ms sur 4G.
 5. **Levier 4** (consolidation bootstrap) — gain marginal mais propre
 
 Chaque étape est validable indépendamment via PageSpeed → on peut s'arrêter dès qu'on atteint la cible.
+
+---
+
+## État d'exécution (2026-05-06)
+
+### ✅ Fait dans ce build (prêt à déployer)
+
+- **Levier 2** : `CompareBar` est maintenant lazy → `motion-vendor.js` (43 KB) ne sera plus
+  chargé sur la home. Aucune régression UX (la barre n'apparaît qu'après ajout au compare).
+- **Levier 3** : `frontend/index.html` lance maintenant 2 stratégies de preload LCP en
+  parallèle du bundle JS — A) lecture `localStorage` (visites suivantes), B) fetch
+  REST direct du premier `cms_banners` actif (premier visit). Tout échec est silencieux.
+- **Levier 1 (préparatoire)** : ajouté un `<link rel="preconnect">` TEMPORAIRE vers
+  `wgidwyrdnboivfphwete.supabase.co` pour amortir la pénalité réseau tant que les URLs
+  legacy ne sont pas migrées. À retirer après l'étape suivante.
+
+### ⏳ À exécuter manuellement côté prod
+
+- **Levier 1 (migration BDD prod)** : voir `scripts/perf-cleanup/README.md`
+   1. Lancer `01-audit.sql` sur Supabase prod (`vpttoqojmiqxgudknyxf`) → SQL editor.
+   2. Si des fichiers manquent côté prod, lancer `02-copy-missing.mjs` avec les
+      service-role keys staging+prod.
+   3. Lancer `03-rewrite-urls.sql` (transactionnel — backup recommandé avant).
+   4. Re-lancer l'audit → tout doit retourner 0.
+   5. Ouvrir un PR pour SUPPRIMER le preconnect temporaire de `index.html` (lignes 26-30).
+
+- **Levier 4** (différé) : consolidation des `platform_settings` dans
+  `platform-bootstrap` — à attaquer seulement si le score post-leviers 1+2+3 reste < 75.
+  Touche edge function + plusieurs hooks (`useSeoEnabled`, `useVisualSearchEnabled`,
+  `useCookieConsent`, etc.) → revue plus longue, non bloquant.
