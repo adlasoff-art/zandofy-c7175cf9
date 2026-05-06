@@ -2,6 +2,7 @@ import { Heart, ShoppingCart, Plus, Star, Trophy, Check, Award, GitCompareArrows
 import { useState, useCallback, useRef, memo } from "react";
 import { useLazyImage } from "@/hooks/use-lazy-image";
 import { useCart } from "@/contexts/CartContext";
+import { OptimizedImage } from "@/components/OptimizedImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useCompare } from "@/contexts/CompareContext";
@@ -93,26 +94,26 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
         )}
         {inView && (
           <>
-            <img
+            <OptimizedImage
               src={imgError ? "/placeholder.svg" : product.image}
               alt={product.nameFr}
-              decoding="async"
               className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
                 loaded ? "opacity-100" : "opacity-0"
               } ${hovered && secondImage ? "opacity-0 scale-105" : ""}`}
-              loading="lazy"
               onLoad={onLoad}
               onError={handleImgError}
+              widths={[200, 400, 600]}
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px"
             />
             {secondImage && (
-              <img
+              <OptimizedImage
                 src={secondImage}
                 alt={product.nameFr}
-                decoding="async"
                 className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
                   hovered ? "opacity-100 scale-100" : "opacity-0 scale-95"
                 }`}
-                loading="lazy"
+                widths={[200, 400, 600]}
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px"
               />
             )}
           </>
