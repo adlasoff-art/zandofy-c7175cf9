@@ -1,3 +1,13 @@
+
+## Exception temporaire — preconnect staging pour images legacy
+
+Tant que `scripts/perf-cleanup/03-rewrite-urls.sql` n'a PAS été exécuté sur la prod,
+`frontend/index.html` contient un `<link rel="preconnect" href="https://wgidwyrdnboivfphwete.supabase.co">`
+pour atténuer la pénalité réseau (DNS+TCP+TLS) sur les images encore servies par
+l'ancien projet (categories, banners, certains products).
+
+Une fois la migration des URLs effectuée et `01-audit.sql` confirme 0 ligne legacy
+dans la prod, **supprimer ce preconnect** — il ne sert plus et gaspille un slot.
 ---
 name: Environment Database Separation
 description: Production = Supabase.com personnel (vpt...yxf). Staging = wgi...wete. Lovable Cloud (uog...zpu) = preview only, NEVER source of truth.

@@ -10,7 +10,6 @@ import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { CartProvider } from "@/contexts/CartContext";
 import { WishlistProvider } from "@/contexts/WishlistContext";
 import { CompareProvider } from "@/contexts/CompareContext";
-import { CompareBar } from "@/components/CompareBar";
 import { CartDrawer } from "@/components/CartDrawer";
 import { SupportDrawer } from "@/components/support/SupportDrawer";
 import { SupportDrawerProvider, useSupportDrawer } from "@/contexts/SupportDrawerContext";
@@ -57,6 +56,11 @@ function lazyRetry(importFn: () => Promise<{ default: ComponentType<any> }>) {
 
 // Lazy-loaded routes
 const Index = lazyRetry(() => import("./pages/Index"));
+// Lazy-loaded UI components that pull heavy deps (framer-motion).
+// CompareBar is invisible until the user adds an item to compare → safe to defer.
+const CompareBar = lazy(() =>
+  import("@/components/CompareBar").then((m) => ({ default: m.CompareBar }))
+);
 const CategoryPage = lazyRetry(() => import("./pages/CategoryPage"));
 const ProductPage = lazyRetry(() => import("./pages/ProductPage"));
 const StorePage = lazyRetry(() => import("./pages/StorePage"));
@@ -229,7 +233,9 @@ const App = () => (
             <SupportDrawerProvider>
             <ScrollRestoration />
              <CartDrawer />
-            <CompareBar />
+            <Suspense fallback={null}>
+              <CompareBar />
+            </Suspense>
             <SupportDrawerWrapper />
             <MobileBottomNav />
             <PWAInstallBanner />

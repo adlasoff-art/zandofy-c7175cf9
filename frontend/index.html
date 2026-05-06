@@ -23,24 +23,56 @@
   <!-- Preconnect: prod Supabase only (REST + Storage + Auth + CDN images via Cloudflare) + Google Fonts.
        Do NOT add the staging project (wgidwyrdnboivfphwete) here — it never serves public traffic. -->
   <link rel="preconnect" href="https://vpttoqojmiqxgudknyxf.supabase.co" crossorigin />
+  <!-- TEMPORAIRE — à supprimer dès que scripts/perf-cleanup/03-rewrite-urls.sql aura été
+       exécuté sur la prod. Tant que les URLs `image_url` legacy pointent vers ce domaine,
+       précharger la connexion économise 200-400 ms sur mobile (DNS+TCP+TLS).
+       Voir scripts/perf-cleanup/README.md. -->
+  <link rel="preconnect" href="https://wgidwyrdnboivfphwete.supabase.co" crossorigin />
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-  <!-- LCP image preload — dynamic. The HeroBanner stores the first hero_slide URL in
-       localStorage on first visit; this script reads it on subsequent visits and injects
-       a high-priority preload BEFORE React boots. Zero impact on first visit, big win after. -->
+  <!-- LCP image preload — two strategies running together for max coverage:
+         A) Synchronous: localStorage cache from previous visits (instant, zero cost).
+         B) Async fetch (in parallel of the JS bundle): asks Supabase for the first
+            active hero_slide image, posts a <link rel=preload> as soon as it arrives.
+            On 4G the fetch completes well before React mounts HeroBanner → the image
+            gets discovered up to 2 s earlier. Zero risk: any failure is silent and
+            the React component still renders the image normally afterwards. -->
   <script>
     (function(){
+      function preload(u){
+        if (!u || !/^https:\/\//.test(u)) return;
+        // Avoid duplicate <link> if both A and B succeed with the same URL.
+        if (document.querySelector('link[rel="preload"][as="image"][href="' + u + '"]')) return;
+        var l = document.createElement('link');
+        l.rel = 'preload';
+        l.as  = 'image';
+        l.href = u;
+        l.setAttribute('fetchpriority', 'high');
+        document.head.appendChild(l);
+      }
+      // A) Cache localStorage (visites suivantes — zéro latence)
       try {
-        var u = localStorage.getItem('z_lcp_hero_url');
-        if (u && /^https:\/\//.test(u)) {
-          var l = document.createElement('link');
-          l.rel = 'preload';
-          l.as = 'image';
-          l.href = u;
-          l.setAttribute('fetchpriority', 'high');
-          document.head.appendChild(l);
-        }
+        preload(localStorage.getItem('z_lcp_hero_url'));
+      } catch(_) {}
+      // B) Fetch direct du premier hero_slide actif (parallèle du JS bundle).
+      // La clé anon publique prod est safe à mettre en clair (RLS protège la base).
+      try {
+        var SB  = 'https://vpttoqojmiqxgudknyxf.supabase.co';
+        var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwdHRvcW9qbWlxeGd1ZGtueXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxNjE0MzcsImV4cCI6MjA2NTczNzQzN30.ZqJUUN6DqXrXJ7CcjmmMRrcVtDkQ4zYM4nhP8mC4_zE';
+        fetch(SB + '/rest/v1/cms_banners?select=image_url&position=eq.hero_slide&is_active=eq.true&order=sort_order.asc&limit=1', {
+          headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, Accept: 'application/json' },
+          // High priority: same critical bucket as the bundle.
+          // @ts-ignore
+          priority: 'high'
+        })
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(rows){
+          if (!rows || !rows[0] || !rows[0].image_url) return;
+          preload(rows[0].image_url);
+          try { localStorage.setItem('z_lcp_hero_url', rows[0].image_url); } catch(_) {}
+        })
+        .catch(function(){ /* silent — React fallback prend le relais */ });
       } catch(_) {}
     })();
   </script>
