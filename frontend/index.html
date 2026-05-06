@@ -23,11 +23,6 @@
   <!-- Preconnect: prod Supabase only (REST + Storage + Auth + CDN images via Cloudflare) + Google Fonts.
        Do NOT add the staging project (wgidwyrdnboivfphwete) here — it never serves public traffic. -->
   <link rel="preconnect" href="https://vpttoqojmiqxgudknyxf.supabase.co" crossorigin />
-  <!-- TEMPORAIRE — à supprimer dès que scripts/perf-cleanup/03-rewrite-urls.sql aura été
-       exécuté sur la prod. Tant que les URLs `image_url` legacy pointent vers ce domaine,
-       précharger la connexion économise 200-400 ms sur mobile (DNS+TCP+TLS).
-       Voir scripts/perf-cleanup/README.md. -->
-  <link rel="preconnect" href="https://wgidwyrdnboivfphwete.supabase.co" crossorigin />
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
