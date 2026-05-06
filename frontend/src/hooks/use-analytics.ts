@@ -77,11 +77,11 @@ async function getGeoData(): Promise<{ country: string; city: string }> {
   }
 }
 
-/** Internal geo cache — populated on first trackEvent call */
-let _geoPromise: Promise<{ country: string; city: string }> | null = null;
+/** Always re-read from sessionStorage (cheap) so events emitted after
+ *  use-geo-detection populated the cache get country/city, while early ones
+ *  remain anonymous. */
 function ensureGeo() {
-  if (!_geoPromise) _geoPromise = getGeoData();
-  return _geoPromise;
+  return getGeoData();
 }
 
 async function trackEvent(
