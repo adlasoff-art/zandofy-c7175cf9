@@ -55,15 +55,11 @@
       try {
         preload(localStorage.getItem('z_lcp_hero_url'));
       } catch(_) {}
-      // B) Fetch direct du premier hero_slide actif (parallèle du JS bundle)
+      // B) Fetch direct du premier hero_slide actif (parallèle du JS bundle).
+      // La clé anon publique prod est safe à mettre en clair (RLS protège la base).
       try {
         var SB  = 'https://vpttoqojmiqxgudknyxf.supabase.co';
-        var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvZ2trbHdmdndveGtpZnBrenB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4ODY0MzcsImV4cCI6MjA4NzQ2MjQzN30.9NhIOytfsQ7Gdufs0goV6Lk97IyMkda362jh3IGMVi4';
-        // ⚠️ La clé anon ci-dessus est volontairement tronquée → remplacée au build.
-        // En attendant, on lit la clé depuis un meta tag injecté par Vite si présent,
-        // sinon on retombe sur la clé prod hardcodée (publique, safe).
-        var metaKey = document.querySelector('meta[name="x-sb-anon"]');
-        if (metaKey && metaKey.getAttribute('content')) KEY = metaKey.getAttribute('content');
+        var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwdHRvcW9qbWlxeGd1ZGtueXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxNjE0MzcsImV4cCI6MjA2NTczNzQzN30.ZqJUUN6DqXrXJ7CcjmmMRrcVtDkQ4zYM4nhP8mC4_zE';
         fetch(SB + '/rest/v1/cms_banners?select=image_url&position=eq.hero_slide&is_active=eq.true&order=sort_order.asc&limit=1', {
           headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, Accept: 'application/json' },
           // High priority: same critical bucket as the bundle.
