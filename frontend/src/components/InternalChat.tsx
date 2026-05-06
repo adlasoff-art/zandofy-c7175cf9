@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { renderChatMessageContent, mergeChatMessages } from "@/components/messages/chatMessageUtils";
 import { sanitizeFilename, sanitizeExtension } from "@/utils/sanitize-filename";
+import { buildChatMediaRef } from "@/lib/chat-media";
 
 interface ChatMessage {
   id: string;
@@ -257,11 +258,11 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
         return;
       }
 
-      const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(filePath);
+      const ref = buildChatMediaRef(filePath);
       const isPdf = file.type === "application/pdf";
       const content = isPdf
-        ? `[📄 PDF] ${sanitizeFilename(file.name)}\n${urlData.publicUrl}`
-        : `[📷 Image]\n${urlData.publicUrl}`;
+        ? `[📄 PDF] ${sanitizeFilename(file.name)}\n${ref}`
+        : `[📷 Image]\n${ref}`;
 
       const { data } = await supabase.from("messages").insert({
         conversation_id: convId,
@@ -312,8 +313,8 @@ export function InternalChat({ storeId, storeName, productId, productName, produ
             return;
           }
 
-          const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(filePath);
-          const content = `[📷 Image]\n${urlData.publicUrl}`;
+          const ref = buildChatMediaRef(filePath);
+          const content = `[📷 Image]\n${ref}`;
 
           const { data } = await supabase.from("messages").insert({
             conversation_id: convId,

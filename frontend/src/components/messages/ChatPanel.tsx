@@ -16,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { sanitizeFilename, sanitizeExtension } from "@/utils/sanitize-filename";
 import type { ConversationItem } from "./ConversationList";
 import { renderChatMessageContent, mergeChatMessages } from "./chatMessageUtils";
+import { buildChatMediaRef } from "@/lib/chat-media";
 
 interface ChatMessage {
   id: string;
@@ -287,11 +288,11 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
         return;
       }
 
-      const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(filePath);
+      const ref = buildChatMediaRef(filePath);
       const isPdf = file.type === "application/pdf";
       const content = isPdf
-        ? `[📄 PDF] ${sanitizeFilename(file.name)}\n${urlData.publicUrl}`
-        : `[📷 Image]\n${urlData.publicUrl}`;
+        ? `[📄 PDF] ${sanitizeFilename(file.name)}\n${ref}`
+        : `[📷 Image]\n${ref}`;
 
       const { data } = await supabase.from("messages").insert({
         conversation_id: conversation.id,
@@ -355,8 +356,8 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
           const filePath = `${user.id}/${Date.now()}-paste.${ext}`;
           const { error: uploadError } = await supabase.storage.from("chat-media").upload(filePath, file, { cacheControl: "31536000" });
           if (uploadError) { toast.error("Erreur lors de l'upload"); return; }
-          const { data: urlData } = supabase.storage.from("chat-media").getPublicUrl(filePath);
-          const content = `[📷 Image]\n${urlData.publicUrl}`;
+          const ref = buildChatMediaRef(filePath);
+          const content = `[📷 Image]\n${ref}`;
           const { data } = await supabase.from("messages").insert({
             conversation_id: conversation.id,
             sender_id: user.id,
