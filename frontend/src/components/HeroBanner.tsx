@@ -98,6 +98,9 @@ export function HeroBanner() {
   useEffect(() => {
     const firstUrl = heroSlides[0]?.image_url;
     if (!firstUrl) return;
+    // Persist LCP URL so the inline boot script can preload it on the next visit
+    // BEFORE React even hydrates (saves ~2s on the LCP "resource load delay" subpart).
+    try { localStorage.setItem("z_lcp_hero_url", firstUrl); } catch { /* quota / private mode */ }
     const id = "hero-lcp-preload";
     if (document.getElementById(id)) return;
     const link = document.createElement("link");

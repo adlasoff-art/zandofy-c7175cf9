@@ -12,8 +12,32 @@ export const PLATFORM_FONTS = [
 
 const DEFAULT_FONT = PLATFORM_FONTS[0].value;
 
+// Map CSS font-family value -> Google Fonts family parameter.
+// Inter is loaded render-blocking by index.html; the others are lazy-injected
+// only when an admin selects them via CMS branding (avoids ~85 KiB at first paint).
+const GOOGLE_FONT_PARAMS: Record<string, string> = {
+  Outfit: "Outfit:wght@400;500;600;700",
+  Poppins: "Poppins:wght@400;500;600;700",
+  "DM Sans": "DM+Sans:wght@400;500;600;700",
+  "Plus Jakarta Sans": "Plus+Jakarta+Sans:wght@400;500;600;700",
+  Roboto: "Roboto:wght@400;500;700",
+};
+
+function ensureGoogleFontLoaded(family: string) {
+  const param = GOOGLE_FONT_PARAMS[family];
+  if (!param) return; // Inter or system fallback — nothing to load
+  const id = `gf-${family.replace(/\s+/g, "-").toLowerCase()}`;
+  if (document.getElementById(id)) return;
+  const link = document.createElement("link");
+  link.id = id;
+  link.rel = "stylesheet";
+  link.href = `https://fonts.googleapis.com/css2?family=${param}&display=swap`;
+  document.head.appendChild(link);
+}
+
 /**
  * Reads primary font from the shared platform-bootstrap cache (no extra request).
+ * Lazy-injects the matching Google Fonts stylesheet only when needed.
  */
 export function usePlatformFont() {
   const { value } = useBootstrapSetting<any>("branding");
@@ -21,5 +45,8 @@ export function usePlatformFont() {
 
   useEffect(() => {
     document.documentElement.style.setProperty("--font-primary", font);
+    // Extract the first family from the CSS stack, e.g. "'Outfit', system-ui" -> "Outfit"
+    const match = font.match(/^['"]?([^'",]+)['"]?/);
+    if (match) ensureGoogleFontLoaded(match[1].trim());
   }, [font]);
 }
