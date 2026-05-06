@@ -1,7 +1,69 @@
-import React from "react";
-import { FileText } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { FileText, Loader2 } from "lucide-react";
+import { resolveChatMediaUrl, extractChatMediaPath } from "@/lib/chat-media";
 
 const URL_PATTERN = /(https?:\/\/[^\s<]+)/gi;
+
+/** Rend une URL signée à la volée pour les références chat-media:// (et URLs legacy). */
+function useResolvedMediaUrl(ref: string): string | null {
+  const [url, setUrl] = useState<string | null>(() =>
+    extractChatMediaPath(ref) ? null : ref
+  );
+  useEffect(() => {
+    let cancelled = false;
+    if (!extractChatMediaPath(ref)) {
+      setUrl(ref);
+      return;
+    }
+    setUrl(null);
+    resolveChatMediaUrl(ref).then((u) => {
+      if (!cancelled) setUrl(u);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ref]);
+  return url;
+}
+
+function SignedImage({ refValue, alt }: { refValue: string; alt: string }) {
+  const url = useResolvedMediaUrl(refValue);
+  if (!url) {
+    return (
+      <div className="flex items-center justify-center w-[200px] h-[120px] bg-muted/40 rounded-md">
+        <Loader2 size={16} className="animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer">
+      <img
+        src={url}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        className="max-w-[200px] max-h-[200px] rounded-md object-cover"
+      />
+    </a>
+  );
+}
+
+function SignedFileLink({ refValue, label }: { refValue: string; label: string }) {
+  const url = useResolvedMediaUrl(refValue);
+  return (
+    <a
+      href={url ?? "#"}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => { if (!url) e.preventDefault(); }}
+      className="flex items-center gap-2 text-sm underline"
+    >
+      <FileText size={16} className="shrink-0" />
+      <span className="truncate">{label}</span>
+      {!url && <Loader2 size={12} className="animate-spin opacity-60" />}
+    </a>
+  );
+}
 
 /**
  * Render URLs as clickable links within plain text.
@@ -35,17 +97,9 @@ export function renderTextWithLinks(text: string): React.ReactNode[] {
 export function renderChatMessageContent(content: string): React.ReactNode {
   // Image message
   if (content.startsWith("[📷 Image]")) {
-    const url = content.split("\n")[1]?.trim();
-    if (url) {
-      return (
-        <a href={url} target="_blank" rel="noopener noreferrer">
-          <img
-            src={url}
-            alt="Image partagée"
-            className="max-w-[200px] max-h-[200px] rounded-md object-cover"
-          />
-        </a>
-      );
+    const ref = content.split("\n")[1]?.trim();
+    if (ref) {
+      return <SignedImage refValue={ref} alt="Image partagée" />;
     }
   }
 
@@ -53,19 +107,9 @@ export function renderChatMessageContent(content: string): React.ReactNode {
   if (content.startsWith("[📄 PDF]")) {
     const lines = content.split("\n");
     const fileName = lines[0]?.replace("[📄 PDF] ", "").trim();
-    const url = lines[1]?.trim();
-    if (url) {
-      return (
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 text-sm underline"
-        >
-          <FileText size={16} className="shrink-0" />
-          <span className="truncate">{fileName || "Document PDF"}</span>
-        </a>
-      );
+    const ref = lines[1]?.trim();
+    if (ref) {
+      return <SignedFileLink refValue={ref} label={fileName || "Document PDF"} />;
     }
   }
 
