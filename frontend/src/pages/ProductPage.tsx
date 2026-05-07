@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchProductBySlug, fetchProducts, fetchPricingTiers, type Product } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
+import { imgUrl, imgSrcSet } from "@/lib/image-url";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { Footer } from "@/components/Footer";
