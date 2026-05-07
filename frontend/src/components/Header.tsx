@@ -79,15 +79,8 @@ export function Header() {
   const { theme, setTheme } = useTheme();
   const headerTheme = useHeaderTheme();
 
-  // Top bar config from CMS
-  const { data: topBarConfig } = useQuery({
-    queryKey: ["topbar-config"],
-    queryFn: async () => {
-      const { data } = await supabase.from("platform_settings").select("value").eq("key", "topbar_config").maybeSingle();
-      return (data?.value || null) as unknown as TopBarConfig | null;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+  // Top bar config — read from consolidated bootstrap cache (no extra request).
+  const { value: topBarConfig } = useBootstrapSetting<TopBarConfig | null>("topbar_config", null);
 
   const topBarMessages = (() => {
     if (!topBarConfig?.enabled) return [];
