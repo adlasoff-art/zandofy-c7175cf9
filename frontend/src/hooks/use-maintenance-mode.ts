@@ -28,7 +28,7 @@ export function useMaintenanceMode() {
         .eq("key", "maintenance_mode")
         .maybeSingle();
       if (error) throw error;
-      return (data?.value as MaintenanceConfig | null) ?? null;
+      return (data?.value as unknown as MaintenanceConfig | null) ?? null;
     },
     staleTime: 10 * 1000,
     gcTime: 5 * 60 * 1000,
