@@ -116,7 +116,7 @@ function LogoUploadField({ value, onChange }: { value: string; onChange: (url: s
     setUploading(true);
     const ext = sanitizeExtension(file.name, "png");
     const path = `email-logo.${ext}`;
-    const { error } = await supabase.storage.from("seo-assets").upload(path, file, { upsert: true });
+    const { error } = await supabase.storage.from("seo-assets").upload(path, file, { upsert: true, cacheControl: "31536000" });
     if (error) {
       toast({ title: "Erreur d'upload", description: error.message, variant: "destructive" });
       setUploading(false);

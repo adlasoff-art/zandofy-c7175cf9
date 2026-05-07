@@ -120,7 +120,7 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
       const rawExt = (file.name.split(".").pop() || "png").toLowerCase();
       const ext = /^[a-z0-9]{1,5}$/.test(rawExt) ? rawExt : "png";
       const path = `${form.slug || slugify(form.name) || "fwd"}-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from("forwarder-logos").upload(path, file, { upsert: true });
+      const { error } = await supabase.storage.from("forwarder-logos").upload(path, file, { upsert: true, cacheControl: "31536000" });
       if (error) throw error;
       const { data } = supabase.storage.from("forwarder-logos").getPublicUrl(path);
       setForm((f) => ({ ...f, logo_url: data.publicUrl }));

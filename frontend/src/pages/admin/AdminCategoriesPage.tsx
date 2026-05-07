@@ -213,7 +213,7 @@ export default function AdminCategoriesPage() {
     const nameWithoutExt = file.name.replace(/\.[^.]+$/, "");
     const safeName = slugify(nameWithoutExt) || "image";
     const path = `categories/${Date.now()}_${safeName}.${ext}`;
-    const { error } = await supabase.storage.from("cms-assets").upload(path, file);
+    const { error } = await supabase.storage.from("cms-assets").upload(path, file, { cacheControl: "31536000" });
     if (error) { toast.error(error.message); setUploading(false); return; }
     const { data: urlData } = supabase.storage.from("cms-assets").getPublicUrl(path);
     setForm(f => ({ ...f, image_url: urlData.publicUrl }));
