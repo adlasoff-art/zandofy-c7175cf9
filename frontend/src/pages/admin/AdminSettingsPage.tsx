@@ -477,13 +477,24 @@ export default function AdminSettingsPage() {
               </div>
               <Switch
                 checked={maintenance.enabled}
-                onCheckedChange={(checked) => setMaintenance(prev => ({
-                  ...prev,
-                  enabled: checked,
-                  end_time: checked ? new Date(Date.now() + prev.duration_minutes * 60 * 1000).toISOString() : prev.end_time,
-                }))}
+                onCheckedChange={(checked) => {
+                  setMaintenance(prev => {
+                    const next = {
+                      ...prev,
+                      enabled: checked,
+                      end_time: checked
+                        ? new Date(Date.now() + prev.duration_minutes * 60 * 1000).toISOString()
+                        : prev.end_time,
+                    };
+                    saveMaintenance(next);
+                    return next;
+                  });
+                }}
               />
             </div>
+            <p className="text-[11px] text-muted-foreground -mt-2 px-1">
+              Bascule immédiate : instantanée pour les nouveaux visiteurs, ≤ 30 s pour ceux déjà sur le site.
+            </p>
             {maintenance.enabled && (
               <div className="space-y-3">
                 <div>
