@@ -38,6 +38,7 @@ export default defineConfig(({ mode }) => ({
           if (!id.includes("node_modules")) return undefined;
           if (id.includes("recharts") || id.includes("d3-")) return "charts-vendor";
           if (id.includes("framer-motion")) return "motion-vendor";
+          if (id.includes("react-qrcode-logo") || id.includes("qrcode")) return "qrcode-vendor";
           if (id.includes("@radix-ui")) return "radix-vendor";
           if (id.includes("lucide-react")) return "lucide-vendor";
           if (id.includes("@tanstack/react-query")) return "query-vendor";
