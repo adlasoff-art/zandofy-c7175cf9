@@ -2,14 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { MaintenancePage } from "@/components/MaintenancePage";
 import { useAuth } from "@/contexts/AuthContext";
-import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
-
-interface MaintenanceConfig {
-  enabled: boolean;
-  title: string;
-  message: string;
-  end_time: string; // ISO
-}
+import { useMaintenanceMode } from "@/hooks/use-maintenance-mode";
 
 /**
  * MaintenanceGuard
@@ -24,10 +17,7 @@ interface MaintenanceConfig {
  */
 export function MaintenanceGuard({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const { value: config, isLoading } = useBootstrapSetting<MaintenanceConfig | null>(
-    "maintenance_mode",
-    null,
-  );
+  const { data: config, isLoading } = useMaintenanceMode();
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminChecked, setAdminChecked] = useState(false);
 
