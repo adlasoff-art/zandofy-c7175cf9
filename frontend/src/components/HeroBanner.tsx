@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { imgUrl, imgSrcSet } from "@/lib/image-url";
 
 interface BannerItem {
   id: string;
@@ -98,16 +99,19 @@ export function HeroBanner() {
   useEffect(() => {
     const firstUrl = heroSlides[0]?.image_url;
     if (!firstUrl) return;
+    const optimizedUrl = imgUrl(firstUrl, { width: 1280, quality: 75 });
     // Persist LCP URL so the inline boot script can preload it on the next visit
     // BEFORE React even hydrates (saves ~2s on the LCP "resource load delay" subpart).
-    try { localStorage.setItem("z_lcp_hero_url", firstUrl); } catch { /* quota / private mode */ }
+    try { localStorage.setItem("z_lcp_hero_url", optimizedUrl); } catch { /* quota / private mode */ }
     const id = "hero-lcp-preload";
     if (document.getElementById(id)) return;
     const link = document.createElement("link");
     link.id = id;
     link.rel = "preload";
     link.as = "image";
-    link.href = firstUrl;
+    link.href = optimizedUrl;
+    link.imageSrcset = imgSrcSet(firstUrl, [640, 1024, 1280], { quality: 75 });
+    link.imageSizes = "100vw";
     (link as any).fetchPriority = "high";
     document.head.appendChild(link);
   }, [heroSlides]);
@@ -146,7 +150,7 @@ export function HeroBanner() {
           <div className="hidden lg:flex flex-col gap-2" style={{ height: 380 }}>
             {leftBanners.map((b) => (
               <Link key={b.id} to={b.link || "/"} className="relative block rounded-xl overflow-hidden group" style={{ flex: 1 }}>
-                <img src={b.image_url || "/placeholder.svg"} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                <img src={imgUrl(b.image_url, { width: 240 }) || "/placeholder.svg"} srcSet={b.image_url ? imgSrcSet(b.image_url, [200, 400]) : undefined} sizes="200px" alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                   <span className="text-white text-sm font-bold">{b.title}</span>
                 </div>
@@ -179,7 +183,9 @@ export function HeroBanner() {
                 }}
               >
                 <img
-                  src={slide.image_url || "/placeholder.svg"}
+                  src={imgUrl(slide.image_url, { width: 1280, quality: 75 }) || "/placeholder.svg"}
+                  srcSet={slide.image_url ? imgSrcSet(slide.image_url, [640, 1024, 1280], { quality: 75 }) : undefined}
+                  sizes="(max-width: 1024px) 100vw, 1024px"
                   alt={slide.title}
                   className="w-full h-full object-cover"
                   loading={i === 0 ? "eager" : "lazy"}
@@ -224,7 +230,7 @@ export function HeroBanner() {
           <div className="hidden lg:flex flex-col gap-2" style={{ height: 380 }}>
             {rightBanners.map((b) => (
               <Link key={b.id} to={b.link || "/"} className="relative block rounded-xl overflow-hidden group" style={{ flex: 1 }}>
-                <img src={b.image_url || "/placeholder.svg"} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                <img src={imgUrl(b.image_url, { width: 220 }) || "/placeholder.svg"} srcSet={b.image_url ? imgSrcSet(b.image_url, [200, 400]) : undefined} sizes="180px" alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                   <span className="text-white text-sm font-bold">{b.title}</span>
                 </div>
