@@ -49,14 +49,15 @@
       }
       function preload(u){
         if (!u || !/^https:\/\//.test(u)) return;
-        u = toRender(u, 1280);
+        var orig = u;
+        u = toRender(orig, 1280);
         // Avoid duplicate <link> if both A and B succeed with the same URL.
         if (document.querySelector('link[rel="preload"][as="image"][href="' + u + '"]')) return;
         var l = document.createElement('link');
         l.rel = 'preload';
         l.as  = 'image';
         l.href = u;
-        l.setAttribute('imagesrcset', toRender(arguments[0], 640) + ' 640w, ' + toRender(arguments[0], 1024) + ' 1024w, ' + toRender(arguments[0], 1280) + ' 1280w');
+        l.setAttribute('imagesrcset', toRender(orig, 640) + ' 640w, ' + toRender(orig, 1024) + ' 1024w, ' + toRender(orig, 1280) + ' 1280w');
         l.setAttribute('imagesizes', '100vw');
         l.setAttribute('fetchpriority', 'high');
         document.head.appendChild(l);
