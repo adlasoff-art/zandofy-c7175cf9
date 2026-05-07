@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { supabase } from "@/integrations/supabase/client";
 import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 
 interface UIConfig {
@@ -25,6 +24,8 @@ export function UIConfigProvider({ children }: { children: ReactNode }) {
 
   // ui_config comes from bootstrap (no extra request)
   const { value: uiConfigValue } = useBootstrapSetting<any>("ui_config");
+  // app_promo also comes from bootstrap now (was a separate idle fetch)
+  const { value: appPromoValue } = useBootstrapSetting<any>("app_promo");
 
   useEffect(() => {
     if (uiConfigValue) {
@@ -37,26 +38,9 @@ export function UIConfigProvider({ children }: { children: ReactNode }) {
     }
   }, [uiConfigValue]);
 
-  // app_promo is not in bootstrap (rarely used) — fetch lazily on idle
   useEffect(() => {
-    const w = window as any;
-    const load = () => {
-      supabase
-        .from("platform_settings")
-        .select("value")
-        .eq("key", "app_promo")
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data?.value) setAppPromo({ ...DEFAULT_APP_PROMO, ...(data.value as any) });
-        });
-    };
-    if (typeof w.requestIdleCallback === "function") {
-      const id = w.requestIdleCallback(load, { timeout: 3000 });
-      return () => w.cancelIdleCallback?.(id);
-    }
-    const t = setTimeout(load, 1500);
-    return () => clearTimeout(t);
-  }, []);
+    if (appPromoValue) setAppPromo({ ...DEFAULT_APP_PROMO, ...appPromoValue });
+  }, [appPromoValue]);
 
   const effectiveDiscountBadge = isMobile ? false : showDiscountBadge;
 
