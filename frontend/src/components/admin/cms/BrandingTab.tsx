@@ -80,7 +80,7 @@ function BrandingTab() {
     const path = `branding/${field}-${Date.now()}.${ext}`;
 
     const { error } = await supabase.storage.from("cms-assets").upload(path, file, {
-      cacheControl: "3600",
+      cacheControl: "31536000",
       upsert: true,
     });
 
