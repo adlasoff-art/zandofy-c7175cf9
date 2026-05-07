@@ -21,6 +21,7 @@ import { useWishlist } from "@/contexts/WishlistContext";
 import { useI18n, LOCALES, CURRENCIES, type CurrencyCode } from "@/contexts/I18nContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useHeaderTheme } from "@/hooks/use-header-theme";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 import { slugify } from "@/utils/slugify";
 
 // Mini error boundary to prevent Radix crashes from taking down the whole page
@@ -79,15 +80,8 @@ export function Header() {
   const { theme, setTheme } = useTheme();
   const headerTheme = useHeaderTheme();
 
-  // Top bar config from CMS
-  const { data: topBarConfig } = useQuery({
-    queryKey: ["topbar-config"],
-    queryFn: async () => {
-      const { data } = await supabase.from("platform_settings").select("value").eq("key", "topbar_config").maybeSingle();
-      return (data?.value || null) as unknown as TopBarConfig | null;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+  // Top bar config — read from consolidated bootstrap cache (no extra request).
+  const { value: topBarConfig } = useBootstrapSetting<TopBarConfig | null>("topbar_config", null);
 
   const topBarMessages = (() => {
     if (!topBarConfig?.enabled) return [];

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { Cookie, X } from "lucide-react";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 
 interface CookieConfig {
   enabled: boolean;
@@ -24,24 +24,16 @@ const DEFAULT_CONFIG: CookieConfig = {
 export function CookieConsent() {
   const [config, setConfig] = useState<CookieConfig | null>(null);
   const [visible, setVisible] = useState(false);
+  const { value: cfg } = useBootstrapSetting<any>("cookie_settings");
 
   useEffect(() => {
     const consent = localStorage.getItem("cookie_consent");
     if (consent) return; // Already answered
-
-    supabase
-      .from("platform_settings")
-      .select("value")
-      .eq("key", "cookie_settings")
-      .maybeSingle()
-      .then(({ data }) => {
-        const cfg = data?.value as any;
-        if (cfg?.enabled) {
-          setConfig({ ...DEFAULT_CONFIG, ...cfg });
-          setVisible(true);
-        }
-      });
-  }, []);
+    if (cfg?.enabled) {
+      setConfig({ ...DEFAULT_CONFIG, ...cfg });
+      setVisible(true);
+    }
+  }, [cfg]);
 
   const handleAccept = () => {
     localStorage.setItem("cookie_consent", JSON.stringify({

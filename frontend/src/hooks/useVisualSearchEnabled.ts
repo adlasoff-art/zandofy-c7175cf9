@@ -1,28 +1,10 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 
 /**
  * Returns whether visual search (camera icon in search bar) is enabled.
- * Reads from platform_settings key "visual_search_enabled".
- * Defaults to false (disabled).
+ * Reads from the consolidated `platform-bootstrap` cache (no extra request).
  */
 export function useVisualSearchEnabled() {
-  const [enabled, setEnabled] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    supabase
-      .from("platform_settings")
-      .select("value")
-      .eq("key", "visual_search_enabled")
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.value) {
-          setEnabled((data.value as any)?.enabled === true);
-        }
-        setLoading(false);
-      });
-  }, []);
-
-  return { enabled, loading };
+  const { value, isLoading } = useBootstrapSetting<any>("visual_search_enabled");
+  return { enabled: value?.enabled === true, loading: isLoading };
 }

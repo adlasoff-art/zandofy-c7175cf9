@@ -8,6 +8,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { usePlatformBootstrap } from "@/hooks/use-platform-bootstrap";
 
 export interface MaintenanceConfig {
   enabled: boolean;
@@ -19,6 +20,12 @@ export interface MaintenanceConfig {
 export const MAINTENANCE_QUERY_KEY = ["maintenance-mode"] as const;
 
 export function useMaintenanceMode() {
+  // Initial value is hydrated from the bootstrap cache (already in flight on first
+  // paint), so the maintenance check is available without an extra round-trip.
+  const { data: bootstrap } = usePlatformBootstrap();
+  const initial =
+    (bootstrap?.maintenance_mode as MaintenanceConfig | undefined) ?? null;
+
   return useQuery<MaintenanceConfig | null>({
     queryKey: MAINTENANCE_QUERY_KEY,
     queryFn: async () => {
@@ -30,6 +37,8 @@ export function useMaintenanceMode() {
       if (error) throw error;
       return (data?.value as unknown as MaintenanceConfig | null) ?? null;
     },
+    initialData: initial,
+    initialDataUpdatedAt: bootstrap ? Date.now() : 0,
     staleTime: 10 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: true,

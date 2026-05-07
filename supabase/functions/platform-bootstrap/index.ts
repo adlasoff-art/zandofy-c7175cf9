@@ -25,6 +25,11 @@ const BOOTSTRAP_KEYS = [
   "ui_config",
   "visual_search_enabled",
   "maintenance_mode",
+  "cookie_settings",
+  "cms_texts",
+  "app_promo",
+  "referral_settings",
+  "seo_enabled",
 ];
 
 Deno.serve(async (req) => {

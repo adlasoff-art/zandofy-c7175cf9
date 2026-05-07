@@ -44,7 +44,7 @@ export function CategoryBanner() {
 
   if (isLoading) {
     return (
-      <section className="py-4 bg-card" style={{ minHeight: 180 }}>
+      <section className="py-4 bg-card" style={{ minHeight: 240 }}>
         <div className="container">
           <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-3">
             {Array.from({ length: 10 }).map((_, i) => (
@@ -68,7 +68,7 @@ export function CategoryBanner() {
   const showAll = expanded || !hasMoreOnMobile;
 
   return (
-    <section className="py-4 bg-card" style={{ minHeight: 180 }}>
+    <section className="py-4 bg-card" style={{ minHeight: 240 }}>
       <div className="container">
         {/* Mobile: grid 5 cols, collapsible */}
         <div className="sm:hidden">
