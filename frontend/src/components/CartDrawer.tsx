@@ -71,7 +71,7 @@ export function CartDrawer() {
                       onCheckedChange={() => toggleSelected(item.id)}
                     />
                   </div>
-                  <img src={item.image} alt={item.nameFr} className="w-20 h-24 object-cover rounded-sm shrink-0" />
+                  <img src={imgUrl(item.image, { width: 160 })} alt={item.nameFr} className="w-20 h-24 object-cover rounded-sm shrink-0" loading="lazy" decoding="async" />
                   <div className="flex-1 min-w-0 space-y-1">
                     <p className="text-sm font-medium text-foreground line-clamp-2">{item.nameFr}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
