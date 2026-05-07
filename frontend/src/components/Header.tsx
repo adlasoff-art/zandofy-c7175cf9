@@ -21,6 +21,7 @@ import { useWishlist } from "@/contexts/WishlistContext";
 import { useI18n, LOCALES, CURRENCIES, type CurrencyCode } from "@/contexts/I18nContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useHeaderTheme } from "@/hooks/use-header-theme";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 import { slugify } from "@/utils/slugify";
 
 // Mini error boundary to prevent Radix crashes from taking down the whole page
