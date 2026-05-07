@@ -1,7 +1,8 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { MaintenancePage } from "@/components/MaintenancePage";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 
 interface MaintenanceConfig {
   enabled: boolean;
@@ -10,49 +11,34 @@ interface MaintenanceConfig {
   end_time: string; // ISO
 }
 
+/**
+ * MaintenanceGuard
+ *
+ * Source unique de vérité : `platform_settings.maintenance_mode` chargé via le
+ * bootstrap (1 requête CDN-cachée pour toute l'app). Plus de localStorage (qui
+ * cassait en navigation privée selon les navigateurs), plus de requête dupliquée.
+ *
+ * Si le bootstrap n'a pas encore répondu, on affiche un skeleton vide pendant
+ * un court instant plutôt que de flasher l'app puis basculer sur la page
+ * maintenance — sinon l'utilisateur peut cliquer un lien avant le 2e render.
+ */
 export function MaintenanceGuard({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [config, setConfig] = useState<MaintenanceConfig | null>(null);
+  const { value: config, isLoading } = useBootstrapSetting<MaintenanceConfig | null>(
+    "maintenance_mode",
+    null,
+  );
   const [isAdmin, setIsAdmin] = useState(false);
-  const [checked, setChecked] = useState(() => {
-    // Use cached maintenance config for instant display
-    try {
-      const cached = localStorage.getItem("maintenance_config");
-      if (cached) {
-        const parsed = JSON.parse(cached) as MaintenanceConfig;
-        if (parsed.enabled && new Date(parsed.end_time).getTime() > Date.now()) {
-          return false; // will use cached config
-        }
-      }
-    } catch {}
-    return true; // no active maintenance cached, show app immediately
-  });
+  const [adminChecked, setAdminChecked] = useState(false);
 
-  useEffect(() => {
-    // Fetch maintenance settings in background
-    supabase
-      .from("platform_settings")
-      .select("value")
-      .eq("key", "maintenance_mode")
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.value) {
-          const mc = data.value as unknown as MaintenanceConfig;
-          setConfig(mc);
-          localStorage.setItem("maintenance_config", JSON.stringify(mc));
-        } else {
-          localStorage.removeItem("maintenance_config");
-        }
-        setChecked(true);
-      });
-  }, []);
-
-  // Check if current user is admin
+  // Check admin role for bypass
   useEffect(() => {
     if (!user) {
       setIsAdmin(false);
+      setAdminChecked(true);
       return;
     }
+    let cancelled = false;
     supabase
       .from("user_roles")
       .select("role")
@@ -60,45 +46,44 @@ export function MaintenanceGuard({ children }: { children: ReactNode }) {
       .eq("role", "admin")
       .maybeSingle()
       .then(({ data }) => {
+        if (cancelled) return;
         setIsAdmin(!!data);
+        setAdminChecked(true);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
-  // While checking, try cached config; if no active maintenance cached, render children immediately
-  if (!checked) {
-    try {
-      const cached = localStorage.getItem("maintenance_config");
-      if (cached) {
-        const parsed = JSON.parse(cached) as MaintenanceConfig;
-        if (parsed.enabled && new Date(parsed.end_time).getTime() > Date.now()) {
-          if (!isAdmin) {
-            return <MaintenancePage title={parsed.title} message={parsed.message} endTime={parsed.end_time} />;
-          }
-        }
-      }
-    } catch {}
+  const isMaintenanceActive =
+    !!config?.enabled &&
+    !!config.end_time &&
+    new Date(config.end_time).getTime() > Date.now();
+
+  // While bootstrap is in-flight, hold rendering briefly to avoid flashing the
+  // app then switching to the maintenance page. We only block on the first
+  // load (isLoading=true & no data yet) — subsequent refetches don't gate UI.
+  if (isLoading && config == null) {
+    return <div aria-hidden="true" style={{ minHeight: "100vh", background: "hsl(var(--background))" }} />;
+  }
+
+  // Maintenance OFF or expired → render the app
+  if (!isMaintenanceActive) {
     return <>{children}</>;
   }
 
-  // Check if maintenance is active
-  if (config?.enabled) {
-    const endTime = new Date(config.end_time).getTime();
-    const now = Date.now();
-    const isStillActive = endTime > now;
-
-    if (isStillActive) {
-      // Admin bypass via role
-      if (isAdmin) return <>{children}</>;
-
-      return (
-        <MaintenancePage
-          title={config.title}
-          message={config.message}
-          endTime={config.end_time}
-        />
-      );
-    }
+  // Maintenance ON: admins bypass (wait for the role check to complete to
+  // avoid kicking an admin out for one frame)
+  if (user && !adminChecked) {
+    return <div aria-hidden="true" style={{ minHeight: "100vh", background: "hsl(var(--background))" }} />;
   }
+  if (isAdmin) return <>{children}</>;
 
-  return <>{children}</>;
+  return (
+    <MaintenancePage
+      title={config!.title}
+      message={config!.message}
+      endTime={config!.end_time}
+    />
+  );
 }
