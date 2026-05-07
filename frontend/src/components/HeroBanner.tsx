@@ -150,7 +150,7 @@ export function HeroBanner() {
           <div className="hidden lg:flex flex-col gap-2" style={{ height: 380 }}>
             {leftBanners.map((b) => (
               <Link key={b.id} to={b.link || "/"} className="relative block rounded-xl overflow-hidden group" style={{ flex: 1 }}>
-                <img src={imgUrl(b.image_url, { width: 240 }) || "/placeholder.svg"} srcSet={b.image_url ? imgSrcSet(b.image_url, [200, 400]) : undefined} sizes="200px" alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
+                <img src={imgUrl(b.image_url, { width: 240 }) || "/placeholder.svg"} srcSet={b.image_url ? imgSrcSet(b.image_url, [200, 400]) : undefined} sizes="200px" alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" {...({ fetchpriority: "low" } as any)} />
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                   <span className="text-white text-sm font-bold">{b.title}</span>
                 </div>
@@ -230,7 +230,7 @@ export function HeroBanner() {
           <div className="hidden lg:flex flex-col gap-2" style={{ height: 380 }}>
             {rightBanners.map((b) => (
               <Link key={b.id} to={b.link || "/"} className="relative block rounded-xl overflow-hidden group" style={{ flex: 1 }}>
-                <img src={imgUrl(b.image_url, { width: 220 }) || "/placeholder.svg"} srcSet={b.image_url ? imgSrcSet(b.image_url, [200, 400]) : undefined} sizes="180px" alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
+                <img src={imgUrl(b.image_url, { width: 220 }) || "/placeholder.svg"} srcSet={b.image_url ? imgSrcSet(b.image_url, [200, 400]) : undefined} sizes="180px" alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" {...({ fetchpriority: "low" } as any)} />
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                   <span className="text-white text-sm font-bold">{b.title}</span>
                 </div>
