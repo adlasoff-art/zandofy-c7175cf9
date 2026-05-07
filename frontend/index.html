@@ -35,14 +35,30 @@
             the React component still renders the image normally afterwards. -->
   <script>
     (function(){
+      function toRender(u, w){
+        if (!u) return u;
+        try {
+          var url = new URL(u);
+          url.pathname = url.pathname.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/');
+          url.searchParams.set('width', String(w || 1280));
+          url.searchParams.set('quality', '75');
+          url.searchParams.set('format', 'webp');
+          url.searchParams.set('resize', 'contain');
+          return url.toString();
+        } catch(_) { return u; }
+      }
       function preload(u){
         if (!u || !/^https:\/\//.test(u)) return;
+        var orig = u;
+        u = toRender(orig, 1280);
         // Avoid duplicate <link> if both A and B succeed with the same URL.
         if (document.querySelector('link[rel="preload"][as="image"][href="' + u + '"]')) return;
         var l = document.createElement('link');
         l.rel = 'preload';
         l.as  = 'image';
         l.href = u;
+        l.setAttribute('imagesrcset', toRender(orig, 640) + ' 640w, ' + toRender(orig, 1024) + ' 1024w, ' + toRender(orig, 1280) + ' 1280w');
+        l.setAttribute('imagesizes', '100vw');
         l.setAttribute('fetchpriority', 'high');
         document.head.appendChild(l);
       }

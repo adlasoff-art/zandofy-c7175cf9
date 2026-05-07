@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
+import { imgUrl } from "@/lib/image-url";
 
 interface PopupData {
   id: string;
@@ -65,7 +66,7 @@ export function AnnouncementPopup() {
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
       <DialogContent className="max-w-md p-0 overflow-hidden">
         {popup.image_url && (
-          <img src={popup.image_url} alt={popup.title} className="w-full h-48 object-cover" />
+          <img src={imgUrl(popup.image_url, { width: 800 })} alt={popup.title} className="w-full h-48 object-cover" loading="lazy" decoding="async" />
         )}
         <div className="p-5 space-y-3">
           <DialogHeader>

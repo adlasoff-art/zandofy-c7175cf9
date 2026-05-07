@@ -1,58 +1,69 @@
-## Diagnostic
+# Plan — Fix logo/texte + Optimisation PageSpeed
 
-Deux bugs cumulés expliquent le comportement observé :
+## Partie 1 — Bug visuel : logo & texte écartés (header + footer)
 
-**Bug n°1 — le toggle ne persiste pas (toggle revient désactivé au refresh)**
-Dans `AdminSettingsPage.tsx` (ligne 456-463), le `<Switch>` ne fait que `setMaintenance(...)` en mémoire. Aucun `upsert` n'est déclenché — il faut cliquer le bouton "Sauvegarder" en bas de page pour que `handleSave` envoie la valeur en base. Sans clic, le rechargement relit la valeur précédente (désactivée) depuis la DB.
+**Cause** (`frontend/src/components/BrandLogo.tsx`) : depuis le fix anti-CLS, le wrapper du logo réserve l'espace via `aspect-ratio: 3.5` sur un `<span>` qui n'a qu'une `height` (h-8/h-10/h-7). Tant que l'image n'est pas chargée, le wrapper occupe `height × 3.5` de largeur **vide** → le texte "Zandofy" est poussé loin à droite. C'est exactement ce qu'on voit sur ta capture (logo, gros vide, puis "Zandofy").
 
-À l'inverse, les `payment_methods` auto-sauvegardent (`updatePaymentMethod` ligne 159-165). Il faut le même pattern pour la maintenance.
+**Correctif** :
+- Retirer le `aspect-ratio` du `<span>` wrapper en mode `logo_and_text` (le texte sert lui-même de réservation).
+- Garder `width`/`height` HTML sur le `<img>` (suffisant pour éviter le CLS sans réserver de largeur fantôme).
+- Réduire le `gap-2` à `gap-1.5` pour coller le texte au logo comme avant.
+- Aligner verticalement avec `items-center` plutôt que `items-end` (évite que le texte « tombe » sous la baseline du logo).
 
-**Bug n°2 — la page maintenance ne s'affiche pas en navigation privée même après sauvegarde**
-`MaintenanceGuard` lit `maintenance_mode` via `usePlatformBootstrap`, qui appelle l'edge function `platform-bootstrap`. Cette fonction renvoie :
-```
-Cache-Control: public, max-age=300, s-maxage=300, stale-while-revalidate=3600
-CDN-Cache-Control: public, max-age=300
-```
-→ La réponse est cachée **5 min sur le CDN Supabase** et **5 min côté navigateur**. En navigation privée, le navigateur n'a rien en cache local mais le **CDN sert toujours la version pré-bascule** pendant jusqu'à 5 min (et jusqu'à 1 h via `stale-while-revalidate`). Côté React Query : `staleTime: 5min` + `refetchOnMount: false` aggravent la chose pour les onglets déjà ouverts.
+Pas de changement en mode `logo_only` (où la réservation est légitime).
 
-Conclusion : même si on corrige le bug n°1, la bascule met jusqu'à 5 min à apparaître pour un visiteur en navigation privée. Inacceptable pour un kill-switch.
+## Partie 2 — Plan PageSpeed restant
 
-## Plan
+Le rewrite des URLs legacy (`wgidwyrdn...` → prod `vpttoqoj...`) est déjà fait, le mode maintenance est OK. Il reste 3 axes mesurables sur PageSpeed mobile.
 
-### 1. Auto-save du toggle maintenance (`frontend/src/pages/admin/AdminSettingsPage.tsx`)
+### A. WebP + variantes responsives à la volée
 
-- Extraire `saveMaintenance(config)` (callback) qui upsert `maintenance_mode` immédiatement, comme `savePaymentMethods`.
-- Le `<Switch>` appelle directement `saveMaintenance({ ...prev, enabled, end_time: ... })`.
-- Les inputs `title`, `message`, `duration_minutes` continuent de passer par `handleSave` global (debounce naturel via le bouton Sauvegarder) — seul l'état `enabled` doit être instantané.
-- À la sauvegarde, invalider la query React Query `["platform-bootstrap"]` pour que l'admin voie l'effet sans F5.
-- Toast clair : "Maintenance activée" / "Maintenance désactivée".
+**Constat** : les images produits/CMS sont servies en JPEG/PNG taille originale (souvent 1200-2000 px) même pour des miniatures de 300 px → poids 5-10× trop élevé.
 
-### 2. Sortir `maintenance_mode` du bootstrap caché (`frontend/src/components/MaintenanceGuard.tsx` + nouvelle hook)
+**Solution** (sans backend custom) : utiliser le **Storage Image Transformation** Supabase (paramètres `?width=...&quality=...&format=webp` sur les URLs publiques `/render/image/`).
 
-Le bootstrap reste utile pour branding/SEO/topbar (5 min de cache OK). Mais `maintenance_mode` doit être réactif sous 10 s max.
+- Créer `frontend/src/lib/image-url.ts` : helper `transformImageUrl(url, { width, quality, format })` qui convertit `/storage/v1/object/public/...` en `/storage/v1/render/image/public/...?width=W&quality=80&format=webp`. Bypass si l'URL n'est pas Supabase.
+- Brancher le helper dans les composants images-lourdes :
+  - `ProductCard` (grilles catalogue, recherche, vitrines) → `width=400`
+  - `ProductGallery` thumbnails → `width=120`, image principale → `width=800`
+  - `CmsBanner` / `HeroSection` → `width=1280`, version mobile `width=640` via `srcSet`
+  - `CategoryCard`, `StoreCard`, `BrandLogo` (footer/header), `BlogPostCard` → tailles adaptées
+- Ajouter `srcSet` + `sizes` sur les composants principaux (cards et héros) pour servir 1×/2× selon DPR.
 
-- Créer `frontend/src/hooks/use-maintenance-mode.ts` :
-  - Lit directement `platform_settings` (table publique en lecture anon, déjà OK via RLS) avec une simple requête `select('value').eq('key', 'maintenance_mode').maybeSingle()`.
-  - `staleTime: 10s`, `refetchOnWindowFocus: true`, `refetchInterval: 30_000` quand l'app a le focus.
-  - Pas d'edge function → pas de cache CDN → propagation instantanée.
-- `MaintenanceGuard` consomme cette hook au lieu de `useBootstrapSetting('maintenance_mode')`.
-- Retirer `maintenance_mode` de la liste `BOOTSTRAP_KEYS` dans `use-platform-bootstrap.ts` ET dans l'edge function `platform-bootstrap/index.ts` (pour ne pas le servir avec un cache 5 min). À redéployer via le workflow GitHub Actions habituel.
+### B. Lazy-loading strict + decoding async
 
-### 3. Documentation rapide dans l'UI admin
+- Auditer toutes les balises `<img>` du projet : ajouter `loading="lazy"` partout sauf le 1er héros above-the-fold (qui garde `fetchpriority="high"`).
+- Ajouter `decoding="async"` partout, et `decoding="sync"` uniquement sur le hero LCP.
+- Vérifier que `IntersectionObserver` (`use-lazy-image.ts`) n'est utilisé que pour les images qui en bénéficient (sinon le natif suffit et est plus rapide).
 
-Sous le toggle, ajouter un petit texte : "La bascule est immédiate (≤ 30 s pour les visiteurs déjà sur le site, instantanée pour les nouveaux)."
+### C. Preconnect, fonts & hints réseau
+
+- Vérifier dans `frontend/index.html` qu'on a `<link rel="preconnect" href="https://vpttoqojmiqxgudknyxf.supabase.co" crossorigin>` (et retirer les preconnect vers le projet legacy s'il en reste).
+- Ajouter `<link rel="dns-prefetch">` pour les CDN externes encore utilisés (analytics, etc.).
+- Vérifier que les polices personnalisées (`Outfit`, font CMS injectée) sont en `font-display: swap` et préchargées (`<link rel="preload" as="font">`) uniquement pour les 1-2 graisses utilisées above-the-fold.
+
+### D. Validation
+
+1. PageSpeed mobile sur `https://zandofy.com` avant/après pour LCP, CLS, total bytes images.
+2. DevTools Network → confirmer que les images du catalogue passent en `image/webp` avec un poids divisé par 3-5×.
+3. Lighthouse local pour vérifier qu'aucune regression sur les PWA scores.
+
+## Ordre d'implémentation suggéré
+
+1. **Fix logo/texte** (5 min, 1 fichier) — corrige immédiatement le visuel cassé.
+2. **Helper `transformImageUrl`** + branchement `ProductCard` (gain le plus visible sur la home et les listings).
+3. **Branchement gallery / hero / banners**.
+4. **Audit lazy-loading global** (chercher `<img` sans `loading=`).
+5. **Preconnect / fonts** dans `index.html`.
 
 ## Détails techniques
 
-- **Pas de migration DB** nécessaire : la colonne `value` JSON existe déjà, RLS lecture anon en place (sinon le guard ne marcherait pas du tout).
-- **Edge function** : modifier `frontend/supabase/functions/platform-bootstrap/index.ts` (retirer `"maintenance_mode"` de `BOOTSTRAP_KEYS`) et redéployer via `deploy-edge-functions.yml` après merge dans `develop` puis `main`.
-- **Bypass admin** : conservé tel quel (le guard attend déjà `adminChecked`).
-- **Compatibilité staging/prod** : les deux instances Supabase ont la même table `platform_settings` et la même RLS — aucun risque de divergence.
+- Le Storage Image Transformation Supabase est inclus dans Cloud, pas de coût additionnel pour une plateforme à 4000 users/jour à ce volume.
+- Aucune migration SQL nécessaire.
+- Aucun changement d'env var.
+- Déploiement : merge `develop` → `main` → Vercel rebuild automatique.
 
-## Validation après déploiement
+## Hors scope (à traiter plus tard si besoin)
 
-1. Activer le toggle dans `/admin/settings` → vérifier toast "Maintenance activée" sans clic Sauvegarder.
-2. F5 sur l'admin → toggle reste activé.
-3. Ouvrir `https://zandofy.com` en navigation privée fraîche → page maintenance s'affiche immédiatement.
-4. Désactiver le toggle → onglet visiteur déjà ouvert : la page disparaît dans les 30 s.
-5. Vérifier qu'un admin connecté contourne toujours la page.
+- Service Worker cache stratégique des images WebP (déjà en place via `sw.js`, juste à valider que les nouvelles URLs `/render/image/` sont matchées).
+- Optimisation JS (code-split routes admin/operator) — gros chantier séparé.

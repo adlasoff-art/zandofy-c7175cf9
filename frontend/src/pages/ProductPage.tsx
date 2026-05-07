@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchProductBySlug, fetchProducts, fetchPricingTiers, type Product } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
+import { imgUrl, imgSrcSet } from "@/lib/image-url";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { Footer } from "@/components/Footer";
@@ -306,7 +307,7 @@ export default function ProductPage() {
                         <Camera size={14} className="text-muted-foreground" />
                       </div>
                     ) : (
-                      <img src={item.url} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={imgUrl(item.url, { width: 160 })} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                     )}
                   </button>
                 ))}
@@ -369,7 +370,7 @@ export default function ProductPage() {
                             <Camera size={12} className="text-muted-foreground" />
                           </div>
                         ) : (
-                          <img src={item.url} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" />
+                          <img src={imgUrl(item.url, { width: 120 })} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                         )}
                       </button>
                     ))}
@@ -424,7 +425,7 @@ export default function ProductPage() {
                     {relatedProducts.slice(0, 6).map((p) => (
                       <Link to={`/product/${(p as any).slug || p.id}`} key={p.id} className="group">
                         <div className="aspect-square rounded-sm overflow-hidden bg-muted">
-                          <img src={p.image} alt={p.nameFr} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          <img src={imgUrl(p.image, { width: 200 })} alt={p.nameFr} className="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" decoding="async" />
                         </div>
                         <p className="text-xs text-foreground mt-1 truncate">{p.nameFr}</p>
                         <div className="flex items-center gap-1.5">
@@ -921,7 +922,7 @@ export default function ProductPage() {
                       <div className="flex items-center gap-3">
                         <div className="relative shrink-0">
                           {(product as any).store.logo_url ? (
-                            <img src={(product as any).store.logo_url} alt={(product as any).store.name} className="w-12 h-12 rounded-full object-cover border border-border" />
+                            <img src={imgUrl((product as any).store.logo_url, { width: 96 })} alt={(product as any).store.name} className="w-12 h-12 rounded-full object-cover border border-border" loading="lazy" decoding="async" />
                           ) : (
                             <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
                               <Store size={20} className="text-primary-foreground" />

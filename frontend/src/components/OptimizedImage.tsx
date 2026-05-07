@@ -32,6 +32,7 @@ function buildSupabaseRenderUrl(url: string, width: number, quality = 70): strin
     u.searchParams.set("width", String(width));
     u.searchParams.set("quality", String(quality));
     u.searchParams.set("resize", "contain");
+    u.searchParams.set("format", "webp");
     return u.toString();
   } catch {
     return url;
