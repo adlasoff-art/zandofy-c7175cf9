@@ -307,7 +307,7 @@ export default function ProductPage() {
                         <Camera size={14} className="text-muted-foreground" />
                       </div>
                     ) : (
-                      <img src={item.url} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={imgUrl(item.url, { width: 160 })} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                     )}
                   </button>
                 ))}
