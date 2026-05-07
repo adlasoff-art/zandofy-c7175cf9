@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { slugify } from "@/utils/slugify";
+import { imgUrl, imgSrcSet } from "@/lib/image-url";
 
 interface DBCategory {
   id: string;
