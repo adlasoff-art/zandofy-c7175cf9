@@ -922,7 +922,7 @@ export default function ProductPage() {
                       <div className="flex items-center gap-3">
                         <div className="relative shrink-0">
                           {(product as any).store.logo_url ? (
-                            <img src={(product as any).store.logo_url} alt={(product as any).store.name} className="w-12 h-12 rounded-full object-cover border border-border" />
+                            <img src={imgUrl((product as any).store.logo_url, { width: 96 })} alt={(product as any).store.name} className="w-12 h-12 rounded-full object-cover border border-border" loading="lazy" decoding="async" />
                           ) : (
                             <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
                               <Store size={20} className="text-primary-foreground" />
