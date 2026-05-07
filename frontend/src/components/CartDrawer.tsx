@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Minus, Plus, Trash2, ShoppingBag, CheckSquare, Square } from "lucide-react";
+import { imgUrl } from "@/lib/image-url";
 import { Link } from "react-router-dom";
 import { CartItemVariantEditor } from "@/components/CartItemVariantEditor";
 import { CartFreightPreview } from "@/components/cart/CartFreightPreview";
