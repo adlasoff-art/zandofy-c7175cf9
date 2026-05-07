@@ -145,7 +145,10 @@ export function HeroBanner() {
   return (
     <section className="bg-muted">
       <div className="container py-3">
-        <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr_180px] gap-2.5" style={{ minHeight: 380 }}>
+        <div
+          className="grid grid-cols-1 lg:grid-cols-[200px_1fr_180px] gap-2.5"
+          style={{ contain: "layout paint" }}
+        >
           {/* Left sidebar banners */}
           <div className="hidden lg:flex flex-col gap-2" style={{ height: 380 }}>
             {leftBanners.map((b) => (
@@ -161,8 +164,7 @@ export function HeroBanner() {
           {/* Center carousel with horizontal slide animation */}
           <div
             ref={sliderRef}
-            className="relative rounded-xl overflow-hidden touch-pan-y select-none bg-muted"
-            style={{ height: 380, minHeight: 380 }}
+            className="relative rounded-xl overflow-hidden touch-pan-y select-none bg-muted h-[260px] md:h-[380px]"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
