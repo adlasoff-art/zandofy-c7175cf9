@@ -94,7 +94,7 @@ export function MegaMenu() {
                     >
                       <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-border group-hover:border-primary transition-colors bg-muted flex items-center justify-center">
                         {sub.image_url ? (
-                          <img src={sub.image_url} alt={sub.name_fr} className="w-full h-full object-cover" />
+                          <img src={imgUrl(sub.image_url, { width: 200 })} srcSet={imgSrcSet(sub.image_url, [120, 240])} sizes="120px" alt={sub.name_fr} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                         ) : sub.icon ? (
                           <span className="text-xl">{sub.icon}</span>
                         ) : (
