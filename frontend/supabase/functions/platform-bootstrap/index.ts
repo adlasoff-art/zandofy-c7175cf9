@@ -41,7 +41,6 @@ const BOOTSTRAP_KEYS = [
   "active_countries",
   "ui_config",
   "visual_search_enabled",
-  "maintenance_mode",
 ];
 
 Deno.serve(async (req) => {

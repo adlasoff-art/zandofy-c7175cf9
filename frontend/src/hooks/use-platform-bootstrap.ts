@@ -42,7 +42,6 @@ export function usePlatformBootstrap() {
             "active_countries",
             "ui_config",
             "visual_search_enabled",
-            "maintenance_mode",
           ]);
         const map: PlatformSettingsMap = {};
         for (const row of data ?? []) map[(row as any).key] = (row as any).value;
