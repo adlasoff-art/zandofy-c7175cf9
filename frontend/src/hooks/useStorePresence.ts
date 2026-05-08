@@ -1,34 +1,38 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useVisibilityAwareInterval } from "@/hooks/use-visibility-aware-interval";
 
 /**
- * Sends heartbeat every 60s to mark store as online.
- * Now derives store online status from member presence (owner + collaborators).
- * Sets store offline on unmount / tab close.
+ * Heartbeat de présence pour un magasin donné.
+ *
+ * Lot 18C : 60 s permanent → 120 s focus / pause si onglet caché.
+ * Réduit ~75 % des RPC `update_store_presence` (≈6 % du temps DB en prod).
+ * Le seuil "magasin en ligne" passe en parallèle à 5 min côté lecture.
  */
 export function useStorePresence(storeId: string | null | undefined) {
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const heartbeat = useCallback(() => {
+    if (!storeId) return;
+    (supabase.rpc as any)("update_store_presence", { p_store_id: storeId }).then(
+      ({ error }: any) => {
+        if (error) console.warn("Presence heartbeat error:", error.message);
+      }
+    );
+  }, [storeId]);
+
+  useVisibilityAwareInterval(heartbeat, {
+    activeMs: 120_000,
+    hiddenMs: 0,
+    enabled: !!storeId,
+  });
 
   useEffect(() => {
     if (!storeId) return;
-
-    const heartbeat = async () => {
-      (supabase.rpc as any)("update_store_presence", { p_store_id: storeId }).then(({ error }: any) => {
-        if (error) console.warn("Presence heartbeat error:", error.message);
-      });
-    };
-
     const goOffline = () => {
       (supabase.rpc as any)("set_store_offline", { p_store_id: storeId });
     };
-
-    heartbeat();
-    intervalRef.current = setInterval(heartbeat, 60_000);
     window.addEventListener("beforeunload", goOffline);
-
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
       window.removeEventListener("beforeunload", goOffline);
       goOffline();
     };
@@ -36,58 +40,73 @@ export function useStorePresence(storeId: string | null | undefined) {
 }
 
 /**
- * Auto-detects all stores the current user is a member of (owner or collaborator)
- * and sends presence heartbeats for all of them.
+ * Auto-détecte tous les magasins dont l'utilisateur courant est membre
+ * (propriétaire ou collaborateur actif) et envoie un heartbeat groupé.
+ *
+ * Idem : 120 s focus / pause si caché.
  */
 export function useAutoStorePresence() {
   const { user } = useAuth();
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const storeIdsRef = useRef<string[]>([]);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!user?.id) return;
-
-    const fetchStores = async () => {
-      // Get owned stores
-      const { data: owned } = await supabase
-        .from("stores")
-        .select("id")
-        .eq("owner_id", user.id);
-
-      // Get collaborator stores
-      const { data: collabs } = await (supabase as any)
-        .from("store_collaborators")
-        .select("store_id")
-        .eq("user_id", user.id)
-        .eq("status", "active");
-
+    if (!user?.id) {
+      storeIdsRef.current = [];
+      setReady(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const [{ data: owned }, { data: collabs }] = await Promise.all([
+        supabase.from("stores").select("id").eq("owner_id", user.id),
+        (supabase as any)
+          .from("store_collaborators")
+          .select("store_id")
+          .eq("user_id", user.id)
+          .eq("status", "active"),
+      ]);
+      if (cancelled) return;
       const ids = new Set<string>();
       (owned ?? []).forEach((s: any) => ids.add(s.id));
       (collabs ?? []).forEach((s: any) => ids.add(s.store_id));
       storeIdsRef.current = Array.from(ids);
-    };
-
-    const heartbeatAll = async () => {
-      for (const sid of storeIdsRef.current) {
-        try { await (supabase.rpc as any)("update_store_presence", { p_store_id: sid }); } catch {}
-      }
-    };
-
-    const goOfflineAll = async () => {
-      for (const sid of storeIdsRef.current) {
-        try { await (supabase.rpc as any)("set_store_offline", { p_store_id: sid }); } catch {}
-      }
-    };
-
-    // Initial fetch + heartbeat
-    fetchStores().then(heartbeatAll);
-
-    // Refresh every 60s
-    intervalRef.current = setInterval(heartbeatAll, 60_000);
-    window.addEventListener("beforeunload", goOfflineAll);
-
+      setReady(true);
+    })();
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const heartbeatAll = useCallback(async () => {
+    for (const sid of storeIdsRef.current) {
+      try {
+        await (supabase.rpc as any)("update_store_presence", { p_store_id: sid });
+      } catch {
+        /* swallow */
+      }
+    }
+  }, []);
+
+  useVisibilityAwareInterval(heartbeatAll, {
+    activeMs: 120_000,
+    hiddenMs: 0,
+    enabled: !!user?.id && ready,
+  });
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const goOfflineAll = () => {
+      for (const sid of storeIdsRef.current) {
+        try {
+          (supabase.rpc as any)("set_store_offline", { p_store_id: sid });
+        } catch {
+          /* swallow */
+        }
+      }
+    };
+    window.addEventListener("beforeunload", goOfflineAll);
+    return () => {
       window.removeEventListener("beforeunload", goOfflineAll);
       goOfflineAll();
     };
