@@ -20,11 +20,13 @@ import {
 import { cn } from "@/lib/utils";
 
 /* ─── Helpers ─── */
-const TWO_MIN = 2 * 60 * 1000;
+// Lot 18C : seuil aligné sur le heartbeat de présence (120 s focus, pause si onglet caché).
+// Marge confortable de 5 min pour éviter les flickers entre deux heartbeats.
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 function isStoreOnline(s: StoreRow): boolean {
   if (!s.is_online) return false;
   if (!s.last_seen_at) return false;
-  return new Date(s.last_seen_at).getTime() > Date.now() - TWO_MIN;
+  return new Date(s.last_seen_at).getTime() > Date.now() - ONLINE_WINDOW_MS;
 }
 
 /* ─── Types ─── */
