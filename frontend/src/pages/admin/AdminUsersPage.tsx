@@ -95,11 +95,11 @@ export default function AdminUsersPage() {
     roles: ((userRolesMap as Record<string, string[]>)[p.id] || []) as AppRole[],
   })), [profiles, userRolesMap]);
 
-  // Online count: is_online = true AND last_seen_at within 2 minutes
-  const TWO_MIN_AGO = useMemo(() => new Date(Date.now() - 2 * 60 * 1000).toISOString(), []);
+  // Online count: is_online = true AND last_seen_at within 5 minutes (Lot 18C — aligné sur heartbeat 120 s).
+  const ONLINE_THRESHOLD = useMemo(() => new Date(Date.now() - 5 * 60 * 1000).toISOString(), []);
   const onlineCount = useMemo(() =>
-    users.filter(u => u.is_online && u.last_seen_at && u.last_seen_at > TWO_MIN_AGO).length,
-    [users, TWO_MIN_AGO]
+    users.filter(u => u.is_online && u.last_seen_at && u.last_seen_at > ONLINE_THRESHOLD).length,
+    [users, ONLINE_THRESHOLD]
   );
 
   const filtered = useMemo(() => users.filter((u) => {
@@ -114,12 +114,12 @@ export default function AdminUsersPage() {
       statusFilter === "all" ||
       (statusFilter === "banned" && u.is_banned) ||
       (statusFilter === "active" && !u.is_banned) ||
-      (statusFilter === "online" && u.is_online && u.last_seen_at && u.last_seen_at > TWO_MIN_AGO) ||
-      (statusFilter === "offline" && (!u.is_online || !u.last_seen_at || u.last_seen_at <= TWO_MIN_AGO));
+      (statusFilter === "online" && u.is_online && u.last_seen_at && u.last_seen_at > ONLINE_THRESHOLD) ||
+      (statusFilter === "offline" && (!u.is_online || !u.last_seen_at || u.last_seen_at <= ONLINE_THRESHOLD));
     const matchesGender = genderFilter === "all" || (u.gender || "").toLowerCase() === genderFilter;
     const matchesAgeFilter = matchesAge(u.birth_year, ageFilter);
     return matchesSearch && matchesRole && matchesStatus && matchesGender && matchesAgeFilter;
-  }), [users, search, roleFilter, statusFilter, genderFilter, ageFilter, TWO_MIN_AGO]);
+  }), [users, search, roleFilter, statusFilter, genderFilter, ageFilter, ONLINE_THRESHOLD]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
@@ -196,7 +196,7 @@ export default function AdminUsersPage() {
     });
   }, [users, chartPeriod]);
 
-  const isUserOnline = (u: any) => u.is_online && u.last_seen_at && u.last_seen_at > TWO_MIN_AGO;
+  const isUserOnline = (u: any) => u.is_online && u.last_seen_at && u.last_seen_at > ONLINE_THRESHOLD;
 
   return (
     <AdminLayout title="Gestion des utilisateurs">
