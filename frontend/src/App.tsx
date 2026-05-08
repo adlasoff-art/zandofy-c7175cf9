@@ -37,6 +37,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoadingSkeleton } from "@/components/PageLoadingSkeleton";
 import { RoleGuard } from "@/components/admin/RoleGuard";
 import { BanGuard } from "@/components/BanGuard";
+import { RecoveryGuard } from "@/components/RecoveryGuard";
 import { useGeoBlocking } from "@/hooks/useGeoBlocking";
 import { GeoBlockScreen } from "@/components/security/GeoBlockScreen";
 
@@ -246,6 +247,7 @@ const App = () => (
             <AutomationPopup />
             <MaintenanceGuard>
             <BanGuard>
+            <RecoveryGuard />
             <Suspense fallback={<PageLoadingSkeleton />}>
               <Routes>
                 <Route path="/banned" element={<BannedPage />} />
