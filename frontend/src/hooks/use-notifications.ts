@@ -26,16 +26,23 @@ export function useNotifications() {
       setLoading(false);
       return;
     }
-    // Colonnes ciblées (au lieu de select *) pour réduire le Disk IO sur la table notifications.
-    const { data } = await supabase
-      .from("notifications")
-      .select("id, type, title, message, link, is_read, created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    const items = (data || []) as Notification[];
-    setNotifications(items);
-    setUnreadCount(items.filter((n) => !n.is_read).length);
+    // Liste limitée à 50 pour le panneau, mais COUNT exact pour le badge
+    // (sinon le compteur plafonne et reste figé quand >50 non-lues existent).
+    const [list, countRes] = await Promise.all([
+      supabase
+        .from("notifications")
+        .select("id, type, title, message, link, is_read, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("is_read", false),
+    ]);
+    setNotifications((list.data || []) as Notification[]);
+    setUnreadCount(countRes.count ?? 0);
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
@@ -48,17 +55,21 @@ export function useNotifications() {
   });
 
   const markAsRead = async (id: string) => {
+    setUnreadCount((c) => Math.max(0, c - 1));
     await supabase.from("notifications").update({ is_read: true }).eq("id", id);
     fetchNotifications();
   };
 
   const markAllAsRead = async () => {
     if (!user) return;
+    setUnreadCount(0);
     await supabase.from("notifications").update({ is_read: true }).eq("user_id", user.id).eq("is_read", false);
     fetchNotifications();
   };
 
   const deleteNotification = async (id: string) => {
+    const wasUnread = notifications.find((n) => n.id === id && !n.is_read);
+    if (wasUnread) setUnreadCount((c) => Math.max(0, c - 1));
     await supabase.from("notifications").delete().eq("id", id);
     fetchNotifications();
   };
