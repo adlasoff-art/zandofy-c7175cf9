@@ -13,8 +13,8 @@
  * Auth : verify_jwt = false (cron / admin tooling).
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
-import nodemailer from "npm:nodemailer@6.9.16";
 import { operatorAutoSuspendEmail } from "../_shared/operator-email-templates.ts";
+import { sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -173,12 +173,6 @@ async function sendSuspensionEmail(
     if (!op.contact_email || !smtpHost || !smtpUser || !smtpPass || !fromEmail) {
       return;
     }
-    const transport = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: { user: smtpUser, pass: smtpPass },
-    });
     const html = operatorAutoSuspendEmail({
       greeting: "Bonjour,",
       companyName: op.company_name,
@@ -186,9 +180,7 @@ async function sendSuspensionEmail(
       score: kpi.score !== null ? Number(kpi.score).toFixed(2) : null,
       windowDays,
     });
-    await transport.sendMail({
-      from: fromEmail,
-      to: op.contact_email,
+    await sendEmail({      to: op.contact_email,
       subject: `⚠️ ${op.company_name} — Suspension automatique`,
       html,
     });

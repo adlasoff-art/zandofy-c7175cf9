@@ -1,4 +1,4 @@
-import nodemailer from "npm:nodemailer@6.9.16";
+import { sendEmail } from "../_shared/email.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -91,12 +91,6 @@ Deno.serve(async (req) => {
     const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || smtpUser;
 
     if (smtpHost && smtpUser && smtpPass && emailWorkflows.length > 0) {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: { user: smtpUser, pass: smtpPass },
-      });
 
       for (const wf of emailWorkflows) {
         if (!wf.email_subject || !wf.email_html_content) continue;
@@ -122,9 +116,7 @@ Deno.serve(async (req) => {
               .replace(/\{\{first_name\}\}/g, profile.first_name || "")
               .replace(/\{\{email\}\}/g, profile.email);
 
-            await transporter.sendMail({
-              from: `Zandofy <${fromEmail}>`,
-              to: profile.email,
+            await sendEmail({              to: profile.email,
               subject: wf.email_subject,
               html: htmlContent,
             });

@@ -9,7 +9,7 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
-import nodemailer from "npm:nodemailer@6.9.16";
+import { sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -95,12 +95,6 @@ Deno.serve(async (req) => {
       const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
       const to = op?.contact_email;
       if (smtpHost && smtpUser && smtpPass && fromEmail && to && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-        const transport = nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: smtpPort === 465,
-          auth: { user: smtpUser, pass: smtpPass },
-        });
         const html = `
           <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#ffffff;color:#111;">
             <h2 style="margin:0 0 16px;color:#0f172a;">Tarif approuvé ✅</h2>
@@ -111,9 +105,7 @@ Deno.serve(async (req) => {
             <p style="color:#888;font-size:12px;margin-top:32px;">Email automatique — plateforme Zandofy.</p>
           </div>
         `;
-        await transport.sendMail({
-          from: fromEmail,
-          to,
+        await sendEmail({          to,
           subject: `Zandofy — Tarif approuvé (${rate.city} / ${rate.zone_name})`,
           html,
         });

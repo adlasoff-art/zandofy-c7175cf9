@@ -8,8 +8,8 @@
  * Auth: service-role only (called from the database). No JWT is required from
  * end users; instead the function checks a shared secret header.
  */
-import nodemailer from "npm:nodemailer@6.9.16";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -142,13 +142,7 @@ Deno.serve(async (req) => {
       </div>
     `;
 
-    const transport = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: { user: smtpUser, pass: smtpPass },
-    });
-    await transport.sendMail({ from: fromEmail, to: recipientEmail, subject, html });
+    await sendEmail({ from: fromEmail, to: recipientEmail, subject, html });
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

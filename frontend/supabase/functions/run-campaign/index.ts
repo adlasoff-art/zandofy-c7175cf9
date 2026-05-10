@@ -1,4 +1,4 @@
-import nodemailer from "npm:nodemailer@6.9.16";
+import { sendEmail } from "../_shared/email.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -148,12 +148,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      const transport = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: { user: smtpUser, pass: smtpPass },
-      });
 
       let sentCount = 0;
       const batchSize = campaign.batch_size || 10;
@@ -168,9 +162,7 @@ Deno.serve(async (req) => {
             .replace(/\{\{promo_code\}\}/g, campaign.promo_code || "");
 
           try {
-            await transport.sendMail({
-              from: fromEmail,
-              to: u.email,
+            await sendEmail({              to: u.email,
               subject: campaign.subject.replace(/\{\{name\}\}/g, u.first_name || "Client"),
               html,
             });

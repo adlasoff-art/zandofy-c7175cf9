@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import nodemailer from "npm:nodemailer@6.9.16";
+import { sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -112,16 +112,8 @@ Deno.serve(async (req) => {
       </div>
     </body></html>`;
 
-    const transport = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: { user: smtpUser, pass: smtpPass },
-    });
 
-    await transport.sendMail({
-      from: fromEmail,
-      to: fromEmail,
+    await sendEmail({      to: fromEmail,
       bcc: adminEmails,
       subject: `[Zandofy] ${pending.length} nouvelles demandes produits`,
       html,

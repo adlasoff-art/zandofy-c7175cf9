@@ -11,8 +11,8 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
-import nodemailer from "npm:nodemailer@6.9.16";
 import { operatorNewOrderEmail } from "../_shared/operator-email-templates.ts";
+import { sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -117,12 +117,6 @@ Deno.serve(async (req) => {
         smtpPass &&
         fromEmail
       ) {
-        const transport = nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: smtpPort === 465,
-          auth: { user: smtpUser, pass: smtpPass },
-        });
 
         const greeting = ownerProfile.first_name
           ? `Bonjour ${ownerProfile.first_name},`
@@ -134,9 +128,7 @@ Deno.serve(async (req) => {
           fee,
         });
 
-        await transport.sendMail({
-          from: fromEmail,
-          to: ownerProfile.email,
+        await sendEmail({          to: ownerProfile.email,
           subject: `🚚 Nouvelle commande ${orderRef} à livrer`,
           html,
         });

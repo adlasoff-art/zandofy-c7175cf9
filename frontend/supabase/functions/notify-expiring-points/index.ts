@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import nodemailer from "npm:nodemailer@6.9.16";
+import { sendEmail } from "../_shared/email.ts";
 
 const ALLOWED_HEADERS =
   "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
@@ -155,9 +155,7 @@ Deno.serve(async (req) => {
       // Email notification
       if (transport && profile.email) {
         try {
-          await transport.sendMail({
-            from: fromEmail,
-            to: profile.email,
+          await sendEmail({            to: profile.email,
             subject: `⚠️ Vos ${account.balance.toFixed(0)} ZandoPoints expirent bientôt`,
             html: buildExpiryWarningEmail(profile.first_name || "", account.balance, monthsLeft, expiryDateStr),
           });

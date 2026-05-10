@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendEmail } from "../_shared/email.ts";
 
 const ALLOWED_HEADERS =
   "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
@@ -111,19 +112,9 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: "SMTP configuration missing. Please configure SMTP secrets." }, 500);
         }
 
-        const nodemailer = (await import("npm:nodemailer@6.9.16")).default;
-        const transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: smtpPort === 465,
-          auth: { user: smtpUser, pass: smtpPass },
-        });
-
         const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "noreply@zandofy.com";
 
-        await transporter.sendMail({
-          from: `"Zandofy" <${fromEmail}>`,
-          to: userEmail,
+        await sendEmail({          to: userEmail,
           subject: "Réinitialisation de votre mot de passe - Zandofy",
           html: `
             <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">

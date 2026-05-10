@@ -9,8 +9,8 @@
  * - Si user existe déjà, lui ajoute le rôle `rider`.
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
-import nodemailer from "npm:nodemailer@6.9.16";
 import { z } from "npm:zod@3.23.8";
+import { sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -119,12 +119,6 @@ Deno.serve(async (req) => {
 
     if (smtpHost && smtpUser && smtpPass && fromEmail) {
       try {
-        const transport = nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: smtpPort === 465,
-          auth: { user: smtpUser, pass: smtpPass },
-        });
 
         const ctaUrl = riderUserId
           ? "https://zandofy.com/rider"
@@ -146,9 +140,7 @@ Deno.serve(async (req) => {
           </div>
         `;
 
-        await transport.sendMail({
-          from: fromEmail,
-          to: rider_email,
+        await sendEmail({          to: rider_email,
           subject: `Zandofy — Invitation livreur (${op.company_name})`,
           html,
         });

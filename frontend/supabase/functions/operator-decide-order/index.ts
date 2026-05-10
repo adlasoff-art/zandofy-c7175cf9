@@ -10,8 +10,8 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
-import nodemailer from "npm:nodemailer@6.9.16";
 import { clientOperatorReassignedEmail } from "../_shared/operator-email-templates.ts";
+import { sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -150,12 +150,6 @@ async function sendClientReassignmentEmail(
     if (!profile?.email || !smtpHost || !smtpUser || !smtpPass || !fromEmail) {
       return;
     }
-    const transport = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: { user: smtpUser, pass: smtpPass },
-    });
     const greeting = profile.first_name ? `Bonjour ${profile.first_name},` : "Bonjour,";
     const html = clientOperatorReassignedEmail({
       greeting,
@@ -163,9 +157,7 @@ async function sendClientReassignmentEmail(
       orderId,
       cause: "declined",
     });
-    await transport.sendMail({
-      from: fromEmail,
-      to: profile.email,
+    await sendEmail({      to: profile.email,
       subject: `🔄 Nouveau transporteur pour votre commande ${orderRef}`,
       html,
     });
