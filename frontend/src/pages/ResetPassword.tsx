@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Lock, Eye, EyeOff } from "lucide-react";
+import { SEOHead } from "@/components/SEOHead";
 
 export default function ResetPassword() {
   const [password, setPassword] = useState("");
@@ -61,6 +62,7 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <SEOHead title="Réinitialiser le mot de passe" description="Définissez un nouveau mot de passe Zandofy." noindex />
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <a href="/" className="text-2xl font-bold tracking-[0.18em] uppercase text-foreground" style={{ fontWeight: 800 }}>ZANDOFY</a>

@@ -84,7 +84,7 @@
       "destination": "/api/meta-injector"
     },
     {
-      "source": "/:globalPath(|faq|stores|blog|about|contact|careers|help|pricing|privacy|terms|popular|trends|search)",
+      "source": "/:globalPath(|faq|stores|blog|about|contact|careers|help|pricing|privacy|terms|popular|trends|search|auth|reset-password|onboarding|impersonate)",
       "has": [
         {
           "type": "header",

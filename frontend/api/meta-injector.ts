@@ -73,6 +73,7 @@ type MetaPayload = {
   ogType?: "website" | "article" | "product";
   jsonLd?: Record<string, unknown>;
   keywords?: string;
+  robots?: string;
 };
 
 // ─── Global SEO config (admin-controlled via platform_settings.seo_config) ───
@@ -109,7 +110,43 @@ const GLOBAL_ROUTES = new Set([
   "/", "/faq", "/stores", "/blog", "/about", "/contact",
   "/careers", "/help", "/pricing", "/privacy", "/terms",
   "/popular", "/trends", "/search",
+  // Private pages — included so the override (noindex,nofollow) is honored
+  "/auth", "/reset-password", "/onboarding", "/impersonate",
 ]);
+
+// ─── Per-page SEO overrides (admin-managed via `seo_page_overrides`) ───
+type SeoOverride = {
+  path: string;
+  title: string | null;
+  og_title: string | null;
+  description: string | null;
+  og_image: string | null;
+  keywords: string[] | null;
+  robots: string | null;
+  jsonld_extra: Record<string, unknown> | null;
+};
+
+let _overridesCache: { value: Record<string, SeoOverride> | null; expiresAt: number } = {
+  value: null,
+  expiresAt: 0,
+};
+
+async function getOverride(pathname: string, forcePurge = false): Promise<SeoOverride | null> {
+  const now = Date.now();
+  if (forcePurge || !_overridesCache.value || _overridesCache.expiresAt <= now) {
+    try {
+      const rows = await sbFetch(
+        `seo_page_overrides?select=path,title,og_title,description,og_image,keywords,robots,jsonld_extra`,
+      );
+      const map: Record<string, SeoOverride> = {};
+      for (const r of rows as any[]) map[r.path] = r;
+      _overridesCache = { value: map, expiresAt: now + 60_000 };
+    } catch {
+      _overridesCache = { value: _overridesCache.value || {}, expiresAt: now + 5_000 };
+    }
+  }
+  return _overridesCache.value?.[pathname] || null;
+}
 
 async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
   const cfg = await getSeoConfig();
@@ -322,6 +359,9 @@ async function buildBlogMeta(slug: string): Promise<MetaPayload | null> {
 }
 
 async function buildMetaForPath(pathname: string): Promise<MetaPayload | null> {
+  // Per-page override takes priority for global/static routes.
+  const override = await getOverride(pathname);
+
   const productMatch = pathname.match(/^\/product\/([^/?#]+)/i);
   if (productMatch) return buildProductMeta(decodeURIComponent(productMatch[1]));
 
@@ -335,32 +375,55 @@ async function buildMetaForPath(pathname: string): Promise<MetaPayload | null> {
   if (blogMatch) return buildBlogMeta(decodeURIComponent(blogMatch[1]));
 
   // Global / static pages — admin-controlled SEO config
-  if (GLOBAL_ROUTES.has(pathname)) return buildGlobalMeta(pathname);
+  if (GLOBAL_ROUTES.has(pathname)) {
+    const base = await buildGlobalMeta(pathname);
+    if (!base && !override) return null;
+    const merged: MetaPayload = base || {
+      title: "Zandofy",
+      description: "",
+      canonical: `${SITE_URL}${pathname}`,
+      ogType: "website",
+    };
+    if (override) {
+      if (override.title) merged.title = override.title;
+      if (override.description) merged.description = truncate(override.description);
+      if (override.og_image) merged.image = override.og_image;
+      if (override.keywords && override.keywords.length)
+        merged.keywords = override.keywords.join(", ");
+      if (override.robots) merged.robots = override.robots;
+      // og_title injected via separate meta tag below
+      if (override.og_title) (merged as any).ogTitle = override.og_title;
+    }
+    return merged;
+  }
 
   return null;
 }
 
 function buildHeadInjection(meta: MetaPayload): string {
   const t = escapeHtml(meta.title);
+  const ogT = escapeHtml((meta as any).ogTitle || meta.title);
   const d = escapeHtml(meta.description);
   const c = escapeHtml(meta.canonical);
   const img = escapeHtml(meta.image || `${SITE_URL}/og-default.jpg`);
   const ogType = meta.ogType || "website";
+  const robots = meta.robots || "index,follow";
 
   let html = `
 <!-- BEGIN injected SEO (meta-injector edge fn) -->
 <title>${t}</title>
+<meta name="robots" content="${escapeHtml(robots)}" />
 <meta name="description" content="${d}" />
 <link rel="canonical" href="${c}" />
 <meta property="og:type" content="${ogType}" />
 <meta property="og:url" content="${c}" />
-<meta property="og:title" content="${t}" />
+<meta property="og:title" content="${ogT}" />
 <meta property="og:description" content="${d}" />
 <meta property="og:image" content="${img}" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="${t}" />
+<meta name="twitter:title" content="${ogT}" />
 <meta name="twitter:description" content="${d}" />
 <meta name="twitter:image" content="${img}" />`;
   if (meta.keywords) {
@@ -383,6 +446,7 @@ function stripStaticSeo(head: string): string {
     .replace(/<title>[\s\S]*?<\/title>/i, "")
     .replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, "")
     .replace(/<meta[^>]+name=["']description["'][^>]*>/gi, "")
+    .replace(/<meta[^>]+name=["']robots["'][^>]*>/gi, "")
     .replace(/<meta[^>]+property=["']og:[^"']+["'][^>]*>/gi, "")
     .replace(/<meta[^>]+name=["']twitter:[^"']+["'][^>]*>/gi, "");
 }
@@ -394,6 +458,7 @@ export default async function handler(req: Request): Promise<Response> {
   // Cache purge endpoint (called by admin after saving SEO config).
   if (req.headers.get("x-purge-cache") === "1") {
     _seoCache = { value: null, expiresAt: 0 };
+    _overridesCache = { value: null, expiresAt: 0 };
     return new Response(JSON.stringify({ purged: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -443,12 +508,14 @@ export default async function handler(req: Request): Promise<Response> {
     ? "public, max-age=60, s-maxage=60, stale-while-revalidate=300"
     : "public, max-age=300, s-maxage=600, stale-while-revalidate=86400";
 
+  // Honor per-page robots override at the HTTP header level too.
+  const xRobots = meta?.robots || "index, follow";
   return new Response(html, {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": cacheControl,
-      "X-Robots-Tag": "index, follow",
+      "X-Robots-Tag": xRobots,
       Vary: "User-Agent",
     },
   });

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, AlertTriangle } from "lucide-react";
+import { SEOHead } from "@/components/SEOHead";
 
 export default function ImpersonatePage() {
   const [searchParams] = useSearchParams();
@@ -93,6 +94,7 @@ export default function ImpersonatePage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
+      <SEOHead title="Impersonation" description="Échange du token d'impersonation." noindex />
       <div className="text-center space-y-4">
         <Loader2 className="mx-auto animate-spin text-primary" size={32} />
         <p className="text-sm text-muted-foreground">{status}</p>

@@ -12,6 +12,7 @@ import { SeoSerpPreview } from "@/components/admin/seo/SeoSerpPreview";
 import { SeoStoresSection } from "@/components/admin/seo/SeoStoresSection";
 import { SeoWatermarkSection } from "@/components/admin/seo/SeoWatermarkSection";
 import { SeoSocialRescrapeSection } from "@/components/admin/seo/SeoSocialRescrapeSection";
+import { SeoPageOverridesSection } from "@/components/admin/seo/SeoPageOverridesSection";
 
 interface SeoConfigState {
   site_title: string;
@@ -196,6 +197,8 @@ export default function AdminSEOPage() {
         <SeoWatermarkSection />
 
         <SeoSocialRescrapeSection />
+
+        <SeoPageOverridesSection />
 
         <button
           onClick={handleSave}

@@ -9,6 +9,9 @@ Disallow: /shipper
 Disallow: /auth
 Disallow: /checkout
 Disallow: /cart
+Disallow: /reset-password
+Disallow: /onboarding
+Disallow: /impersonate
 Disallow: /wp-admin
 Disallow: /wp-content
 Disallow: /wp-includes
@@ -25,6 +28,9 @@ Disallow: /shipper
 Disallow: /auth
 Disallow: /checkout
 Disallow: /cart
+Disallow: /reset-password
+Disallow: /onboarding
+Disallow: /impersonate
 
 Host: https://zandofy.com
 Sitemap: https://zandofy.com/sitemap.xml

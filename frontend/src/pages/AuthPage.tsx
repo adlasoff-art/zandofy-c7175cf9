@@ -13,6 +13,7 @@ import { useGeoDetection } from "@/hooks/use-geo-detection";
 import { useActiveGeo } from "@/hooks/useActiveGeo";
 import { LegalModal } from "@/components/auth/LegalModal";
 import { HoneypotField, isHoneypotTriggered } from "@/components/security/FormProtection";
+import { SEOHead } from "@/components/SEOHead";
 import {
   signInWithGoogle,
   checkRateLimit,
@@ -209,6 +210,7 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <SEOHead title="Connexion" description="Connectez-vous à votre compte Zandofy." noindex />
       <header className="border-b border-border bg-card">
         <div className="container flex items-center h-14">
           <a href="/" className="text-xl font-bold tracking-[0.18em] uppercase text-foreground" style={{ fontWeight: 800 }}>
