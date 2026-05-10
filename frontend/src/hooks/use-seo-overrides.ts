@@ -18,7 +18,7 @@ const TTL = 60_000;
 async function fetchAll(): Promise<Record<string, SeoOverride>> {
   const now = Date.now();
   if (_cache && _cache.expiresAt > now) return _cache.rows;
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("seo_page_overrides")
     .select("path,title,og_title,description,og_image,keywords,robots,jsonld_extra");
   if (error || !data) {
@@ -50,7 +50,7 @@ export function useSeoOverride(path: string): SeoOverride | null {
 
 /** Admin: list all overrides (no cache). */
 export async function listSeoOverrides(): Promise<SeoOverride[]> {
-  const { data } = await supabase
+  const { data } = await (supabase as any)
     .from("seo_page_overrides")
     .select("*")
     .order("path");
