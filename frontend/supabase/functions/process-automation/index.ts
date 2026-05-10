@@ -1,4 +1,5 @@
 import { sendEmail } from "../_shared/email.ts";
+import { sendWebPushSafe } from "../_shared/web-push.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -65,19 +66,16 @@ Deno.serve(async (req) => {
           sent_at: new Date().toISOString(),
         });
 
-        // Invoke the existing push-notifications function
-        try {
-          await supabaseAdmin.functions.invoke("push-notifications", {
-            body: {
-              user_ids: [userId],
-              title: wf.push_title,
-              body: wf.push_body,
-              url: wf.popup_cta_link || "/",
-            },
-          });
-        } catch (pushErr) {
-          console.error(`Push failed for user ${userId}:`, pushErr);
-        }
+        // Send Web Push directly via shared helper
+        await sendWebPushSafe(supabaseAdmin, {
+          userIds: [userId],
+          payload: {
+            title: wf.push_title,
+            body: wf.push_body,
+            url: wf.popup_cta_link || "/",
+            tag: `automation-${wf.id}`,
+          },
+        });
 
         totalProcessed++;
       }
