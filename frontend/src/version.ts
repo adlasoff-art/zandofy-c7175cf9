@@ -11,7 +11,7 @@
  *
  * IMPORTANT : Lovable doit demander confirmation à l'utilisateur avant chaque bump.
  */
-export const APP_VERSION = "1.9.0";
+export const APP_VERSION = "1.10.0";
 
 /**
  * Si true : affiche la modale "Nouvelle version disponible" + envoi push.
