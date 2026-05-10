@@ -139,6 +139,38 @@ Deno.serve(async (req) => {
       returnUrl: returnUrl,
     };
 
+    const origin = req.headers.get("Origin") || req.headers.get("Referer") || "";
+    const merchantCodeMasked = keccelMerchantCode
+      ? `${keccelMerchantCode.slice(0, 2)}***${keccelMerchantCode.slice(-2)}`
+      : null;
+
+    // Helper: persist a diagnostic row (best-effort, never throws)
+    async function persistDiagnostic(extra: Record<string, unknown>) {
+      try {
+        await supabase.from("keccel_cardpay_diagnostics").insert({
+          diagnostic_id: diagnosticId,
+          function_name: "keccel-cardpay",
+          environment: supabaseUrl,
+          origin,
+          site_base_url: siteBaseUrl,
+          user_id: user.id,
+          order_id: order.id,
+          reference,
+          amount,
+          currency: "USD",
+          callback_url: callbackUrl,
+          return_url: returnUrl,
+          merchant_code_masked: merchantCodeMasked,
+          token_present: Boolean(keccelToken),
+          token_length: keccelToken?.length ?? null,
+          sent_keys: Object.keys(keccelPayload),
+          ...extra,
+        });
+      } catch (e) {
+        console.error(`[${diagnosticId}] Failed to persist diagnostic:`, e);
+      }
+    }
+
     // ---- Local pre-flight validation (before hitting Keccel) ----
     const required: Record<string, unknown> = {
       merchantcode: keccelPayload.merchantcode,
@@ -157,6 +189,7 @@ Deno.serve(async (req) => {
     }
     if (missingLocal.length > 0) {
       console.error(`[${diagnosticId}] Pre-flight failed, missing:`, missingLocal);
+      await persistDiagnostic({ pre_flight_missing: missingLocal, error: "pre_flight_missing" });
       return errorResponse(
         `Champs manquants avant envoi : ${missingLocal.join(", ")} (diag ${diagnosticId})`,
         { diagnostic_id: diagnosticId, missing: missingLocal }
@@ -201,6 +234,12 @@ Deno.serve(async (req) => {
         keccelResponse = JSON.parse(rawBody);
       } catch (_parseErr) {
         console.error(`[${diagnosticId}] Keccel cardpay returned non-JSON body`);
+        await persistDiagnostic({
+          payload_shape: fieldShape,
+          http_status: resp.status,
+          raw_body: rawBody.slice(0, 4000),
+          error: "non_json_response",
+        });
         return errorResponse(
           `Réponse invalide de la passerelle (HTTP ${resp.status}) — diag ${diagnosticId}`,
           { diagnostic_id: diagnosticId, httpStatus: resp.status, body: rawBody.slice(0, 500) }
@@ -209,6 +248,15 @@ Deno.serve(async (req) => {
 
       if (String(keccelResponse?.code) !== "0") {
         console.error(`[${diagnosticId}] Keccel API returned error:`, keccelResponse, "with payload keys:", Object.keys(keccelPayload));
+        await persistDiagnostic({
+          payload_shape: fieldShape,
+          http_status: resp.status,
+          raw_body: rawBody.slice(0, 4000),
+          keccel_code: String(keccelResponse?.code ?? ""),
+          keccel_description: keccelResponse?.description ?? null,
+          keccel_response: keccelResponse,
+          error: "keccel_error",
+        });
         return errorResponse(
           `Keccel ${keccelResponse?.code ?? "?"} : ${keccelResponse?.description || "Erreur de la passerelle de paiement"} (diag ${diagnosticId})`,
           { diagnostic_id: diagnosticId, keccel: keccelResponse, sent_keys: Object.keys(keccelPayload), shape: fieldShape }
@@ -216,8 +264,21 @@ Deno.serve(async (req) => {
       }
 
       redirectUrl = keccelResponse?.checkoutUrl || null;
+
+      // Success trace (no error)
+      await persistDiagnostic({
+        payload_shape: fieldShape,
+        http_status: resp.status,
+        keccel_code: "0",
+        keccel_description: keccelResponse?.description ?? null,
+        keccel_response: keccelResponse,
+      });
     } catch (apiError) {
       console.error(`[${diagnosticId}] Keccel API error:`, apiError);
+      await persistDiagnostic({
+        payload_shape: fieldShape,
+        error: `network_error: ${(apiError as any)?.message ?? String(apiError)}`,
+      });
       return errorResponse(`Erreur de connexion à la passerelle de paiement (diag ${diagnosticId})`, { diagnostic_id: diagnosticId });
     }
 
