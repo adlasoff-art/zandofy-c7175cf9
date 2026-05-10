@@ -444,6 +444,11 @@ export default function AdminNotificationsPage() {
             )}
           </div>
         </TabsContent>
+
+        {/* ── Tab: PWA Update Broadcast ── */}
+        <TabsContent value="pwa-update">
+          <PwaUpdateBroadcastCard />
+        </TabsContent>
       </Tabs>
     </AdminLayout>
   );
