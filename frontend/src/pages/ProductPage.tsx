@@ -89,6 +89,7 @@ export default function ProductPage() {
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedDynamic, setSelectedDynamic] = useState<Record<string, string>>({});
   const [sizeRegion, setSizeRegion] = useState("EU");
   const [copied, setCopied] = useState(false);
   const wishlisted = id ? isInWishlist(id) : false;
