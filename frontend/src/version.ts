@@ -11,11 +11,11 @@
  *
  * IMPORTANT : Lovable doit demander confirmation à l'utilisateur avant chaque bump.
  */
-export const APP_VERSION = "1.10.0";
+export const APP_VERSION = "1.10.1";
 
 /**
  * Si true : affiche la modale "Nouvelle version disponible" + envoi push.
  * Si false : le nouveau Service Worker s'installe et s'active silencieusement.
  * Mettre à true uniquement pour les bumps `minor` ou `major`.
  */
-export const SHOW_UPDATE_PROMPT = true;
+export const SHOW_UPDATE_PROMPT = false;
