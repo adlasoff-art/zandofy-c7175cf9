@@ -1,81 +1,56 @@
+## Lot 3 — Réparer le paiement par carte (Keccel CardPay) — révisé
 
-## Décision validée
+### Nouveau diagnostic
 
-Titre par défaut de la home : **« Zandofy — Marketplace sino-africaine | Achat à l'international et livraison en Afrique »** (78 car).
+Tous les secrets Keccel sont configurés en prod (`KECCEL_CARD_MERCHANT_CODE`, `KELPAY_TOKEN`, `KELPAY_MERCHANT_CODE`, `SITE_BASE_URL`). La cause racine est donc ailleurs. Hypothèses restantes par ordre de probabilité :
 
-Comme c'est > 60 car (limite SEO recommandée pour éviter la troncature Google), je seed deux versions :
-- **`<title>`** (affiché Google, ≤60 car) : « Zandofy — Marketplace sino-africaine d'import »
-- **`og:title` / `meta description`** (riche, plus long) : ta phrase complète.
+1. **Format `amount`** : Mobile Money envoie `String(cleanAmount)`, Keccel CardPay envoie `amount: number`. La doc Keccel attend une string `"X.XX"`. Rejet probable côté API.
+2. **Token incorrect pour `/cardpay`** : `KELPAY_TOKEN` est valide pour `api.kelpay.com` (Mobile Money). Keccel CardPay (`api.keccel.net/cardpay`) peut exiger un token différent ou un header d'auth différent (ex: `X-API-Key` au lieu de `Bearer`).
+3. **Champ `merchantcode` vs `merchantCode`** : casse exacte attendue par l'API.
+4. **`currency: "USD"` non supporté** par le merchant code (compte configuré en CDF/EUR ?).
+5. **`returnUrl` vs `returnurl`** : incohérence de casse avec les autres champs en lowercase (`callbackurl`).
 
-Tu pourras éditer les deux dans le CMS si tu préfères ta version longue partout.
+Sans le message d'erreur exact retourné par Keccel, on tâtonne. Stratégie : **déployer un patch d'observabilité d'abord**, faire un test, lire le vrai code/description Keccel, puis fixer ciblé.
 
-## Problèmes adressés
+### Étapes d'exécution
 
-1. `https://zandofy.com/auth` indexé en 1ère position avec « Aucune information ».
-2. Aucun contrôle admin par page — tout passe par le `seo_config` global.
-3. Titres auto `Label | Zandofy` non personnalisables.
-4. Sitelinks type Amazon à renforcer.
+#### 1. Patch d'observabilité (les 2 fichiers `keccel-cardpay/index.ts`)
 
-## Livrables
+- **Logger le payload envoyé** (sans le token) : `console.log("Keccel cardpay → payload:", JSON.stringify(keccelPayload))`.
+- **Logger la réponse brute** (`status`, `body text`) avant le `.json()` pour capturer un éventuel HTML/erreur réseau.
+- **Renvoyer au front les détails Keccel** : déjà fait pour `keccelResponse?.code` et `description`, on s'assure qu'ils sont bien transmis.
+- **Supprimer le fallback `|| "jam"`** : retour 500 propre si secret absent (hardening, déjà discuté).
+- **Garder `amount: number`** pour ce premier patch — on ne change pas la cause potentielle avant d'avoir le log.
+- **Unifier les deux fichiers** edge function (déjà quasi identiques, on s'aligne sur la version frontend qui a CORS strict).
 
-### A. Bloquer les pages privées de l'index Google
+#### 2. Améliorer le toast côté `CheckoutPage.tsx`
 
-- `frontend/public/robots.txt` : ajouter `Disallow: /auth`, `/reset-password`, `/onboarding`, `/impersonate` (vérifier que `/dashboard`, `/admin`, `/checkout`, `/cart` sont déjà bloqués).
-- Ajouter `<SEOHead>` avec `noindex,nofollow` sur `AuthPage`, `ResetPassword`, `OnboardingPage`, `ImpersonatePage`.
-- Note manuelle GSC (à faire toi-même après déploiement) : Search Console → Suppressions → demander suppression temporaire de `https://zandofy.com/auth`.
+Afficher `data.code` + `data.description` retournés par l'edge function dans le toast d'erreur (au lieu du message générique). Tu verras directement le motif Keccel.
 
-### B. Contrôle admin par page (style RankMath)
+#### 3. Test prod (toi)
 
-Nouvelle table Supabase `seo_page_overrides` :
+Une fois mergé et déployé via GitHub Actions :
+- Tenter un paiement carte de petit montant.
+- Copier le toast d'erreur enrichi → me l'envoyer.
+- En parallèle je peux lire les logs `keccel-cardpay` côté Lovable Cloud (mais je ne peux pas lire ceux de la prod `vpt...yxf` — il faudra que tu me copies la ligne `Keccel cardpay response: {...}` depuis Supabase prod → Edge Functions → Logs).
 
-| colonne | type | rôle |
-|---|---|---|
-| `path` (PK) | text | `/`, `/stores`, `/pricing`… |
-| `title` | text | `<title>` (≤60 idéal) |
-| `og_title` | text | titre Open Graph long (optionnel) |
-| `description` | text | meta description (≤160) |
-| `og_image` | text | URL image OG override |
-| `keywords` | text[] | mots-clés |
-| `robots` | text | `index,follow` ou `noindex,nofollow` |
-| `jsonld_extra` | jsonb | JSON-LD additionnel |
-| `updated_at` | timestamptz | |
+#### 4. Fix ciblé (en 2e PR)
 
-- RLS : SELECT public, INSERT/UPDATE admins uniquement.
-- Migration de seed avec les 13 routes globales : home, /stores, /pricing, /about, /faq, /help, /careers, /blog, /privacy, /terms, /popular, /trends, /search.
+Selon ce que dit Keccel, on applique le fix précis :
+- `amount` en string → trivial
+- token séparé → ajouter `KECCEL_CARD_TOKEN` secret
+- casse de champ → renommer
+- currency → adapter ou rendre dynamique
+- header auth → changer
 
-Nouvelle UI **Admin → SEO → onglet « Pages »** :
-- Tableau des routes avec champs éditables (Title, OG title, Description, OG image, Indexable toggle, Keywords).
-- Compteur de caractères en direct (vert ≤60, orange 60-70, rouge >70 pour title).
-- Aperçu SERP en direct par ligne (réutilise `SeoSerpPreview`).
-- Bouton « Purger cache crawler » (réutilise hook existant du `meta-injector`).
+#### 5. Bump PWA `1.10.2` (patch silencieux) à la fin du cycle.
 
-### C. Wiring runtime
+#### 6. Mémoire
 
-- **`meta-injector.ts`** (Vercel edge, bots) : avant `buildGlobalMeta`, chercher l'override pour `pathname` dans `seo_page_overrides` (cache 60s en mémoire). Si trouvé → utiliser. Sinon → fallback actuel.
-- **`SEOHead.tsx`** (humains + bots non couverts) : nouveau hook `useSeoOverride(path)` qui lit l'override depuis le cache `platform-bootstrap`, l'utilise comme valeur par défaut quand la page n'a pas de title/description explicite.
-- **`platform-bootstrap`** : ajouter une 2ème requête `seo_page_overrides` à la réponse pour éviter une query supplémentaire au premier rendu.
-- **`vercel.json`** : étendre la règle `globalPath` pour inclure `auth|reset-password` (afin que les bots reçoivent immédiatement le `noindex` côté serveur).
-- **`Index.tsx`** : utiliser `seo_page_overrides['/']?.title` si présent, sinon le `seo_config.site_title` actuel.
+Mettre à jour `mem://features/keccel-cardpay-constraints` avec la cause définitive une fois identifiée (référence pour éviter régression).
 
-### D. Renforcer les sitelinks (objectif Amazon-like)
+### Hors scope
 
-- Vérifier la cohérence du `SiteNavigationElement` JSON-LD dans `index.html` avec les labels du menu et les nouveaux titres `seo_page_overrides`.
-- Confirmer que `WebSite + SearchAction` JSON-LD est bien présent sur la home (déjà fait dans `Index.tsx` ✓).
-- Confirmer `Organization` JSON-LD (logo + sameAs) (déjà fait dans `Index.tsx` ✓).
-- Sitemap : vérifier priorités 0.9–1.0 pour les 8 sections nav.
-- Action manuelle après déploiement : GSC → soumettre sitemap, demander indexation des 8 sections nav.
-
-## Détails techniques
-
-- **Stack** : modifs livrées via GitHub Actions vers prod (`vpt...yxf`) selon SOP.
-- **Migration SQL** : nouvelle table + seed dans `frontend/supabase/migrations/` (à rejouer sur prod ET staging).
-- **PWA versioning** : ce changement modifie `SEOHead.tsx` côté client → nécessite bump mineur **1.10.0** + push notif update. Je te demanderai l'OK explicite avant le bump (protocole PWA). Si tu préfères le grouper avec le Lot 3 (paiement carte), on peut différer le bump.
-- **Aucune modif** des fichiers déploiement-sensibles (Docker, ports, domaines).
-
-## Hors scope
-
-- Per-product/per-store SEO override avancé (reste basé sur nom+description DB).
-- Multi-langue hreflang `en/zh` (reste `fr` + `x-default`).
-- API GSC pour suppression auto (manuel).
-
-J'attends ton « go » pour implémenter, et la décision sur le bump 1.10.0 (maintenant ou groupé avec Lot 3).
+- Pas de migration DB.
+- Pas de touche Mobile Money / KelPay.
+- Pas de remplacement de Keccel par Stripe.
