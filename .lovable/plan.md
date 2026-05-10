@@ -1,43 +1,63 @@
-## Constat immédiat
+## Décision retenue
 
-Le toast montre bien `diag cf2024fd`, donc la fonction a généré une tentative traçable. Pourtant, aucun log `cf2024fd` ni aucun appel récent `keccel-cardpay` n’apparaît dans les logs Lovable Cloud que je peux consulter ici. Cela indique très probablement que le paiement testé passe par l’environnement staging/production réel, pas par le backend preview Lovable, ou que les logs runtime ne sont pas exploitables comme source de vérité.
+Envoyer à Keccel un **`amount` entier arrondi à l'entier supérieur** (`Math.ceil`), pas en centimes.
 
-## Objectif
+| Prix Zandofy | `amount` envoyé à Keccel |
+|---|---|
+| 18.99 | **19** |
+| 19.99 | **20** |
+| 49.99 | **50** |
+| 100.00 | **100** |
 
-Arrêter les corrections à l’aveugle et produire une preuve exacte : payload envoyé à Keccel, environnement utilisé, réponse brute Keccel, puis correction unique.
+Justification : tous nos prix se terminent en `.99` (logique de prix stratégique), donc l'arrondi vers le haut ne fait perdre qu'**1 centime maximum** au client — risque négligeable, et conforme à l'attente de Keccel (entier).
 
-## Plan proposé
+## Modifications
 
-1. **Geler le payload actuel**
-   - Ne plus modifier les noms de champs ou formats sans preuve.
-   - Garder `keccel-cardpay` identique dans `supabase/functions/` et `frontend/supabase/functions/`.
+### 1. `supabase/functions/keccel-cardpay/index.ts`
 
-2. **Remplacer les logs volatils par une trace persistante**
-   - Ajouter une table de diagnostic dédiée aux tentatives CardPay.
-   - Chaque tentative écrit : `diagnostic_id`, environnement, fonction, `order_id`, référence, montant, devise, URL callback/return, noms de champs envoyés, types, statut HTTP Keccel, réponse brute Keccel masquée, horodatage.
-   - Ne jamais stocker le token ni le merchant code complet.
+- Calculer `amountInteger = Math.ceil(amount)` juste après la validation `amount > 0`.
+- Envoyer `amount: amountInteger` dans `keccelPayload` (au lieu de `amount`).
+- **Garder `amount` décimal** pour :
+  - la table `payment_transactions` (montant réel facturé côté plateforme)
+  - le diagnostic `keccel_cardpay_diagnostics.amount`
+- Ajouter `amount_sent` (entier) dans le diagnostic pour traçabilité.
 
-3. **Écrire la trace avant et après l’appel Keccel**
-   - Avant l’appel : sauvegarder le payload shape envoyé.
-   - Après l’appel : sauvegarder `HTTP status`, `code`, `description`, `checkoutUrl présent/ou non`.
-   - Si Keccel répond `Missing parameter`, on saura exactement quel payload était associé au `diag`.
+### 2. Migration SQL
 
-4. **Retourner un diagnostic exploitable au frontend**
-   - Le toast garde le `diag`.
-   - La réponse inclut seulement les infos non sensibles nécessaires : `diagnostic_id`, `sent_keys`, `field_shape`, `keccel_code`, `keccel_description`.
+Ajouter une colonne `amount_sent numeric` à `keccel_cardpay_diagnostics`.
 
-5. **Créer un script de comparaison contrôlé**
-   - Comparer automatiquement le payload du flux abonnement qui fonctionne avec le flux commande qui échoue.
-   - Sortie attendue : différences de champs, types, longueurs, URLs, montant, référence, merchant env.
+```sql
+ALTER TABLE public.keccel_cardpay_diagnostics
+  ADD COLUMN IF NOT EXISTS amount_sent numeric;
+```
 
-6. **Vérifier le vrai environnement ciblé**
-   - Confirmer quelle URL backend est appelée par le frontend testé : preview, staging ou production.
-   - Ne pas conclure depuis Lovable Cloud si le test vient de `zandofy.com` ou `studio.zandofy.com`.
+Livrée en fichier téléchargeable `/mnt/documents/keccel_diag_amount_sent_migration.sql`, à exécuter manuellement par toi dans le SQL Editor prod (`vpt...yxf`).
 
-7. **Correction unique puis nettoyage**
-   - Une fois la cause identifiée, appliquer une seule correction ciblée.
-   - Réduire ensuite le diagnostic : garder uniquement `diagnostic_id`, statut, code Keccel et erreur masquée pendant une courte période.
+### 3. Aucun changement de schéma fonctionnel
 
-## Résultat attendu
+- `payment_transactions.amount` reste le montant **réel** (ex. 18.99).
+- Le webhook `kelpay-webhook` n'a rien à changer (il s'appuie sur la `reference`, pas le montant).
 
-À la prochaine erreur `Missing parameter`, on ne devine plus : on ouvre la ligne du diagnostic correspondant et on voit précisément ce que Keccel a reçu, dans quel environnement, et pourquoi la passerelle refuse la requête.
+## Fichiers impactés
+
+| Fichier | Action |
+|---|---|
+| `supabase/functions/keccel-cardpay/index.ts` | Modifier — `Math.ceil(amount)` envoyé à Keccel + log `amount_sent` |
+| `supabase/migrations/<timestamp>_keccel_diag_amount_sent.sql` | Nouveau — colonne `amount_sent` |
+| `/mnt/documents/keccel_diag_amount_sent_migration.sql` | Nouveau — copie téléchargeable |
+
+## Procédure après mon implémentation
+
+1. Je te livre le fichier SQL téléchargeable.
+2. Tu l'exécutes dans le SQL Editor prod (`vpt...yxf`).
+3. Tu attends que GitHub Actions déploie l'edge function corrigée sur prod.
+4. Tu refais un paiement test carte → tu notes le `diag XXXXXXXX`.
+5. Tu colles ici le résultat de :
+   ```sql
+   select diagnostic_id, amount, amount_sent, http_status, keccel_code, keccel_description
+   from public.keccel_cardpay_diagnostics
+   where diagnostic_id = '<diag>'
+   order by created_at desc limit 1;
+   ```
+
+Si `keccel_code = "0"` → bingo, c'était bien le format `amount`. Si on reçoit encore "Missing parameter", on saura que ce n'est pas le montant et on passe à l'hypothèse credentials/habilitation merchant CardPay.

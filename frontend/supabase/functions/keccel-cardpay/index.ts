@@ -121,6 +121,10 @@ Deno.serve(async (req) => {
       return errorResponse("Montant invalide");
     }
 
+    // Keccel CardPay attend un montant ENTIER. Tous nos prix se terminent en .99 (prix
+    // stratégique), donc on arrondit à l'entier supérieur : perte max 1 centime côté client.
+    const amountSent = Math.ceil(amount);
+
     // Diagnostic id (short, returned to client to correlate with logs)
     const diagnosticId = crypto.randomUUID().slice(0, 8);
 
@@ -132,7 +136,7 @@ Deno.serve(async (req) => {
     const keccelPayload = {
       merchantcode: keccelMerchantCode,
       reference: reference,
-      amount: amount,
+      amount: amountSent,
       currency: "USD",
       description: `Commande ${order.order_ref} - Zandofy`,
       callbackurl: callbackUrl,
@@ -157,6 +161,7 @@ Deno.serve(async (req) => {
           order_id: order.id,
           reference,
           amount,
+          amount_sent: amountSent,
           currency: "USD",
           callback_url: callbackUrl,
           return_url: returnUrl,
