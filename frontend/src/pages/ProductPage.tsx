@@ -721,7 +721,16 @@ export default function ProductPage() {
                     price: currentUnitPrice,
                     originalPrice: product.originalPrice,
                     color: product.colors?.[selectedColor] || null,
-                    size: selectedSize,
+                    size: (() => {
+                      const dynParts = Object.entries(selectedDynamic)
+                        .map(([typeId, label]) => {
+                          const dv = ((product as any).dynamicVariants || []).find((d: any) => d.typeId === typeId);
+                          return dv ? `${dv.typeName}: ${label}` : null;
+                        })
+                        .filter(Boolean);
+                      const parts = [selectedSize, ...dynParts].filter(Boolean);
+                      return parts.length > 0 ? parts.join(" / ") : null;
+                    })(),
                     quantity: currentQty,
                     moq: moq,
                   });
