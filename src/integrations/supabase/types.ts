@@ -4224,6 +4224,7 @@ export type Database = {
       keccel_cardpay_diagnostics: {
         Row: {
           amount: number | null
+          amount_sent: number | null
           callback_url: string | null
           created_at: string
           currency: string | null
@@ -4252,6 +4253,7 @@ export type Database = {
         }
         Insert: {
           amount?: number | null
+          amount_sent?: number | null
           callback_url?: string | null
           created_at?: string
           currency?: string | null
@@ -4280,6 +4282,7 @@ export type Database = {
         }
         Update: {
           amount?: number | null
+          amount_sent?: number | null
           callback_url?: string | null
           created_at?: string
           currency?: string | null
