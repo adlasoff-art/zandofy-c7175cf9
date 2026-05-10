@@ -7,6 +7,7 @@ import { LazyMount } from "@/components/LazyMount";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { SEOHead } from "@/components/SEOHead";
 import { useSeoConfig } from "@/hooks/use-seo-config";
+import { useSeoOverride } from "@/hooks/use-seo-overrides";
 import { Loader2 } from "lucide-react";
 
 // Below-the-fold: lazy-loaded to reduce initial JS and main-thread work.
@@ -23,6 +24,7 @@ const SITE_URL = import.meta.env.VITE_SITE_URL || "https://zandofy.com";
 const Index = () => {
   const queryClient = useQueryClient();
   const seoConfig = useSeoConfig();
+  const override = useSeoOverride("/");
   const handleRefresh = useCallback(async () => {
     await queryClient.invalidateQueries();
     await new Promise((resolve) => setTimeout(resolve, 400));
@@ -71,8 +73,8 @@ const Index = () => {
       {...handlers}
     >
       <SEOHead
-        title={seoConfig.site_title}
-        description={seoConfig.site_description}
+        title={override?.title || seoConfig.site_title}
+        description={override?.description || seoConfig.site_description}
         canonical="/"
         jsonLd={jsonLd as any}
       />
