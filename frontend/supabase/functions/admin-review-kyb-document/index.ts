@@ -130,27 +130,7 @@ Deno.serve(async (req) => {
                   </div>
                 </div>`;
 
-          const SMTP_HOST = Deno.env.get("SMTP_HOST");
-          const SMTP_USER = Deno.env.get("SMTP_USER");
-          const SMTP_PASS = Deno.env.get("SMTP_PASS");
-          const SMTP_FROM = Deno.env.get("SMTP_FROM_EMAIL") || "noreply@zandofy.com";
-          const SMTP_PORT = parseInt(Deno.env.get("SMTP_PORT") || "587");
-
-          if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
-            const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
-            const client = new SMTPClient({
-              connection: {
-                hostname: SMTP_HOST,
-                port: SMTP_PORT,
-                tls: SMTP_PORT === 465,
-                auth: { username: SMTP_USER, password: SMTP_PASS },
-              },
-            });
-            await client.send({ from: SMTP_FROM, to: recipient, subject, content: "auto", html });
-            await client.close();
-          } else {
-            console.warn("[admin-review-kyb-document] SMTP env missing, email skipped");
-          }
+          await sendEmail({ to: recipient, subject, html });
         }
       } catch (mailErr) {
         console.warn("[admin-review-kyb-document] email send failed", mailErr);
