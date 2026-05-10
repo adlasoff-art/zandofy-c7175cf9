@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
       currency: "USD",
       description: `Commande ${order.order_ref} - Zandofy`,
       callbackurl: callbackUrl,
-      returnurl: returnUrl,
+      returnUrl: returnUrl,
     };
 
     let keccelResponse: any = null;
