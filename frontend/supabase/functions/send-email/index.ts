@@ -116,9 +116,6 @@ Deno.serve(async (req) => {
       );
     }
 
-      );
-    }
-
     await sendEmail({      to,
       subject,
       html,
