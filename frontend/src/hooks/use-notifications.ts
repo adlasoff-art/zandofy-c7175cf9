@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useVisibilityAwareInterval } from "@/hooks/use-visibility-aware-interval";
@@ -53,6 +53,41 @@ export function useNotifications() {
     hiddenMs: 30_000,
     enabled: !!user,
   });
+
+  // Keep PWA app icon badge in sync with unread count (Android Chrome,
+  // iOS 16.4+ installed PWA, Windows). Falls back silently on browsers
+  // that don't support the Badging API.
+  useEffect(() => {
+    const nav = typeof navigator !== "undefined" ? (navigator as any) : null;
+    if (!nav) return;
+    try {
+      if ("setAppBadge" in nav) {
+        if (unreadCount > 0) nav.setAppBadge(unreadCount);
+        else nav.clearAppBadge?.();
+      }
+      if ("serviceWorker" in nav && nav.serviceWorker?.controller) {
+        nav.serviceWorker.controller.postMessage({
+          type: "ZANDOFY_SET_BADGE",
+          count: unreadCount,
+        });
+      }
+    } catch {
+      // ignore — Badging API is best-effort
+    }
+  }, [unreadCount]);
+
+  // Listen for push events from the SW so we refresh the unread count
+  // immediately instead of waiting for the next polling tick.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === "ZANDOFY_PUSH_RECEIVED") {
+        fetchNotifications();
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, [fetchNotifications]);
 
   const markAsRead = async (id: string) => {
     setUnreadCount((c) => Math.max(0, c - 1));
