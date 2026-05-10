@@ -10,6 +10,7 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { sendEmail } from "../_shared/email.ts";
+import { sendWebPushSafe } from "../_shared/web-push.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -131,6 +132,18 @@ Deno.serve(async (req) => {
     `;
 
     await sendEmail({ to: recipientEmail, subject, html });
+
+    if (order.user_id) {
+      await sendWebPushSafe(svc, {
+        userIds: [order.user_id],
+        payload: {
+          title: meta.title,
+          body: `Commande ${orderRef} — ${meta.intro}`.slice(0, 200),
+          url: `/orders/${order.id}`,
+          tag: `handoff-${order.id}-${handoff.status ?? ""}`,
+        },
+      });
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
