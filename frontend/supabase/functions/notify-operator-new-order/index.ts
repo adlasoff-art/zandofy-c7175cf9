@@ -105,11 +105,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (
-        ownerProfile?.email &&
-        smtpHost &&
-        smtpUser &&
-        smtpPass &&
-        fromEmail
+        ownerProfile?.email 
       ) {
 
         const greeting = ownerProfile.first_name

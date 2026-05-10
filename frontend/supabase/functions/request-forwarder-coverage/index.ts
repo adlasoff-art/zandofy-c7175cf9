@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
 
         // Lot 11C — Notif email admin (best-effort, non bloquant).
         try {
-          if (smtpHost && smtpUser && smtpPass && fromEmail) {
+          if (fromEmail) {
             const adminIds = admins.map((a: any) => a.user_id);
             const { data: adminProfiles } = await svc
               .from("profiles")

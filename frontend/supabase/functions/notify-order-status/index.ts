@@ -306,7 +306,7 @@ Deno.serve(async (req) => {
 
     const recipientEmail = order.shipping_email;
 
-    if (smtpHost && smtpUser && smtpPass && fromEmail && recipientEmail) {
+    if (recipientEmail) {
       try {
 
         const includeDetails = newStatus === "pending" || newStatus === "off_platform_validated";

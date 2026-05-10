@@ -101,7 +101,7 @@ async function sendClientExpiredEmail(
       .select("email, first_name")
       .eq("id", userId)
       .maybeSingle();
-    if (!profile?.email || !smtpHost || !smtpUser || !smtpPass || !fromEmail) {
+    if (!profile?.email ) {
       return;
     }
     const greeting = profile.first_name ? `Bonjour ${profile.first_name},` : "Bonjour,";

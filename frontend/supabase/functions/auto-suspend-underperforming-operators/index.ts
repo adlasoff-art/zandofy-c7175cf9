@@ -165,7 +165,7 @@ async function sendSuspensionEmail(
   reasonText: string,
 ) {
   try {
-    if (!op.contact_email || !smtpHost || !smtpUser || !smtpPass || !fromEmail) {
+    if (!op.contact_email ) {
       return;
     }
     const html = operatorAutoSuspendEmail({

@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       }
       // Phase 7 — email opérateur
       const to = op?.contact_email;
-      if (smtpHost && smtpUser && smtpPass && fromEmail && to && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      if (to && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
         const escapedReason = String(reason).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!));
         const html = `
           <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#ffffff;color:#111;">

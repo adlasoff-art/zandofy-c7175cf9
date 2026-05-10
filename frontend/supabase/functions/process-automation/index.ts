@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
 
     // 3. Process emails with stagger
 
-    if (smtpHost && smtpUser && smtpPass && emailWorkflows.length > 0) {
+    if (emailWorkflows.length > 0) {
 
       for (const wf of emailWorkflows) {
         if (!wf.email_subject || !wf.email_html_content) continue;
