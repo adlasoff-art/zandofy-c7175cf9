@@ -89,6 +89,7 @@ export default function ProductPage() {
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedDynamic, setSelectedDynamic] = useState<Record<string, string>>({});
   const [sizeRegion, setSizeRegion] = useState("EU");
   const [copied, setCopied] = useState(false);
   const wishlisted = id ? isInWishlist(id) : false;
@@ -657,9 +658,18 @@ export default function ProductPage() {
                 <span className="text-sm font-medium text-foreground">{dv.icon ? `${dv.icon} ` : ""}{dv.typeName}{dv.unit ? ` (${dv.unit})` : ""}</span>
                 <div className="flex flex-wrap gap-2">
                   {dv.options.map((opt: any) => (
-                    <span key={opt.id} className="min-w-[40px] h-9 px-3 rounded-sm border border-border text-sm font-medium flex items-center justify-center text-foreground">
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setSelectedDynamic((prev) => ({ ...prev, [dv.typeId]: opt.label }))}
+                      className={`min-w-[40px] h-9 px-3 rounded-sm border text-sm font-medium transition-all ${
+                        selectedDynamic[dv.typeId] === opt.label
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border text-foreground hover:border-primary"
+                      }`}
+                    >
                       {opt.label}
-                    </span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -711,7 +721,16 @@ export default function ProductPage() {
                     price: currentUnitPrice,
                     originalPrice: product.originalPrice,
                     color: product.colors?.[selectedColor] || null,
-                    size: selectedSize,
+                    size: (() => {
+                      const dynParts = Object.entries(selectedDynamic)
+                        .map(([typeId, label]) => {
+                          const dv = ((product as any).dynamicVariants || []).find((d: any) => d.typeId === typeId);
+                          return dv ? `${dv.typeName}: ${label}` : null;
+                        })
+                        .filter(Boolean);
+                      const parts = [selectedSize, ...dynParts].filter(Boolean);
+                      return parts.length > 0 ? parts.join(" / ") : null;
+                    })(),
                     quantity: currentQty,
                     moq: moq,
                   });
