@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { sendEmail } from "../_shared/email.ts";
+import { sendWebPushSafe } from "../_shared/web-push.ts";
 
 const ALLOWED_HEADERS =
   "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
@@ -330,15 +331,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3. Push notification
-    const { data: pushSubs } = await supabase
-      .from("push_subscriptions")
-      .select("endpoint, p256dh, auth")
-      .eq("user_id", order.user_id);
-
-    if (pushSubs && pushSubs.length > 0) {
-      results.push = { subscriptions: pushSubs.length, attempted: true };
-    }
+    // 3. Web Push notification (real send via VAPID)
+    const pushRes = await sendWebPushSafe(supabase, {
+      userIds: [order.user_id],
+      payload: {
+        title: template.subject,
+        body: `${template.heading} — Commande ${order.order_ref}`,
+        url: `/orders/${order.id}`,
+        tag: `order-${order.id}-${newStatus}`,
+        requireInteraction: ["confirmed", "shipped", "out_for_delivery", "delivered"].includes(newStatus),
+      },
+    });
+    results.push = pushRes;
 
     return new Response(JSON.stringify({ ok: true, ...results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
