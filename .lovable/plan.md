@@ -1,63 +1,43 @@
+## Constat immédiat
+
+Le toast montre bien `diag cf2024fd`, donc la fonction a généré une tentative traçable. Pourtant, aucun log `cf2024fd` ni aucun appel récent `keccel-cardpay` n’apparaît dans les logs Lovable Cloud que je peux consulter ici. Cela indique très probablement que le paiement testé passe par l’environnement staging/production réel, pas par le backend preview Lovable, ou que les logs runtime ne sont pas exploitables comme source de vérité.
+
 ## Objectif
-Remplacer les essais successifs par un diagnostic fiable de l’erreur `Keccel 1 : Missing parameter`, avec preuves exploitables et rollback propre.
+
+Arrêter les corrections à l’aveugle et produire une preuve exacte : payload envoyé à Keccel, environnement utilisé, réponse brute Keccel, puis correction unique.
 
 ## Plan proposé
 
-1. **Geler les changements fonctionnels**
-   - Ne plus modifier au hasard les noms ou formats de champs envoyés à Keccel.
-   - Stabiliser une seule version de `keccel-cardpay` dans les deux emplacements utilisés par le projet.
+1. **Geler le payload actuel**
+   - Ne plus modifier les noms de champs ou formats sans preuve.
+   - Garder `keccel-cardpay` identique dans `supabase/functions/` et `frontend/supabase/functions/`.
 
-2. **Ajouter un mode diagnostic contrôlé dans `keccel-cardpay`**
-   - Générer un `diagnostic_id` unique par tentative.
-   - Journaliser côté fonction :
-     - liste exacte des champs envoyés à Keccel,
-     - type de chaque champ (`number`, `string`, etc.),
-     - longueurs utiles (`reference`, `description`, URLs),
-     - présence/absence des secrets sans afficher les valeurs,
-     - URL appelée,
-     - statut HTTP,
-     - réponse brute complète de Keccel.
-   - Masquer strictement `merchantcode`, token, données utilisateur sensibles.
+2. **Remplacer les logs volatils par une trace persistante**
+   - Ajouter une table de diagnostic dédiée aux tentatives CardPay.
+   - Chaque tentative écrit : `diagnostic_id`, environnement, fonction, `order_id`, référence, montant, devise, URL callback/return, noms de champs envoyés, types, statut HTTP Keccel, réponse brute Keccel masquée, horodatage.
+   - Ne jamais stocker le token ni le merchant code complet.
 
-3. **Retourner le `diagnostic_id` dans le toast / réponse frontend**
-   - Quand Keccel renvoie `Missing parameter`, l’utilisateur voit aussi un identifiant court.
-   - Cet identifiant permet de retrouver exactement la tentative correspondante dans les logs, sans deviner.
+3. **Écrire la trace avant et après l’appel Keccel**
+   - Avant l’appel : sauvegarder le payload shape envoyé.
+   - Après l’appel : sauvegarder `HTTP status`, `code`, `description`, `checkoutUrl présent/ou non`.
+   - Si Keccel répond `Missing parameter`, on saura exactement quel payload était associé au `diag`.
 
-4. **Créer une sonde de comparaison avec le flux qui marche**
-   - Ajouter temporairement une comparaison structurée entre :
-     - payload `subscribe-payment` qui est supposé fonctionner,
-     - payload `keccel-cardpay` qui échoue.
-   - Comparer noms de champs, types, longueurs, valeurs nulles/vides, merchant code, return/callback URLs.
+4. **Retourner un diagnostic exploitable au frontend**
+   - Le toast garde le `diag`.
+   - La réponse inclut seulement les infos non sensibles nécessaires : `diagnostic_id`, `sent_keys`, `field_shape`, `keccel_code`, `keccel_description`.
 
-5. **Ajouter une validation locale avant appel Keccel**
-   - Bloquer immédiatement si un champ requis est vide, `undefined`, trop long ou d’un type suspect.
-   - Le message d’erreur interne dira précisément quel champ est invalide avant même d’appeler Keccel.
+5. **Créer un script de comparaison contrôlé**
+   - Comparer automatiquement le payload du flux abonnement qui fonctionne avec le flux commande qui échoue.
+   - Sortie attendue : différences de champs, types, longueurs, URLs, montant, référence, merchant env.
 
-6. **Mettre en place un test reproductible côté Edge Function**
-   - Tester la fonction déployée avec une commande contrôlée ou via l’outil Edge Function.
-   - Confirmer si l’appel atteint Keccel et récupérer la réponse brute.
-   - Ne pas considérer le fix comme terminé tant qu’on n’a pas :
-     - les logs d’une tentative réelle,
-     - le payload exact,
-     - la réponse brute Keccel.
+6. **Vérifier le vrai environnement ciblé**
+   - Confirmer quelle URL backend est appelée par le frontend testé : preview, staging ou production.
+   - Ne pas conclure depuis Lovable Cloud si le test vient de `zandofy.com` ou `studio.zandofy.com`.
 
-7. **Nettoyage après diagnostic**
-   - Une fois la cause identifiée, appliquer une correction unique.
-   - Retirer ou réduire les logs de diagnostic trop verbeux.
-   - Garder uniquement un logging minimal sécurisé : `diagnostic_id`, code Keccel, statut HTTP, champs présents.
+7. **Correction unique puis nettoyage**
+   - Une fois la cause identifiée, appliquer une seule correction ciblée.
+   - Réduire ensuite le diagnostic : garder uniquement `diagnostic_id`, statut, code Keccel et erreur masquée pendant une courte période.
 
-## Hypothèse principale à vérifier
-Le problème n’est probablement plus “quel champ essayer ensuite”, mais l’un de ces écarts :
-- champ requis par CardPay absent mais non documenté dans notre code,
-- nom exact attendu différent (`returnUrl` vs autre casse),
-- `merchantcode` ou token non adapté au endpoint CardPay,
-- type/format refusé par Keccel malgré présence du champ,
-- callback/return URL rejetée,
-- production pas réellement déployée avec la dernière version.
+## Résultat attendu
 
-## Critère de succès
-Après implémentation, chaque échec Keccel doit produire un diagnostic traçable permettant de dire précisément :
-- ce qui a été envoyé,
-- ce que Keccel a répondu,
-- quelle différence existe avec le flux fonctionnel,
-- quelle correction finale appliquer.
+À la prochaine erreur `Missing parameter`, on ne devine plus : on ouvre la ligne du diagnostic correspondant et on voit précisément ce que Keccel a reçu, dans quel environnement, et pourquoi la passerelle refuse la requête.
