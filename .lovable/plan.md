@@ -1,17 +1,18 @@
-## Fix Keccel CardPay — Missing returnUrl
+## Plan de correction ciblée
 
-### Diagnostic
+1. Mettre à jour `keccel-cardpay` dans les deux emplacements synchronisés :
+   - `frontend/supabase/functions/keccel-cardpay/index.ts`
+   - `supabase/functions/keccel-cardpay/index.ts`
 
-Keccel renvoie : `Missing returnUrl parameter` — donc le champ attendu est bien **`returnUrl`** (camelCase), pas `returnurl`. Mon hypothèse précédente (tout lowercase) était fausse pour ce champ.
+2. Aligner le payload CardPay sur le format déjà utilisé par le flux abonnement qui fonctionne comme référence interne :
+   - conserver `merchantcode`, `reference`, `currency`, `description`, `callbackurl`, `returnUrl`
+   - repasser `amount` en nombre brut au lieu de string formatée, car le flux abonnement envoie `amount` directement et l’erreur restante est redevenue générique.
 
-### Fix
+3. Améliorer légèrement le diagnostic sans exposer de secret :
+   - garder le log payload avec `merchantcode` masqué
+   - ajouter un message d’erreur utilisateur qui affiche les détails Keccel quand ils existent déjà.
 
-`frontend/supabase/functions/keccel-cardpay/index.ts` (+ mirror `supabase/functions/keccel-cardpay/index.ts`) :
-
-- Remettre `returnurl` → **`returnUrl`** (camelCase).
-- Garder `amount: String(amount.toFixed(2))` (peut-être inoffensif, à vérifier au prochain test).
-- Garder logs payload + body brut.
-
-### Validation
-
-Toi : merge → GitHub Actions déploie → retest paiement carte. Si ça passe, on met à jour la mémoire `keccel-cardpay-constraints` avec le format exact (`merchantcode`, `callbackurl` lowercase ; `returnUrl` camelCase ; `amount` string).
+4. Validation attendue :
+   - redéploiement via GitHub Actions comme précédemment
+   - retest carte.
+   - si Keccel renvoie encore “Missing parameter” sans nom, il faudra comparer avec leur documentation exacte ou tester leur exigence sur un champ supplémentaire non présent dans l’intégration actuelle.
