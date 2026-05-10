@@ -10,6 +10,7 @@
 - **Pricing**: 45% markup + 10% commission. Carts split par store_id. COD = collecte rider obligatoire.
 - **Logistics roles** (Phase 10.5 — vérité figée) : forwarder=fret intl, shipper=hub local, operator=entreprise last-mile, rider=livreur (humain).
 - **Dual-code security** : pickup_code (hub↔rider) + delivery_code (client↔rider). Voir mem://features/dual-code-pickup-delivery-security.
+- **PWA Versioning (Option B)** : source unique `frontend/src/version.ts`. À chaque fin de lot/itération significative, DEMANDER à l'utilisateur s'il veut bumper. patch=silencieux (`SHOW_UPDATE_PROMPT=false`), minor/major=modale + edge function `notify-app-update`. Voir mem://architecture/pwa-versioning-protocol.
 
 ## Memories
 
@@ -54,6 +55,7 @@
 - [Storage Upsert Policy](mem://architecture/supabase-storage-upsert-policy-constraint-logic)
 - [Service Worker Config](mem://architecture/service-worker-config-injection-logic)
 - [Cache Management Strategy](mem://architecture/cache-management-strategy)
+- [PWA Versioning Protocol](mem://architecture/pwa-versioning-protocol) — Option B, version.ts source unique, push notify-app-update sur minor/major
 - [Playwright E2E Setup](mem://architecture/playwright-e2e-setup) — Specs `frontend/e2e/`, CI GH Actions. Sandbox Lovable ne peut PAS lancer Chromium.
 - [Data Privacy Views](mem://architecture/data-privacy-views-config)
 - [Environment CSP Strategy](mem://architecture/environment-aware-csp-strategy)

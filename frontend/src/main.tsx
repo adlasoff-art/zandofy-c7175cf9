@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { APP_VERSION } from "./version";
 
 // Chunk load error detection & auto-reload
 function isChunkLoadError(error: unknown): boolean {
@@ -75,7 +76,7 @@ if ("serviceWorker" in navigator) {
       window.dispatchEvent(new CustomEvent("sw-update-available", { detail: { registration } }));
     };
 
-    navigator.serviceWorker.register("/sw.js").then((registration) => {
+    navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`).then((registration) => {
       // Send Supabase config to SW so it doesn't need hardcoded keys
       const sendConfig = (sw: ServiceWorker | null) => {
         sw?.postMessage({
