@@ -13,6 +13,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
 import { operatorNewOrderEmail } from "../_shared/operator-email-templates.ts";
 import { sendEmail } from "../_shared/email.ts";
+import { sendWebPushSafe } from "../_shared/web-push.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -94,6 +95,18 @@ Deno.serve(async (req) => {
       console.error("[notify-operator-new-order] insert failed:", notifErr);
       return json({ error: "Notification failed" }, 500);
     }
+
+    // Web Push best-effort
+    await sendWebPushSafe(svc, {
+      userIds: [op.owner_user_id],
+      payload: {
+        title: "🚚 Nouvelle commande à livrer",
+        body: `Commande ${orderRef} (${order.shipping_city || "—"}) — $${fee}`,
+        url: "/operator/orders",
+        tag: `op-order-${order.id}`,
+        requireInteraction: true,
+      },
+    });
 
     // Envoi email best-effort à l'owner
     let emailSent = false;
