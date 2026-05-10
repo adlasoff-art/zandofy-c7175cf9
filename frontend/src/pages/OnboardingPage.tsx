@@ -12,6 +12,7 @@ import {
   MapPin, ShieldCheck, ChevronRight, ChevronLeft, Check, Loader2, Upload, Camera, User,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { SEOHead } from "@/components/SEOHead";
 
 type Step = "welcome" | "address" | "kyc" | "done";
 
@@ -137,6 +138,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <SEOHead title="Bienvenue" description="Configurez votre compte Zandofy." noindex />
       <header className="border-b border-border bg-card">
         <div className="container flex items-center justify-between h-14">
           <a href="/" className="text-xl font-bold tracking-[0.18em] uppercase text-foreground" style={{ fontWeight: 800 }}>
