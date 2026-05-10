@@ -84,11 +84,6 @@ Deno.serve(async (req) => {
     }
 
     // 3. Process emails with stagger
-    const smtpHost = Deno.env.get("SMTP_HOST");
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-    const smtpUser = Deno.env.get("SMTP_USER");
-    const smtpPass = Deno.env.get("SMTP_PASS");
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || smtpUser;
 
     if (smtpHost && smtpUser && smtpPass && emailWorkflows.length > 0) {
 

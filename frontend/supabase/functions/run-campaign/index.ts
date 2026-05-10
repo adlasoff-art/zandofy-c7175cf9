@@ -135,19 +135,6 @@ Deno.serve(async (req) => {
       });
 
       // SMTP setup
-      const smtpHost = Deno.env.get("SMTP_HOST");
-      const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-      const smtpUser = Deno.env.get("SMTP_USER");
-      const smtpPass = Deno.env.get("SMTP_PASS");
-      const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-
-      if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
-        return new Response(JSON.stringify({ error: "SMTP not configured" }), {
-          status: 500,
-          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-        });
-      }
-
 
       let sentCount = 0;
       const batchSize = campaign.batch_size || 10;

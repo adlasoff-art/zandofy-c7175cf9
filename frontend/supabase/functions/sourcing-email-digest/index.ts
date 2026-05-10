@@ -74,18 +74,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const smtpHost = Deno.env.get("SMTP_HOST");
-    const smtpUser = Deno.env.get("SMTP_USER");
-    const smtpPass = Deno.env.get("SMTP_PASS");
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-    if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
-      return new Response(JSON.stringify({ error: "SMTP not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const rows = pending
       .map((r) => {
         const p = profMap.get(r.user_id);
@@ -111,7 +99,6 @@ Deno.serve(async (req) => {
         <p style="margin-top:24px"><a href="https://zandofy.com/admin/sourcing" style="background:#0f9d58;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Ouvrir l'administration</a></p>
       </div>
     </body></html>`;
-
 
     await sendEmail({      to: fromEmail,
       bcc: adminEmails,

@@ -104,19 +104,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const smtpHost = Deno.env.get("SMTP_HOST");
-    const smtpUser = Deno.env.get("SMTP_USER");
-    const smtpPass = Deno.env.get("SMTP_PASS");
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-
-    if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
-      return new Response(JSON.stringify({ error: "SMTP not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const productName = escapeHtml(response.product_name || request.product_name || "Votre produit");
     const description = escapeHtml(response.description || "");
     const price = response.price ?? 0;
@@ -144,7 +131,6 @@ Deno.serve(async (req) => {
     <p style="color:#999;font-size:12px;margin-top:32px">— L'équipe Zandofy</p>
   </div>
 </body></html>`;
-
 
     await sendEmail({      to: recipientEmail,
       subject: `Votre produit demandé est disponible — ${productName}`,

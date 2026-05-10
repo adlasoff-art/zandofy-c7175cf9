@@ -165,11 +165,6 @@ async function sendSuspensionEmail(
   reasonText: string,
 ) {
   try {
-    const smtpHost = Deno.env.get("SMTP_HOST");
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-    const smtpUser = Deno.env.get("SMTP_USER");
-    const smtpPass = Deno.env.get("SMTP_PASS");
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
     if (!op.contact_email || !smtpHost || !smtpUser || !smtpPass || !fromEmail) {
       return;
     }

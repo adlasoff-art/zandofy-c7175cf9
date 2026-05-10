@@ -102,18 +102,6 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: "Could not generate recovery link" }, 500);
         }
 
-        const smtpHost = Deno.env.get("SMTP_HOST");
-        const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "465");
-        const smtpUser = Deno.env.get("SMTP_USER");
-        const smtpPass = Deno.env.get("SMTP_PASS");
-
-        if (!smtpHost || !smtpUser || !smtpPass) {
-          console.error("Missing SMTP secrets:", { hasHost: !!smtpHost, hasUser: !!smtpUser, hasPass: !!smtpPass });
-          return jsonResponse({ error: "SMTP configuration missing. Please configure SMTP secrets." }, 500);
-        }
-
-        const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") || "noreply@zandofy.com";
-
         await sendEmail({          to: userEmail,
           subject: "Réinitialisation de votre mot de passe - Zandofy",
           html: `

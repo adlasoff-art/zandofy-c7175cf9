@@ -116,22 +116,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    const smtpHost = Deno.env.get("SMTP_HOST");
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-    const smtpUser = Deno.env.get("SMTP_USER");
-    const smtpPass = Deno.env.get("SMTP_PASS");
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-
-    if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
-      return new Response(
-        JSON.stringify({ error: "SMTP configuration is incomplete" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
       );
     }
-
 
     await sendEmail({      to,
       subject,

@@ -104,12 +104,6 @@ Deno.serve(async (req) => {
         .eq("id", op.owner_user_id)
         .maybeSingle();
 
-      const smtpHost = Deno.env.get("SMTP_HOST");
-      const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-      const smtpUser = Deno.env.get("SMTP_USER");
-      const smtpPass = Deno.env.get("SMTP_PASS");
-      const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-
       if (
         ownerProfile?.email &&
         smtpHost &&

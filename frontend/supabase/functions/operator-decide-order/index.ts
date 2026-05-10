@@ -142,11 +142,6 @@ async function sendClientReassignmentEmail(
       .select("email, first_name")
       .eq("id", userId)
       .maybeSingle();
-    const smtpHost = Deno.env.get("SMTP_HOST");
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-    const smtpUser = Deno.env.get("SMTP_USER");
-    const smtpPass = Deno.env.get("SMTP_PASS");
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
     if (!profile?.email || !smtpHost || !smtpUser || !smtpPass || !fromEmail) {
       return;
     }

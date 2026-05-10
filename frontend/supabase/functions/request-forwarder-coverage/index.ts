@@ -104,11 +104,6 @@ Deno.serve(async (req) => {
 
         // Lot 11C — Notif email admin (best-effort, non bloquant).
         try {
-          const smtpHost = Deno.env.get("SMTP_HOST");
-          const smtpUser = Deno.env.get("SMTP_USER");
-          const smtpPass = Deno.env.get("SMTP_PASS");
-          const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-          const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
           if (smtpHost && smtpUser && smtpPass && fromEmail) {
             const adminIds = admins.map((a: any) => a.user_id);
             const { data: adminProfiles } = await svc
