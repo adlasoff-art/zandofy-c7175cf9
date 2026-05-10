@@ -14,6 +14,7 @@ import { UserSearchSelect, type SelectedUser } from "@/components/admin/notifica
 import { SmsConfigPanel } from "@/components/admin/notifications/SmsConfigPanel";
 import { CampaignsPanel } from "@/components/admin/notifications/CampaignsPanel";
 import { ensureFreshSession, parseEdgeFunctionError } from "@/services/admin-email";
+import { PwaUpdateBroadcastCard } from "@/components/admin/PwaUpdateBroadcastCard";
 
 type Channel = "push" | "email" | "sms";
 type Audience = "all" | "vendors" | "shippers" | "riders" | "customers";
@@ -237,6 +238,7 @@ export default function AdminNotificationsPage() {
           <TabsTrigger value="campaigns" className="text-xs gap-1"><Calendar size={12} /> Campagnes auto</TabsTrigger>
           <TabsTrigger value="sms-config" className="text-xs gap-1"><Settings size={12} /> Config SMS</TabsTrigger>
           <TabsTrigger value="deliverability" className="text-xs gap-1"><TestTube size={12} /> Test email</TabsTrigger>
+          <TabsTrigger value="pwa-update" className="text-xs gap-1"><Bell size={12} /> Mise à jour PWA</TabsTrigger>
         </TabsList>
 
         {/* ── Tab: Compose & Send ── */}
