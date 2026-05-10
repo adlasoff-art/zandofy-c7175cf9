@@ -1220,7 +1220,10 @@ export default function CheckoutPage() {
         if (!data) throw new Error("Pas de réponse de la passerelle de paiement");
         if (data.success === false) {
           console.error("keccel-cardpay API error:", data);
-          throw new Error(data.error || "Erreur de la passerelle de paiement");
+          const detail = data?.details
+            ? ` (code ${data.details.code ?? "?"}${data.details.description ? " — " + data.details.description : ""})`
+            : "";
+          throw new Error((data.error || "Erreur de la passerelle de paiement") + detail);
         }
         if (data.redirect_url) {
           window.location.href = data.redirect_url;

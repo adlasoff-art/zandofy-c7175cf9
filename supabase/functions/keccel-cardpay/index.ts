@@ -1,12 +1,38 @@
+// Keccel CardPay — reference capped at 25 chars for Visa compatibility
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_HEADERS =
+  "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowed = [
+    "https://studio.zandofy.com",
+    "https://zandofy.com",
+    "https://www.zandofy.com",
+  ];
+  const isAllowed =
+    allowed.includes(origin) ||
+    origin.endsWith(".lovable.app") ||
+    origin.endsWith(".lovableproject.com") ||
+    origin.startsWith("http://localhost");
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowed[0],
+    "Access-Control-Allow-Headers": ALLOWED_HEADERS,
+  };
+}
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
+  function errorResponse(error: string, details?: any) {
+    return new Response(
+      JSON.stringify({ success: false, error, ...(details ? { details } : {}) }),
+      { status: 200, headers: jsonHeaders }
+    );
+  }
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -15,48 +41,55 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const siteBaseUrl = Deno.env.get("SITE_BASE_URL");
+    const keccelToken = Deno.env.get("KELPAY_TOKEN");
+    const keccelMerchantCode = Deno.env.get("KECCEL_CARD_MERCHANT_CODE");
 
     if (!siteBaseUrl) {
       console.error("SITE_BASE_URL is not configured");
-      return new Response(
-        JSON.stringify({ error: "Configuration serveur incomplète (SITE_BASE_URL)" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse("Configuration serveur incomplète (SITE_BASE_URL)");
     }
-    const keccelToken = Deno.env.get("KELPAY_TOKEN");
-    const keccelMerchantCode = Deno.env.get("KECCEL_CARD_MERCHANT_CODE") || "jam";
+    if (!keccelMerchantCode) {
+      console.error("KECCEL_CARD_MERCHANT_CODE is not configured");
+      return errorResponse("Configuration carte incomplète : merchant code manquant. Contactez le support.");
+    }
+    if (!keccelToken) {
+      console.error("KELPAY_TOKEN is not configured");
+      return errorResponse("Configuration carte incomplète : token manquant. Contactez le support.");
+    }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Authenticate user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Non autorisé" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse("Non autorisé");
     }
 
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Non autorisé" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse("Non autorisé");
+    }
+
+    // Rate limiting: 5 requests/min per user
+    const { data: rlAllowed } = await supabase.rpc("check_rate_limit", {
+      p_identifier: user.id,
+      p_endpoint: "keccel-cardpay",
+      p_max_requests: 5,
+      p_window_seconds: 60,
+    });
+    if (rlAllowed === false) {
+      return errorResponse("Trop de requêtes. Veuillez patienter.");
     }
 
     const body = await req.json();
     const { order_id, payment_method, payment_type, save_card } = body;
 
     if (!order_id) {
-      return new Response(JSON.stringify({ error: "order_id requis" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse("order_id requis");
     }
 
-    const method = payment_method || "card"; // card or paypal
+    const method = payment_method || "card";
 
     // Fetch order
     const { data: order, error: orderError } = await supabase
@@ -66,17 +99,11 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (orderError || !order) {
-      return new Response(JSON.stringify({ error: "Commande introuvable" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse("Commande introuvable");
     }
 
     if (order.user_id !== user.id) {
-      return new Response(JSON.stringify({ error: "Cette commande ne vous appartient pas" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse("Cette commande ne vous appartient pas");
     }
 
     // Determine amount based on payment_type
@@ -91,18 +118,14 @@ Deno.serve(async (req) => {
     }
 
     if (amount <= 0) {
-      return new Response(JSON.stringify({ error: "Montant invalide" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse("Montant invalide");
     }
 
+    // Max 25 chars for Keccel compatibility
     const reference = `KC${crypto.randomUUID().replace(/-/g, "").toUpperCase().slice(0, 23)}`;
     const returnUrl = `${siteBaseUrl}/payment/return?ref=${encodeURIComponent(reference)}&order_id=${order.id}`;
     const callbackUrl = `${supabaseUrl}/functions/v1/kelpay-webhook`;
 
-    // Payload conforme à la doc officielle Keccel CardPay API
-    // 7 champs obligatoires : merchantcode, reference, amount, currency, description, callbackurl, returnUrl
     const keccelPayload = {
       merchantcode: keccelMerchantCode,
       reference: reference,
@@ -117,6 +140,7 @@ Deno.serve(async (req) => {
     let redirectUrl: string | null = null;
 
     try {
+      console.log("Keccel cardpay → payload:", JSON.stringify({ ...keccelPayload, merchantcode: "[redacted]" }));
       const resp = await fetch("https://api.keccel.net/cardpay", {
         method: "POST",
         headers: {
@@ -126,29 +150,30 @@ Deno.serve(async (req) => {
         body: JSON.stringify(keccelPayload),
       });
 
-      keccelResponse = await resp.json();
-      console.log("Keccel cardpay response:", JSON.stringify(keccelResponse));
-
-      // Vérifier code === "0" (succès selon la doc)
-      if (String(keccelResponse?.code) !== "0") {
-        console.error("Keccel API returned error:", keccelResponse);
-        return new Response(
-          JSON.stringify({
-            error: keccelResponse?.description || "Erreur de la passerelle de paiement",
-            details: keccelResponse,
-          }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      const rawBody = await resp.text();
+      console.log("Keccel cardpay ← status:", resp.status, "body:", rawBody);
+      try {
+        keccelResponse = JSON.parse(rawBody);
+      } catch (_parseErr) {
+        console.error("Keccel cardpay returned non-JSON body");
+        return errorResponse(
+          `Réponse invalide de la passerelle (HTTP ${resp.status})`,
+          { httpStatus: resp.status, body: rawBody.slice(0, 500) }
         );
       }
 
-      // checkoutUrl est le champ de redirection selon la doc officielle
+      if (String(keccelResponse?.code) !== "0") {
+        console.error("Keccel API returned error:", keccelResponse);
+        return errorResponse(
+          `Keccel ${keccelResponse?.code ?? "?"} : ${keccelResponse?.description || "Erreur de la passerelle de paiement"}`,
+          keccelResponse
+        );
+      }
+
       redirectUrl = keccelResponse?.checkoutUrl || null;
     } catch (apiError) {
       console.error("Keccel API error:", apiError);
-      return new Response(
-        JSON.stringify({ error: "Erreur de connexion à la passerelle de paiement" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse("Erreur de connexion à la passerelle de paiement");
     }
 
     // Create payment transaction record
@@ -172,10 +197,7 @@ Deno.serve(async (req) => {
 
     if (txError) {
       console.error("Error creating payment transaction:", txError);
-      return new Response(
-        JSON.stringify({ error: "Erreur interne lors de la création de la transaction" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse("Erreur interne lors de la création de la transaction");
     }
 
     // Update order status to awaiting_payment if it's the main order payment
@@ -189,18 +211,19 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
+        success: true,
         transaction_id: tx?.id,
         redirect_url: redirectUrl,
         reference: reference,
         status: "pending",
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: jsonHeaders }
     );
   } catch (error) {
     console.error("keccel-cardpay error:", error);
     return new Response(
-      JSON.stringify({ error: "Erreur serveur" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ success: false, error: "Erreur serveur" }),
+      { status: 200, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   }
 });
