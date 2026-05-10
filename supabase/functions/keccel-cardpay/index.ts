@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
     const keccelPayload = {
       merchantcode: keccelMerchantCode,
       reference: reference,
-      amount: String(amount.toFixed(2)),
+      amount: amount,
       currency: "USD",
       description: `Commande ${order.order_ref} - Zandofy`,
       callbackurl: callbackUrl,
