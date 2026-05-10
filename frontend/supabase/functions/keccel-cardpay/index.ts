@@ -42,11 +42,19 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const siteBaseUrl = Deno.env.get("SITE_BASE_URL");
     const keccelToken = Deno.env.get("KELPAY_TOKEN");
-    const keccelMerchantCode = Deno.env.get("KECCEL_CARD_MERCHANT_CODE") || "jam";
+    const keccelMerchantCode = Deno.env.get("KECCEL_CARD_MERCHANT_CODE");
 
     if (!siteBaseUrl) {
       console.error("SITE_BASE_URL is not configured");
       return errorResponse("Configuration serveur incomplète (SITE_BASE_URL)");
+    }
+    if (!keccelMerchantCode) {
+      console.error("KECCEL_CARD_MERCHANT_CODE is not configured");
+      return errorResponse("Configuration carte incomplète : merchant code manquant. Contactez le support.");
+    }
+    if (!keccelToken) {
+      console.error("KELPAY_TOKEN is not configured");
+      return errorResponse("Configuration carte incomplète : token manquant. Contactez le support.");
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -132,6 +140,7 @@ Deno.serve(async (req) => {
     let redirectUrl: string | null = null;
 
     try {
+      console.log("Keccel cardpay → payload:", JSON.stringify({ ...keccelPayload, merchantcode: "[redacted]" }));
       const resp = await fetch("https://api.keccel.net/cardpay", {
         method: "POST",
         headers: {
@@ -141,13 +150,22 @@ Deno.serve(async (req) => {
         body: JSON.stringify(keccelPayload),
       });
 
-      keccelResponse = await resp.json();
-      console.log("Keccel cardpay response:", JSON.stringify(keccelResponse));
+      const rawBody = await resp.text();
+      console.log("Keccel cardpay ← status:", resp.status, "body:", rawBody);
+      try {
+        keccelResponse = JSON.parse(rawBody);
+      } catch (_parseErr) {
+        console.error("Keccel cardpay returned non-JSON body");
+        return errorResponse(
+          `Réponse invalide de la passerelle (HTTP ${resp.status})`,
+          { httpStatus: resp.status, body: rawBody.slice(0, 500) }
+        );
+      }
 
       if (String(keccelResponse?.code) !== "0") {
         console.error("Keccel API returned error:", keccelResponse);
         return errorResponse(
-          keccelResponse?.description || "Erreur de la passerelle de paiement",
+          `Keccel ${keccelResponse?.code ?? "?"} : ${keccelResponse?.description || "Erreur de la passerelle de paiement"}`,
           keccelResponse
         );
       }
