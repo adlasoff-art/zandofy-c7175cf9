@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
       </div>
     `;
 
-    await sendEmail({ from: fromEmail, to: forwarder.contact_email, subject, html });
+    await sendEmail({ to: forwarder.contact_email, subject, html });
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

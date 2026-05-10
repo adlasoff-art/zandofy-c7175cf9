@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
 
     // Email d'invitation
 
-    if (fromEmail) {
+    if (true) {
       try {
 
         const ctaUrl = riderUserId

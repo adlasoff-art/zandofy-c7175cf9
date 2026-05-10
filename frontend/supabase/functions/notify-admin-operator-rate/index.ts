@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
       </div>
     `;
 
-    await sendEmail({      to: fromEmail,
+    await sendEmail({      to: Deno.env.get("SMTP_FROM_EMAIL") || "noreply@zandofy.com",
       bcc: recipients,
       subject,
       html,

@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
       </div>
     </body></html>`;
 
-    await sendEmail({      to: fromEmail,
+    await sendEmail({      to: Deno.env.get("SMTP_FROM_EMAIL") || "noreply@zandofy.com",
       bcc: adminEmails,
       subject: `[Zandofy] ${pending.length} nouvelles demandes produits`,
       html,

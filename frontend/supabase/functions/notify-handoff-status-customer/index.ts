@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
       </div>
     `;
 
-    await sendEmail({ from: fromEmail, to: recipientEmail, subject, html });
+    await sendEmail({ to: recipientEmail, subject, html });
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
