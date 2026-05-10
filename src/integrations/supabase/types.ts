@@ -4221,6 +4221,93 @@ export type Database = {
         }
         Relationships: []
       }
+      keccel_cardpay_diagnostics: {
+        Row: {
+          amount: number | null
+          callback_url: string | null
+          created_at: string
+          currency: string | null
+          diagnostic_id: string
+          environment: string | null
+          error: string | null
+          function_name: string
+          http_status: number | null
+          id: string
+          keccel_code: string | null
+          keccel_description: string | null
+          keccel_response: Json | null
+          merchant_code_masked: string | null
+          order_id: string | null
+          origin: string | null
+          payload_shape: Json | null
+          pre_flight_missing: string[] | null
+          raw_body: string | null
+          reference: string | null
+          return_url: string | null
+          sent_keys: string[] | null
+          site_base_url: string | null
+          token_length: number | null
+          token_present: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          callback_url?: string | null
+          created_at?: string
+          currency?: string | null
+          diagnostic_id: string
+          environment?: string | null
+          error?: string | null
+          function_name: string
+          http_status?: number | null
+          id?: string
+          keccel_code?: string | null
+          keccel_description?: string | null
+          keccel_response?: Json | null
+          merchant_code_masked?: string | null
+          order_id?: string | null
+          origin?: string | null
+          payload_shape?: Json | null
+          pre_flight_missing?: string[] | null
+          raw_body?: string | null
+          reference?: string | null
+          return_url?: string | null
+          sent_keys?: string[] | null
+          site_base_url?: string | null
+          token_length?: number | null
+          token_present?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          callback_url?: string | null
+          created_at?: string
+          currency?: string | null
+          diagnostic_id?: string
+          environment?: string | null
+          error?: string | null
+          function_name?: string
+          http_status?: number | null
+          id?: string
+          keccel_code?: string | null
+          keccel_description?: string | null
+          keccel_response?: Json | null
+          merchant_code_masked?: string | null
+          order_id?: string | null
+          origin?: string | null
+          payload_shape?: Json | null
+          pre_flight_missing?: string[] | null
+          raw_body?: string | null
+          reference?: string | null
+          return_url?: string | null
+          sent_keys?: string[] | null
+          site_base_url?: string | null
+          token_length?: number | null
+          token_present?: boolean | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       kyb_audit_log: {
         Row: {
           action: string
