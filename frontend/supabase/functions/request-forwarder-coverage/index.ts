@@ -7,7 +7,7 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.23.8";
-import nodemailer from "npm:nodemailer@6.9.16";
+import { sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -104,12 +104,7 @@ Deno.serve(async (req) => {
 
         // Lot 11C — Notif email admin (best-effort, non bloquant).
         try {
-          const smtpHost = Deno.env.get("SMTP_HOST");
-          const smtpUser = Deno.env.get("SMTP_USER");
-          const smtpPass = Deno.env.get("SMTP_PASS");
-          const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-          const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-          if (smtpHost && smtpUser && smtpPass && fromEmail) {
+          if (true) {
             const adminIds = admins.map((a: any) => a.user_id);
             const { data: adminProfiles } = await svc
               .from("profiles")
@@ -119,12 +114,6 @@ Deno.serve(async (req) => {
               .map((p: any) => p?.email)
               .filter((e: string | null): e is string => !!e && e.includes("@"));
             if (recipients.length > 0) {
-              const transport = nodemailer.createTransport({
-                host: smtpHost,
-                port: smtpPort,
-                secure: smtpPort === 465,
-                auth: { user: smtpUser, pass: smtpPass },
-              });
               const html = `
 <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#fff;color:#111;padding:24px">
   <div style="max-width:520px;margin:0 auto">
@@ -140,9 +129,7 @@ Deno.serve(async (req) => {
     <p style="color:#999;font-size:12px;margin-top:24px">— Zandofy</p>
   </div>
 </body></html>`;
-              await transport.sendMail({
-                from: fromEmail,
-                to: recipients.join(","),
+              await sendEmail({                to: recipients.join(","),
                 subject: `[Zandofy] Demande couverture transitaire ${originISO} → ${destISO} (${input.mode})`,
                 html,
               });

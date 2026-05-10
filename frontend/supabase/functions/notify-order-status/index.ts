@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import nodemailer from "npm:nodemailer@6.9.16";
+import { sendEmail } from "../_shared/email.ts";
 
 const ALLOWED_HEADERS =
   "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
@@ -303,28 +303,15 @@ Deno.serve(async (req) => {
     }
 
     // 2. Email notification via SMTP
-    const smtpHost = Deno.env.get("SMTP_HOST");
-    const smtpUser = Deno.env.get("SMTP_USER");
-    const smtpPass = Deno.env.get("SMTP_PASS");
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
 
     const recipientEmail = order.shipping_email;
 
-    if (smtpHost && smtpUser && smtpPass && fromEmail && recipientEmail) {
+    if (recipientEmail) {
       try {
-        const transport = nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: smtpPort === 465,
-          auth: { user: smtpUser, pass: smtpPass },
-        });
 
         const includeDetails = newStatus === "pending" || newStatus === "off_platform_validated";
 
-        await transport.sendMail({
-          from: fromEmail,
-          to: recipientEmail,
+        await sendEmail({          to: recipientEmail,
           subject: `${template.subject} — ${order.order_ref}`,
           html: buildEmailHtml(
             template.heading,

@@ -8,8 +8,8 @@
  * Auth: service-role only (called from the database). No JWT is required from
  * end users; instead the function checks a shared secret header.
  */
-import nodemailer from "npm:nodemailer@6.9.16";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -113,18 +113,6 @@ Deno.serve(async (req) => {
       .eq("id", handoff.forwarder_id)
       .maybeSingle();
 
-    const smtpHost = Deno.env.get("SMTP_HOST");
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-    const smtpUser = Deno.env.get("SMTP_USER");
-    const smtpPass = Deno.env.get("SMTP_PASS");
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-    if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
-      return new Response(JSON.stringify({ error: "SMTP not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const orderRef = order.order_ref ?? order.id;
     const subject = `Zandofy — ${meta.title} (commande ${orderRef})`;
     const html = `
@@ -142,13 +130,7 @@ Deno.serve(async (req) => {
       </div>
     `;
 
-    const transport = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: { user: smtpUser, pass: smtpPass },
-    });
-    await transport.sendMail({ from: fromEmail, to: recipientEmail, subject, html });
+    await sendEmail({ to: recipientEmail, subject, html });
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

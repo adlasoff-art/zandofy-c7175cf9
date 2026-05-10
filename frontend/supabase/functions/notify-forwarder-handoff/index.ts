@@ -10,8 +10,8 @@
  *
  * Auth: requiert un JWT valide (user authentifié — propriétaire de la commande).
  */
-import nodemailer from "npm:nodemailer@6.9.16";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendEmail } from "../_shared/email.ts";
 
 const ALLOWED_HEADERS =
   "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
@@ -120,18 +120,6 @@ Deno.serve(async (req) => {
     }
 
     // SMTP config
-    const smtpHost = Deno.env.get("SMTP_HOST");
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-    const smtpUser = Deno.env.get("SMTP_USER");
-    const smtpPass = Deno.env.get("SMTP_PASS");
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-    if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
-      return new Response(JSON.stringify({ error: "SMTP not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const payload = handoff.notification_payload ?? {};
     const subject = `Zandofy — Nouvelle expédition à traiter (commande ${order.order_ref ?? order.id})`;
     const html = `
@@ -153,13 +141,7 @@ Deno.serve(async (req) => {
       </div>
     `;
 
-    const transport = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: { user: smtpUser, pass: smtpPass },
-    });
-    await transport.sendMail({ from: fromEmail, to: forwarder.contact_email, subject, html });
+    await sendEmail({ to: forwarder.contact_email, subject, html });
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

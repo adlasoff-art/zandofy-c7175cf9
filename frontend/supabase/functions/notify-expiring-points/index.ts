@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import nodemailer from "npm:nodemailer@6.9.16";
+import { sendEmail } from "../_shared/email.ts";
 
 const ALLOWED_HEADERS =
   "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
@@ -111,24 +111,9 @@ Deno.serve(async (req) => {
 
     const profileMap = Object.fromEntries((profiles || []).map((p) => [p.id, p]));
 
-    // Setup SMTP
-    const smtpHost = Deno.env.get("SMTP_HOST");
-    const smtpUser = Deno.env.get("SMTP_USER");
-    const smtpPass = Deno.env.get("SMTP_PASS");
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-
     let emailsSent = 0;
     let inAppSent = 0;
-
-    const transport = smtpHost && smtpUser && smtpPass && fromEmail
-      ? nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: smtpPort === 465,
-          auth: { user: smtpUser, pass: smtpPass },
-        })
-      : null;
+    const canSendEmail = !!Deno.env.get("RESEND_API_KEY");
 
     for (const account of atRiskAccounts) {
       const profile = profileMap[account.user_id];
@@ -153,11 +138,9 @@ Deno.serve(async (req) => {
       inAppSent++;
 
       // Email notification
-      if (transport && profile.email) {
+      if (canSendEmail && profile.email) {
         try {
-          await transport.sendMail({
-            from: fromEmail,
-            to: profile.email,
+          await sendEmail({            to: profile.email,
             subject: `⚠️ Vos ${account.balance.toFixed(0)} ZandoPoints expirent bientôt`,
             html: buildExpiryWarningEmail(profile.first_name || "", account.balance, monthsLeft, expiryDateStr),
           });

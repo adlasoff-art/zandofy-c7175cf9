@@ -1,4 +1,4 @@
-import nodemailer from "npm:nodemailer@6.9.16";
+import { sendEmail } from "../_shared/email.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -135,25 +135,6 @@ Deno.serve(async (req) => {
       });
 
       // SMTP setup
-      const smtpHost = Deno.env.get("SMTP_HOST");
-      const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-      const smtpUser = Deno.env.get("SMTP_USER");
-      const smtpPass = Deno.env.get("SMTP_PASS");
-      const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-
-      if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
-        return new Response(JSON.stringify({ error: "SMTP not configured" }), {
-          status: 500,
-          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-        });
-      }
-
-      const transport = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: { user: smtpUser, pass: smtpPass },
-      });
 
       let sentCount = 0;
       const batchSize = campaign.batch_size || 10;
@@ -168,9 +149,7 @@ Deno.serve(async (req) => {
             .replace(/\{\{promo_code\}\}/g, campaign.promo_code || "");
 
           try {
-            await transport.sendMail({
-              from: fromEmail,
-              to: u.email,
+            await sendEmail({              to: u.email,
               subject: campaign.subject.replace(/\{\{name\}\}/g, u.first_name || "Client"),
               html,
             });
