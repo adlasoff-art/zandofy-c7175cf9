@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { sendEmail } from "../_shared/email.ts";
+import { sendWebPushSafe } from "../_shared/web-push.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -141,6 +142,18 @@ Deno.serve(async (req) => {
       .from("product_sourcing_responses")
       .update({ notify_email_sent: true })
       .eq("request_id", requestId);
+
+    // Web Push (best-effort)
+    await sendWebPushSafe(supabase, {
+      userIds: [request.user_id],
+      payload: {
+        title: "🎯 Produit trouvé !",
+        body: `Nous avons identifié « ${response.product_name || request.product_name || "votre produit"} » pour vous.`,
+        url: "/sourcing",
+        tag: `sourcing-${requestId}`,
+        requireInteraction: true,
+      },
+    });
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
