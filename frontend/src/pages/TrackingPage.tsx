@@ -116,6 +116,8 @@ function Timeline({ steps, currentStatus }: { steps: typeof SHIPMENT_STEPS; curr
 
 // ── 9-Step Order Timeline (3 rows × 3, snake flow) ──
 function OrderTimeline({ currentStatus, history }: { currentStatus: string; history: OrderTrackingResult["history"] }) {
+  const { locale } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "fr-FR";
   const isCancelled = currentStatus === "cancelled";
   const isReturned = currentStatus === "returned";
   const activeIdx = getStepIndex(currentStatus);
@@ -147,9 +149,9 @@ function OrderTimeline({ currentStatus, history }: { currentStatus: string; hist
         </span>
         {ts && (
           <span className="text-[10px] text-muted-foreground">
-            {new Date(ts).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+            {new Date(ts).toLocaleDateString(dateLocale, { day: "numeric", month: "short" })}
             {" "}
-            {new Date(ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+            {new Date(ts).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" })}
           </span>
         )}
       </div>
