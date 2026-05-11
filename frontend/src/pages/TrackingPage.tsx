@@ -477,7 +477,8 @@ function RiderProfileBanner({ riderId, riderName }: { riderId: string; riderName
 // ── Main Page ──
 export default function TrackingPage() {
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t, formatPrice, locale } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "fr-FR";
   const { ref: urlRef } = useParams<{ ref?: string }>();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState("order");
@@ -646,8 +647,8 @@ export default function TrackingPage() {
             if (ext.configured && ext.error) {
               // Provider configured but couldn't find the number
               toast.error(ext.error === "Tracking number not found"
-                ? "Numéro de suivi introuvable chez nos transporteurs partenaires."
-                : `Suivi externe : ${ext.error}`);
+                ? t("tracking.notFoundExtCarriers")
+                : `${t("tracking.externalErrorPrefix")} ${ext.error}`);
             }
             detectCarrier(trimmed);
             setNotFound(true);
