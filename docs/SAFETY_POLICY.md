@@ -51,3 +51,30 @@ Le Service Worker est enregistré via `/sw.js?v=${APP_VERSION}` dans `main.tsx`.
 l'administrateur :
 *"Veux-tu bumper la version pour notifier les utilisateurs PWA installés ?"*.
 Aucun bump silencieux n'est autorisé.
+
+## 7. Intégration Keccel CardPay (IMMUABLE)
+
+Règles officielles confirmées par l'équipe Keccel (WhatsApp). Toute déviation provoque
+un rejet `{"code":"1","description":"Missing X parameter"}`.
+
+**Endpoint** : `POST https://api.keccel.net/cardpay`
+**Auth** : header `Authorization: Bearer <KELPAY_TOKEN>` (token brut, jamais "Bearer Bearer").
+
+**Payload — EXACTEMENT 7 champs, TOUS en minuscules** :
+- `merchantcode` (secret `KECCEL_CARD_MERCHANT_CODE` = `JAMSIO` pour Zandofy)
+- `reference` (≤ 25 chars)
+- `amount` (STRING entière, `Math.ceil`)
+- `currency` (`USD`)
+- `description`
+- `callbackurl`
+- `returnurl`
+
+**INTERDICTIONS ABSOLUES** :
+- Aucune clé en camelCase (`merchantCode`, `callbackUrl`, `returnUrl`).
+- Aucun champ extra (`language`, `customerEmail`, `customerName`, `customerPhone`,
+  `notifyUrl`, `country`, `channel`, etc.).
+- Aucune boucle de variantes lors du debug — un seul payload conforme.
+- Toute modification du payload (ajout de champ, changement de casse, changement de
+  `merchantcode`) requiert une **confirmation écrite préalable** de l'équipe Keccel.
+
+Référence mémoire détaillée : `mem://features/keccel-cardpay-constraints`.
