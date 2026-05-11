@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Copy, Package2, Warehouse, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "@/contexts/I18nContext";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -50,15 +51,6 @@ function resolveTemplate(tpl: string, ctx: CustomerCtx): string {
     .replace(/\{\{order_ref\}\}/g, ctx.order_ref || "");
 }
 
-async function copyToClipboard(text: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast.success("Copié dans le presse-papier");
-  } catch {
-    toast.error("Copie impossible");
-  }
-}
-
 export function ForwarderShippingCopyBlock({
   forwarderId,
   customer,
@@ -66,9 +58,19 @@ export function ForwarderShippingCopyBlock({
   forwarderId: string;
   customer: CustomerCtx;
 }) {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t("forwarder.copy.copied") || "Copié dans le presse-papier");
+    } catch {
+      toast.error(t("forwarder.copy.copyFail") || "Copie impossible");
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -109,7 +111,7 @@ export function ForwarderShippingCopyBlock({
     return (
       <div className="flex items-center gap-2 text-[11px] text-muted-foreground py-2">
         <Loader2 size={12} className="animate-spin text-primary" />
-        Chargement des modèles d'expédition…
+        {t("forwarder.copy.loading") || "Chargement des modèles d'expédition…"}
       </div>
     );
   }
@@ -117,27 +119,27 @@ export function ForwarderShippingCopyBlock({
   if (templates.length === 0) {
     return (
       <div className="px-2.5 py-1.5 rounded-md border border-dashed border-border text-[11px] text-muted-foreground">
-        Aucun modèle d'expédition configuré pour ce transitaire. Demandez à un administrateur d'en créer un.
+        {t("forwarder.copy.empty") || "Aucun modèle d'expédition configuré pour ce transitaire. Demandez à un administrateur d'en créer un."}
       </div>
     );
   }
 
   if (!selected) return null;
 
-  const fullText = `${resolvedPackageInfo}\n\n— Entrepôt —\n${selected.warehouse_address}`;
+  const fullText = `${resolvedPackageInfo}\n\n${t("forwarder.copy.warehouseHeader") || "— Entrepôt —"}\n${selected.warehouse_address}`;
 
   return (
     <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
           <Package2 size={12} className="text-primary" />
-          Bloc expédition transitaire
-          <span className="text-muted-foreground font-normal">(vendeur uniquement)</span>
+          {t("forwarder.copy.title") || "Bloc expédition transitaire"}
+          <span className="text-muted-foreground font-normal">{t("forwarder.copy.vendorOnly") || "(vendeur uniquement)"}</span>
         </p>
         {templates.length > 1 && (
           <Select value={selectedId ?? ""} onValueChange={(v) => setSelectedId(v)}>
             <SelectTrigger className="h-7 text-[11px] w-[180px]">
-              <SelectValue placeholder="Choisir un entrepôt" />
+              <SelectValue placeholder={t("forwarder.copy.selectPlaceholder") || "Choisir un entrepôt"} />
             </SelectTrigger>
             <SelectContent>
               {templates.map((t) => (
@@ -155,7 +157,7 @@ export function ForwarderShippingCopyBlock({
         <div className="rounded-md border border-border bg-background/60 p-2.5 space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Infos à coller sur le colis
+              {t("forwarder.copy.packageInfoLabel") || "Infos à coller sur le colis"}
             </p>
             <Button
               size="sm"
@@ -163,7 +165,7 @@ export function ForwarderShippingCopyBlock({
               className="h-6 px-2 text-[10px]"
               onClick={() => copyToClipboard(resolvedPackageInfo)}
             >
-              <Copy size={10} className="mr-1" /> Copier
+              <Copy size={10} className="mr-1" /> {t("forwarder.copy.copy") || "Copier"}
             </Button>
           </div>
           <pre className="whitespace-pre-wrap text-[11px] text-foreground font-mono leading-snug">
@@ -175,7 +177,7 @@ export function ForwarderShippingCopyBlock({
         <div className="rounded-md border border-border bg-background/60 p-2.5 space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-              <Warehouse size={10} /> Adresse entrepôt transitaire
+              <Warehouse size={10} /> {t("forwarder.copy.warehouseLabel") || "Adresse entrepôt transitaire"}
             </p>
             <Button
               size="sm"
@@ -183,7 +185,7 @@ export function ForwarderShippingCopyBlock({
               className="h-6 px-2 text-[10px]"
               onClick={() => copyToClipboard(selected.warehouse_address)}
             >
-              <Copy size={10} className="mr-1" /> Copier
+              <Copy size={10} className="mr-1" /> {t("forwarder.copy.copy") || "Copier"}
             </Button>
           </div>
           <pre className="whitespace-pre-wrap text-[11px] text-foreground font-mono leading-snug">
@@ -199,7 +201,7 @@ export function ForwarderShippingCopyBlock({
           className="h-7 text-[11px]"
           onClick={() => copyToClipboard(fullText)}
         >
-          <Copy size={11} className="mr-1.5" /> Tout copier
+          <Copy size={11} className="mr-1.5" /> {t("forwarder.copy.copyAll") || "Tout copier"}
         </Button>
       </div>
     </div>

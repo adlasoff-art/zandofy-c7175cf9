@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useI18n } from "@/contexts/I18nContext";
 import { Loader2, Upload, Trash2, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -27,6 +28,7 @@ const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
  */
 export function DisputeEvidenceUpload({ disputeId, canUpload }: DisputeEvidenceUploadProps) {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [files, setFiles] = useState<EvidenceFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -64,9 +66,9 @@ export function DisputeEvidenceUpload({ disputeId, canUpload }: DisputeEvidenceU
 
   const handleFile = async (file: File) => {
     if (!user) return;
-    if (file.size > MAX_BYTES) { toast.error("Fichier > 10 Mo"); return; }
+    if (file.size > MAX_BYTES) { toast.error(t("dispute.evidence.tooLarge") || "Fichier > 10 Mo"); return; }
     if (files.filter(f => f.ownerId === user.id).length >= MAX_FILES) {
-      toast.error(`Maximum ${MAX_FILES} preuves par utilisateur`);
+      toast.error(t("dispute.evidence.maxFiles", { n: MAX_FILES }) || `Maximum ${MAX_FILES} preuves par utilisateur`);
       return;
     }
     setUploading(true);
@@ -75,22 +77,22 @@ export function DisputeEvidenceUpload({ disputeId, canUpload }: DisputeEvidenceU
     const { error } = await supabase.storage
       .from("dispute-evidence")
       .upload(path, file, { contentType: file.type });
-    if (error) toast.error("Échec upload : " + error.message);
-    else { toast.success("Preuve ajoutée"); await load(); }
+    if (error) toast.error(t("dispute.evidence.uploadFail", { msg: error.message }) || `Échec upload : ${error.message}`);
+    else { toast.success(t("dispute.evidence.uploaded") || "Preuve ajoutée"); await load(); }
     setUploading(false);
   };
 
   const handleDelete = async (fullPath: string) => {
     const { error } = await supabase.storage.from("dispute-evidence").remove([fullPath]);
-    if (error) toast.error("Suppression refusée");
-    else { toast.success("Supprimé"); setFiles(f => f.filter(x => x.fullPath !== fullPath)); }
+    if (error) toast.error(t("dispute.evidence.deleteFail") || "Suppression refusée");
+    else { toast.success(t("dispute.evidence.deleted") || "Supprimé"); setFiles(f => f.filter(x => x.fullPath !== fullPath)); }
   };
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
-          <ImageIcon size={14} className="text-primary" /> Preuves visuelles
+          <ImageIcon size={14} className="text-primary" /> {t("dispute.evidence.title") || "Preuves visuelles"}
         </h4>
         {canUpload && (
           <label className="cursor-pointer">
@@ -102,7 +104,7 @@ export function DisputeEvidenceUpload({ disputeId, canUpload }: DisputeEvidenceU
               onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
             />
             <span className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90">
-              {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Ajouter
+              {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {t("dispute.evidence.add") || "Ajouter"}
             </span>
           </label>
         )}
@@ -111,7 +113,7 @@ export function DisputeEvidenceUpload({ disputeId, canUpload }: DisputeEvidenceU
       {loading ? (
         <div className="flex justify-center py-4"><Loader2 className="animate-spin text-primary" size={16} /></div>
       ) : files.length === 0 ? (
-        <p className="text-xs text-muted-foreground text-center py-4">Aucune preuve uploadée.</p>
+        <p className="text-xs text-muted-foreground text-center py-4">{t("dispute.evidence.empty") || "Aucune preuve uploadée."}</p>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
           {files.map(f => (

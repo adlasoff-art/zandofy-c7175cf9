@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Factory, Plane, FileCheck2, PackageCheck, XCircle, Check, Hash, ExternalLink, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "@/contexts/I18nContext";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { HandoffEventsTimeline } from "@/components/forwarder/HandoffEventsTimeline";
@@ -41,34 +42,34 @@ interface HandoffRow {
 
 interface Step {
   key: string;
-  label: string;
-  sublabel: string;
+  labelKey: string;
+  sublabelKey: string;
   icon: JSX.Element;
 }
 
 const STEPS: Step[] = [
   {
     key: "origin",
-    label: "Origine",
-    sublabel: "Préparation à l'expédition",
+    labelKey: "intl.timeline.step.origin",
+    sublabelKey: "intl.timeline.step.origin.sub",
     icon: <Factory size={14} />,
   },
   {
     key: "handoff",
-    label: "Pris en charge",
-    sublabel: "Réceptionné par le transitaire",
+    labelKey: "intl.timeline.step.handoff",
+    sublabelKey: "intl.timeline.step.handoff.sub",
     icon: <Check size={14} />,
   },
   {
     key: "transit",
-    label: "En transit / Douane",
-    sublabel: "Acheminement international",
+    labelKey: "intl.timeline.step.transit",
+    sublabelKey: "intl.timeline.step.transit.sub",
     icon: <Plane size={14} />,
   },
   {
     key: "delivered",
-    label: "Livré",
-    sublabel: "Disponible pour la livraison locale",
+    labelKey: "intl.timeline.step.delivered",
+    sublabelKey: "intl.timeline.step.delivered.sub",
     icon: <PackageCheck size={14} />,
   },
 ];
@@ -90,6 +91,7 @@ function statusToIndex(status: HandoffStatus | null): number {
 }
 
 export function InternationalShipmentTimeline({ orderId }: { orderId: string }) {
+  const { t, locale } = useI18n();
   const [loading, setLoading] = useState(true);
   const [handoff, setHandoff] = useState<HandoffRow | null>(null);
 
@@ -120,7 +122,7 @@ export function InternationalShipmentTimeline({ orderId }: { orderId: string }) 
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
         <Loader2 size={12} className="animate-spin text-primary" />
-        Chargement du suivi international…
+        {t("intl.timeline.loading") || "Chargement du suivi international…"}
       </div>
     );
   }
@@ -131,7 +133,7 @@ export function InternationalShipmentTimeline({ orderId }: { orderId: string }) 
     return (
       <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
         <div className="flex items-center gap-2 text-xs text-destructive">
-          <XCircle size={14} /> Expédition annulée par le transitaire.
+          <XCircle size={14} /> {t("intl.timeline.cancelled") || "Expédition annulée par le transitaire."}
         </div>
         <HistoryButton handoffId={handoff.id} />
       </div>
@@ -145,10 +147,11 @@ export function InternationalShipmentTimeline({ orderId }: { orderId: string }) 
     <div className="rounded-lg border border-border bg-background/40 p-3">
       <div className="flex items-center justify-between mb-3">
         <p className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-          <FileCheck2 size={11} /> Suivi international
+          <FileCheck2 size={11} /> {t("intl.timeline.header") || "Suivi international"}
         </p>
         <p className="text-[10px] text-muted-foreground">
-          Mis à jour : {new Date(handoff.updated_at).toLocaleDateString("fr-FR")}
+          {t("intl.timeline.updatedAt", { date: new Date(handoff.updated_at).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR") })
+            || `Mis à jour : ${new Date(handoff.updated_at).toLocaleDateString("fr-FR")}`}
         </p>
       </div>
 
@@ -184,10 +187,10 @@ export function InternationalShipmentTimeline({ orderId }: { orderId: string }) 
                   isFuture ? "text-muted-foreground" : "text-foreground"
                 }`}
               >
-                {step.label}
+                {t(step.labelKey)}
               </p>
               <p className="text-[9px] text-muted-foreground leading-tight mt-0.5 max-w-[90px]">
-                {step.sublabel}
+                {t(step.sublabelKey)}
               </p>
             </li>
           );
@@ -200,7 +203,7 @@ export function InternationalShipmentTimeline({ orderId }: { orderId: string }) 
             <Hash size={12} className="text-primary shrink-0" />
             <div className="min-w-0">
               <p className="text-[9px] uppercase tracking-wide text-muted-foreground">
-                {handoff.tracking_carrier || "N° de suivi"}
+                {handoff.tracking_carrier || t("intl.timeline.trackingFallback") || "N° de suivi"}
               </p>
               <p className="text-xs font-mono font-semibold text-foreground truncate">
                 {handoff.tracking_number}
@@ -214,7 +217,7 @@ export function InternationalShipmentTimeline({ orderId }: { orderId: string }) 
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
             >
-              Suivre <ExternalLink size={11} />
+              {t("intl.timeline.follow") || "Suivre"} <ExternalLink size={11} />
             </a>
           )}
         </div>
@@ -228,18 +231,19 @@ export function InternationalShipmentTimeline({ orderId }: { orderId: string }) 
 }
 
 function HistoryButton({ handoffId }: { handoffId: string }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" className="h-7 text-[11px] gap-1.5">
-          <History size={12} /> Voir l'historique détaillé
+          <History size={12} /> {t("intl.timeline.historyBtn") || "Voir l'historique détaillé"}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <History size={16} /> Historique de l'expédition
+            <History size={16} /> {t("intl.timeline.historyTitle") || "Historique de l'expédition"}
           </DialogTitle>
         </DialogHeader>
         {open && <HandoffEventsTimeline handoffId={handoffId} />}

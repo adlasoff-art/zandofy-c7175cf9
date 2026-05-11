@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useI18n } from "@/contexts/I18nContext";
 import { Loader2, Send, MessageCircle, Shield, Store, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -25,6 +26,7 @@ interface DisputeChatProps {
 
 export function DisputeChat({ disputeId, disputeStatus, viewerRole }: DisputeChatProps) {
   const { user } = useAuth();
+  const { t, locale } = useI18n();
   const [messages, setMessages] = useState<DisputeMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [reply, setReply] = useState("");
@@ -32,6 +34,7 @@ export function DisputeChat({ disputeId, disputeStatus, viewerRole }: DisputeCha
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const canReply = disputeStatus === "open" || disputeStatus === "under_review";
+  const userFallback = t("dispute.chat.userFallback") || "Utilisateur";
 
   const loadMessages = async () => {
     setLoading(true);
@@ -48,12 +51,12 @@ export function DisputeChat({ disputeId, disputeStatus, viewerRole }: DisputeCha
         supabase.from("user_roles").select("user_id, role").in("user_id", senderIds),
       ]);
 
-      const profileMap = new Map((profiles || []).map(p => [p.id, `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Utilisateur"]));
+      const profileMap = new Map((profiles || []).map(p => [p.id, `${p.first_name || ""} ${p.last_name || ""}`.trim() || userFallback]));
       const roleMap = new Map((roles || []).map(r => [r.user_id, r.role]));
 
       setMessages(msgs.map(m => ({
         ...m,
-        sender_name: profileMap.get(m.sender_id) || "Utilisateur",
+        sender_name: profileMap.get(m.sender_id) || userFallback,
         sender_role: roleMap.get(m.sender_id) || "client",
       })));
     } else {
@@ -88,7 +91,7 @@ export function DisputeChat({ disputeId, disputeStatus, viewerRole }: DisputeCha
       sender_id: user.id,
       content: reply.trim(),
     });
-    if (error) toast.error("Erreur lors de l'envoi");
+    if (error) toast.error(t("dispute.chat.sendError") || "Erreur lors de l'envoi");
     else { setReply(""); }
     setSending(false);
   };
@@ -100,22 +103,22 @@ export function DisputeChat({ disputeId, disputeStatus, viewerRole }: DisputeCha
   };
 
   const getRoleLabel = (role?: string) => {
-    if (role === "admin" || role === "manager") return "Admin";
-    if (role === "vendor") return "Vendeur";
-    return "Client";
+    if (role === "admin" || role === "manager") return t("dispute.chat.role.admin") || "Admin";
+    if (role === "vendor") return t("dispute.chat.role.vendor") || "Vendeur";
+    return t("dispute.chat.role.client") || "Client";
   };
 
   return (
     <div className="flex flex-col">
       <h4 className="text-sm font-bold text-foreground flex items-center gap-2 mb-3">
-        <MessageCircle size={14} className="text-primary" /> Messagerie du litige
+        <MessageCircle size={14} className="text-primary" /> {t("dispute.chat.title") || "Messagerie du litige"}
       </h4>
 
       <div className="max-h-80 overflow-y-auto space-y-2 mb-3">
         {loading ? (
           <div className="flex justify-center py-6"><Loader2 className="animate-spin text-primary" size={16} /></div>
         ) : messages.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-6">Aucun message. Envoyez le premier message.</p>
+          <p className="text-xs text-muted-foreground text-center py-6">{t("dispute.chat.empty") || "Aucun message. Envoyez le premier message."}</p>
         ) : (
           messages.map(m => {
             const isOwn = m.sender_id === user?.id;
@@ -128,12 +131,12 @@ export function DisputeChat({ disputeId, disputeStatus, viewerRole }: DisputeCha
                   <div className="flex items-center gap-1.5 mb-1">
                     {getRoleIcon(m.sender_role)}
                     <span className={cn("font-semibold text-[10px]", isOwn ? "text-primary-foreground/80" : "text-muted-foreground")}>
-                      {isOwn ? "Vous" : m.sender_name} · {getRoleLabel(m.sender_role)}
+                      {isOwn ? (t("dispute.chat.you") || "Vous") : m.sender_name} · {getRoleLabel(m.sender_role)}
                     </span>
                   </div>
                   <p className="whitespace-pre-wrap">{m.content}</p>
                   <p className={cn("text-[10px] mt-1", isOwn ? "text-primary-foreground/50" : "text-muted-foreground")}>
-                    {new Date(m.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    {new Date(m.created_at).toLocaleString(locale === "en" ? "en-US" : "fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
               </div>
@@ -148,7 +151,7 @@ export function DisputeChat({ disputeId, disputeStatus, viewerRole }: DisputeCha
           <input
             value={reply}
             onChange={e => setReply(e.target.value)}
-            placeholder="Votre message..."
+            placeholder={t("dispute.chat.placeholder") || "Votre message..."}
             className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-primary"
             onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
           />
@@ -157,7 +160,7 @@ export function DisputeChat({ disputeId, disputeStatus, viewerRole }: DisputeCha
           </Button>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground text-center py-2">Ce litige est {disputeStatus === "resolved" ? "résolu" : "fermé"}. Aucun nouveau message ne peut être envoyé.</p>
+        <p className="text-xs text-muted-foreground text-center py-2">{t("dispute.chat.closedNotice", { state: disputeStatus === "resolved" ? (t("dispute.status.resolved") || "résolu").toLowerCase() : (t("dispute.status.closed") || "fermé").toLowerCase() }) || `Ce litige est ${disputeStatus === "resolved" ? "résolu" : "fermé"}. Aucun nouveau message ne peut être envoyé.`}</p>
       )}
     </div>
   );

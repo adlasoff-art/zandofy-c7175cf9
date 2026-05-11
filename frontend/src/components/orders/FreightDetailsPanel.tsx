@@ -14,6 +14,7 @@
 import { useEffect, useState } from "react";
 import { Truck, Package, Layers, BadgeDollarSign, Clock, Loader2, Repeat, MapPin, Mail, AlertTriangle, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "@/contexts/I18nContext";
 import { InternationalShipmentTimeline } from "./InternationalShipmentTimeline";
 import { Button } from "@/components/ui/button";
 import { ReassignForwarderDialog } from "@/components/forwarder/ReassignForwarderDialog";
@@ -59,12 +60,12 @@ interface FreightQuoteRow {
   } | null;
 }
 
-const MODE_LABELS: Record<string, string> = {
-  air: "Aérien",
-  sea: "Maritime",
-  road: "Routier",
-  rail: "Ferroviaire",
-  express: "Express",
+const MODE_KEYS: Record<string, string> = {
+  air: "freight.panel.mode.air",
+  sea: "freight.panel.mode.sea",
+  road: "freight.panel.mode.road",
+  rail: "freight.panel.mode.rail",
+  express: "freight.panel.mode.express",
 };
 
 export function FreightDetailsPanel({
@@ -75,6 +76,7 @@ export function FreightDetailsPanel({
   /** Si défini, affiche le bouton "Changer transitaire". */
   actor?: "vendor" | "admin";
 }) {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [quote, setQuote] = useState<FreightQuoteRow | null>(null);
   const [forwarderName, setForwarderName] = useState<string | null>(null);
@@ -209,7 +211,7 @@ export function FreightDetailsPanel({
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
         <Loader2 size={12} className="animate-spin text-primary" />
-        Chargement du détail fret…
+        {t("freight.panel.loading") || "Chargement du détail fret…"}
       </div>
     );
   }
@@ -219,11 +221,12 @@ export function FreightDetailsPanel({
   const bd = quote.breakdown ?? {};
   const choice = bd.consolidation_choice ?? "split";
   const subpackages = bd.subpackages ?? [];
-  const modeLabel = bd.mode ? MODE_LABELS[bd.mode] ?? bd.mode : "—";
+  const modeLabel = bd.mode ? (t(MODE_KEYS[bd.mode] || "") || bd.mode) : "—";
   const transitLabel =
     quote.transit_min_days || quote.transit_max_days
-      ? `${quote.transit_min_days ?? "?"}–${quote.transit_max_days ?? "?"} jours`
-      : "Délai non communiqué";
+      ? (t("freight.panel.transit.range", { min: quote.transit_min_days ?? "?", max: quote.transit_max_days ?? "?" })
+          || `${quote.transit_min_days ?? "?"}–${quote.transit_max_days ?? "?"} jours`)
+      : (t("freight.panel.transit.notCommunicated") || "Délai non communiqué");
 
   // Lot 11A — Affichage robuste : si le devis est à 0 mais la commande a un
   // shipping_cost > 0, on affiche le shipping_cost (source de vérité financière)
@@ -241,9 +244,9 @@ export function FreightDetailsPanel({
       .eq("id", quote.id);
     setResyncing(false);
     if (error) {
-      toast.error("Échec resync : " + error.message);
+      toast.error(t("freight.panel.desync.resyncFail", { msg: error.message }) || `Échec resync : ${error.message}`);
     } else {
-      toast.success("Devis resynchronisé");
+      toast.success(t("freight.panel.desync.resyncOk") || "Devis resynchronisé");
       setReloadKey((k) => k + 1);
     }
   };
@@ -254,11 +257,11 @@ export function FreightDetailsPanel({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            Transport international
+            {t("freight.panel.transport") || "Transport international"}
           </p>
           <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
             <Truck size={13} className="text-primary" />
-            {forwarderName ?? "Transitaire"}
+            {forwarderName ?? t("freight.panel.forwarderFallback") ?? "Transitaire"}
             <span className="text-[10px] font-normal text-muted-foreground">
               · {modeLabel}
               {bd.service_class ? ` · ${bd.service_class}` : ""}
@@ -279,10 +282,10 @@ export function FreightDetailsPanel({
         <div className="flex items-start gap-2 px-2.5 py-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 text-[11px]">
           <AlertTriangle size={12} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-foreground">Devis désynchronisé</p>
+            <p className="font-semibold text-foreground">{t("freight.panel.desync.title") || "Devis désynchronisé"}</p>
             <p className="text-muted-foreground">
-              Devis verrouillé à 0 USD mais commande facturée à {quote.currency}{" "}
-              {orderShippingCost.toFixed(2)}. Le montant affiché est celui réellement facturé.
+              {t("freight.panel.desync.body", { currency: quote.currency, amount: orderShippingCost.toFixed(2) })
+                || `Devis verrouillé à 0 USD mais commande facturée à ${quote.currency} ${orderShippingCost.toFixed(2)}. Le montant affiché est celui réellement facturé.`}
             </p>
             {actor === "admin" && (
               <Button
@@ -294,7 +297,7 @@ export function FreightDetailsPanel({
                 disabled={resyncing}
               >
                 <RefreshCw size={10} className={resyncing ? "animate-spin" : ""} />
-                Resynchroniser le devis
+                {t("freight.panel.desync.resyncBtn") || "Resynchroniser le devis"}
               </Button>
             )}
           </div>
@@ -310,10 +313,12 @@ export function FreightDetailsPanel({
             className="h-7 px-2 text-[11px] gap-1"
             onClick={() => setReassignOpen(true)}
             disabled={!activeHandoffId && actor === "vendor"}
-            title={!activeHandoffId && actor === "vendor" ? "Aucun handoff actif" : undefined}
+            title={!activeHandoffId && actor === "vendor" ? (t("freight.panel.reassign.noHandoff") || "Aucun handoff actif") : undefined}
           >
             <Repeat size={11} />
-            {actor === "admin" ? "Réassigner / router" : "Changer transitaire"}
+            {actor === "admin"
+              ? (t("freight.panel.reassign.admin") || "Réassigner / router")
+              : (t("freight.panel.reassign.vendor") || "Changer transitaire")}
           </Button>
         </div>
       )}
@@ -329,8 +334,9 @@ export function FreightDetailsPanel({
         >
           {choice === "consolidated" ? <Layers size={10} /> : <Package size={10} />}
           {choice === "consolidated"
-            ? "Groupage multi-fournisseurs"
-            : `Expédition séparée (${subpackages.length || quote.pieces_count} colis)`}
+            ? (t("freight.panel.consolidation.consolidated") || "Groupage multi-fournisseurs")
+            : (t("freight.panel.consolidation.split", { count: subpackages.length || quote.pieces_count })
+                || `Expédition séparée (${subpackages.length || quote.pieces_count} colis)`)}
         </span>
         <span className="text-[10px] text-muted-foreground">
           {Number(quote.cbm).toFixed(3)} CBM · {Number(quote.weight_kg).toFixed(1)} kg
@@ -342,8 +348,8 @@ export function FreightDetailsPanel({
         <div className="flex items-start gap-2 px-2.5 py-1.5 rounded-md border border-primary/30 bg-primary/5 text-[11px]">
           <BadgeDollarSign size={12} className="shrink-0 mt-0.5 text-primary" />
           <p className="text-foreground">
-            Acompte fret : <strong>{quote.currency} {Number(quote.deposit_amount).toFixed(2)}</strong>
-            <span className="text-muted-foreground"> ({quote.deposit_pct}%)</span>
+            {t("freight.panel.deposit") || "Acompte fret :"} <strong>{quote.currency} {Number(quote.deposit_amount).toFixed(2)}</strong>
+            <span className="text-muted-foreground"> {t("freight.panel.depositPct", { pct: quote.deposit_pct }) || `(${quote.deposit_pct}%)`}</span>
           </p>
         </div>
       )}
@@ -353,7 +359,7 @@ export function FreightDetailsPanel({
         <div className="flex items-start gap-2 px-2.5 py-1.5 rounded-md border border-border bg-background/40 text-[11px]">
           <MapPin size={12} className="shrink-0 mt-0.5 text-primary" />
           <div className="min-w-0">
-            <p className="font-semibold text-foreground">Adresse de récupération</p>
+            <p className="font-semibold text-foreground">{t("freight.panel.pickup.title") || "Adresse de récupération"}</p>
             <p className="text-muted-foreground whitespace-pre-line">{pickupAddress}</p>
             {pickupEmail && actor && (
               <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -381,9 +387,9 @@ export function FreightDetailsPanel({
           <summary className="cursor-pointer text-[11px] text-primary hover:underline list-none flex items-center gap-1">
             <Package size={11} />
             <span className="group-open:hidden">
-              Voir le détail par sous-colis ({subpackages.length})
+              {t("freight.panel.subpackages.show", { count: subpackages.length }) || `Voir le détail par sous-colis (${subpackages.length})`}
             </span>
-            <span className="hidden group-open:inline">Masquer le détail</span>
+            <span className="hidden group-open:inline">{t("freight.panel.subpackages.hide") || "Masquer le détail"}</span>
           </summary>
           <ul className="mt-2 space-y-1.5">
             {subpackages.map((sp, idx) => (
@@ -393,14 +399,14 @@ export function FreightDetailsPanel({
               >
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-foreground truncate">
-                    Colis #{idx + 1}
+                    {t("freight.panel.subpackages.parcel", { n: idx + 1 }) || `Colis #${idx + 1}`}
                     <span className="text-muted-foreground font-normal">
                       {" "}· {sp.tier_used}
                     </span>
                   </p>
                   <p className="text-muted-foreground">
-                    {Number(sp.billable_weight_kg).toFixed(1)} kg facturable ·{" "}
-                    {Number(sp.cbm).toFixed(3)} CBM
+                    {t("freight.panel.subpackages.billable", { kg: Number(sp.billable_weight_kg).toFixed(1), cbm: Number(sp.cbm).toFixed(3) })
+                      || `${Number(sp.billable_weight_kg).toFixed(1)} kg facturable · ${Number(sp.cbm).toFixed(3)} CBM`}
                   </p>
                 </div>
                 <span className="font-semibold text-foreground shrink-0">
@@ -413,11 +419,11 @@ export function FreightDetailsPanel({
           </ul>
           {choice === "consolidated" && bd.consolidation_offer && (
             <p className="mt-2 text-[10px] text-muted-foreground italic">
-              Frais de groupage inclus :{" "}
-              {quote.currency}{" "}
-              {Number(bd.consolidation_offer.consolidation_fee).toFixed(2)} (économie vs split :{" "}
-              {quote.currency}{" "}
-              {Math.max(0, -Number(bd.consolidation_offer.delta_vs_split)).toFixed(2)})
+              {t("freight.panel.subpackages.consolidationFee", {
+                currency: quote.currency,
+                fee: Number(bd.consolidation_offer.consolidation_fee).toFixed(2),
+                savings: Math.max(0, -Number(bd.consolidation_offer.delta_vs_split)).toFixed(2),
+              }) || `Frais de groupage inclus : ${quote.currency} ${Number(bd.consolidation_offer.consolidation_fee).toFixed(2)} (économie vs split : ${quote.currency} ${Math.max(0, -Number(bd.consolidation_offer.delta_vs_split)).toFixed(2)})`}
             </p>
           )}
         </details>

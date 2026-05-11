@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "@/contexts/I18nContext";
 import { Loader2, Wallet, Banknote, CreditCard, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -32,9 +33,16 @@ export function DisputeRefundPanel({
   finalRefundMethod,
   onChanged,
 }: DisputeRefundPanelProps) {
+  const { t, formatPrice } = useI18n();
   const [amount, setAmount] = useState<string>("");
   const [method, setMethod] = useState<Method>("wallet");
   const [busy, setBusy] = useState(false);
+
+  const methodLong = (m?: string | null) => {
+    if (m === "wallet") return t("dispute.refund.method.wallet") || "portefeuille";
+    if (m === "cash") return t("dispute.refund.method.cash") || "espèces";
+    return t("dispute.refund.method.original") || "moyen original";
+  };
 
   const call = async (action: Action, payload?: { amount?: number; method?: Method }) => {
     setBusy(true);
@@ -43,10 +51,10 @@ export function DisputeRefundPanel({
     });
     setBusy(false);
     if (error || (data as any)?.error) {
-      toast.error(((data as any)?.error as string) || error?.message || "Erreur");
+      toast.error(((data as any)?.error as string) || error?.message || t("dispute.refund.error") || "Erreur");
       return;
     }
-    toast.success("OK");
+    toast.success(t("dispute.refund.ok") || "OK");
     onChanged?.();
   };
 
@@ -55,12 +63,11 @@ export function DisputeRefundPanel({
     return (
       <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-900 rounded-lg p-3 text-xs">
         <div className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-400">
-          <Check size={14} /> Remboursement appliqué
+          <Check size={14} /> {t("dispute.refund.applied") || "Remboursement appliqué"}
         </div>
         <p className="text-muted-foreground mt-1">
-          {finalRefundAmount} via{" "}
-          {finalRefundMethod === "wallet" ? "portefeuille" :
-           finalRefundMethod === "cash" ? "espèces" : "moyen original"}
+          {t("dispute.refund.appliedVia", { amount: formatPrice(Number(finalRefundAmount)), method: methodLong(finalRefundMethod) })
+            || `${formatPrice(Number(finalRefundAmount))} via ${methodLong(finalRefundMethod)}`}
         </p>
       </div>
     );
@@ -71,19 +78,20 @@ export function DisputeRefundPanel({
     return (
       <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900 rounded-lg p-3 space-y-2">
         <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-          Proposition en attente : {proposedAmount} ({proposedMethod})
+          {t("dispute.refund.proposalPending", { amount: formatPrice(Number(proposedAmount)), method: methodLong(proposedMethod) })
+            || `Proposition en attente : ${formatPrice(Number(proposedAmount))} (${methodLong(proposedMethod)})`}
         </p>
         {viewerRole === "client" ? (
           <div className="flex gap-2">
             <Button size="sm" disabled={busy} onClick={() => call("accept")}>
-              {busy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} className="mr-1" />} Accepter
+              {busy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} className="mr-1" />} {t("dispute.refund.accept") || "Accepter"}
             </Button>
             <Button size="sm" variant="outline" disabled={busy} onClick={() => call("reject")}>
-              <X size={12} className="mr-1" /> Refuser
+              <X size={12} className="mr-1" /> {t("dispute.refund.reject") || "Refuser"}
             </Button>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">En attente de la réponse du client.</p>
+          <p className="text-xs text-muted-foreground">{t("dispute.refund.waitingClient") || "En attente de la réponse du client."}</p>
         )}
       </div>
     );
@@ -93,7 +101,7 @@ export function DisputeRefundPanel({
   if (viewerRole === "client") {
     return (
       <p className="text-xs text-muted-foreground italic">
-        Aucune proposition de remboursement pour le moment.
+        {t("dispute.refund.none") || "Aucune proposition de remboursement pour le moment."}
       </p>
     );
   }
@@ -101,11 +109,13 @@ export function DisputeRefundPanel({
   return (
     <div className="bg-card border border-border rounded-lg p-3 space-y-3">
       <h4 className="text-sm font-bold text-foreground">
-        {viewerRole === "admin" ? "Appliquer un remboursement" : "Proposer un remboursement"}
+        {viewerRole === "admin"
+          ? (t("dispute.refund.title.admin") || "Appliquer un remboursement")
+          : (t("dispute.refund.title.vendor") || "Proposer un remboursement")}
       </h4>
 
       <div>
-        <label className="text-[11px] text-muted-foreground">Montant (≤ {orderTotal})</label>
+        <label className="text-[11px] text-muted-foreground">{t("dispute.refund.amountLabel", { max: formatPrice(orderTotal) }) || `Montant (≤ ${formatPrice(orderTotal)})`}</label>
         <div className="flex gap-2 mt-1">
           <input
             type="number"
@@ -133,12 +143,12 @@ export function DisputeRefundPanel({
       </div>
 
       <div>
-        <label className="text-[11px] text-muted-foreground">Méthode</label>
+        <label className="text-[11px] text-muted-foreground">{t("dispute.refund.methodLabel") || "Méthode"}</label>
         <div className="grid grid-cols-3 gap-1 mt-1">
           {([
-            { v: "wallet" as Method, label: "Portefeuille", icon: Wallet },
-            { v: "cash" as Method, label: "Espèces", icon: Banknote },
-            { v: "original_method" as Method, label: "Origine", icon: CreditCard },
+            { v: "wallet" as Method, label: t("dispute.refund.method.walletShort") || "Portefeuille", icon: Wallet },
+            { v: "cash" as Method, label: t("dispute.refund.method.cashShort") || "Espèces", icon: Banknote },
+            { v: "original_method" as Method, label: t("dispute.refund.method.originalShort") || "Origine", icon: CreditCard },
           ]).map(({ v, label, icon: Icon }) => (
             <button
               key={v}
@@ -164,7 +174,7 @@ export function DisputeRefundPanel({
             className="w-full"
           >
             {busy ? <Loader2 size={12} className="animate-spin mr-1" /> : null}
-            Appliquer
+            {t("dispute.refund.applyBtn") || "Appliquer"}
           </Button>
         ) : (
           <Button
@@ -174,7 +184,7 @@ export function DisputeRefundPanel({
             className="w-full"
           >
             {busy ? <Loader2 size={12} className="animate-spin mr-1" /> : null}
-            Proposer au client
+            {t("dispute.refund.proposeBtn") || "Proposer au client"}
           </Button>
         )}
       </div>
