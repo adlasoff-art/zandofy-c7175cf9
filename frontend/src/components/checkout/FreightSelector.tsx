@@ -26,12 +26,12 @@ import { debugForwarderEligibility, type ForwarderEligibilityDebug } from "@/ser
 import { useRoles } from "@/hooks/use-roles";
 import { useI18n } from "@/contexts/I18nContext";
 
-const MODE_META: Record<string, { label: string; Icon: typeof Plane; cls: string }> = {
-  air: { label: "Aérien", Icon: Plane, cls: "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30" },
-  sea: { label: "Maritime", Icon: Ship, cls: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
-  road: { label: "Routier", Icon: Truck, cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" },
-  rail: { label: "Ferroviaire", Icon: TramFront, cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
-  express: { label: "Express", Icon: Plane, cls: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30" },
+const MODE_META: Record<string, { labelKey: string; fallback: string; Icon: typeof Plane; cls: string }> = {
+  air: { labelKey: "shipping.mode.air", fallback: "Aérien", Icon: Plane, cls: "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30" },
+  sea: { labelKey: "shipping.mode.sea", fallback: "Maritime", Icon: Ship, cls: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
+  road: { labelKey: "shipping.mode.road", fallback: "Routier", Icon: Truck, cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" },
+  rail: { labelKey: "shipping.mode.rail", fallback: "Ferroviaire", Icon: TramFront, cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
+  express: { labelKey: "shipping.mode.express", fallback: "Express", Icon: Plane, cls: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30" },
 };
 
 export type ConsolidationChoice = "split" | "consolidated";
@@ -206,7 +206,7 @@ export function FreightSelector({
     return (
       <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
         <Loader2 size={12} className="animate-spin text-primary" />
-        Calcul des devis transporteurs…
+        {t("freight.calculatingQuotes") || "Calcul des devis transporteurs…"}
       </div>
     );
   }
@@ -219,11 +219,11 @@ export function FreightSelector({
         <div className="flex items-start gap-2 px-2.5 py-2 rounded-md border border-destructive/40 bg-destructive/5 text-[11px] text-destructive">
           <AlertTriangle size={12} className="shrink-0 mt-0.5" />
           <span>
-            Aucun transitaire ne dessert
-            {destinationCityName ? ` ${destinationCityName}` : " cette destination"}
-            {" "}depuis l'origine du produit en mode{" "}
-            <span className="font-medium">{MODE_META[mode]?.label ?? mode}</span>.
-            Le checkout est bloqué pour cette commande — demandez une couverture ou modifiez l'adresse / le mode.
+            {t("freight.noForwarderForDestination", {
+              destination: destinationCityName || (t("freight.thisDestination") || "cette destination"),
+              mode: (MODE_META[mode] && (t(MODE_META[mode].labelKey) || MODE_META[mode].fallback)) || mode,
+            }) ||
+              `Aucun transitaire ne dessert ${destinationCityName || "cette destination"} depuis l'origine du produit en mode ${MODE_META[mode]?.fallback ?? mode}. Le checkout est bloqué pour cette commande — demandez une couverture ou modifiez l'adresse / le mode.`}
           </span>
         </div>
         {originCountry && (
@@ -268,11 +268,13 @@ export function FreightSelector({
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium text-foreground flex items-center gap-2">
           <Truck size={14} className="text-primary" />
-          {selectedId ? "Transitaire choisi" : "Choisissez un transitaire"}
+          {selectedId
+            ? (t("freight.forwarderChosen") || "Transitaire choisi")
+            : (t("freight.chooseForwarder") || "Choisissez un transitaire")}
         </p>
         {!selectedId && (
           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive uppercase tracking-wide">
-            Requis
+            {t("freight.required") || "Requis"}
           </span>
         )}
       </div>
@@ -299,8 +301,9 @@ export function FreightSelector({
         >
           {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           {expanded
-            ? "Masquer les alternatives"
-            : `Voir ${alternatives.length} alternative${alternatives.length > 1 ? "s" : ""}`}
+            ? (t("freight.hideAlternatives") || "Masquer les alternatives")
+            : (t("freight.showAlternatives", { count: alternatives.length }) ||
+                `Voir ${alternatives.length} alternative${alternatives.length > 1 ? "s" : ""}`)}
         </button>
       )}
 
