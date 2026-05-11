@@ -2083,6 +2083,7 @@ function MessagesRedirectTab() {
 }
 
 function AddressesTab({ userId }: { userId: string }) {
+  const { t } = useI18n();
   const { toast } = useToast();
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2141,7 +2142,7 @@ function AddressesTab({ userId }: { userId: string }) {
 
   const handleSave = async () => {
     if (!form.first_name || !form.last_name || !form.phone || !form.address || !form.city) {
-      toast({ title: "Champs requis", description: "Remplissez tous les champs obligatoires.", variant: "destructive" });
+      toast({ title: t("addr.toast.required"), description: t("addr.toast.requiredDesc"), variant: "destructive" });
       return;
     }
     setSaving(true);
@@ -2163,38 +2164,38 @@ function AddressesTab({ userId }: { userId: string }) {
     setSaving(false);
     if (error) {
       console.error("[AddressesTab] save error:", error);
-      toast({ title: "Erreur", description: "Impossible d'enregistrer l'adresse. Réessayez.", variant: "destructive" });
+      toast({ title: t("addr.toast.error"), description: t("addr.toast.saveError"), variant: "destructive" });
       return;
     }
     resetForm();
     await fetchAddresses();
-    toast({ title: editId ? "Adresse modifiée !" : "Adresse ajoutée !" });
+    toast({ title: editId ? t("addr.toast.modified") : t("addr.toast.added") });
   };
 
   const handleDelete = async (id: string) => {
     const addr = addresses.find(a => a.id === id);
     if (addr && ((addr as any).is_first_address || addr.is_default)) {
-      toast({ title: "Action impossible", description: "L'adresse par défaut ne peut pas être supprimée, uniquement modifiée.", variant: "destructive" });
+      toast({ title: t("addr.toast.deleteImpossible"), description: t("addr.toast.deleteDefault"), variant: "destructive" });
       return;
     }
     if (hasActiveOrders) {
-      toast({ title: "Action impossible", description: "Vous ne pouvez pas supprimer une adresse tant que vous avez des commandes en cours.", variant: "destructive" });
+      toast({ title: t("addr.toast.deleteImpossible"), description: t("addr.toast.deleteActive"), variant: "destructive" });
       return;
     }
     const { error } = await supabase.from("saved_addresses").delete().eq("id", id);
     if (error) {
-      toast({ title: "Erreur", description: error.message?.includes("default") ? "Impossible de supprimer l'adresse par défaut." : "Impossible de supprimer cette adresse.", variant: "destructive" });
+      toast({ title: t("addr.toast.error"), description: error.message?.includes("default") ? t("addr.toast.deleteErrorDefault") : t("addr.toast.deleteError"), variant: "destructive" });
       return;
     }
     await fetchAddresses();
-    toast({ title: "Adresse supprimée" });
+    toast({ title: t("addr.toast.deleted") });
   };
 
   const handleSetDefault = async (id: string) => {
     // Trigger handles unsetting other defaults automatically
     await supabase.from("saved_addresses").update({ is_default: true } as any).eq("id", id);
     await fetchAddresses();
-    toast({ title: "Adresse par défaut mise à jour" });
+    toast({ title: t("addr.toast.defaultUpdated") });
   };
 
   const labelIcons: Record<string, React.ReactNode> = {
@@ -2209,7 +2210,7 @@ function AddressesTab({ userId }: { userId: string }) {
       {hasActiveOrders && (
         <div className="bg-muted/50 border border-border rounded-lg p-3 text-xs text-muted-foreground flex items-center gap-2">
           <AlertTriangle size={14} className="text-amber-500 shrink-0" />
-          <span>Vous avez des commandes en cours. La modification et la suppression des adresses de livraison sont temporairement bloquées.</span>
+          <span>{t("addr.activeOrdersLock")}</span>
         </div>
       )}
       {addresses.map(addr => (
@@ -2219,7 +2220,7 @@ function AddressesTab({ userId }: { userId: string }) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-semibold text-foreground">{addr.label}</span>
-                {addr.is_default && <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold">Par défaut</span>}
+                {addr.is_default && <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold">{t("addr.default")}</span>}
               </div>
               <p className="text-sm text-foreground">{addr.first_name} {addr.last_name}</p>
               <p className="text-xs text-muted-foreground">{addr.address}{addr.quartier ? `, Q. ${addr.quartier}` : ""}{addr.commune ? `, C. ${addr.commune}` : ""}, {addr.city}{(addr as any).province ? `, ${(addr as any).province}` : ""}, {addr.country}</p>
@@ -2228,7 +2229,7 @@ function AddressesTab({ userId }: { userId: string }) {
             <div className="flex items-center gap-1 shrink-0">
               {!addr.is_default && !hasActiveOrders && (
                 <button onClick={() => handleSetDefault(addr.id)} className="text-[11px] text-primary font-medium hover:underline">
-                  Par défaut
+                  {t("addr.setDefault")}
                 </button>
               )}
               <button onClick={() => handleEdit(addr)} disabled={hasActiveOrders} className="p-1.5 text-muted-foreground hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed">
@@ -2247,32 +2248,32 @@ function AddressesTab({ userId }: { userId: string }) {
       {showForm && (
         <div className="bg-card border border-border rounded-lg p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-bold text-foreground">{editId ? "Modifier l'adresse" : "Nouvelle adresse"}</h4>
+            <h4 className="text-sm font-bold text-foreground">{editId ? t("addr.form.editTitle") : t("addr.form.newTitle")}</h4>
             <button onClick={resetForm} className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Libellé</Label>
-              <Input className="mt-1" value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder="Ex: Domicile 1, Bureau..." />
+              <Label className="text-xs">{t("addr.form.label")}</Label>
+              <Input className="mt-1" value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} placeholder={t("addr.form.labelPh")} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Prénom *</Label>
+              <Label className="text-xs">{t("addr.form.firstName")}</Label>
               <Input className="mt-1" value={form.first_name} onChange={e => setForm(f => ({ ...f, first_name: e.target.value }))} />
             </div>
             <div>
-              <Label className="text-xs">Nom *</Label>
+              <Label className="text-xs">{t("addr.form.lastName")}</Label>
               <Input className="mt-1" value={form.last_name} onChange={e => setForm(f => ({ ...f, last_name: e.target.value }))} />
             </div>
           </div>
           <div>
-            <Label className="text-xs">Téléphone *</Label>
-            <Input className="mt-1" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+243 XXX XXX XXX" />
+            <Label className="text-xs">{t("addr.form.phone")}</Label>
+            <Input className="mt-1" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder={t("addr.form.phonePh")} />
           </div>
           <div>
-            <Label className="text-xs">Adresse *</Label>
-            <Input className="mt-1" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="N° parcelle, N° appartement, Avenue/Rue" />
+            <Label className="text-xs">{t("addr.form.address")}</Label>
+            <Input className="mt-1" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder={t("addr.form.addressPh")} />
           </div>
           <CascadingAddressFields
             data={{
@@ -2289,7 +2290,7 @@ function AddressesTab({ userId }: { userId: string }) {
           />
           <Button onClick={handleSave} disabled={saving} size="sm">
             {saving ? <Loader2 className="animate-spin mr-2" size={14} /> : <Save size={14} className="mr-2" />}
-            {editId ? "Modifier" : "Ajouter"}
+            {editId ? t("addr.form.update") : t("addr.form.add")}
           </Button>
         </div>
       )}
@@ -2299,12 +2300,12 @@ function AddressesTab({ userId }: { userId: string }) {
           onClick={() => { resetForm(); setShowForm(true); }}
           className="w-full py-3 text-sm font-medium border border-dashed border-border rounded-lg text-muted-foreground hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2"
         >
-          <Plus size={16} /> Ajouter une adresse ({addresses.length}/{maxAddresses})
+          <Plus size={16} /> {t("addr.add", { count: addresses.length, max: maxAddresses })}
         </button>
       )}
       {!showForm && addresses.length >= maxAddresses && (
         <p className="text-xs text-muted-foreground text-center py-2">
-          Limite atteinte ({maxAddresses} adresses). {!isKycVerified && "Vérifiez votre identité pour en ajouter jusqu'à 5."}
+          {t("addr.limitReached", { max: maxAddresses })} {!isKycVerified && t("addr.limitReachedKyc")}
         </p>
       )}
     </div>
@@ -2312,6 +2313,7 @@ function AddressesTab({ userId }: { userId: string }) {
 }
 
 function ClientCertificationSection() {
+  const { t } = useI18n();
   const { isCertified, canCertify, isLoading, toggleCertification, isToggling } = useCertification();
 
   if (isLoading) return null;
@@ -2330,7 +2332,7 @@ function ClientCertificationSection() {
         />
       </div>
       <p className="text-xs text-muted-foreground">
-        Activez votre badge de certification pour afficher un symbole de confiance vérifié à côté de votre nom sur la plateforme.
+        {t("kyc.certification.desc")}
       </p>
     </div>
   );
