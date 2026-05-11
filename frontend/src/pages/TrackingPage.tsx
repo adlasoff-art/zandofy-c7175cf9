@@ -432,6 +432,7 @@ function LiveRiderMap({ deliveryId, orderId, userId }: { deliveryId: string; ord
 
 // ── Rider Profile Banner (visible to customer) ──
 function RiderProfileBanner({ riderId, riderName }: { riderId: string; riderName: string }) {
+  const { t } = useI18n();
   const { data: profile } = useQuery({
     queryKey: ["rider-profile", riderId],
     queryFn: async () => {
@@ -464,9 +465,9 @@ function RiderProfileBanner({ riderId, riderName }: { riderId: string; riderName
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground">Votre livreur : {displayName}</p>
+        <p className="text-sm font-semibold text-foreground">{t("tracking.rider.banner")} {displayName}</p>
         {avgRating && (
-          <p className="text-xs text-muted-foreground">⭐ {avgRating.avg}/5 ({avgRating.count} avis)</p>
+          <p className="text-xs text-muted-foreground">{t("tracking.rider.reviews", { avg: avgRating.avg, count: avgRating.count })}</p>
         )}
       </div>
     </div>
