@@ -101,7 +101,7 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { t } = useI18n();
+  const { t, formatPrice } = useI18n();
   const { data: paymentConfig } = usePaymentMethods();
   const { isVerified: isKycVerified, isOrderBlocked, needsKyc, kycStatus } = useKycStatus();
 
