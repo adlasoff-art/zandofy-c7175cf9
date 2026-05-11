@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 interface RecommendedProduct {
   id: string;
   name: string;
+  nameFr?: string | null;
   price: number;
   image: string;
   rating?: number;
@@ -15,7 +16,7 @@ interface RecommendedProduct {
 
 export function RecommendationsSection() {
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [products, setProducts] = useState<RecommendedProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,47 +38,63 @@ export function RecommendationsSection() {
           }
         }
 
-        let query = supabase
+        const { data: allProducts } = await supabase
           .from("products")
-          .select("id, name, price, rating, product_images(image_url, position), gender_target")
+          .select("id, name, name_fr, price, rating, product_images(image_url, position), gender_target")
           .eq("publish_status", "published")
           .order("rating", { ascending: false })
-          .limit(30);
-
-        const { data: allProducts } = await query;
+          .limit(60);
         const products_list = (allProducts || []) as any[];
 
-        let filtered: any[];
+        let topRow: any[];
 
         if (userGender === "female" || userGender === "femme") {
           const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
           const unisex = products_list.filter(p => p.gender_target === "unisex" && !female.includes(p));
-          filtered = [...female, ...unisex].slice(0, 8);
+          topRow = [...female, ...unisex].slice(0, 4);
         } else if (userGender === "male" || userGender === "homme") {
           const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
           const unisex = products_list.filter(p => p.gender_target === "unisex" && !male.includes(p));
-          filtered = [...male, ...unisex].slice(0, 8);
+          topRow = [...male, ...unisex].slice(0, 4);
         } else {
           const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
           const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
           const unisex = products_list.filter(p => !["female", "femme", "male", "homme"].includes(p.gender_target || ""));
-          filtered = [
-            ...female.slice(0, 3),
-            ...male.slice(0, 3),
-            ...unisex.slice(0, 2),
-          ].slice(0, 8);
+          topRow = [
+            ...female.slice(0, 2),
+            ...male.slice(0, 1),
+            ...unisex.slice(0, 1),
+          ].slice(0, 4);
         }
 
-        if (filtered.length < 8) {
-          const existingIds = new Set(filtered.map(p => p.id));
+        if (topRow.length < 4) {
+          const existingIds = new Set(topRow.map(p => p.id));
           const remaining = products_list.filter(p => !existingIds.has(p.id));
-          filtered = [...filtered, ...remaining].slice(0, 8);
+          topRow = [...topRow, ...remaining].slice(0, 4);
         }
 
+        // Ligne 2 : pool aléatoire (mix anciens + nouveaux)
+        const topIds = new Set(topRow.map(p => p.id));
+        const { data: poolData } = await supabase
+          .from("products")
+          .select("id, name, name_fr, price, rating, product_images(image_url, position)")
+          .eq("publish_status", "published")
+          .order("created_at", { ascending: false })
+          .limit(80);
+        const pool = ((poolData || []) as any[]).filter(p => !topIds.has(p.id));
+        // Fisher-Yates shuffle
+        for (let i = pool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        const bottomRow = pool.slice(0, 4);
+
+        const combined = [...topRow, ...bottomRow];
         setProducts(
-          filtered.map((p: any) => ({
+          combined.map((p: any) => ({
             id: p.id,
             name: p.name,
+            nameFr: p.name_fr,
             price: Number(p.price),
             rating: p.rating,
             image: p.product_images?.[0]?.image_url || "/placeholder.svg",
@@ -86,7 +103,7 @@ export function RecommendationsSection() {
       } catch {
         const { data: popular } = await supabase
           .from("products")
-          .select("id, name, price, rating, product_images(image_url, position)")
+          .select("id, name, name_fr, price, rating, product_images(image_url, position)")
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
           .limit(8);
@@ -95,6 +112,7 @@ export function RecommendationsSection() {
           (popular || []).map((p: any) => ({
             id: p.id,
             name: p.name,
+            nameFr: (p as any).name_fr,
             price: Number(p.price),
             rating: p.rating,
             image: p.product_images?.[0]?.image_url || "/placeholder.svg",
@@ -128,7 +146,9 @@ export function RecommendationsSection() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        {products.map((product) => (
+        {products.map((product) => {
+          const displayName = locale === "fr" ? product.nameFr || product.name : product.name;
+          return (
           <Link
             key={product.id}
             to={`/product/${product.id}`}
@@ -137,13 +157,13 @@ export function RecommendationsSection() {
             <div className="aspect-square overflow-hidden">
               <img
                 src={product.image}
-                alt={product.name}
+                alt={displayName}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 loading="lazy"
               />
             </div>
             <div className="p-2.5">
-              <p className="text-xs font-medium text-foreground line-clamp-2 mb-1">{product.name}</p>
+              <p className="text-xs font-medium text-foreground line-clamp-2 mb-1">{displayName}</p>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-primary">${product.price.toFixed(2)}</span>
                 {product.rating != null && product.rating > 0 && (
@@ -152,7 +172,8 @@ export function RecommendationsSection() {
               </div>
             </div>
           </Link>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
