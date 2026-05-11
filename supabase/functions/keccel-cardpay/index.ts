@@ -106,6 +106,22 @@ Deno.serve(async (req) => {
       return errorResponse("Cette commande ne vous appartient pas");
     }
 
+    // Fetch buyer profile (email, name, phone) to populate optional Keccel fields
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("email, first_name, last_name, phone")
+      .eq("id", user.id)
+      .maybeSingle();
+    const customerEmail = (profile?.email || user.email || "").trim();
+    const customerName = `${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`.trim() || "Client Zandofy";
+    // Normalise phone vers E.164 simple (chiffres uniquement, défaut +243)
+    const rawPhone = (profile?.phone || "").replace(/[^\d+]/g, "");
+    const customerPhone = rawPhone.startsWith("+")
+      ? rawPhone
+      : rawPhone
+        ? (rawPhone.startsWith("0") ? "+243" + rawPhone.slice(1) : "+" + rawPhone)
+        : "+243000000000";
+
     // Determine amount based on payment_type
     const pType = payment_type || "order";
     let amount: number;
@@ -250,18 +266,40 @@ Deno.serve(async (req) => {
       attempt_index: number;
       auth_format: "bearer_normalized" | "raw_token";
       return_key_mode: "returnUrl" | "returnurl" | "both";
+      extra?: Record<string, unknown>;
+      label?: string;
     };
     const attempts: Attempt[] = [
       { attempt_index: 1, auth_format: "bearer_normalized", return_key_mode: "returnUrl" },
       { attempt_index: 2, auth_format: "raw_token",         return_key_mode: "returnUrl" },
       { attempt_index: 3, auth_format: "bearer_normalized", return_key_mode: "returnurl" },
       { attempt_index: 4, auth_format: "bearer_normalized", return_key_mode: "both" },
+      // ---- Champs supplémentaires (Keccel a probablement ajouté un required field) ----
+      { attempt_index: 5, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
+        label: "lang_fr",
+        extra: { language: "fr" } },
+      { attempt_index: 6, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
+        label: "lang+email",
+        extra: { language: "fr", customerEmail } },
+      { attempt_index: 7, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
+        label: "lang+email+name",
+        extra: { language: "fr", customerEmail, customerName } },
+      { attempt_index: 8, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
+        label: "lang+email+name+phone",
+        extra: { language: "fr", customerEmail, customerName, customerPhone } },
+      { attempt_index: 9, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
+        label: "+notifyUrl",
+        extra: { language: "fr", customerEmail, customerName, customerPhone, notifyUrl: callbackUrl } },
+      { attempt_index: 10, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
+        label: "+country+channel",
+        extra: { language: "fr", customerEmail, customerName, customerPhone, notifyUrl: callbackUrl, country: "CD", channel: "web" } },
     ];
 
     let keccelResponse: any = null;
     let redirectUrl: string | null = null;
     let lastHttpStatus = 0;
     let lastRawBody = "";
+    let lastKeccelDescription = "";
     let success = false;
 
     for (const att of attempts) {
@@ -272,11 +310,14 @@ Deno.serve(async (req) => {
       if (att.return_key_mode === "returnurl" || att.return_key_mode === "both") {
         payload.returnurl = returnUrl;
       }
+      if (att.extra) {
+        for (const [k, v] of Object.entries(att.extra)) payload[k] = v;
+      }
       const authValue = att.auth_format === "bearer_normalized"
         ? `Bearer ${cleanToken}`
         : cleanToken;
 
-      console.log(`[${diagnosticId}] attempt ${att.attempt_index} auth=${att.auth_format} returnKey=${att.return_key_mode} keys=${Object.keys(payload).join(",")}`);
+      console.log(`[${diagnosticId}] attempt ${att.attempt_index} (${att.label ?? "base"}) auth=${att.auth_format} returnKey=${att.return_key_mode} keys=${Object.keys(payload).join(",")}`);
 
       try {
         const resp = await fetch("https://api.keccel.net/cardpay", {
@@ -295,6 +336,7 @@ Deno.serve(async (req) => {
 
         let parsed: any = null;
         try { parsed = JSON.parse(rawBody); } catch { parsed = null; }
+        if (parsed?.description) lastKeccelDescription = String(parsed.description);
 
         const attemptShape = Object.fromEntries(
           Object.entries(payload).map(([k, v]) => [k, {
@@ -312,6 +354,7 @@ Deno.serve(async (req) => {
           keccel_description: parsed?.description ?? null,
           keccel_response: {
             attempt_index: att.attempt_index,
+            label: att.label ?? "base",
             auth_format: att.auth_format,
             return_key_mode: att.return_key_mode,
             sent_keys: Object.keys(payload),
@@ -332,6 +375,7 @@ Deno.serve(async (req) => {
           payload_shape: fieldShape,
           keccel_response: {
             attempt_index: att.attempt_index,
+            label: att.label ?? "base",
             auth_format: att.auth_format,
             return_key_mode: att.return_key_mode,
           },
@@ -342,10 +386,11 @@ Deno.serve(async (req) => {
 
     if (!success) {
       return errorResponse(
-        `Keccel a refusé les ${attempts.length} variantes d'appel (diag ${diagnosticId}). Dernière réponse HTTP ${lastHttpStatus}.`,
+        `Keccel a refusé les ${attempts.length} variantes (diag ${diagnosticId}). HTTP ${lastHttpStatus} — ${lastKeccelDescription || "réponse vide"}.`,
         {
           diagnostic_id: diagnosticId,
           httpStatus: lastHttpStatus,
+          keccel_description: lastKeccelDescription,
           body: lastRawBody.slice(0, 500),
           diagnostic_persisted: diagnosticPersisted,
           diagnostic_insert_error: lastDiagnosticInsertError,

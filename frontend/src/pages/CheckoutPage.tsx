@@ -1220,9 +1220,12 @@ export default function CheckoutPage() {
         if (!data) throw new Error("Pas de réponse de la passerelle de paiement");
         if (data.success === false) {
           console.error("keccel-cardpay API error:", data);
-          const detail = data?.details
-            ? ` (code ${data.details.code ?? "?"}${data.details.description ? " — " + data.details.description : ""})`
-            : "";
+          const d = data?.details ?? {};
+          const parts: string[] = [];
+          if (d.keccel_description) parts.push(d.keccel_description);
+          if (d.httpStatus) parts.push(`HTTP ${d.httpStatus}`);
+          if (d.diagnostic_id) parts.push(`diag ${d.diagnostic_id}`);
+          const detail = parts.length ? ` — ${parts.join(" · ")}` : "";
           throw new Error((data.error || "Erreur de la passerelle de paiement") + detail);
         }
         if (data.redirect_url) {
