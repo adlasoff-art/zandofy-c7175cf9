@@ -1,4 +1,14 @@
-// Keccel CardPay — reference capped at 25 chars for Visa compatibility
+// Keccel CardPay — Intégration officielle confirmée par l'équipe Keccel.
+//
+// RÈGLES IMMUABLES (cf. SAFETY_POLICY.md §7 et mem://features/keccel-cardpay-constraints) :
+// 1. merchantcode = valeur fournie par Keccel (secret KECCEL_CARD_MERCHANT_CODE).
+// 2. TOUTES les clés en MINUSCULES (jamais de camelCase).
+// 3. Exactement 7 champs : merchantcode, reference, amount, currency, description,
+//    callbackurl, returnurl. Ne JAMAIS ajouter language, customerEmail, etc.
+// 4. amount en STRING entière (Math.ceil), reference ≤ 25 chars.
+// 5. Authorization: "Bearer <token>" (token brut côté secret).
+// 6. Endpoint : POST https://api.keccel.net/cardpay
+// Toute modification du payload requiert une confirmation écrite de Keccel.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const ALLOWED_HEADERS =
@@ -59,36 +69,25 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Authenticate user
+    // Auth
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return errorResponse("Non autorisé");
-    }
-
+    if (!authHeader) return errorResponse("Non autorisé");
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return errorResponse("Non autorisé");
-    }
+    if (authError || !user) return errorResponse("Non autorisé");
 
-    // Rate limiting: 5 requests/min per user
+    // Rate limit 5/min
     const { data: rlAllowed } = await supabase.rpc("check_rate_limit", {
       p_identifier: user.id,
       p_endpoint: "keccel-cardpay",
       p_max_requests: 5,
       p_window_seconds: 60,
     });
-    if (rlAllowed === false) {
-      return errorResponse("Trop de requêtes. Veuillez patienter.");
-    }
+    if (rlAllowed === false) return errorResponse("Trop de requêtes. Veuillez patienter.");
 
     const body = await req.json();
-    const { order_id, payment_method, payment_type, save_card } = body;
-
-    if (!order_id) {
-      return errorResponse("order_id requis");
-    }
-
+    const { order_id, payment_method, payment_type } = body;
+    if (!order_id) return errorResponse("order_id requis");
     const method = payment_method || "card";
 
     // Fetch order
@@ -97,330 +96,128 @@ Deno.serve(async (req) => {
       .select("id, order_ref, user_id, total, subtotal, shipping_cost, status, last_mile_fee")
       .eq("id", order_id)
       .maybeSingle();
+    if (orderError || !order) return errorResponse("Commande introuvable");
+    if (order.user_id !== user.id) return errorResponse("Cette commande ne vous appartient pas");
 
-    if (orderError || !order) {
-      return errorResponse("Commande introuvable");
-    }
-
-    if (order.user_id !== user.id) {
-      return errorResponse("Cette commande ne vous appartient pas");
-    }
-
-    // Fetch buyer profile (email, name, phone) to populate optional Keccel fields
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("email, first_name, last_name, phone")
-      .eq("id", user.id)
-      .maybeSingle();
-    const customerEmail = (profile?.email || user.email || "").trim();
-    const customerName = `${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`.trim() || "Client Zandofy";
-    // Normalise phone vers E.164 simple (chiffres uniquement, défaut +243)
-    const rawPhone = (profile?.phone || "").replace(/[^\d+]/g, "");
-    const customerPhone = rawPhone.startsWith("+")
-      ? rawPhone
-      : rawPhone
-        ? (rawPhone.startsWith("0") ? "+243" + rawPhone.slice(1) : "+" + rawPhone)
-        : "+243000000000";
-
-    // Determine amount based on payment_type
+    // Determine amount
     const pType = payment_type || "order";
     let amount: number;
-    if (pType === "shipping") {
-      amount = Number(order.shipping_cost) || 0;
-    } else if (pType === "last_mile") {
-      amount = Number(order.last_mile_fee) || 0;
-    } else {
-      amount = Number(order.total) || 0;
-    }
+    if (pType === "shipping") amount = Number(order.shipping_cost) || 0;
+    else if (pType === "last_mile") amount = Number(order.last_mile_fee) || 0;
+    else amount = Number(order.total) || 0;
+    if (amount <= 0) return errorResponse("Montant invalide");
 
-    if (amount <= 0) {
-      return errorResponse("Montant invalide");
-    }
-
-    // Keccel CardPay attend un montant ENTIER. Tous nos prix se terminent en .99 (prix
-    // stratégique), donc on arrondit à l'entier supérieur : perte max 1 centime côté client.
+    // Keccel exige amount entier — arrondi sup (perte max 1 cent côté client pour prix .99)
     const amountSent = Math.ceil(amount);
 
-    // Diagnostic id (short, returned to client to correlate with logs)
     const diagnosticId = crypto.randomUUID().slice(0, 8);
-
-    // Max 25 chars for Keccel compatibility
+    // Référence ≤ 25 chars (contrainte Keccel/Visa)
     const reference = `KC${crypto.randomUUID().replace(/-/g, "").toUpperCase().slice(0, 23)}`;
     const returnUrl = `${siteBaseUrl}/payment/return?ref=${encodeURIComponent(reference)}&order_id=${order.id}`;
     const callbackUrl = `${supabaseUrl}/functions/v1/kelpay-webhook`;
 
-    // Base payload (sans la clé returnUrl/returnurl, ajoutée par variante)
-    const basePayload = {
+    // ---- PAYLOAD UNIQUE : 7 champs lowercase, conforme doc Keccel ----
+    const payload = {
       merchantcode: keccelMerchantCode,
-      reference: reference,
-      // Keccel exige `amount` en STRING (cf. doc Kelpay_API_Card page 2, exemple "amount":"100").
+      reference,
       amount: String(amountSent),
       currency: "USD",
       description: `Commande ${order.order_ref} - Zandofy`,
       callbackurl: callbackUrl,
+      returnurl: returnUrl,
     };
-    // Payload par défaut (clé `returnUrl` camelCase) pour les diagnostics et pre-flight
-    const keccelPayload: Record<string, unknown> = { ...basePayload, returnUrl: returnUrl };
 
     const origin = req.headers.get("Origin") || req.headers.get("Referer") || "";
-    const merchantCodeMasked = keccelMerchantCode
-      ? `${keccelMerchantCode.slice(0, 2)}***${keccelMerchantCode.slice(-2)}`
-      : null;
-    let diagnosticPersisted = false;
-    let lastDiagnosticInsertError: Record<string, unknown> | null = null;
+    const merchantCodeMasked = `${keccelMerchantCode.slice(0, 2)}***${keccelMerchantCode.slice(-2)}`;
 
-    // Helper: persist a diagnostic row (best-effort, never throws)
-    async function persistDiagnostic(extra: Record<string, unknown>): Promise<boolean> {
-      try {
-        const { error: diagInsertError } = await supabase.from("keccel_cardpay_diagnostics").insert({
-          diagnostic_id: diagnosticId,
-          function_name: "keccel-cardpay",
-          environment: supabaseUrl,
-          origin,
-          site_base_url: siteBaseUrl,
-          user_id: user.id,
-          order_id: order.id,
-          reference,
-          amount,
-          amount_sent: amountSent,
-          currency: "USD",
-          callback_url: callbackUrl,
-          return_url: returnUrl,
-          merchant_code_masked: merchantCodeMasked,
-          token_present: Boolean(keccelToken),
-          token_length: keccelToken?.length ?? null,
-          sent_keys: Object.keys(keccelPayload),
-          ...extra,
-        });
-        if (diagInsertError) {
-          lastDiagnosticInsertError = {
-            code: (diagInsertError as any)?.code,
-            message: (diagInsertError as any)?.message,
-            details: (diagInsertError as any)?.details,
-            hint: (diagInsertError as any)?.hint,
-          };
-          console.error(
-            `[${diagnosticId}] Diagnostic insert FAILED on table keccel_cardpay_diagnostics:`,
-            JSON.stringify(lastDiagnosticInsertError)
-          );
-          return false;
-        }
-        diagnosticPersisted = true;
-        return true;
-      } catch (e) {
-        lastDiagnosticInsertError = { message: (e as any)?.message ?? String(e) };
-        console.error(`[${diagnosticId}] Failed to persist diagnostic:`, e);
-        return false;
-      }
-    }
-
-    // ---- Local pre-flight validation (before hitting Keccel) ----
-    const required: Record<string, unknown> = {
-      merchantcode: basePayload.merchantcode,
-      reference: basePayload.reference,
-      amount: basePayload.amount,
-      currency: basePayload.currency,
-      description: basePayload.description,
-      callbackurl: basePayload.callbackurl,
-      returnUrl: returnUrl,
-    };
-    const missingLocal: string[] = [];
-    for (const [k, v] of Object.entries(required)) {
-      if (v === undefined || v === null || v === "" || (typeof v === "number" && !Number.isFinite(v))) {
-        missingLocal.push(k);
-      }
-    }
-    if (missingLocal.length > 0) {
-      console.error(`[${diagnosticId}] Pre-flight failed, missing:`, missingLocal);
-      await persistDiagnostic({ pre_flight_missing: missingLocal, error: "pre_flight_missing" });
+    // Pre-flight : aucun champ vide
+    const missing = Object.entries(payload)
+      .filter(([_, v]) => v === undefined || v === null || v === "")
+      .map(([k]) => k);
+    if (missing.length > 0) {
+      console.error(`[${diagnosticId}] Pre-flight failed:`, missing);
       return errorResponse(
-        `Champs manquants avant envoi : ${missingLocal.join(", ")} (diag ${diagnosticId})`,
-        { diagnostic_id: diagnosticId, missing: missingLocal }
+        `Champs manquants avant envoi : ${missing.join(", ")} (diag ${diagnosticId})`,
+        { diagnostic_id: diagnosticId, missing }
       );
     }
 
-    // ---- Diagnostic snapshot (safe: no secret values) ----
-    const fieldShape = Object.fromEntries(
-      Object.entries(keccelPayload).map(([k, v]) => [
-        k,
-        {
-          type: typeof v,
-          length: typeof v === "string" ? v.length : undefined,
-          present: v !== undefined && v !== null && v !== "",
-          // sample only for non-secret URL/ref fields
-          sample: ["reference", "currency", "callbackurl", "returnUrl"].includes(k)
-            ? String(v).slice(0, 80)
-            : undefined,
-        },
-      ])
-    );
-    console.log(`[${diagnosticId}] Keccel cardpay payload shape:`, JSON.stringify(fieldShape));
-    console.log(`[${diagnosticId}] Keccel cardpay payload keys:`, Object.keys(keccelPayload).join(","));
-    console.log(`[${diagnosticId}] Keccel token present:`, Boolean(keccelToken), "len:", keccelToken?.length);
-
-    // Normaliser le token : si l'admin a stocké "Bearer xxx" dans le secret,
-    // on enlève le préfixe pour éviter "Bearer Bearer xxx".
+    // Normaliser le token (au cas où "Bearer xxx" stocké)
     const cleanToken = keccelToken.replace(/^\s*Bearer\s+/i, "").trim();
 
-    type Attempt = {
-      attempt_index: number;
-      auth_format: "bearer_normalized" | "raw_token";
-      return_key_mode: "returnUrl" | "returnurl" | "both";
-      extra?: Record<string, unknown>;
-      label?: string;
-      key_case?: "lowercase" | "camelCase";
-    };
-    const attempts: Attempt[] = [
-      { attempt_index: 1, auth_format: "bearer_normalized", return_key_mode: "returnUrl" },
-      { attempt_index: 2, auth_format: "raw_token",         return_key_mode: "returnUrl" },
-      { attempt_index: 3, auth_format: "bearer_normalized", return_key_mode: "returnurl" },
-      { attempt_index: 4, auth_format: "bearer_normalized", return_key_mode: "both" },
-      // ---- Champs supplémentaires (Keccel a probablement ajouté un required field) ----
-      { attempt_index: 5, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
-        label: "lang_fr",
-        extra: { language: "fr" } },
-      { attempt_index: 6, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
-        label: "lang+email",
-        extra: { language: "fr", customerEmail } },
-      { attempt_index: 7, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
-        label: "lang+email+name",
-        extra: { language: "fr", customerEmail, customerName } },
-      { attempt_index: 8, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
-        label: "lang+email+name+phone",
-        extra: { language: "fr", customerEmail, customerName, customerPhone } },
-      { attempt_index: 9, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
-        label: "+notifyUrl",
-        extra: { language: "fr", customerEmail, customerName, customerPhone, notifyUrl: callbackUrl } },
-      { attempt_index: 10, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
-        label: "+country+channel",
-        extra: { language: "fr", customerEmail, customerName, customerPhone, notifyUrl: callbackUrl, country: "CD", channel: "web" } },
-      // ---- camelCase strict : Keccel cite "returnUrl" en camelCase dans ses erreurs ----
-      { attempt_index: 11, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
-        label: "camelCase_full", key_case: "camelCase" },
-      { attempt_index: 12, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
-        label: "camelCase+customer", key_case: "camelCase",
-        extra: { customerEmail, customerName, customerPhone } },
-      { attempt_index: 13, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
-        label: "camelCase+lang", key_case: "camelCase",
-        extra: { language: "fr" } },
-    ];
+    console.log(`[${diagnosticId}] Keccel cardpay POST keys=${Object.keys(payload).join(",")} amount=${payload.amount}`);
 
-    let keccelResponse: any = null;
-    let redirectUrl: string | null = null;
-    let lastHttpStatus = 0;
-    let lastRawBody = "";
-    let lastKeccelDescription = "";
-    let success = false;
+    let httpStatus = 0;
+    let rawBody = "";
+    let parsed: any = null;
+    let networkError: string | null = null;
 
-    for (const att of attempts) {
-      const useCamel = att.key_case === "camelCase";
-      const payload: Record<string, unknown> = useCamel
-        ? {
-            merchantCode: basePayload.merchantcode,
-            reference: basePayload.reference,
-            amount: basePayload.amount,
-            currency: basePayload.currency,
-            description: basePayload.description,
-            callbackUrl: basePayload.callbackurl,
-          }
-        : { ...basePayload };
-      if (att.return_key_mode === "returnUrl" || att.return_key_mode === "both") {
-        payload.returnUrl = returnUrl;
-      }
-      if (att.return_key_mode === "returnurl" || att.return_key_mode === "both") {
-        payload.returnurl = returnUrl;
-      }
-      if (att.extra) {
-        for (const [k, v] of Object.entries(att.extra)) payload[k] = v;
-      }
-      const authValue = att.auth_format === "bearer_normalized"
-        ? `Bearer ${cleanToken}`
-        : cleanToken;
+    try {
+      const resp = await fetch("https://api.keccel.net/cardpay", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Authorization": `Bearer ${cleanToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      httpStatus = resp.status;
+      rawBody = await resp.text();
+      console.log(`[${diagnosticId}] Keccel ← ${resp.status} ${rawBody.slice(0, 500)}`);
+      try { parsed = JSON.parse(rawBody); } catch { parsed = null; }
+    } catch (e) {
+      networkError = (e as any)?.message ?? String(e);
+      console.error(`[${diagnosticId}] Keccel network error:`, e);
+    }
 
-      console.log(`[${diagnosticId}] attempt ${att.attempt_index} (${att.label ?? "base"}) auth=${att.auth_format} returnKey=${att.return_key_mode} keys=${Object.keys(payload).join(",")}`);
+    const success = parsed && String(parsed.code) === "0";
+    const redirectUrl: string | null = success ? (parsed?.checkoutUrl || null) : null;
 
-      try {
-        const resp = await fetch("https://api.keccel.net/cardpay", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Authorization": authValue,
-          },
-          body: JSON.stringify(payload),
-        });
-        lastHttpStatus = resp.status;
-        const rawBody = await resp.text();
-        lastRawBody = rawBody;
-        console.log(`[${diagnosticId}] attempt ${att.attempt_index} ← status ${resp.status} body ${rawBody.slice(0, 500)}`);
-
-        let parsed: any = null;
-        try { parsed = JSON.parse(rawBody); } catch { parsed = null; }
-        if (parsed?.description) lastKeccelDescription = String(parsed.description);
-
-        const attemptShape = Object.fromEntries(
-          Object.entries(payload).map(([k, v]) => [k, {
-            type: typeof v,
-            length: typeof v === "string" ? (v as string).length : undefined,
-            present: v !== undefined && v !== null && v !== "",
-          }])
-        );
-
-        await persistDiagnostic({
-          payload_shape: attemptShape,
-          http_status: resp.status,
-          raw_body: rawBody.slice(0, 4000),
-          keccel_code: String(parsed?.code ?? ""),
-          keccel_description: parsed?.description ?? null,
-          keccel_response: {
-            attempt_index: att.attempt_index,
-            label: att.label ?? "base",
-            auth_format: att.auth_format,
-            return_key_mode: att.return_key_mode,
-            sent_keys: Object.keys(payload),
-            response: parsed,
-          },
-          error: parsed && String(parsed?.code) === "0" ? null : "keccel_error",
-        });
-
-        if (parsed && String(parsed.code) === "0") {
-          keccelResponse = parsed;
-          redirectUrl = parsed?.checkoutUrl || null;
-          success = true;
-          break;
-        }
-      } catch (apiError) {
-        console.error(`[${diagnosticId}] attempt ${att.attempt_index} network error:`, apiError);
-        await persistDiagnostic({
-          payload_shape: fieldShape,
-          keccel_response: {
-            attempt_index: att.attempt_index,
-            label: att.label ?? "base",
-            auth_format: att.auth_format,
-            return_key_mode: att.return_key_mode,
-          },
-          error: `network_error: ${(apiError as any)?.message ?? String(apiError)}`,
-        });
-      }
+    // Diagnostic (best-effort, jamais bloquant)
+    try {
+      await supabase.from("keccel_cardpay_diagnostics").insert({
+        diagnostic_id: diagnosticId,
+        function_name: "keccel-cardpay",
+        environment: supabaseUrl,
+        origin,
+        site_base_url: siteBaseUrl,
+        user_id: user.id,
+        order_id: order.id,
+        reference,
+        amount,
+        amount_sent: amountSent,
+        currency: "USD",
+        callback_url: callbackUrl,
+        return_url: returnUrl,
+        merchant_code_masked: merchantCodeMasked,
+        token_present: true,
+        token_length: cleanToken.length,
+        sent_keys: Object.keys(payload),
+        http_status: httpStatus,
+        raw_body: rawBody.slice(0, 4000),
+        keccel_code: String(parsed?.code ?? ""),
+        keccel_description: parsed?.description ?? null,
+        keccel_response: parsed,
+        error: networkError ? `network_error: ${networkError}` : (success ? null : "keccel_error"),
+      });
+    } catch (e) {
+      console.error(`[${diagnosticId}] Diagnostic insert failed:`, e);
     }
 
     if (!success) {
       return errorResponse(
-        `Keccel a refusé les ${attempts.length} variantes (diag ${diagnosticId}). HTTP ${lastHttpStatus} — ${lastKeccelDescription || "réponse vide"}.`,
+        `Keccel a refusé le paiement (diag ${diagnosticId}). HTTP ${httpStatus} — ${parsed?.description ?? "réponse vide"}.`,
         {
           diagnostic_id: diagnosticId,
-          httpStatus: lastHttpStatus,
-          keccel_description: lastKeccelDescription,
-          body: lastRawBody.slice(0, 500),
-          diagnostic_persisted: diagnosticPersisted,
-          diagnostic_insert_error: lastDiagnosticInsertError,
-          environment: supabaseUrl,
-          site_base_url: siteBaseUrl,
+          httpStatus,
+          keccel_description: parsed?.description ?? null,
+          body: rawBody.slice(0, 500),
         }
       );
     }
 
-    // Create payment transaction record
+    // Create payment transaction
     const { data: tx, error: txError } = await supabase
       .from("payment_transactions")
       .insert({
@@ -428,13 +225,13 @@ Deno.serve(async (req) => {
         user_id: user.id,
         method: method === "paypal" ? "paypal" : "card",
         provider: "keccel",
-        amount: amount,
+        amount,
         currency: "USD",
         reference: reference.substring(0, 255),
-        transaction_id: keccelResponse?.transactionid || null,
+        transaction_id: parsed?.transactionid || null,
         status: "pending",
         payment_type: pType,
-        callback_payload: keccelResponse,
+        callback_payload: parsed,
       })
       .select("id")
       .single();
@@ -444,7 +241,6 @@ Deno.serve(async (req) => {
       return errorResponse("Erreur interne lors de la création de la transaction");
     }
 
-    // Update order status to awaiting_payment if it's the main order payment
     if (pType === "order") {
       await supabase
         .from("orders")
@@ -458,7 +254,7 @@ Deno.serve(async (req) => {
         success: true,
         transaction_id: tx?.id,
         redirect_url: redirectUrl,
-        reference: reference,
+        reference,
         status: "pending",
       }),
       { status: 200, headers: jsonHeaders }

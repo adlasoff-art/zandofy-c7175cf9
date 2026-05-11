@@ -1,65 +1,96 @@
-## Hypothèse confirmée à 90 %
+## Objectif
 
-Keccel attend toutes les clés du payload en **camelCase**, pas en minuscules :
+1. **Graver dans la mémoire projet** les règles officielles Keccel CardPay (confirmées par l'agent Keccel) pour qu'aucune itération future ne reproduise les erreurs.
+2. **Remettre `keccel-cardpay/index.ts` dans un état propre** : un seul appel, payload exact, plus de boucle d'essais à 13 variantes.
 
-- `merchantCode` (pas `merchantcode`)
-- `callbackUrl` (pas `callbackurl`)
-- `returnUrl` ✓ (déjà bon)
+> Note : tu as déjà mis à jour le secret `KECCEL_CARD_MERCHANT_CODE` = `JAMSIO`. Aucune action secret à demander.
 
-**Preuve** : l'attempt #3 (qui envoie `returnurl` lowercase) reçoit `Missing returnUrl parameter` — Keccel cite le nom attendu en camelCase. Pour les autres attempts, le nom est vide (double espace) parce que Keccel ne parvient pas à reformater nos clés lowercase.
+---
 
-Notre merchant code `jam` est bien envoyé (`ja***am` confirmé), mais Keccel ne le voit pas parce qu'il cherche la clé `merchantCode` qui n'existe pas dans le JSON.
+## Partie 1 — Documentation immuable (avant tout code)
 
-## Plan d'action — Étape unique
+### 1a. Réécrire `mem://features/keccel-cardpay-constraints`
 
-Modifier `frontend/supabase/functions/keccel-cardpay/index.ts` pour ajouter **3 nouvelles variantes camelCase** (attempts 11-13) en gardant les 10 existantes (au cas où l'hypothèse serait fausse) :
+Règles officielles confirmées par l'agent Keccel (WhatsApp) :
 
-### Variantes à ajouter
+- **`merchantcode`** : valeur fournie par Keccel pour Zandofy = **`JAMSIO`** (stocké dans secret `KECCEL_CARD_MERCHANT_CODE`).
+- **Casse des clés** : **TOUS les paramètres en minuscules** — `merchantcode`, `reference`, `amount`, `currency`, `description`, `callbackurl`, `returnurl`. Jamais de camelCase.
+- **Champs autorisés** : exactement **7 champs**. **Ne jamais ajouter** `language`, `customerEmail`, `customerName`, `customerPhone`, `notifyUrl`, `country`, `channel`, etc.
+- **`amount`** : string entière (`Math.ceil`).
+- **`reference`** : ≤ 25 caractères.
+- **`Authorization`** : `Bearer <token>` (token brut côté secret).
+- **Endpoint** : `POST https://api.keccel.net/cardpay`.
+
+### 1b. Ajouter section « 7. Intégration Keccel CardPay (immuable) » dans `SAFETY_POLICY.md` et `docs/SAFETY_POLICY.md`
+
+Reprend les 7 règles ci-dessus + mention :
+> Toute modification du payload Keccel CardPay (ajout de champ, changement de casse, changement du merchantcode) nécessite une confirmation écrite de l'équipe Keccel. Aucun champ « au cas où » pendant le debug.
+
+---
+
+## Partie 2 — Nettoyage de l'edge function
+
+Refactor identique de `supabase/functions/keccel-cardpay/index.ts` ET `frontend/supabase/functions/keccel-cardpay/index.ts`.
+
+### Supprimé
+
+- Boucle `attempts[]` (13 variantes).
+- Variantes camelCase (`merchantCode`, `callbackUrl`, `returnUrl`).
+- Variantes avec champs extra (`language`, `customerEmail`, `customerName`, `customerPhone`, `notifyUrl`, `country`, `channel`).
+- Variante `returnurl + returnUrl` (mode `both`).
+- Lecture du profil (email/nom/phone) si plus utilisée ailleurs dans la fonction.
+
+### Conservé
+
+- Auth utilisateur, rate limiting, fetch order, validation montant.
+- `reference` ≤ 25 chars, `callbackUrl`, `returnUrl`.
+- Pre-flight validation des 7 champs.
+- Diagnostic : 1 insert dans `keccel_cardpay_diagnostics` (succès ou échec).
+- Création `payment_transactions` + update `orders.status` inchangées.
+
+### Payload final unique
 
 ```ts
-// Attempt 11 : tout en camelCase strict
-{ attempt_index: 11, label: "camelCase_full",
-  payload_keys: { merchantCode, reference, amount, currency, description, callbackUrl, returnUrl }
-}
+const payload = {
+  merchantcode: keccelMerchantCode, // = "JAMSIO"
+  reference,
+  amount: String(Math.ceil(amount)),
+  currency: "USD",
+  description: `Commande ${order.order_ref} - Zandofy`,
+  callbackurl: callbackUrl,
+  returnurl: returnUrl, // lowercase obligatoire
+};
 
-// Attempt 12 : camelCase + champs client (au cas où)
-{ attempt_index: 12, label: "camelCase+customer",
-  payload_keys: { merchantCode, reference, amount, currency, description, callbackUrl, returnUrl,
-                  customerEmail, customerName, customerPhone }
-}
-
-// Attempt 13 : camelCase + language
-{ attempt_index: 13, label: "camelCase+lang",
-  payload_keys: { merchantCode, reference, amount, currency, description, callbackUrl, returnUrl,
-                  language: "fr" }
-}
+await fetch("https://api.keccel.net/cardpay", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "Authorization": `Bearer ${cleanToken}`,
+  },
+  body: JSON.stringify(payload),
+});
 ```
 
-Implémentation : refactor mineur du builder de payload pour basculer entre `lowercase` / `camelCase` selon l'attempt.
+### Fichiers touchés
 
-## Étape de validation post-déploiement
+- `mem://features/keccel-cardpay-constraints` (réécriture complète)
+- `SAFETY_POLICY.md` (ajout section 7)
+- `docs/SAFETY_POLICY.md` (ajout section 7)
+- `supabase/functions/keccel-cardpay/index.ts` (refactor)
+- `frontend/supabase/functions/keccel-cardpay/index.ts` (refactor identique)
+- `.lovable/plan.md` (mise à jour finale)
 
-1. GitHub Actions déploie automatiquement la fonction sur prod (5 min).
-2. Tu fais **un seul** test carte sur `zandofy.com`.
-3. Tu lances le SQL du dernier plan (mêmes 2 requêtes).
-4. Lecture :
+Pas de migration SQL. Pas de changement frontend.
 
-| Cas | Verdict |
-|---|---|
-| Attempt 11/12/13 a `keccel_code = "0"` + checkoutUrl | **GAGNÉ** — Keccel attend bien camelCase. On nettoie ensuite et on retire les 10 anciennes variantes. |
-| Toujours `Missing parameter` même en camelCase | L'hypothèse était fausse — on regarde la doc Keccel ou on contacte le support avec preuve à l'appui. |
-| Nouvelle erreur (genre `Invalid amount`, `Unauthorized`...) | On progresse — le format des clés était bon, il manque juste un champ ou un format précis. |
+---
 
-## Ce que je ne touche PAS
+## Validation post-déploiement
 
-- Aucun changement de logique business (montant, reference, transaction record, ordre status).
-- Le merchant code reste à `jam` (à ne PAS revenir à JAMSIO).
-- Les 10 anciennes variantes lowercase restent en place tant qu'on n'a pas confirmé.
+1. Commit → GitHub Actions déploie sur la prod (`vpt...yxf`).
+2. Test d'un paiement carte réel sur `zandofy.com`.
+3. Attendu : Keccel répond `{"code":"0","checkoutUrl":"..."}` → redirection 3DS.
 
-## Fichier impacté
+---
 
-- `frontend/supabase/functions/keccel-cardpay/index.ts` : ajout d'un flag `key_case: "lowercase" | "camelCase"` dans le type `Attempt`, et logique pour construire le payload selon le case choisi. ~30 lignes ajoutées.
-
-Pas de migration DB (la table `keccel_cardpay_diagnostics` accepte déjà des `attempt_label` libres).
-
-Approuve et j'implémente immédiatement.
+**Confirmes-tu que je peux appliquer ce plan ?**
