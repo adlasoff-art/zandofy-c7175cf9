@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
     // Helper: persist a diagnostic row (best-effort, never throws)
     async function persistDiagnostic(extra: Record<string, unknown>) {
       try {
-        await supabase.from("keccel_cardpay_diagnostics").insert({
+        const { error: diagInsertError } = await supabase.from("keccel_cardpay_diagnostics").insert({
           diagnostic_id: diagnosticId,
           function_name: "keccel-cardpay",
           environment: supabaseUrl,
@@ -174,6 +174,17 @@ Deno.serve(async (req) => {
           sent_keys: Object.keys(keccelPayload),
           ...extra,
         });
+        if (diagInsertError) {
+          console.error(
+            `[${diagnosticId}] Diagnostic insert FAILED on table keccel_cardpay_diagnostics:`,
+            JSON.stringify({
+              code: (diagInsertError as any)?.code,
+              message: (diagInsertError as any)?.message,
+              details: (diagInsertError as any)?.details,
+              hint: (diagInsertError as any)?.hint,
+            })
+          );
+        }
       } catch (e) {
         console.error(`[${diagnosticId}] Failed to persist diagnostic:`, e);
       }
