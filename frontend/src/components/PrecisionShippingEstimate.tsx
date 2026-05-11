@@ -7,13 +7,14 @@ import {
   type City, type DynamicQuoteResult,
 } from "@/services/dynamic-shipping";
 import { isLandTransportFeasible } from "@/utils/neighboring-countries";
+import { useI18n } from "@/contexts/I18nContext";
 
 // ── Constants ──
 const MODE_META = {
-  air:  { icon: Plane,     label: "Aérien",      unit: "kg",  baseLabel: "/ kg" },
-  sea:  { icon: Ship,      label: "Maritime",     unit: "cbm", baseLabel: "/ CBM" },
-  road: { icon: TruckIcon, label: "Routier",      unit: "kg",  baseLabel: "/ kg" },
-  rail: { icon: Train,     label: "Ferroviaire",  unit: "kg",  baseLabel: "/ kg" },
+  air:  { icon: Plane,     label: "Aérien",     labelKey: "shipping.mode.air",  unit: "kg",  baseLabel: "/ kg" },
+  sea:  { icon: Ship,      label: "Maritime",   labelKey: "shipping.mode.sea",  unit: "cbm", baseLabel: "/ CBM" },
+  road: { icon: TruckIcon, label: "Routier",    labelKey: "shipping.mode.road", unit: "kg",  baseLabel: "/ kg" },
+  rail: { icon: Train,     label: "Ferroviaire",labelKey: "shipping.mode.rail", unit: "kg",  baseLabel: "/ kg" },
 } as const;
 
 type TransportMode = keyof typeof MODE_META;
@@ -96,6 +97,7 @@ export function PrecisionShippingEstimate({
   prepDaysMin = 2,
   prepDaysMax = 5,
 }: Props) {
+  const { t, formatPrice } = useI18n();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<City[]>([]);
   const [open, setOpen] = useState(false);
@@ -302,7 +304,9 @@ export function PrecisionShippingEstimate({
       const futureCostPerUnit = preciseRound(futureTotal / futureQty, 2);
       if (futureCostPerUnit < currentCostPerUnit) {
         return {
-          text: `Ajoutez ${airQuote.unitsToNextKg} unité${airQuote.unitsToNextKg > 1 ? "s" : ""} pour compléter votre prochain KG et optimiser vos coûts de transport aérien.`,
+          text:
+            t("shipping.addUnitsForKgAir", { count: airQuote.unitsToNextKg }) ||
+            `Ajoutez ${airQuote.unitsToNextKg} unité${airQuote.unitsToNextKg > 1 ? "s" : ""} pour compléter votre prochain KG et optimiser vos coûts de transport aérien.`,
           savings: preciseRound(currentCostPerUnit - futureCostPerUnit, 2),
         };
       }
@@ -310,12 +314,14 @@ export function PrecisionShippingEstimate({
 
     if (seaQuote?.unitsToNextCbm && seaQuote.unitsToNextCbm > 0 && seaQuote.unitsToNextCbm <= 20) {
       return {
-        text: `Ajoutez ${seaQuote.unitsToNextCbm} unité${seaQuote.unitsToNextCbm > 1 ? "s" : ""} pour compléter votre prochain 0.1 CBM et optimiser vos coûts de fret maritime.`,
+        text:
+          t("shipping.addUnitsForCbm", { count: seaQuote.unitsToNextCbm }) ||
+          `Ajoutez ${seaQuote.unitsToNextCbm} unité${seaQuote.unitsToNextCbm > 1 ? "s" : ""} pour compléter votre prochain 0.1 CBM et optimiser vos coûts de fret maritime.`,
         savings: null,
       };
     }
     return null;
-  }, [precisionQuotes, quantity, weight]);
+  }, [precisionQuotes, quantity, weight, t]);
 
   return (
     <div className="space-y-3">
@@ -327,7 +333,7 @@ export function PrecisionShippingEstimate({
           onChange={e => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => { if (!loading) setOpen(false); }, 400)}
-          placeholder="Entrez votre ville pour estimer..."
+          placeholder={t("shipping.searchCityEstimate") || "Entrez votre ville pour estimer..."}
           className="h-9 pl-8 text-sm w-full max-w-full"
           style={{ fontSize: '16px' }}
         />
@@ -348,7 +354,7 @@ export function PrecisionShippingEstimate({
                 <span className="text-xs text-muted-foreground">{city.country_code}</span>
               </button>
             )) : (
-              <div className="px-3 py-3 text-xs text-muted-foreground text-center">Aucune ville trouvée</div>
+              <div className="px-3 py-3 text-xs text-muted-foreground text-center">{t("shipping.noCityFound") || "Aucune ville trouvée"}</div>
             )}
           </div>
         )}
@@ -357,7 +363,7 @@ export function PrecisionShippingEstimate({
       {calculating && (
         <div className="flex items-center justify-center py-3">
           <Loader2 size={16} className="animate-spin text-primary mr-2" />
-          <span className="text-xs text-muted-foreground">Calcul en cours...</span>
+          <span className="text-xs text-muted-foreground">{t("shipping.calculating") || "Calcul en cours..."}</span>
         </div>
       )}
 
@@ -372,21 +378,25 @@ export function PrecisionShippingEstimate({
                 <div className="flex items-center justify-between px-3 py-2 text-sm">
                   <div className="flex items-center gap-2">
                     <Icon size={14} className="text-primary" />
-                    <span className="font-medium">{Meta?.label || q.mode}</span>
+                    <span className="font-medium">{(Meta && (t(Meta.labelKey) || Meta.label)) || q.mode}</span>
                     {(q.mode === "road" || q.mode === "rail") && originCity && selectedCity && (
                       <Badge className={`text-[9px] px-1.5 py-0 h-4 ${
                         originCity.country_code === selectedCity.country_code
                           ? "bg-emerald-500/15 text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-700"
                           : "bg-sky-500/15 text-sky-700 border-sky-300 dark:text-sky-400 dark:border-sky-700"
                       }`} variant="outline">
-                        {originCity.country_code === selectedCity.country_code ? "National" : "Limitrophe"}
+                        {originCity.country_code === selectedCity.country_code
+                          ? (t("shipping.national") || "National")
+                          : (t("shipping.crossBorder") || "Limitrophe")}
                       </Badge>
                     )}
                   </div>
                   <div className="text-right">
-                    <span className="font-bold text-foreground">${q.totalPrice.toFixed(2)}</span>
+                    <span className="font-bold text-foreground">{formatPrice(q.totalPrice)}</span>
                     {q.transitMin && q.transitMax && (
-                      <p className="text-[10px] text-muted-foreground">{q.transitMin}–{q.transitMax} jours</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {t("freight.transitDays", { min: q.transitMin, max: q.transitMax }) || `${q.transitMin}–${q.transitMax} jours`}
+                      </p>
                     )}
                     {q.transitMin != null && q.transitMax != null && (() => {
                       const totalMin = prepDaysMin + q.transitMin;
@@ -407,8 +417,8 @@ export function PrecisionShippingEstimate({
                 {/* Breakdown */}
                 <div className="px-3 pb-2 text-[10px] text-muted-foreground space-y-0.5">
                   <div className="flex justify-between">
-                    <span>Tarif de base</span>
-                    <span>${q.baseRate.toFixed(2)} {Meta?.baseLabel}</span>
+                    <span>{t("shipping.baseRate") || "Tarif de base"}</span>
+                    <span>{formatPrice(q.baseRate)} {Meta?.baseLabel}</span>
                   </div>
                   {q.unit === "kg" && q.totalWeight > 0 && (
                     <div className="flex justify-between">
@@ -423,17 +433,17 @@ export function PrecisionShippingEstimate({
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span>Fret de base</span>
-                    <span>${q.basePrice.toFixed(2)}</span>
+                    <span>{t("shipping.basePriceLine") || "Fret de base"}</span>
+                    <span>{formatPrice(q.basePrice)}</span>
                   </div>
                   {q.fuelSurcharge > 0 && (
                     <div className="flex justify-between">
-                      <span>Surtaxe carburant ({q.fuelPercent}%)</span>
-                      <span>${q.fuelSurcharge.toFixed(2)}</span>
+                      <span>{t("shipping.fuelSurchargeShort", { pct: q.fuelPercent }) || `Surtaxe carburant (${q.fuelPercent}%)`}</span>
+                      <span>{formatPrice(q.fuelSurcharge)}</span>
                     </div>
                   )}
                   {q.routeType === "default" && (
-                    <span className="text-[9px] text-muted-foreground/60 italic">Tarif indicatif</span>
+                    <span className="text-[9px] text-muted-foreground/60 italic">{t("shipping.indicativeRate") || "Tarif indicatif"}</span>
                   )}
                 </div>
               </div>
@@ -452,7 +462,8 @@ export function PrecisionShippingEstimate({
             <div className="flex items-start gap-2 bg-muted/40 border border-border rounded-sm px-2.5 py-2">
               <Info size={12} className="text-muted-foreground shrink-0 mt-0.5" />
               <p className="text-[10px] text-muted-foreground">
-                Seuls les modes <strong className="text-foreground">Aérien</strong> et <strong className="text-foreground">Maritime</strong> sont disponibles pour les routes internationales. Le Routier et le Ferroviaire ne sont proposés que pour les trajets nationaux ou entre pays limitrophes.
+                {t("shipping.intlOnlyInfo") ||
+                  "Seuls les modes Aérien et Maritime sont disponibles pour les routes internationales. Le Routier et le Ferroviaire ne sont proposés que pour les trajets nationaux ou entre pays limitrophes."}
               </p>
             </div>
           )}
@@ -462,11 +473,12 @@ export function PrecisionShippingEstimate({
             <div className="flex items-start gap-2 bg-primary/5 border border-primary/20 rounded-sm px-3 py-2">
               <Lightbulb size={14} className="text-primary shrink-0 mt-0.5" />
               <div>
-                <p className="text-[11px] font-medium text-foreground">Optimisation</p>
+                <p className="text-[11px] font-medium text-foreground">{t("shipping.optimization") || "Optimisation"}</p>
                 <p className="text-[10px] text-muted-foreground">{optimizationTip.text}</p>
                 {optimizationTip.savings && (
                   <p className="text-[10px] font-semibold text-primary">
-                    Économie potentielle : ${optimizationTip.savings}/unité
+                    {t("shipping.potentialSaving", { amount: formatPrice(optimizationTip.savings) }) ||
+                      `Économie potentielle : ${formatPrice(optimizationTip.savings)}/unité`}
                   </p>
                 )}
               </div>
