@@ -109,15 +109,16 @@ export function ProductGrid() {
           fetchProducts({ categoryId: cat.id, limit: 12 }).then((data) => {
             if (data.length > 0) {
               setCategorySections((prev) => {
-                if (prev.find((s) => s.label === section.labelFr)) return prev;
-                return [...prev, { label: section.labelFr, products: data }];
+                const label = t(section.labelKey) || section.labelFr;
+                if (prev.find((s) => s.label === label)) return prev;
+                return [...prev, { label, products: data }];
               });
             }
           });
         }
       });
     });
-  }, []);
+  }, [t]);
 
   // Load main Tendances products when tab changes
   useEffect(() => {
