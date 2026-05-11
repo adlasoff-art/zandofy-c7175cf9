@@ -34,7 +34,7 @@ import { CustomerOrderTracker } from "@/components/orders/CustomerOrderTracker";
 import { DisputesList } from "@/components/disputes/DisputesList";
 import { DisputeForm } from "@/components/disputes/DisputeForm";
 import { formatDistanceToNow, format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { fr, enUS } from "date-fns/locale";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -63,28 +63,28 @@ import { CascadingAddressFields, type AddressData } from "@/components/address/C
 import { CustomerPricingTab } from "@/components/customer/CustomerPricingTab";
 
 const TABS = [
-  { key: "overview", label: "Aperçu", icon: Package },
-  { key: "orders", label: "Commandes", icon: Package },
-  { key: "subscriptions", label: "Abonnements", icon: CreditCard },
-  { key: "tracking", label: "Suivi", icon: Truck },
-  { key: "returns", label: "Retours", icon: RotateCcw },
-  { key: "disputes", label: "Litiges", icon: AlertTriangle },
-  { key: "referral", label: "Parrainage", icon: Gift },
-  { key: "affiliate", label: "Affiliation", icon: Star },
-  { key: "notifications", label: "Notifications", icon: Bell },
-  { key: "messages", label: "Messages", icon: MessageCircle },
-  { key: "profile", label: "Profil", icon: UserIcon },
-  { key: "kyc", label: "Vérification", icon: ShieldCheck },
-  { key: "addresses", label: "Adresses de livraison", icon: MapPin },
+  { key: "overview", labelKey: "dashboard.tab.overview", icon: Package },
+  { key: "orders", labelKey: "dashboard.tab.orders", icon: Package },
+  { key: "subscriptions", labelKey: "dashboard.tab.subscriptions", icon: CreditCard },
+  { key: "tracking", labelKey: "dashboard.tab.tracking", icon: Truck },
+  { key: "returns", labelKey: "dashboard.tab.returns", icon: RotateCcw },
+  { key: "disputes", labelKey: "dashboard.tab.disputes", icon: AlertTriangle },
+  { key: "referral", labelKey: "dashboard.tab.referral", icon: Gift },
+  { key: "affiliate", labelKey: "dashboard.tab.affiliate", icon: Star },
+  { key: "notifications", labelKey: "dashboard.tab.notifications", icon: Bell },
+  { key: "messages", labelKey: "dashboard.tab.messages", icon: MessageCircle },
+  { key: "profile", labelKey: "dashboard.tab.profile", icon: UserIcon },
+  { key: "kyc", labelKey: "dashboard.tab.kyc", icon: ShieldCheck },
+  { key: "addresses", labelKey: "dashboard.tab.addresses", icon: MapPin },
 ];
 
 const ORDERS_PER_PAGE = 10;
 
 const STATUS_FILTERS = [
-  { key: "all", label: "Toutes" },
-  { key: "active", label: "En cours" },
-  { key: "delivered", label: "Livrées" },
-  { key: "cancelled", label: "Annulées" },
+  { key: "all", labelKey: "dashboard.filter.all" },
+  { key: "active", labelKey: "dashboard.filter.active" },
+  { key: "delivered", labelKey: "dashboard.filter.delivered" },
+  { key: "cancelled", labelKey: "dashboard.filter.cancelled" },
 ];
 
 interface OrderRow {
