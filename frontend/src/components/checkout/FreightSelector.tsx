@@ -523,15 +523,20 @@ function OfferCard({
   realPriceIndicative?: number;
   totalWeightKgForMarketing?: number;
 }) {
+  const { t } = useI18n();
   const { quote, service_class, mode, pickup_address } = offer;
   const isPlatform = offer.is_platform_owned === true;
   const isPlatformGreyed = isPlatform && offer.has_profile_for_zone === false;
   const forwarderName = offer.forwarder_name ?? null;
-  const meta = MODE_META[mode] ?? { label: mode, Icon: Truck, cls: "bg-muted text-foreground border-border" };
+  const metaRaw = MODE_META[mode];
+  const meta = metaRaw
+    ? { ...metaRaw, label: t(metaRaw.labelKey) || metaRaw.label }
+    : { label: mode, labelKey: "", Icon: Truck, cls: "bg-muted text-foreground border-border" };
   const ModeIcon = meta.Icon;
   const transitLabel =
     quote.transit_min_days || quote.transit_max_days
-      ? `${quote.transit_min_days ?? "?"}–${quote.transit_max_days ?? "?"} jours`
+      ? (t("freight.transitDays", { min: quote.transit_min_days ?? "?", max: quote.transit_max_days ?? "?" }) ||
+          `${quote.transit_min_days ?? "?"}–${quote.transit_max_days ?? "?"} jours`)
       : null;
 
   // ───────────────── Cas 1 : Carte plateforme grisée (Very Speed indispo) ───
@@ -556,15 +561,15 @@ function OfferCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs font-semibold text-foreground">
-              {forwarderName ?? "Service plateforme"}
+              {forwarderName ?? (t("freight.platformService") || "Service plateforme")}
             </span>
             <span className="text-[9px] px-1.5 py-0 rounded-full border border-border bg-background text-muted-foreground uppercase tracking-wide">
-              Plateforme
+              {t("freight.platform") || "Plateforme"}
             </span>
             <Lock size={10} className="text-muted-foreground" />
           </div>
           <p className="text-[10px] text-muted-foreground mt-0.5">
-            {offer.unavailable_message ?? "Service plateforme non disponible dans votre zone"}
+            {offer.unavailable_message ?? (t("freight.platformUnavailable") || "Service plateforme non disponible dans votre zone")}
           </p>
         </div>
       </div>
@@ -602,14 +607,14 @@ function OfferCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs font-semibold text-foreground">
-              {forwarderName ?? "Service plateforme"}
+              {forwarderName ?? (t("freight.platformService") || "Service plateforme")}
             </span>
             <span className="text-[9px] px-1.5 py-0 rounded-full bg-primary/15 text-primary uppercase tracking-wide font-semibold">
-              Plateforme
+              {t("freight.platform") || "Plateforme"}
             </span>
             {isCheapest && (
               <span className="text-[9px] px-1.5 py-0 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
-                Le moins cher
+                {t("freight.cheapest") || "Le moins cher"}
               </span>
             )}
             {isSelected && <BadgeCheck size={11} className="text-primary" />}
@@ -622,13 +627,13 @@ function OfferCard({
                       tabIndex={0}
                       onClick={(e) => e.stopPropagation()}
                       className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                      aria-label="Adresse de récupération"
+                      aria-label={t("freight.pickupAddress") || "Adresse de récupération"}
                     >
                       <MapPin size={9} />
                     </span>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-sm text-[11px] break-words">
-                    <p className="font-semibold mb-0.5">Adresse de récupération</p>
+                    <p className="font-semibold mb-0.5">{t("freight.pickupAddress") || "Adresse de récupération"}</p>
                     <p className="whitespace-pre-line break-words text-muted-foreground">{pickup_address}</p>
                   </TooltipContent>
                 </Tooltip>
@@ -640,7 +645,8 @@ function OfferCard({
               {/* Ligne 1 : tarif réel ↔ montant entre parenthèses (même taille) */}
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-[10px] text-muted-foreground">
-                  Tarif réel basé sur votre poids ({weightKg.toFixed(2)} kg)
+                  {t("freight.realRateBasedOnWeight", { weight: weightKg.toFixed(2) }) ||
+                    `Tarif réel basé sur votre poids (${weightKg.toFixed(2)} kg)`}
                 </p>
                 <p className="text-[10px] text-muted-foreground whitespace-nowrap">
                   ({quote.currency} {realPriceIndicative.toFixed(2)})
@@ -649,26 +655,30 @@ function OfferCard({
               {/* Ligne 2 : forfait facturé ↔ montant en gras (aligné) */}
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-snug">
-                  ℹ️ Le transitaire vous facturera le forfait minimum de
+                  {t("freight.flatMinimumNotice") || "ℹ️ Le transitaire vous facturera le forfait minimum de"}
                 </p>
                 <p className="text-xs font-bold text-foreground whitespace-nowrap">
                   {quote.currency} {flatPrice.toFixed(2)}
                 </p>
               </div>
               {transitLabel && (
-                <p className="text-[10px] text-muted-foreground">Délai : {transitLabel}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {t("freight.transitLabel", { label: transitLabel }) || `Délai : ${transitLabel}`}
+                </p>
               )}
               {remainingForOneKg > 0 && (
                 <p className="text-[10px] text-primary leading-snug">
-                  💡 Ajoutez encore {(remainingForOneKg * 1000).toFixed(0)}g pour atteindre 1 kg
-                  et rentabiliser ce tarif.
+                  {t("freight.addGramsForOneKg", { grams: (remainingForOneKg * 1000).toFixed(0) }) ||
+                    `💡 Ajoutez encore ${(remainingForOneKg * 1000).toFixed(0)}g pour atteindre 1 kg et rentabiliser ce tarif.`}
                 </p>
               )}
             </div>
           ) : (
             <>
               {transitLabel && (
-                <p className="text-[10px] text-muted-foreground">Délai : {transitLabel}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {t("freight.transitLabel", { label: transitLabel }) || `Délai : ${transitLabel}`}
+                </p>
               )}
               <div className="mt-0.5 flex justify-end">
                 <p className="text-xs font-bold text-foreground">
@@ -716,7 +726,7 @@ function OfferCard({
           <span className="text-[10px] text-muted-foreground capitalize">{service_class}</span>
           {isCheapest && (
             <span className="text-[9px] px-1.5 py-0 rounded-full bg-primary/15 text-primary uppercase tracking-wide">
-              Le moins cher
+              {t("freight.cheapest") || "Le moins cher"}
             </span>
           )}
           {isSelected && <BadgeCheck size={11} className="text-primary" />}
@@ -729,13 +739,13 @@ function OfferCard({
                     tabIndex={0}
                     onClick={(e) => e.stopPropagation()}
                     className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                    aria-label="Adresse de récupération"
+                    aria-label={t("freight.pickupAddress") || "Adresse de récupération"}
                   >
                     <MapPin size={9} />
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-sm text-[11px] break-words">
-                  <p className="font-semibold mb-0.5">Adresse de récupération</p>
+                  <p className="font-semibold mb-0.5">{t("freight.pickupAddress") || "Adresse de récupération"}</p>
                   <p className="whitespace-pre-line break-words text-muted-foreground">{pickup_address}</p>
                 </TooltipContent>
               </Tooltip>
@@ -743,7 +753,9 @@ function OfferCard({
           )}
         </div>
         {transitLabel && (
-          <p className="text-[10px] text-muted-foreground">Délai : {transitLabel}</p>
+          <p className="text-[10px] text-muted-foreground">
+            {t("freight.transitLabel", { label: transitLabel }) || `Délai : ${transitLabel}`}
+          </p>
         )}
         {quote.warnings.length > 0 && (
           <p className="text-[10px] text-destructive flex items-center gap-1 mt-0.5">
@@ -758,7 +770,8 @@ function OfferCard({
         </p>
         {quote.deposit_required && (
           <p className="text-[9px] text-muted-foreground">
-            Acompte {quote.deposit_pct}% : {quote.deposit_amount.toFixed(2)}
+            {t("freight.depositLine", { pct: quote.deposit_pct, amount: quote.deposit_amount.toFixed(2) }) ||
+              `Acompte ${quote.deposit_pct}% : ${quote.deposit_amount.toFixed(2)}`}
           </p>
         )}
       </div>
