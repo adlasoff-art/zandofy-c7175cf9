@@ -394,7 +394,7 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
-                <p className="text-sm font-bold text-foreground truncate">Bienvenue, {welcomeName}</p>
+                <p className="text-sm font-bold text-foreground truncate">{t("dashboard.welcomeDesktop", { name: welcomeName })}</p>
                 <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
               </div>
 
