@@ -26,12 +26,12 @@ import { debugForwarderEligibility, type ForwarderEligibilityDebug } from "@/ser
 import { useRoles } from "@/hooks/use-roles";
 import { useI18n } from "@/contexts/I18nContext";
 
-const MODE_META: Record<string, { labelKey: string; fallback: string; Icon: typeof Plane; cls: string }> = {
-  air: { labelKey: "shipping.mode.air", fallback: "Aérien", Icon: Plane, cls: "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30" },
-  sea: { labelKey: "shipping.mode.sea", fallback: "Maritime", Icon: Ship, cls: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
-  road: { labelKey: "shipping.mode.road", fallback: "Routier", Icon: Truck, cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" },
-  rail: { labelKey: "shipping.mode.rail", fallback: "Ferroviaire", Icon: TramFront, cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
-  express: { labelKey: "shipping.mode.express", fallback: "Express", Icon: Plane, cls: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30" },
+const MODE_META: Record<string, { label: string; labelKey: string; Icon: typeof Plane; cls: string }> = {
+  air: { label: "Aérien", labelKey: "shipping.mode.air", Icon: Plane, cls: "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30" },
+  sea: { label: "Maritime", labelKey: "shipping.mode.sea", Icon: Ship, cls: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
+  road: { label: "Routier", labelKey: "shipping.mode.road", Icon: Truck, cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" },
+  rail: { label: "Ferroviaire", labelKey: "shipping.mode.rail", Icon: TramFront, cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
+  express: { label: "Express", labelKey: "shipping.mode.express", Icon: Plane, cls: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30" },
 };
 
 export type ConsolidationChoice = "split" | "consolidated";
@@ -221,9 +221,9 @@ export function FreightSelector({
           <span>
             {t("freight.noForwarderForDestination", {
               destination: destinationCityName || (t("freight.thisDestination") || "cette destination"),
-              mode: (MODE_META[mode] && (t(MODE_META[mode].labelKey) || MODE_META[mode].fallback)) || mode,
+              mode: (MODE_META[mode] && (t(MODE_META[mode].labelKey) || MODE_META[mode].label)) || mode,
             }) ||
-              `Aucun transitaire ne dessert ${destinationCityName || "cette destination"} depuis l'origine du produit en mode ${MODE_META[mode]?.fallback ?? mode}. Le checkout est bloqué pour cette commande — demandez une couverture ou modifiez l'adresse / le mode.`}
+              `Aucun transitaire ne dessert ${destinationCityName || "cette destination"} depuis l'origine du produit en mode ${MODE_META[mode]?.label ?? mode}. Le checkout est bloqué pour cette commande — demandez une couverture ou modifiez l'adresse / le mode.`}
           </span>
         </div>
         {originCountry && (
