@@ -55,7 +55,9 @@ const SPECIAL_SLUGS = ["nouveautes", "soldes"];
 
 export default function CategoryPage() {
   const { slug } = useParams<{ slug: string }>();
-  const { t } = useI18n();
+  const { t, locale, formatPrice } = useI18n();
+  const labelOf = (c: { name?: string | null; name_fr?: string | null }) =>
+    locale === "fr" ? (c.name_fr ?? c.name ?? "") : (c.name ?? c.name_fr ?? "");
   const isSpecial = SPECIAL_SLUGS.includes(slug?.toLowerCase() || "");
 
   // Filters state
@@ -217,8 +219,11 @@ export default function CategoryPage() {
     );
   }
 
-  const seoTitle = `${category.name_fr} — Acheter en ligne`;
-  const seoDesc = `Découvrez ${filteredProducts?.length || 0} produits ${category.name_fr} sur Zandofy. Livraison rapide, prix compétitifs.`;
+  const catLabel = labelOf(category);
+  const seoTitle = `${catLabel} — ${t("category.online") || "Acheter en ligne"}`;
+  const seoDesc = locale === "fr"
+    ? `Découvrez ${filteredProducts?.length || 0} produits ${catLabel} sur Zandofy. Livraison rapide, prix compétitifs.`
+    : `Discover ${filteredProducts?.length || 0} ${catLabel} products on Zandofy. Fast delivery, competitive prices.`;
 
   return (
     <div className="min-h-screen bg-background">
@@ -243,13 +248,13 @@ export default function CategoryPage() {
               <>
                 <BreadcrumbItem>
                   <BreadcrumbLink asChild>
-                    <Link to={`/category/${slugify(category.parent.name)}`}>{category.parent.name_fr}</Link>
+                    <Link to={`/category/${slugify(category.parent.name)}`}>{labelOf(category.parent)}</Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
               </>
             )}
-            <BreadcrumbItem><BreadcrumbPage>{category.name_fr}</BreadcrumbPage></BreadcrumbItem>
+            <BreadcrumbItem><BreadcrumbPage>{catLabel}</BreadcrumbPage></BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
 
@@ -258,7 +263,7 @@ export default function CategoryPage() {
           <div className="flex items-center gap-3">
             {category.icon && <span className="text-3xl">{category.icon}</span>}
             <div>
-              <h1 className="text-2xl font-bold text-foreground">{category.name_fr}</h1>
+              <h1 className="text-2xl font-bold text-foreground">{catLabel}</h1>
               <p className="text-sm text-muted-foreground mt-1">
                 {filteredProducts?.length || 0} {t("filter.products")}
               </p>
@@ -278,7 +283,7 @@ export default function CategoryPage() {
                   className="px-4 py-2 text-sm rounded-full border border-border bg-card text-foreground hover:border-primary hover:text-primary transition-colors"
                 >
                   {sub.icon && <span className="mr-1">{sub.icon}</span>}
-                  {sub.name_fr}
+                  {labelOf(sub)}
                 </Link>
               ))}
             </div>
@@ -335,9 +340,9 @@ export default function CategoryPage() {
                 className="mt-2"
               />
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>${priceRange[0]}</span>
+                <span>{formatPrice(priceRange[0])}</span>
                 <span>—</span>
-                <span>${priceRange[1]}</span>
+                <span>{formatPrice(priceRange[1])}</span>
               </div>
             </div>
 
@@ -390,7 +395,7 @@ export default function CategoryPage() {
           <div className="flex flex-wrap gap-1.5 mb-4">
             {(priceRange[0] > 0 || priceRange[1] < 10000) && (
               <Badge variant="outline" className="gap-1 text-xs">
-                ${priceRange[0]} - ${priceRange[1]}
+                {formatPrice(priceRange[0])} - {formatPrice(priceRange[1])}
                 <X size={10} className="cursor-pointer" onClick={() => setPriceRange([0, 10000])} />
               </Badge>
             )}
