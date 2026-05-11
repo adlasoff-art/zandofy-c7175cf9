@@ -90,11 +90,11 @@ export default function WishlistPage() {
               onClick={() => {
                 const url = `${window.location.origin}/wishlist/shared/${user.id}`;
                 navigator.clipboard.writeText(url);
-                toast.success("Lien de partage copié !");
+                toast.success(t("wishlist.shareCopied") || "Lien de partage copié !");
               }}
               className="flex items-center gap-2"
             >
-              <Share2 size={14} /> Partager
+              <Share2 size={14} /> {t("wishlist.share") || "Partager"}
             </Button>
           )}
         </div>
