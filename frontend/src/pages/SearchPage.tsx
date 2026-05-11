@@ -15,7 +15,9 @@ import { useI18n } from "@/contexts/I18nContext";
 import { TOGGLE_SEARCH_EVENT } from "@/components/MobileBottomNav";
 
 export default function SearchPage() {
-  const { t } = useI18n();
+  const { t, locale, formatPrice } = useI18n();
+  const labelOf = (c: { name?: string | null; nameFr?: string | null }) =>
+    locale === "fr" ? (c.nameFr ?? c.name ?? "") : (c.name ?? c.nameFr ?? "");
   const [searchParams, setSearchParams] = useSearchParams();
   const queryParam = searchParams.get("q") || "";
 
@@ -165,7 +167,7 @@ export default function SearchPage() {
                 onClick={() => setSelectedCategory(cat.name)}
                 className={`block text-xs w-full text-left px-2 py-1 rounded transition-colors ${selectedCategory === cat.name ? "bg-primary/10 text-primary font-medium" : "text-foreground hover:bg-muted"}`}
               >
-                {cat.nameFr || cat.name}
+                {labelOf(cat)}
               </button>
             ))}
           </div>
@@ -189,8 +191,8 @@ export default function SearchPage() {
               className="mb-2"
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>${priceRange[0]}</span>
-              <span>${priceRange[1]}{priceRange[1] >= 500 ? "+" : ""}</span>
+              <span>{formatPrice(priceRange[0])}</span>
+              <span>{formatPrice(priceRange[1])}{priceRange[1] >= 500 ? "+" : ""}</span>
             </div>
           </div>
         )}
@@ -253,11 +255,15 @@ export default function SearchPage() {
   );
 
   const seoTitle = queryParam
-    ? `Résultats pour "${queryParam}" — Recherche`
-    : "Rechercher des produits";
+    ? (locale === "fr" ? `Résultats pour "${queryParam}" — Recherche` : `Results for "${queryParam}" — Search`)
+    : (locale === "fr" ? "Rechercher des produits" : "Search products");
   const seoDesc = queryParam
-    ? `Trouvez "${queryParam}" parmi des milliers de produits mode, tech et maison sur Zandofy. Prix compétitifs et livraison rapide en Afrique.`
-    : "Recherchez parmi des milliers de produits mode, électronique et maison sur Zandofy. Filtrez par catégorie, prix et taille.";
+    ? (locale === "fr"
+        ? `Trouvez "${queryParam}" parmi des milliers de produits mode, tech et maison sur Zandofy. Prix compétitifs et livraison rapide en Afrique.`
+        : `Find "${queryParam}" among thousands of fashion, tech and home products on Zandofy. Competitive prices and fast delivery across Africa.`)
+    : (locale === "fr"
+        ? "Recherchez parmi des milliers de produits mode, électronique et maison sur Zandofy. Filtrez par catégorie, prix et taille."
+        : "Search thousands of fashion, electronics and home products on Zandofy. Filter by category, price and size.");
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
