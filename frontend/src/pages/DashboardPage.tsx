@@ -1638,6 +1638,7 @@ function TrackingTab({ orders }: { orders: OrderRow[] }) {
 }
 
 function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: () => Promise<void> | void }) {
+  const { t } = useI18n();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1718,7 +1719,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
       .single();
     setSaving(false);
     if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      toast({ title: t("profile.error"), description: error.message, variant: "destructive" });
     } else {
       const updated = data as any;
       setProfile({
@@ -1748,43 +1749,43 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
         },
       });
       await onProfileUpdated?.();
-      toast({ title: "Profil mis à jour !" });
+      toast({ title: t("profile.updated") });
     }
   };
 
   const handlePasswordChange = async () => {
     if (!currentPassword) {
-      toast({ title: "Erreur", description: "Veuillez saisir votre mot de passe actuel.", variant: "destructive" });
+      toast({ title: t("profile.error"), description: t("profile.password.errorRequired"), variant: "destructive" });
       return;
     }
     if (newPassword.length < 8) {
-      toast({ title: "Erreur", description: "Le mot de passe doit contenir au moins 8 caractères.", variant: "destructive" });
+      toast({ title: t("profile.error"), description: t("profile.password.errorMin"), variant: "destructive" });
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast({ title: "Erreur", description: "Les mots de passe ne correspondent pas.", variant: "destructive" });
+      toast({ title: t("profile.error"), description: t("profile.password.errorMismatch"), variant: "destructive" });
       return;
     }
     setChangingPassword(true);
     // Verify current password by re-authenticating
     const email = user.email;
     if (!email) {
-      toast({ title: "Erreur", description: "Adresse email introuvable.", variant: "destructive" });
+      toast({ title: t("profile.error"), description: t("profile.password.errorEmail"), variant: "destructive" });
       setChangingPassword(false);
       return;
     }
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
     if (signInError) {
-      toast({ title: "Erreur", description: "Le mot de passe actuel est incorrect.", variant: "destructive" });
+      toast({ title: t("profile.error"), description: t("profile.password.errorWrong"), variant: "destructive" });
       setChangingPassword(false);
       return;
     }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setChangingPassword(false);
     if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      toast({ title: t("profile.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Mot de passe modifié avec succès !" });
+      toast({ title: t("profile.password.success") });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -1799,12 +1800,12 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
     const path = `${user.id}/avatar.${ext}`;
     const { error } = await supabase.storage.from("product-media").upload(path, compressed, { upsert: true, cacheControl: "31536000" });
     if (error) {
-      toast({ title: "Erreur upload", description: error.message, variant: "destructive" });
+      toast({ title: t("profile.avatar.error"), description: error.message, variant: "destructive" });
       return;
     }
     const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
     setProfile(prev => ({ ...prev, avatar_url: urlData.publicUrl }));
-    toast({ title: "Photo mise à jour !" });
+    toast({ title: t("profile.avatar.updated") });
   };
 
   if (loading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary" size={20} /></div>;
@@ -1814,7 +1815,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
       {/* Profile info */}
       <div className="bg-card border border-border rounded-lg p-6">
         <h3 className="text-base font-bold text-foreground mb-5 flex items-center gap-2">
-          <UserIcon size={18} /> Mon Profil
+          <UserIcon size={18} /> {t("profile.title")}
         </h3>
 
         {/* Avatar */}
@@ -1833,46 +1834,46 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
             </label>
           </div>
           <div>
-            <p className="text-sm font-medium text-foreground">{profile.first_name || profile.last_name ? `${profile.first_name} ${profile.last_name}`.trim() : "Votre nom"}</p>
+            <p className="text-sm font-medium text-foreground">{profile.first_name || profile.last_name ? `${profile.first_name} ${profile.last_name}`.trim() : t("profile.namePlaceholder")}</p>
             <p className="text-xs text-muted-foreground">{user.email}</p>
           </div>
         </div>
 
         <div className="space-y-4">
           <div>
-            <Label className="text-xs text-muted-foreground">Email</Label>
+            <Label className="text-xs text-muted-foreground">{t("profile.email")}</Label>
             <Input className="mt-1 bg-muted" value={user.email || ""} disabled />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs text-muted-foreground">Prénom</Label>
-              <Input className="mt-1" value={profile.first_name} onChange={e => setProfile(p => ({ ...p, first_name: e.target.value }))} placeholder="Votre prénom" />
+              <Label className="text-xs text-muted-foreground">{t("profile.firstName")}</Label>
+              <Input className="mt-1" value={profile.first_name} onChange={e => setProfile(p => ({ ...p, first_name: e.target.value }))} placeholder={t("profile.firstNamePh")} />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Nom</Label>
-              <Input className="mt-1" value={profile.last_name} onChange={e => setProfile(p => ({ ...p, last_name: e.target.value }))} placeholder="Votre nom" />
+              <Label className="text-xs text-muted-foreground">{t("profile.lastName")}</Label>
+              <Input className="mt-1" value={profile.last_name} onChange={e => setProfile(p => ({ ...p, last_name: e.target.value }))} placeholder={t("profile.lastNamePh")} />
             </div>
           </div>
           <div>
-            <Label className="text-xs text-muted-foreground">Téléphone</Label>
-            <Input className="mt-1" value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} placeholder="+243 XXX XXX XXX" />
+            <Label className="text-xs text-muted-foreground">{t("profile.phone")}</Label>
+            <Input className="mt-1" value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} placeholder={t("profile.phonePh")} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs text-muted-foreground">Sexe</Label>
+              <Label className="text-xs text-muted-foreground">{t("profile.gender")}</Label>
               <select
                 className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-card"
                 value={profile.gender}
                 onChange={e => setProfile(p => ({ ...p, gender: e.target.value }))}
               >
-                <option value="">Non renseigné</option>
-                <option value="male">Homme</option>
-                <option value="female">Femme</option>
-                <option value="other">Autre</option>
+                <option value="">{t("profile.gender.none")}</option>
+                <option value="male">{t("profile.gender.male")}</option>
+                <option value="female">{t("profile.gender.female")}</option>
+                <option value="other">{t("profile.gender.other")}</option>
               </select>
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Date de naissance</Label>
+              <Label className="text-xs text-muted-foreground">{t("profile.dob")}</Label>
               <Input
                 type="date"
                 className="mt-1"
@@ -1883,20 +1884,20 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
             </div>
           </div>
           <div>
-            <Label className="text-xs text-muted-foreground">Nationalité</Label>
-            <Input className="mt-1" value={profile.nationality} onChange={e => setProfile(p => ({ ...p, nationality: e.target.value }))} placeholder="Ex: Congolaise" />
+            <Label className="text-xs text-muted-foreground">{t("profile.nationality")}</Label>
+            <Input className="mt-1" value={profile.nationality} onChange={e => setProfile(p => ({ ...p, nationality: e.target.value }))} placeholder={t("profile.nationalityPh")} />
           </div>
           {/* Residence address - cascading geo fields */}
           {hasActiveOrders && (
             <div className="bg-muted/50 border border-border rounded-lg p-3 text-xs text-muted-foreground flex items-center gap-2">
               <AlertTriangle size={14} className="text-amber-500 shrink-0" />
-              <span>Votre adresse de résidence est verrouillée car vous avez des commandes en cours. Vous pouvez soumettre une demande de modification.</span>
+              <span>{t("profile.locked")}</span>
             </div>
           )}
           {addressChangeRequestPending && (
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-xs text-primary flex items-center gap-2">
               <Clock size={14} className="shrink-0" />
-              <span>Une demande de modification d'adresse est en attente de validation.</span>
+              <span>{t("profile.pendingRequest")}</span>
             </div>
           )}
           <CascadingAddressFields
@@ -1928,27 +1929,27 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           />
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs text-muted-foreground">Langue préférée</Label>
+              <Label className="text-xs text-muted-foreground">{t("profile.preferredLanguage")}</Label>
               <select
                 className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-card"
                 value={profile.preferred_language}
                 onChange={e => setProfile(p => ({ ...p, preferred_language: e.target.value }))}
               >
-                <option value="fr">Français</option>
-                <option value="en">English</option>
-                <option value="ln">Lingala</option>
-                <option value="sw">Swahili</option>
+                <option value="fr">{t("profile.lang.fr")}</option>
+                <option value="en">{t("profile.lang.en")}</option>
+                <option value="ln">{t("profile.lang.ln")}</option>
+                <option value="sw">{t("profile.lang.sw")}</option>
               </select>
             </div>
           </div>
           <div>
-            <Label className="text-xs text-muted-foreground mb-2 block">Canaux de contact</Label>
+            <Label className="text-xs text-muted-foreground mb-2 block">{t("profile.channels")}</Label>
             <div className="space-y-2">
               {[
-                { value: "chat", label: "Chat interne", mandatory: true },
-                { value: "email", label: "Email", mandatory: true },
-                { value: "whatsapp", label: "WhatsApp", mandatory: false },
-                { value: "sms", label: "SMS", mandatory: false },
+                { value: "chat", label: t("profile.channels.chat"), mandatory: true },
+                { value: "email", label: t("profile.channels.email"), mandatory: true },
+                { value: "whatsapp", label: t("profile.channels.whatsapp"), mandatory: false },
+                { value: "sms", label: t("profile.channels.sms"), mandatory: false },
               ].map(ch => {
                 const checked = profile.allowed_channels.includes(ch.value);
                 return (
@@ -1969,7 +1970,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
                       }}
                     />
                     <span className="text-foreground">{ch.label}</span>
-                    {ch.mandatory && <span className="text-[10px] text-muted-foreground">(obligatoire)</span>}
+                    {ch.mandatory && <span className="text-[10px] text-muted-foreground">{t("profile.channels.mandatory")}</span>}
                   </label>
                 );
               })}
@@ -1977,7 +1978,7 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           </div>
           <Button onClick={handleSave} disabled={saving} className="mt-2">
             {saving ? <Loader2 className="animate-spin mr-2" size={14} /> : <Save size={14} className="mr-2" />}
-            Sauvegarder
+            {t("profile.save")}
           </Button>
         </div>
       </div>
@@ -1985,27 +1986,27 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
       {/* Password change */}
       <div className="bg-card border border-border rounded-lg p-6">
         <h3 className="text-base font-bold text-foreground mb-5 flex items-center gap-2">
-          🔒 Modifier le mot de passe
+          {t("profile.password.title")}
         </h3>
         <div className="space-y-4">
           <div>
-            <Label className="text-xs text-muted-foreground">Mot de passe actuel</Label>
-            <Input type="password" className="mt-1" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Entrez votre mot de passe actuel" />
+            <Label className="text-xs text-muted-foreground">{t("profile.password.current")}</Label>
+            <Input type="password" className="mt-1" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder={t("profile.password.currentPh")} />
           </div>
           <div>
-            <Label className="text-xs text-muted-foreground">Nouveau mot de passe</Label>
-            <Input type="password" className="mt-1" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Min. 8 caractères" />
+            <Label className="text-xs text-muted-foreground">{t("profile.password.new")}</Label>
+            <Input type="password" className="mt-1" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder={t("profile.password.newPh")} />
           </div>
           <div>
-            <Label className="text-xs text-muted-foreground">Confirmer le nouveau mot de passe</Label>
-            <Input type="password" className="mt-1" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Retapez le mot de passe" />
+            <Label className="text-xs text-muted-foreground">{t("profile.password.confirm")}</Label>
+            <Input type="password" className="mt-1" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder={t("profile.password.confirmPh")} />
           </div>
           {newPassword && confirmPassword && newPassword !== confirmPassword && (
-            <p className="text-xs text-destructive">Les mots de passe ne correspondent pas.</p>
+            <p className="text-xs text-destructive">{t("profile.password.mismatch")}</p>
           )}
           <Button onClick={handlePasswordChange} disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword} variant="outline" className="mt-2">
             {changingPassword ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
-            Changer le mot de passe
+            {t("profile.password.change")}
           </Button>
         </div>
       </div>
