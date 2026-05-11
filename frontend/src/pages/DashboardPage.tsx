@@ -339,20 +339,20 @@ export default function DashboardPage() {
             {kycStatus !== "not_started" && !showKycForm && (
               <div className="bg-card rounded-lg p-5 border border-border space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-foreground">Statut de vérification</h3>
+                  <h3 className="font-bold text-foreground">{t("kyc.statusTitle")}</h3>
                   <KycStatusBadge status={kycStatus} />
                 </div>
                 {kycVerification?.rejection_reason && (
-                  <p className="text-sm text-destructive">Raison : {kycVerification.rejection_reason}</p>
+                  <p className="text-sm text-destructive">{t("kyc.reason")} {kycVerification.rejection_reason}</p>
                 )}
                 {canResubmit && (
-                  <Button size="sm" onClick={() => setShowKycForm(true)}>Resoumettre les documents</Button>
+                  <Button size="sm" onClick={() => setShowKycForm(true)}>{t("kyc.resubmit")}</Button>
                 )}
               </div>
             )}
             {(showKycForm || kycStatus === "not_started") && kycStatus !== "pending" && kycStatus !== "approved" && (
               <div className="bg-card rounded-lg p-6 border border-border">
-                <h3 className="font-bold text-foreground mb-4">Vérification d'identité</h3>
+                <h3 className="font-bold text-foreground mb-4">{t("kyc.formTitle")}</h3>
                 <KycSubmissionForm existingKyc={canResubmit ? kycVerification : null} onSuccess={() => { setShowKycForm(false); refetchKyc(); }} />
               </div>
             )}
@@ -360,8 +360,8 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 <div className="bg-card rounded-lg p-6 border border-border text-center space-y-2">
                   <ShieldCheck size={32} className="mx-auto text-primary" />
-                  <h3 className="font-bold text-foreground">Identité vérifiée</h3>
-                  <p className="text-sm text-muted-foreground">Vous avez accès à toutes les options de paiement et livraison avancées.</p>
+                  <h3 className="font-bold text-foreground">{t("kyc.verified.title")}</h3>
+                  <p className="text-sm text-muted-foreground">{t("kyc.verified.desc")}</p>
                 </div>
                 <ClientCertificationSection />
               </div>
