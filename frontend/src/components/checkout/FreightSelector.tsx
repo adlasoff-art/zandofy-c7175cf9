@@ -443,13 +443,14 @@ function ConsolidationChooser({
   choice: ConsolidationChoice;
   onChange: (c: ConsolidationChoice) => void;
 }) {
+  const { t } = useI18n();
   const co = offer.consolidation_offer;
   if (!co?.available) return null;
   const splitTotal = offer.split_total ?? offer.quote.total;
   const delta = co.delta_vs_split;
   const deltaLabel =
     delta === 0
-      ? "même prix"
+      ? (t("freight.samePrice") || "même prix")
       : delta > 0
         ? `+${delta.toFixed(2)} ${offer.quote.currency}`
         : `−${Math.abs(delta).toFixed(2)} ${offer.quote.currency}`;
@@ -457,7 +458,7 @@ function ConsolidationChooser({
   return (
     <div className="mt-2 space-y-1.5 rounded-md border border-border/60 bg-muted/30 p-2">
       <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-        Mode d'expédition
+        {t("freight.shippingMode") || "Mode d'expédition"}
       </div>
       <button
         type="button"
@@ -470,9 +471,9 @@ function ConsolidationChooser({
       >
         <div className="flex items-center gap-1.5 min-w-0">
           <Package size={11} className="text-muted-foreground shrink-0" />
-          <span className="text-[11px] font-medium">Expédition séparée</span>
+          <span className="text-[11px] font-medium">{t("freight.separateShipping") || "Expédition séparée"}</span>
           <span className="text-[9px] text-muted-foreground">
-            {offer.subpackages?.length ?? 0} colis
+            {t("freight.parcelsCount", { count: offer.subpackages?.length ?? 0 }) || `${offer.subpackages?.length ?? 0} colis`}
           </span>
         </div>
         <span className="text-[11px] font-semibold">
@@ -490,7 +491,7 @@ function ConsolidationChooser({
       >
         <div className="flex items-center gap-1.5 min-w-0">
           <Boxes size={11} className="text-muted-foreground shrink-0" />
-          <span className="text-[11px] font-medium">Groupage 1 colis</span>
+          <span className="text-[11px] font-medium">{t("freight.consolidatedOneParcel") || "Groupage 1 colis"}</span>
           <span className="text-[9px] text-muted-foreground">{deltaLabel}</span>
         </div>
         <span className="text-[11px] font-semibold">
@@ -499,7 +500,8 @@ function ConsolidationChooser({
       </button>
       {co.consolidation_fee > 0 && (
         <p className="text-[9px] text-muted-foreground px-1">
-          Frais de groupage inclus : {offer.quote.currency} {co.consolidation_fee.toFixed(2)}
+          {t("freight.consolidationFeeIncluded", { amount: `${offer.quote.currency} ${co.consolidation_fee.toFixed(2)}` }) ||
+            `Frais de groupage inclus : ${offer.quote.currency} ${co.consolidation_fee.toFixed(2)}`}
         </p>
       )}
     </div>
