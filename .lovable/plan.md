@@ -1,56 +1,103 @@
-Constat prioritaire production
+# Diagnostic CardPay (Keccel / MasterCard) — état actuel + plan d'action
 
-- Le test affiché avec `diag 9ab216af` échoue côté client après 4 variantes CardPay.
-- Si la requête SQL en production retourne `Success. No rows returned`, ce diagnostic n’est pas dans la base production interrogée.
-- Donc, à ce stade, le problème prioritaire n’est pas encore “Keccel uniquement” : il faut d’abord prouver quelle Edge Function et quelle base sont réellement utilisées par `zandofy.com`.
+## 1. Ce que je peux confirmer sans accès prod
 
-Ce que le code montre déjà
+### Côté DB (prod)
+La table `keccel_cardpay_diagnostics` est bien en place sur la prod : ta capture d'écran montre les 27 colonnes attendues (incluant `amount_sent`). **Les deux migrations sont donc déjà appliquées.** Tu n'as plus rien à exécuter côté schéma.
 
-- Le code CardPay actuel appelle toujours `https://api.keccel.net/cardpay`, pas le terminal Keccel.
-- Les deux copies `supabase/functions/keccel-cardpay` et `frontend/supabase/functions/keccel-cardpay` sont identiques côté logique.
-- Le workflow GitHub Actions déploie les fonctions depuis `frontend/` avec `supabase functions deploy`, donc la source réellement déployée en prod est surtout `frontend/supabase/functions/**`.
-- Les migrations diagnostics `keccel_cardpay_diagnostics` existent uniquement dans `supabase/migrations`, pas dans `frontend/supabase/migrations`, alors que la règle projet dit que `frontend/supabase/migrations/` est la source de vérité Supabase. Cela peut expliquer pourquoi la prod ne retourne aucune ligne ou pourquoi l’insert diagnostic échoue selon l’état réel de la DB prod.
+### Côté Edge Function `keccel-cardpay`
+Le fichier `frontend/supabase/functions/keccel-cardpay/index.ts` (poussé via GitHub Action `deploy-edge-functions.yml` vers la prod `vpt...yxf`) :
+- valide l'auth, le rate-limit, fetch la commande
+- calcule `amountSent = Math.ceil(amount)` et envoie `amount` en **string** (conforme doc Kelpay)
+- génère une `reference` ≤ 25 chars (`KC` + 23 hex)
+- essaie **4 variantes** d'appel à `https://api.keccel.net/cardpay` :
+  1. `Bearer <token>` + clé `returnUrl`
+  2. token brut + `returnUrl`
+  3. `Bearer` + `returnurl` (lowercase)
+  4. `Bearer` + les deux clés
+- pour chaque tentative, persiste une ligne dans `keccel_cardpay_diagnostics` avec `http_status`, `raw_body`, `keccel_code`, `keccel_description`
+- si aucune ne renvoie `code=="0"` → `success:false` + message "Keccel a refusé les 4 variantes (diag XXXX)…"
 
-Plan d’action proposé
+### Côté front (`CheckoutPage.tsx` lignes 1203-1240)
+- Appel correct via `supabase.functions.invoke("keccel-cardpay", …)`
+- Si `data.redirect_url` → `window.location.href = data.redirect_url` (pas de nouvel onglet, c'est la **même fenêtre**, comportement normal)
+- Le toast "Erreur paiement" s'affiche uniquement quand `data.success === false` ou erreur SDK
 
-1. Remettre la source prod au carré
-   - Garder `frontend/supabase/functions/keccel-cardpay/index.ts` comme source principale pour GitHub Actions/prod.
-   - Garder `supabase/functions/keccel-cardpay/index.ts` synchronisé seulement pour Lovable/preview, sans le présenter comme preuve prod.
+### Conclusion intermédiaire
+Le code edge + front est cohérent. **Le toast "diag 497a3b2b" que tu as vu signifie que Keccel a renvoyé un HTTP 400 sur les 4 variantes.** La cause n'est ni le schéma DB, ni le code de redirection (puisqu'on n'arrive jamais à `redirect_url`) — la cause est dans le **payload envoyé à Keccel** ou la **config secrets** côté prod.
 
-2. Corriger la traçabilité prod
-   - Copier les migrations `keccel_cardpay_diagnostics` dans `frontend/supabase/migrations/` avec les mêmes colonnes, dont `amount_sent`.
-   - Ajouter une migration idempotente si nécessaire, pour éviter les erreurs si la table existe déjà.
-   - Objectif : après un test sur `zandofy.com`, le diag doit être visible dans la base production.
+---
 
-3. Renforcer le diagnostic sans changer le parcours client
-   - Ne pas rediriger vers `terminal.keccel.com/payment.php`.
-   - Conserver l’appel serveur-à-serveur vers `api.keccel.net/cardpay`.
-   - Avant chaque insert diagnostic, logger explicitement une erreur si l’insert échoue, avec le nom de table/champ concerné.
-   - Retourner au client un message différencié si Keccel refuse l’appel mais que le diagnostic n’a pas pu être persisté.
+## 2. Ce que tu dois exécuter sur la prod (SQL Editor Supabase `vpt...yxf`)
 
-4. Vérifier les variables prod attendues
-   - Documenter clairement que la prod doit avoir : `SITE_BASE_URL=https://zandofy.com`, `KELPAY_TOKEN`, `KECCEL_CARD_MERCHANT_CODE`.
-   - Sans afficher les secrets, comparer dans les diagnostics : `site_base_url`, `merchant_code_masked`, `token_present`, `token_length`, `callback_url`.
+Une fois que tu as relancé un essai de paiement carte (pour générer une ligne fraîche) :
 
-5. Après merge/deploy prod
-   - Tester uniquement depuis `https://zandofy.com`.
-   - Interroger la base production avec :
-
+### Requête A — voir le dernier diagnostic en entier
 ```sql
-select diagnostic_id, created_at, environment, origin, site_base_url,
+select created_at, diagnostic_id, environment, site_base_url,
+       merchant_code_masked, token_present, token_length,
+       amount, amount_sent, currency,
+       reference, length(reference) as ref_len,
+       callback_url, return_url,
+       sent_keys, payload_shape,
        http_status, keccel_code, keccel_description,
-       amount, amount_sent, merchant_code_masked,
-       keccel_response->>'attempt_index' as attempt,
-       keccel_response->>'auth_format' as auth,
-       keccel_response->>'return_key_mode' as return_key,
-       raw_body
+       left(raw_body, 1000) as raw_body_preview,
+       error
 from public.keccel_cardpay_diagnostics
-where diagnostic_id = '<diag>'
-order by created_at asc;
+order by created_at desc
+limit 8;
 ```
 
-Résultat attendu
+Cela te (et me) donne **les 4 tentatives** de la dernière commande + les 4 précédentes. Colle le résultat ici demain.
 
-- Si les lignes apparaissent en prod : on saura exactement ce que Keccel reçoit/refuse.
-- Si aucune ligne n’apparaît encore : le front prod ne pointe pas vers la base/fonction prod attendue, ou la fonction prod n’est pas celle déployée par GitHub Actions.
-- Tant que ce point n’est pas clarifié, Lovable Cloud ne doit pas être utilisé comme preuve de résolution production.
+### Requête B — vérifier qu'on tape bien la prod
+```sql
+select environment, site_base_url, count(*) 
+from public.keccel_cardpay_diagnostics
+where created_at > now() - interval '24 hours'
+group by 1,2
+order by 3 desc;
+```
+- `environment` doit être `https://vpt....supabase.co` (prod), pas `uog...`
+- `site_base_url` doit être `https://zandofy.com` (sinon Keccel refuse le `returnUrl`)
+
+### Requête C — voir si une transaction a quand même été créée
+```sql
+select id, created_at, status, reference, transaction_id, callback_payload->>'description' as keccel_desc
+from public.payment_transactions
+where provider = 'keccel'
+order by created_at desc
+limit 5;
+```
+
+---
+
+## 3. Hypothèses prioritaires si Keccel renvoie HTTP 400
+
+Sans la valeur de `keccel_description` je dois lister les causes possibles. La requête A va trancher en une lecture.
+
+| # | Cause probable | Symptôme dans `keccel_cardpay_diagnostics` | Correctif |
+|---|---|---|---|
+| 1 | `SITE_BASE_URL` côté prod n'est pas `https://zandofy.com` (manque `https://` ou pointe vers staging/lovable) | `site_base_url` ≠ prod, ou `keccel_description` ~ "invalid returnUrl" | Mettre à jour le secret `SITE_BASE_URL` dans la prod Supabase |
+| 2 | `KECCEL_CARD_MERCHANT_CODE` mauvais merchant ou non whitelisté pour `zandofy.com` | `keccel_description` ~ "merchant not found" / "domain not allowed" | Vérifier avec Keccel + corriger le secret |
+| 3 | `KELPAY_TOKEN` expiré / token Mobile Money réutilisé pour CardPay | HTTP 401/403 ou "invalid token" | Demander un token CardPay dédié à Keccel |
+| 4 | Devise USD non activée pour le marchand | "currency not supported" | Activer USD côté Keccel ou basculer sur CDF |
+| 5 | `description` contient un caractère interdit (l'emoji/accent passe mais "—" non) | "invalid description" | Sanitiser la `description` |
+| 6 | Référence trop longue ou format refusé (Visa = 25, Mastercard parfois 22) | "invalid reference" | Réduire à 22 chars |
+
+---
+
+## 4. Plan d'action pour demain (à approuver)
+
+1. **Tu lances un essai carte en prod** → un toast "diag XXXX" apparaît.
+2. **Tu colles le résultat de la requête A** ici.
+3. Je lis `keccel_description` + `raw_body` + `site_base_url` et je te dis **exactement** quel secret/champ corriger (un seul aller-retour).
+4. Je corrige le code de l'edge function si besoin (ex: sanitiser description, raccourcir ref, ajouter un header) → push GitHub → redéploiement auto via `deploy-edge-functions.yml` sur la prod.
+5. Tu retestes ; si `success` → on supprime ensuite la table de diagnostic ou on la garde 30 jours pour audit.
+
+## 5. Ce que je ne peux PAS faire seul
+- Lire les secrets `SITE_BASE_URL` / `KECCEL_CARD_MERCHANT_CODE` / `KELPAY_TOKEN` de la prod (Lovable n'a pas accès au projet `vpt...yxf`).
+- Lire les logs edge prod (idem).
+- Donc la requête A est **l'unique pont** entre toi et moi pour diagnostiquer.
+
+Bonne nuit. Au réveil : un essai carte + requête A collée = je te livre le fix exact dans la foulée.
