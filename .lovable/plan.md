@@ -1,65 +1,71 @@
-# Fix CardPay — Keccel exige un champ supplémentaire
+## Voie B — Test direct avec `jam`
 
-## Ce que le diagnostic prouve (CSV n°5)
+### Étape 1 — Mettre à jour le secret en prod
 
-- Stack frappée = bonne : `environment = vpttoqojmiqxgudknyxf` (prod), `site_base_url = https://zandofy.com` ✅
-- Token et merchantcode présents (`token_length=36`, `JA***IO`) ✅
-- `returnUrl` (camelCase) est bien reçu par Keccel : la tentative qui n'envoyait QUE `returnurl` (lowercase) reçoit l'erreur précise « Missing returnUrl parameter » → l'API parse bien le nom camelCase
-- Les 3 tentatives qui envoyaient `returnUrl` correctement reçoivent quand même HTTP 400 avec **« Missing&nbsp;&nbsp;parameter »** (nom vide entre deux espaces) → Keccel a un champ requis dont **le template d'erreur n'affiche pas le nom**, donc un champ ajouté récemment et mal documenté
-- Historique (CSV n°6) : la dernière transaction `success` date du **31 mars 2026** avec exactement le même format de référence `KC<23 hex>` → notre payload de l'époque marchait, donc **Keccel a ajouté un champ obligatoire entre le 31 mars et aujourd'hui**
+Tu vas dans **Connectors → Lovable Cloud → Secrets** (ou directement Supabase Vault sur le projet prod `vpttoqojmiqxgudknyxf`) et tu mets :
 
-## Hypothèses sur le champ manquant (par ordre de probabilité)
+- **Nom** : `KECCEL_CARD_MERCHANT_CODE`
+- **Valeur** : `jam` (3 caractères, **minuscules**, **aucun espace** avant/après)
 
-1. **`language`** (`fr` / `en`) — très fréquent dans les CardPay africains qui hébergent leur propre page checkout
-2. **`customerEmail`** — exigé pour 3DS / reçu
-3. **`customerName`** — souvent requis pour MasterCard
-4. **`customerPhone`** — exigé pour SMS OTP
-5. **`notifyUrl`** (en plus de `callbackurl`)
-6. **`country`** (`CD`) ou **`channel`** (`web`)
+⚠️ Important : c'est le secret côté **prod** (`zandofy.com`), pas Lovable Cloud preview. Si tu utilises GitHub Actions / Vercel pour propager, vérifie que le secret est bien à jour là où l'Edge Function `keccel-cardpay` lit ses env (Supabase Edge Functions secrets du projet prod).
 
-Le template d'erreur Keccel ne nous le dit pas, donc on va **brute-forcer** intelligemment : au lieu d'ajouter des champs au hasard, on ajoute UNE NOUVELLE série de tentatives qui empile les champs candidats. La table de diagnostic nous dira exactement laquelle débloque.
+### Étape 2 — Attendre 30 sec puis lancer UN seul test carte
 
-## Action concrète (ce que je code dès que tu approuves)
+Sur `https://zandofy.com` :
+1. Ajoute un produit au panier
+2. Va au checkout
+3. Choisis paiement par carte
+4. Clique « Payer »
+5. Note l'heure exacte du clic et le `diag XXXXXX` affiché en cas d'erreur
 
-### 1. Étendre `frontend/supabase/functions/keccel-cardpay/index.ts`
+### Étape 3 — Exécute ce SQL dans le SQL Editor prod
 
-Ajouter 6 nouvelles tentatives, **dans l'ordre**, qui complètent le payload existant (tout reste : `merchantcode`, `reference`, `amount`, `currency`, `description`, `callbackurl`, `returnUrl`, `Bearer <token>`) :
+```sql
+-- 1) Vérifier que le NOUVEAU merchant code est bien arrivé en Edge Function
+SELECT
+  created_at AT TIME ZONE 'Africa/Kinshasa' AS heure_kin,
+  diagnostic_id,
+  merchant_code_masked,           -- doit montrer 'ja***am' ou 'j***m' (3 chars)
+  token_length,
+  attempt_idx,
+  attempt_label,
+  http_status,
+  keccel_code,
+  keccel_description,
+  LEFT(raw_body, 200) AS body_extrait
+FROM keccel_cardpay_diagnostics
+WHERE created_at > NOW() - INTERVAL '15 minutes'
+ORDER BY created_at DESC, attempt_idx ASC
+LIMIT 30;
+```
 
-| Tentative | Champ(s) ajouté(s) |
-|---|---|
-| 5 | `language: "fr"` |
-| 6 | `language: "fr"`, `customerEmail: <email user>` |
-| 7 | + `customerName: <prénom + nom>` |
-| 8 | + `customerPhone: <phone user>` (E.164) |
-| 9 | + `notifyUrl: <même que callbackurl>` |
-| 10 | + `country: "CD"`, `channel: "web"` |
+```sql
+-- 2) Résumé : un seul résultat par diag, statut global
+SELECT
+  diagnostic_id,
+  MIN(created_at) AT TIME ZONE 'Africa/Kinshasa' AS heure,
+  MAX(merchant_code_masked) AS merchant_used,
+  COUNT(*) AS attempts,
+  COUNT(*) FILTER (WHERE keccel_code = '0') AS success_count,
+  STRING_AGG(DISTINCT keccel_description, ' | ') AS descriptions_keccel
+FROM keccel_cardpay_diagnostics
+WHERE created_at > NOW() - INTERVAL '15 minutes'
+GROUP BY diagnostic_id
+ORDER BY heure DESC;
+```
 
-À chaque tentative, on persiste comme avant `payload_shape`, `http_status`, `keccel_description`. **Dès qu'une renvoie `code: "0"`, on arrête, on log la combinaison gagnante, et on l'utilisera comme payload de référence.**
+### Étape 4 — Lecture des résultats
 
-Pour récupérer email/nom/phone : déjà lus depuis `profiles` ou `orders` côté edge (ou depuis `auth.users` via le `user.email`). On normalise (regex E.164 pour le phone, fallback `+243000000000` si absent).
+| Cas | Diagnostic | Action |
+|---|---|---|
+| `merchant_code_masked` toujours `JA***IO` | Le secret n'a **pas été propagé** à l'Edge Function prod | Vérifier que tu as mis à jour le bon environnement (Supabase Edge Functions du projet prod, pas Lovable Cloud) |
+| `merchant_code_masked` = `j***m` ou similaire **et** `success_count > 0` | **GAGNÉ** 🎉 | Je nettoie le code (1 seule tentative au lieu de 10) et on passe en prod propre |
+| `merchant_code_masked` changé **mais** `keccel_description` différente (genre `Invalid merchant`, `Account suspended`...) | Nouvelle piste | Tu me partages le texte exact, on adapte |
+| `merchant_code_masked` changé **mais** toujours `Missing parameter` identique | Le merchant code n'était pas le souci | On lance les variantes 5-10 (form-urlencoded, header `apikey:`, etc.) |
 
-### 2. Améliorer le toast côté front
+## Ce que je ferai après ton retour
 
-Dans `CheckoutPage.tsx` ligne 1226, ajouter au message d'erreur la `keccel_description` brute (déjà disponible dans `data.details.body`) pour qu'on n'ait plus besoin d'une requête SQL pour comprendre l'échec à la prochaine itération.
+- **Si succès** : patch minimal sur `keccel-cardpay/index.ts` pour retirer les 9 variantes inutiles, garder le diagnostic, mettre à jour `mem://features/keccel-cardpay-constraints` avec la règle : « merchant code carte ≠ merchant code Mobile Money, valeur officielle = `jam` ».
+- **Si échec** : nouvelle vague de variantes ciblée selon l'erreur reçue.
 
-### 3. Workflow de validation
-
-1. Push sur `main` → déploiement auto via `deploy-edge-functions.yml` sur prod `vpt...yxf`
-2. Tu lances un essai carte → 10 tentatives au lieu de 4
-3. Tu me colles le résultat de la **Requête A** (déjà connue)
-4. Je lis quelle tentative a renvoyé `code=0` → je supprime les autres, je verrouille le payload gagnant, je nettoie
-5. Une fois stable, je propose de purger la table `keccel_cardpay_diagnostics` (garder 30 jours pour audit)
-
-### 4. Ce que je NE fais PAS encore
-
-- Pas de changement de schéma DB (la table est OK)
-- Pas de changement de secrets (ils sont OK)
-- Pas de modif des autres edge functions (kelpay-webhook, etc.)
-
-## Risque
-
-Très faible : on n'ajoute que des **champs supplémentaires** au payload Keccel ; les 4 anciennes tentatives restent en première ligne donc si Keccel revient à son comportement d'avant, ça marche. Pas de régression possible côté DB ou côté front (on ne touche que le toast d'erreur en lecture seule).
-
-## Estimation
-
-~80 lignes à ajouter dans `index.ts` + ~3 lignes de toast. 1 commit, 1 push, 1 déploiement auto, 1 test, 1 fix final.
+Quand tu as fait l'étape 1+2, dis-moi simplement « secret mis à jour, test fait » et colle les résultats SQL — je te donne le verdict immédiatement.
