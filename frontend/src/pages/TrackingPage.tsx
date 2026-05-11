@@ -346,6 +346,7 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
 
 // ── Confirmation Code Entry (Hub Pickup) ──
 function ConfirmationCodeEntry({ order, onConfirmed }: { order: OrderTrackingResult; onConfirmed: () => void }) {
+  const { t } = useI18n();
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
 
@@ -360,11 +361,11 @@ function ConfirmationCodeEntry({ order, onConfirmed }: { order: OrderTrackingRes
       if (data?.error) {
         toast.error(data.error);
       } else if (data?.success) {
-        toast.success("Commande récupérée avec succès !");
+        toast.success(t("tracking.code.success"));
         onConfirmed();
       }
     } catch (e: any) {
-      toast.error(e.message || "Erreur");
+      toast.error(e.message || t("tracking.errorGeneric"));
     } finally {
       setVerifying(false);
     }
@@ -373,23 +374,21 @@ function ConfirmationCodeEntry({ order, onConfirmed }: { order: OrderTrackingRes
   return (
     <div className="border border-primary/30 bg-primary/5 rounded-xl p-4 space-y-3">
       <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-        <Hash size={16} className="text-primary" /> Code de confirmation
+        <Hash size={16} className="text-primary" /> {t("tracking.code.title")}
       </h3>
-      <p className="text-xs text-muted-foreground">
-        Entrez le code de confirmation fourni par le vendeur pour valider la récupération de votre colis.
-      </p>
+      <p className="text-xs text-muted-foreground">{t("tracking.code.desc")}</p>
       <div className="flex gap-2">
         <input
           type="text"
           value={code}
           onChange={e => setCode(e.target.value.toUpperCase())}
-          placeholder="Ex: A3B7K2"
+          placeholder={t("tracking.code.placeholder")}
           maxLength={6}
           className="flex-1 px-3 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono text-center tracking-widest uppercase"
           style={{ fontSize: "16px" }}
         />
         <Button onClick={handleVerify} disabled={verifying || code.trim().length < 6}>
-          {verifying ? <Loader2 size={14} className="animate-spin" /> : "Valider"}
+          {verifying ? <Loader2 size={14} className="animate-spin" /> : t("tracking.code.validate")}
         </Button>
       </div>
     </div>
