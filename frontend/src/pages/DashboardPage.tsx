@@ -678,6 +678,9 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
   onBack: () => void;
   onCancelSuccess: () => void;
 }) {
+  const { t, locale, formatPrice } = useI18n();
+  const dateLocale = locale === "en" ? enUS : fr;
+  const dateStringLocale = locale === "en" ? "en-US" : "fr-FR";
   const { toast } = useToast();
   const { user } = useAuth();
   const [showReturnForm, setShowReturnForm] = useState(false);
@@ -740,9 +743,9 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       is_approved: false,
     });
     if (error) {
-      toast({ title: "Erreur", description: "Impossible de soumettre l'avis.", variant: "destructive" });
+      toast({ title: t("dashboard.review.errorTitle"), description: t("dashboard.review.errorDesc"), variant: "destructive" });
     } else {
-      toast({ title: "Merci !", description: "Votre avis a été soumis. Ajoutez des photos pour gagner des ZandoPoints !" });
+      toast({ title: t("dashboard.review.thanks"), description: t("dashboard.review.thanksDesc") });
       setExistingReviews(prev => new Set([...prev, productId]));
       setReviewRating(0);
       setReviewComment("");
@@ -772,7 +775,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
   return (
     <div className="bg-card border border-border rounded-lg p-5 space-y-5">
       <button onClick={onBack} className="text-sm text-primary flex items-center gap-1">
-        <ChevronLeft size={14} /> Retour aux commandes
+        <ChevronLeft size={14} /> {t("dashboard.detail.back")}
       </button>
 
       {/* Header */}
@@ -783,16 +786,16 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
 
       {/* Summary grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-        <div><span className="text-muted-foreground">Date</span><p className="font-medium">{new Date(order.created_at).toLocaleDateString("fr-FR")}</p></div>
-        <div><span className="text-muted-foreground">Sous-total</span><p className="font-medium">${Number(order.subtotal).toFixed(2)}</p></div>
-        <div><span className="text-muted-foreground">Livraison</span><p className="font-medium">{Number(order.shipping_cost) === 0 ? "Gratuite" : `$${Number(order.shipping_cost).toFixed(2)}`}</p></div>
-        <div><span className="text-muted-foreground">Total</span><p className="font-bold text-primary">${Number(order.total).toFixed(2)}</p></div>
+        <div><span className="text-muted-foreground">{t("dashboard.detail.date")}</span><p className="font-medium">{new Date(order.created_at).toLocaleDateString(dateStringLocale)}</p></div>
+        <div><span className="text-muted-foreground">{t("dashboard.detail.subtotal")}</span><p className="font-medium">{formatPrice(Number(order.subtotal))}</p></div>
+        <div><span className="text-muted-foreground">{t("dashboard.detail.shipping")}</span><p className="font-medium">{Number(order.shipping_cost) === 0 ? t("dashboard.detail.free") : formatPrice(Number(order.shipping_cost))}</p></div>
+        <div><span className="text-muted-foreground">{t("dashboard.detail.total")}</span><p className="font-bold text-primary">{formatPrice(Number(order.total))}</p></div>
       </div>
 
       {order.coupon_code && (
         <div className="flex items-center gap-2 text-sm text-primary">
           <Star size={14} />
-          <span>Code promo : <strong>{order.coupon_code}</strong> (-${Number(order.discount_amount || 0).toFixed(2)})</span>
+          <span>{t("dashboard.detail.couponPromo")} <strong>{order.coupon_code}</strong> (-{formatPrice(Number(order.discount_amount || 0))})</span>
         </div>
       )}
 
@@ -800,22 +803,22 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       <div className="flex flex-wrap gap-1.5 text-[10px]">
         {order.payment_method && (
           <span className="px-2 py-0.5 rounded-full bg-muted font-medium">
-            Paiement : {order.payment_method === "stripe" || order.payment_method === "card" ? "Carte bancaire" : order.payment_method === "paypal" ? "PayPal" : order.payment_method === "mobile_money" ? "Mobile Money" : order.payment_method === "cod" ? "Cash à la livraison" : order.payment_method === "off_platform" ? "Hors plateforme" : order.payment_method}
+            {t("dashboard.detail.payment")} {order.payment_method === "stripe" || order.payment_method === "card" ? t("dashboard.detail.pm.card") : order.payment_method === "paypal" ? t("dashboard.detail.pm.paypal") : order.payment_method === "mobile_money" ? t("dashboard.detail.pm.mobileMoney") : order.payment_method === "cod" ? t("dashboard.detail.pm.cod") : order.payment_method === "off_platform" ? t("dashboard.detail.pm.offPlatform") : order.payment_method}
           </span>
         )}
         {order.shipping_payment_status && (
           <span className={`px-2 py-0.5 rounded-full font-medium ${order.shipping_payment_status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-            Expédition : {order.shipping_payment_status === "paid" ? "Payée" : order.shipping_payment_status === "deferred" ? "Paiement différé" : order.shipping_payment_status}
+            {t("dashboard.detail.shippingFee")} {order.shipping_payment_status === "paid" ? t("dashboard.detail.shippingStatus.paid") : order.shipping_payment_status === "deferred" ? t("dashboard.detail.shippingStatus.deferred") : order.shipping_payment_status}
           </span>
         )}
         {order.delivery_choice && (
           <span className={`px-2 py-0.5 rounded-full font-medium ${order.delivery_choice === "home_delivery" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
-            {order.delivery_choice === "home_delivery" ? "Livraison domicile" : "Retrait Hub"}
+            {order.delivery_choice === "home_delivery" ? t("dashboard.detail.delivery.home") : t("dashboard.detail.delivery.hub")}
           </span>
         )}
         {order.last_mile_payment_method && (
           <span className="px-2 py-0.5 rounded-full bg-muted font-medium">
-            Dernier km : {order.last_mile_payment_method === "cash" ? "Cash au livreur" : "Mobile Money"}
+            {t("dashboard.detail.lastMile")} {order.last_mile_payment_method === "cash" ? t("dashboard.detail.lastMile.cash") : t("dashboard.detail.lastMile.mobile")}
           </span>
         )}
       </div>
@@ -823,7 +826,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       {/* Shipping info - full address */}
       {(order.shipping_first_name || order.shipping_last_name) && (
         <div className="text-sm">
-          <p className="text-muted-foreground text-xs mb-1">Destinataire</p>
+          <p className="text-muted-foreground text-xs mb-1">{t("dashboard.detail.recipient")}</p>
           <p className="font-medium text-foreground">{order.shipping_first_name} {order.shipping_last_name}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
             {[order.shipping_address, order.shipping_city, order.shipping_country].filter(Boolean).join(", ")}
@@ -834,12 +837,12 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       {/* Tracking number only — supplier info hidden from clients */}
       {order.tracking_number && (
         <div className="space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground">Informations de suivi</p>
+          <p className="text-xs font-semibold text-muted-foreground">{t("dashboard.detail.trackingInfo")}</p>
           {order.tracking_number && (
             <div className="flex items-center gap-2 text-sm bg-muted/30 rounded-md p-2.5">
               <Truck size={14} className="text-primary shrink-0" />
               <div className="flex-1 min-w-0">
-                <span className="text-[11px] text-muted-foreground block">N° de suivi (tracking)</span>
+                <span className="text-[11px] text-muted-foreground block">{t("dashboard.detail.trackingNo")}</span>
                 <span className="font-mono font-bold text-foreground">{order.tracking_number}</span>
               </div>
             </div>
@@ -854,7 +857,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       {order.assigned_rider_name && (
         <div className="flex items-center gap-2 text-sm bg-muted/30 rounded-md p-2.5">
           <Truck size={14} className="text-primary shrink-0" />
-          <span className="text-muted-foreground">Livreur :</span>
+          <span className="text-muted-foreground">{t("dashboard.detail.rider")}</span>
           <a href="/tracking" className="font-bold text-primary hover:underline">{order.assigned_rider_name}</a>
         </div>
       )}
@@ -863,17 +866,13 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       {order.confirmation_code && order.status !== "delivered" && order.status !== "cancelled" && (
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
           <p className="text-xs font-semibold text-foreground flex items-center gap-2">
-            🔐 Votre code de confirmation
+            {t("dashboard.detail.confirmCode.title")}
           </p>
-          <p className="text-[11px] text-muted-foreground">
-            Présentez ce code lors de la réception de votre colis (retrait au Hub ou livraison à domicile).
-          </p>
+          <p className="text-[11px] text-muted-foreground">{t("dashboard.detail.confirmCode.desc")}</p>
           <div className="bg-background border border-border rounded-lg px-4 py-3 text-center">
             <span className="font-mono font-bold text-xl tracking-[0.3em] text-primary">{order.confirmation_code}</span>
           </div>
-          <p className="text-[10px] text-muted-foreground text-center">
-            Ne partagez ce code qu'au moment de la réception.
-          </p>
+          <p className="text-[10px] text-muted-foreground text-center">{t("dashboard.detail.confirmCode.footer")}</p>
         </div>
       )}
 
@@ -882,18 +881,16 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
             <span className="text-amber-700 dark:text-amber-400 font-medium">
-              ⏳ Commande en attente — Uploadez votre preuve de paiement du produit : <strong>${Number(order.subtotal).toFixed(2)}</strong>
+              {t("dashboard.detail.offPlatform.pendingProduct")} <strong>{formatPrice(Number(order.subtotal))}</strong>
             </span>
           </div>
           <PaymentProofUpload
             orderId={order.id}
             field="shipping_payment_proof_url"
-            label="Preuve de paiement de la commande"
+            label={t("dashboard.detail.proof.order")}
             existingUrl={order.shipping_payment_proof_url}
           />
-          <p className="text-[10px] text-muted-foreground">
-            Le vendeur validera votre paiement pour confirmer la commande. Les frais d'expédition et livraison seront à régler séparément.
-          </p>
+          <p className="text-[10px] text-muted-foreground">{t("dashboard.detail.offPlatform.note")}</p>
         </div>
       )}
 
@@ -907,7 +904,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
             <span className="text-amber-700 dark:text-amber-400 font-medium">
-              ⏳ Frais d'expédition à régler : <strong>${Number(order.shipping_cost || 0).toFixed(2)}</strong>
+              {t("dashboard.detail.deferred.shipping")} <strong>{formatPrice(Number(order.shipping_cost || 0))}</strong>
             </span>
           </div>
           <Button
@@ -915,7 +912,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
             className="w-full gap-2"
             onClick={() => setShowShippingPayment("shipping")}
           >
-            <CreditCard size={14} /> Payer l'expédition (${Number(order.shipping_cost || 0).toFixed(2)})
+            <CreditCard size={14} /> {t("dashboard.detail.payShipping")} ({formatPrice(Number(order.shipping_cost || 0))})
           </Button>
         </div>
       )}
@@ -925,7 +922,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-2.5">
             <span className="text-blue-700 dark:text-blue-400 font-medium">
-              🚚 Frais de livraison à domicile : <strong>${Number(order.last_mile_fee).toFixed(2)}</strong>
+              {t("dashboard.detail.lastMileHome")} <strong>{formatPrice(Number(order.last_mile_fee))}</strong>
             </span>
           </div>
           <Button
@@ -933,7 +930,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
             className="w-full gap-2"
             onClick={() => setShowShippingPayment("last_mile")}
           >
-            <CreditCard size={14} /> Payer la livraison (${Number(order.last_mile_fee).toFixed(2)})
+            <CreditCard size={14} /> {t("dashboard.detail.payLastMile")} ({formatPrice(Number(order.last_mile_fee))})
           </Button>
         </div>
       )}
@@ -947,8 +944,8 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       {order.delivery_date_requested && (
         <div className="flex items-center gap-2 text-xs bg-primary/5 border border-primary/20 rounded-md p-2.5">
           <span className="text-primary font-medium">
-            📅 Livraison prévue : <strong>{new Date(order.delivery_date_requested).toLocaleDateString("fr-FR")}</strong>
-            {order.delivery_time_requested && <> à <strong>{order.delivery_time_requested}</strong></>}
+            {t("dashboard.detail.scheduled")} <strong>{new Date(order.delivery_date_requested).toLocaleDateString(dateStringLocale)}</strong>
+            {order.delivery_time_requested && <> {t("dashboard.detail.scheduledAt")} <strong>{order.delivery_time_requested}</strong></>}
           </span>
         </div>
       )}
@@ -957,11 +954,11 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       {order.hub_pickup_proof_url && (
         <div className="space-y-2">
           <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-            📦 Photo du colis au Hub
+            {t("dashboard.detail.hubPhoto")}
           </p>
           <DeliveryProofImage
             pathOrUrl={order.hub_pickup_proof_url}
-            alt="Photo du colis"
+            alt={t("dashboard.detail.hubPhotoAlt")}
             className="w-full max-w-xs rounded-lg border border-border object-cover"
           />
         </div>
@@ -972,13 +969,13 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
             <span className="text-amber-700 dark:text-amber-400 font-medium">
-              💳 Paiement hors plateforme — Envoyez votre preuve de paiement pour validation
+              {t("dashboard.detail.offPlatform.send")}
             </span>
           </div>
           <PaymentProofUpload
             orderId={order.id}
             field="shipping_payment_proof_url"
-            label="Preuve de paiement (capture d'écran)"
+            label={t("dashboard.detail.proof.screenshot")}
             existingUrl={order.shipping_payment_proof_url}
           />
         </div>
@@ -988,7 +985,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       {order.payment_method === "off_platform" && order.status === "awaiting_payment" && order.shipping_payment_proof_url && (
         <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-2.5">
           <span className="text-blue-700 dark:text-blue-400 font-medium">
-            ⏳ Preuve envoyée — En attente de validation par le vendeur
+            {t("dashboard.detail.offPlatform.waiting")}
           </span>
         </div>
       )}
@@ -998,7 +995,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         <PaymentProofUpload
           orderId={order.id}
           field="hub_pickup_proof_url"
-          label="Preuve de retrait au Hub"
+          label={t("dashboard.detail.proof.hubPickup")}
           existingUrl={order.hub_pickup_proof_url}
         />
       )}
@@ -1008,12 +1005,12 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         <div className={`flex items-center gap-2 text-sm rounded-md p-2.5 ${
           order.delivery_choice === "home_delivery" ? "bg-blue-50 dark:bg-blue-900/20" : "bg-amber-50 dark:bg-amber-900/20"
         }`}>
-          <span className="text-muted-foreground">Mode de réception :</span>
+          <span className="text-muted-foreground">{t("dashboard.detail.deliveryMode")}</span>
           <span className="font-bold text-foreground">
-            {order.delivery_choice === "home_delivery" ? "Livraison à domicile" : "Retrait au Hub"}
+            {order.delivery_choice === "home_delivery" ? t("dashboard.detail.deliveryMode.home") : t("dashboard.detail.deliveryMode.hub")}
           </span>
           {order.last_mile_fee != null && Number(order.last_mile_fee) > 0 && order.delivery_choice === "home_delivery" && (
-            <span className="text-xs text-muted-foreground">(${Number(order.last_mile_fee).toFixed(2)})</span>
+            <span className="text-xs text-muted-foreground">({formatPrice(Number(order.last_mile_fee))})</span>
           )}
         </div>
       )}
@@ -1026,7 +1023,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       {/* Items */}
       {orderItems.length > 0 && (
         <div className="border-t border-border pt-4">
-          <h4 className="text-sm font-semibold text-foreground mb-2">Articles ({orderItems.length})</h4>
+          <h4 className="text-sm font-semibold text-foreground mb-2">{t("dashboard.detail.items", { count: orderItems.length })}</h4>
           <div className="space-y-2">
             {orderItems.map(item => (
               <div key={item.id} className="flex items-center gap-3">
@@ -1036,7 +1033,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-foreground truncate">{item.product_name}</p>
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1 flex-wrap">
-                    <span>Qté: {item.quantity}</span>
+                    <span>{t("dashboard.detail.qty")} {item.quantity}</span>
                     {item.size && <span>· {item.size}</span>}
                     {item.color && (() => {
                       const cd = getColorDisplay(item.color);
@@ -1049,7 +1046,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
                     })()}
                   </p>
                 </div>
-                <span className="text-sm font-medium text-foreground">${(Number(item.price) * item.quantity).toFixed(2)}</span>
+                <span className="text-sm font-medium text-foreground">{formatPrice(Number(item.price) * item.quantity)}</span>
               </div>
             ))}
           </div>
@@ -1063,7 +1060,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       {statusHistory.length > 0 && (
         <div className="border-t border-border pt-4">
           <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-            <History size={14} /> Historique détaillé
+            <History size={14} /> {t("dashboard.detail.history")}
           </h4>
           <div className="relative pl-4 space-y-3">
             <div className="absolute left-[7px] top-1 bottom-1 w-px bg-border" />
@@ -1083,7 +1080,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
                       {cfg.label}
                     </p>
                     <p className="text-[10px] text-muted-foreground">
-                      {format(new Date(entry.created_at), "dd MMM yyyy 'à' HH:mm", { locale: fr })}
+                      {format(new Date(entry.created_at), locale === "en" ? "dd MMM yyyy 'at' HH:mm" : "dd MMM yyyy 'à' HH:mm", { locale: dateLocale })}
                     </p>
                     {entry.notes && (
                       <p className="text-[10px] text-muted-foreground italic mt-0.5">{entry.notes}</p>
@@ -1100,7 +1097,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       <div className="border-t border-border pt-4 flex flex-wrap gap-2">
         {canRetryPayment && (
           <Button variant="default" size="sm" onClick={() => setShowRetryPayment(true)}>
-            <CreditCard size={14} className="mr-1" /> Relancer le paiement
+            <CreditCard size={14} className="mr-1" /> {t("dashboard.detail.retryPayment")}
           </Button>
         )}
         {canCancel && <CancelOrderButton orderId={order.id} orderRef={order.order_ref} onSuccess={onCancelSuccess} />}
@@ -1113,7 +1110,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
                 `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-invoice`,
                 { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess.session.access_token}` }, body: JSON.stringify({ orderId: order.id, format: "pdf" }), retries: 2, timeout: 20000 }
               );
-              if (!resp.ok) throw new Error(resp.status === 401 ? "Session expirée" : `Erreur ${resp.status}`);
+              if (!resp.ok) throw new Error(resp.status === 401 ? t("dashboard.invoice.sessionExpired") : t("dashboard.invoice.serverError", { status: resp.status }));
               const html = await resp.text();
               if (!html) return;
               const blob = new Blob([html], { type: "text/html" });
@@ -1127,20 +1124,20 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
                 URL.revokeObjectURL(url);
               }
             } catch (e) {
-              toast({ title: "Erreur", description: e instanceof Error ? e.message : "Impossible de télécharger la facture.", variant: "destructive" });
+              toast({ title: t("dashboard.invoice.error"), description: e instanceof Error ? e.message : t("dashboard.invoice.errorDesc"), variant: "destructive" });
             }
           }}>
-            <FileText size={14} className="mr-1" /> Télécharger PDF
+            <FileText size={14} className="mr-1" /> {t("dashboard.detail.downloadPdf")}
           </Button>
         )}
         {canReturn && !showReturnForm && (
           <Button variant="outline" size="sm" onClick={() => setShowReturnForm(true)}>
-            <RotateCcw size={14} className="mr-1" /> Demander un retour
+            <RotateCcw size={14} className="mr-1" /> {t("dashboard.detail.requestReturn")}
           </Button>
         )}
         {canDispute && !showDisputeForm && (
           <Button variant="outline" size="sm" onClick={() => setShowDisputeForm(true)}>
-            <AlertTriangle size={14} className="mr-1" /> Ouvrir un litige
+            <AlertTriangle size={14} className="mr-1" /> {t("dashboard.detail.openDispute")}
           </Button>
         )}
       </div>
@@ -1149,11 +1146,9 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       {order.status === "delivered" && orderItems.length > 0 && (
         <div className="border-t border-border pt-4 space-y-3">
           <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Star size={14} className="text-primary" /> Laisser un avis
+            <Star size={14} className="text-primary" /> {t("dashboard.review.title")}
           </h4>
-          <p className="text-xs text-muted-foreground">
-            Partagez votre expérience et gagnez des ZandoPoints en ajoutant des photos ! 📸
-          </p>
+          <p className="text-xs text-muted-foreground">{t("dashboard.review.desc")}</p>
           {orderItems.filter(item => item.product_id && !existingReviews.has(item.product_id)).map(item => (
             <div key={item.id} className="bg-muted/30 border border-border rounded-lg p-3 space-y-3">
               <div className="flex items-center gap-3">
@@ -1174,7 +1169,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
                 ))}
               </div>
               <Textarea
-                placeholder="Décrivez votre expérience avec ce produit..."
+                placeholder={t("dashboard.review.placeholder")}
                 value={reviewComment}
                 onChange={e => setReviewComment(e.target.value)}
                 className="text-sm min-h-[60px]"
@@ -1183,7 +1178,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-xs text-primary cursor-pointer">
                   <Camera size={14} />
-                  <span>Ajouter des photos (bonus ZandoPoints)</span>
+                  <span>{t("dashboard.review.addPhotos")}</span>
                   <input type="file" accept="image/*" multiple className="hidden" onChange={handleReviewImageUpload} />
                 </label>
                 {reviewImages.length > 0 && (
@@ -1208,13 +1203,13 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
                 onClick={() => handleSubmitReview(item.product_id!)}
               >
                 {reviewSubmitting ? <Loader2 size={14} className="animate-spin mr-1" /> : <Star size={14} className="mr-1" />}
-                Soumettre l'avis
+                {t("dashboard.review.submit")}
               </Button>
             </div>
           ))}
           {orderItems.every(item => !item.product_id || existingReviews.has(item.product_id)) && (
             <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <CheckCircle2 size={12} className="text-primary" /> Vous avez déjà laissé un avis pour tous les articles.
+              <CheckCircle2 size={12} className="text-primary" /> {t("dashboard.review.allDone")}
             </p>
           )}
         </div>
