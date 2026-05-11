@@ -154,7 +154,7 @@ export function FeaturedSidebar() {
         {/* Header */}
         <div className="flex items-center gap-1.5 mb-2">
           <Sparkles size={14} className="text-primary" />
-          <span className="text-xs font-semibold text-primary uppercase tracking-wide">Sponsorisé</span>
+          <span className="text-xs font-semibold text-primary uppercase tracking-wide">{t("common.sponsored") || "Sponsorisé"}</span>
         </div>
 
         {/* Card */}
