@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { slugify } from "@/utils/slugify";
 import { imgUrl, imgSrcSet } from "@/lib/image-url";
+import { useI18n } from "@/contexts/I18nContext";
 
 interface DBCategory {
   id: string;
@@ -17,6 +18,9 @@ interface DBCategory {
 
 export function MegaMenu() {
   const [activeIndex, setActiveIndex] = useState(0);
+  const { locale, t } = useI18n();
+  const getLabel = (c: { name: string; name_fr: string }) =>
+    locale === "fr" ? (c.name_fr ?? c.name) : (c.name ?? c.name_fr);
 
   const { data: allCategories } = useQuery({
     queryKey: ["mega-menu-categories"],
@@ -71,7 +75,7 @@ export function MegaMenu() {
                 }`}
               >
                 {cat.icon && <span>{cat.icon}</span>}
-                {cat.name_fr}
+                {getLabel(cat)}
               </Link>
             ))}
           </div>
@@ -84,7 +88,7 @@ export function MegaMenu() {
                   to={`/category/${slugify(active.name)}`}
                   className="inline-flex items-center gap-1 text-xs text-primary font-medium mb-3 hover:underline"
                 >
-                  Tout voir {active.name_fr} →
+                  {t("megaMenu.viewAll") || "Tout voir"} {getLabel(active)} →
                 </Link>
                 <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
                   {subcategories.map((sub) => (
@@ -95,17 +99,17 @@ export function MegaMenu() {
                     >
                       <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-border group-hover:border-primary transition-colors bg-muted flex items-center justify-center">
                         {sub.image_url ? (
-                          <img src={imgUrl(sub.image_url, { width: 200 })} srcSet={imgSrcSet(sub.image_url, [120, 240])} sizes="120px" alt={sub.name_fr} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                          <img src={imgUrl(sub.image_url, { width: 200 })} srcSet={imgSrcSet(sub.image_url, [120, 240])} sizes="120px" alt={getLabel(sub)} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                         ) : sub.icon ? (
                           <span className="text-xl">{sub.icon}</span>
                         ) : (
                           <span className="text-xs font-bold text-primary">
-                            {sub.name_fr.slice(0, 2).toUpperCase()}
+                            {getLabel(sub).slice(0, 2).toUpperCase()}
                           </span>
                         )}
                       </div>
                       <span className="text-[11px] text-foreground text-center font-medium group-hover:text-primary transition-colors">
-                        {sub.name_fr}
+                        {getLabel(sub)}
                       </span>
                     </Link>
                   ))}
@@ -115,7 +119,7 @@ export function MegaMenu() {
 
             {subcategories.length === 0 && active && (
               <p className="text-sm text-muted-foreground py-4">
-                Aucune sous-catégorie
+                {t("megaMenu.noSubcategory") || "Aucune sous-catégorie"}
               </p>
             )}
           </div>
