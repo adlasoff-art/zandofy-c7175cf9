@@ -1584,7 +1584,7 @@ export default function CheckoutPage() {
                             : !hasOperatorCoverage
                               ? "Aucun livreur ne dessert encore votre quartier"
                               : lastMileResult && lastMileResult.fee > 0
-                                ? `Frais estimés : $${lastMileResult.fee.toFixed(2)}`
+                                ? `${t("checkout.estimatedFees") || "Frais estimés"} : ${formatPrice(lastMileResult.fee)}`
                                 : "Recevez votre colis directement chez vous",
                           disabled: (lastMileResult ? !lastMileResult.deliverable : false) || (!operatorCoverageLoading && !hasOperatorCoverage),
                         },
@@ -1671,11 +1671,11 @@ export default function CheckoutPage() {
                     {/* Last-mile payment choice */}
                     {deliveryOption === "home_delivery" && lastMileResult?.deliverable && lastMileFee > 0 && !hasActiveDeliverySub && (
                       <div className="bg-muted/50 rounded-lg p-3 space-y-2 mt-2">
-                        <p className="text-xs font-medium text-foreground">Paiement de la livraison locale : ${lastMileFee.toFixed(2)}</p>
+                        <p className="text-xs font-medium text-foreground">{t("checkout.localDeliveryPayment") || "Paiement de la livraison locale"} : {formatPrice(lastMileFee)}</p>
                         <div className="space-y-1.5">
                           {[
-                            { key: "pay_with_shipping" as LastMilePayment, label: "Inclure dans le total", desc: `Ajouter $${lastMileFee.toFixed(2)} au paiement` },
-                            { key: "pay_cash_on_delivery" as LastMilePayment, label: "Payer à la réception", desc: "Régler au livreur à la livraison" },
+                            { key: "pay_with_shipping" as LastMilePayment, label: t("checkout.includeInTotal") || "Inclure dans le total", desc: `${t("checkout.addToPayment") || "Ajouter"} ${formatPrice(lastMileFee)} ${t("checkout.toPayment") || "au paiement"}` },
+                            { key: "pay_cash_on_delivery" as LastMilePayment, label: t("checkout.payOnDelivery") || "Payer à la réception", desc: t("checkout.payOnDeliveryDesc") || "Régler au livreur à la livraison" },
                           ].map(opt => (
                             <button
                               key={opt.key}
