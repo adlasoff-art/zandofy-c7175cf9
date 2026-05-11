@@ -283,7 +283,7 @@ export default function DashboardPage() {
 
   const displayName = profileName.first_name || profileName.last_name
     ? `${profileName.first_name} ${profileName.last_name}`.trim()
-    : "Client";
+    : t("dashboard.client");
   const welcomeName = profileName.first_name || displayName;
 
   // KPI data (always visible)
@@ -427,27 +427,27 @@ export default function DashboardPage() {
             {!loading && (
               <div className="grid grid-cols-3 xl:grid-cols-6 gap-3">
                 <div className="bg-card border border-border rounded-lg p-3">
-                  <p className="text-[11px] text-muted-foreground">Bienvenue</p>
+                  <p className="text-[11px] text-muted-foreground">{t("dashboard.welcome")}</p>
                   <p className="text-sm font-bold text-foreground mt-1 truncate">{displayName}</p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-3">
-                  <p className="text-[11px] text-muted-foreground">En cours</p>
+                  <p className="text-[11px] text-muted-foreground">{t("dashboard.kpi.inProgress")}</p>
                   <p className="text-xl font-bold text-primary mt-1">{activeOrders}</p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-3">
-                  <p className="text-[11px] text-muted-foreground">Total commandes</p>
+                  <p className="text-[11px] text-muted-foreground">{t("dashboard.totalOrders")}</p>
                   <p className="text-xl font-bold text-foreground mt-1">{validOrders.length}</p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-3">
-                  <p className="text-[11px] text-muted-foreground">Total dépensé</p>
+                  <p className="text-[11px] text-muted-foreground">{t("dashboard.totalSpent")}</p>
                   <p className="text-xl font-bold text-foreground mt-1">${totalSpent.toFixed(2)}</p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-3">
-                  <p className="text-[11px] text-muted-foreground">Annulées</p>
+                  <p className="text-[11px] text-muted-foreground">{t("dashboard.kpi.cancelled")}</p>
                   <p className="text-xl font-bold text-destructive mt-1">{cancelledCount}</p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-3">
-                  <p className="text-[11px] text-muted-foreground">Retournées</p>
+                  <p className="text-[11px] text-muted-foreground">{t("dashboard.kpi.returned")}</p>
                   <p className="text-xl font-bold text-orange-500 mt-1">{returnedCount}</p>
                 </div>
               </div>
@@ -470,7 +470,7 @@ export default function DashboardPage() {
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-foreground truncate">Bienvenue, {welcomeName}</p>
+              <p className="text-sm font-bold text-foreground truncate">{t("dashboard.welcomeMobile", { name: welcomeName })}</p>
               <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
             </div>
           </div>
@@ -479,15 +479,15 @@ export default function DashboardPage() {
           {!loading && (
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-card border border-border rounded-lg p-2.5">
-                <p className="text-[10px] text-muted-foreground">En cours</p>
+                <p className="text-[10px] text-muted-foreground">{t("dashboard.kpi.inProgress")}</p>
                 <p className="text-lg font-bold text-primary">{activeOrders}</p>
               </div>
               <div className="bg-card border border-border rounded-lg p-2.5">
-                <p className="text-[10px] text-muted-foreground">Commandes</p>
+                <p className="text-[10px] text-muted-foreground">{t("dashboard.kpi.ordersShort")}</p>
                 <p className="text-lg font-bold text-foreground">{validOrders.length}</p>
               </div>
               <div className="bg-card border border-border rounded-lg p-2.5">
-                <p className="text-[10px] text-muted-foreground">Dépensé</p>
+                <p className="text-[10px] text-muted-foreground">{t("dashboard.kpi.spentShort")}</p>
                 <p className="text-lg font-bold text-foreground">${totalSpent.toFixed(2)}</p>
               </div>
             </div>
