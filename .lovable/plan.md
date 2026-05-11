@@ -1,71 +1,65 @@
-## Voie B — Test direct avec `jam`
+## Hypothèse confirmée à 90 %
 
-### Étape 1 — Mettre à jour le secret en prod
+Keccel attend toutes les clés du payload en **camelCase**, pas en minuscules :
 
-Tu vas dans **Connectors → Lovable Cloud → Secrets** (ou directement Supabase Vault sur le projet prod `vpttoqojmiqxgudknyxf`) et tu mets :
+- `merchantCode` (pas `merchantcode`)
+- `callbackUrl` (pas `callbackurl`)
+- `returnUrl` ✓ (déjà bon)
 
-- **Nom** : `KECCEL_CARD_MERCHANT_CODE`
-- **Valeur** : `jam` (3 caractères, **minuscules**, **aucun espace** avant/après)
+**Preuve** : l'attempt #3 (qui envoie `returnurl` lowercase) reçoit `Missing returnUrl parameter` — Keccel cite le nom attendu en camelCase. Pour les autres attempts, le nom est vide (double espace) parce que Keccel ne parvient pas à reformater nos clés lowercase.
 
-⚠️ Important : c'est le secret côté **prod** (`zandofy.com`), pas Lovable Cloud preview. Si tu utilises GitHub Actions / Vercel pour propager, vérifie que le secret est bien à jour là où l'Edge Function `keccel-cardpay` lit ses env (Supabase Edge Functions secrets du projet prod).
+Notre merchant code `jam` est bien envoyé (`ja***am` confirmé), mais Keccel ne le voit pas parce qu'il cherche la clé `merchantCode` qui n'existe pas dans le JSON.
 
-### Étape 2 — Attendre 30 sec puis lancer UN seul test carte
+## Plan d'action — Étape unique
 
-Sur `https://zandofy.com` :
-1. Ajoute un produit au panier
-2. Va au checkout
-3. Choisis paiement par carte
-4. Clique « Payer »
-5. Note l'heure exacte du clic et le `diag XXXXXX` affiché en cas d'erreur
+Modifier `frontend/supabase/functions/keccel-cardpay/index.ts` pour ajouter **3 nouvelles variantes camelCase** (attempts 11-13) en gardant les 10 existantes (au cas où l'hypothèse serait fausse) :
 
-### Étape 3 — Exécute ce SQL dans le SQL Editor prod
+### Variantes à ajouter
 
-```sql
--- 1) Vérifier que le NOUVEAU merchant code est bien arrivé en Edge Function
-SELECT
-  created_at AT TIME ZONE 'Africa/Kinshasa' AS heure_kin,
-  diagnostic_id,
-  merchant_code_masked,           -- doit montrer 'ja***am' ou 'j***m' (3 chars)
-  token_length,
-  attempt_idx,
-  attempt_label,
-  http_status,
-  keccel_code,
-  keccel_description,
-  LEFT(raw_body, 200) AS body_extrait
-FROM keccel_cardpay_diagnostics
-WHERE created_at > NOW() - INTERVAL '15 minutes'
-ORDER BY created_at DESC, attempt_idx ASC
-LIMIT 30;
+```ts
+// Attempt 11 : tout en camelCase strict
+{ attempt_index: 11, label: "camelCase_full",
+  payload_keys: { merchantCode, reference, amount, currency, description, callbackUrl, returnUrl }
+}
+
+// Attempt 12 : camelCase + champs client (au cas où)
+{ attempt_index: 12, label: "camelCase+customer",
+  payload_keys: { merchantCode, reference, amount, currency, description, callbackUrl, returnUrl,
+                  customerEmail, customerName, customerPhone }
+}
+
+// Attempt 13 : camelCase + language
+{ attempt_index: 13, label: "camelCase+lang",
+  payload_keys: { merchantCode, reference, amount, currency, description, callbackUrl, returnUrl,
+                  language: "fr" }
+}
 ```
 
-```sql
--- 2) Résumé : un seul résultat par diag, statut global
-SELECT
-  diagnostic_id,
-  MIN(created_at) AT TIME ZONE 'Africa/Kinshasa' AS heure,
-  MAX(merchant_code_masked) AS merchant_used,
-  COUNT(*) AS attempts,
-  COUNT(*) FILTER (WHERE keccel_code = '0') AS success_count,
-  STRING_AGG(DISTINCT keccel_description, ' | ') AS descriptions_keccel
-FROM keccel_cardpay_diagnostics
-WHERE created_at > NOW() - INTERVAL '15 minutes'
-GROUP BY diagnostic_id
-ORDER BY heure DESC;
-```
+Implémentation : refactor mineur du builder de payload pour basculer entre `lowercase` / `camelCase` selon l'attempt.
 
-### Étape 4 — Lecture des résultats
+## Étape de validation post-déploiement
 
-| Cas | Diagnostic | Action |
-|---|---|---|
-| `merchant_code_masked` toujours `JA***IO` | Le secret n'a **pas été propagé** à l'Edge Function prod | Vérifier que tu as mis à jour le bon environnement (Supabase Edge Functions du projet prod, pas Lovable Cloud) |
-| `merchant_code_masked` = `j***m` ou similaire **et** `success_count > 0` | **GAGNÉ** 🎉 | Je nettoie le code (1 seule tentative au lieu de 10) et on passe en prod propre |
-| `merchant_code_masked` changé **mais** `keccel_description` différente (genre `Invalid merchant`, `Account suspended`...) | Nouvelle piste | Tu me partages le texte exact, on adapte |
-| `merchant_code_masked` changé **mais** toujours `Missing parameter` identique | Le merchant code n'était pas le souci | On lance les variantes 5-10 (form-urlencoded, header `apikey:`, etc.) |
+1. GitHub Actions déploie automatiquement la fonction sur prod (5 min).
+2. Tu fais **un seul** test carte sur `zandofy.com`.
+3. Tu lances le SQL du dernier plan (mêmes 2 requêtes).
+4. Lecture :
 
-## Ce que je ferai après ton retour
+| Cas | Verdict |
+|---|---|
+| Attempt 11/12/13 a `keccel_code = "0"` + checkoutUrl | **GAGNÉ** — Keccel attend bien camelCase. On nettoie ensuite et on retire les 10 anciennes variantes. |
+| Toujours `Missing parameter` même en camelCase | L'hypothèse était fausse — on regarde la doc Keccel ou on contacte le support avec preuve à l'appui. |
+| Nouvelle erreur (genre `Invalid amount`, `Unauthorized`...) | On progresse — le format des clés était bon, il manque juste un champ ou un format précis. |
 
-- **Si succès** : patch minimal sur `keccel-cardpay/index.ts` pour retirer les 9 variantes inutiles, garder le diagnostic, mettre à jour `mem://features/keccel-cardpay-constraints` avec la règle : « merchant code carte ≠ merchant code Mobile Money, valeur officielle = `jam` ».
-- **Si échec** : nouvelle vague de variantes ciblée selon l'erreur reçue.
+## Ce que je ne touche PAS
 
-Quand tu as fait l'étape 1+2, dis-moi simplement « secret mis à jour, test fait » et colle les résultats SQL — je te donne le verdict immédiatement.
+- Aucun changement de logique business (montant, reference, transaction record, ordre status).
+- Le merchant code reste à `jam` (à ne PAS revenir à JAMSIO).
+- Les 10 anciennes variantes lowercase restent en place tant qu'on n'a pas confirmé.
+
+## Fichier impacté
+
+- `frontend/supabase/functions/keccel-cardpay/index.ts` : ajout d'un flag `key_case: "lowercase" | "camelCase"` dans le type `Attempt`, et logique pour construire le payload selon le case choisi. ~30 lignes ajoutées.
+
+Pas de migration DB (la table `keccel_cardpay_diagnostics` accepte déjà des `attempt_label` libres).
+
+Approuve et j'implémente immédiatement.
