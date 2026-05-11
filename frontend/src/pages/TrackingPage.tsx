@@ -782,7 +782,7 @@ export default function TrackingPage() {
               {orderResult.tracking_number && (
                 <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-3 py-2">
                   <Package size={14} className="text-primary shrink-0" />
-                  <span className="text-muted-foreground">N° de suivi :</span>
+                  <span className="text-muted-foreground">{t("tracking.trackingNumberLabel")}</span>
                   <span className="font-mono font-semibold text-foreground">{orderResult.tracking_number}</span>
                 </div>
               )}
@@ -791,7 +791,7 @@ export default function TrackingPage() {
               {orderResult.delivery_operator_name && (
                 <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-3 py-2">
                   <Truck size={14} className="text-primary shrink-0" />
-                  <span className="text-muted-foreground">Transporteur :</span>
+                  <span className="text-muted-foreground">{t("tracking.transporterLabel")}</span>
                   <span className="font-semibold text-foreground">
                     {orderResult.delivery_operator_name}
                   </span>
@@ -802,7 +802,7 @@ export default function TrackingPage() {
               {orderResult.assigned_rider_name && (
                 <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-3 py-2">
                   <Bike size={14} className="text-primary shrink-0" />
-                  <span className="text-muted-foreground">Livreur :</span>
+                  <span className="text-muted-foreground">{t("tracking.riderLabel")}</span>
                   <Link
                     to={`/tracking?tab=delivery&ref=${orderResult.order_ref}`}
                     className="font-semibold text-primary hover:underline cursor-pointer"
@@ -815,8 +815,8 @@ export default function TrackingPage() {
               {/* Confirmation code — visible to customer */}
               {orderResult.confirmation_code && orderResult.status !== "delivered" && (
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
-                  <p className="text-xs font-semibold text-foreground">🔐 Votre code de confirmation</p>
-                  <p className="text-[11px] text-muted-foreground">Présentez ce code lors de la réception de votre colis.</p>
+                  <p className="text-xs font-semibold text-foreground">{t("tracking.confirmationCodeTitle")}</p>
+                  <p className="text-[11px] text-muted-foreground">{t("tracking.confirmationCodeDesc")}</p>
                   <div className="bg-background border border-border rounded-lg px-4 py-3 text-center">
                     <span className="font-mono font-bold text-xl tracking-[0.3em] text-primary">{orderResult.confirmation_code}</span>
                   </div>
@@ -854,15 +854,15 @@ export default function TrackingPage() {
                   {orderResult.delivery_choice === "home_delivery" ? (
                     <>
                       <Home size={14} className="text-primary shrink-0" />
-                      <span className="text-foreground">Livraison à domicile</span>
+                      <span className="text-foreground">{t("tracking.choiceInfo.home")}</span>
                       {orderResult.last_mile_fee && orderResult.last_mile_fee > 0 && (
-                        <span className="text-muted-foreground ml-1">— ${orderResult.last_mile_fee.toFixed(2)}</span>
+                        <span className="text-muted-foreground ml-1">— {formatPrice(orderResult.last_mile_fee)}</span>
                       )}
                     </>
                   ) : (
                     <>
                       <Store size={14} className="text-primary shrink-0" />
-                      <span className="text-foreground">Récupération au Hub</span>
+                      <span className="text-foreground">{t("tracking.choiceInfo.pickup")}</span>
                     </>
                   )}
                 </div>
@@ -872,7 +872,7 @@ export default function TrackingPage() {
               {orderResult.delivery_id && (
                 <div className="border-t border-border pt-4">
                   <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <Bike size={16} className="text-primary" /> Suivi en direct — GPS bidirectionnel
+                    <Bike size={16} className="text-primary" /> {t("tracking.live.title")}
                   </h3>
                   <LiveRiderMap deliveryId={orderResult.delivery_id} orderId={orderResult.id} userId={user?.id} />
                 </div>
@@ -880,7 +880,7 @@ export default function TrackingPage() {
 
               {/* Rider profile visible to customer */}
               {orderResult.assigned_rider_id && orderResult.status === "out_for_delivery" && (
-                <RiderProfileBanner riderId={orderResult.assigned_rider_id} riderName={orderResult.assigned_rider_name || "Livreur"} />
+                <RiderProfileBanner riderId={orderResult.assigned_rider_id} riderName={orderResult.assigned_rider_name || t("tracking.rider.default")} />
               )}
 
               {/* Ephemeral chat during delivery */}
@@ -888,7 +888,7 @@ export default function TrackingPage() {
                 <DeliveryChat
                   orderId={orderResult.id}
                   deliveryId={orderResult.delivery_id}
-                  otherPartyName={orderResult.assigned_rider_name || "Votre livreur"}
+                  otherPartyName={orderResult.assigned_rider_name || t("tracking.rider.defaultChat")}
                 />
               )}
 
@@ -897,7 +897,7 @@ export default function TrackingPage() {
                 <RiderRatingModal
                   orderId={orderResult.id}
                   riderId={orderResult.assigned_rider_id}
-                  riderName={orderResult.assigned_rider_name || "Livreur"}
+                  riderName={orderResult.assigned_rider_name || t("tracking.rider.default")}
                   userId={user.id}
                   deliveryId={orderResult.delivery_id}
                   tippingEnabled={tippingEnabled}
