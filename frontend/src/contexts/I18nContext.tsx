@@ -422,6 +422,12 @@ const translations: Record<Locale, Record<string, string>> = {
     "home.popularProducts": "Produits populaires",
     "home.trends": "Tendances",
     "home.all": "Tout",
+    // Common UI
+    "common.sponsored": "Sponsorisé",
+    "common.collapse": "Réduire",
+    "common.showAll": "Voir tout",
+    "common.retry": "Réessayer",
+    "common.loadProductsFailed": "Impossible de charger les produits",
     // Cart drawer
     "cart.loginRequired": "Connectez-vous pour voir votre panier",
     "cart.login": "Se connecter",
@@ -1026,6 +1032,12 @@ const translations: Record<Locale, Record<string, string>> = {
     "home.popularProducts": "Popular products",
     "home.trends": "Trends",
     "home.all": "All",
+    // Common UI
+    "common.sponsored": "Sponsored",
+    "common.collapse": "Collapse",
+    "common.showAll": "View all",
+    "common.retry": "Retry",
+    "common.loadProductsFailed": "Failed to load products",
     // Cart drawer
     "cart.loginRequired": "Log in to view your cart",
     "cart.login": "Log in",
