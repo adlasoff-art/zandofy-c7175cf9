@@ -1,103 +1,65 @@
-# Diagnostic CardPay (Keccel / MasterCard) — état actuel + plan d'action
+# Fix CardPay — Keccel exige un champ supplémentaire
 
-## 1. Ce que je peux confirmer sans accès prod
+## Ce que le diagnostic prouve (CSV n°5)
 
-### Côté DB (prod)
-La table `keccel_cardpay_diagnostics` est bien en place sur la prod : ta capture d'écran montre les 27 colonnes attendues (incluant `amount_sent`). **Les deux migrations sont donc déjà appliquées.** Tu n'as plus rien à exécuter côté schéma.
+- Stack frappée = bonne : `environment = vpttoqojmiqxgudknyxf` (prod), `site_base_url = https://zandofy.com` ✅
+- Token et merchantcode présents (`token_length=36`, `JA***IO`) ✅
+- `returnUrl` (camelCase) est bien reçu par Keccel : la tentative qui n'envoyait QUE `returnurl` (lowercase) reçoit l'erreur précise « Missing returnUrl parameter » → l'API parse bien le nom camelCase
+- Les 3 tentatives qui envoyaient `returnUrl` correctement reçoivent quand même HTTP 400 avec **« Missing&nbsp;&nbsp;parameter »** (nom vide entre deux espaces) → Keccel a un champ requis dont **le template d'erreur n'affiche pas le nom**, donc un champ ajouté récemment et mal documenté
+- Historique (CSV n°6) : la dernière transaction `success` date du **31 mars 2026** avec exactement le même format de référence `KC<23 hex>` → notre payload de l'époque marchait, donc **Keccel a ajouté un champ obligatoire entre le 31 mars et aujourd'hui**
 
-### Côté Edge Function `keccel-cardpay`
-Le fichier `frontend/supabase/functions/keccel-cardpay/index.ts` (poussé via GitHub Action `deploy-edge-functions.yml` vers la prod `vpt...yxf`) :
-- valide l'auth, le rate-limit, fetch la commande
-- calcule `amountSent = Math.ceil(amount)` et envoie `amount` en **string** (conforme doc Kelpay)
-- génère une `reference` ≤ 25 chars (`KC` + 23 hex)
-- essaie **4 variantes** d'appel à `https://api.keccel.net/cardpay` :
-  1. `Bearer <token>` + clé `returnUrl`
-  2. token brut + `returnUrl`
-  3. `Bearer` + `returnurl` (lowercase)
-  4. `Bearer` + les deux clés
-- pour chaque tentative, persiste une ligne dans `keccel_cardpay_diagnostics` avec `http_status`, `raw_body`, `keccel_code`, `keccel_description`
-- si aucune ne renvoie `code=="0"` → `success:false` + message "Keccel a refusé les 4 variantes (diag XXXX)…"
+## Hypothèses sur le champ manquant (par ordre de probabilité)
 
-### Côté front (`CheckoutPage.tsx` lignes 1203-1240)
-- Appel correct via `supabase.functions.invoke("keccel-cardpay", …)`
-- Si `data.redirect_url` → `window.location.href = data.redirect_url` (pas de nouvel onglet, c'est la **même fenêtre**, comportement normal)
-- Le toast "Erreur paiement" s'affiche uniquement quand `data.success === false` ou erreur SDK
+1. **`language`** (`fr` / `en`) — très fréquent dans les CardPay africains qui hébergent leur propre page checkout
+2. **`customerEmail`** — exigé pour 3DS / reçu
+3. **`customerName`** — souvent requis pour MasterCard
+4. **`customerPhone`** — exigé pour SMS OTP
+5. **`notifyUrl`** (en plus de `callbackurl`)
+6. **`country`** (`CD`) ou **`channel`** (`web`)
 
-### Conclusion intermédiaire
-Le code edge + front est cohérent. **Le toast "diag 497a3b2b" que tu as vu signifie que Keccel a renvoyé un HTTP 400 sur les 4 variantes.** La cause n'est ni le schéma DB, ni le code de redirection (puisqu'on n'arrive jamais à `redirect_url`) — la cause est dans le **payload envoyé à Keccel** ou la **config secrets** côté prod.
+Le template d'erreur Keccel ne nous le dit pas, donc on va **brute-forcer** intelligemment : au lieu d'ajouter des champs au hasard, on ajoute UNE NOUVELLE série de tentatives qui empile les champs candidats. La table de diagnostic nous dira exactement laquelle débloque.
 
----
+## Action concrète (ce que je code dès que tu approuves)
 
-## 2. Ce que tu dois exécuter sur la prod (SQL Editor Supabase `vpt...yxf`)
+### 1. Étendre `frontend/supabase/functions/keccel-cardpay/index.ts`
 
-Une fois que tu as relancé un essai de paiement carte (pour générer une ligne fraîche) :
+Ajouter 6 nouvelles tentatives, **dans l'ordre**, qui complètent le payload existant (tout reste : `merchantcode`, `reference`, `amount`, `currency`, `description`, `callbackurl`, `returnUrl`, `Bearer <token>`) :
 
-### Requête A — voir le dernier diagnostic en entier
-```sql
-select created_at, diagnostic_id, environment, site_base_url,
-       merchant_code_masked, token_present, token_length,
-       amount, amount_sent, currency,
-       reference, length(reference) as ref_len,
-       callback_url, return_url,
-       sent_keys, payload_shape,
-       http_status, keccel_code, keccel_description,
-       left(raw_body, 1000) as raw_body_preview,
-       error
-from public.keccel_cardpay_diagnostics
-order by created_at desc
-limit 8;
-```
+| Tentative | Champ(s) ajouté(s) |
+|---|---|
+| 5 | `language: "fr"` |
+| 6 | `language: "fr"`, `customerEmail: <email user>` |
+| 7 | + `customerName: <prénom + nom>` |
+| 8 | + `customerPhone: <phone user>` (E.164) |
+| 9 | + `notifyUrl: <même que callbackurl>` |
+| 10 | + `country: "CD"`, `channel: "web"` |
 
-Cela te (et me) donne **les 4 tentatives** de la dernière commande + les 4 précédentes. Colle le résultat ici demain.
+À chaque tentative, on persiste comme avant `payload_shape`, `http_status`, `keccel_description`. **Dès qu'une renvoie `code: "0"`, on arrête, on log la combinaison gagnante, et on l'utilisera comme payload de référence.**
 
-### Requête B — vérifier qu'on tape bien la prod
-```sql
-select environment, site_base_url, count(*) 
-from public.keccel_cardpay_diagnostics
-where created_at > now() - interval '24 hours'
-group by 1,2
-order by 3 desc;
-```
-- `environment` doit être `https://vpt....supabase.co` (prod), pas `uog...`
-- `site_base_url` doit être `https://zandofy.com` (sinon Keccel refuse le `returnUrl`)
+Pour récupérer email/nom/phone : déjà lus depuis `profiles` ou `orders` côté edge (ou depuis `auth.users` via le `user.email`). On normalise (regex E.164 pour le phone, fallback `+243000000000` si absent).
 
-### Requête C — voir si une transaction a quand même été créée
-```sql
-select id, created_at, status, reference, transaction_id, callback_payload->>'description' as keccel_desc
-from public.payment_transactions
-where provider = 'keccel'
-order by created_at desc
-limit 5;
-```
+### 2. Améliorer le toast côté front
 
----
+Dans `CheckoutPage.tsx` ligne 1226, ajouter au message d'erreur la `keccel_description` brute (déjà disponible dans `data.details.body`) pour qu'on n'ait plus besoin d'une requête SQL pour comprendre l'échec à la prochaine itération.
 
-## 3. Hypothèses prioritaires si Keccel renvoie HTTP 400
+### 3. Workflow de validation
 
-Sans la valeur de `keccel_description` je dois lister les causes possibles. La requête A va trancher en une lecture.
+1. Push sur `main` → déploiement auto via `deploy-edge-functions.yml` sur prod `vpt...yxf`
+2. Tu lances un essai carte → 10 tentatives au lieu de 4
+3. Tu me colles le résultat de la **Requête A** (déjà connue)
+4. Je lis quelle tentative a renvoyé `code=0` → je supprime les autres, je verrouille le payload gagnant, je nettoie
+5. Une fois stable, je propose de purger la table `keccel_cardpay_diagnostics` (garder 30 jours pour audit)
 
-| # | Cause probable | Symptôme dans `keccel_cardpay_diagnostics` | Correctif |
-|---|---|---|---|
-| 1 | `SITE_BASE_URL` côté prod n'est pas `https://zandofy.com` (manque `https://` ou pointe vers staging/lovable) | `site_base_url` ≠ prod, ou `keccel_description` ~ "invalid returnUrl" | Mettre à jour le secret `SITE_BASE_URL` dans la prod Supabase |
-| 2 | `KECCEL_CARD_MERCHANT_CODE` mauvais merchant ou non whitelisté pour `zandofy.com` | `keccel_description` ~ "merchant not found" / "domain not allowed" | Vérifier avec Keccel + corriger le secret |
-| 3 | `KELPAY_TOKEN` expiré / token Mobile Money réutilisé pour CardPay | HTTP 401/403 ou "invalid token" | Demander un token CardPay dédié à Keccel |
-| 4 | Devise USD non activée pour le marchand | "currency not supported" | Activer USD côté Keccel ou basculer sur CDF |
-| 5 | `description` contient un caractère interdit (l'emoji/accent passe mais "—" non) | "invalid description" | Sanitiser la `description` |
-| 6 | Référence trop longue ou format refusé (Visa = 25, Mastercard parfois 22) | "invalid reference" | Réduire à 22 chars |
+### 4. Ce que je NE fais PAS encore
 
----
+- Pas de changement de schéma DB (la table est OK)
+- Pas de changement de secrets (ils sont OK)
+- Pas de modif des autres edge functions (kelpay-webhook, etc.)
 
-## 4. Plan d'action pour demain (à approuver)
+## Risque
 
-1. **Tu lances un essai carte en prod** → un toast "diag XXXX" apparaît.
-2. **Tu colles le résultat de la requête A** ici.
-3. Je lis `keccel_description` + `raw_body` + `site_base_url` et je te dis **exactement** quel secret/champ corriger (un seul aller-retour).
-4. Je corrige le code de l'edge function si besoin (ex: sanitiser description, raccourcir ref, ajouter un header) → push GitHub → redéploiement auto via `deploy-edge-functions.yml` sur la prod.
-5. Tu retestes ; si `success` → on supprime ensuite la table de diagnostic ou on la garde 30 jours pour audit.
+Très faible : on n'ajoute que des **champs supplémentaires** au payload Keccel ; les 4 anciennes tentatives restent en première ligne donc si Keccel revient à son comportement d'avant, ça marche. Pas de régression possible côté DB ou côté front (on ne touche que le toast d'erreur en lecture seule).
 
-## 5. Ce que je ne peux PAS faire seul
-- Lire les secrets `SITE_BASE_URL` / `KECCEL_CARD_MERCHANT_CODE` / `KELPAY_TOKEN` de la prod (Lovable n'a pas accès au projet `vpt...yxf`).
-- Lire les logs edge prod (idem).
-- Donc la requête A est **l'unique pont** entre toi et moi pour diagnostiquer.
+## Estimation
 
-Bonne nuit. Au réveil : un essai carte + requête A collée = je te livre le fix exact dans la foulée.
+~80 lignes à ajouter dans `index.ts` + ~3 lignes de toast. 1 commit, 1 push, 1 déploiement auto, 1 test, 1 fix final.
