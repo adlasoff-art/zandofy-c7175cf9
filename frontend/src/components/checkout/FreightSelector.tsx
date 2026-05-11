@@ -26,12 +26,12 @@ import { debugForwarderEligibility, type ForwarderEligibilityDebug } from "@/ser
 import { useRoles } from "@/hooks/use-roles";
 import { useI18n } from "@/contexts/I18nContext";
 
-const MODE_META: Record<string, { label: string; Icon: typeof Plane; cls: string }> = {
-  air: { label: "Aérien", Icon: Plane, cls: "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30" },
-  sea: { label: "Maritime", Icon: Ship, cls: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
-  road: { label: "Routier", Icon: Truck, cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" },
-  rail: { label: "Ferroviaire", Icon: TramFront, cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
-  express: { label: "Express", Icon: Plane, cls: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30" },
+const MODE_META: Record<string, { label: string; labelKey: string; Icon: typeof Plane; cls: string }> = {
+  air: { label: "Aérien", labelKey: "shipping.mode.air", Icon: Plane, cls: "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30" },
+  sea: { label: "Maritime", labelKey: "shipping.mode.sea", Icon: Ship, cls: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" },
+  road: { label: "Routier", labelKey: "shipping.mode.road", Icon: Truck, cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" },
+  rail: { label: "Ferroviaire", labelKey: "shipping.mode.rail", Icon: TramFront, cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
+  express: { label: "Express", labelKey: "shipping.mode.express", Icon: Plane, cls: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30" },
 };
 
 export type ConsolidationChoice = "split" | "consolidated";
@@ -206,7 +206,7 @@ export function FreightSelector({
     return (
       <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
         <Loader2 size={12} className="animate-spin text-primary" />
-        Calcul des devis transporteurs…
+        {t("freight.calculatingQuotes") || "Calcul des devis transporteurs…"}
       </div>
     );
   }
@@ -219,11 +219,11 @@ export function FreightSelector({
         <div className="flex items-start gap-2 px-2.5 py-2 rounded-md border border-destructive/40 bg-destructive/5 text-[11px] text-destructive">
           <AlertTriangle size={12} className="shrink-0 mt-0.5" />
           <span>
-            Aucun transitaire ne dessert
-            {destinationCityName ? ` ${destinationCityName}` : " cette destination"}
-            {" "}depuis l'origine du produit en mode{" "}
-            <span className="font-medium">{MODE_META[mode]?.label ?? mode}</span>.
-            Le checkout est bloqué pour cette commande — demandez une couverture ou modifiez l'adresse / le mode.
+            {t("freight.noForwarderForDestination", {
+              destination: destinationCityName || (t("freight.thisDestination") || "cette destination"),
+              mode: (MODE_META[mode] && (t(MODE_META[mode].labelKey) || MODE_META[mode].label)) || mode,
+            }) ||
+              `Aucun transitaire ne dessert ${destinationCityName || "cette destination"} depuis l'origine du produit en mode ${MODE_META[mode]?.label ?? mode}. Le checkout est bloqué pour cette commande — demandez une couverture ou modifiez l'adresse / le mode.`}
           </span>
         </div>
         {originCountry && (
@@ -268,11 +268,13 @@ export function FreightSelector({
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium text-foreground flex items-center gap-2">
           <Truck size={14} className="text-primary" />
-          {selectedId ? "Transitaire choisi" : "Choisissez un transitaire"}
+          {selectedId
+            ? (t("freight.forwarderChosen") || "Transitaire choisi")
+            : (t("freight.chooseForwarder") || "Choisissez un transitaire")}
         </p>
         {!selectedId && (
           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive uppercase tracking-wide">
-            Requis
+            {t("freight.required") || "Requis"}
           </span>
         )}
       </div>
@@ -299,8 +301,9 @@ export function FreightSelector({
         >
           {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           {expanded
-            ? "Masquer les alternatives"
-            : `Voir ${alternatives.length} alternative${alternatives.length > 1 ? "s" : ""}`}
+            ? (t("freight.hideAlternatives") || "Masquer les alternatives")
+            : (t("freight.showAlternatives", { count: alternatives.length }) ||
+                `Voir ${alternatives.length} alternative${alternatives.length > 1 ? "s" : ""}`)}
         </button>
       )}
 
@@ -440,13 +443,14 @@ function ConsolidationChooser({
   choice: ConsolidationChoice;
   onChange: (c: ConsolidationChoice) => void;
 }) {
+  const { t } = useI18n();
   const co = offer.consolidation_offer;
   if (!co?.available) return null;
   const splitTotal = offer.split_total ?? offer.quote.total;
   const delta = co.delta_vs_split;
   const deltaLabel =
     delta === 0
-      ? "même prix"
+      ? (t("freight.samePrice") || "même prix")
       : delta > 0
         ? `+${delta.toFixed(2)} ${offer.quote.currency}`
         : `−${Math.abs(delta).toFixed(2)} ${offer.quote.currency}`;
@@ -454,7 +458,7 @@ function ConsolidationChooser({
   return (
     <div className="mt-2 space-y-1.5 rounded-md border border-border/60 bg-muted/30 p-2">
       <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-        Mode d'expédition
+        {t("freight.shippingMode") || "Mode d'expédition"}
       </div>
       <button
         type="button"
@@ -467,9 +471,9 @@ function ConsolidationChooser({
       >
         <div className="flex items-center gap-1.5 min-w-0">
           <Package size={11} className="text-muted-foreground shrink-0" />
-          <span className="text-[11px] font-medium">Expédition séparée</span>
+          <span className="text-[11px] font-medium">{t("freight.separateShipping") || "Expédition séparée"}</span>
           <span className="text-[9px] text-muted-foreground">
-            {offer.subpackages?.length ?? 0} colis
+            {t("freight.parcelsCount", { count: offer.subpackages?.length ?? 0 }) || `${offer.subpackages?.length ?? 0} colis`}
           </span>
         </div>
         <span className="text-[11px] font-semibold">
@@ -487,7 +491,7 @@ function ConsolidationChooser({
       >
         <div className="flex items-center gap-1.5 min-w-0">
           <Boxes size={11} className="text-muted-foreground shrink-0" />
-          <span className="text-[11px] font-medium">Groupage 1 colis</span>
+          <span className="text-[11px] font-medium">{t("freight.consolidatedOneParcel") || "Groupage 1 colis"}</span>
           <span className="text-[9px] text-muted-foreground">{deltaLabel}</span>
         </div>
         <span className="text-[11px] font-semibold">
@@ -496,7 +500,8 @@ function ConsolidationChooser({
       </button>
       {co.consolidation_fee > 0 && (
         <p className="text-[9px] text-muted-foreground px-1">
-          Frais de groupage inclus : {offer.quote.currency} {co.consolidation_fee.toFixed(2)}
+          {t("freight.consolidationFeeIncluded", { amount: `${offer.quote.currency} ${co.consolidation_fee.toFixed(2)}` }) ||
+            `Frais de groupage inclus : ${offer.quote.currency} ${co.consolidation_fee.toFixed(2)}`}
         </p>
       )}
     </div>
@@ -518,15 +523,20 @@ function OfferCard({
   realPriceIndicative?: number;
   totalWeightKgForMarketing?: number;
 }) {
+  const { t } = useI18n();
   const { quote, service_class, mode, pickup_address } = offer;
   const isPlatform = offer.is_platform_owned === true;
   const isPlatformGreyed = isPlatform && offer.has_profile_for_zone === false;
   const forwarderName = offer.forwarder_name ?? null;
-  const meta = MODE_META[mode] ?? { label: mode, Icon: Truck, cls: "bg-muted text-foreground border-border" };
+  const metaRaw = MODE_META[mode];
+  const meta = metaRaw
+    ? { ...metaRaw, label: t(metaRaw.labelKey) || metaRaw.label }
+    : { label: mode, labelKey: "", Icon: Truck, cls: "bg-muted text-foreground border-border" };
   const ModeIcon = meta.Icon;
   const transitLabel =
     quote.transit_min_days || quote.transit_max_days
-      ? `${quote.transit_min_days ?? "?"}–${quote.transit_max_days ?? "?"} jours`
+      ? (t("freight.transitDays", { min: quote.transit_min_days ?? "?", max: quote.transit_max_days ?? "?" }) ||
+          `${quote.transit_min_days ?? "?"}–${quote.transit_max_days ?? "?"} jours`)
       : null;
 
   // ───────────────── Cas 1 : Carte plateforme grisée (Very Speed indispo) ───
@@ -551,15 +561,15 @@ function OfferCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs font-semibold text-foreground">
-              {forwarderName ?? "Service plateforme"}
+              {forwarderName ?? (t("freight.platformService") || "Service plateforme")}
             </span>
             <span className="text-[9px] px-1.5 py-0 rounded-full border border-border bg-background text-muted-foreground uppercase tracking-wide">
-              Plateforme
+              {t("freight.platform") || "Plateforme"}
             </span>
             <Lock size={10} className="text-muted-foreground" />
           </div>
           <p className="text-[10px] text-muted-foreground mt-0.5">
-            {offer.unavailable_message ?? "Service plateforme non disponible dans votre zone"}
+            {offer.unavailable_message ?? (t("freight.platformUnavailable") || "Service plateforme non disponible dans votre zone")}
           </p>
         </div>
       </div>
@@ -597,14 +607,14 @@ function OfferCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs font-semibold text-foreground">
-              {forwarderName ?? "Service plateforme"}
+              {forwarderName ?? (t("freight.platformService") || "Service plateforme")}
             </span>
             <span className="text-[9px] px-1.5 py-0 rounded-full bg-primary/15 text-primary uppercase tracking-wide font-semibold">
-              Plateforme
+              {t("freight.platform") || "Plateforme"}
             </span>
             {isCheapest && (
               <span className="text-[9px] px-1.5 py-0 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
-                Le moins cher
+                {t("freight.cheapest") || "Le moins cher"}
               </span>
             )}
             {isSelected && <BadgeCheck size={11} className="text-primary" />}
@@ -617,13 +627,13 @@ function OfferCard({
                       tabIndex={0}
                       onClick={(e) => e.stopPropagation()}
                       className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                      aria-label="Adresse de récupération"
+                      aria-label={t("freight.pickupAddress") || "Adresse de récupération"}
                     >
                       <MapPin size={9} />
                     </span>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-sm text-[11px] break-words">
-                    <p className="font-semibold mb-0.5">Adresse de récupération</p>
+                    <p className="font-semibold mb-0.5">{t("freight.pickupAddress") || "Adresse de récupération"}</p>
                     <p className="whitespace-pre-line break-words text-muted-foreground">{pickup_address}</p>
                   </TooltipContent>
                 </Tooltip>
@@ -635,7 +645,8 @@ function OfferCard({
               {/* Ligne 1 : tarif réel ↔ montant entre parenthèses (même taille) */}
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-[10px] text-muted-foreground">
-                  Tarif réel basé sur votre poids ({weightKg.toFixed(2)} kg)
+                  {t("freight.realRateBasedOnWeight", { weight: weightKg.toFixed(2) }) ||
+                    `Tarif réel basé sur votre poids (${weightKg.toFixed(2)} kg)`}
                 </p>
                 <p className="text-[10px] text-muted-foreground whitespace-nowrap">
                   ({quote.currency} {realPriceIndicative.toFixed(2)})
@@ -644,26 +655,30 @@ function OfferCard({
               {/* Ligne 2 : forfait facturé ↔ montant en gras (aligné) */}
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-snug">
-                  ℹ️ Le transitaire vous facturera le forfait minimum de
+                  {t("freight.flatMinimumNotice") || "ℹ️ Le transitaire vous facturera le forfait minimum de"}
                 </p>
                 <p className="text-xs font-bold text-foreground whitespace-nowrap">
                   {quote.currency} {flatPrice.toFixed(2)}
                 </p>
               </div>
               {transitLabel && (
-                <p className="text-[10px] text-muted-foreground">Délai : {transitLabel}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {t("freight.transitLabel", { label: transitLabel }) || `Délai : ${transitLabel}`}
+                </p>
               )}
               {remainingForOneKg > 0 && (
                 <p className="text-[10px] text-primary leading-snug">
-                  💡 Ajoutez encore {(remainingForOneKg * 1000).toFixed(0)}g pour atteindre 1 kg
-                  et rentabiliser ce tarif.
+                  {t("freight.addGramsForOneKg", { grams: (remainingForOneKg * 1000).toFixed(0) }) ||
+                    `💡 Ajoutez encore ${(remainingForOneKg * 1000).toFixed(0)}g pour atteindre 1 kg et rentabiliser ce tarif.`}
                 </p>
               )}
             </div>
           ) : (
             <>
               {transitLabel && (
-                <p className="text-[10px] text-muted-foreground">Délai : {transitLabel}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {t("freight.transitLabel", { label: transitLabel }) || `Délai : ${transitLabel}`}
+                </p>
               )}
               <div className="mt-0.5 flex justify-end">
                 <p className="text-xs font-bold text-foreground">
@@ -711,7 +726,7 @@ function OfferCard({
           <span className="text-[10px] text-muted-foreground capitalize">{service_class}</span>
           {isCheapest && (
             <span className="text-[9px] px-1.5 py-0 rounded-full bg-primary/15 text-primary uppercase tracking-wide">
-              Le moins cher
+              {t("freight.cheapest") || "Le moins cher"}
             </span>
           )}
           {isSelected && <BadgeCheck size={11} className="text-primary" />}
@@ -724,13 +739,13 @@ function OfferCard({
                     tabIndex={0}
                     onClick={(e) => e.stopPropagation()}
                     className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                    aria-label="Adresse de récupération"
+                    aria-label={t("freight.pickupAddress") || "Adresse de récupération"}
                   >
                     <MapPin size={9} />
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-sm text-[11px] break-words">
-                  <p className="font-semibold mb-0.5">Adresse de récupération</p>
+                  <p className="font-semibold mb-0.5">{t("freight.pickupAddress") || "Adresse de récupération"}</p>
                   <p className="whitespace-pre-line break-words text-muted-foreground">{pickup_address}</p>
                 </TooltipContent>
               </Tooltip>
@@ -738,7 +753,9 @@ function OfferCard({
           )}
         </div>
         {transitLabel && (
-          <p className="text-[10px] text-muted-foreground">Délai : {transitLabel}</p>
+          <p className="text-[10px] text-muted-foreground">
+            {t("freight.transitLabel", { label: transitLabel }) || `Délai : ${transitLabel}`}
+          </p>
         )}
         {quote.warnings.length > 0 && (
           <p className="text-[10px] text-destructive flex items-center gap-1 mt-0.5">
@@ -753,7 +770,8 @@ function OfferCard({
         </p>
         {quote.deposit_required && (
           <p className="text-[9px] text-muted-foreground">
-            Acompte {quote.deposit_pct}% : {quote.deposit_amount.toFixed(2)}
+            {t("freight.depositLine", { pct: quote.deposit_pct, amount: quote.deposit_amount.toFixed(2) }) ||
+              `Acompte ${quote.deposit_pct}% : ${quote.deposit_amount.toFixed(2)}`}
           </p>
         )}
       </div>

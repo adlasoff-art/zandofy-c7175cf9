@@ -17,12 +17,13 @@ import {
   MultiOriginFreightSelector,
   type FreightGroupSelection,
 } from "@/components/checkout/MultiOriginFreightSelector";
+import { useI18n } from "@/contexts/I18nContext";
 
 const MODE_META = {
-  air:  { icon: Plane,     label: "Aérien",     localLabel: "Aérien local",  unit: "kg" },
-  sea:  { icon: Ship,      label: "Maritime",   localLabel: "Maritime",      unit: "cbm" },
-  road: { icon: TruckIcon, label: "Routier",    localLabel: "Routier",       unit: "kg" },
-  rail: { icon: Train,     label: "Ferroviaire",localLabel: "Ferroviaire",   unit: "kg" },
+  air:  { icon: Plane,     label: "Aérien",     labelKey: "shipping.mode.air",  localLabel: "Aérien local", unit: "kg" },
+  sea:  { icon: Ship,      label: "Maritime",   labelKey: "shipping.mode.sea",  localLabel: "Maritime",     unit: "cbm" },
+  road: { icon: TruckIcon, label: "Routier",    labelKey: "shipping.mode.road", localLabel: "Routier",      unit: "kg" },
+  rail: { icon: Train,     label: "Ferroviaire",labelKey: "shipping.mode.rail", localLabel: "Ferroviaire",  unit: "kg" },
 } as const;
 
 type TransportMode = keyof typeof MODE_META;
@@ -73,6 +74,7 @@ export function CheckoutShippingCalculator({
   onFreightAvailabilityChange,
   onFreightGroupsChange,
 }: Props) {
+  const { t, formatPrice } = useI18n();
   const [products, setProducts] = useState<CartProductInfo[]>([]);
   const [destCity, setDestCity] = useState<City | null>(null);
   const [originCities, setOriginCities] = useState<Map<string, City>>(new Map());
@@ -474,7 +476,9 @@ export function CheckoutShippingCalculator({
     
     if (unitsNeeded > 0 && unitsNeeded <= 10) {
       return {
-        text: `Ajoutez ${unitsNeeded} unité${unitsNeeded > 1 ? "s" : ""} pour compléter votre prochain KG et optimiser vos frais de transport.`,
+        text:
+          t("shipping.addUnitsGeneric", { count: unitsNeeded }) ||
+          `Ajoutez ${unitsNeeded} unité${unitsNeeded > 1 ? "s" : ""} pour compléter votre prochain KG et optimiser vos frais de transport.`,
         unitsNeeded,
       };
     }
@@ -485,7 +489,7 @@ export function CheckoutShippingCalculator({
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
         <Info size={12} />
-        <span>Renseignez votre ville pour un calcul précis du fret</span>
+        <span>{t("shipping.fillCityHint") || "Renseignez votre ville pour un calcul précis du fret"}</span>
       </div>
     );
   }
@@ -494,7 +498,7 @@ export function CheckoutShippingCalculator({
     return (
       <div className="flex items-center gap-2 py-2">
         <Loader2 size={14} className="animate-spin text-primary" />
-        <span className="text-xs text-muted-foreground">Calcul du fret en cours...</span>
+        <span className="text-xs text-muted-foreground">{t("shipping.calculatingFreight") || "Calcul du fret en cours..."}</span>
       </div>
     );
   }
@@ -502,7 +506,7 @@ export function CheckoutShippingCalculator({
   if (modeTotals.size === 0 && !loading) {
     return (
       <div className="text-xs text-muted-foreground py-1">
-        Fret standard appliqué
+        {t("shipping.standardFreight") || "Fret standard appliqué"}
       </div>
     );
   }
@@ -532,7 +536,8 @@ export function CheckoutShippingCalculator({
               disabled={isSeaDisabled}
               title={
                 seaNoQuote
-                  ? `Maritime : disponible une fois le seuil de fret de $${seaThreshold?.min_subtotal ?? 49} atteint`
+                  ? (t("shipping.seaTooltip", { min: formatPrice(seaThreshold?.min_subtotal ?? 49) }) ||
+                      `Maritime : disponible une fois le seuil de fret de ${formatPrice(seaThreshold?.min_subtotal ?? 49)} atteint`)
                   : undefined
               }
               onClick={() => {
@@ -549,7 +554,7 @@ export function CheckoutShippingCalculator({
               }`}
             >
               <Icon size={12} />
-              <span>{isLocalStore ? Meta.localLabel : Meta.label}</span>
+              <span>{isLocalStore ? Meta.localLabel : (t(Meta.labelKey) || Meta.label)}</span>
               {(mode === "road" || mode === "rail") && destCity && (() => {
                 const allSameCountry = products.every(p => {
                   const oc = originCities.get(p.originCountry);
@@ -561,14 +566,16 @@ export function CheckoutShippingCalculator({
                       ? "bg-emerald-500/15 text-emerald-700 border-emerald-300 dark:text-emerald-400 dark:border-emerald-700"
                       : "bg-sky-500/15 text-sky-700 border-sky-300 dark:text-sky-400 dark:border-sky-700"
                   }`}>
-                    {allSameCountry ? "National" : "Limitrophe"}
+                    {allSameCountry
+                      ? (t("shipping.national") || "National")
+                      : (t("shipping.crossBorder") || "Limitrophe")}
                   </span>
                 );
               })()}
               {data && data.total > 0 ? (
-                <span className="font-bold">${data.total.toFixed(2)}</span>
+                <span className="font-bold">{formatPrice(data.total)}</span>
               ) : (
-                <span className="text-[10px] italic opacity-70">verrouillé</span>
+                <span className="text-[10px] italic opacity-70">{t("shipping.locked") || "verrouillé"}</span>
               )}
             </button>
           );
@@ -582,9 +589,14 @@ export function CheckoutShippingCalculator({
           <div className="flex items-start gap-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-2">
             <Ship size={12} className="shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium">🚢 Maritime indisponible — seuil de fret non atteint</p>
+              <p className="font-medium">{t("shipping.seaUnavailableTitle") || "🚢 Maritime indisponible — seuil de fret non atteint"}</p>
               <p className="text-[10px] mt-0.5 text-amber-600 dark:text-amber-500">
-                Le fret maritime actuel est de ${seaQuoteTotal.toFixed(2)} — ajoutez du poids/volume (encore ${freightGap.toFixed(2)} de fret) pour atteindre le seuil de ${seaThreshold.min_subtotal} et débloquer ce mode.
+                {t("shipping.seaThresholdHint", {
+                  current: formatPrice(seaQuoteTotal),
+                  gap: formatPrice(freightGap),
+                  min: formatPrice(seaThreshold.min_subtotal),
+                }) ||
+                  `Le fret maritime actuel est de ${formatPrice(seaQuoteTotal)} — ajoutez ${formatPrice(freightGap)} de fret pour atteindre ${formatPrice(seaThreshold.min_subtotal)}.`}
               </p>
             </div>
           </div>
@@ -600,30 +612,33 @@ export function CheckoutShippingCalculator({
         return (
           <div className="bg-muted/30 rounded-md px-3 py-2 space-y-1">
             <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Fret {MODE_META[activeMode].label}</span>
-              <span className="font-bold text-foreground">${data.total.toFixed(2)}</span>
+              <span className="text-muted-foreground">
+                {t("shipping.modeFreightLabel", { mode: t(MODE_META[activeMode].labelKey) || MODE_META[activeMode].label }) ||
+                  `Fret ${MODE_META[activeMode].label}`}
+              </span>
+              <span className="font-bold text-foreground">{formatPrice(data.total)}</span>
             </div>
             {data.surchargeAmount > 0 && (
               <div className="flex justify-between text-[10px] text-amber-600">
-                <span>Surtaxe catégorie</span>
-                <span>+${data.surchargeAmount.toFixed(2)}</span>
+                <span>{t("shipping.categorySurcharge") || "Surtaxe catégorie"}</span>
+                <span>+{formatPrice(data.surchargeAmount)}</span>
               </div>
             )}
             {data.transitMin && data.transitMax && (
               <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>Délai estimé</span>
-                <span>{data.transitMin}–{data.transitMax} jours</span>
+                <span>{t("shipping.estimatedDelay") || "Délai estimé"}</span>
+                <span>{t("freight.transitDays", { min: data.transitMin, max: data.transitMax }) || `${data.transitMin}–${data.transitMax} jours`}</span>
               </div>
             )}
             {totalWeight > 0 && (
               <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>Poids total</span>
+                <span>{t("shipping.totalWeight") || "Poids total"}</span>
                 <span>{preciseRound(totalWeight / 1000, 3)} kg</span>
               </div>
             )}
             {totalVolume > 0 && (
               <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>Volume total</span>
+                <span>{t("shipping.totalVolumeLabel") || "Volume total"}</span>
                 <span>{preciseRound(totalVolume, 4)} CBM</span>
               </div>
             )}
@@ -644,7 +659,7 @@ export function CheckoutShippingCalculator({
                   }
                   return `${originLabel} → ${details[0].destination_city}`;
                 })()} · {details[0].distance_km.toLocaleString()} km
-                {details[0].route_type === "default" && " · Tarif indicatif"}
+                {details[0].route_type === "default" && ` · ${t("shipping.indicativeRate") || "Tarif indicatif"}`}
               </div>
             )}
             {/* Estimated arrival date */}
@@ -656,7 +671,7 @@ export function CheckoutShippingCalculator({
                 return (
                   <div className="flex items-center gap-1.5 text-sm text-destructive font-semibold pt-1.5 border-t border-border/50 mt-1.5">
                     <CalendarDays size={14} className="shrink-0" />
-                    <span>🏪 Livraison estimée : {fmtH(minH)} – {fmtH(maxH)}</span>
+                    <span>{t("shipping.localDeliveryEstimate", { min: fmtH(minH), max: fmtH(maxH) }) || `🏪 Livraison estimée : ${fmtH(minH)} – ${fmtH(maxH)}`}</span>
                   </div>
                 );
               }
@@ -674,7 +689,7 @@ export function CheckoutShippingCalculator({
               return (
                 <div className="flex items-center gap-1.5 text-sm text-destructive font-semibold pt-1.5 border-t border-border/50 mt-1.5">
                   <CalendarDays size={14} className="shrink-0" />
-                  <span>📦 Arrivée estimée : {fmt(dateMin)} – {fmt(dateMax)} {dateMax.getFullYear()}</span>
+                  <span>{t("shipping.intlArrivalEstimate", { min: fmt(dateMin), max: fmt(dateMax), year: dateMax.getFullYear() }) || `📦 Arrivée estimée : ${fmt(dateMin)} – ${fmt(dateMax)} ${dateMax.getFullYear()}`}</span>
                 </div>
               );
             })()}

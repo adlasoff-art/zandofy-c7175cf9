@@ -11,6 +11,7 @@ import {
 } from "@/services/dynamic-shipping";
 import { WORLD_CITIES, type WorldCity } from "@/data/world-cities";
 import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "@/contexts/I18nContext";
 
 // ── City Autocomplete (DB + WORLD_CITIES fallback) ──
 function CityAutocomplete({ label, value, onSelect }: {
@@ -18,6 +19,7 @@ function CityAutocomplete({ label, value, onSelect }: {
   value: City | null;
   onSelect: (city: City) => void;
 }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<City[]>([]);
   const [worldResults, setWorldResults] = useState<WorldCity[]>([]);
@@ -100,7 +102,7 @@ function CityAutocomplete({ label, value, onSelect }: {
           onChange={e => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => { if (!loading) setOpen(false); }, 400)}
-          placeholder="Rechercher une ville (mondiale)..."
+          placeholder={t("shipping.searchCityWorld") || "Rechercher une ville (mondiale)..."}
           className="h-9 pl-8 text-sm"
         />
         {open && (
@@ -132,7 +134,7 @@ function CityAutocomplete({ label, value, onSelect }: {
                 {worldResults.length > 0 && (
                   <>
                     {results.length > 0 && <div className="border-t border-border" />}
-                    <div className="px-3 py-1 text-[10px] text-muted-foreground bg-muted/30">Villes mondiales</div>
+                    <div className="px-3 py-1 text-[10px] text-muted-foreground bg-muted/30">{t("shipping.worldCities") || "Villes mondiales"}</div>
                     {worldResults.map((wc, i) => (
                       <button
                         key={`wc-${wc.countryCode}-${wc.city}-${i}`}
@@ -150,7 +152,7 @@ function CityAutocomplete({ label, value, onSelect }: {
                 )}
                 {results.length === 0 && worldResults.length === 0 && (
                   <div className="px-3 py-3 text-xs text-muted-foreground text-center">
-                    Aucune ville trouvée
+                    {t("shipping.noCityFound") || "Aucune ville trouvée"}
                   </div>
                 )}
               </>
@@ -164,14 +166,15 @@ function CityAutocomplete({ label, value, onSelect }: {
 
 // ── Mode Selector ──
 const ALL_MODES = [
-  { value: "air", label: "Aérien", icon: Plane, desc: "Rapide, par kg" },
-  { value: "sea", label: "Maritime", icon: Ship, desc: "Économique, par CBM/kg" },
-  { value: "road", label: "Routier", icon: TruckIcon, desc: "Régional, fixe/km" },
-  { value: "rail", label: "Ferroviaire", icon: TruckIcon, desc: "Corridor, par kg" },
+  { value: "air", label: "Aérien", labelKey: "shipping.mode.air", desc: "Rapide, par kg", descKey: "shipping.mode.airDesc", icon: Plane },
+  { value: "sea", label: "Maritime", labelKey: "shipping.mode.sea", desc: "Économique, par CBM/kg", descKey: "shipping.mode.seaDesc", icon: Ship },
+  { value: "road", label: "Routier", labelKey: "shipping.mode.road", desc: "Régional, fixe/km", descKey: "shipping.mode.roadDesc", icon: TruckIcon },
+  { value: "rail", label: "Ferroviaire", labelKey: "shipping.mode.rail", desc: "Corridor, par kg", descKey: "shipping.mode.railDesc", icon: TruckIcon },
 ];
 
 // ── Main Calculator ──
 export function DynamicShippingCalculator() {
+  const { t, formatPrice } = useI18n();
   const [originCity, setOriginCity] = useState<City | null>(null);
   const [destCity, setDestCity] = useState<City | null>(null);
   const [mode, setMode] = useState("air");
@@ -213,7 +216,7 @@ export function DynamicShippingCalculator() {
     });
 
     if (!result) {
-      setError("Aucun tarif trouvé pour cette route/mode. Configurez d'abord les zones et tarifs.");
+      setError(t("shipping.noQuoteFound") || "Aucun tarif trouvé pour cette route/mode. Configurez d'abord les zones et tarifs.");
     } else {
       setQuote(result);
     }
@@ -228,19 +231,19 @@ export function DynamicShippingCalculator() {
       {/* Header */}
       <div className="bg-primary/5 border-b border-border px-5 py-3 flex items-center gap-2">
         <Globe size={18} className="text-primary" />
-        <h2 className="font-semibold text-sm">Calculateur Dynamique de Fret</h2>
+        <h2 className="font-semibold text-sm">{t("shipping.calculatorTitle") || "Calculateur Dynamique de Fret"}</h2>
       </div>
 
       <div className="p-5 space-y-4">
         {/* Cities */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <CityAutocomplete label="Ville d'origine" value={originCity} onSelect={setOriginCity} />
-          <CityAutocomplete label="Ville de destination" value={destCity} onSelect={setDestCity} />
+          <CityAutocomplete label={t("shipping.originCity") || "Ville d'origine"} value={originCity} onSelect={setOriginCity} />
+          <CityAutocomplete label={t("shipping.destinationCity") || "Ville de destination"} value={destCity} onSelect={setDestCity} />
         </div>
 
         {/* Mode */}
         <div>
-          <Label className="text-xs font-medium">Mode de transport</Label>
+          <Label className="text-xs font-medium">{t("shipping.transportMode") || "Mode de transport"}</Label>
           {(() => {
             const landOk = originCity && destCity && isLandTransportFeasible(originCity.country_code, destCity.country_code);
             const MODES = landOk ? ALL_MODES : ALL_MODES.filter(m => m.value === "air" || m.value === "sea");
@@ -260,8 +263,8 @@ export function DynamicShippingCalculator() {
                       }`}
                     >
                       <Icon size={16} />
-                      <span>{m.label}</span>
-                      <span className="text-[10px] opacity-70">{m.desc}</span>
+                      <span>{t(m.labelKey) || m.label}</span>
+                      <span className="text-[10px] opacity-70">{t(m.descKey) || m.desc}</span>
                     </button>
                   );
                 })}
@@ -273,7 +276,7 @@ export function DynamicShippingCalculator() {
         {/* Weight + Quantity (always shown) */}
         <div className={`grid gap-3 ${isSea ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2"}`}>
           <div>
-            <Label className="text-xs">Poids unitaire (kg)</Label>
+            <Label className="text-xs">{t("shipping.unitWeightKg") || "Poids unitaire (kg)"}</Label>
             <Input
               type="number" min="0.01" step="0.01" value={weightKg}
               onChange={e => setWeightKg(parseFloat(e.target.value) || 0)}
@@ -282,13 +285,15 @@ export function DynamicShippingCalculator() {
             <p className="text-[10px] text-muted-foreground mt-0.5">{Math.round(weightKg * 1000)} g</p>
           </div>
           <div>
-            <Label className="text-xs">Quantité</Label>
+            <Label className="text-xs">{t("shipping.quantity") || "Quantité"}</Label>
             <Input
               type="number" min="1" value={quantity}
               onChange={e => setQuantity(parseInt(e.target.value) || 1)}
               className="h-9 text-sm"
             />
-            <p className="text-[10px] text-muted-foreground mt-0.5">Total: {(weightKg * quantity).toFixed(2)} kg</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {t("shipping.totalKg", { kg: (weightKg * quantity).toFixed(2) }) || `Total: ${(weightKg * quantity).toFixed(2)} kg`}
+            </p>
           </div>
 
           {/* Dimensions for maritime only */}
@@ -296,7 +301,7 @@ export function DynamicShippingCalculator() {
             <>
               <div className="col-span-2 grid grid-cols-3 gap-2">
                 <div>
-                  <Label className="text-xs">Longueur (cm)</Label>
+                  <Label className="text-xs">{t("shipping.lengthCm") || "Longueur (cm)"}</Label>
                   <Input
                     type="number" min="0" step="1" value={lengthCm || ""}
                     onChange={e => setLengthCm(parseFloat(e.target.value) || 0)}
@@ -304,7 +309,7 @@ export function DynamicShippingCalculator() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Largeur (cm)</Label>
+                  <Label className="text-xs">{t("shipping.widthCm") || "Largeur (cm)"}</Label>
                   <Input
                     type="number" min="0" step="1" value={widthCm || ""}
                     onChange={e => setWidthCm(parseFloat(e.target.value) || 0)}
@@ -312,7 +317,7 @@ export function DynamicShippingCalculator() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Hauteur (cm)</Label>
+                  <Label className="text-xs">{t("shipping.heightCm") || "Hauteur (cm)"}</Label>
                   <Input
                     type="number" min="0" step="1" value={heightCm || ""}
                     onChange={e => setHeightCm(parseFloat(e.target.value) || 0)}
@@ -323,8 +328,13 @@ export function DynamicShippingCalculator() {
               {computedCbm > 0 && (
                 <div className="col-span-2">
                   <p className="text-xs text-muted-foreground">
-                    Volume unitaire: <strong className="text-foreground">{computedCbm.toFixed(4)} CBM</strong>
-                    {quantity > 1 && <> — Total: <strong className="text-foreground">{totalCbm.toFixed(4)} CBM</strong></>}
+                    {t("shipping.unitVolumeLine", { cbm: computedCbm.toFixed(4) }) || `Volume unitaire: ${computedCbm.toFixed(4)} CBM`}
+                    {quantity > 1 && (
+                      <>
+                        {" — "}
+                        {t("shipping.totalVolumeLine", { cbm: totalCbm.toFixed(4) }) || `Total: ${totalCbm.toFixed(4)} CBM`}
+                      </>
+                    )}
                   </p>
                 </div>
               )}
@@ -339,7 +349,7 @@ export function DynamicShippingCalculator() {
           className="w-full"
         >
           {loading ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Calculator size={14} className="mr-2" />}
-          Calculer le devis
+          {t("shipping.calculateQuote") || "Calculer le devis"}
         </Button>
 
         {/* Error */}
@@ -356,7 +366,7 @@ export function DynamicShippingCalculator() {
             <div className="flex items-center gap-2 text-sm">
               <Badge variant="outline" className="gap-1">
                 {mode === "air" ? <Plane size={12} /> : mode === "sea" ? <Ship size={12} /> : <TruckIcon size={12} />}
-                {ALL_MODES.find(m => m.value === mode)?.label}
+                {(() => { const m = ALL_MODES.find(m => m.value === mode); return m ? (t(m.labelKey) || m.label) : mode; })()}
               </Badge>
               <span className="text-muted-foreground text-xs truncate">
                 {quote.origin_city}
@@ -374,14 +384,14 @@ export function DynamicShippingCalculator() {
               <ArrowRight size={10} />
               <span>{quote.destination_zone}</span>
               {quote.route_type === "default" && (
-                <Badge variant="secondary" className="text-[9px] ml-auto">Tarif défaut</Badge>
+                <Badge variant="secondary" className="text-[9px] ml-auto">{t("shipping.defaultRate") || "Tarif défaut"}</Badge>
               )}
             </div>
 
             {/* Distance */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Ruler size={11} />
-              <span>Distance: <strong className="text-foreground">{quote.distance_km.toLocaleString()} km</strong></span>
+              <span>{t("shipping.distance", { km: quote.distance_km.toLocaleString() }) || `Distance: ${quote.distance_km.toLocaleString()} km`}</span>
             </div>
 
             {/* Quantity / Weight summary */}
@@ -395,23 +405,23 @@ export function DynamicShippingCalculator() {
             {/* Price breakdown */}
             <div className="border-t border-border pt-3 space-y-1.5">
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Tarif de base ({quote.unit})</span>
-                <span className="font-mono">${quote.base_price.toFixed(2)}</span>
+                <span className="text-muted-foreground">{t("shipping.baseRate") || "Tarif de base"} ({quote.unit})</span>
+                <span className="font-mono">{formatPrice(quote.base_price)}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Surcharge carburant ({quote.fuel_percent}%)</span>
-                <span className="font-mono">${quote.fuel_surcharge.toFixed(2)}</span>
+                <span className="text-muted-foreground">{t("shipping.fuelSurcharge", { pct: quote.fuel_percent }) || `Surcharge carburant (${quote.fuel_percent}%)`}</span>
+                <span className="font-mono">{formatPrice(quote.fuel_surcharge)}</span>
               </div>
               <div className="flex justify-between text-sm font-semibold border-t border-border pt-2">
-                <span>Total</span>
-                <span className="text-primary text-lg">${quote.total_price.toFixed(2)}</span>
+                <span>{t("shipping.totalLine") || "Total"}</span>
+                <span className="text-primary text-lg">{formatPrice(quote.total_price)}</span>
               </div>
             </div>
 
             {/* Transit */}
             {quote.transit_min && quote.transit_max && (
               <div className="text-xs text-muted-foreground">
-                ⏱ Transit estimé: <strong className="text-foreground">{quote.transit_min}–{quote.transit_max} jours</strong>
+                ⏱ {t("shipping.transitEstimate", { min: quote.transit_min, max: quote.transit_max }) || `Transit estimé: ${quote.transit_min}–${quote.transit_max} jours`}
               </div>
             )}
 
@@ -420,11 +430,14 @@ export function DynamicShippingCalculator() {
               <div className="bg-accent/20 rounded-lg p-2.5 flex items-start gap-2 text-xs">
                 <Package size={14} className="text-primary shrink-0 mt-0.5" />
                 <div>
-                  <strong>Pack Efficiency</strong>
+                  <strong>{t("shipping.packEfficiency") || "Pack Efficiency"}</strong>
                   <p className="text-muted-foreground mt-0.5">
-                    Votre article pèse {quote.pack_efficiency.weight_grams}g.
-                    Vous pouvez expédier <strong className="text-foreground">{quote.pack_efficiency.units_per_kg} unités par kg</strong> pour
-                    optimiser le coût à ${(quote.total_price / quote.pack_efficiency.units_per_kg).toFixed(2)}/unité.
+                    {t("shipping.packEfficiencyDesc", {
+                      g: quote.pack_efficiency.weight_grams,
+                      units: quote.pack_efficiency.units_per_kg,
+                      price: formatPrice(quote.total_price / quote.pack_efficiency.units_per_kg),
+                    }) ||
+                      `Votre article pèse ${quote.pack_efficiency.weight_grams}g. Vous pouvez expédier ${quote.pack_efficiency.units_per_kg} unités par kg pour optimiser le coût à ${formatPrice(quote.total_price / quote.pack_efficiency.units_per_kg)}/unité.`}
                   </p>
                 </div>
               </div>
