@@ -133,17 +133,18 @@ Deno.serve(async (req) => {
     const returnUrl = `${siteBaseUrl}/payment/return?ref=${encodeURIComponent(reference)}&order_id=${order.id}`;
     const callbackUrl = `${supabaseUrl}/functions/v1/kelpay-webhook`;
 
-    const keccelPayload = {
+    // Base payload (sans la clé returnUrl/returnurl, ajoutée par variante)
+    const basePayload = {
       merchantcode: keccelMerchantCode,
       reference: reference,
       // Keccel exige `amount` en STRING (cf. doc Kelpay_API_Card page 2, exemple "amount":"100").
-      // Envoyer un number provoque code:1 "Missing parameter".
       amount: String(amountSent),
       currency: "USD",
       description: `Commande ${order.order_ref} - Zandofy`,
       callbackurl: callbackUrl,
-      returnUrl: returnUrl,
     };
+    // Payload par défaut (clé `returnUrl` camelCase) pour les diagnostics et pre-flight
+    const keccelPayload: Record<string, unknown> = { ...basePayload, returnUrl: returnUrl };
 
     const origin = req.headers.get("Origin") || req.headers.get("Referer") || "";
     const merchantCodeMasked = keccelMerchantCode
@@ -180,13 +181,13 @@ Deno.serve(async (req) => {
 
     // ---- Local pre-flight validation (before hitting Keccel) ----
     const required: Record<string, unknown> = {
-      merchantcode: keccelPayload.merchantcode,
-      reference: keccelPayload.reference,
-      amount: keccelPayload.amount,
-      currency: keccelPayload.currency,
-      description: keccelPayload.description,
-      callbackurl: keccelPayload.callbackurl,
-      returnUrl: keccelPayload.returnUrl,
+      merchantcode: basePayload.merchantcode,
+      reference: basePayload.reference,
+      amount: basePayload.amount,
+      currency: basePayload.currency,
+      description: basePayload.description,
+      callbackurl: basePayload.callbackurl,
+      returnUrl: returnUrl,
     };
     const missingLocal: string[] = [];
     for (const [k, v] of Object.entries(required)) {
@@ -222,71 +223,109 @@ Deno.serve(async (req) => {
     console.log(`[${diagnosticId}] Keccel cardpay payload keys:`, Object.keys(keccelPayload).join(","));
     console.log(`[${diagnosticId}] Keccel token present:`, Boolean(keccelToken), "len:", keccelToken?.length);
 
+    // Normaliser le token : si l'admin a stocké "Bearer xxx" dans le secret,
+    // on enlève le préfixe pour éviter "Bearer Bearer xxx".
+    const cleanToken = keccelToken.replace(/^\s*Bearer\s+/i, "").trim();
+
+    type Attempt = {
+      attempt_index: number;
+      auth_format: "bearer_normalized" | "raw_token";
+      return_key_mode: "returnUrl" | "returnurl" | "both";
+    };
+    const attempts: Attempt[] = [
+      { attempt_index: 1, auth_format: "bearer_normalized", return_key_mode: "returnUrl" },
+      { attempt_index: 2, auth_format: "raw_token",         return_key_mode: "returnUrl" },
+      { attempt_index: 3, auth_format: "bearer_normalized", return_key_mode: "returnurl" },
+      { attempt_index: 4, auth_format: "bearer_normalized", return_key_mode: "both" },
+    ];
+
     let keccelResponse: any = null;
     let redirectUrl: string | null = null;
+    let lastHttpStatus = 0;
+    let lastRawBody = "";
+    let success = false;
 
-    try {
-      const resp = await fetch("https://api.keccel.net/cardpay", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${keccelToken}`,
-        },
-        body: JSON.stringify(keccelPayload),
-      });
+    for (const att of attempts) {
+      const payload: Record<string, unknown> = { ...basePayload };
+      if (att.return_key_mode === "returnUrl" || att.return_key_mode === "both") {
+        payload.returnUrl = returnUrl;
+      }
+      if (att.return_key_mode === "returnurl" || att.return_key_mode === "both") {
+        payload.returnurl = returnUrl;
+      }
+      const authValue = att.auth_format === "bearer_normalized"
+        ? `Bearer ${cleanToken}`
+        : cleanToken;
 
-      const rawBody = await resp.text();
-      console.log(`[${diagnosticId}] Keccel cardpay ← status:`, resp.status, "raw body:", rawBody);
+      console.log(`[${diagnosticId}] attempt ${att.attempt_index} auth=${att.auth_format} returnKey=${att.return_key_mode} keys=${Object.keys(payload).join(",")}`);
+
       try {
-        keccelResponse = JSON.parse(rawBody);
-      } catch (_parseErr) {
-        console.error(`[${diagnosticId}] Keccel cardpay returned non-JSON body`);
+        const resp = await fetch("https://api.keccel.net/cardpay", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": authValue,
+          },
+          body: JSON.stringify(payload),
+        });
+        lastHttpStatus = resp.status;
+        const rawBody = await resp.text();
+        lastRawBody = rawBody;
+        console.log(`[${diagnosticId}] attempt ${att.attempt_index} ← status ${resp.status} body ${rawBody.slice(0, 500)}`);
+
+        let parsed: any = null;
+        try { parsed = JSON.parse(rawBody); } catch { parsed = null; }
+
+        const attemptShape = Object.fromEntries(
+          Object.entries(payload).map(([k, v]) => [k, {
+            type: typeof v,
+            length: typeof v === "string" ? (v as string).length : undefined,
+            present: v !== undefined && v !== null && v !== "",
+          }])
+        );
+
         await persistDiagnostic({
-          payload_shape: fieldShape,
+          payload_shape: attemptShape,
           http_status: resp.status,
           raw_body: rawBody.slice(0, 4000),
-          error: "non_json_response",
+          keccel_code: String(parsed?.code ?? ""),
+          keccel_description: parsed?.description ?? null,
+          keccel_response: {
+            attempt_index: att.attempt_index,
+            auth_format: att.auth_format,
+            return_key_mode: att.return_key_mode,
+            sent_keys: Object.keys(payload),
+            response: parsed,
+          },
+          error: parsed && String(parsed?.code) === "0" ? null : "keccel_error",
         });
-        return errorResponse(
-          `Réponse invalide de la passerelle (HTTP ${resp.status}) — diag ${diagnosticId}`,
-          { diagnostic_id: diagnosticId, httpStatus: resp.status, body: rawBody.slice(0, 500) }
-        );
-      }
 
-      if (String(keccelResponse?.code) !== "0") {
-        console.error(`[${diagnosticId}] Keccel API returned error:`, keccelResponse, "with payload keys:", Object.keys(keccelPayload));
+        if (parsed && String(parsed.code) === "0") {
+          keccelResponse = parsed;
+          redirectUrl = parsed?.checkoutUrl || null;
+          success = true;
+          break;
+        }
+      } catch (apiError) {
+        console.error(`[${diagnosticId}] attempt ${att.attempt_index} network error:`, apiError);
         await persistDiagnostic({
           payload_shape: fieldShape,
-          http_status: resp.status,
-          raw_body: rawBody.slice(0, 4000),
-          keccel_code: String(keccelResponse?.code ?? ""),
-          keccel_description: keccelResponse?.description ?? null,
-          keccel_response: keccelResponse,
-          error: "keccel_error",
+          keccel_response: {
+            attempt_index: att.attempt_index,
+            auth_format: att.auth_format,
+            return_key_mode: att.return_key_mode,
+          },
+          error: `network_error: ${(apiError as any)?.message ?? String(apiError)}`,
         });
-        return errorResponse(
-          `Keccel ${keccelResponse?.code ?? "?"} : ${keccelResponse?.description || "Erreur de la passerelle de paiement"} (diag ${diagnosticId})`,
-          { diagnostic_id: diagnosticId, keccel: keccelResponse, sent_keys: Object.keys(keccelPayload), shape: fieldShape }
-        );
       }
+    }
 
-      redirectUrl = keccelResponse?.checkoutUrl || null;
-
-      // Success trace (no error)
-      await persistDiagnostic({
-        payload_shape: fieldShape,
-        http_status: resp.status,
-        keccel_code: "0",
-        keccel_description: keccelResponse?.description ?? null,
-        keccel_response: keccelResponse,
-      });
-    } catch (apiError) {
-      console.error(`[${diagnosticId}] Keccel API error:`, apiError);
-      await persistDiagnostic({
-        payload_shape: fieldShape,
-        error: `network_error: ${(apiError as any)?.message ?? String(apiError)}`,
-      });
-      return errorResponse(`Erreur de connexion à la passerelle de paiement (diag ${diagnosticId})`, { diagnostic_id: diagnosticId });
+    if (!success) {
+      return errorResponse(
+        `Keccel a refusé les ${attempts.length} variantes d'appel (diag ${diagnosticId}). Dernière réponse HTTP ${lastHttpStatus}.`,
+        { diagnostic_id: diagnosticId, httpStatus: lastHttpStatus, body: lastRawBody.slice(0, 500) }
+      );
     }
 
     // Create payment transaction record
