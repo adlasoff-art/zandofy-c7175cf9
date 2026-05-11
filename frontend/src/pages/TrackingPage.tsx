@@ -910,17 +910,17 @@ export default function TrackingPage() {
               <div className="grid grid-cols-2 gap-4 text-sm border-t border-border pt-4">
                 <div>
                   <span className="text-muted-foreground">{t("cart.total")}</span>
-                  <p className="font-semibold text-foreground">${orderResult.total.toFixed(2)}</p>
+                  <p className="font-semibold text-foreground">{formatPrice(orderResult.total)}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Date</span>
+                  <span className="text-muted-foreground">{t("tracking.dateLabel")}</span>
                   <p className="font-medium text-foreground">
-                    {new Date(orderResult.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                    {new Date(orderResult.created_at).toLocaleDateString(dateLocale, { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                 </div>
                 {/* Full address */}
                 <div className="col-span-2">
-                  <span className="text-muted-foreground">Adresse de livraison</span>
+                  <span className="text-muted-foreground">{t("tracking.address")}</span>
                   <p className="font-medium text-foreground">
                     {[orderResult.shipping_address, orderResult.shipping_city, orderResult.shipping_country].filter(Boolean).join(", ") || "—"}
                   </p>
@@ -930,7 +930,7 @@ export default function TrackingPage() {
               {/* History log */}
               {orderResult.history.length > 0 && (
                 <div className="border-t border-border pt-4">
-                  <h3 className="text-sm font-semibold text-foreground mb-3">Historique</h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-3">{t("tracking.history")}</h3>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {[...orderResult.history].reverse().map((h, i) => {
                       const cfg = STATUS_CONFIG[h.status];
@@ -942,7 +942,7 @@ export default function TrackingPage() {
                             {h.notes && <span className="text-muted-foreground ml-1">— {h.notes}</span>}
                           </div>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {new Date(h.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                            {new Date(h.created_at).toLocaleDateString(dateLocale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                           </span>
                         </div>
                       );
@@ -954,7 +954,7 @@ export default function TrackingPage() {
               {/* Real-time indicator */}
               <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t border-border">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Mis à jour en temps réel
+                {t("tracking.realtimeUpdate")}
               </div>
             </CardContent>
           </Card>
@@ -983,13 +983,13 @@ export default function TrackingPage() {
               </div>
               <Timeline steps={SHIPMENT_STEPS} currentStatus={shipment.status} />
               <div className="grid grid-cols-2 gap-4 text-sm border-t border-border pt-4">
-                <div><span className="text-muted-foreground">Mode</span><p className="font-medium text-foreground capitalize">{shipment.mode}</p></div>
-                <div><span className="text-muted-foreground">Articles</span><p className="font-medium text-foreground">{shipment.items_count}</p></div>
-                <div><span className="text-muted-foreground">ETA</span><p className="font-medium text-foreground">{shipment.eta || "—"}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.shipmentDetails.mode")}</span><p className="font-medium text-foreground capitalize">{shipment.mode}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.shipmentDetails.items")}</span><p className="font-medium text-foreground">{shipment.items_count}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.eta")}</span><p className="font-medium text-foreground">{shipment.eta || "—"}</p></div>
                 <div>
-                  <span className="text-muted-foreground">Mise à jour</span>
+                  <span className="text-muted-foreground">{t("tracking.shipmentDetails.update")}</span>
                   <p className="font-medium text-foreground">
-                    {new Date(shipment.updated_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    {new Date(shipment.updated_at).toLocaleDateString(dateLocale, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
               </div>
@@ -1020,13 +1020,13 @@ export default function TrackingPage() {
               </div>
               <Timeline steps={DELIVERY_STEPS} currentStatus={delivery.status} />
               <div className="grid grid-cols-2 gap-4 text-sm border-t border-border pt-4">
-                <div><span className="text-muted-foreground">Client</span><p className="font-medium text-foreground">{delivery.customer_name}</p></div>
-                <div><span className="text-muted-foreground">Date</span><p className="font-medium text-foreground">{new Date(delivery.delivery_date).toLocaleDateString("fr-FR")}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.client")}</span><p className="font-medium text-foreground">{delivery.customer_name}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.dateLabel")}</span><p className="font-medium text-foreground">{new Date(delivery.delivery_date).toLocaleDateString(dateLocale)}</p></div>
                 {delivery.delivered_at && (
                   <div className="col-span-2">
                     <span className="text-muted-foreground">{t("tracking.delivered")}</span>
                     <p className="font-medium text-foreground">
-                      {new Date(delivery.delivered_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {new Date(delivery.delivered_at).toLocaleDateString(dateLocale, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
                 )}
@@ -1066,18 +1066,18 @@ export default function TrackingPage() {
                     <p className="text-sm font-medium text-foreground">{event.description}</p>
                     <p className="text-xs text-muted-foreground">
                       {event.location && `${event.location} — `}
-                      {event.timestamp && new Date(event.timestamp).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {event.timestamp && new Date(event.timestamp).toLocaleDateString(dateLocale, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
                 ))}
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm border-t border-border pt-4">
-                <div><span className="text-muted-foreground">Transporteur</span><p className="font-medium text-foreground">{globalResult.carrier}</p></div>
-                <div><span className="text-muted-foreground">ETA</span><p className="font-medium text-foreground">{globalResult.estimated_delivery || "—"}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.carrier")}</span><p className="font-medium text-foreground">{globalResult.carrier}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.eta")}</span><p className="font-medium text-foreground">{globalResult.estimated_delivery || "—"}</p></div>
                 <div className="col-span-2">
-                  <span className="text-muted-foreground">Mise à jour</span>
+                  <span className="text-muted-foreground">{t("tracking.shipmentDetails.update")}</span>
                   <p className="font-medium text-foreground">
-                    {new Date(globalResult.last_update).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    {new Date(globalResult.last_update).toLocaleDateString(dateLocale, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
               </div>
