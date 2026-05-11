@@ -7,6 +7,7 @@ import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { Heart, Gift, Share2, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useI18n } from "@/contexts/I18nContext";
 import type { Product } from "@/services/api";
 
 function mapProduct(row: any): Product {
@@ -39,6 +40,7 @@ function mapProduct(row: any): Product {
 
 export default function SharedWishlistPage() {
   const { userId } = useParams<{ userId: string }>();
+  const { t } = useI18n();
 
   const { data: profile } = useQuery({
     queryKey: ["shared-wishlist-profile", userId],
@@ -78,11 +80,12 @@ export default function SharedWishlistPage() {
     enabled: !!userId,
   });
 
-  const ownerName = profile ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Un utilisateur" : "...";
+  const fallbackOwner = t("wishlist.shared.someone") || "Un utilisateur";
+  const ownerName = profile ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || fallbackOwner : "...";
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href);
-    toast.success("Lien copié !");
+    toast.success(t("wishlist.shared.linkCopied") || "Lien copié !");
   };
 
   return (
@@ -93,14 +96,14 @@ export default function SharedWishlistPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <Gift size={24} className="text-primary" />
-              Liste de souhaits de {ownerName}
+              {(t("wishlist.shared.title", { owner: ownerName }) || `Liste de souhaits de ${ownerName}`)}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {products.length} article{products.length !== 1 ? "s" : ""}
+              {t("wishlist.shared.itemsCount", { count: products.length, plural: products.length !== 1 ? "s" : "" }) || `${products.length} article${products.length !== 1 ? "s" : ""}`}
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={copyLink} className="flex items-center gap-2">
-            <Copy size={14} /> Copier le lien
+            <Copy size={14} /> {t("wishlist.shared.copyLink") || "Copier le lien"}
           </Button>
         </div>
 
@@ -111,9 +114,9 @@ export default function SharedWishlistPage() {
         ) : products.length === 0 ? (
           <div className="text-center py-20">
             <Heart size={48} className="mx-auto text-muted-foreground/30 mb-4" />
-            <h2 className="text-lg font-semibold text-foreground mb-2">Liste vide</h2>
-            <p className="text-muted-foreground mb-6">Cette liste de souhaits ne contient aucun article.</p>
-            <Button asChild><Link to="/">Découvrir les produits</Link></Button>
+            <h2 className="text-lg font-semibold text-foreground mb-2">{t("wishlist.shared.empty") || "Liste vide"}</h2>
+            <p className="text-muted-foreground mb-6">{t("wishlist.shared.emptyDesc") || "Cette liste de souhaits ne contient aucun article."}</p>
+            <Button asChild><Link to="/">{t("wishlist.shared.discover") || "Découvrir les produits"}</Link></Button>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
