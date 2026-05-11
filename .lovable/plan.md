@@ -1,174 +1,56 @@
-## Correction de cap
+Constat prioritaire production
 
-Tu as raison : **on ne doit pas renvoyer le client vers le terminal Keccel**. Ce serait redondant, moins contrôlé, et risqué si le client peut ressaisir/modifier le montant. On garde donc le flux voulu :
+- Le test affiché avec `diag 9ab216af` échoue côté client après 4 variantes CardPay.
+- Si la requête SQL en production retourne `Success. No rows returned`, ce diagnostic n’est pas dans la base production interrogée.
+- Donc, à ce stade, le problème prioritaire n’est pas encore “Keccel uniquement” : il faut d’abord prouver quelle Edge Function et quelle base sont réellement utilisées par `zandofy.com`.
 
-```text
-Zandofy checkout carte
-→ Edge Function keccel-cardpay
-→ API CardPay Keccel
-→ checkoutUrl Mastercard
-→ ap-gateway.mastercard.com
-```
+Ce que le code montre déjà
 
-## Ce que je sais maintenant
+- Le code CardPay actuel appelle toujours `https://api.keccel.net/cardpay`, pas le terminal Keccel.
+- Les deux copies `supabase/functions/keccel-cardpay` et `frontend/supabase/functions/keccel-cardpay` sont identiques côté logique.
+- Le workflow GitHub Actions déploie les fonctions depuis `frontend/` avec `supabase functions deploy`, donc la source réellement déployée en prod est surtout `frontend/supabase/functions/**`.
+- Les migrations diagnostics `keccel_cardpay_diagnostics` existent uniquement dans `supabase/migrations`, pas dans `frontend/supabase/migrations`, alors que la règle projet dit que `frontend/supabase/migrations/` est la source de vérité Supabase. Cela peut expliquer pourquoi la prod ne retourne aucune ligne ou pourquoi l’insert diagnostic échoue selon l’état réel de la DB prod.
 
-**Do I know what the issue is?** Pas encore à 100%, mais je sais où il est : **avant la base et avant le webhook**, au moment où `keccel-cardpay` appelle `https://api.keccel.net/cardpay`.
+Plan d’action proposé
 
-Ce n’est probablement pas :
-- la création de commande ;
-- le webhook `kelpay-webhook` ;
-- la redirection frontend ;
-- la table `payment_transactions`, car la transaction est créée seulement après succès Keccel ;
-- RLS, car le diagnostic est bien écrit par service role.
+1. Remettre la source prod au carré
+   - Garder `frontend/supabase/functions/keccel-cardpay/index.ts` comme source principale pour GitHub Actions/prod.
+   - Garder `supabase/functions/keccel-cardpay/index.ts` synchronisé seulement pour Lovable/preview, sans le présenter comme preuve prod.
 
-Le blocage est dans **la requête d’initialisation CardPay** : Keccel rejette le payload avec `code: 1 Missing parameter`.
+2. Corriger la traçabilité prod
+   - Copier les migrations `keccel_cardpay_diagnostics` dans `frontend/supabase/migrations/` avec les mêmes colonnes, dont `amount_sent`.
+   - Ajouter une migration idempotente si nécessaire, pour éviter les erreurs si la table existe déjà.
+   - Objectif : après un test sur `zandofy.com`, le diag doit être visible dans la base production.
 
-## Vérifications DB à faire avant changement de code
+3. Renforcer le diagnostic sans changer le parcours client
+   - Ne pas rediriger vers `terminal.keccel.com/payment.php`.
+   - Conserver l’appel serveur-à-serveur vers `api.keccel.net/cardpay`.
+   - Avant chaque insert diagnostic, logger explicitement une erreur si l’insert échoue, avec le nom de table/champ concerné.
+   - Retourner au client un message différencié si Keccel refuse l’appel mais que le diagnostic n’a pas pu être persisté.
 
-Sur le dernier diagnostic `e2c8bd82`, il faut confirmer si la prod a bien reçu la dernière version où `amount` est une string.
+4. Vérifier les variables prod attendues
+   - Documenter clairement que la prod doit avoir : `SITE_BASE_URL=https://zandofy.com`, `KELPAY_TOKEN`, `KECCEL_CARD_MERCHANT_CODE`.
+   - Sans afficher les secrets, comparer dans les diagnostics : `site_base_url`, `merchant_code_masked`, `token_present`, `token_length`, `callback_url`.
+
+5. Après merge/deploy prod
+   - Tester uniquement depuis `https://zandofy.com`.
+   - Interroger la base production avec :
 
 ```sql
-select diagnostic_id,
-       created_at,
-       amount,
-       amount_sent,
-       http_status,
-       keccel_code,
-       keccel_description,
-       merchant_code_masked,
-       token_present,
-       token_length,
-       sent_keys,
-       payload_shape->'amount' as amount_shape,
-       payload_shape->'merchantcode' as merchant_shape,
-       payload_shape->'returnUrl' as return_url_shape,
-       payload_shape->'callbackurl' as callback_shape,
-       raw_body,
-       error
+select diagnostic_id, created_at, environment, origin, site_base_url,
+       http_status, keccel_code, keccel_description,
+       amount, amount_sent, merchant_code_masked,
+       keccel_response->>'attempt_index' as attempt,
+       keccel_response->>'auth_format' as auth,
+       keccel_response->>'return_key_mode' as return_key,
+       raw_body
 from public.keccel_cardpay_diagnostics
-where diagnostic_id = 'e2c8bd82'
-order by created_at desc
-limit 1;
+where diagnostic_id = '<diag>'
+order by created_at asc;
 ```
 
-Résultat attendu après le dernier correctif :
+Résultat attendu
 
-```text
-amount_shape.type = string
-amount_sent = 19
-sent_keys contient merchantcode, reference, amount, currency, description, callbackurl, returnUrl
-```
-
-Si `amount_shape.type = number`, alors ce n’est pas le bon code qui tourne encore en production.
-
-## Plan d’implémentation proposé
-
-### 1. Garder l’API CardPay, supprimer toute piste terminal
-
-Ne pas construire d’URL `terminal.keccel.com/payment.php`.
-Ne pas laisser le client saisir de montant ailleurs.
-Ne pas ajouter un deuxième choix Visa/Mobile Money.
-
-### 2. Ajouter un diagnostic contrôlé côté Edge Function
-
-Dans :
-- `supabase/functions/keccel-cardpay/index.ts`
-- `frontend/supabase/functions/keccel-cardpay/index.ts`
-
-Garder le même payload métier, mais si Keccel répond `code: 1`, essayer automatiquement des variantes **serveur-à-serveur uniquement**, sans interaction client et sans terminal.
-
-Ordre proposé :
-
-```text
-Tentative 1 : Authorization: Bearer <token normalisé> + returnUrl
-Tentative 2 : Authorization: <token brut> + returnUrl
-Tentative 3 : Authorization: Bearer <token normalisé> + returnurl
-Tentative 4 : Authorization: Bearer <token normalisé> + returnUrl + returnurl
-```
-
-Pourquoi ces variantes :
-- le code actuel ajoute `Bearer`, mais les docs internes du projet se contredisent sur le format exact du secret ;
-- `returnUrl` est probablement correct, mais l’erreur générique Keccel peut venir d’une casse attendue différente ;
-- le lien terminal prouve que Keccel sait ouvrir Mastercard, donc on teste l’exactitude API sans sortir du checkout Zandofy.
-
-### 3. Sécuriser le token sans l’exposer
-
-Normaliser le token avant envoi :
-
-```text
-si le secret contient déjà "Bearer ", on enlève ce préfixe avant de reconstruire l’header
-```
-
-Cela évite le cas dangereux :
-
-```text
-Authorization: Bearer Bearer xxxxx
-```
-
-Aucune valeur secrète ne sera loggée.
-
-### 4. Logger chaque tentative dans les diagnostics existants
-
-Pas besoin de migration SQL obligatoire : on peut stocker dans `keccel_response` / `payload_shape` :
-
-```json
-{
-  "attempt_index": 1,
-  "auth_format": "bearer_normalized",
-  "return_key_mode": "returnUrl",
-  "response": { "code": "1", "description": "Missing parameter" }
-}
-```
-
-Même `diagnostic_id`, plusieurs lignes possibles, une par tentative.
-
-### 5. S’arrêter dès que Keccel renvoie `code: 0`
-
-Dès qu’une tentative réussit :
-- créer `payment_transactions` ;
-- mettre la commande en `awaiting_payment` ;
-- retourner `redirect_url = keccelResponse.checkoutUrl` ;
-- rediriger le client directement vers Mastercard.
-
-### 6. Si les 4 tentatives échouent
-
-Alors on aura une preuve propre que le blocage n’est plus le code Zandofy basique, mais probablement :
-- `merchantcode` non habilité CardPay API ;
-- token Mobile Money utilisé pour CardPay ;
-- callback URL non whitelistée ;
-- devise USD non activée pour ce merchant.
-
-À ce moment-là, on prépare un message technique très court à Keccel avec :
-- endpoint utilisé ;
-- clés envoyées ;
-- types des champs ;
-- référence ;
-- masked merchant ;
-- réponses exactes ;
-- sans token ni données sensibles.
-
-## Questions utiles à vérifier côté Keccel / secrets
-
-1. Le `merchantcode` CardPay API officiel est-il bien le même que celui du terminal `m=jam`, ou un code séparé de 6 caractères ?
-2. Le token CardPay est-il le même que Mobile Money/KelPay, ou Keccel fournit-il un token dédié CardPay ?
-3. La callback URL `https://vpttoqojmiqxgudknyxf.supabase.co/functions/v1/kelpay-webhook` est-elle whitelistée côté Keccel pour CardPay ?
-4. Le merchant est-il habilité en `USD` pour CardPay Mastercard ?
-
-## Résultat attendu après implémentation
-
-Le prochain test ne proposera pas de terminal. Il donnera soit :
-
-```text
-code 0 → redirect_url Mastercard obtenu
-```
-
-soit un diagnostic précis :
-
-```text
-attempt 1 bearer_normalized → Missing parameter
-attempt 2 raw_token → Missing parameter
-attempt 3 returnurl → Missing parameter
-attempt 4 both_return_keys → Missing parameter
-```
-
-Là, on saura si le problème est un format d’appel API ou une habilitation Keccel.
+- Si les lignes apparaissent en prod : on saura exactement ce que Keccel reçoit/refuse.
+- Si aucune ligne n’apparaît encore : le front prod ne pointe pas vers la base/fonction prod attendue, ou la fonction prod n’est pas celle déployée par GitHub Actions.
+- Tant que ce point n’est pas clarifié, Lovable Cloud ne doit pas être utilisé comme preuve de résolution production.
