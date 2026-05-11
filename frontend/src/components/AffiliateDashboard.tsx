@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "@/contexts/I18nContext";
 import { Loader2, Award, TrendingUp, Users, Star, ChevronRight, Link2 } from "lucide-react";
 import { AffiliateLinksManager } from "@/components/affiliate/AffiliateLinksManager";
 
@@ -15,6 +16,7 @@ interface AffiliateTier {
 
 export function AffiliateDashboard() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [tiers, setTiers] = useState<AffiliateTier[]>([]);
   const [currentTier, setCurrentTier] = useState<string | null>(null);
   const [referralCount, setReferralCount] = useState(0);
@@ -49,7 +51,7 @@ export function AffiliateDashboard() {
     return (
       <div className="text-center py-8 space-y-2">
         <Award size={40} className="mx-auto text-muted-foreground/20" />
-        <p className="text-sm text-muted-foreground">Le programme d'affiliation n'est pas encore configuré.</p>
+        <p className="text-sm text-muted-foreground">{t("affiliate.notConfigured")}</p>
       </div>
     );
   }
@@ -65,26 +67,26 @@ export function AffiliateDashboard() {
       <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-xl p-5">
         <div className="flex items-center gap-2 mb-3">
           <Award size={18} className="text-primary" />
-          <h3 className="text-sm font-bold text-foreground">Votre niveau d'affiliation</h3>
+          <h3 className="text-sm font-bold text-foreground">{t("affiliate.your.title")}</h3>
         </div>
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
             <Star size={24} className="text-primary" />
           </div>
           <div>
-            <p className="text-lg font-bold text-foreground">{currentTierData?.badge_label || "Débutant"}</p>
+            <p className="text-lg font-bold text-foreground">{currentTierData?.badge_label || t("affiliate.beginner")}</p>
             <p className="text-xs text-muted-foreground">
-              {currentTierData ? `${currentTierData.commission_pct}% de commission` : "Pas encore de palier"}
+              {currentTierData ? t("affiliate.commissionPct", { pct: currentTierData.commission_pct }) : t("affiliate.noTier")}
             </p>
-            <p className="text-xs text-primary font-medium">{referralCount} filleul(s)</p>
+            <p className="text-xs text-primary font-medium">{t("affiliate.referees", { count: referralCount })}</p>
           </div>
         </div>
 
         {nextTier && (
           <div className="mt-4">
             <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-              <span>Prochain niveau : {nextTier.badge_label}</span>
-              <span>{referralsNeeded} filleul(s) restant(s)</span>
+              <span>{t("affiliate.next", { name: nextTier.badge_label })}</span>
+              <span>{t("affiliate.remaining", { count: referralsNeeded })}</span>
             </div>
             <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
               <div
@@ -99,7 +101,7 @@ export function AffiliateDashboard() {
       {/* All tiers */}
       <div className="bg-card border border-border rounded-xl p-5">
         <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
-          <TrendingUp size={16} className="text-primary" /> Paliers d'affiliation
+          <TrendingUp size={16} className="text-primary" /> {t("affiliate.tiers.title")}
         </h3>
         <div className="space-y-2">
           {tiers.map((tier, i) => {
@@ -122,13 +124,13 @@ export function AffiliateDashboard() {
                     <div>
                       <p className="text-sm font-bold text-foreground">{tier.badge_label}</p>
                       <p className="text-[10px] text-muted-foreground">
-                        {tier.min_referrals} filleuls min · {tier.commission_pct}% commission
-                        {bonusEnabled && tier.bonus_points > 0 && ` · +${tier.bonus_points} bonus pts`}
+                        {t("affiliate.tier.summary", { min: tier.min_referrals, pct: tier.commission_pct })}
+                        {bonusEnabled && tier.bonus_points > 0 && t("affiliate.tier.bonus", { pts: tier.bonus_points })}
                       </p>
                     </div>
                   </div>
-                  {isActive && <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-semibold">Actuel</span>}
-                  {!isActive && isReached && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500 text-white font-semibold">✓ Atteint</span>}
+                  {isActive && <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-semibold">{t("affiliate.tier.current")}</span>}
+                  {!isActive && isReached && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500 text-white font-semibold">{t("affiliate.tier.reached")}</span>}
                 </div>
               </div>
             );
@@ -139,7 +141,7 @@ export function AffiliateDashboard() {
       {/* Affiliate Links Manager */}
       <div className="bg-card border border-border rounded-xl p-5">
         <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
-          <Link2 size={16} className="text-primary" /> Mes liens d'affiliation
+          <Link2 size={16} className="text-primary" /> {t("affiliate.links.title")}
         </h3>
         <AffiliateLinksManager />
       </div>

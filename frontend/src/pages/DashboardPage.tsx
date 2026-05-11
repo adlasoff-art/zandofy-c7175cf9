@@ -2017,6 +2017,8 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
 function NotificationsTab() {
   const { notifications, loading, markAsRead, markAllAsRead, deleteNotification, unreadCount } = useNotifications();
   const navigate = useNavigate();
+  const { t, locale } = useI18n();
+  const dateLocale = locale === "en" ? enUS : fr;
 
   const typeIcons: Record<string, React.ReactNode> = {
     order: <Package size={16} className="text-blue-500" />,
@@ -2030,10 +2032,10 @@ function NotificationsTab() {
   return (
     <div className="max-w-xl space-y-3">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-sm text-muted-foreground">{unreadCount} non lue{unreadCount > 1 ? "s" : ""}</p>
+        <p className="text-sm text-muted-foreground">{t("notif.unread", { count: unreadCount })}</p>
         {unreadCount > 0 && (
           <Button variant="ghost" size="sm" className="text-xs h-7" onClick={markAllAsRead}>
-            <CheckCircle2 size={12} className="mr-1" /> Tout marquer comme lu
+            <CheckCircle2 size={12} className="mr-1" /> {t("notif.markAllReadFull")}
           </Button>
         )}
       </div>
@@ -2041,7 +2043,7 @@ function NotificationsTab() {
       {notifications.length === 0 ? (
         <div className="text-center py-12">
           <Bell size={32} className="mx-auto text-muted-foreground/30 mb-2" />
-          <p className="text-sm text-muted-foreground">Aucune notification</p>
+          <p className="text-sm text-muted-foreground">{t("notif.empty")}</p>
         </div>
       ) : (
         notifications.map((n) => (
@@ -2060,7 +2062,7 @@ function NotificationsTab() {
               <p className={`text-sm ${!n.is_read ? "font-semibold" : ""} text-foreground`}>{n.title}</p>
               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
               <p className="text-[10px] text-muted-foreground mt-1">
-                {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: fr })}
+                {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: dateLocale })}
               </p>
             </div>
             <button

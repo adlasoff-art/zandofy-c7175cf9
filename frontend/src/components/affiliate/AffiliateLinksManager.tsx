@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/contexts/I18nContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link2, Plus, Copy, Trash2, Loader2, MousePointer, ShoppingBag, DollarSign, TrendingUp } from "lucide-react";
@@ -23,6 +24,7 @@ interface AffiliateLink {
 export function AffiliateLinksManager() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useI18n();
   const [links, setLinks] = useState<AffiliateLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -52,9 +54,9 @@ export function AffiliateLinksManager() {
       label: newLabel.trim() || null,
     });
     if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      toast({ title: t("affiliate.links.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Lien créé !" });
+      toast({ title: t("affiliate.links.created") });
       setNewLabel("");
       load();
     }
@@ -64,13 +66,13 @@ export function AffiliateLinksManager() {
   const copyLink = (code: string) => {
     const url = `${window.location.origin}?ref=${code}`;
     navigator.clipboard.writeText(url);
-    toast({ title: "Lien copié !" });
+    toast({ title: t("affiliate.links.copied") });
   };
 
   const deleteLink = async (id: string) => {
     const { error } = await (supabase as any).from("affiliate_links").delete().eq("id", id);
-    if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    else { toast({ title: "Lien supprimé" }); load(); }
+    if (error) toast({ title: t("affiliate.links.error"), description: error.message, variant: "destructive" });
+    else { toast({ title: t("affiliate.links.deleted") }); load(); }
   };
 
   if (loading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary" size={20} /></div>;
@@ -86,17 +88,17 @@ export function AffiliateLinksManager() {
         <div className="bg-card border border-border rounded-xl p-3 text-center">
           <MousePointer size={16} className="mx-auto text-primary mb-1" />
           <p className="text-lg font-bold text-foreground">{totalClicks}</p>
-          <p className="text-[10px] text-muted-foreground">Clics</p>
+          <p className="text-[10px] text-muted-foreground">{t("affiliate.links.clicks")}</p>
         </div>
         <div className="bg-card border border-border rounded-xl p-3 text-center">
           <ShoppingBag size={16} className="mx-auto text-primary mb-1" />
           <p className="text-lg font-bold text-foreground">{totalConversions}</p>
-          <p className="text-[10px] text-muted-foreground">Conversions</p>
+          <p className="text-[10px] text-muted-foreground">{t("affiliate.links.conversions")}</p>
         </div>
         <div className="bg-card border border-border rounded-xl p-3 text-center">
           <DollarSign size={16} className="mx-auto text-primary mb-1" />
           <p className="text-lg font-bold text-foreground">${totalRevenue.toFixed(2)}</p>
-          <p className="text-[10px] text-muted-foreground">Revenus</p>
+          <p className="text-[10px] text-muted-foreground">{t("affiliate.links.revenue")}</p>
         </div>
       </div>
 
@@ -104,18 +106,18 @@ export function AffiliateLinksManager() {
       <div className="bg-card border border-border rounded-xl p-4">
         <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-3">
           <Link2 size={16} className="text-primary" />
-          Créer un lien d'affiliation
+          {t("affiliate.links.create")}
         </h3>
         <div className="flex gap-2">
           <Input
-            placeholder="Nom du lien (ex: Instagram Bio)"
+            placeholder={t("affiliate.links.placeholder")}
             value={newLabel}
             onChange={(e) => setNewLabel(e.target.value)}
             className="flex-1"
           />
           <Button onClick={createLink} disabled={creating} size="sm" className="gap-1.5">
             {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            Créer
+            {t("affiliate.links.createBtn")}
           </Button>
         </div>
       </div>
@@ -124,7 +126,7 @@ export function AffiliateLinksManager() {
       <div className="space-y-2">
         {links.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-4">
-            Aucun lien d'affiliation. Créez votre premier lien ci-dessus.
+            {t("affiliate.links.empty")}
           </p>
         )}
         {links.map((link) => (
@@ -146,8 +148,8 @@ export function AffiliateLinksManager() {
               </div>
             </div>
             <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
-              <span className="flex items-center gap-1"><MousePointer size={10} /> {link.clicks} clics</span>
-              <span className="flex items-center gap-1"><ShoppingBag size={10} /> {link.conversions} conv.</span>
+              <span className="flex items-center gap-1"><MousePointer size={10} /> {t("affiliate.links.clicksShort", { count: link.clicks })}</span>
+              <span className="flex items-center gap-1"><ShoppingBag size={10} /> {t("affiliate.links.convShort", { count: link.conversions })}</span>
               <span className="flex items-center gap-1"><DollarSign size={10} /> ${link.revenue_generated.toFixed(2)}</span>
               {link.custom_commission_pct && (
                 <span className="flex items-center gap-1"><TrendingUp size={10} /> {link.custom_commission_pct}%</span>
