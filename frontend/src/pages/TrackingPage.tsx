@@ -61,17 +61,17 @@ interface OrderTrackingResult {
 
 // ── Shipment / Delivery constants ──
 const SHIPMENT_STEPS = [
-  { key: "loading", label: "Chargement", icon: Package },
-  { key: "in_transit", label: "En transit", icon: Plane },
-  { key: "customs", label: "Douanes", icon: MapPin },
-  { key: "arrived", label: "Arrivé", icon: CheckCircle2 },
-  { key: "delivered", label: "Livré", icon: CheckCircle2 },
+  { key: "loading", labelKey: "tracking.steps.loading", icon: Package },
+  { key: "in_transit", labelKey: "tracking.steps.inTransit", icon: Plane },
+  { key: "customs", labelKey: "tracking.steps.customs", icon: MapPin },
+  { key: "arrived", labelKey: "tracking.steps.arrived", icon: CheckCircle2 },
+  { key: "delivered", labelKey: "tracking.steps.delivered", icon: CheckCircle2 },
 ];
 
 const DELIVERY_STEPS = [
-  { key: "pending", label: "En attente", icon: Clock },
-  { key: "in_progress", label: "En cours", icon: Truck },
-  { key: "delivered", label: "Livré", icon: CheckCircle2 },
+  { key: "pending", labelKey: "tracking.steps.pending", icon: Clock },
+  { key: "in_progress", labelKey: "tracking.steps.inProgress", icon: Truck },
+  { key: "delivered", labelKey: "tracking.steps.delivered", icon: CheckCircle2 },
 ];
 
 const modeIcons: Record<string, typeof Plane> = { air: Plane, sea: Ship, road: Truck, rail: Train };
@@ -83,6 +83,7 @@ function getStepIdx(steps: { key: string }[], status: string) {
 
 // ── Reusable simple Timeline (shipment/delivery) ──
 function Timeline({ steps, currentStatus }: { steps: typeof SHIPMENT_STEPS; currentStatus: string }) {
+  const { t } = useI18n();
   const activeIdx = getStepIdx(steps, currentStatus);
   return (
     <div className="flex items-start gap-0 w-full overflow-x-auto py-4">
@@ -104,7 +105,7 @@ function Timeline({ steps, currentStatus }: { steps: typeof SHIPMENT_STEPS; curr
               {isCurrent ? <CircleDot size={18} /> : done ? <Icon size={18} /> : <Circle size={18} />}
             </div>
             <span className={cn("text-xs mt-2 text-center font-medium", isCurrent ? "text-primary" : done ? "text-foreground" : "text-muted-foreground")}>
-              {step.label}
+              {t(step.labelKey)}
             </span>
           </div>
         );
