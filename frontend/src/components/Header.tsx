@@ -240,8 +240,8 @@ export function Header() {
               <Link
                 to="/sourcing"
                 className="p-2 text-foreground hover:text-primary transition-colors"
-                aria-label="Trouvez-moi ce produit"
-                title="Trouvez-moi ce produit"
+                aria-label={t("header.findProduct") || "Trouvez-moi ce produit"}
+                title={t("header.findProduct") || "Trouvez-moi ce produit"}
               >
                 <Sparkles size={20} />
               </Link>
@@ -307,14 +307,14 @@ export function Header() {
                     <Link to="/vendor" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.vendorSpace")}</Link>
                     <Link to="/become-vendor" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">{t("header.becomeVendor")}</Link>
                     {isOperator ? (
-                      <Link to="/operator" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">Espace opérateur</Link>
+                      <Link to="/operator" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.operatorSpace") || "Espace opérateur"}</Link>
                     ) : (
-                      <Link to="/become-operator" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">Devenir opérateur de livraison</Link>
+                      <Link to="/become-operator" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">{t("header.becomeOperator") || "Devenir opérateur de livraison"}</Link>
                     )}
                     {isForwarder ? (
-                      <Link to="/forwarder" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">Espace transitaire</Link>
+                      <Link to="/forwarder" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.forwarderSpace") || "Espace transitaire"}</Link>
                     ) : (
-                      <Link to="/become-forwarder" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">Devenir transitaire</Link>
+                      <Link to="/become-forwarder" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">{t("header.becomeForwarder") || "Devenir transitaire"}</Link>
                     )}
                     {isStaff && <Link to="/admin" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.admin")}</Link>}
                     <button onClick={async () => { setUserMenuOpen(false); await signOut(); }} className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-muted transition-colors flex items-center gap-2">
