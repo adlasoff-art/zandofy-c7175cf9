@@ -150,9 +150,11 @@ Deno.serve(async (req) => {
     const merchantCodeMasked = keccelMerchantCode
       ? `${keccelMerchantCode.slice(0, 2)}***${keccelMerchantCode.slice(-2)}`
       : null;
+    let diagnosticPersisted = false;
+    let lastDiagnosticInsertError: Record<string, unknown> | null = null;
 
     // Helper: persist a diagnostic row (best-effort, never throws)
-    async function persistDiagnostic(extra: Record<string, unknown>) {
+    async function persistDiagnostic(extra: Record<string, unknown>): Promise<boolean> {
       try {
         const { error: diagInsertError } = await supabase.from("keccel_cardpay_diagnostics").insert({
           diagnostic_id: diagnosticId,
@@ -175,18 +177,24 @@ Deno.serve(async (req) => {
           ...extra,
         });
         if (diagInsertError) {
+          lastDiagnosticInsertError = {
+            code: (diagInsertError as any)?.code,
+            message: (diagInsertError as any)?.message,
+            details: (diagInsertError as any)?.details,
+            hint: (diagInsertError as any)?.hint,
+          };
           console.error(
             `[${diagnosticId}] Diagnostic insert FAILED on table keccel_cardpay_diagnostics:`,
-            JSON.stringify({
-              code: (diagInsertError as any)?.code,
-              message: (diagInsertError as any)?.message,
-              details: (diagInsertError as any)?.details,
-              hint: (diagInsertError as any)?.hint,
-            })
+            JSON.stringify(lastDiagnosticInsertError)
           );
+          return false;
         }
+        diagnosticPersisted = true;
+        return true;
       } catch (e) {
+        lastDiagnosticInsertError = { message: (e as any)?.message ?? String(e) };
         console.error(`[${diagnosticId}] Failed to persist diagnostic:`, e);
+        return false;
       }
     }
 
@@ -335,7 +343,15 @@ Deno.serve(async (req) => {
     if (!success) {
       return errorResponse(
         `Keccel a refusé les ${attempts.length} variantes d'appel (diag ${diagnosticId}). Dernière réponse HTTP ${lastHttpStatus}.`,
-        { diagnostic_id: diagnosticId, httpStatus: lastHttpStatus, body: lastRawBody.slice(0, 500) }
+        {
+          diagnostic_id: diagnosticId,
+          httpStatus: lastHttpStatus,
+          body: lastRawBody.slice(0, 500),
+          diagnostic_persisted: diagnosticPersisted,
+          diagnostic_insert_error: lastDiagnosticInsertError,
+          environment: supabaseUrl,
+          site_base_url: siteBaseUrl,
+        }
       );
     }
 
