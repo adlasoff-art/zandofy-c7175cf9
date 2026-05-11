@@ -1531,17 +1531,17 @@ export default function CheckoutPage() {
                     return (
                     <div className="pt-3 border-t border-border space-y-2">
                       <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                        <Truck size={14} className="text-primary" /> Paiement des frais d'expédition
+                        <Truck size={14} className="text-primary" /> {t("checkout.shippingPaymentTitle") || "Paiement des frais d'expédition"}
                       </p>
                       {awaitingForwarderChoice && (
                         <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                          Sélectionnez un transitaire ci-dessus pour voir le montant exact.
+                          {t("checkout.selectForwarderHint") || "Sélectionnez un transitaire ci-dessus pour voir le montant exact."}
                         </p>
                       )}
                       <div className="space-y-2">
                         {[
-                          { key: "pay_now" as const, label: "Payer maintenant", desc: `Inclure ${amountLabel} dans le total` },
-                          { key: "pay_on_arrival" as const, label: "Payer à l'arrivée au Hub", desc: `Régler ${amountLabel} quand le colis arrive au hub (avant livraison)` },
+                          { key: "pay_now" as const, label: t("checkout.payNow") || "Payer maintenant", desc: `${t("checkout.includeInTotal") || "Inclure"} ${amountLabel} ${t("checkout.inTotal") || "dans le total"}` },
+                          { key: "pay_on_arrival" as const, label: t("checkout.payOnHubArrival") || "Payer à l'arrivée au Hub", desc: `${t("checkout.payOnHubArrivalDesc") || "Régler"} ${amountLabel} ${t("checkout.payOnHubArrivalDesc2") || "quand le colis arrive au hub (avant livraison)"}` },
                         ].map(opt => (
                           <button
                             key={opt.key}
