@@ -343,7 +343,15 @@ Deno.serve(async (req) => {
     if (!success) {
       return errorResponse(
         `Keccel a refusé les ${attempts.length} variantes d'appel (diag ${diagnosticId}). Dernière réponse HTTP ${lastHttpStatus}.`,
-        { diagnostic_id: diagnosticId, httpStatus: lastHttpStatus, body: lastRawBody.slice(0, 500) }
+        {
+          diagnostic_id: diagnosticId,
+          httpStatus: lastHttpStatus,
+          body: lastRawBody.slice(0, 500),
+          diagnostic_persisted: diagnosticPersisted,
+          diagnostic_insert_error: lastDiagnosticInsertError,
+          environment: supabaseUrl,
+          site_base_url: siteBaseUrl,
+        }
       );
     }
 
