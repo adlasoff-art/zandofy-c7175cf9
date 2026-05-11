@@ -36,7 +36,7 @@ interface PointTransaction {
 
 export function ReferralDashboard() {
   const { user } = useAuth();
-  const { t, locale, formatPrice } = useI18n();
+  const { t, locale } = useI18n();
   const [referralCode, setReferralCode] = useState("");
   const [referrals, setReferrals] = useState<ReferralData[]>([]);
   const [wallet, setWallet] = useState<PointsWallet>({ balance: 0, pending_balance: 0, total_earned: 0, total_spent: 0 });
