@@ -1527,7 +1527,7 @@ export default function CheckoutPage() {
                       freightOffersAvailable > 0 && !selectedFreightOffer;
                     const amountLabel = awaitingForwarderChoice
                       ? "—"
-                      : `$${shippingCost.toFixed(2)}`;
+                      : formatPrice(shippingCost);
                     return (
                     <div className="pt-3 border-t border-border space-y-2">
                       <p className="text-sm font-medium text-foreground flex items-center gap-2">
