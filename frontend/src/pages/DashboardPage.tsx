@@ -1269,6 +1269,7 @@ function CancelOrderButton({ orderId, orderRef, onSuccess, small }: {
   onSuccess: () => void;
   small?: boolean;
 }) {
+  const { t } = useI18n();
   const { toast } = useToast();
   const [cancelling, setCancelling] = useState(false);
 
@@ -1280,9 +1281,9 @@ function CancelOrderButton({ orderId, orderRef, onSuccess, small }: {
       .eq("id", orderId);
     setCancelling(false);
     if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      toast({ title: t("dashboard.cancel.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Commande annulée", description: `${orderRef} a été annulée.` });
+      toast({ title: t("dashboard.cancel.success"), description: t("dashboard.cancel.successDesc", { ref: orderRef }) });
       onSuccess();
     }
   };
@@ -1291,10 +1292,10 @@ function CancelOrderButton({ orderId, orderRef, onSuccess, small }: {
     <AlertDialog>
       <AlertDialogTrigger asChild>
         {small ? (
-          <button className="text-[10px] text-destructive font-medium hover:underline whitespace-nowrap">Annuler</button>
+          <button className="text-[10px] text-destructive font-medium hover:underline whitespace-nowrap">{t("dashboard.cancel.small")}</button>
         ) : (
           <Button variant="destructive" size="sm">
-            <XCircle size={14} className="mr-1" /> Annuler la commande
+            <XCircle size={14} className="mr-1" /> {t("dashboard.cancel.full")}
           </Button>
         )}
       </AlertDialogTrigger>
@@ -1302,17 +1303,15 @@ function CancelOrderButton({ orderId, orderRef, onSuccess, small }: {
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <AlertTriangle size={18} className="text-destructive" />
-            Annuler {orderRef} ?
+            {t("dashboard.cancel.title", { ref: orderRef })}
           </AlertDialogTitle>
-          <AlertDialogDescription>
-            Cette action est irréversible. La commande sera marquée comme annulée et ne pourra plus être modifiée.
-          </AlertDialogDescription>
+          <AlertDialogDescription>{t("dashboard.cancel.desc")}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Non, garder</AlertDialogCancel>
+          <AlertDialogCancel>{t("dashboard.cancel.keep")}</AlertDialogCancel>
           <AlertDialogAction onClick={handleCancel} disabled={cancelling} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
             {cancelling ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
-            Oui, annuler
+            {t("dashboard.cancel.confirm")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -1321,6 +1320,8 @@ function CancelOrderButton({ orderId, orderRef, onSuccess, small }: {
 }
 
 function TrackingStepper({ status, statusHistory, orderRef, trackingNumber }: { status: string; statusHistory?: StatusHistoryRow[]; orderRef?: string; trackingNumber?: string | null }) {
+  const { t, locale } = useI18n();
+  const dateLocale = locale === "en" ? enUS : fr;
   const navigate = useNavigate();
   const currentIdx = getStepIndex(status);
   const isCancelled = status === "cancelled" || status === "returned";
@@ -1364,7 +1365,7 @@ function TrackingStepper({ status, statusHistory, orderRef, trackingNumber }: { 
         key={step.key}
         className={`flex flex-col items-center gap-1 flex-1 min-w-0 ${clickable ? "cursor-pointer group" : ""}`}
         onClick={clickable ? () => handleStepClick(step.key) : undefined}
-        title={clickable ? (step.key === "out_for_delivery" ? "Suivre le livreur sur la carte" : "Suivre l'expédition") : undefined}
+        title={clickable ? (step.key === "out_for_delivery" ? t("dashboard.stepper.viewRider") : t("dashboard.stepper.viewShipment")) : undefined}
       >
         <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all ${
           isCurrent ? "bg-primary text-primary-foreground ring-2 ring-primary/30 scale-110"
@@ -1380,7 +1381,7 @@ function TrackingStepper({ status, statusHistory, orderRef, trackingNumber }: { 
         </span>
         {ts && (
           <span className="text-[10px] text-muted-foreground leading-tight">
-            {format(new Date(ts), "dd/MM HH:mm", { locale: fr })}
+            {format(new Date(ts), "dd/MM HH:mm", { locale: dateLocale })}
           </span>
         )}
       </div>
