@@ -17,12 +17,13 @@ import {
   MultiOriginFreightSelector,
   type FreightGroupSelection,
 } from "@/components/checkout/MultiOriginFreightSelector";
+import { useI18n } from "@/contexts/I18nContext";
 
 const MODE_META = {
-  air:  { icon: Plane,     label: "Aérien",     localLabel: "Aérien local",  unit: "kg" },
-  sea:  { icon: Ship,      label: "Maritime",   localLabel: "Maritime",      unit: "cbm" },
-  road: { icon: TruckIcon, label: "Routier",    localLabel: "Routier",       unit: "kg" },
-  rail: { icon: Train,     label: "Ferroviaire",localLabel: "Ferroviaire",   unit: "kg" },
+  air:  { icon: Plane,     label: "Aérien",     labelKey: "shipping.mode.air",  localLabel: "Aérien local", unit: "kg" },
+  sea:  { icon: Ship,      label: "Maritime",   labelKey: "shipping.mode.sea",  localLabel: "Maritime",     unit: "cbm" },
+  road: { icon: TruckIcon, label: "Routier",    labelKey: "shipping.mode.road", localLabel: "Routier",      unit: "kg" },
+  rail: { icon: Train,     label: "Ferroviaire",labelKey: "shipping.mode.rail", localLabel: "Ferroviaire",  unit: "kg" },
 } as const;
 
 type TransportMode = keyof typeof MODE_META;
@@ -73,6 +74,7 @@ export function CheckoutShippingCalculator({
   onFreightAvailabilityChange,
   onFreightGroupsChange,
 }: Props) {
+  const { t, formatPrice } = useI18n();
   const [products, setProducts] = useState<CartProductInfo[]>([]);
   const [destCity, setDestCity] = useState<City | null>(null);
   const [originCities, setOriginCities] = useState<Map<string, City>>(new Map());
@@ -474,7 +476,9 @@ export function CheckoutShippingCalculator({
     
     if (unitsNeeded > 0 && unitsNeeded <= 10) {
       return {
-        text: `Ajoutez ${unitsNeeded} unité${unitsNeeded > 1 ? "s" : ""} pour compléter votre prochain KG et optimiser vos frais de transport.`,
+        text:
+          t("shipping.addUnitsGeneric", { count: unitsNeeded }) ||
+          `Ajoutez ${unitsNeeded} unité${unitsNeeded > 1 ? "s" : ""} pour compléter votre prochain KG et optimiser vos frais de transport.`,
         unitsNeeded,
       };
     }
@@ -485,7 +489,7 @@ export function CheckoutShippingCalculator({
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
         <Info size={12} />
-        <span>Renseignez votre ville pour un calcul précis du fret</span>
+        <span>{t("shipping.fillCityHint") || "Renseignez votre ville pour un calcul précis du fret"}</span>
       </div>
     );
   }
@@ -494,7 +498,7 @@ export function CheckoutShippingCalculator({
     return (
       <div className="flex items-center gap-2 py-2">
         <Loader2 size={14} className="animate-spin text-primary" />
-        <span className="text-xs text-muted-foreground">Calcul du fret en cours...</span>
+        <span className="text-xs text-muted-foreground">{t("shipping.calculatingFreight") || "Calcul du fret en cours..."}</span>
       </div>
     );
   }
@@ -502,7 +506,7 @@ export function CheckoutShippingCalculator({
   if (modeTotals.size === 0 && !loading) {
     return (
       <div className="text-xs text-muted-foreground py-1">
-        Fret standard appliqué
+        {t("shipping.standardFreight") || "Fret standard appliqué"}
       </div>
     );
   }
