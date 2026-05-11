@@ -80,7 +80,7 @@ const SIZE_REGIONS: Record<string, string[]> = {
 
 // ─── Component ─────────────────────────────────
 export default function ProductPage() {
-  const { t } = useI18n();
+  const { t, formatPrice } = useI18n();
   const { addItem } = useCart();
   const { toast } = useToast();
   const { isInWishlist, toggleWishlist } = useWishlist();
