@@ -136,7 +136,9 @@ Deno.serve(async (req) => {
     const keccelPayload = {
       merchantcode: keccelMerchantCode,
       reference: reference,
-      amount: amountSent,
+      // Keccel exige `amount` en STRING (cf. doc Kelpay_API_Card page 2, exemple "amount":"100").
+      // Envoyer un number provoque code:1 "Missing parameter".
+      amount: String(amountSent),
       currency: "USD",
       description: `Commande ${order.order_ref} - Zandofy`,
       callbackurl: callbackUrl,

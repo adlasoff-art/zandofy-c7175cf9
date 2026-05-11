@@ -1,63 +1,51 @@
-## Décision retenue
+## Diagnostic
 
-Envoyer à Keccel un **`amount` entier arrondi à l'entier supérieur** (`Math.ceil`), pas en centimes.
+La doc Keccel (PDF officiel) confirme :
+- Endpoint `POST https://api.keccel.net/cardpay` ✅ (notre code)
+- Header `Authorization: Bearer <token>` ✅
+- 7 paramètres body tous obligatoires ✅
+- **Mais l'exemple page 2 envoie `"amount": "100"` en STRING**, pas en number
 
-| Prix Zandofy | `amount` envoyé à Keccel |
-|---|---|
-| 18.99 | **19** |
-| 19.99 | **20** |
-| 49.99 | **50** |
-| 100.00 | **100** |
+Notre diagnostic prod montre `payload_shape.amount.type = "number"`. C'est ça l'erreur. Keccel renvoie `code:1 "Missing parameter"` car son parser strict ne reconnaît pas `amount` quand ce n'est pas une string.
 
-Justification : tous nos prix se terminent en `.99` (logique de prix stratégique), donc l'arrondi vers le haut ne fait perdre qu'**1 centime maximum** au client — risque négligeable, et conforme à l'attente de Keccel (entier).
+L'`amount_sent: 19` (entier, post `Math.ceil`) reste correct sur le fond — il faut juste l'envoyer en string `"19"`.
 
-## Modifications
+## Changements
 
-### 1. `supabase/functions/keccel-cardpay/index.ts`
+### 1. `supabase/functions/keccel-cardpay/index.ts` (prod via GitHub Actions)
 
-- Calculer `amountInteger = Math.ceil(amount)` juste après la validation `amount > 0`.
-- Envoyer `amount: amountInteger` dans `keccelPayload` (au lieu de `amount`).
-- **Garder `amount` décimal** pour :
-  - la table `payment_transactions` (montant réel facturé côté plateforme)
-  - le diagnostic `keccel_cardpay_diagnostics.amount`
-- Ajouter `amount_sent` (entier) dans le diagnostic pour traçabilité.
+Une seule ligne change dans `keccelPayload` :
 
-### 2. Migration SQL
+```ts
+// AVANT
+amount: amountSent,
 
-Ajouter une colonne `amount_sent numeric` à `keccel_cardpay_diagnostics`.
-
-```sql
-ALTER TABLE public.keccel_cardpay_diagnostics
-  ADD COLUMN IF NOT EXISTS amount_sent numeric;
+// APRÈS
+amount: String(amountSent),  // Keccel exige une string (cf. doc Kelpay_API_Card)
 ```
 
-Livrée en fichier téléchargeable `/mnt/documents/keccel_diag_amount_sent_migration.sql`, à exécuter manuellement par toi dans le SQL Editor prod (`vpt...yxf`).
+Le diagnostic enregistré dans `keccel_cardpay_diagnostics.amount_sent` (numeric) reste l'entier — pas de changement DB.
 
-### 3. Aucun changement de schéma fonctionnel
+### 2. `frontend/supabase/functions/keccel-cardpay/index.ts`
 
-- `payment_transactions.amount` reste le montant **réel** (ex. 18.99).
-- Le webhook `kelpay-webhook` n'a rien à changer (il s'appuie sur la `reference`, pas le montant).
+Même changement (la prod tire de ce dossier via GitHub Actions).
 
-## Fichiers impactés
+### 3. Pas de migration SQL nécessaire
 
-| Fichier | Action |
-|---|---|
-| `supabase/functions/keccel-cardpay/index.ts` | Modifier — `Math.ceil(amount)` envoyé à Keccel + log `amount_sent` |
-| `supabase/migrations/<timestamp>_keccel_diag_amount_sent.sql` | Nouveau — colonne `amount_sent` |
-| `/mnt/documents/keccel_diag_amount_sent_migration.sql` | Nouveau — copie téléchargeable |
+La colonne `amount_sent numeric` est déjà en place et reste valide (on logge l'entier).
 
-## Procédure après mon implémentation
+## Procédure post-implémentation
 
-1. Je te livre le fichier SQL téléchargeable.
-2. Tu l'exécutes dans le SQL Editor prod (`vpt...yxf`).
-3. Tu attends que GitHub Actions déploie l'edge function corrigée sur prod.
-4. Tu refais un paiement test carte → tu notes le `diag XXXXXXXX`.
-5. Tu colles ici le résultat de :
-   ```sql
-   select diagnostic_id, amount, amount_sent, http_status, keccel_code, keccel_description
-   from public.keccel_cardpay_diagnostics
-   where diagnostic_id = '<diag>'
-   order by created_at desc limit 1;
-   ```
+1. Tu pousses `main` → GitHub Actions déploie en ~2 min
+2. Tu refais un test paiement carte sur prod
+3. Tu me partages le diag XXXXXXXX
+4. Verdict attendu : `keccel_code = "0"` + `redirect_url` rempli → tu es redirigé sur `ap-gateway.mastercard.com`
 
-Si `keccel_code = "0"` → bingo, c'était bien le format `amount`. Si on reçoit encore "Missing parameter", on saura que ce n'est pas le montant et on passe à l'hypothèse credentials/habilitation merchant CardPay.
+## Si ça ne suffit pas (très peu probable)
+
+Cascade de hypothèses restantes, à tester dans l'ordre :
+- B. Caster aussi `amount` ET garder le format strict de la doc (clé `returnUrl` avec U majuscule — déjà OK chez nous)
+- C. Vérifier que `KECCEL_CARD_MERCHANT_CODE` correspond bien à `JAM…` (les 3 premiers chars du terminal `m=jam`)
+- D. Demander à Keccel d'activer/whitelister notre `callbackurl` Supabase
+
+Mais à 95% le cast en string règle l'affaire.
