@@ -18,6 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/contexts/I18nContext";
 
 /* ─── Helpers ─── */
 // Lot 18C : seuil aligné sur le heartbeat de présence (120 s focus, pause si onglet caché).
@@ -53,13 +54,13 @@ interface StoreRow {
 }
 
 /* ─── Sort options ─── */
-const SORT_OPTIONS = [
-  { value: "popular", label: "Plus populaires", icon: Flame },
-  { value: "rating", label: "Mieux notés", icon: Star },
-  { value: "sales", label: "Plus de ventes", icon: TrendingUp },
-  { value: "followers", label: "Plus d'abonnés", icon: Users },
-  { value: "products", label: "Plus d'articles", icon: Package },
-  { value: "newest", label: "Plus récents", icon: Clock },
+const SORT_OPTIONS: { value: string; labelKey: string; fallback: string; icon: React.ElementType }[] = [
+  { value: "popular", labelKey: "stores.sort.popular", fallback: "Plus populaires", icon: Flame },
+  { value: "rating", labelKey: "stores.sort.rating", fallback: "Mieux notés", icon: Star },
+  { value: "sales", labelKey: "stores.sort.sales", fallback: "Plus de ventes", icon: TrendingUp },
+  { value: "followers", labelKey: "stores.sort.followers", fallback: "Plus d'abonnés", icon: Users },
+  { value: "products", labelKey: "stores.sort.products", fallback: "Plus d'articles", icon: Package },
+  { value: "newest", labelKey: "stores.sort.newest", fallback: "Plus récents", icon: Clock },
 ];
 
 /* ─── Helpers ─── */
@@ -103,6 +104,7 @@ function StatPill({ icon: Icon, value, label, highlight = false }: {
 
 /* ─── Store Card ─── */
 function StoreCard({ store }: { store: StoreRow }) {
+  const { t, locale } = useI18n();
   const online = isStoreOnline(store);
   const followers = store.followers_override ?? store.followers_count ?? 0;
   const sales = store.sales_override ?? store.sales_count ?? 0;
@@ -141,13 +143,13 @@ function StoreCard({ store }: { store: StoreRow }) {
             )}
             <span className={`relative inline-flex h-2 w-2 rounded-full ${online ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
           </span>
-          {online ? "En ligne" : "Hors ligne"}
+          {online ? (t("stores.online") || "En ligne") : (t("stores.offline") || "Hors ligne")}
         </span>
 
         {/* Verified badge */}
         {verified && (
           <span className="absolute top-2.5 left-2.5 flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-semibold shadow-sm">
-            <ShieldCheck size={11} /> Vérifié
+            <ShieldCheck size={11} /> {t("stores.verified") || "Vérifié"}
             {verifiedYears > 0 && <span>· {verifiedYears}a</span>}
           </span>
         )}
@@ -197,18 +199,18 @@ function StoreCard({ store }: { store: StoreRow }) {
 
         {/* Stats */}
         <div className="flex flex-wrap gap-1.5">
-          <StatPill icon={TrendingUp} value={formatCount(sales)} label="ventes" highlight={sales > 50} />
-          <StatPill icon={Users} value={formatCount(followers)} label="abonnés" highlight={followers > 100} />
-          <StatPill icon={Package} value={formatCount(products)} label="articles" />
+          <StatPill icon={TrendingUp} value={formatCount(sales)} label={t("stores.sales") || "ventes"} highlight={sales > 50} />
+          <StatPill icon={Users} value={formatCount(followers)} label={t("stores.followers") || "abonnés"} highlight={followers > 100} />
+          <StatPill icon={Package} value={formatCount(products)} label={t("stores.products") || "articles"} />
         </div>
 
         {/* CTA */}
         <div className="mt-auto pt-2 flex items-center justify-between">
           <span className="text-[10px] text-muted-foreground">
-            Depuis {new Date(store.created_at).toLocaleDateString("fr-FR", { month: "short", year: "numeric" })}
+            {t("stores.since") || "Depuis"} {new Date(store.created_at).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { month: "short", year: "numeric" })}
           </span>
           <span className="flex items-center gap-1 text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <Eye size={13} /> Voir la boutique
+            <Eye size={13} /> {t("stores.viewStore") || "Voir la boutique"}
           </span>
         </div>
       </div>
@@ -241,15 +243,16 @@ function StoreCardSkeleton() {
 }
 
 /* ─── Filter Chips ─── */
-const FILTER_OPTIONS = [
-  { value: "all", label: "Tous", icon: Store },
-  { value: "verified", label: "Vérifiés", icon: ShieldCheck },
-  { value: "online", label: "En ligne", icon: Sparkles },
-  { value: "top_rated", label: "Top noté", icon: Crown },
+const FILTER_OPTIONS: { value: string; labelKey: string; fallback: string; icon: React.ElementType }[] = [
+  { value: "all", labelKey: "stores.filter.all", fallback: "Tous", icon: Store },
+  { value: "verified", labelKey: "stores.filter.verified", fallback: "Vérifiés", icon: ShieldCheck },
+  { value: "online", labelKey: "stores.filter.online", fallback: "En ligne", icon: Sparkles },
+  { value: "top_rated", labelKey: "stores.filter.topRated", fallback: "Top noté", icon: Crown },
 ];
 
 /* ═══════════════ PAGE ═══════════════ */
 export default function StoresPage() {
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("popular");
   const [filter, setFilter] = useState("all");
@@ -332,8 +335,8 @@ export default function StoresPage() {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title="Nos Fournisseurs — Marketplace"
-        description="Explorez les fournisseurs vérifiés de Zandofy. Comparez les boutiques, découvrez leurs produits et trouvez ceux qui correspondent à vos besoins."
+        title={t("stores.seo.title") || "Nos Fournisseurs — Marketplace"}
+        description={t("stores.seo.description") || "Explorez les fournisseurs vérifiés de Zandofy. Comparez les boutiques, découvrez leurs produits et trouvez ceux qui correspondent à vos besoins."}
         canonical="/stores"
       />
       <Header />
@@ -350,14 +353,14 @@ export default function StoresPage() {
           <div className="container relative z-10 text-center space-y-5">
             <div className="inline-flex items-center gap-2 rounded-full bg-primary-foreground/15 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-primary-foreground/90">
               <Store size={14} />
-              {isLoading ? "..." : `${totalStores} fournisseurs`} sur Zandofy
+              {isLoading ? "..." : `${totalStores} ${t("stores.hero.badgeSuffix") || "fournisseurs sur Zandofy"}`}
             </div>
 
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-primary-foreground tracking-tight">
-              Explorez nos <span className="underline decoration-primary-foreground/30 decoration-4 underline-offset-4">Fournisseurs</span>
+              {t("stores.hero.title") || "Explorez nos"} <span className="underline decoration-primary-foreground/30 decoration-4 underline-offset-4">{t("stores.hero.titleHighlight") || "Fournisseurs"}</span>
             </h1>
             <p className="text-sm md:text-base text-primary-foreground/80 max-w-xl mx-auto leading-relaxed">
-              Comparez les fournisseurs, découvrez leurs produits et trouvez ceux qui correspondent à vos besoins.
+              {t("stores.hero.subtitle") || "Comparez les fournisseurs, découvrez leurs produits et trouvez ceux qui correspondent à vos besoins."}
             </p>
 
             {/* Search bar */}
@@ -366,7 +369,7 @@ export default function StoresPage() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher un fournisseur..."
+                placeholder={t("stores.search.placeholder") || "Rechercher un fournisseur..."}
                 className="pl-10 pr-10 h-12 rounded-full bg-card border-border shadow-lg text-sm placeholder:text-muted-foreground/70"
               />
               {search && (
@@ -386,7 +389,7 @@ export default function StoresPage() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             {/* Filter chips */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none flex-1">
-              {FILTER_OPTIONS.map(({ value, label, icon: Icon }) => (
+              {FILTER_OPTIONS.map(({ value, labelKey, fallback, icon: Icon }) => (
                 <button
                   key={value}
                   onClick={() => setFilter(value)}
@@ -398,7 +401,7 @@ export default function StoresPage() {
                   )}
                 >
                   <Icon size={13} />
-                  {label}
+                  {t(labelKey) || fallback}
                 </button>
               ))}
             </div>
@@ -406,7 +409,7 @@ export default function StoresPage() {
             {/* Sort + count */}
             <div className="flex items-center gap-2.5 shrink-0">
               <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {filtered.length} résultat{filtered.length !== 1 ? "s" : ""}
+                {filtered.length} {filtered.length !== 1 ? (t("stores.results") || "résultats") : (t("stores.result") || "résultat")}
               </span>
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="h-8 w-[180px] text-xs rounded-full border-border">
@@ -414,10 +417,10 @@ export default function StoresPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {SORT_OPTIONS.map(({ value, label, icon: Icon }) => (
+                  {SORT_OPTIONS.map(({ value, labelKey, fallback, icon: Icon }) => (
                     <SelectItem key={value} value={value} className="text-xs">
                       <span className="flex items-center gap-1.5">
-                        <Icon size={12} /> {label}
+                        <Icon size={12} /> {t(labelKey) || fallback}
                       </span>
                     </SelectItem>
                   ))}
@@ -438,11 +441,11 @@ export default function StoresPage() {
           ) : filtered.length === 0 ? (
             <div className="text-center py-20 space-y-3">
               <Store size={48} className="mx-auto text-muted-foreground/20" />
-              <h2 className="text-lg font-semibold text-foreground">Aucun fournisseur trouvé</h2>
+              <h2 className="text-lg font-semibold text-foreground">{t("stores.empty.title") || "Aucun fournisseur trouvé"}</h2>
               <p className="text-sm text-muted-foreground">
                 {search
-                  ? `Aucun résultat pour « ${search} ». Essayez un autre terme.`
-                  : "Aucun fournisseur ne correspond aux filtres sélectionnés."}
+                  ? (t("stores.empty.search", { query: search }) || `Aucun résultat pour « ${search} ». Essayez un autre terme.`)
+                  : (t("stores.empty.noFilter") || "Aucun fournisseur ne correspond aux filtres sélectionnés.")}
               </p>
               {(search || filter !== "all") && (
                 <Button
@@ -451,7 +454,7 @@ export default function StoresPage() {
                   onClick={() => { setSearch(""); setFilter("all"); }}
                   className="mt-2"
                 >
-                  <X size={14} className="mr-1.5" /> Effacer les filtres
+                  <X size={14} className="mr-1.5" /> {t("stores.clearFilters") || "Effacer les filtres"}
                 </Button>
               )}
             </div>
@@ -468,7 +471,7 @@ export default function StoresPage() {
                     onClick={() => setVisibleCount((prev) => prev + 10)}
                     className="px-10 py-2.5 text-sm font-medium border border-foreground text-foreground bg-card hover:bg-foreground hover:text-card transition-colors"
                   >
-                    Voir plus
+                    {t("stores.viewMore") || "Voir plus"}
                   </button>
                 </div>
               )}

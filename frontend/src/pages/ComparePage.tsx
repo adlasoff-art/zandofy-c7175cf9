@@ -8,27 +8,27 @@ import { useI18n } from "@/contexts/I18nContext";
 
 export default function ComparePage() {
   const { items, removeFromCompare, clearCompare } = useCompare();
-  const { formatPrice } = useI18n();
+  const { formatPrice, t } = useI18n();
 
   const rows: { label: string; render: (p: typeof items[0]) => React.ReactNode }[] = [
-    { label: "Image", render: (p) => <img src={p.image} alt={p.nameFr} className="w-24 h-32 object-cover rounded-sm mx-auto" /> },
-    { label: "Nom", render: (p) => <Link to={`/product/${p.slug || p.id}`} className="text-sm font-medium text-primary hover:underline">{p.nameFr}</Link> },
-    { label: "Prix", render: (p) => (
+    { label: t("compare.row.image") || "Image", render: (p) => <img src={p.image} alt={p.nameFr} className="w-24 h-32 object-cover rounded-sm mx-auto" /> },
+    { label: t("compare.row.name") || "Nom", render: (p) => <Link to={`/product/${p.slug || p.id}`} className="text-sm font-medium text-primary hover:underline">{p.nameFr}</Link> },
+    { label: t("compare.row.price") || "Prix", render: (p) => (
       <div>
         <span className="font-bold text-foreground">{formatPrice(p.price)}</span>
         {p.originalPrice && <span className="text-xs text-muted-foreground line-through ml-1">{formatPrice(p.originalPrice)}</span>}
       </div>
     )},
-    { label: "Note", render: (p) => (
+    { label: t("compare.row.rating") || "Note", render: (p) => (
       <span className="inline-flex items-center gap-1 text-sm">
         <Star size={12} className="fill-accent text-accent" /> {p.rating || "—"}
       </span>
     )},
-    { label: "Avis", render: (p) => <span className="text-sm">{p.reviewCount}</span> },
-    { label: "Catégorie", render: (p) => <span className="text-sm text-muted-foreground">{p.categoryFr}</span> },
-    { label: "Origine", render: (p) => <span className="text-sm text-muted-foreground">{p.originCountry || "—"}</span> },
-    { label: "Matière", render: (p) => <span className="text-sm text-muted-foreground">{p.material || "—"}</span> },
-    { label: "Tailles", render: (p) => <span className="text-xs text-muted-foreground">{p.sizes?.join(", ") || "—"}</span> },
+    { label: t("compare.row.reviews") || "Avis", render: (p) => <span className="text-sm">{p.reviewCount}</span> },
+    { label: t("compare.row.category") || "Catégorie", render: (p) => <span className="text-sm text-muted-foreground">{p.categoryFr}</span> },
+    { label: t("compare.row.origin") || "Origine", render: (p) => <span className="text-sm text-muted-foreground">{p.originCountry || "—"}</span> },
+    { label: t("compare.row.material") || "Matière", render: (p) => <span className="text-sm text-muted-foreground">{p.material || "—"}</span> },
+    { label: t("compare.row.sizes") || "Tailles", render: (p) => <span className="text-xs text-muted-foreground">{p.sizes?.join(", ") || "—"}</span> },
   ];
 
   return (
@@ -36,16 +36,16 @@ export default function ComparePage() {
       <Header />
       <main className="container py-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-bold text-foreground">Comparateur ({items.length})</h1>
+          <h1 className="text-xl font-bold text-foreground">{t("compare.title") || "Comparateur"} ({items.length})</h1>
           {items.length > 0 && (
-            <Button variant="outline" size="sm" onClick={clearCompare}>Vider</Button>
+            <Button variant="outline" size="sm" onClick={clearCompare}>{t("compare.clear") || "Vider"}</Button>
           )}
         </div>
 
         {items.length < 2 ? (
           <div className="text-center py-20 text-muted-foreground">
-            <p>Ajoutez au moins 2 produits pour comparer.</p>
-            <Link to="/" className="text-primary underline mt-2 inline-block">Retour aux produits</Link>
+            <p>{t("compare.empty") || "Ajoutez au moins 2 produits pour comparer."}</p>
+            <Link to="/" className="text-primary underline mt-2 inline-block">{t("compare.backToProducts") || "Retour aux produits"}</Link>
           </div>
         ) : (
           <div className="overflow-x-auto">
