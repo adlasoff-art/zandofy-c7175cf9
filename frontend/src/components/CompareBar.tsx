@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { X, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import { useI18n } from "@/contexts/I18nContext";
 
 export function CompareBar() {
   const { items, removeFromCompare, clearCompare } = useCompare();
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   if (items.length === 0) return null;
 
@@ -43,11 +45,11 @@ export function CompareBar() {
           onClick={() => navigate("/compare")}
           className="whitespace-nowrap"
         >
-          Comparer <ArrowRight size={14} className="ml-1" />
+          {t("compare.bar.compare") || "Comparer"} <ArrowRight size={14} className="ml-1" />
         </Button>
 
         <button onClick={clearCompare} className="text-xs text-muted-foreground hover:text-foreground">
-          Vider
+          {t("compare.clear") || "Vider"}
         </button>
       </motion.div>
     </AnimatePresence>
