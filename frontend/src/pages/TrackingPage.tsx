@@ -397,6 +397,7 @@ function ConfirmationCodeEntry({ order, onConfirmed }: { order: OrderTrackingRes
 
 // ── Live Rider Tracking Map (bidirectional) ──
 function LiveRiderMap({ deliveryId, orderId, userId }: { deliveryId: string; orderId?: string; userId?: string }) {
+  const { t } = useI18n();
   const [riderLat, setRiderLat] = useState<number | null>(null);
   const [riderLng, setRiderLng] = useState<number | null>(null);
 
@@ -412,8 +413,8 @@ function LiveRiderMap({ deliveryId, orderId, userId }: { deliveryId: string; ord
     return (
       <div className="bg-muted/30 rounded-xl p-6 text-center">
         <Bike size={24} className="text-muted-foreground mx-auto mb-2" />
-        <p className="text-sm text-muted-foreground">En attente de la position du livreur...</p>
-        <p className="text-xs text-muted-foreground mt-1">Votre position GPS est partagée avec le livreur</p>
+        <p className="text-sm text-muted-foreground">{t("tracking.live.waiting")}</p>
+        <p className="text-xs text-muted-foreground mt-1">{t("tracking.live.shared")}</p>
       </div>
     );
   }
@@ -422,7 +423,7 @@ function LiveRiderMap({ deliveryId, orderId, userId }: { deliveryId: string; ord
     <div>
       <div className="flex items-center gap-2 mb-2">
         <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-        <span className="text-xs font-medium text-foreground">Livreur en route — GPS bidirectionnel actif</span>
+        <span className="text-xs font-medium text-foreground">{t("tracking.live.active")}</span>
       </div>
       <DeliveryMap riderLat={riderLat} riderLng={riderLng} showPolylines showEta className="h-[300px]" />
     </div>
