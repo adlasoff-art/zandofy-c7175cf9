@@ -268,6 +268,7 @@ Deno.serve(async (req) => {
       return_key_mode: "returnUrl" | "returnurl" | "both";
       extra?: Record<string, unknown>;
       label?: string;
+      key_case?: "lowercase" | "camelCase";
     };
     const attempts: Attempt[] = [
       { attempt_index: 1, auth_format: "bearer_normalized", return_key_mode: "returnUrl" },
@@ -293,6 +294,15 @@ Deno.serve(async (req) => {
       { attempt_index: 10, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
         label: "+country+channel",
         extra: { language: "fr", customerEmail, customerName, customerPhone, notifyUrl: callbackUrl, country: "CD", channel: "web" } },
+      // ---- camelCase strict : Keccel cite "returnUrl" en camelCase dans ses erreurs ----
+      { attempt_index: 11, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
+        label: "camelCase_full", key_case: "camelCase" },
+      { attempt_index: 12, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
+        label: "camelCase+customer", key_case: "camelCase",
+        extra: { customerEmail, customerName, customerPhone } },
+      { attempt_index: 13, auth_format: "bearer_normalized", return_key_mode: "returnUrl",
+        label: "camelCase+lang", key_case: "camelCase",
+        extra: { language: "fr" } },
     ];
 
     let keccelResponse: any = null;
@@ -303,7 +313,17 @@ Deno.serve(async (req) => {
     let success = false;
 
     for (const att of attempts) {
-      const payload: Record<string, unknown> = { ...basePayload };
+      const useCamel = att.key_case === "camelCase";
+      const payload: Record<string, unknown> = useCamel
+        ? {
+            merchantCode: basePayload.merchantcode,
+            reference: basePayload.reference,
+            amount: basePayload.amount,
+            currency: basePayload.currency,
+            description: basePayload.description,
+            callbackUrl: basePayload.callbackurl,
+          }
+        : { ...basePayload };
       if (att.return_key_mode === "returnUrl" || att.return_key_mode === "both") {
         payload.returnUrl = returnUrl;
       }
