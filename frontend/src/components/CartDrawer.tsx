@@ -18,7 +18,7 @@ export function CartDrawer() {
     toggleSelected, selectAll, deselectAll,
   } = useCart();
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t, formatPrice } = useI18n();
 
   const allSelected = items.length > 0 && items.every(i => i.selected);
   const noneSelected = items.every(i => !i.selected);
@@ -88,7 +88,7 @@ export function CartDrawer() {
                       {item.size && <span>{t("search.size")}: {item.size}</span>}
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-foreground">${(item.price * item.quantity).toFixed(2)}</span>
+                      <span className="font-bold text-foreground">{formatPrice(item.price * item.quantity)}</span>
                       <div className="flex items-center gap-1">
                         <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-7 h-7 flex items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground">
                           <Minus size={14} />
@@ -120,7 +120,7 @@ export function CartDrawer() {
             <div className="border-t border-border pt-4 space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t("cart.subtotal")} ({selectedCount} {t("cart.selected")})</span>
-                <span className="font-bold text-foreground">${selectedSubtotal.toFixed(2)}</span>
+                <span className="font-bold text-foreground">{formatPrice(selectedSubtotal)}</span>
               </div>
               {user && selectedCount > 0 && (
                 <CartFreightPreview
@@ -137,7 +137,7 @@ export function CartDrawer() {
                 </Button>
               ) : (
                 <Link to="/checkout" onClick={() => setDrawerOpen(false)}>
-                  <Button className="w-full h-12 font-bold">{t("cart.order")} ({selectedCount}) — ${selectedSubtotal.toFixed(2)}</Button>
+                  <Button className="w-full h-12 font-bold">{t("cart.order")} ({selectedCount}) — {formatPrice(selectedSubtotal)}</Button>
                 </Link>
               )}
             </div>

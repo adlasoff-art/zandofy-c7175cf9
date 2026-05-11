@@ -101,7 +101,7 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { t } = useI18n();
+  const { t, formatPrice } = useI18n();
   const { data: paymentConfig } = usePaymentMethods();
   const { isVerified: isKycVerified, isOrderBlocked, needsKyc, kycStatus } = useKycStatus();
 
@@ -1527,21 +1527,21 @@ export default function CheckoutPage() {
                       freightOffersAvailable > 0 && !selectedFreightOffer;
                     const amountLabel = awaitingForwarderChoice
                       ? "—"
-                      : `$${shippingCost.toFixed(2)}`;
+                      : formatPrice(shippingCost);
                     return (
                     <div className="pt-3 border-t border-border space-y-2">
                       <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                        <Truck size={14} className="text-primary" /> Paiement des frais d'expédition
+                        <Truck size={14} className="text-primary" /> {t("checkout.shippingPaymentTitle") || "Paiement des frais d'expédition"}
                       </p>
                       {awaitingForwarderChoice && (
                         <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                          Sélectionnez un transitaire ci-dessus pour voir le montant exact.
+                          {t("checkout.selectForwarderHint") || "Sélectionnez un transitaire ci-dessus pour voir le montant exact."}
                         </p>
                       )}
                       <div className="space-y-2">
                         {[
-                          { key: "pay_now" as const, label: "Payer maintenant", desc: `Inclure ${amountLabel} dans le total` },
-                          { key: "pay_on_arrival" as const, label: "Payer à l'arrivée au Hub", desc: `Régler ${amountLabel} quand le colis arrive au hub (avant livraison)` },
+                          { key: "pay_now" as const, label: t("checkout.payNow") || "Payer maintenant", desc: `${t("checkout.includeInTotal") || "Inclure"} ${amountLabel} ${t("checkout.inTotal") || "dans le total"}` },
+                          { key: "pay_on_arrival" as const, label: t("checkout.payOnHubArrival") || "Payer à l'arrivée au Hub", desc: `${t("checkout.payOnHubArrivalDesc") || "Régler"} ${amountLabel} ${t("checkout.payOnHubArrivalDesc2") || "quand le colis arrive au hub (avant livraison)"}` },
                         ].map(opt => (
                           <button
                             key={opt.key}
@@ -1584,7 +1584,7 @@ export default function CheckoutPage() {
                             : !hasOperatorCoverage
                               ? "Aucun livreur ne dessert encore votre quartier"
                               : lastMileResult && lastMileResult.fee > 0
-                                ? `Frais estimés : $${lastMileResult.fee.toFixed(2)}`
+                                ? `${t("checkout.estimatedFees") || "Frais estimés"} : ${formatPrice(lastMileResult.fee)}`
                                 : "Recevez votre colis directement chez vous",
                           disabled: (lastMileResult ? !lastMileResult.deliverable : false) || (!operatorCoverageLoading && !hasOperatorCoverage),
                         },
@@ -1671,11 +1671,11 @@ export default function CheckoutPage() {
                     {/* Last-mile payment choice */}
                     {deliveryOption === "home_delivery" && lastMileResult?.deliverable && lastMileFee > 0 && !hasActiveDeliverySub && (
                       <div className="bg-muted/50 rounded-lg p-3 space-y-2 mt-2">
-                        <p className="text-xs font-medium text-foreground">Paiement de la livraison locale : ${lastMileFee.toFixed(2)}</p>
+                        <p className="text-xs font-medium text-foreground">{t("checkout.localDeliveryPayment") || "Paiement de la livraison locale"} : {formatPrice(lastMileFee)}</p>
                         <div className="space-y-1.5">
                           {[
-                            { key: "pay_with_shipping" as LastMilePayment, label: "Inclure dans le total", desc: `Ajouter $${lastMileFee.toFixed(2)} au paiement` },
-                            { key: "pay_cash_on_delivery" as LastMilePayment, label: "Payer à la réception", desc: "Régler au livreur à la livraison" },
+                            { key: "pay_with_shipping" as LastMilePayment, label: t("checkout.includeInTotal") || "Inclure dans le total", desc: `${t("checkout.addToPayment") || "Ajouter"} ${formatPrice(lastMileFee)} ${t("checkout.toPayment") || "au paiement"}` },
+                            { key: "pay_cash_on_delivery" as LastMilePayment, label: t("checkout.payOnDelivery") || "Payer à la réception", desc: t("checkout.payOnDeliveryDesc") || "Régler au livreur à la livraison" },
                           ].map(opt => (
                             <button
                               key={opt.key}
@@ -1930,7 +1930,7 @@ export default function CheckoutPage() {
                 {paymentMethod === "cod" && (
                   <div className="pt-2 border-t border-border">
                     <p className="text-sm text-muted-foreground">
-                      Montant à payer à la livraison : <strong className="text-foreground">${total.toFixed(2)}</strong>
+                      {t("checkout.codAmountDue") || "Montant à payer à la livraison"} : <strong className="text-foreground">{formatPrice(total)}</strong>
                     </p>
                   </div>
                 )}
@@ -1938,7 +1938,7 @@ export default function CheckoutPage() {
                 {paymentMethod === "off_platform" && (
                   <div className="pt-2 border-t border-border space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      Montant à payer : <strong className="text-foreground">${total.toFixed(2)}</strong>
+                      {t("checkout.amountDue") || "Montant à payer"} : <strong className="text-foreground">{formatPrice(total)}</strong>
                     </p>
 
                     {/* Payment numbers */}
@@ -1996,7 +1996,7 @@ export default function CheckoutPage() {
                       {processing ? (
                         <><Loader2 size={16} className="animate-spin mr-2" /> {t("checkout.processing")}</>
                       ) : (
-                        `${t("checkout.placeOrder")} — $${total.toFixed(2)}`
+                        `${t("checkout.placeOrder")} — ${formatPrice(total)}`
                       )}
                     </Button>
                     {!termsAccepted && (
@@ -2034,7 +2034,7 @@ export default function CheckoutPage() {
                 )}
                 {appliedCoupon && (
                   <p className="text-sm text-primary font-medium">
-                    {t("checkout.promoCode")} {appliedCoupon.code} — -${discountAmount.toFixed(2)}
+                    {t("checkout.promoCode")} {appliedCoupon.code} — -{formatPrice(discountAmount)}
                   </p>
                 )}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
@@ -2074,7 +2074,7 @@ export default function CheckoutPage() {
                           {item.size && <span>{item.size}</span>}
                           <span>× {item.quantity}</span>
                         </div>
-                        <p className="text-sm font-bold text-foreground">${(item.price * item.quantity).toFixed(2)}</p>
+                        <p className="text-sm font-bold text-foreground">{formatPrice(item.price * item.quantity)}</p>
                       </div>
                     </div>
                   ))}
@@ -2159,7 +2159,7 @@ export default function CheckoutPage() {
                           onChange={e => setPointsToUse(Number(e.target.value))}
                           className="flex-1 accent-primary"
                         />
-                        <span className="text-sm font-bold text-primary w-24 text-right">{pointsToUse} pts (${(pointsToUse / pointsPerDollar).toFixed(2)})</span>
+                        <span className="text-sm font-bold text-primary w-24 text-right">{pointsToUse} pts ({formatPrice(pointsToUse / pointsPerDollar)})</span>
                       </div>
                     )}
                   </div>
@@ -2177,69 +2177,69 @@ export default function CheckoutPage() {
                 <div className="border-t border-border pt-3 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">{t("cart.subtotal")}</span>
-                    <span className="text-foreground">${subtotal.toFixed(2)}</span>
+                    <span className="text-foreground">{formatPrice(subtotal)}</span>
                   </div>
                   {couponDiscount > 0 && (
                     <div className="flex justify-between text-primary">
                       <span>{t("checkout.promoCode")}</span>
-                      <span>-${couponDiscount.toFixed(2)}</span>
+                      <span>-{formatPrice(couponDiscount)}</span>
                     </div>
                   )}
                   {loyaltyDiscount > 0 && (
                     <div className="flex justify-between text-primary">
                       <span>{loyaltyBadge} (-{loyaltyPct}%)</span>
-                      <span>-${loyaltyDiscount.toFixed(2)}</span>
+                      <span>-{formatPrice(loyaltyDiscount)}</span>
                     </div>
                   )}
                   {pointsDiscount > 0 && (
                     <div className="flex justify-between text-primary">
                       <span>ZandoPoints</span>
-                      <span>-${pointsDiscount.toFixed(2)}</span>
+                      <span>-{formatPrice(pointsDiscount)}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Expédition ({shippingMode})</span>
+                    <span className="text-muted-foreground">{t("checkout.shipping")} ({shippingMode})</span>
                     {shippingPaymentChoice === "pay_on_arrival" && shippingCost > 0 ? (
                       <span className="text-amber-600 font-medium text-xs">
-                        ${shippingCost.toFixed(2)} — à l'arrivée
+                        {formatPrice(shippingCost)} — {t("checkout.onArrival") || "à l'arrivée"}
                       </span>
                     ) : (
                       <span className={shippingCost === 0 ? "text-primary font-medium" : "text-foreground"}>
-                        {shippingCost === 0 ? t("cart.free") : `$${shippingCost.toFixed(2)}`}
+                        {shippingCost === 0 ? t("cart.free") : formatPrice(shippingCost)}
                       </span>
                     )}
                   </div>
                   {deliveryOption === "home_delivery" && hasActiveDeliverySub && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Livraison locale</span>
-                      <span className="text-primary font-medium text-xs">Incluse (forfait {deliverySubName})</span>
+                      <span className="text-muted-foreground">{t("checkout.localDelivery") || "Livraison locale"}</span>
+                      <span className="text-primary font-medium text-xs">{t("checkout.includedPlan") || "Incluse (forfait"} {deliverySubName})</span>
                     </div>
                   )}
                   {deliveryOption === "home_delivery" && lastMileFee > 0 && !hasActiveDeliverySub && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Livraison locale</span>
+                      <span className="text-muted-foreground">{t("checkout.localDelivery") || "Livraison locale"}</span>
                       {lastMilePayment === "pay_cash_on_delivery" ? (
-                        <span className="text-amber-600 font-medium text-xs">${lastMileFee.toFixed(2)} — à la réception</span>
+                        <span className="text-amber-600 font-medium text-xs">{formatPrice(lastMileFee)} — {t("checkout.onReceipt") || "à la réception"}</span>
                       ) : (
-                        <span className="text-foreground">${lastMileFee.toFixed(2)}</span>
+                        <span className="text-foreground">{formatPrice(lastMileFee)}</span>
                       )}
                     </div>
                   )}
                   {deliveryOption === "hub_pickup" && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Livraison</span>
-                      <span className="text-primary font-medium">Retrait Hub (gratuit)</span>
+                      <span className="text-muted-foreground">{t("checkout.delivery") || "Livraison"}</span>
+                      <span className="text-primary font-medium">{t("checkout.hubPickupFree") || "Retrait Hub (gratuit)"}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-bold text-foreground pt-2 border-t border-border text-base">
                     <span>{t("cart.total")}</span>
-                    <span>${total.toFixed(2)}</span>
+                    <span>{formatPrice(total)}</span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <ShieldCheck size={14} className="text-primary shrink-0" />
-                  <span>Paiement 100% sécurisé · Données chiffrées</span>
+                  <span>{t("checkout.securePayment")}</span>
                 </div>
               </div>
             </div>
