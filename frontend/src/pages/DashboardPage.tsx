@@ -532,6 +532,7 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
   statusHistory: StatusHistoryRow[];
   onCancelSuccess: () => void;
 }) {
+  const { t, locale, formatPrice } = useI18n();
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(0);
@@ -575,7 +576,7 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Rechercher par référence..."
+            placeholder={t("dashboard.orders.searchPlaceholder")}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="pl-9 h-9 text-sm"
@@ -592,17 +593,17 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
                   : "bg-card text-muted-foreground border-border hover:border-foreground"
               }`}
             >
-              {f.label}
+              {t(f.labelKey)}
             </button>
           ))}
         </div>
       </div>
 
       {/* Count */}
-      <p className="text-xs text-muted-foreground">{filtered.length} commande{filtered.length > 1 ? "s" : ""}</p>
+      <p className="text-xs text-muted-foreground">{t(filtered.length > 1 ? "dashboard.orders.countPlural" : "dashboard.orders.count", { count: filtered.length })}</p>
 
       {filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-12">Aucune commande trouvée.</p>
+        <p className="text-sm text-muted-foreground text-center py-12">{t("dashboard.orders.empty")}</p>
       ) : (
         <div className="space-y-2">
           {paginated.map(order => {
@@ -622,19 +623,19 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {new Date(order.created_at).toLocaleDateString("fr-FR")} · ${Number(order.total).toFixed(2)}
+                    {new Date(order.created_at).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR")} · {formatPrice(Number(order.total))}
                     {order.coupon_code && ` · 🏷️ ${order.coupon_code}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {canRetryPayment && (
                     <button onClick={() => setRetryOrder(order)} className="text-xs text-primary font-medium flex items-center gap-0.5">
-                      <CreditCard size={12} /> Payer
+                      <CreditCard size={12} /> {t("dashboard.orders.pay")}
                     </button>
                   )}
                   {canCancel && <CancelOrderButton orderId={order.id} orderRef={order.order_ref} onSuccess={onCancelSuccess} small />}
                   <button onClick={() => setSelectedOrder(order.id)} className="text-xs text-primary font-medium flex items-center gap-0.5">
-                    Détails <ChevronRight size={12} />
+                    {t("dashboard.orders.details")} <ChevronRight size={12} />
                   </button>
                 </div>
               </div>
