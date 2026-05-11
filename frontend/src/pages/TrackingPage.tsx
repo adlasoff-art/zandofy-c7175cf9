@@ -702,7 +702,7 @@ export default function TrackingPage() {
 
               <TabsContent value="order">
                 <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input placeholder="Ex: ORD-ABC123" value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
+                  <Input placeholder={t("tracking.placeholder.order")} value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
                   <Button type="submit" disabled={loading || !query.trim()}>
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                     <span className="ml-2 hidden sm:inline">{t("tracking.track")}</span>
@@ -713,7 +713,7 @@ export default function TrackingPage() {
 
               <TabsContent value="shipment">
                 <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input placeholder="Ex: AWB-2026-001" value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
+                  <Input placeholder={t("tracking.placeholder.shipment")} value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
                   <Button type="submit" disabled={loading || !query.trim()}>
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                     <span className="ml-2 hidden sm:inline">{t("tracking.search")}</span>
@@ -723,7 +723,7 @@ export default function TrackingPage() {
 
               <TabsContent value="delivery">
                 <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input placeholder="Ex: ORD-ABC123" value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
+                  <Input placeholder={t("tracking.placeholder.order")} value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
                   <Button type="submit" disabled={loading || !query.trim()}>
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                     <span className="ml-2 hidden sm:inline">{t("tracking.search")}</span>
@@ -733,7 +733,7 @@ export default function TrackingPage() {
 
               <TabsContent value="global">
                 <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input placeholder="DHL, FedEx, UPS, EMS..." value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
+                  <Input placeholder={t("tracking.placeholder.global")} value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
                   <Button type="submit" disabled={loading || !query.trim()}>
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <Globe size={16} />}
                     <span className="ml-2 hidden sm:inline">{t("tracking.tracker")}</span>
