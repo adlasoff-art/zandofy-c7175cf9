@@ -10,9 +10,9 @@ const PAGE_SIZE = 24;
 
 // Category-based sections to show between Tendances and Voir Plus
 const CATEGORY_SECTIONS = [
-  { categoryName: "Fashion", labelFr: "👗 Mode Femme", icon: Users },
-  { categoryName: "Electronics", labelFr: "📱 Électronique", icon: TrendingUp },
-  { categoryName: "Home & Living", labelFr: "🏠 Maison & Déco", icon: TrendingUp },
+  { categoryName: "Fashion", labelKey: "home.womenFashion", labelFr: "👗 Mode Femme", icon: Users },
+  { categoryName: "Electronics", labelKey: "home.electronics", labelFr: "📱 Électronique", icon: TrendingUp },
+  { categoryName: "Home & Living", labelKey: "home.homeLiving", labelFr: "🏠 Maison & Déco", icon: TrendingUp },
 ];
 
 export function ProductGrid() {
@@ -141,7 +141,7 @@ export function ProductGrid() {
       })
       .catch((err) => {
         console.error("[ProductGrid] Load failed:", err);
-        setError(err.message || "Erreur de chargement");
+        setError(err.message || (t("common.loadProductsFailed") || "Erreur de chargement"));
         setLoading(false);
       });
   }, [activeTab, retryKey]);
@@ -259,12 +259,12 @@ export function ProductGrid() {
         {/* Main grid */}
         {error ? (
           <div className="text-center py-10">
-            <p className="text-sm text-muted-foreground mb-3">Impossible de charger les produits</p>
+            <p className="text-sm text-muted-foreground mb-3">{t("common.loadProductsFailed") || "Impossible de charger les produits"}</p>
             <button
               onClick={() => setRetryKey((k) => k + 1)}
               className="px-6 py-2 text-sm font-medium border border-foreground text-foreground bg-card hover:bg-foreground hover:text-card transition-colors"
             >
-              Réessayer
+              {t("common.retry") || "Réessayer"}
             </button>
           </div>
         ) : (
