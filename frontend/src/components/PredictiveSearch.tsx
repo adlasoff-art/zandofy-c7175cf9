@@ -155,7 +155,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
 
   const processVisualSearch = async (file: File) => {
     if (file.size > 10 * 1024 * 1024) {
-      toast({ title: "Image trop volumineuse", description: "Maximum 10 Mo.", variant: "destructive" });
+      toast({ title: t("visualSearch.tooLarge") || "Image trop volumineuse", description: t("visualSearch.tooLargeDesc") || "Maximum 10 Mo.", variant: "destructive" });
       return;
     }
     setVisualLoading(true);
@@ -170,11 +170,11 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
       navigate("/search?visual=true");
       onClose?.();
       if (!data?.products?.length) {
-        toast({ title: "Aucun produit trouvé", description: "Les mots-clés détectés sont affichés sur la page." });
+        toast({ title: t("visualSearch.noProducts") || "Aucun produit trouvé", description: t("visualSearch.noProductsDesc") || "Les mots-clés détectés sont affichés sur la page." });
       }
     } catch (err) {
       console.error("Visual search error:", err);
-      toast({ title: "Erreur", description: "Impossible d'analyser l'image.", variant: "destructive" });
+      toast({ title: t("visualSearch.error") || "Erreur", description: t("visualSearch.errorDesc") || "Impossible d'analyser l'image.", variant: "destructive" });
     } finally {
       setVisualLoading(false);
     }
@@ -319,7 +319,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
                 {/* Preview panel (desktop only) */}
                 {!mobile && hoveredSuggestion && (
                   <div className="hidden md:block w-64 border-l border-border bg-muted/30 p-3">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Aperçu</p>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">{t("search.preview") || "Aperçu"}</p>
                     {previewLoading ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 size={16} className="animate-spin text-muted-foreground" />
@@ -342,7 +342,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground text-center py-4">Aucun aperçu</p>
+                      <p className="text-xs text-muted-foreground text-center py-4">{t("search.noPreview") || "Aucun aperçu"}</p>
                     )}
                   </div>
                 )}
@@ -370,7 +370,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
                 {/* Search history */}
                 {searchHistory.length > 0 && (
                   <>
-                    <p className="px-3 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Historique</p>
+                    <p className="px-3 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t("search.history") || "Historique"}</p>
                     {searchHistory.map((term) => (
                       <button
                         key={term}
@@ -416,7 +416,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
             onDrop={handleDrop}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-foreground">Recherche par image</h3>
+              <h3 className="text-lg font-bold text-foreground">{t("visualSearch.title") || "Recherche par image"}</h3>
               <button onClick={() => setVisualModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors">
                 <X size={18} className="text-muted-foreground" />
               </button>
@@ -429,8 +429,8 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
               }`}
             >
               <ImageIcon size={48} className="mx-auto text-muted-foreground mb-3" />
-              <p className="text-sm text-foreground font-medium mb-1">Glissez-déposez une image ici</p>
-              <p className="text-xs text-muted-foreground mb-4">ou choisissez une option ci-dessous</p>
+              <p className="text-sm text-foreground font-medium mb-1">{t("visualSearch.dropHere") || "Glissez-déposez une image ici"}</p>
+              <p className="text-xs text-muted-foreground mb-4">{t("visualSearch.orChoose") || "ou choisissez une option ci-dessous"}</p>
 
               <div className="flex flex-col sm:flex-row gap-2 justify-center">
                 {/* Upload from device */}
@@ -439,7 +439,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
                   className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
                 >
                   <Upload size={16} />
-                  Importer une image
+                  {t("visualSearch.uploadImage") || "Importer une image"}
                 </button>
 
                 {/* Camera capture (mobile) */}
@@ -448,7 +448,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
                   className="flex items-center justify-center gap-2 px-4 py-2.5 bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors md:hidden"
                 >
                   <Camera size={16} />
-                  Prendre une photo
+                  {t("visualSearch.takePhoto") || "Prendre une photo"}
                 </button>
 
                 {/* Paste from clipboard */}
@@ -456,13 +456,13 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
                   onClick={handlePaste}
                   className="hidden md:flex items-center justify-center gap-2 px-4 py-2.5 bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors"
                 >
-                  Coller (Ctrl+V)
+                  {t("visualSearch.paste") || "Coller (Ctrl+V)"}
                 </button>
               </div>
             </div>
 
             <p className="text-[10px] text-muted-foreground text-center mt-3">
-              Formats supportés: JPG, PNG, WEBP • Max 5 Mo
+              {t("visualSearch.formats") || "Formats supportés: JPG, PNG, WEBP • Max 5 Mo"}
             </p>
 
             {/* Hidden file inputs */}
