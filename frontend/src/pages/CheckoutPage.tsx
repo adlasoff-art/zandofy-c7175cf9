@@ -1930,7 +1930,7 @@ export default function CheckoutPage() {
                 {paymentMethod === "cod" && (
                   <div className="pt-2 border-t border-border">
                     <p className="text-sm text-muted-foreground">
-                      Montant à payer à la livraison : <strong className="text-foreground">${total.toFixed(2)}</strong>
+                      {t("checkout.codAmountDue") || "Montant à payer à la livraison"} : <strong className="text-foreground">{formatPrice(total)}</strong>
                     </p>
                   </div>
                 )}
@@ -1938,7 +1938,7 @@ export default function CheckoutPage() {
                 {paymentMethod === "off_platform" && (
                   <div className="pt-2 border-t border-border space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      Montant à payer : <strong className="text-foreground">${total.toFixed(2)}</strong>
+                      {t("checkout.amountDue") || "Montant à payer"} : <strong className="text-foreground">{formatPrice(total)}</strong>
                     </p>
 
                     {/* Payment numbers */}
@@ -1996,7 +1996,7 @@ export default function CheckoutPage() {
                       {processing ? (
                         <><Loader2 size={16} className="animate-spin mr-2" /> {t("checkout.processing")}</>
                       ) : (
-                        `${t("checkout.placeOrder")} — $${total.toFixed(2)}`
+                        `${t("checkout.placeOrder")} — ${formatPrice(total)}`
                       )}
                     </Button>
                     {!termsAccepted && (
@@ -2034,7 +2034,7 @@ export default function CheckoutPage() {
                 )}
                 {appliedCoupon && (
                   <p className="text-sm text-primary font-medium">
-                    {t("checkout.promoCode")} {appliedCoupon.code} — -${discountAmount.toFixed(2)}
+                    {t("checkout.promoCode")} {appliedCoupon.code} — -{formatPrice(discountAmount)}
                   </p>
                 )}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
@@ -2074,7 +2074,7 @@ export default function CheckoutPage() {
                           {item.size && <span>{item.size}</span>}
                           <span>× {item.quantity}</span>
                         </div>
-                        <p className="text-sm font-bold text-foreground">${(item.price * item.quantity).toFixed(2)}</p>
+                        <p className="text-sm font-bold text-foreground">{formatPrice(item.price * item.quantity)}</p>
                       </div>
                     </div>
                   ))}
@@ -2159,7 +2159,7 @@ export default function CheckoutPage() {
                           onChange={e => setPointsToUse(Number(e.target.value))}
                           className="flex-1 accent-primary"
                         />
-                        <span className="text-sm font-bold text-primary w-24 text-right">{pointsToUse} pts (${(pointsToUse / pointsPerDollar).toFixed(2)})</span>
+                        <span className="text-sm font-bold text-primary w-24 text-right">{pointsToUse} pts ({formatPrice(pointsToUse / pointsPerDollar)})</span>
                       </div>
                     )}
                   </div>
@@ -2177,69 +2177,69 @@ export default function CheckoutPage() {
                 <div className="border-t border-border pt-3 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">{t("cart.subtotal")}</span>
-                    <span className="text-foreground">${subtotal.toFixed(2)}</span>
+                    <span className="text-foreground">{formatPrice(subtotal)}</span>
                   </div>
                   {couponDiscount > 0 && (
                     <div className="flex justify-between text-primary">
                       <span>{t("checkout.promoCode")}</span>
-                      <span>-${couponDiscount.toFixed(2)}</span>
+                      <span>-{formatPrice(couponDiscount)}</span>
                     </div>
                   )}
                   {loyaltyDiscount > 0 && (
                     <div className="flex justify-between text-primary">
                       <span>{loyaltyBadge} (-{loyaltyPct}%)</span>
-                      <span>-${loyaltyDiscount.toFixed(2)}</span>
+                      <span>-{formatPrice(loyaltyDiscount)}</span>
                     </div>
                   )}
                   {pointsDiscount > 0 && (
                     <div className="flex justify-between text-primary">
                       <span>ZandoPoints</span>
-                      <span>-${pointsDiscount.toFixed(2)}</span>
+                      <span>-{formatPrice(pointsDiscount)}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Expédition ({shippingMode})</span>
+                    <span className="text-muted-foreground">{t("checkout.shipping")} ({shippingMode})</span>
                     {shippingPaymentChoice === "pay_on_arrival" && shippingCost > 0 ? (
                       <span className="text-amber-600 font-medium text-xs">
-                        ${shippingCost.toFixed(2)} — à l'arrivée
+                        {formatPrice(shippingCost)} — {t("checkout.onArrival") || "à l'arrivée"}
                       </span>
                     ) : (
                       <span className={shippingCost === 0 ? "text-primary font-medium" : "text-foreground"}>
-                        {shippingCost === 0 ? t("cart.free") : `$${shippingCost.toFixed(2)}`}
+                        {shippingCost === 0 ? t("cart.free") : formatPrice(shippingCost)}
                       </span>
                     )}
                   </div>
                   {deliveryOption === "home_delivery" && hasActiveDeliverySub && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Livraison locale</span>
-                      <span className="text-primary font-medium text-xs">Incluse (forfait {deliverySubName})</span>
+                      <span className="text-muted-foreground">{t("checkout.localDelivery") || "Livraison locale"}</span>
+                      <span className="text-primary font-medium text-xs">{t("checkout.includedPlan") || "Incluse (forfait"} {deliverySubName})</span>
                     </div>
                   )}
                   {deliveryOption === "home_delivery" && lastMileFee > 0 && !hasActiveDeliverySub && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Livraison locale</span>
+                      <span className="text-muted-foreground">{t("checkout.localDelivery") || "Livraison locale"}</span>
                       {lastMilePayment === "pay_cash_on_delivery" ? (
-                        <span className="text-amber-600 font-medium text-xs">${lastMileFee.toFixed(2)} — à la réception</span>
+                        <span className="text-amber-600 font-medium text-xs">{formatPrice(lastMileFee)} — {t("checkout.onReceipt") || "à la réception"}</span>
                       ) : (
-                        <span className="text-foreground">${lastMileFee.toFixed(2)}</span>
+                        <span className="text-foreground">{formatPrice(lastMileFee)}</span>
                       )}
                     </div>
                   )}
                   {deliveryOption === "hub_pickup" && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Livraison</span>
-                      <span className="text-primary font-medium">Retrait Hub (gratuit)</span>
+                      <span className="text-muted-foreground">{t("checkout.delivery") || "Livraison"}</span>
+                      <span className="text-primary font-medium">{t("checkout.hubPickupFree") || "Retrait Hub (gratuit)"}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-bold text-foreground pt-2 border-t border-border text-base">
                     <span>{t("cart.total")}</span>
-                    <span>${total.toFixed(2)}</span>
+                    <span>{formatPrice(total)}</span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <ShieldCheck size={14} className="text-primary shrink-0" />
-                  <span>Paiement 100% sécurisé · Données chiffrées</span>
+                  <span>{t("checkout.securePayment")}</span>
                 </div>
               </div>
             </div>
