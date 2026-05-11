@@ -1453,6 +1453,7 @@ function TrackingStepper({ status, statusHistory, orderRef, trackingNumber }: { 
 
 /** Client chooses between home delivery or hub pickup */
 function DeliveryChoicePanel({ order }: { order: OrderRow }) {
+  const { t, formatPrice } = useI18n();
   const { toast } = useToast();
   const [choosing, setChoosing] = useState(false);
 
@@ -1471,22 +1472,20 @@ function DeliveryChoicePanel({ order }: { order: OrderRow }) {
     const { error } = await supabase.from("orders").update(updates).eq("id", order.id);
     setChoosing(false);
     if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      toast({ title: t("dashboard.deliveryChoice.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: choice === "home_delivery" ? "Livraison à domicile sélectionnée — Payez les frais pour définir la date de livraison." : "Retrait au Hub sélectionné — Aucun frais de livraison." });
+      toast({ title: choice === "home_delivery" ? t("dashboard.deliveryChoice.toastHome") : t("dashboard.deliveryChoice.toastHub") });
       window.location.reload();
     }
   };
 
   return (
     <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3">
-      <p className="text-sm font-bold text-foreground">🏠 Choisissez votre mode de réception</p>
-      <p className="text-xs text-muted-foreground">
-        Votre commande est arrivée au Hub ! Vous pouvez la récupérer gratuitement ou opter pour une livraison à domicile.
-      </p>
+      <p className="text-sm font-bold text-foreground">{t("dashboard.deliveryChoice.title")}</p>
+      <p className="text-xs text-muted-foreground">{t("dashboard.deliveryChoice.desc")}</p>
       {order.last_mile_fee != null && Number(order.last_mile_fee) > 0 && (
         <p className="text-xs text-muted-foreground">
-          Frais de livraison à domicile : <strong className="text-foreground">${Number(order.last_mile_fee).toFixed(2)}</strong>
+          {t("dashboard.deliveryChoice.fee")} <strong className="text-foreground">{formatPrice(Number(order.last_mile_fee))}</strong>
         </p>
       )}
       <div className="flex gap-2">
@@ -1495,14 +1494,14 @@ function DeliveryChoicePanel({ order }: { order: OrderRow }) {
           disabled={choosing}
           className="flex-1 px-3 py-2.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
         >
-          {choosing ? <Loader2 size={12} className="animate-spin mx-auto" /> : "🚚 Livraison à domicile"}
+          {choosing ? <Loader2 size={12} className="animate-spin mx-auto" /> : t("dashboard.deliveryChoice.home")}
         </button>
         <button
           onClick={() => handleChoice("hub_pickup")}
           disabled={choosing}
           className="flex-1 px-3 py-2.5 text-xs font-medium bg-card text-foreground border border-border rounded-lg hover:bg-muted disabled:opacity-50"
         >
-          🏪 Retrait au Hub (gratuit)
+          {t("dashboard.deliveryChoice.hub")}
         </button>
       </div>
     </div>
@@ -1511,6 +1510,7 @@ function DeliveryChoicePanel({ order }: { order: OrderRow }) {
 
 /** Client picks delivery date & time after paying last-mile */
 function DeliveryDatePicker({ orderId, onSaved }: { orderId: string; onSaved: () => void }) {
+  const { t } = useI18n();
   const { toast } = useToast();
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -1519,7 +1519,7 @@ function DeliveryDatePicker({ orderId, onSaved }: { orderId: string; onSaved: ()
   const minDate = new Date(Date.now() + 86400000).toISOString().split("T")[0]; // tomorrow
 
   const handleSave = async () => {
-    if (!date) { toast({ title: "Date requise", variant: "destructive" }); return; }
+    if (!date) { toast({ title: t("dashboard.deliveryDate.required"), variant: "destructive" }); return; }
     setSaving(true);
     const { error } = await supabase.from("orders").update({
       delivery_date_requested: date,
@@ -1527,32 +1527,32 @@ function DeliveryDatePicker({ orderId, onSaved }: { orderId: string; onSaved: ()
     } as any).eq("id", orderId);
     setSaving(false);
     if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      toast({ title: t("dashboard.deliveryDate.error"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Date de livraison enregistrée !" });
+      toast({ title: t("dashboard.deliveryDate.saved") });
       onSaved();
     }
   };
 
   return (
     <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3">
-      <p className="text-sm font-bold text-foreground">📅 Définir la date de livraison</p>
-      <p className="text-xs text-muted-foreground">Choisissez quand vous souhaitez être livré. Le livreur sera assigné en fonction de cette date.</p>
+      <p className="text-sm font-bold text-foreground">{t("dashboard.deliveryDate.title")}</p>
+      <p className="text-xs text-muted-foreground">{t("dashboard.deliveryDate.desc")}</p>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">Date</label>
+          <label className="text-xs text-muted-foreground block mb-1">{t("dashboard.deliveryDate.date")}</label>
           <input type="date" min={minDate} value={date} onChange={e => setDate(e.target.value)}
             className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg" style={{ fontSize: "16px" }} />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">Heure (optionnel)</label>
+          <label className="text-xs text-muted-foreground block mb-1">{t("dashboard.deliveryDate.time")}</label>
           <input type="time" value={time} onChange={e => setTime(e.target.value)}
             className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg" style={{ fontSize: "16px" }} />
         </div>
       </div>
       <Button size="sm" className="w-full gap-2" onClick={handleSave} disabled={saving || !date}>
         {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-        Confirmer la date
+        {t("dashboard.deliveryDate.confirm")}
       </Button>
     </div>
   );
@@ -1560,6 +1560,7 @@ function DeliveryDatePicker({ orderId, onSaved }: { orderId: string; onSaved: ()
 
 /** Client enters confirmation code for hub pickup */
 function ConfirmationCodeEntry({ orderId, onSuccess }: { orderId: string; onSuccess: () => void }) {
+  const { t } = useI18n();
   const { toast } = useToast();
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -1574,32 +1575,30 @@ function ConfirmationCodeEntry({ orderId, onSuccess }: { orderId: string; onSucc
       if (error) throw error;
       if (data?.error) {
         if (data.retry_after) {
-          toast({ title: "Trop de tentatives", description: `Réessayez dans ${data.retry_after} secondes.`, variant: "destructive" });
+          toast({ title: t("dashboard.confirm.tooManyAttempts"), description: t("dashboard.confirm.retryIn", { seconds: data.retry_after }), variant: "destructive" });
         } else {
-          toast({ title: "Code incorrect", description: data.error, variant: "destructive" });
+          toast({ title: t("dashboard.confirm.wrongCode"), description: data.error, variant: "destructive" });
         }
       } else if (data?.success) {
-        toast({ title: "✅ Commande confirmée !", description: "Votre commande est marquée comme livrée." });
+        toast({ title: t("dashboard.confirm.success"), description: t("dashboard.confirm.successDesc") });
         onSuccess();
       }
     } catch (e: any) {
-      toast({ title: "Erreur", description: e.message || "Erreur de vérification", variant: "destructive" });
+      toast({ title: t("dashboard.confirm.errorTitle"), description: e.message || t("dashboard.confirm.errorDesc"), variant: "destructive" });
     }
     setVerifying(false);
   };
 
   return (
     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 space-y-3">
-      <p className="text-sm font-bold text-foreground">🔐 Code de confirmation</p>
-      <p className="text-xs text-muted-foreground">
-        Saisissez le code à 6 caractères fourni par le vendeur lors de la récupération de votre colis au Hub.
-      </p>
+      <p className="text-sm font-bold text-foreground">{t("dashboard.confirm.title")}</p>
+      <p className="text-xs text-muted-foreground">{t("dashboard.confirm.desc")}</p>
       <div className="flex gap-2">
         <input
           type="text"
           value={code}
           onChange={e => setCode(e.target.value.toUpperCase())}
-          placeholder="EX: A3B7K2"
+          placeholder={t("dashboard.confirm.placeholder")}
           maxLength={6}
           className="flex-1 px-3 py-2.5 text-sm font-mono text-center tracking-widest bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 uppercase"
           style={{ fontSize: "16px" }}
@@ -1610,7 +1609,7 @@ function ConfirmationCodeEntry({ orderId, onSuccess }: { orderId: string; onSucc
           className="px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1.5"
         >
           {verifying ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-          Valider
+          {t("dashboard.confirm.verify")}
         </button>
       </div>
     </div>
@@ -1618,9 +1617,10 @@ function ConfirmationCodeEntry({ orderId, onSuccess }: { orderId: string; onSucc
 }
 
 function TrackingTab({ orders }: { orders: OrderRow[] }) {
+  const { t } = useI18n();
   const activeOrders = orders.filter(o => !["delivered", "cancelled", "returned"].includes(o.status));
   if (activeOrders.length === 0) {
-    return <p className="text-sm text-muted-foreground py-8 text-center">Aucune commande en cours de livraison.</p>;
+    return <p className="text-sm text-muted-foreground py-8 text-center">{t("dashboard.trackingTab.empty")}</p>;
   }
   return (
     <div className="space-y-4">
