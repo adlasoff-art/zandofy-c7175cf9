@@ -413,7 +413,7 @@ export default function DashboardPage() {
                       }`}
                     >
                       <tab.icon size={16} />
-                      {tab.label}
+                      {t(tab.labelKey)}
                     </button>
                   );
                 })}
@@ -506,7 +506,7 @@ export default function DashboardPage() {
                 }`}
               >
                 <tab.icon size={14} />
-                {tab.label}
+                {t(tab.labelKey)}
               </button>
             ))}
           </div>
