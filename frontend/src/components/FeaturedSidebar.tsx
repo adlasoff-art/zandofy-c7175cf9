@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/contexts/I18nContext";
 
 interface FeaturedPlacement {
   id: string;
@@ -105,6 +106,7 @@ export function FeaturedSidebar() {
   const [hovered, setHovered] = useState(false);
   const [slideDir, setSlideDir] = useState<"left" | "right">("left");
   const [animating, setAnimating] = useState(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     const now = new Date().toISOString();
