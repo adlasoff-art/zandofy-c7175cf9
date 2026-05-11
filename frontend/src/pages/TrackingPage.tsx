@@ -231,6 +231,7 @@ function OrderTimeline({ currentStatus, history }: { currentStatus: string; hist
 
 // ── Delivery Choice Panel ──
 function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResult; onChoiceMade: () => void }) {
+  const { t, formatPrice } = useI18n();
   const [choosing, setChoosing] = useState(false);
   const [lastMileResult, setLastMileResult] = useState<LastMileFeeResult | null>(null);
   const [lmLoading, setLmLoading] = useState(true);
@@ -274,10 +275,10 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
         .update(updates)
         .eq("id", order.id);
       if (error) throw error;
-      toast.success(choice === "home" ? "Livraison à domicile choisie !" : "Récupération au Hub choisie !");
+      toast.success(choice === "home" ? t("tracking.choice.successHome") : t("tracking.choice.successPickup"));
       onChoiceMade();
     } catch (e: any) {
-      toast.error(e.message || "Erreur");
+      toast.error(e.message || t("tracking.errorGeneric"));
     } finally {
       setChoosing(false);
     }
@@ -288,16 +289,14 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
   return (
     <div className="border border-primary/30 bg-primary/5 rounded-xl p-4 space-y-3">
       <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-        <MapPin size={16} className="text-primary" /> Choisissez votre mode de réception
+        <MapPin size={16} className="text-primary" /> {t("tracking.choice.title")}
       </h3>
-      <p className="text-xs text-muted-foreground">
-        Votre commande est arrivée au Hub ! Comment souhaitez-vous la récupérer ?
-      </p>
+      <p className="text-xs text-muted-foreground">{t("tracking.choice.subtitle")}</p>
 
       {/* Zone not deliverable warning */}
       {lastMileResult && !lastMileResult.deliverable && (
         <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded">
-          ⚠️ Livraison à domicile non disponible dans votre zone{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}. Veuillez récupérer au Hub.
+          {t("tracking.choice.notDeliverable")}{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}
         </p>
       )}
 
@@ -313,13 +312,13 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
             <Home size={18} className="text-primary" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">Livraison à domicile</p>
+            <p className="text-sm font-semibold text-foreground">{t("tracking.choice.home")}</p>
             {lmLoading ? (
-              <p className="text-xs text-muted-foreground">Calcul des frais...</p>
+              <p className="text-xs text-muted-foreground">{t("tracking.choice.homeCalculating")}</p>
             ) : lastMileFee > 0 ? (
-              <p className="text-xs text-muted-foreground">Frais : ${lastMileFee.toFixed(2)} — à payer à la réception</p>
+              <p className="text-xs text-muted-foreground">{t("tracking.choice.homeFee", { fee: formatPrice(lastMileFee) })}</p>
             ) : (
-              <p className="text-xs text-muted-foreground">Un livreur sera assigné</p>
+              <p className="text-xs text-muted-foreground">{t("tracking.choice.homeAssign")}</p>
             )}
           </div>
         </button>
@@ -333,8 +332,8 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
             <Store size={18} className="text-accent-foreground" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">Récupérer au Hub</p>
-            <p className="text-xs text-muted-foreground">Gratuit — code de confirmation</p>
+            <p className="text-sm font-semibold text-foreground">{t("tracking.choice.pickup")}</p>
+            <p className="text-xs text-muted-foreground">{t("tracking.choice.pickupFree")}</p>
           </div>
         </button>
       </div>
