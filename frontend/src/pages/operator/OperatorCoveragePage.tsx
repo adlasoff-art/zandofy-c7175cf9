@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GeoFieldsRow } from "@/components/address/GeoFieldsRow";
 import { toast } from "sonner";
-import { MapPin, Plus, Loader2, Trash2 } from "lucide-react";
+import { MapPin, Plus, Loader2, Trash2, AlertCircle } from "lucide-react";
 
 export default function OperatorCoveragePage() {
   const { operator } = useOperatorContext();
@@ -71,6 +71,15 @@ export default function OperatorCoveragePage() {
         <h1 className="text-2xl font-bold text-foreground">Couverture géographique</h1>
         <p className="text-sm text-muted-foreground">Villes où votre entreprise opère.</p>
       </div>
+
+      {!isLoading && cities.length === 0 && (
+        <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md">
+          <AlertCircle size={14} className="text-amber-600 mt-0.5 shrink-0" />
+          <p className="text-xs text-amber-800 dark:text-amber-200">
+            Aucune ville couverte pour l'instant. Ajoutez au moins une ville pour pouvoir y définir des tarifs et apparaître au checkout.
+          </p>
+        </div>
+      )}
 
       <Card>
         <CardContent className="pt-4">
