@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { GeoFieldsRow } from "@/components/address/GeoFieldsRow";
 import { toast } from "sonner";
 import { Plus, Loader2, Trash2, Banknote, ShieldAlert, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
-import { useQuery as _ } from "@tanstack/react-query"; // alias to avoid duplicate import lint
 
 export default function OperatorRatesPage() {
   const { operator } = useOperatorContext();
