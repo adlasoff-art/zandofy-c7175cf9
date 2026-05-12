@@ -71,3 +71,26 @@ The following files are infrastructure-sensitive and must be edited carefully:
 ## Architectural Rule
 
 Feature work should not silently modify deployment, domains, ports, or variable naming. Those changes must be deliberate, documented, and reviewed.
+
+## Rôles applicatifs (`app_role`)
+
+Chaîne logistique canonique :
+
+```text
+vendor → forwarder → shipper → operator → rider → customer
+```
+
+| Rôle DB    | Libellé UI FR              | Espace dédié                  |
+|------------|----------------------------|-------------------------------|
+| admin      | Admin                      | `/admin/*`                    |
+| manager    | Manager                    | `/admin/*`                    |
+| vendor     | Vendeur                    | `/dashboard`, `/vendor`       |
+| forwarder  | Transitaire                | `/forwarder/*`                |
+| shipper    | Hub local                  | `/shipper-dashboard`          |
+| operator   | Entreprise de livraison    | `/operator/*`                 |
+| rider      | Livreur                    | `/rider-dashboard`, `/driver` |
+
+- Source unique des libellés UI : `frontend/src/lib/role-labels.ts` (`ROLE_LABELS_FR`, `ROLE_LABELS_EN`, `ALL_APP_ROLES`).
+- Clés i18n associées : `role.<rolename>` et `role.<rolename>.plural` dans `frontend/src/contexts/I18nContext.tsx`.
+- Règles métier détaillées (qui livre, qui reçoit le cargo, garde-fous d'attribution) : voir `mem://auth/logistics-roles-canonical`.
+- Plus jamais le libellé « Transporteur » seul — ambigu entre `shipper` et `forwarder`.
