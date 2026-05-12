@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import { fromTable } from "@/lib/supabase-helpers";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -387,6 +388,47 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
   });
 
   const availableRoles = ALL_ROLES.filter(r => !user.roles.includes(r));
+
+  const navigate = useNavigate();
+
+  // Guard for roles that require an entity to be linked (operator → delivery_operators,
+  // forwarder → forwarders). Admin can confirm to assign anyway.
+  const handleAddRole = async (role: AppRole) => {
+    if (role === "operator") {
+      const { data } = await (supabase
+        .from("delivery_operators") as any)
+        .select("id")
+        .eq("owner_user_id", user.id)
+        .limit(1)
+        .maybeSingle();
+      if (!data) {
+        toast.warning("Aucune entreprise de livraison rattachée", {
+          description: "Le rôle ne donnera accès à /operator/* qu'une fois une entreprise créée et rattachée à cet utilisateur.",
+          action: { label: "Créer une entreprise", onClick: () => navigate("/admin/operators") },
+          duration: 8000,
+        });
+        if (!window.confirm("Attribuer le rôle 'Entreprise de livraison' sans entreprise rattachée ?")) return;
+      }
+    }
+    if (role === "forwarder") {
+      const { data } = await (supabase
+        .from("forwarders") as any)
+        .select("id")
+        .or(`owner_user_id.eq.${user.id},linked_transporter_user_id.eq.${user.id}`)
+        .limit(1)
+        .maybeSingle();
+      if (!data) {
+        toast.warning("Aucun transitaire rattaché", {
+          description: "Le rôle ne donnera accès à /forwarder/* qu'une fois un transitaire créé et rattaché à cet utilisateur.",
+          action: { label: "Créer un transitaire", onClick: () => navigate("/admin/forwarders") },
+          duration: 8000,
+        });
+        if (!window.confirm("Attribuer le rôle 'Transitaire' sans transitaire rattaché ?")) return;
+      }
+    }
+    addRoleMutation.mutate(role);
+  };
+
   const cancellationRate = orderStats && orderStats.total > 0
     ? Math.round((orderStats.cancelled / orderStats.total) * 100)
     : 0;
@@ -531,7 +573,7 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
             {showAddRole && (
               <div className="flex flex-wrap gap-1.5 p-2 bg-muted/30 rounded-lg">
                 {availableRoles.map(role => (
-                  <button key={role} onClick={() => addRoleMutation.mutate(role)}
+                  <button key={role} onClick={() => handleAddRole(role)}
                     className="text-xs px-3 py-1.5 rounded-full border border-border hover:bg-primary hover:text-primary-foreground transition-colors">
                     {roleLabels[role]}
                   </button>
