@@ -6,7 +6,7 @@
  * (`ForwarderHandoffsPanel`) qui s'appuie sur RLS pour le filtrage.
  */
 import { ArrowLeftRight } from "lucide-react";
-import ForwarderHandoffsPanel from "@/components/forwarder/ForwarderHandoffsPanel";
+import { ForwarderHandoffsPanel } from "@/components/forwarder/ForwarderHandoffsPanel";
 import { useForwarderContext } from "@/hooks/use-forwarder-context";
 
 export default function ForwarderHandoffsPage() {
