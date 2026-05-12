@@ -144,8 +144,24 @@ export function OverviewTab({ period, geoFilters }: Props) {
   });
 
   const loading = lp || lo;
-  const roleLabels: Record<string, string> = { vendor: "Vendeurs", shipper: "Transporteurs", rider: "Livreurs", manager: "Managers", admin: "Admins" };
-  const roleColors: Record<string, string> = { vendor: "bg-primary", shipper: "bg-blue-500", rider: "bg-amber-500", manager: "bg-purple-500", admin: "bg-destructive" };
+  const roleLabels: Record<string, string> = {
+    vendor: "Vendeurs",
+    forwarder: "Transitaires",
+    shipper: "Hubs locaux",
+    operator: "Entreprises de livraison",
+    rider: "Livreurs",
+    manager: "Managers",
+    admin: "Admins",
+  };
+  const roleColors: Record<string, string> = {
+    vendor: "bg-primary",
+    forwarder: "bg-cyan-500",
+    shipper: "bg-blue-500",
+    operator: "bg-indigo-500",
+    rider: "bg-amber-500",
+    manager: "bg-purple-500",
+    admin: "bg-destructive",
+  };
   const orderStatusEntries = Object.entries(orderStats?.byStatus ?? {});
 
   return (
