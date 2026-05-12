@@ -1,62 +1,74 @@
-## Avancement constaté (capture du `/admin/users`)
+## Affinage UX `/forwarder/*` — espace transitaire complet
 
-Les 7 onglets sont visibles avec les libellés canoniques : `Tous (318)`, `Client (310)`, `Admin (1)`, `Manager (0)`, `Vendeur (6)`, **`Transitaire (0)`**, **`Hub local (1)`**, **`Entreprise de livraison (1)`**, `Livreur (1)`. La migration enum `forwarder` + `operator` est donc bien appliquée en prod.
+Aujourd'hui `/forwarder` = une seule page « passive » (lecture KYB + docs). Objectif : transformer en vrai espace de travail aligné sur `/operator/*` et `/admin/forwarders`, avec **tarifs auto-éditables**.
 
-État des lots :
+### Pré-requis DB (1 migration)
 
-- **R1 audit** — fait
-- **R2 migration enum + backfill** — appliquée en prod (capture confirme)
-- **R3 source unique des libellés** (`role-labels.ts`) — fait
-- **R4.1/4.2 onglets admin + comptes par rôle** — fait (capture)
-- **R4.3 garde-fou attribution `operator`** — pas encore : aujourd'hui un admin peut cocher `operator` dans le drawer sans qu'il existe de ligne `delivery_operators` correspondante → utilisateur "fantôme" sans entreprise rattachée
-- **R5.1 i18n FR + EN** — fait (16 clés `role.*`)
-- **R5.2 mémoire** `mem://auth/logistics-roles-canonical` — fait
-- **R5.3 documentation `docs/ARCHITECTURE.md`** — pas encore
+`forwarder_pricing_profiles`, `forwarder_kg_tiers`, `forwarder_cbm_tiers`, `forwarder_piece_tiers`, `forwarder_surcharges` n'autorisent en écriture que les admins. Ajouter des policies "owner peut gérer ses propres profils + tiers + surcharges, uniquement si forwarder approuvé".
 
-## Reste à faire (2 items)
+```sql
+-- Policy : un forwarder approuvé peut SELECT/INSERT/UPDATE/DELETE
+-- ses profils. Helper has_forwarder_access(profile_id, auth.uid()).
+CREATE OR REPLACE FUNCTION public.user_owns_forwarder_profile(_profile_id uuid, _user_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM forwarder_pricing_profiles p
+    JOIN forwarders f ON f.id = p.forwarder_id
+    WHERE p.id = _profile_id
+      AND f.status = 'approved'
+      AND (f.owner_user_id = _user_id OR f.linked_transporter_user_id = _user_id)
+  )
+$$;
+-- + policy équivalente sur forwarders.id pour la création de profils.
+```
 
-### 1. Garde-fou `operator` dans `UserDetailDrawer` (R4.3)
+Livré comme fichier SQL téléchargeable pour exécution en production.
 
-Dans `frontend/src/components/admin/UserDetailDrawer.tsx`, intercepter le clic "+ Ajouter rôle" pour `operator` et `forwarder` :
+### Layout & routes
 
-- **`operator`** : avant l'`INSERT`, vérifier `SELECT id FROM delivery_operators WHERE owner_user_id = user.id LIMIT 1`. Si absent → toast informatif + bouton "Créer une entreprise de livraison" qui ouvre `/admin/operators` (page existante). Pas de blocage dur si l'admin confirme — confirmation modale courte ("Ce rôle ne donnera accès à `/operator/*` qu'une fois une entreprise rattachée. Continuer ?").
-- **`forwarder`** : même logique, vérifier `SELECT id FROM forwarders WHERE owner_user_id = user.id OR linked_transporter_user_id = user.id LIMIT 1`. Lien "Créer un transitaire" → `/admin/forwarders`.
-- Pour les 5 autres rôles (`admin`, `manager`, `vendor`, `shipper`, `rider`), comportement actuel inchangé.
+- `frontend/src/layouts/ForwarderLayout.tsx` : sidebar + header + statut badges, palette froide bleue dédiée (tokens `--forwarder-*` dans `index.css`, copiés du modèle opérateur).
+- Routes ajoutées dans `App.tsx` :
+  - `/forwarder` → tableau de bord
+  - `/forwarder/profiles` → tarifs (CRUD)
+  - `/forwarder/coverage` → routes & restrictions
+  - `/forwarder/handoffs` → handoffs reçus / émis (lecture)
+  - `/forwarder/settings` → profil + KYB
 
-Aucune migration DB. Pas de policy à ajouter (lecture déjà autorisée à l'admin sur ces tables).
+### Pages
 
-### 2. Doc `docs/ARCHITECTURE.md` — section Rôles (R5.3)
+1. **ForwarderDashboardPage (refactor)**
+   - KPI : profils actifs, routes couvertes, handoffs 30j, statut KYB, score d'acceptation handoffs.
+   - Checklist « mise en route » (au moins 1 profil, 1 route, 1 tier).
+   - Statut KYB conservé.
 
-Ajouter (ou mettre à jour si elle existe) une section concise :
+2. **ForwarderProfilesPage (nouveau)**
+   - Liste des `forwarder_pricing_profiles` du forwarder courant (filter via `forwarders.owner_user_id = auth.uid()`).
+   - Bouton « Nouveau profil » → dialog avec mode (`air | sea | road | rail`), pays/ville origine via `GeoFieldsRow`, transit min/max, devise, deposit %.
+   - Drawer d'édition : onglets « Général », « Tiers KG », « Tiers CBM », « Tiers à la pièce », « Surcharges ».
+   - Inline CRUD sur tiers + surcharges (CRUD direct sur tables, RLS gère l'accès).
+   - Badge `is_active` togglable + soft delete.
 
-````text
-## Rôles applicatifs (app_role)
+3. **ForwarderCoveragePage (nouveau)** — Édite `coverage_routes jsonb` sur la ligne `forwarders` du compte (origin/destination/mode), via un éditeur de lignes simple. Liens vers `forwarder_restrictions` en lecture (admin-managed).
 
-Chaîne logistique :
-  vendor → forwarder → shipper → operator → rider → customer
+4. **ForwarderHandoffsPage (nouveau)** — Lecture `forwarder_handoffs` filtrée sur `from_forwarder_id` ou `to_forwarder_id` égaux aux ids du transitaire courant. Affiche statut, contrepartie, order_ref, date.
 
-| Rôle DB    | Libellé UI FR              | Espace dédié          |
-|------------|----------------------------|-----------------------|
-| admin      | Admin                      | /admin/*              |
-| manager    | Manager                    | /admin/*              |
-| vendor     | Vendeur                    | /dashboard, /vendor   |
-| forwarder  | Transitaire                | /forwarder/*          |
-| shipper    | Hub local                  | /shipper-dashboard    |
-| operator   | Entreprise de livraison    | /operator/*           |
-| rider      | Livreur                    | /rider-dashboard      |
-````
+5. **ForwarderSettingsPage (nouveau)** — Identité : `contact_email`, `contact_phone`, `headquarters_address`, `logo_url`, `description`. RCCM/NIF/raison sociale en read-only avec bandeau « contactez le support ». Réutilise les docs KYB de l'ancien dashboard.
 
-+ pointer vers `frontend/src/lib/role-labels.ts` comme source unique et vers `mem://auth/logistics-roles-canonical` pour les règles métier.
+### Composant partagé
 
-## Hors scope
+`ForwarderOnboardingChecklist.tsx` : même pattern que `OperatorOnboardingChecklist`, étapes (KYB approuvé, ≥1 profil, ≥1 tier KG/CBM/piece, ≥1 route).
 
-- Pas de refonte des espaces `/forwarder/*` ni `/operator/*`.
-- Pas de modification des policies RLS.
-- Pas de nouvelle migration SQL — la prod est en phase avec le code.
+### Hors scope (à faire après)
 
-## Ordre
+- Édition `forwarder_restrictions` (sensibilités douanières — admin-only).
+- Édition `forwarder_shipping_templates` (réservée aux profils légués).
+- Score d'acceptation détaillé (besoin métrique handoffs déclinés).
+- Tableau commission/facturation transitaire (pas de ledger dédié pour l'instant).
 
-1. Garde-fou drawer (R4.3) — modif d'un seul fichier `UserDetailDrawer.tsx`.
-2. Section `docs/ARCHITECTURE.md` (R5.3).
+### Livrables
 
-Estimation : 1 cycle d'implémentation court.
+- 1 fichier SQL `add_forwarder_self_service_rls.sql` à exécuter en prod.
+- `ForwarderLayout.tsx` + 4 nouvelles pages + checklist + ajout des tokens CSS.
+- Mise à jour `App.tsx` (routes nested) et `MobileAccountMenu` / `Header` pour exposer le menu transitaire quand le rôle est `forwarder`.
+- Mémoire mise à jour : `mem/features/forwarder-self-service-space.md`.

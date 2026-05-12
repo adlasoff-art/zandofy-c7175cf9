@@ -1,214 +1,169 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+/**
+ * ForwarderDashboardPage — Affinage UX /forwarder/* (Phase B2.2)
+ *
+ * KPIs : profils actifs · routes couvertes · handoffs 30j · taux d'acceptation handoffs.
+ * Inclut la checklist d'onboarding et un raccourci handoffs urgents.
+ */
+import { useQuery } from "@tanstack/react-query";
+import { useForwarderContext } from "@/hooks/use-forwarder-context";
+import { fromTable } from "@/lib/supabase-helpers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Loader2, Package, MapPin, FileText, AlertCircle, CheckCircle2, Clock, Ban, ExternalLink } from "lucide-react";
-
-type ForwarderRow = {
-  id: string;
-  company_name: string;
-  legal_name: string | null;
-  status: string;
-  rejection_reason: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
-  headquarters_city: string | null;
-  headquarters_country: string | null;
-  supported_modes: string[] | null;
-  coverage_routes: any;
-  documents: any;
-  submitted_at: string | null;
-  approved_at: string | null;
-};
-
-const STATUS_META: Record<string, { label: string; icon: any; tone: string }> = {
-  pending: { label: "En cours d'examen", icon: Clock, tone: "text-amber-500" },
-  approved: { label: "Approuvé", icon: CheckCircle2, tone: "text-emerald-500" },
-  rejected: { label: "Refusé", icon: Ban, tone: "text-destructive" },
-  suspended: { label: "Suspendu", icon: AlertCircle, tone: "text-destructive" },
-};
+import { Link } from "react-router-dom";
+import {
+  FileText, Map, ArrowLeftRight, Loader2, TrendingUp,
+  Target, Banknote, Settings,
+} from "lucide-react";
+import { ForwarderOnboardingChecklist } from "@/components/forwarder/ForwarderOnboardingChecklist";
 
 export default function ForwarderDashboardPage() {
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [forwarder, setForwarder] = useState<ForwarderRow | null>(null);
-  const [signedDocs, setSignedDocs] = useState<{ name: string; url: string }[]>([]);
+  const { forwarder } = useForwarderContext();
 
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      setLoading(true);
-      const { data, error } = await (supabase as any)
-        .from("forwarders")
-        .select("*")
-        .eq("owner_user_id", user.id)
-        .order("submitted_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) console.warn("[ForwarderDashboard]", error.message);
-      setForwarder(data || null);
+  const { data: profilesActive = 0 } = useQuery({
+    queryKey: ["forwarder-dash-profiles", forwarder?.id],
+    enabled: !!forwarder?.id,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { count } = await fromTable("forwarder_pricing_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("forwarder_id", forwarder!.id)
+        .eq("is_active", true);
+      return count ?? 0;
+    },
+  });
 
-      // Signer les URLs des documents
-      const docs = Array.isArray(data?.documents) ? data.documents : [];
-      const signed: { name: string; url: string }[] = [];
-      for (const doc of docs) {
-        const path = typeof doc === "string" ? doc : doc?.path;
-        const name = typeof doc === "string" ? doc.split("/").pop() : (doc?.name || doc?.path?.split("/").pop());
-        if (!path) continue;
-        const { data: signedData } = await supabase.storage
-          .from("forwarder-documents")
-          .createSignedUrl(path, 3600);
-        if (signedData?.signedUrl) signed.push({ name: name || "document", url: signedData.signedUrl });
-      }
-      setSignedDocs(signed);
-      setLoading(false);
-    })();
-  }, [user]);
+  const { data: handoffStats, isLoading: handoffLoading } = useQuery({
+    queryKey: ["forwarder-dash-handoffs", forwarder?.id],
+    enabled: !!forwarder?.id,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const since = new Date(Date.now() - 30 * 24 * 3600_000).toISOString();
+      const { data } = await fromTable("forwarder_handoffs")
+        .select("status, created_at")
+        .eq("forwarder_id", forwarder!.id)
+        .gte("created_at", since)
+        .limit(1000);
+      const rows = (data ?? []) as Array<{ status: string; created_at: string }>;
+      const total = rows.length;
+      const accepted = rows.filter((r) => r.status === "accepted" || r.status === "in_transit" || r.status === "delivered").length;
+      const declined = rows.filter((r) => r.status === "declined" || r.status === "cancelled").length;
+      const decisions = accepted + declined;
+      return {
+        total,
+        accepted,
+        rate: decisions > 0 ? Math.round((accepted / decisions) * 100) : null,
+        pending: rows.filter((r) => r.status === "pending" || r.status === "notified").length,
+      };
+    },
+  });
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="animate-spin text-primary" size={32} />
-      </div>
-    );
-  }
+  if (!forwarder) return null;
 
-  if (!forwarder) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4 px-4">
-        <Package size={48} className="text-muted-foreground" />
-        <h1 className="text-lg font-bold text-foreground">Aucun dossier transitaire</h1>
-        <p className="text-sm text-muted-foreground text-center max-w-md">
-          Vous n'avez pas encore soumis de candidature transitaire. Démarrez votre dossier KYB.
-        </p>
-        <Button asChild>
-          <Link to="/become-forwarder">Devenir transitaire</Link>
-        </Button>
-      </div>
-    );
-  }
-
-  const meta = STATUS_META[forwarder.status] || STATUS_META.pending;
-  const Icon = meta.icon;
-  const routes = Array.isArray(forwarder.coverage_routes) ? forwarder.coverage_routes : [];
+  const routesCount = Array.isArray(forwarder.coverage_routes) ? forwarder.coverage_routes.length : 0;
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Espace transitaire</h1>
-          <p className="text-sm text-muted-foreground">Suivi de votre dossier {forwarder.company_name}</p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Tableau de bord</h1>
+        <p className="text-sm text-muted-foreground">
+          Bienvenue, {forwarder.name}. Vue d'ensemble de votre activité fret.
+        </p>
+      </div>
 
-        {/* Statut */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Icon className={meta.tone} size={20} />
-              Statut KYB
+      <ForwarderOnboardingChecklist forwarder={forwarder} />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard icon={FileText} label="Profils actifs" value={profilesActive.toString()} hint="Tarifs publiés" />
+        <KpiCard icon={Map} label="Routes couvertes" value={routesCount.toString()} hint="Origin → destination" />
+        <KpiCard
+          icon={ArrowLeftRight}
+          label="Handoffs (30j)"
+          value={handoffLoading ? "…" : (handoffStats?.total ?? 0).toString()}
+          hint={`${handoffStats?.pending ?? 0} en attente`}
+        />
+        <KpiCard
+          icon={Target}
+          label="Taux d'acceptation"
+          value={handoffStats?.rate != null ? `${handoffStats.rate}%` : "—"}
+          hint={
+            handoffStats?.rate != null
+              ? `${handoffStats.accepted} acceptés sur 30j`
+              : "Aucune décision sur 30j"
+          }
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp size={16} className="text-[hsl(var(--forwarder-primary))]" />
+              Activité globale
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <Badge variant="outline" className={meta.tone}>{meta.label}</Badge>
-            {forwarder.status === "pending" && (
-              <p className="text-sm text-muted-foreground">
-                Votre dossier est en cours d'examen par notre équipe. Vous serez notifié(e) par email
-                dès qu'une décision sera prise (généralement sous 48-72h ouvrées).
-              </p>
-            )}
-            {forwarder.status === "rejected" && forwarder.rejection_reason && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
-                <p className="text-xs font-semibold text-destructive mb-1">Motif du refus</p>
-                <p className="text-sm text-foreground">{forwarder.rejection_reason}</p>
-              </div>
-            )}
-            {forwarder.status === "suspended" && (
-              <p className="text-sm text-muted-foreground">
-                Votre compte est temporairement suspendu. Contactez le support pour plus d'informations.
-              </p>
-            )}
+          <CardContent className="space-y-2 text-sm">
+            <Row label="Statut" value={<span className="text-emerald-500 font-medium">● {forwarder.status}</span>} />
+            <Row label="Modes supportés" value={(forwarder.supported_modes ?? []).join(", ").toUpperCase() || "—"} />
+            <Row label="Siège" value={`${forwarder.headquarters_city ?? "—"}${forwarder.headquarters_country ? `, ${forwarder.headquarters_country}` : ""}`} />
+            <Row label="Volume mensuel estimé" value={forwarder.estimated_monthly_volume_kg ? `${forwarder.estimated_monthly_volume_kg.toLocaleString()} kg` : "—"} />
           </CardContent>
         </Card>
 
-        {/* Identité & contact */}
         <Card>
-          <CardHeader><CardTitle>Identité & contact</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            <div><span className="text-muted-foreground">Nom commercial : </span><span className="text-foreground">{forwarder.company_name}</span></div>
-            {forwarder.legal_name && <div><span className="text-muted-foreground">Raison sociale : </span><span className="text-foreground">{forwarder.legal_name}</span></div>}
-            {forwarder.contact_email && <div><span className="text-muted-foreground">Email : </span><span className="text-foreground">{forwarder.contact_email}</span></div>}
-            {forwarder.contact_phone && <div><span className="text-muted-foreground">Téléphone : </span><span className="text-foreground">{forwarder.contact_phone}</span></div>}
-            {forwarder.headquarters_city && (
-              <div className="md:col-span-2 flex items-center gap-1">
-                <MapPin size={14} className="text-muted-foreground" />
-                <span className="text-foreground">{forwarder.headquarters_city}, {forwarder.headquarters_country}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Couverture */}
-        <Card>
-          <CardHeader><CardTitle>Couverture & modes</CardTitle></CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex flex-wrap gap-2">
-              {(forwarder.supported_modes || []).map((m) => (
-                <Badge key={m} variant="secondary">{m.toUpperCase()}</Badge>
-              ))}
-            </div>
-            {routes.length > 0 ? (
-              <ul className="space-y-1">
-                {routes.map((r: any, i: number) => (
-                  <li key={i} className="text-foreground">
-                    • {r.origin || "?"} → {r.destination || "?"} {r.mode && <span className="text-muted-foreground">({r.mode})</span>}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-foreground">Aucune route déclarée.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Documents */}
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><FileText size={18} /> Documents soumis</CardTitle></CardHeader>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">À traiter</CardTitle>
+          </CardHeader>
           <CardContent>
-            {signedDocs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucun document attaché.</p>
+            {handoffLoading ? (
+              <Loader2 className="animate-spin mx-auto" size={20} />
             ) : (
-              <ul className="space-y-2">
-                {signedDocs.map((d, i) => (
-                  <li key={i} className="flex items-center justify-between gap-2 text-sm border border-border rounded-md p-2">
-                    <span className="text-foreground truncate">{d.name}</span>
-                    <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
-                      <ExternalLink size={12} /> Voir
-                    </a>
-                  </li>
-                ))}
-              </ul>
+              <Link to="/forwarder/handoffs" className="block p-3 rounded-md bg-[hsl(var(--forwarder-primary))]/10 hover:bg-[hsl(var(--forwarder-primary))]/15 transition-colors">
+                <p className="text-2xl font-bold text-[hsl(var(--forwarder-primary))]">{handoffStats?.pending ?? 0}</p>
+                <p className="text-xs text-muted-foreground">Handoff(s) en attente</p>
+              </Link>
             )}
           </CardContent>
         </Card>
+      </div>
 
-        {/* Tarifs (CTA) */}
-        {forwarder.status === "approved" && (
-          <Card className="border-primary/30">
-            <CardContent className="py-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Gérer vos tarifs</p>
-                <p className="text-xs text-muted-foreground">Configurez vos profils tarifaires et routes (à venir).</p>
-              </div>
-              <Button asChild variant="outline" size="sm" disabled>
-                <span>Bientôt disponible</span>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <QuickLink to="/forwarder/profiles" icon={Banknote} label="Gérer mes tarifs" />
+        <QuickLink to="/forwarder/coverage" icon={Map} label="Mes routes" />
+        <QuickLink to="/forwarder/handoffs" icon={ArrowLeftRight} label="Mes handoffs" />
+        <QuickLink to="/forwarder/settings" icon={Settings} label="Paramètres" />
       </div>
     </div>
+  );
+}
+
+function KpiCard({ icon: Icon, label, value, hint }: { icon: any; label: string; value: string; hint?: string }) {
+  return (
+    <Card>
+      <CardContent className="pt-4">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs text-muted-foreground">{label}</span>
+          <Icon size={14} className="text-[hsl(var(--forwarder-primary))]" />
+        </div>
+        <p className="text-xl font-bold text-foreground">{value}</p>
+        {hint && <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between py-1 border-b border-border/40 last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">{value}</span>
+    </div>
+  );
+}
+
+function QuickLink({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
+  return (
+    <Link to={to} className="flex items-center gap-2 p-3 rounded-md border border-border bg-card hover:border-[hsl(var(--forwarder-primary))]/40 hover:bg-[hsl(var(--forwarder-primary))]/5 transition-colors">
+      <Icon size={14} className="text-[hsl(var(--forwarder-primary))]" />
+      <span className="text-xs font-medium">{label}</span>
+    </Link>
   );
 }

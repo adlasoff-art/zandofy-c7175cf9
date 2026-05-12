@@ -93,6 +93,25 @@
     --operator-sidebar-border: 215 30% 18%;
     --operator-gradient: linear-gradient(135deg, hsl(210 90% 35%), hsl(195 85% 45%));
     --operator-shadow: 0 4px 20px -4px hsl(210 90% 35% / 0.18);
+
+    /* Forwarder dashboard palette — bleu profond fret international */
+    --forwarder-primary: 222 80% 38%;
+    --forwarder-primary-foreground: 0 0% 100%;
+    --forwarder-accent: 188 75% 42%;
+    --forwarder-accent-foreground: 0 0% 100%;
+    --forwarder-bg: 220 30% 97%;
+    --forwarder-surface: 0 0% 100%;
+    --forwarder-border: 220 25% 88%;
+    --forwarder-muted: 220 20% 48%;
+    --forwarder-success: 152 69% 40%;
+    --forwarder-warning: 38 92% 50%;
+    --forwarder-danger: 0 75% 55%;
+    --forwarder-sidebar-bg: 222 38% 13%;
+    --forwarder-sidebar-fg: 220 15% 92%;
+    --forwarder-sidebar-active: 188 75% 48%;
+    --forwarder-sidebar-border: 222 30% 19%;
+    --forwarder-gradient: linear-gradient(135deg, hsl(222 80% 38%), hsl(188 75% 42%));
+    --forwarder-shadow: 0 4px 20px -4px hsl(222 80% 38% / 0.18);
   }
 
   .dark {
