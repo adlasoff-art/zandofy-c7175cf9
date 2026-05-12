@@ -59,14 +59,17 @@ export default function OperatorFleetPage() {
     if (!inviteEmail.includes("@")) { toast.error("Email invalide"); return; }
     setInviting(true);
     try {
-      const { error } = await supabase.functions.invoke("operator-invite-rider", {
+      const { data, error } = await supabase.functions.invoke("operator-invite-rider", {
         body: {
-          email: inviteEmail.trim().toLowerCase(),
+          rider_email: inviteEmail.trim().toLowerCase(),
           full_name: inviteName.trim(),
           vehicle_type: inviteVehicle,
         },
       });
-      if (error) throw new Error(error.message);
+      if (error) {
+        const serverMsg = (data as any)?.error || error.message;
+        throw new Error(serverMsg);
+      }
       toast.success("Invitation envoyée");
       setInviteOpen(false);
       setInviteEmail(""); setInviteName("");
