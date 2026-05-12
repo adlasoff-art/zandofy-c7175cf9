@@ -173,6 +173,11 @@ const OperatorRatesPage = lazyRetry(() => import("./pages/operator/OperatorRates
 const OperatorBillingPage = lazyRetry(() => import("./pages/operator/OperatorBillingPage"));
 const OperatorSettingsPage = lazyRetry(() => import("./pages/operator/OperatorSettingsPage"));
 const ForwarderDashboardPage = lazyRetry(() => import("./pages/forwarder/ForwarderDashboardPage"));
+const ForwarderProfilesPage = lazyRetry(() => import("./pages/forwarder/ForwarderProfilesPage"));
+const ForwarderCoveragePage = lazyRetry(() => import("./pages/forwarder/ForwarderCoveragePage"));
+const ForwarderHandoffsPage = lazyRetry(() => import("./pages/forwarder/ForwarderHandoffsPage"));
+const ForwarderSettingsPage = lazyRetry(() => import("./pages/forwarder/ForwarderSettingsPage"));
+const ForwarderLayout = lazyRetry(() => import("./layouts/ForwarderLayout"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchOnWindowFocus: false } },
@@ -371,10 +376,16 @@ const App = () => (
                   path="/forwarder"
                   element={
                     <RoleGuard allowedRoles={["forwarder", "admin", "manager"]}>
-                      <ForwarderDashboardPage />
+                      <ForwarderLayout />
                     </RoleGuard>
                   }
-                />
+                >
+                  <Route index element={<ForwarderDashboardPage />} />
+                  <Route path="profiles" element={<ForwarderProfilesPage />} />
+                  <Route path="coverage" element={<ForwarderCoveragePage />} />
+                  <Route path="handoffs" element={<ForwarderHandoffsPage />} />
+                  <Route path="settings" element={<ForwarderSettingsPage />} />
+                </Route>
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
