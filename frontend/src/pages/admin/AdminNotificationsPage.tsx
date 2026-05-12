@@ -17,10 +17,16 @@ import { ensureFreshSession, parseEdgeFunctionError } from "@/services/admin-ema
 import { PwaUpdateBroadcastCard } from "@/components/admin/PwaUpdateBroadcastCard";
 
 type Channel = "push" | "email" | "sms";
-type Audience = "all" | "vendors" | "shippers" | "riders" | "customers";
+type Audience = "all" | "vendors" | "forwarders" | "shippers" | "operators" | "riders" | "customers";
 
 const audienceToRole: Record<Audience, string | null> = {
-  all: null, vendors: "vendor", shippers: "shipper", riders: "rider", customers: null,
+  all: null,
+  vendors: "vendor",
+  forwarders: "forwarder",
+  shippers: "shipper",
+  operators: "operator",
+  riders: "rider",
+  customers: null,
 };
 
 const db = supabase as any;
@@ -49,7 +55,9 @@ export default function AdminNotificationsPage() {
   const audienceOptions: { key: Audience; label: string; icon: React.ElementType }[] = [
     { key: "all", label: "Tous", icon: Users },
     { key: "vendors", label: "Vendeurs", icon: Store },
-    { key: "shippers", label: "Transporteurs", icon: Truck },
+    { key: "forwarders", label: "Transitaires", icon: Truck },
+    { key: "shippers", label: "Hubs locaux", icon: Truck },
+    { key: "operators", label: "Entreprises de livraison", icon: Truck },
     { key: "riders", label: "Livreurs", icon: Bike },
     { key: "customers", label: "Clients", icon: Users },
   ];
