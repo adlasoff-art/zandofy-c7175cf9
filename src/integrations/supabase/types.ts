@@ -10851,6 +10851,14 @@ export type Database = {
         Returns: boolean
       }
       user_owns_any_operator: { Args: { _uid: string }; Returns: boolean }
+      user_owns_forwarder: {
+        Args: { _forwarder_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_owns_forwarder_profile: {
+        Args: { _profile_id: string; _user_id: string }
+        Returns: boolean
+      }
       validate_coupon: {
         Args: { p_code: string }
         Returns: {
