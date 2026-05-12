@@ -395,8 +395,8 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
   // forwarder → forwarders). Admin can confirm to assign anyway.
   const handleAddRole = async (role: AppRole) => {
     if (role === "operator") {
-      const { data } = await (supabase
-        .from("delivery_operators") as any)
+      const { data } = await ((supabase as any)
+        .from("delivery_operators"))
         .select("id")
         .eq("owner_user_id", user.id)
         .limit(1)
@@ -411,8 +411,8 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
       }
     }
     if (role === "forwarder") {
-      const { data } = await (supabase
-        .from("forwarders") as any)
+      const { data } = await ((supabase as any)
+        .from("forwarders"))
         .select("id")
         .or(`owner_user_id.eq.${user.id},linked_transporter_user_id.eq.${user.id}`)
         .limit(1)
