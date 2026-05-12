@@ -1,100 +1,62 @@
-## Contexte
+## Avancement constaté (capture du `/admin/users`)
 
-Aujourd'hui en prod, l'admin ne voit que 5 onglets de rôles : `Client / Admin / Manager / Vendeur / Transporteur / Livreur`. Le label « Transporteur » est en réalité le rôle DB `shipper` (hub local). Les 2 rôles métier critiques pour la chaîne logistique — **`forwarder`** (transitaire international Chine→RDC) et **`operator`** (entreprise de livraison last-mile) — sont **inexistants à l'écran**, et probablement absents de l'enum `app_role` en prod.
+Les 7 onglets sont visibles avec les libellés canoniques : `Tous (318)`, `Client (310)`, `Admin (1)`, `Manager (0)`, `Vendeur (6)`, **`Transitaire (0)`**, **`Hub local (1)`**, **`Entreprise de livraison (1)`**, `Livreur (1)`. La migration enum `forwarder` + `operator` est donc bien appliquée en prod.
 
-Résultat : impossible d'attribuer le rôle `forwarder` à un utilisateur, donc les espaces `/forwarder/*` et `/operator/*` ne servent à personne en production.
+État des lots :
 
-## Vérité des 7 rôles (cible)
+- **R1 audit** — fait
+- **R2 migration enum + backfill** — appliquée en prod (capture confirme)
+- **R3 source unique des libellés** (`role-labels.ts`) — fait
+- **R4.1/4.2 onglets admin + comptes par rôle** — fait (capture)
+- **R4.3 garde-fou attribution `operator`** — pas encore : aujourd'hui un admin peut cocher `operator` dans le drawer sans qu'il existe de ligne `delivery_operators` correspondante → utilisateur "fantôme" sans entreprise rattachée
+- **R5.1 i18n FR + EN** — fait (16 clés `role.*`)
+- **R5.2 mémoire** `mem://auth/logistics-roles-canonical` — fait
+- **R5.3 documentation `docs/ARCHITECTURE.md`** — pas encore
 
-| Rôle DB | Libellé UI cible (FR / EN) | Métier |
-|---|---|---|
-| `admin` | Admin / Admin | Staff plateforme |
-| `manager` | Manager / Manager | Staff plateforme |
-| `vendor` | Vendeur / Vendor | Propriétaire boutique |
-| `forwarder` | **Transitaire** / Forwarder | Fret international (DHL, agences sino-congolaises) |
-| `shipper` | **Hub local** / Hub agent | Réception conteneur, photo, dispatch |
-| `operator` | **Entreprise de livraison** / Delivery operator | Société last-mile avec flotte + tarifs quartier |
-| `rider` | Livreur / Rider | Personne physique qui livre |
+## Reste à faire (2 items)
 
-Plus jamais le mot « Transporteur » tout court.
+### 1. Garde-fou `operator` dans `UserDetailDrawer` (R4.3)
 
-## Plan d'exécution
+Dans `frontend/src/components/admin/UserDetailDrawer.tsx`, intercepter le clic "+ Ajouter rôle" pour `operator` et `forwarder` :
 
-### Lot R1 — Audit base prod (lecture seule, 10 min)
+- **`operator`** : avant l'`INSERT`, vérifier `SELECT id FROM delivery_operators WHERE owner_user_id = user.id LIMIT 1`. Si absent → toast informatif + bouton "Créer une entreprise de livraison" qui ouvre `/admin/operators` (page existante). Pas de blocage dur si l'admin confirme — confirmation modale courte ("Ce rôle ne donnera accès à `/operator/*` qu'une fois une entreprise rattachée. Continuer ?").
+- **`forwarder`** : même logique, vérifier `SELECT id FROM forwarders WHERE owner_user_id = user.id OR linked_transporter_user_id = user.id LIMIT 1`. Lien "Créer un transitaire" → `/admin/forwarders`.
+- Pour les 5 autres rôles (`admin`, `manager`, `vendor`, `shipper`, `rider`), comportement actuel inchangé.
 
-Avant tout, exécuter ces 2 requêtes sur la prod (`vpt…yxf`) via Supabase SQL Editor :
+Aucune migration DB. Pas de policy à ajouter (lecture déjà autorisée à l'admin sur ces tables).
 
-```sql
--- 1. Liste des valeurs enum
-SELECT unnest(enum_range(NULL::public.app_role))::text AS role;
+### 2. Doc `docs/ARCHITECTURE.md` — section Rôles (R5.3)
 
--- 2. Comptage des assignations existantes
-SELECT role, count(*) FROM public.user_roles GROUP BY role ORDER BY 2 DESC;
-```
+Ajouter (ou mettre à jour si elle existe) une section concise :
 
-→ Détermine si la migration R2 doit créer les enum values ou juste vérifier.
+````text
+## Rôles applicatifs (app_role)
 
-### Lot R2 — Migration idempotente enum + backfill
+Chaîne logistique :
+  vendor → forwarder → shipper → operator → rider → customer
 
-Une migration unique `*_logistics_roles_canonical.sql` qui :
+| Rôle DB    | Libellé UI FR              | Espace dédié          |
+|------------|----------------------------|-----------------------|
+| admin      | Admin                      | /admin/*              |
+| manager    | Manager                    | /admin/*              |
+| vendor     | Vendeur                    | /dashboard, /vendor   |
+| forwarder  | Transitaire                | /forwarder/*          |
+| shipper    | Hub local                  | /shipper-dashboard    |
+| operator   | Entreprise de livraison    | /operator/*           |
+| rider      | Livreur                    | /rider-dashboard      |
+````
 
-1. `ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'forwarder';`
-2. `ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'operator';`
-3. Backfill : pour chaque `delivery_operators.owner_user_id` existant, insère `user_roles(user_id, role='operator')` `ON CONFLICT DO NOTHING`.
-4. Backfill : pour chaque `forwarders.linked_transporter_user_id` (ou équivalent), insère `user_roles(user_id, role='forwarder')` `ON CONFLICT DO NOTHING`.
-5. Pas de policy à rajouter (RLS user_roles existe déjà).
++ pointer vers `frontend/src/lib/role-labels.ts` comme source unique et vers `mem://auth/logistics-roles-canonical` pour les règles métier.
 
-Déploiement : commit sur `develop` → PR → `main` → GitHub Actions pousse en prod.
+## Hors scope
 
-### Lot R3 — Source de vérité unique des libellés (frontend)
+- Pas de refonte des espaces `/forwarder/*` ni `/operator/*`.
+- Pas de modification des policies RLS.
+- Pas de nouvelle migration SQL — la prod est en phase avec le code.
 
-Créer `frontend/src/lib/role-labels.ts` :
+## Ordre
 
-```ts
-export const ROLE_LABELS_FR: Record<AppRole | "customer", string> = {
-  admin: "Admin",
-  manager: "Manager",
-  vendor: "Vendeur",
-  forwarder: "Transitaire",
-  shipper: "Hub local",
-  operator: "Entreprise de livraison",
-  rider: "Livreur",
-  customer: "Client",
-};
-export const ROLE_LABELS_EN: Record<...> = { ... };
-export function roleLabel(role, lang): string { ... }
-```
+1. Garde-fou drawer (R4.3) — modif d'un seul fichier `UserDetailDrawer.tsx`.
+2. Section `docs/ARCHITECTURE.md` (R5.3).
 
-Puis remplacer les mappings dispersés dans :
-
-- `frontend/src/pages/admin/AdminUsersPage.tsx`
-- `frontend/src/components/admin/UserDetailDrawer.tsx`
-- `frontend/src/components/admin/dashboard/OverviewTab.tsx`
-- `frontend/src/pages/admin/AdminLogisticsPage.tsx`
-- `frontend/src/pages/admin/AdminNotificationsPage.tsx`
-
-### Lot R4 — Admin Users : 2 onglets + drawer d'attribution
-
-Dans `AdminUsersPage.tsx` :
-
-1. Ajouter onglets `Transitaire` + `Entreprise livraison` à la barre de filtres.
-2. Compter via `user_roles` (count par rôle).
-3. Dans `UserDetailDrawer`, exposer les 7 cases à cocher de rôles (admin only) avec garde-fous (ne pas pouvoir cocher `operator` sans qu'il y ait une ligne `delivery_operators` correspondante — proposer un lien direct vers la page de création).
-
-### Lot R5 — i18n + documentation
-
-1. Ajouter ~20 clés dans `I18nContext.tsx` (`role.forwarder`, `role.shipper`, `role.operator`, etc.) FR + EN.
-2. Mettre à jour `mem://auth/logistics-roles-canonical` avec les libellés UI définitifs.
-3. Court paragraphe dans `docs/ARCHITECTURE.md` section « Rôles ».
-
-## Ce qui n'est PAS dans ce plan (volontairement)
-
-- Pas de refonte des espaces `/forwarder/*` ni `/operator/*` — c'était le sujet précédent (lots F1→F5 sur les dates d'expédition côté transitaire).
-- Pas de migration des données `forwarder_handoffs` (intacte).
-- Pas de changement de policies RLS existantes.
-
-## Ordre recommandé
-
-R1 (audit) → R2 (migration) → R3 (labels) → R4 (admin UI) → R5 (i18n + docs).
-
-R1 doit être fait avant R2 pour décider si on déclenche réellement la migration ou si elle sera un no-op. Les 4 lots suivants peuvent s'enchaîner sans pause.
+Estimation : 1 cycle d'implémentation court.
