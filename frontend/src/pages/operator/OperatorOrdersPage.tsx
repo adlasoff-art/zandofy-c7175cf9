@@ -12,10 +12,11 @@ import { fromTable } from "@/lib/supabase-helpers";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import {
   Loader2, Truck, MapPin, Phone, Package, User,
-  CheckCircle2, XCircle, Clock,
+  CheckCircle2, XCircle, Clock, Search, AlertCircle,
 } from "lucide-react";
 
 type TabKey = "awaiting" | "pending" | "in_progress" | "delivered" | "cancelled";
@@ -34,11 +35,12 @@ export default function OperatorOrdersPage() {
   const queryClient = useQueryClient();
   const [assigning, setAssigning] = useState<string | null>(null);
   const [deciding, setDeciding] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [, setTick] = useState(0);
 
-  // Re-render every 30s pour le countdown
+  // Re-render toutes les 10s pour un countdown précis (mm:ss en dernière ligne droite)
   useEffect(() => {
-    const t = setInterval(() => setTick((v) => v + 1), 30_000);
+    const t = setInterval(() => setTick((v) => v + 1), 10_000);
     return () => clearInterval(t);
   }, []);
 
@@ -82,12 +84,22 @@ export default function OperatorOrdersPage() {
   const accepted = orders.filter(
     (o) => o.operator_acceptance_status !== "pending",
   );
-  const filtered =
+  const filteredByTab =
     tab === "awaiting"
       ? awaiting
       : accepted.filter((o) =>
           TAB_FILTERS[tab as Exclude<TabKey, "awaiting">]([o.status], o.assigned_rider_id),
         );
+
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? filteredByTab.filter((o) => {
+        const ref = (o.order_ref || "").toLowerCase();
+        const name = `${o.shipping_first_name || ""} ${o.shipping_last_name || ""}`.toLowerCase();
+        const phone = (o.shipping_phone || "").toLowerCase();
+        return ref.includes(q) || name.includes(q) || phone.includes(q);
+      })
+    : filteredByTab;
 
   const decide = async (
     orderId: string,
@@ -130,10 +142,19 @@ export default function OperatorOrdersPage() {
   const formatRemaining = (deadline: string | null) => {
     if (!deadline) return null;
     const ms = new Date(deadline).getTime() - Date.now();
-    if (ms <= 0) return "Expiré";
-    const mins = Math.floor(ms / 60_000);
-    if (mins < 60) return `${mins} min`;
-    return `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}`;
+    if (ms <= 0) return { text: "Expiré", urgent: true, expired: true };
+    const totalSec = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSec / 60);
+    if (mins < 5) {
+      const s = totalSec % 60;
+      return { text: `${mins}:${String(s).padStart(2, "0")}`, urgent: true, expired: false };
+    }
+    if (mins < 60) return { text: `${mins} min`, urgent: mins < 10, expired: false };
+    return {
+      text: `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}`,
+      urgent: false,
+      expired: false,
+    };
   };
 
   const assign = async (orderId: string, riderId: string) => {
@@ -159,6 +180,33 @@ export default function OperatorOrdersPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Courses</h1>
         <p className="text-sm text-muted-foreground">Commandes assignées à votre entreprise</p>
+      </div>
+
+      {/* Bandeau prioritaire si courses awaiting */}
+      {awaiting.length > 0 && tab !== "awaiting" && (
+        <button
+          onClick={() => setTab("awaiting")}
+          className="w-full flex items-center justify-between gap-3 p-3 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 hover:brightness-105 transition text-left"
+        >
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="text-amber-600" />
+            <span className="text-sm font-medium text-amber-900 dark:text-amber-100">
+              {awaiting.length} course{awaiting.length > 1 ? "s" : ""} en attente de votre réponse
+            </span>
+          </div>
+          <span className="text-xs underline text-amber-900 dark:text-amber-100">Voir →</span>
+        </button>
+      )}
+
+      {/* Search */}
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Rechercher par référence, client ou téléphone…"
+          className="pl-9 h-9 text-sm"
+        />
       </div>
 
       {/* Tabs */}
@@ -230,11 +278,18 @@ export default function OperatorOrdersPage() {
                     </p>
                   )}
                   {isAwaiting && remaining && (
-                    <p className={`flex items-center gap-1.5 font-medium ${
-                      remaining === "Expiré" ? "text-destructive" : "text-amber-600"
-                    }`}>
-                      <Clock size={11} /> Réponse dans : {remaining}
-                    </p>
+                      <p className={`flex items-center gap-1.5 font-medium ${
+                        remaining.expired
+                          ? "text-destructive"
+                          : remaining.urgent
+                          ? "text-destructive animate-pulse"
+                          : "text-amber-600"
+                      }`}>
+                        <Clock size={11} />
+                        {remaining.expired
+                          ? "Délai expiré — réassignation imminente"
+                          : `Réponse dans : ${remaining.text}`}
+                      </p>
                   )}
                 </div>
                 {isAwaiting && (

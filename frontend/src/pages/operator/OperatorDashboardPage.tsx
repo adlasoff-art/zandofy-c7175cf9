@@ -8,9 +8,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useOperatorContext } from "@/hooks/use-operator-context";
 import { fromTable } from "@/lib/supabase-helpers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Truck, Banknote, Percent, Users, Star, TrendingUp, Loader2 } from "lucide-react";
+import { Truck, Banknote, Percent, Users, Star, TrendingUp, Loader2, AlertCircle, Target } from "lucide-react";
 import { Link } from "react-router-dom";
 import { OperatorPerformanceWidget } from "@/components/operator/OperatorPerformanceWidget";
+import { OperatorOnboardingChecklist } from "@/components/operator/OperatorOnboardingChecklist";
 
 export default function OperatorDashboardPage() {
   const { operator } = useOperatorContext();
@@ -60,6 +61,40 @@ export default function OperatorDashboardPage() {
     },
   });
 
+  // Courses en attente de réponse (acceptance pending)
+  const { data: awaitingCount = 0 } = useQuery({
+    queryKey: ["operator-orders-awaiting", operator?.id],
+    enabled: !!operator?.id,
+    staleTime: 15_000,
+    queryFn: async () => {
+      const { count } = await fromTable("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("delivery_operator_id", operator!.id)
+        .eq("operator_acceptance_status", "pending");
+      return count ?? 0;
+    },
+  });
+
+  // Taux d'acceptation : accepted / (accepted + declined + expired) sur 90 derniers jours
+  const { data: acceptanceStats } = useQuery({
+    queryKey: ["operator-acceptance-rate", operator?.id],
+    enabled: !!operator?.id,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const since = new Date(Date.now() - 90 * 24 * 3600_000).toISOString();
+      const { data } = await fromTable("orders")
+        .select("operator_acceptance_status")
+        .eq("delivery_operator_id", operator!.id)
+        .in("operator_acceptance_status", ["accepted", "declined", "expired"])
+        .gte("operator_assigned_at", since)
+        .limit(1000);
+      const rows = (data ?? []) as Array<{ operator_acceptance_status: string }>;
+      const total = rows.length;
+      const accepted = rows.filter((r) => r.operator_acceptance_status === "accepted").length;
+      return { total, accepted, rate: total > 0 ? Math.round((accepted / total) * 100) : null };
+    },
+  });
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -85,12 +120,56 @@ export default function OperatorDashboardPage() {
         </p>
       </div>
 
+      {/* Onboarding checklist (se replie en bandeau succès quand complète) */}
+      <OperatorOnboardingChecklist operator={operator} />
+
+      {/* Bandeau urgent : courses à accepter */}
+      {awaitingCount > 0 && (
+        <Link
+          to="/operator/orders"
+          className="flex items-center justify-between gap-3 p-3 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 hover:brightness-105 transition"
+        >
+          <div className="flex items-center gap-2">
+            <AlertCircle size={18} className="text-amber-600 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                {awaitingCount} course{awaitingCount > 1 ? "s" : ""} à accepter
+              </p>
+              <p className="text-xs text-amber-800 dark:text-amber-200">
+                Vous avez 30 minutes pour répondre, sinon elle{awaitingCount > 1 ? "s seront réassignées" : " sera réassignée"}.
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-medium text-amber-900 dark:text-amber-100 underline">
+            Voir les courses →
+          </span>
+        </Link>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard icon={Truck} label="Courses aujourd'hui" value={todayDeliveries.toString()} hint={`${monthDeliveries} ce mois`} />
         <KpiCard icon={Banknote} label="Revenu net (mois)" value={`$${monthNet.toFixed(2)}`} hint={`Net après commission`} />
-        <KpiCard icon={Percent} label="Commission retenue" value={`$${monthCommission.toFixed(2)}`} hint={`${operator.platform_commission_pct}% / course`} />
+        <KpiCard
+          icon={Target}
+          label="Taux d'acceptation"
+          value={acceptanceStats?.rate != null ? `${acceptanceStats.rate}%` : "—"}
+          hint={
+            acceptanceStats && acceptanceStats.total > 0
+              ? `${acceptanceStats.accepted}/${acceptanceStats.total} sur 90j`
+              : "Aucune décision sur 90j"
+          }
+        />
         <KpiCard icon={Users} label="Livreurs actifs" value={`${ridersCount}/${operator.max_riders}`} hint="Quota utilisé" />
+      </div>
+
+      {/* KPI commission relégué en ligne secondaire pour garder l'info sans alourdir */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <Percent size={12} className="text-[hsl(var(--operator-primary))]" />
+          Commission Zandofy retenue ce mois : <span className="font-semibold text-foreground">${monthCommission.toFixed(2)}</span>
+          <span className="opacity-70">({operator.platform_commission_pct}%/course)</span>
+        </div>
       </div>
 
       {/* B9 — Score de fiabilité */}
