@@ -18,10 +18,12 @@ const corsHeaders = {
 };
 
 const BodySchema = z.object({
-  rider_email: z.string().trim().email().max(160),
-  vehicle_type: z.enum(["moto", "voiture", "camionnette", "velo"]).default("moto"),
+  rider_email: z.string().trim().email().max(160).optional(),
+  email: z.string().trim().email().max(160).optional(),
+  vehicle_type: z.enum(["moto", "voiture", "tricycle", "camionnette", "velo"]).default("moto"),
   vehicle_plate: z.string().trim().max(20).optional().nullable(),
-});
+  full_name: z.string().trim().max(160).optional(),
+}).refine((d) => !!(d.rider_email || d.email), { message: "rider_email ou email requis" });
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -46,7 +48,8 @@ Deno.serve(async (req) => {
     if (!parsed.success) {
       return json({ error: "Invalid input", details: parsed.error.flatten() }, 400);
     }
-    const { rider_email, vehicle_type, vehicle_plate } = parsed.data;
+    const rider_email = (parsed.data.rider_email || parsed.data.email)!.toLowerCase();
+    const { vehicle_type, vehicle_plate } = parsed.data;
 
     const svc = createClient(supabaseUrl, serviceKey);
 
