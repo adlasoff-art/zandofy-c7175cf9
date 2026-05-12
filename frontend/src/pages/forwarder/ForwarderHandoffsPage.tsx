@@ -27,7 +27,10 @@ export default function ForwarderHandoffsPage() {
           </p>
         </div>
       </header>
-      <ForwarderHandoffsPanel />
+      <ForwarderHandoffsPanel
+        forwarderIds={forwarder ? [forwarder.id] : []}
+        forwarderNames={forwarder ? { [forwarder.id]: forwarder.name } : {}}
+      />
     </div>
   );
 }
