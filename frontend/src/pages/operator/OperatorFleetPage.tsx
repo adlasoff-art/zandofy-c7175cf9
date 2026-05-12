@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { UserPlus, Loader2, ShieldAlert, Trash2, Pause, Play, ArrowUpRight } from "lucide-react";
 
 const VEHICLES = ["moto", "voiture", "tricycle", "camionnette"];
+const MIN_RIDERS = 3;
 
 export default function OperatorFleetPage() {
   const { operator, refetch } = useOperatorContext();
@@ -52,6 +53,7 @@ export default function OperatorFleetPage() {
 
   const activeCount = riders.filter((r) => r.status === "active").length;
   const quotaReached = operator && activeCount >= operator.max_riders;
+  const belowMinRiders = activeCount < MIN_RIDERS;
 
   const submitInvite = async () => {
     if (!inviteEmail.includes("@")) { toast.error("Email invalide"); return; }
@@ -203,6 +205,15 @@ export default function OperatorFleetPage() {
           <ShieldAlert size={14} className="text-amber-600 mt-0.5 shrink-0" />
           <p className="text-xs text-amber-800 dark:text-amber-200">
             Quota maximum atteint. Demandez une augmentation pour inviter plus de livreurs.
+          </p>
+        </div>
+      )}
+
+      {!quotaReached && belowMinRiders && (
+        <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md">
+          <ShieldAlert size={14} className="text-amber-600 mt-0.5 shrink-0" />
+          <p className="text-xs text-amber-800 dark:text-amber-200">
+            Recommandation Zandofy : maintenez au moins {MIN_RIDERS} livreurs actifs pour assurer un taux d'acceptation élevé. Vous en avez actuellement <span className="font-semibold">{activeCount}</span>.
           </p>
         </div>
       )}
