@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { GeoFieldsRow } from "@/components/address/GeoFieldsRow";
 import { toast } from "sonner";
 import { Plus, Loader2, Trash2, Banknote, ShieldAlert, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { useQuery as _ } from "@tanstack/react-query"; // alias to avoid duplicate import lint
 
 export default function OperatorRatesPage() {
   const { operator } = useOperatorContext();
@@ -37,6 +38,31 @@ export default function OperatorRatesPage() {
       return (data ?? []) as any[];
     },
   });
+
+  // Liste des villes couvertes par l'opérateur — utilisée pour signaler celles sans tarif approuvé
+  const { data: coveredCities = [] } = useQuery({
+    queryKey: ["operator-covered-cities", operator?.id],
+    enabled: !!operator?.id,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data } = await fromTable("delivery_operator_cities")
+        .select("city, country_code, is_active")
+        .eq("operator_id", operator!.id)
+        .eq("is_active", true);
+      return (data ?? []) as Array<{ city: string; country_code: string }>;
+    },
+  });
+
+  const cityKey = (city?: string, country?: string) =>
+    `${(country || "").toUpperCase()}|${(city || "").toLowerCase()}`;
+  const approvedRateKeys = new Set(
+    rates
+      .filter((r) => r.status === "approved" && r.is_active)
+      .map((r) => cityKey(r.city, r.country_code)),
+  );
+  const citiesWithoutApprovedRate = coveredCities.filter(
+    (c) => !approvedRateKeys.has(cityKey(c.city, c.country_code)),
+  );
 
   const findCap = (city: string, country: string) =>
     caps.find(
@@ -93,6 +119,25 @@ export default function OperatorRatesPage() {
   return (
     <div className="space-y-4">
       <div><h1 className="text-2xl font-bold">Tarifs</h1><p className="text-sm text-muted-foreground">Vos tarifs par zone géographique.</p></div>
+
+      {citiesWithoutApprovedRate.length > 0 && (
+        <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md">
+          <AlertTriangle size={14} className="text-amber-600 mt-0.5 shrink-0" />
+          <div className="text-xs text-amber-800 dark:text-amber-200">
+            <p className="font-medium">
+              {citiesWithoutApprovedRate.length} ville{citiesWithoutApprovedRate.length > 1 ? "s" : ""} sans tarif approuvé :
+            </p>
+            <p className="mt-0.5">
+              {citiesWithoutApprovedRate
+                .map((c) => `${c.city} (${c.country_code})`)
+                .join(", ")}
+            </p>
+            <p className="mt-1 opacity-80">
+              Vous n'apparaîtrez pas au checkout dans ces villes tant qu'au moins un tarif n'est pas approuvé.
+            </p>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardContent className="pt-4 space-y-3">
