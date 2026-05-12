@@ -241,7 +241,7 @@ export default function AdminLogisticsPage() {
             {[
               { label: "En transit", value: orderStats?.inTransit ?? 0, icon: Package },
               { label: "Livrés", value: orderStats?.delivered ?? 0, icon: CheckCircle },
-              { label: "Transporteurs", value: shipperCount, icon: Truck },
+              { label: "Hubs locaux", value: shipperCount, icon: Truck },
               { label: "Livreurs", value: riderCount, icon: Bike },
             ].map((s) => (
               <div key={s.label} className="bg-card border border-border rounded-xl p-4 text-center">

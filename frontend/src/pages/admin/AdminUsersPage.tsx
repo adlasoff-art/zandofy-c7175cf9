@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { UserDetailDrawer } from "@/components/admin/UserDetailDrawer";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import type { AppRole } from "@/hooks/use-roles";
+import { ALL_APP_ROLES, ROLE_LABELS_FR } from "@/lib/role-labels";
 
 type RoleFilter = "all" | "customer" | AppRole;
 type StatusFilter = "all" | "active" | "banned" | "online" | "offline";
@@ -18,21 +19,28 @@ type GenderFilter = "all" | "male" | "female" | "other";
 type AgeFilter = "all" | "18-25" | "26-35" | "36-45" | "46+";
 type ChartPeriod = "day" | "week" | "month" | "year";
 
-const ALL_ROLES: AppRole[] = ["admin", "manager", "vendor", "shipper", "rider"];
+const ALL_ROLES: AppRole[] = ALL_APP_ROLES;
 
 const roleIcons: Record<string, React.ElementType> = {
-  vendor: Store, shipper: Truck, rider: Bike, customer: UserCheck, admin: ShieldCheck, manager: ShieldCheck,
+  vendor: Store,
+  forwarder: Truck,
+  shipper: Truck,
+  operator: Truck,
+  rider: Bike,
+  customer: UserCheck,
+  admin: ShieldCheck,
+  manager: ShieldCheck,
 };
 
-const roleLabels: Record<string, string> = {
-  vendor: "Vendeur", shipper: "Transporteur", rider: "Livreur", customer: "Client", admin: "Admin", manager: "Manager",
-};
+const roleLabels = ROLE_LABELS_FR;
 
 const roleBadgeColors: Record<string, string> = {
   admin: "bg-destructive/10 text-destructive",
   manager: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
   vendor: "bg-primary/10 text-primary",
+  forwarder: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300",
   shipper: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  operator: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
   rider: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
 };
 
