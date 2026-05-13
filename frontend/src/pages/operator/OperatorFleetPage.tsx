@@ -205,7 +205,7 @@ export default function OperatorFleetPage() {
           )}
         </div>
         <div className="flex gap-2">
-          <Dialog open={quotaOpen} onOpenChange={setQuotaOpen}>
+          {operator && <Dialog open={quotaOpen} onOpenChange={setQuotaOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
                 <ArrowUpRight size={14} /> Augmenter quota
@@ -238,7 +238,7 @@ export default function OperatorFleetPage() {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
+          </Dialog>}
 
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
@@ -250,6 +250,21 @@ export default function OperatorFleetPage() {
             <DialogContent>
               <DialogHeader><DialogTitle>Inviter un livreur</DialogTitle></DialogHeader>
               <div className="space-y-3">
+                {isAdmin && (
+                  <div>
+                    <Label htmlFor="iop">Opérateur cible {operator ? "(défaut: votre opérateur)" : "*"}</Label>
+                    <select id="iop" value={inviteOperatorId}
+                      onChange={(e) => setInviteOperatorId(e.target.value)}
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                      <option value="">{operator ? `Mon opérateur (${operator.company_name})` : "— Choisir —"}</option>
+                      {allOperators.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.company_name} {o.status !== "approved" || !o.is_active ? `(${o.status})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="iemail">Email du livreur *</Label>
                   <Input id="iemail" type="email" value={inviteEmail}
