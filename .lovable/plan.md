@@ -1,66 +1,121 @@
-## Problème
+## Diagnostic — pourquoi le livreur n'apparaît pas
 
-L'edge function `operator-invite-rider` filtre strictement `delivery_operators.owner_user_id = auth.uid()` et renvoie « Aucun opérateur trouvé » dès que l'appelant n'est pas l'owner direct (cas confirmé : tu testes en prod avec un compte admin / owner légitime mais dont l'`owner_user_id` ne matche pas la ligne `delivery_operators` ciblée).
+Symptômes observés :
+- Invitation envoyée → toast OK + email reçu.
+- Le livreur clique le lien → arrive sur `/rider` (donc son compte existait déjà → la fonction l'a inséré directement dans `delivery_operator_riders` avec `status = kyc_required`).
+- Côté owner : la liste reste vide (« Aucun livreur dans la flotte »), aucune erreur visible.
 
-Aujourd'hui c'est aussi un blocage UX : un admin plateforme ne peut pas inviter au nom d'un opérateur, et un owner légitime mal rattaché reste bloqué sans diagnostic.
+La requête côté front (`OperatorFleetPage.tsx`) est :
+```
+fromTable("delivery_operator_riders")
+  .select(...)
+  .eq("operator_id", operator.id)
+```
+Pas de filtre sur `status` → la ligne `kyc_required` devrait s'afficher.
 
-## Objectif
+Quand le résultat est vide sans erreur, dans 95 % des cas en prod c'est **RLS** (silencieux) ou un **mismatch d'`operator_id`**. Vu le mémo `rls-staging-prod-divergence` (les RLS de Lot 11B / multi-operator n'ont jamais été rejouées sur la base prod `vpt…yxf`), c'est l'hypothèse n°1.
 
-1. Permettre à un admin d'inviter pour n'importe quel opérateur via un `operator_id` explicite.
-2. Garder la sécurité : un non-admin reste limité à son propre opérateur (owner).
-3. Donner un message d'erreur clair indiquant **quel** `auth.uid()` a été reçu et pourquoi le lookup a échoué (pour diagnostiquer rapidement les cas "owner légitime mais pas matché en prod").
-4. Côté UI : si l'utilisateur est admin et n'a pas d'opérateur owner, proposer un sélecteur d'opérateur dans la modale d'invitation.
-
-## Changements
-
-### Edge function `operator-invite-rider` (frontend/supabase/functions + supabase/functions, à dupliquer)
-
-- Ajouter un champ optionnel `operator_id` dans le `BodySchema`.
-- Charger les rôles de l'appelant via `user_roles` (service role).
-- Logique de résolution de l'opérateur :
-  1. Si `operator_id` fourni :
-     - admin → autorisé directement.
-     - non-admin → vérifier qu'il est owner de cet `operator_id`, sinon 403.
-  2. Sinon : fallback actuel (lookup par `owner_user_id`).
-- En cas d'absence d'opérateur, retourner un 404 explicite incluant `auth_user_id` et un hint (« Vous n'êtes pas owner d'un opérateur. Contactez un admin ou passez `operator_id`. ») pour faciliter le debug prod.
-- Conserver tout le reste (quota, invitation persistée, email Resend, JSON `request_id`).
-
-### Frontend `OperatorFleetPage.tsx` + modale d'invitation
-
-- Lire le rôle admin via `useRoles()`.
-- Si admin et pas d'opérateur owner détecté (ou multi-opérateurs) : afficher un `Select` listant les opérateurs (`delivery_operators` triés par `company_name`) ; sinon comportement inchangé.
-- Passer `operator_id` à l'invocation de l'edge function quand la sélection admin est utilisée.
-- Améliorer l'affichage d'erreur : déjà en place via `error.context.json()`, on s'assure d'afficher le nouveau hint.
-
-### Diagnostic prod (à exécuter par toi sur `supabasa.zandofy.com`)
-
-Aucun changement DB requis. SQL de vérification à lancer :
+## Étape 1 — Vérifier sur la PROD (3 requêtes SQL à exécuter dans Supabase Studio prod)
 
 ```sql
--- 1) L'opérateur existe-t-il et qui est owner ?
-select id, company_name, owner_user_id, status, is_active
-from public.delivery_operators
-order by created_at desc;
+-- (A) La ligne du livreur a-t-elle bien été insérée ?
+select id, operator_id, rider_user_id, status, vehicle_type, invited_at
+from public.delivery_operator_riders
+order by invited_at desc
+limit 10;
 
--- 2) L'email avec lequel tu es loggué correspond-il à cet owner ?
-select p.id as profile_id, p.email, array_agg(ur.role) as roles
-from public.profiles p
-left join public.user_roles ur on ur.user_id = p.id
-where p.email ilike '<TON_EMAIL>'
-group by p.id, p.email;
+-- (B) Les RLS attendues existent-elles sur les 2 tables ?
+select tablename, policyname, cmd
+from pg_policies
+where schemaname='public'
+  and tablename in ('delivery_operator_riders','delivery_operator_rider_invites')
+order by tablename, policyname;
+
+-- (C) Helper is_operator_owner présent ?
+select proname, pg_get_function_identity_arguments(oid) as args
+from pg_proc
+where proname='is_operator_owner';
 ```
 
-Si `profile_id` ≠ `delivery_operators.owner_user_id`, tu sauras que c'est un mismatch data prod (à corriger par un `update` ciblé ou via la nouvelle option admin + `operator_id`).
+Résultats attendus :
+- (A) ≥ 1 ligne avec `operator_id` = celui de l'owner.
+- (B) doit lister `op_riders_select_owner`, `op_riders_select_self`, `op_riders_select_staff`, `op_riders_insert_owner`, `op_riders_update_owner`, `op_riders_update_staff`, `op_riders_delete_owner` + 2 policies sur les invites.
+- (C) une fonction `is_operator_owner(uuid, uuid)`.
 
-## Hors scope
+Selon ce qui manque, on tombe sur l'un des cas suivants :
 
-- Pas de migration DB.
-- Pas de modification des règles RLS.
-- Pas de refonte du flux d'acceptation `operator-accept-rider-invite` (déjà OK).
+| Cas | Symptôme | Correctif |
+|---|---|---|
+| 1 | (A) vide | INSERT silencieusement bloqué côté edge (à investiguer dans les logs `operator-invite-rider`). |
+| 2 | (A) OK, (B) ne contient pas `op_riders_select_owner` ou la table invites n'a pas de policy | **Rejouer la migration RLS sur prod** (SQL fourni étape 2). |
+| 3 | (A) OK, (B) OK mais `operator_id` du rider ≠ `delivery_operators.id` lié à l'owner | Mismatch côté front (ex. owner possède 2 opérateurs → `useOperatorContext` n'en charge qu'un seul). Correctif app : afficher la flotte de **tous** les opérateurs détenus. |
+| 4 | (C) absent | Recréer la fonction `is_operator_owner` (incluse dans le SQL étape 2). |
 
-## Validation
+## Étape 2 — Migration idempotente prod (à appliquer si cas 2 ou 4)
 
-1. En tant qu'admin sans operator owner : ouvrir la modale → sélectionner un opérateur → invitation OK, ligne `delivery_operator_rider_invites` créée, email envoyé.
-2. En tant qu'owner classique : flux inchangé, pas de sélecteur affiché.
-3. Tentative non-admin avec `operator_id` d'un autre opérateur → 403 explicite.
-4. Erreur "no operator" affiche désormais le hint + `auth_user_id` dans le toast.
+Fichier à créer dans `frontend/supabase/migrations/` (la SOT prod) puis à exécuter sur la base prod :
+
+```sql
+-- Helper (no-op si déjà présent)
+CREATE OR REPLACE FUNCTION public.is_operator_owner(_uid uuid, _operator_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
+  SELECT EXISTS(
+    SELECT 1 FROM public.delivery_operators
+    WHERE id=_operator_id AND owner_user_id=_uid
+  );
+$$;
+
+-- Riders : RLS + policies idempotentes
+ALTER TABLE public.delivery_operator_riders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "op_riders_select_owner" ON public.delivery_operator_riders;
+DROP POLICY IF EXISTS "op_riders_select_self"  ON public.delivery_operator_riders;
+DROP POLICY IF EXISTS "op_riders_select_staff" ON public.delivery_operator_riders;
+DROP POLICY IF EXISTS "op_riders_update_owner" ON public.delivery_operator_riders;
+DROP POLICY IF EXISTS "op_riders_update_staff" ON public.delivery_operator_riders;
+
+CREATE POLICY "op_riders_select_owner" ON public.delivery_operator_riders
+  FOR SELECT TO authenticated USING (public.is_operator_owner(auth.uid(),operator_id));
+CREATE POLICY "op_riders_select_self" ON public.delivery_operator_riders
+  FOR SELECT TO authenticated USING (rider_user_id=auth.uid());
+CREATE POLICY "op_riders_select_staff" ON public.delivery_operator_riders
+  FOR SELECT TO authenticated USING (public.has_role(auth.uid(),'admin') OR public.has_role(auth.uid(),'manager'));
+CREATE POLICY "op_riders_update_owner" ON public.delivery_operator_riders
+  FOR UPDATE TO authenticated USING (public.is_operator_owner(auth.uid(),operator_id));
+CREATE POLICY "op_riders_update_staff" ON public.delivery_operator_riders
+  FOR UPDATE TO authenticated USING (public.has_role(auth.uid(),'admin') OR public.has_role(auth.uid(),'manager'));
+
+-- Invites : SELECT owner/staff + UPDATE owner (cancel depuis le front)
+ALTER TABLE public.delivery_operator_rider_invites ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "rider_invites_select_owner" ON public.delivery_operator_rider_invites;
+DROP POLICY IF EXISTS "rider_invites_select_staff" ON public.delivery_operator_rider_invites;
+DROP POLICY IF EXISTS "rider_invites_update_owner" ON public.delivery_operator_rider_invites;
+DROP POLICY IF EXISTS "rider_invites_update_staff" ON public.delivery_operator_rider_invites;
+
+CREATE POLICY "rider_invites_select_owner" ON public.delivery_operator_rider_invites
+  FOR SELECT TO authenticated USING (public.is_operator_owner(auth.uid(),operator_id));
+CREATE POLICY "rider_invites_select_staff" ON public.delivery_operator_rider_invites
+  FOR SELECT TO authenticated USING (public.has_role(auth.uid(),'admin') OR public.has_role(auth.uid(),'manager'));
+CREATE POLICY "rider_invites_update_owner" ON public.delivery_operator_rider_invites
+  FOR UPDATE TO authenticated USING (public.is_operator_owner(auth.uid(),operator_id));
+CREATE POLICY "rider_invites_update_staff" ON public.delivery_operator_rider_invites
+  FOR UPDATE TO authenticated USING (public.has_role(auth.uid(),'admin') OR public.has_role(auth.uid(),'manager'));
+```
+
+À noter : j'ajoute **UPDATE owner** sur `delivery_operator_rider_invites` (manquant dans la migration actuelle), sinon le bouton « Annuler l'invitation » échoue silencieusement.
+
+## Étape 3 — Robustesse front (toujours appliquée)
+
+Dans `OperatorFleetPage.tsx`, je vais :
+1. **Logguer / afficher** les erreurs de fetch riders & invites (au lieu de les avaler) → on saura tout de suite si c'est un 401/403/RLS.
+2. **Ajouter un bouton « Rafraîchir »** à côté du compteur de la flotte (pour invalider le cache 30 s sans recharger la page).
+3. **Refetch automatique** des deux queries après acceptation côté rider (déjà fait après invite, à compléter).
+
+Aucun changement business : juste de la visibilité + UX.
+
+## Livrables
+
+- SQL de diagnostic (étape 1) — à coller dans Supabase Studio prod.
+- Migration `frontend/supabase/migrations/<timestamp>_fix_operator_riders_rls.sql` (étape 2).
+- Patch `OperatorFleetPage.tsx` : exposition des erreurs + bouton refresh (étape 3).
+
+Une fois l'étape 1 exécutée, dis-moi ce que retournent (A), (B), (C) — je saurai exactement quelle case cocher et je n'aurai pas besoin de plusieurs itérations.

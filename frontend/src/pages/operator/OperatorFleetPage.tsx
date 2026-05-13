@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserPlus, Loader2, ShieldAlert, Trash2, Pause, Play, ArrowUpRight, Mail, Copy, X } from "lucide-react";
+import { UserPlus, Loader2, ShieldAlert, Trash2, Pause, Play, ArrowUpRight, Mail, Copy, X, RefreshCw } from "lucide-react";
 
 const VEHICLES = ["moto", "voiture", "tricycle", "camionnette"];
 const MIN_RIDERS = 3;
@@ -40,7 +40,7 @@ export default function OperatorFleetPage() {
   const [justification, setJustification] = useState("");
   const [requestingQuota, setRequestingQuota] = useState(false);
 
-  const { data: riders = [], isLoading } = useQuery({
+  const { data: riders = [], isLoading, error: ridersError, refetch: refetchRiders } = useQuery({
     queryKey: ["operator-fleet", operator?.id],
     enabled: !!operator?.id,
     staleTime: 30_000,
@@ -49,12 +49,15 @@ export default function OperatorFleetPage() {
         .select("id, rider_user_id, vehicle_type, vehicle_plate, status, invited_at, activated_at")
         .eq("operator_id", operator!.id)
         .order("invited_at", { ascending: false });
-      if (error) throw error;
+      if (error) {
+        console.error("[fleet] riders fetch failed:", error);
+        throw error;
+      }
       return (data ?? []) as any[];
     },
   });
 
-  const { data: invites = [] } = useQuery({
+  const { data: invites = [], error: invitesError, refetch: refetchInvites } = useQuery({
     queryKey: ["operator-fleet-invites", operator?.id],
     enabled: !!operator?.id,
     staleTime: 30_000,
@@ -65,8 +68,8 @@ export default function OperatorFleetPage() {
         .eq("status", "pending")
         .order("invited_at", { ascending: false });
       if (error) {
-        console.warn("[fleet] invites fetch failed", error.message);
-        return [];
+        console.error("[fleet] invites fetch failed:", error);
+        throw error;
       }
       return (data ?? []) as any[];
     },
@@ -89,6 +92,11 @@ export default function OperatorFleetPage() {
   const activeCount = riders.filter((r) => r.status === "active").length;
   const quotaReached = operator && activeCount >= operator.max_riders;
   const belowMinRiders = activeCount < MIN_RIDERS;
+
+  const handleRefresh = () => {
+    refetchRiders();
+    refetchInvites();
+  };
 
   const submitInvite = async () => {
     if (!inviteEmail.includes("@")) { toast.error("Email invalide"); return; }
@@ -205,6 +213,11 @@ export default function OperatorFleetPage() {
           )}
         </div>
         <div className="flex gap-2">
+          {operator && (
+            <Button variant="outline" size="sm" onClick={handleRefresh} title="Rafraîchir la flotte">
+              <RefreshCw size={14} />
+            </Button>
+          )}
           {operator && <Dialog open={quotaOpen} onOpenChange={setQuotaOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
@@ -315,6 +328,17 @@ export default function OperatorFleetPage() {
       )}
 
       {isLoading && <Loader2 className="animate-spin mx-auto my-8" size={24} />}
+      {(ridersError || invitesError) && (
+        <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md">
+          <ShieldAlert size={14} className="text-destructive mt-0.5 shrink-0" />
+          <div className="text-xs text-destructive space-y-1">
+            <p className="font-semibold">Échec du chargement de la flotte (probablement RLS).</p>
+            {ridersError && <p>Riders : {(ridersError as any)?.message || String(ridersError)}</p>}
+            {invitesError && <p>Invitations : {(invitesError as any)?.message || String(invitesError)}</p>}
+            <p className="opacity-80">Operator ID : <code>{operator?.id}</code></p>
+          </div>
+        </div>
+      )}
       {!isLoading && riders.length === 0 && invites.length === 0 && (
         <Card><CardContent className="pt-8 text-center text-sm text-muted-foreground">
           Aucun livreur dans la flotte. Cliquez sur "Inviter un livreur" pour commencer.
