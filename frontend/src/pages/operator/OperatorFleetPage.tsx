@@ -189,16 +189,20 @@ export default function OperatorFleetPage() {
     );
   };
 
-  if (!operator) return null;
+  if (!operator && !isAdmin) return null;
 
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Flotte</h1>
-          <p className="text-sm text-muted-foreground">
-            {activeCount} actif{activeCount > 1 ? "s" : ""} / {operator.max_riders} (quota)
-          </p>
+          {operator ? (
+            <p className="text-sm text-muted-foreground">
+              {activeCount} actif{activeCount > 1 ? "s" : ""} / {operator.max_riders} (quota)
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Mode admin — sélectionnez un opérateur dans la modale d'invitation</p>
+          )}
         </div>
         <div className="flex gap-2">
           <Dialog open={quotaOpen} onOpenChange={setQuotaOpen}>
