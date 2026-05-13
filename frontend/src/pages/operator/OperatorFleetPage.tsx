@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOperatorContext } from "@/hooks/use-operator-context";
+import { useRoles } from "@/hooks/use-roles";
 import { fromTable } from "@/lib/supabase-helpers";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +23,7 @@ const MIN_RIDERS = 3;
 
 export default function OperatorFleetPage() {
   const { operator, refetch } = useOperatorContext();
+  const { isAdmin } = useRoles();
   const queryClient = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [quotaOpen, setQuotaOpen] = useState(false);
@@ -30,6 +32,7 @@ export default function OperatorFleetPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
   const [inviteVehicle, setInviteVehicle] = useState("moto");
+  const [inviteOperatorId, setInviteOperatorId] = useState<string>("");
   const [inviting, setInviting] = useState(false);
 
   // Quota form
@@ -69,12 +72,28 @@ export default function OperatorFleetPage() {
     },
   });
 
+  // Liste des opérateurs visible uniquement par les admins (pour invite override)
+  const { data: allOperators = [] } = useQuery({
+    queryKey: ["all-delivery-operators-admin"],
+    enabled: isAdmin,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await fromTable("delivery_operators")
+        .select("id, company_name, status, is_active")
+        .order("company_name", { ascending: true });
+      if (error) return [];
+      return (data ?? []) as Array<{ id: string; company_name: string; status: string; is_active: boolean }>;
+    },
+  });
+
   const activeCount = riders.filter((r) => r.status === "active").length;
   const quotaReached = operator && activeCount >= operator.max_riders;
   const belowMinRiders = activeCount < MIN_RIDERS;
 
   const submitInvite = async () => {
     if (!inviteEmail.includes("@")) { toast.error("Email invalide"); return; }
+    const targetOperatorId = inviteOperatorId || operator?.id || null;
+    if (!targetOperatorId) { toast.error("Sélectionnez un opérateur"); return; }
     setInviting(true);
     try {
       const { data, error } = await supabase.functions.invoke("operator-invite-rider", {
@@ -82,6 +101,7 @@ export default function OperatorFleetPage() {
           rider_email: inviteEmail.trim().toLowerCase(),
           full_name: inviteName.trim(),
           vehicle_type: inviteVehicle,
+          operator_id: targetOperatorId,
         },
       });
       if (error) {
@@ -92,6 +112,7 @@ export default function OperatorFleetPage() {
           if (ctx && typeof ctx.json === "function") {
             const body = await ctx.json();
             serverMsg = body?.error || body?.message || serverMsg;
+            if (body?.auth_user_id) serverMsg += ` (uid: ${body.auth_user_id.slice(0, 8)}…)`;
           }
         } catch { /* ignore */ }
         throw new Error(serverMsg);
@@ -104,7 +125,7 @@ export default function OperatorFleetPage() {
         toast.success(msg);
       }
       setInviteOpen(false);
-      setInviteEmail(""); setInviteName("");
+      setInviteEmail(""); setInviteName(""); setInviteOperatorId("");
       queryClient.invalidateQueries({ queryKey: ["operator-fleet"] });
       queryClient.invalidateQueries({ queryKey: ["operator-fleet-invites"] });
     } catch (e: any) {
@@ -168,19 +189,23 @@ export default function OperatorFleetPage() {
     );
   };
 
-  if (!operator) return null;
+  if (!operator && !isAdmin) return null;
 
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Flotte</h1>
-          <p className="text-sm text-muted-foreground">
-            {activeCount} actif{activeCount > 1 ? "s" : ""} / {operator.max_riders} (quota)
-          </p>
+          {operator ? (
+            <p className="text-sm text-muted-foreground">
+              {activeCount} actif{activeCount > 1 ? "s" : ""} / {operator.max_riders} (quota)
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Mode admin — sélectionnez un opérateur dans la modale d'invitation</p>
+          )}
         </div>
         <div className="flex gap-2">
-          <Dialog open={quotaOpen} onOpenChange={setQuotaOpen}>
+          {operator && <Dialog open={quotaOpen} onOpenChange={setQuotaOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
                 <ArrowUpRight size={14} /> Augmenter quota
@@ -213,7 +238,7 @@ export default function OperatorFleetPage() {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
+          </Dialog>}
 
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
@@ -225,6 +250,21 @@ export default function OperatorFleetPage() {
             <DialogContent>
               <DialogHeader><DialogTitle>Inviter un livreur</DialogTitle></DialogHeader>
               <div className="space-y-3">
+                {isAdmin && (
+                  <div>
+                    <Label htmlFor="iop">Opérateur cible {operator ? "(défaut: votre opérateur)" : "*"}</Label>
+                    <select id="iop" value={inviteOperatorId}
+                      onChange={(e) => setInviteOperatorId(e.target.value)}
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                      <option value="">{operator ? `Mon opérateur (${operator.company_name})` : "— Choisir —"}</option>
+                      {allOperators.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.company_name} {o.status !== "approved" || !o.is_active ? `(${o.status})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="iemail">Email du livreur *</Label>
                   <Input id="iemail" type="email" value={inviteEmail}

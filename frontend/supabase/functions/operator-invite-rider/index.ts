@@ -23,6 +23,7 @@ const BodySchema = z.object({
   vehicle_type: z.enum(["moto", "voiture", "tricycle", "camionnette", "velo"]).default("moto"),
   vehicle_plate: z.string().trim().max(20).optional().nullable(),
   full_name: z.string().trim().max(160).optional(),
+  operator_id: z.string().uuid().optional(),
 }).refine((d) => !!(d.rider_email || d.email), { message: "rider_email ou email requis" });
 
 Deno.serve(async (req) => {
@@ -52,19 +53,48 @@ Deno.serve(async (req) => {
       return json({ error: "Invalid input", details: parsed.error.flatten() }, 400);
     }
     const rider_email = (parsed.data.rider_email || parsed.data.email)!.toLowerCase();
-    const { vehicle_type, vehicle_plate } = parsed.data;
+    const { vehicle_type, vehicle_plate, operator_id: requestedOperatorId } = parsed.data;
 
     const svc = createClient(supabaseUrl, serviceKey);
 
-    // Récupérer l'opérateur du user (owner)
-    const { data: op } = await svc
-      .from("delivery_operators")
-      .select("id, company_name, max_riders, status, is_active")
-      .eq("owner_user_id", userId)
-      .maybeSingle();
-    if (!op) return json({ error: "Aucun opérateur trouvé pour cet utilisateur" }, 403);
+    // Vérifier rôle admin (autorise override operator_id)
+    const { data: roleRows } = await svc
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    const isAdmin = (roleRows ?? []).some((r: { role: string }) => r.role === "admin");
+
+    // Résoudre l'opérateur : operator_id explicite (admin OU owner) sinon lookup par owner
+    let op: { id: string; company_name: string; max_riders: number; status: string; is_active: boolean; owner_user_id: string } | null = null;
+    if (requestedOperatorId) {
+      const { data } = await svc
+        .from("delivery_operators")
+        .select("id, company_name, max_riders, status, is_active, owner_user_id")
+        .eq("id", requestedOperatorId)
+        .maybeSingle();
+      op = data as typeof op;
+      if (!op) return json({ error: "Opérateur introuvable", operator_id: requestedOperatorId, auth_user_id: userId }, 404);
+      if (!isAdmin && op.owner_user_id !== userId) {
+        return json({ error: "Vous n'êtes pas owner de cet opérateur", auth_user_id: userId }, 403);
+      }
+    } else {
+      const { data } = await svc
+        .from("delivery_operators")
+        .select("id, company_name, max_riders, status, is_active, owner_user_id")
+        .eq("owner_user_id", userId)
+        .maybeSingle();
+      op = data as typeof op;
+      if (!op) {
+        return json({
+          error: "Aucun opérateur trouvé pour cet utilisateur. Si vous êtes admin, passez operator_id dans la requête ; sinon vérifiez que votre compte est bien owner d'un opérateur.",
+          auth_user_id: userId,
+          is_admin: isAdmin,
+          hint: "Vérifiez en SQL: select id, owner_user_id from public.delivery_operators where owner_user_id = '" + userId + "';",
+        }, 404);
+      }
+    }
     if (op.status !== "approved" || !op.is_active) {
-      return json({ error: "Opérateur non approuvé/actif" }, 403);
+      return json({ error: "Opérateur non approuvé/actif", status: op.status, is_active: op.is_active }, 403);
     }
 
     // Quota = riders actifs/pending + invitations ouvertes
