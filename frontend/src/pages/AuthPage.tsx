@@ -47,10 +47,22 @@ export default function AuthPage() {
 
   const searchParams = new URLSearchParams(window.location.search);
   const refCode = searchParams.get("ref") || "";
+  const redirectTo = searchParams.get("redirect") || "/";
+  const initialMode = searchParams.get("mode") === "signup" ? "signup" : "login";
+  const prefillEmail = searchParams.get("email") || "";
 
   useEffect(() => {
-    if (user) navigate("/", { replace: true });
-  }, [user, navigate]);
+    if (user) {
+      const safeRedirect = redirectTo.startsWith("/") ? redirectTo : "/";
+      navigate(safeRedirect, { replace: true });
+    }
+  }, [user, navigate, redirectTo]);
+
+  useEffect(() => {
+    setMode(initialMode);
+    if (prefillEmail && !email) setEmail(prefillEmail);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pwStrength = mode === "signup" ? getPasswordStrength(password) : null;
 
