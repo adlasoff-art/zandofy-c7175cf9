@@ -2255,6 +2255,76 @@ export type Database = {
           },
         ]
       }
+      delivery_operator_rider_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_user_id: string | null
+          email: string
+          expires_at: string
+          id: string
+          invited_at: string
+          invited_by: string | null
+          operator_id: string
+          revoked_at: string | null
+          status: string
+          token: string
+          vehicle_plate: string | null
+          vehicle_type: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          email: string
+          expires_at?: string
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          operator_id: string
+          revoked_at?: string | null
+          status?: string
+          token: string
+          vehicle_plate?: string | null
+          vehicle_type?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          operator_id?: string
+          revoked_at?: string | null
+          status?: string
+          token?: string
+          vehicle_plate?: string | null
+          vehicle_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_operator_rider_invites_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_operators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_operator_rider_invites_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_operators_by_city"
+            referencedColumns: ["operator_id"]
+          },
+          {
+            foreignKeyName: "delivery_operator_rider_invites_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "v_operator_performance"
+            referencedColumns: ["operator_id"]
+          },
+        ]
+      }
       delivery_operator_riders: {
         Row: {
           activated_at: string | null

@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserPlus, Loader2, ShieldAlert, Trash2, Pause, Play, ArrowUpRight } from "lucide-react";
+import { UserPlus, Loader2, ShieldAlert, Trash2, Pause, Play, ArrowUpRight, Mail, Copy, X } from "lucide-react";
 
 const VEHICLES = ["moto", "voiture", "tricycle", "camionnette"];
 const MIN_RIDERS = 3;
@@ -51,6 +51,24 @@ export default function OperatorFleetPage() {
     },
   });
 
+  const { data: invites = [] } = useQuery({
+    queryKey: ["operator-fleet-invites", operator?.id],
+    enabled: !!operator?.id,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await fromTable("delivery_operator_rider_invites")
+        .select("id, email, vehicle_type, status, invited_at, expires_at, token")
+        .eq("operator_id", operator!.id)
+        .eq("status", "pending")
+        .order("invited_at", { ascending: false });
+      if (error) {
+        console.warn("[fleet] invites fetch failed", error.message);
+        return [];
+      }
+      return (data ?? []) as any[];
+    },
+  });
+
   const activeCount = riders.filter((r) => r.status === "active").length;
   const quotaReached = operator && activeCount >= operator.max_riders;
   const belowMinRiders = activeCount < MIN_RIDERS;
@@ -67,13 +85,28 @@ export default function OperatorFleetPage() {
         },
       });
       if (error) {
-        const serverMsg = (data as any)?.error || error.message;
+        // Le SDK avale le body sur non-2xx : on lit error.context.json()
+        let serverMsg = error.message;
+        try {
+          const ctx = (error as any).context;
+          if (ctx && typeof ctx.json === "function") {
+            const body = await ctx.json();
+            serverMsg = body?.error || body?.message || serverMsg;
+          }
+        } catch { /* ignore */ }
         throw new Error(serverMsg);
       }
-      toast.success("Invitation envoyée");
+      if ((data as any)?.error) throw new Error((data as any).error);
+      const msg = (data as any)?.message || "Invitation envoyée";
+      if ((data as any)?.email_sent === false) {
+        toast.warning(msg);
+      } else {
+        toast.success(msg);
+      }
       setInviteOpen(false);
       setInviteEmail(""); setInviteName("");
       queryClient.invalidateQueries({ queryKey: ["operator-fleet"] });
+      queryClient.invalidateQueries({ queryKey: ["operator-fleet-invites"] });
     } catch (e: any) {
       toast.error(e.message || "Échec invitation");
     } finally {
@@ -113,6 +146,26 @@ export default function OperatorFleetPage() {
       toast.success("Statut mis à jour");
       queryClient.invalidateQueries({ queryKey: ["operator-fleet"] });
     }
+  };
+
+  const cancelInvite = async (inviteId: string) => {
+    if (!confirm("Annuler cette invitation ?")) return;
+    const { error } = await fromTable("delivery_operator_rider_invites")
+      .update({ status: "revoked", revoked_at: new Date().toISOString() })
+      .eq("id", inviteId);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Invitation annulée");
+      queryClient.invalidateQueries({ queryKey: ["operator-fleet-invites"] });
+    }
+  };
+
+  const copyInviteLink = (token: string, email: string) => {
+    const url = `${window.location.origin}/rider-invite?token=${token}&email=${encodeURIComponent(email)}`;
+    navigator.clipboard.writeText(url).then(
+      () => toast.success("Lien copié"),
+      () => toast.error("Impossible de copier"),
+    );
   };
 
   if (!operator) return null;
@@ -222,10 +275,48 @@ export default function OperatorFleetPage() {
       )}
 
       {isLoading && <Loader2 className="animate-spin mx-auto my-8" size={24} />}
-      {!isLoading && riders.length === 0 && (
+      {!isLoading && riders.length === 0 && invites.length === 0 && (
         <Card><CardContent className="pt-8 text-center text-sm text-muted-foreground">
           Aucun livreur dans la flotte. Cliquez sur "Inviter un livreur" pour commencer.
         </CardContent></Card>
+      )}
+
+      {invites.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">
+            Invitations en attente ({invites.length})
+          </h2>
+          {invites.map((inv) => (
+            <Card key={inv.id}>
+              <CardContent className="pt-3 pb-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex items-center gap-2">
+                    <Mail size={14} className="text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm text-foreground truncate">{inv.email}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {inv.vehicle_type} · invité le {new Date(inv.invited_at).toLocaleDateString()} · expire le {new Date(inv.expires_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                      En attente d'inscription
+                    </span>
+                    <Button size="icon" variant="ghost" title="Copier le lien d'invitation"
+                      onClick={() => copyInviteLink(inv.token, inv.email)}>
+                      <Copy size={14} />
+                    </Button>
+                    <Button size="icon" variant="ghost" title="Annuler l'invitation"
+                      onClick={() => cancelInvite(inv.id)}>
+                      <X size={14} className="text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
 
       <div className="space-y-2">

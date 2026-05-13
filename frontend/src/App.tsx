@@ -74,6 +74,7 @@ const DashboardPage = lazyRetry(() => import("./pages/DashboardPage"));
 const VendorDashboardPage = lazyRetry(() => import("./pages/VendorDashboardPage"));
 const ShipperDashboardPage = lazyRetry(() => import("./pages/ShipperDashboardPage"));
 const RiderDashboardPage = lazyRetry(() => import("./pages/RiderDashboardPage"));
+const RiderInvitePage = lazyRetry(() => import("./pages/RiderInvitePage"));
 const SearchPage = lazyRetry(() => import("./pages/SearchPage"));
 const WishlistPage = lazyRetry(() => import("./pages/WishlistPage"));
 const SharedWishlistPage = lazyRetry(() => import("./pages/SharedWishlistPage"));
@@ -274,6 +275,7 @@ const App = () => (
                 <Route path="/vendor" element={<VendorDashboardPage />} />
                 <Route path="/shipper" element={<ShipperDashboardPage />} />
                 <Route path="/rider" element={<RiderDashboardPage />} />
+                <Route path="/rider-invite" element={<RiderInvitePage />} />
                 <Route path="/carrier" element={<CarrierDashboardPage />} />
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/wishlist" element={<WishlistPage />} />
