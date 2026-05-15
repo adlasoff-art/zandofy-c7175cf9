@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserPlus, Loader2, ShieldAlert, Trash2, Pause, Play, ArrowUpRight, Mail, Copy, X, RefreshCw, Phone, BellRing, CheckCircle2, AlertCircle, User as UserIcon, Package, Star } from "lucide-react";
+import { UserPlus, Loader2, ShieldAlert, Trash2, Pause, Play, ArrowUpRight, Mail, Copy, X, RefreshCw, Phone, BellRing, CheckCircle2, AlertCircle, User as UserIcon, Package } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const VEHICLES = ["moto", "voiture", "tricycle", "camionnette"];
