@@ -98,25 +98,16 @@ export default function OperatorFleetPage() {
     queryFn: async () => {
       const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
       const { data } = await fromTable("orders")
-        .select("rider_id, status, rider_rating")
-        .in("rider_id", activeRiderIds)
+        .select("assigned_rider_id, status")
+        .in("assigned_rider_id", activeRiderIds)
         .gte("created_at", since);
-      const map: Record<string, { delivered: number; total: number; ratingAvg: number | null }> = {};
-      activeRiderIds.forEach((id) => { map[id] = { delivered: 0, total: 0, ratingAvg: null }; });
-      const ratingsAcc: Record<string, number[]> = {};
+      const map: Record<string, { delivered: number; total: number }> = {};
+      activeRiderIds.forEach((id) => { map[id] = { delivered: 0, total: 0 }; });
       (data ?? []).forEach((o: any) => {
-        const m = map[o.rider_id];
+        const m = map[o.assigned_rider_id];
         if (!m) return;
         m.total += 1;
         if (o.status === "delivered") m.delivered += 1;
-        if (typeof o.rider_rating === "number") {
-          ratingsAcc[o.rider_id] = ratingsAcc[o.rider_id] || [];
-          ratingsAcc[o.rider_id].push(o.rider_rating);
-        }
-      });
-      Object.keys(ratingsAcc).forEach((id) => {
-        const arr = ratingsAcc[id];
-        map[id].ratingAvg = arr.length ? arr.reduce((s, n) => s + n, 0) / arr.length : null;
       });
       return map;
     },
@@ -605,10 +596,6 @@ function RiderCard({ rider, profile, kyc, stats, onSuspend, onReactivate, onRevo
               {stats.total > 0
                 ? `${Math.round((stats.delivered / stats.total) * 100)}% complétées`
                 : "—"}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Star size={12} />
-              {stats.ratingAvg != null ? stats.ratingAvg.toFixed(2) : "—"}
             </span>
           </div>
         )}
