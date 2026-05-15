@@ -2,7 +2,7 @@
 // Returns all critical platform_settings in a single CDN-cached response.
 // Replaces 8+ sequential client requests on first paint.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

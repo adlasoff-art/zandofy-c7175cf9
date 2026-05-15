@@ -1,6 +1,6 @@
 // Watermark an image stored in Supabase Storage and overwrite the original.
 // Lot 10 — Volet C — single-version embedded watermark.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { Image } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
 
 const corsHeaders = {
