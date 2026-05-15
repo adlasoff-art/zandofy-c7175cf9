@@ -1,7 +1,7 @@
 // Edge Function: get-store-whatsapp
 // Returns the whatsapp_number of a store ONLY for authenticated users.
 // This protects against PII scraping while preserving the click-to-WhatsApp UX.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
