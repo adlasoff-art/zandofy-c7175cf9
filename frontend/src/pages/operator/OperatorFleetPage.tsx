@@ -493,7 +493,8 @@ function RiderCard({ rider, profile, kyc, stats, onSuspend, onReactivate, onRevo
   const fullName = profile ? [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim() : "";
   const displayName = fullName || profile?.email || `Livreur ${rider.rider_user_id.slice(0, 8)}…`;
   const initials = (fullName || profile?.email || "??").split(/\s+/).map((w: string) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
-  const needsKyc = rider.status === "kyc_required" || rider.status === "pending";
+  const kycApproved = kyc?.kyc_status === "approved";
+  const needsKyc = !kycApproved && (rider.status === "kyc_required" || rider.status === "pending");
   const reminderRecent = rider.last_kyc_reminder_at
     ? (Date.now() - new Date(rider.last_kyc_reminder_at).getTime()) < 24 * 3600 * 1000
     : false;
