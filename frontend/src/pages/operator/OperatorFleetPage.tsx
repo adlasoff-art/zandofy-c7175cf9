@@ -16,7 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserPlus, Loader2, ShieldAlert, Trash2, Pause, Play, ArrowUpRight, Mail, Copy, X, RefreshCw } from "lucide-react";
+import { UserPlus, Loader2, ShieldAlert, Trash2, Pause, Play, ArrowUpRight, Mail, Copy, X, RefreshCw, Phone, BellRing, CheckCircle2, AlertCircle, User as UserIcon, Package, Star } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const VEHICLES = ["moto", "voiture", "tricycle", "camionnette"];
 const MIN_RIDERS = 3;
@@ -46,7 +47,7 @@ export default function OperatorFleetPage() {
     staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await fromTable("delivery_operator_riders")
-        .select("id, rider_user_id, vehicle_type, vehicle_plate, status, invited_at, activated_at")
+        .select("id, rider_user_id, vehicle_type, vehicle_plate, status, invited_at, activated_at, last_kyc_reminder_at")
         .eq("operator_id", operator!.id)
         .order("invited_at", { ascending: false });
       if (error) {
@@ -54,6 +55,70 @@ export default function OperatorFleetPage() {
         throw error;
       }
       return (data ?? []) as any[];
+    },
+  });
+
+  // Profils des livreurs (identité)
+  const riderUserIds = riders.map((r) => r.rider_user_id).filter(Boolean);
+  const { data: profilesById = {} } = useQuery({
+    queryKey: ["operator-fleet-profiles", operator?.id, riderUserIds.sort().join(",")],
+    enabled: riderUserIds.length > 0,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await fromTable("profiles")
+        .select("id, first_name, last_name, email, phone, avatar_url")
+        .in("id", riderUserIds);
+      if (error) { console.warn("[fleet] profiles fetch failed:", error); return {}; }
+      const map: Record<string, any> = {};
+      (data ?? []).forEach((p: any) => { map[p.id] = p; });
+      return map;
+    },
+  });
+
+  // Vue KYC par livreur
+  const { data: kycById = {} } = useQuery({
+    queryKey: ["operator-fleet-kyc", operator?.id],
+    enabled: !!operator?.id && riderUserIds.length > 0,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("get_riders_kyc_overview", { _operator_id: operator!.id });
+      if (error) { console.warn("[fleet] kyc overview failed:", error); return {}; }
+      const map: Record<string, any> = {};
+      (data ?? []).forEach((row: any) => { map[row.rider_user_id] = row; });
+      return map;
+    },
+  });
+
+  // Stats activité 30j (actifs uniquement)
+  const activeRiderIds = riders.filter((r) => r.status === "active").map((r) => r.rider_user_id);
+  const { data: statsById = {} } = useQuery({
+    queryKey: ["operator-fleet-stats", operator?.id, activeRiderIds.sort().join(",")],
+    enabled: activeRiderIds.length > 0,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+      const { data } = await fromTable("orders")
+        .select("rider_id, status, rider_rating")
+        .in("rider_id", activeRiderIds)
+        .gte("created_at", since);
+      const map: Record<string, { delivered: number; total: number; ratingAvg: number | null }> = {};
+      activeRiderIds.forEach((id) => { map[id] = { delivered: 0, total: 0, ratingAvg: null }; });
+      const ratingsAcc: Record<string, number[]> = {};
+      (data ?? []).forEach((o: any) => {
+        const m = map[o.rider_id];
+        if (!m) return;
+        m.total += 1;
+        if (o.status === "delivered") m.delivered += 1;
+        if (typeof o.rider_rating === "number") {
+          ratingsAcc[o.rider_id] = ratingsAcc[o.rider_id] || [];
+          ratingsAcc[o.rider_id].push(o.rider_rating);
+        }
+      });
+      Object.keys(ratingsAcc).forEach((id) => {
+        const arr = ratingsAcc[id];
+        map[id].ratingAvg = arr.length ? arr.reduce((s, n) => s + n, 0) / arr.length : null;
+      });
+      return map;
     },
   });
 
@@ -186,6 +251,30 @@ export default function OperatorFleetPage() {
     else {
       toast.success("Invitation annulée");
       queryClient.invalidateQueries({ queryKey: ["operator-fleet-invites"] });
+    }
+  };
+
+  const remindRiderKyc = async (riderId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("operator-remind-rider-kyc", {
+        body: { rider_id: riderId },
+      });
+      if (error) {
+        let msg = error.message;
+        try {
+          const ctx = (error as any).context;
+          if (ctx?.json) {
+            const b = await ctx.json();
+            msg = b?.error || msg;
+          }
+        } catch { /* ignore */ }
+        throw new Error(msg);
+      }
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success((data as any)?.message || "Rappel envoyé");
+      queryClient.invalidateQueries({ queryKey: ["operator-fleet"] });
+    } catch (e: any) {
+      toast.error(e.message || "Échec envoi rappel");
     }
   };
 
