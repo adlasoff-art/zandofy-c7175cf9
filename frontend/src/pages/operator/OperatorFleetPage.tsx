@@ -474,46 +474,146 @@ export default function OperatorFleetPage() {
 
       <div className="space-y-2">
         {riders.map((r) => (
-          <Card key={r.id}>
-            <CardContent className="pt-3 pb-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-mono text-xs text-foreground">{r.rider_user_id.slice(0, 8)}...</p>
-                  <p className="text-xs text-muted-foreground">
-                    {r.vehicle_type} · invité le {new Date(r.invited_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={r.status} />
-                  {r.status === "active" && (
-                    <Button size="icon" variant="ghost"
-                      onClick={() => updateRiderStatus(r.id, "suspended")} title="Suspendre">
-                      <Pause size={14} />
-                    </Button>
-                  )}
-                  {r.status === "suspended" && (
-                    <Button size="icon" variant="ghost"
-                      onClick={() => updateRiderStatus(r.id, "active")} title="Réactiver">
-                      <Play size={14} />
-                    </Button>
-                  )}
-                  {r.status !== "revoked" && (
-                    <Button size="icon" variant="ghost"
-                      onClick={() => {
-                        if (confirm("Retirer définitivement ce livreur de la flotte ?")) {
-                          updateRiderStatus(r.id, "revoked");
-                        }
-                      }} title="Retirer">
-                      <Trash2 size={14} className="text-destructive" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <RiderCard
+            key={r.id}
+            rider={r}
+            profile={(profilesById as any)[r.rider_user_id]}
+            kyc={(kycById as any)[r.rider_user_id]}
+            stats={(statsById as any)[r.rider_user_id]}
+            onSuspend={() => updateRiderStatus(r.id, "suspended")}
+            onReactivate={() => updateRiderStatus(r.id, "active")}
+            onRevoke={() => {
+              if (confirm("Retirer définitivement ce livreur de la flotte ?")) {
+                updateRiderStatus(r.id, "revoked");
+              }
+            }}
+            onRemindKyc={() => remindRiderKyc(r.id)}
+          />
         ))}
       </div>
     </div>
+  );
+}
+
+function RiderCard({ rider, profile, kyc, stats, onSuspend, onReactivate, onRevoke, onRemindKyc }: {
+  rider: any; profile?: any; kyc?: any; stats?: any;
+  onSuspend: () => void; onReactivate: () => void; onRevoke: () => void; onRemindKyc: () => void;
+}) {
+  const fullName = profile ? [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim() : "";
+  const displayName = fullName || profile?.email || `Livreur ${rider.rider_user_id.slice(0, 8)}…`;
+  const initials = (fullName || profile?.email || "??").split(/\s+/).map((w: string) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+  const needsKyc = rider.status === "kyc_required" || rider.status === "pending";
+  const reminderRecent = rider.last_kyc_reminder_at
+    ? (Date.now() - new Date(rider.last_kyc_reminder_at).getTime()) < 24 * 3600 * 1000
+    : false;
+  const labelMap: Record<string, string> = {
+    document_front: "Pièce d'identité (recto)",
+    document_back: "Pièce d'identité (verso)",
+    selfie: "Selfie",
+  };
+
+  return (
+    <Card>
+      <CardContent className="pt-3 pb-3 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <Avatar className="h-10 w-10 shrink-0">
+              {profile?.avatar_url ? <AvatarImage src={profile.avatar_url} alt={displayName} /> : null}
+              <AvatarFallback className="text-xs">{initials || <UserIcon size={14} />}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                {profile?.email && <span className="truncate">{profile.email}</span>}
+                {profile?.phone && (
+                  <a href={`tel:${profile.phone}`} className="inline-flex items-center gap-1 hover:text-foreground">
+                    <Phone size={11} /> {profile.phone}
+                  </a>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                {rider.vehicle_type}
+                {rider.vehicle_plate ? ` · plaque ${rider.vehicle_plate}` : ""}
+                {" · invité le "}{new Date(rider.invited_at).toLocaleDateString()}
+                {rider.activated_at ? ` · actif depuis ${new Date(rider.activated_at).toLocaleDateString()}` : ""}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <StatusBadge status={rider.status} />
+            {rider.status === "active" && (
+              <Button size="icon" variant="ghost" onClick={onSuspend} title="Suspendre"><Pause size={14} /></Button>
+            )}
+            {rider.status === "suspended" && (
+              <Button size="icon" variant="ghost" onClick={onReactivate} title="Réactiver"><Play size={14} /></Button>
+            )}
+            {rider.status !== "revoked" && (
+              <Button size="icon" variant="ghost" onClick={onRevoke} title="Retirer">
+                <Trash2 size={14} className="text-destructive" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {needsKyc && (
+          <div className="rounded-md border border-orange-200 dark:border-orange-900 bg-orange-50/60 dark:bg-orange-950/20 p-2.5 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-orange-800 dark:text-orange-300">
+              <AlertCircle size={13} />
+              KYC en attente {kyc?.kyc_status ? `(${kyc.kyc_status})` : ""}
+            </div>
+            {kyc?.missing_steps?.length ? (
+              <ul className="text-xs text-orange-800/90 dark:text-orange-200/90 space-y-0.5 ml-5 list-disc">
+                {kyc.missing_steps.map((s: string) => <li key={s}>{labelMap[s] ?? s}</li>)}
+              </ul>
+            ) : kyc?.kyc_status === "pending" ? (
+              <p className="text-xs text-orange-800/90 dark:text-orange-200/90 ml-1">
+                Pièces soumises, en attente de validation par l'équipe Zandofy.
+              </p>
+            ) : kyc?.kyc_status === "rejected" ? (
+              <p className="text-xs text-destructive ml-1">
+                Rejet : {kyc.rejection_reason || "raison non précisée"}
+              </p>
+            ) : (
+              <p className="text-xs text-orange-800/90 dark:text-orange-200/90 ml-1">
+                Le livreur n'a encore rien soumis.
+              </p>
+            )}
+            <div className="flex items-center gap-2 pt-1">
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
+                disabled={reminderRecent || kyc?.kyc_status === "pending"}
+                onClick={onRemindKyc}>
+                <BellRing size={12} />
+                {reminderRecent ? "Rappel envoyé (24 h)" : "Relancer par email"}
+              </Button>
+              {rider.last_kyc_reminder_at && (
+                <span className="text-[10px] text-muted-foreground">
+                  Dernier rappel : {new Date(rider.last_kyc_reminder_at).toLocaleString()}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {rider.status === "active" && stats && (
+          <div className="flex items-center gap-4 text-xs text-muted-foreground border-t border-border pt-2">
+            <span className="inline-flex items-center gap-1">
+              <Package size={12} />
+              <span className="font-medium text-foreground">{stats.delivered}</span> livrées (30 j)
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <CheckCircle2 size={12} />
+              {stats.total > 0
+                ? `${Math.round((stats.delivered / stats.total) * 100)}% complétées`
+                : "—"}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Star size={12} />
+              {stats.ratingAvg != null ? stats.ratingAvg.toFixed(2) : "—"}
+            </span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
