@@ -2330,6 +2330,7 @@ export type Database = {
           activated_at: string | null
           id: string
           invited_at: string
+          last_kyc_reminder_at: string | null
           operator_id: string
           revoked_at: string | null
           rider_user_id: string
@@ -2341,6 +2342,7 @@ export type Database = {
           activated_at?: string | null
           id?: string
           invited_at?: string
+          last_kyc_reminder_at?: string | null
           operator_id: string
           revoked_at?: string | null
           rider_user_id: string
@@ -2352,6 +2354,7 @@ export type Database = {
           activated_at?: string | null
           id?: string
           invited_at?: string
+          last_kyc_reminder_at?: string | null
           operator_id?: string
           revoked_at?: string | null
           rider_user_id?: string
@@ -10764,6 +10767,19 @@ export type Database = {
           real_avg_rating: number
           real_review_count: number
           real_sales_count: number
+        }[]
+      }
+      get_riders_kyc_overview: {
+        Args: { _operator_id: string }
+        Returns: {
+          has_document_back: boolean
+          has_document_front: boolean
+          has_selfie: boolean
+          kyc_status: string
+          kyc_updated_at: string
+          missing_steps: string[]
+          rejection_reason: string
+          rider_user_id: string
         }[]
       }
       get_store_followers_count: {
