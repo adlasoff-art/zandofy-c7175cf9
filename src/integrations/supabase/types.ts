@@ -10421,6 +10421,16 @@ export type Database = {
           id: string
         }[]
       }
+      admin_search_forwarder_users: {
+        Args: { p_limit?: number; p_query?: string }
+        Returns: {
+          display_label: string
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+        }[]
+      }
       admin_search_users: {
         Args: { p_limit?: number; p_query: string }
         Returns: {

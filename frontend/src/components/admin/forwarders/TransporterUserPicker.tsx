@@ -47,11 +47,16 @@ export function TransporterUserPicker({ value, onChange, placeholder, disabled }
     },
   });
 
+  // Search restricted to users with the "forwarder" role.
+  // When the popover is open and the query is empty, we pre-load the top 20 forwarders.
   const { data: hits = [], isFetching } = useQuery({
-    queryKey: ["admin-search-users", debounced],
-    enabled: open && debounced.length >= 2,
+    queryKey: ["admin-search-forwarder-users", debounced],
+    enabled: open,
     queryFn: async () => {
-      const { data, error } = await sb.rpc("admin_search_users", { p_query: debounced, p_limit: 12 });
+      const { data, error } = await sb.rpc("admin_search_forwarder_users", {
+        p_query: debounced || null,
+        p_limit: 20,
+      });
       if (error) throw error;
       return (data ?? []) as UserHit[];
     },
@@ -84,23 +89,21 @@ export function TransporterUserPicker({ value, onChange, placeholder, disabled }
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Email, prénom ou nom (min. 2 caractères)"
+              placeholder="Filtrer par email, prénom ou nom"
               className="pl-7 h-9"
             />
           </div>
 
           <div className="mt-2 max-h-64 overflow-y-auto">
-            {debounced.length < 2 ? (
-              <p className="text-xs text-muted-foreground px-2 py-3 text-center">
-                Tapez au moins 2 caractères…
-              </p>
-            ) : isFetching ? (
+            {isFetching ? (
               <div className="flex justify-center py-3">
                 <Loader2 className="animate-spin text-primary" size={14} />
               </div>
             ) : hits.length === 0 ? (
               <p className="text-xs text-muted-foreground px-2 py-3 text-center">
-                Aucun utilisateur trouvé.
+                Aucun compte avec le rôle Transitaire.
+                <br />
+                Ajoutez d'abord le rôle dans Admin &gt; Utilisateurs.
               </p>
             ) : (
               <ul className="space-y-1">
@@ -125,6 +128,9 @@ export function TransporterUserPicker({ value, onChange, placeholder, disabled }
               </ul>
             )}
           </div>
+          <p className="text-[10px] text-muted-foreground px-2 pt-2 border-t mt-2">
+            Seuls les utilisateurs ayant le rôle Transitaire apparaissent ici.
+          </p>
         </PopoverContent>
       </Popover>
 
