@@ -1735,6 +1735,15 @@ export default function CheckoutPage() {
                     </>
                   ) : null}
 
+                  {/* Mobile/Tablet (< lg) — Récapitulatif commande (haut) inséré
+                      juste après l'adresse, avant les choix de paiement frais
+                      d'expédition. Sur desktop, ce bloc est dans la sidebar. */}
+                  {!isDesktop && (
+                    <div className="pt-3 border-t border-border space-y-4">
+                      {renderSummaryTop()}
+                    </div>
+                  )}
+
                   {/* Deferred shipping payment option */}
                   {shippingCost > 0 && (() => {
                     // Lot Very Speed — Si un transitaire est requis (offres dispos) mais aucun
@@ -1919,6 +1928,15 @@ export default function CheckoutPage() {
                     )}
                   </div>
 
+                  {/* Mobile/Tablet (< lg) — Totaux récap juste avant le bouton
+                      Continuer, après toutes les sélections (transitaire,
+                      paiement frais, option livraison). */}
+                  {!isDesktop && (
+                    <div className="pt-3 border-t border-border space-y-3">
+                      {renderSummaryTotals()}
+                    </div>
+                  )}
+
                   <Button type="submit" className="w-full h-12 font-bold mt-2">
                     {t("checkout.continueToPayment")} <ChevronRight size={16} />
                   </Button>
@@ -1928,6 +1946,15 @@ export default function CheckoutPage() {
 
             {step === "payment" && (
               <div className="bg-card rounded-lg p-6 shadow-card space-y-5">
+                {/* Mobile/Tablet (< lg) — Récap commande + totaux affichés au-dessus
+                    du mode de paiement pour que l'utilisateur voie ce qu'il paye. */}
+                {!isDesktop && (
+                  <div className="space-y-4 pb-4 border-b border-border">
+                    {renderSummaryTop()}
+                    {renderSummaryTotals()}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                     <CreditCard size={18} /> {t("checkout.paymentMethod")}
