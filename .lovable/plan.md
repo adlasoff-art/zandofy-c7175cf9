@@ -1,54 +1,152 @@
-## Cause
+## Objectif
 
-L'erreur `column forwarder_handoffs.deposit_required does not exist` provient de la prod (`vpt...yxf`) à laquelle il manque la migration **Lot 4O** (acompte / solde sur les handoffs transitaires).
+Sur **mobile + tablette uniquement** (`< lg`, soit < 1024px), réorganiser l'ordre d'affichage des sections de la page Checkout pour éviter les va-et-vient. **La version desktop (`≥ lg`) reste strictement identique** : colonne gauche + sidebar récap à droite, aucune modification visuelle ni logique.
 
-En auditant la divergence entre `supabase/migrations/` (Lovable Cloud, à jour) et `frontend/supabase/migrations/` (source GitHub → prod), **7 migrations forwarder_handoffs n'ont jamais été copiées vers `frontend/`**, donc GitHub Actions ne les a jamais déployées en prod :
+Aucun changement métier, aucun changement de flux de paiement, aucune migration DB, aucun edge function. Pur réagencement responsive dans `frontend/src/pages/CheckoutPage.tsx`.
 
-| # | Fichier | Contenu |
-|---|---|---|
-| 1 | `20260423183341_…` | Création initiale handoffs + RPC v1 |
-| 2 | `20260423231921_…` | RPC quote v2 (deposit) |
-| 3 | `20260424101513_…` | Ajustements coverage |
-| 4 | `20260424130759_…` | **Lot 4O — colonnes deposit/balance/payment_status** ← cause du bug |
-| 5 | `20260424130816_…` | RLS / policies handoffs |
-| 6 | `20260424193202_…` | Réassignation forwarder (legs) |
-| 7 | `20260428221831_…` | Vues / index |
+---
 
-Conformément à la mémoire `rls-staging-prod-divergence`, tout fix doit être **rejoué sur les deux** (staging + prod) en passant par `frontend/supabase/migrations/`.
+## Problème actuel (mobile)
 
-## Plan
+Aujourd'hui la grille `grid lg:grid-cols-5` empile sur mobile dans cet ordre :
 
-### 1. Correctif immédiat (fichier SQL téléchargeable)
+```
+[Adresses enregistrées / Formulaire adresse]
+[Paiement des frais d'expédition (payer maintenant / à l'arrivée)]
+[Option de livraison (domicile / hub) + sélecteur opérateur]
+[Bouton "Continuer vers le paiement"]
+[Récapitulatif commande]            ← contient le choix transitaire !
+  ├─ Items
+  ├─ Code promo
+  ├─ Calculateur shipping + CHOIX TRANSITAIRE
+  ├─ ZandoPoints
+  └─ Sous-total / frais / Total
+```
 
-Générer **un seul fichier SQL idempotent** pour la prod, à exécuter dans Supabase SQL Editor sur `vpt...yxf` :
+Le client doit donc **scroller tout en bas** pour choisir le transitaire, **remonter** pour choisir « payer maintenant / à l'arrivée », **remonter encore** pour cocher domicile/hub, puis redescendre cliquer « Continuer ». Même chose à l'étape paiement : le récap est en-dessous des moyens de paiement.
 
-- Tout le contenu de la migration **Lot 4O** (colonnes `deposit_required`, `deposit_amount`, `deposit_paid_amount`, `deposit_paid_at`, `balance_amount`, `balance_paid_amount`, `balance_paid_at`, `payment_status`, `payment_currency`)
-- Backfill depuis `freight_quotes`
-- Fonction + trigger `recompute_handoff_payment_status`
+---
 
-Toutes les opérations utilisent `IF NOT EXISTS` / `CREATE OR REPLACE` / `DROP TRIGGER IF EXISTS` → ré-exécution sûre.
+## Nouvel ordre demandé (mobile/tablette)
 
-Livré dans `/mnt/documents/fix_forwarder_handoffs_deposit_lot4o.sql`.
+### Étape 1 — Livraison (`step === "shipping"`)
 
-→ **Effet immédiat** : la page `/forwarder/handoffs` recharge sans erreur.
+```
+1. Adresses enregistrées / Formulaire adresse
+2. Récapitulatif commande (haut)
+   ├─ Items (×N)
+   ├─ Code promo
+   ├─ Calculateur shipping (aérien/maritime) + CHOIX TRANSITAIRE
+   └─ ZandoPoints
+3. Paiement des frais d'expédition (payer maintenant / à l'arrivée au Hub)
+4. Option de livraison (domicile / retrait Hub) + sélecteur opérateur
+5. Récapitulatif totaux (bas)
+   ├─ Sous-total
+   ├─ Réductions (promo, fidélité, points)
+   ├─ Frais d'expédition
+   ├─ Livraison locale
+   └─ TOTAL
+6. Bouton "Continuer vers le paiement"
+```
 
-### 2. Synchronisation GitHub (pour pérenniser)
+### Étape 2 — Paiement (`step === "payment"`)
 
-Copier les **7 migrations** de `supabase/migrations/` vers `frontend/supabase/migrations/` (mêmes timestamps, mêmes noms) afin que :
-- Les prochains déploiements GitHub Actions appliquent automatiquement le Lot 4O sur tout nouvel environnement.
-- Staging et prod restent alignées avec Lovable Cloud.
+```
+1. Récapitulatif commande (haut)  — items + promo + calculateur + points
+2. Récapitulatif totaux (bas) — sous-total + Total
+3. Mode de paiement
+   ├─ Bloc "Livraison à : adresse"
+   ├─ Liste des méthodes (Carte, PayPal, Mobile Money, COD, hors plateforme)
+   └─ Champs spécifiques + bouton Payer
+```
 
-Aucune des 7 ne sera ré-exécutée en prod (timestamps déjà passés, ou idempotents) — c'est purement de la mise en conformité du repo.
+### Desktop (`≥ lg`) — INCHANGÉ
 
-### 3. À ne pas faire dans ce lot
+Colonne gauche : adresse → shipping payment → delivery option → bouton.
+Sidebar droite sticky : récap complet (items + calculateur + totaux). Identique à aujourd'hui.
 
-- Aucun changement de code frontend (le code attend déjà ces colonnes, c'est la DB qui est en retard).
-- Pas de modification de RLS, de RPC, ni de structure au-delà du Lot 4O.
-- Pas de touche aux 6 autres migrations dont le contenu est déjà appliqué côté prod (à confirmer par toi : vois ci-dessous).
+---
 
-## Question avant exécution
+## Illustration ASCII
 
-Confirme un des deux scopes :
+```text
+─────────────── MOBILE (avant) ───────────────   ─────────────── MOBILE (après) ───────────────
+┌───────────────────────────┐                    ┌───────────────────────────┐
+│ Adresse enregistrée       │                    │ Adresse enregistrée       │
+├───────────────────────────┤                    ├───────────────────────────┤
+│ Paiement frais expédition │ ← pas de montant   │ Récap commande (haut)     │
+│  ○ Payer maintenant       │   sans transitaire │  • Items                  │
+│  ○ Payer à l'arrivée      │                    │  • Code promo             │
+├───────────────────────────┤                    │  • Aérien / Maritime      │
+│ Option de livraison       │                    │  • CHOIX TRANSITAIRE  ⭐  │
+│  ○ Livraison à domicile   │                    │  • ZandoPoints            │
+│  ○ Retrait Hub            │                    ├───────────────────────────┤
+├───────────────────────────┤                    │ Paiement frais expédition │ ← montant exact
+│ [Continuer vers paiement] │ ← clic trop tôt    │  ○ Payer maintenant       │
+├───────────────────────────┤                    │  ○ Payer à l'arrivée      │
+│ Récap commande            │                    ├───────────────────────────┤
+│  • Items                  │                    │ Option de livraison       │
+│  • Code promo             │                    │  ○ Domicile (+ opérateur) │
+│  • CHOIX TRANSITAIRE  ⭐  │ ← découvert tard  │  ○ Retrait Hub            │
+│  • ZandoPoints            │                    ├───────────────────────────┤
+│  • Sous-total / TOTAL     │                    │ Récap totaux (bas)        │
+└───────────────────────────┘                    │  Sous-total ... TOTAL     │
+                                                  ├───────────────────────────┤
+                                                  │ [Continuer vers paiement] │
+                                                  └───────────────────────────┘
 
-- **A.** Juste le fix Lot 4O (SQL téléchargeable + copier uniquement cette migration dans `frontend/`).
-- **B.** Fix Lot 4O **+** copier les 7 migrations dans `frontend/` pour réaligner le repo (recommandé).
+─────────────── DESKTOP (inchangé) ───────────────
+┌─────────────────────────────┬───────────────────────────┐
+│ Adresse                     │ Récap commande (sticky)   │
+│ Paiement frais expédition   │  Items                    │
+│ Option de livraison         │  Code promo               │
+│ [Continuer vers paiement]   │  Calculateur + transitaire│
+│                             │  Sous-total / TOTAL       │
+└─────────────────────────────┴───────────────────────────┘
+```
+
+---
+
+## Détails techniques (pour l'agent / Cursor)
+
+Fichier unique modifié : **`frontend/src/pages/CheckoutPage.tsx`** (aucun autre fichier).
+
+1. **Extraire 2 sous-blocs JSX** déjà présents dans la sidebar actuelle (lignes ~2055–2244) en fonctions locales internes au composant (pas de nouveaux fichiers, pour minimiser le diff) :
+   - `renderSummaryTop()` → titre, items, code promo, `CheckoutShippingCalculator` (qui porte le choix transitaire), ZandoPoints, notice de plafond de réductions.
+   - `renderSummaryTotals()` → bloc sous-total / réductions / shipping / livraison locale / Total + bandeau « Paiement sécurisé ».
+
+2. **Sidebar desktop** (`lg:col-span-2`) : devient `hidden lg:block`. Contient `renderSummaryTop()` + `renderSummaryTotals()` exactement comme aujourd'hui (sticky, même styles).
+
+3. **Colonne principale, étape `shipping`** : insérer, **uniquement en mobile (`lg:hidden`)**, dans cet ordre :
+   - juste après le bloc adresses/formulaire → `renderSummaryTop()` dans une `Card` identique (`bg-card rounded-lg p-5 shadow-card space-y-4`).
+   - le bloc "Paiement des frais d'expédition" et "Option de livraison" restent à leur place actuelle.
+   - juste avant le `<Button type="submit">Continuer vers le paiement` → `renderSummaryTotals()`.
+
+4. **Colonne principale, étape `payment`** : insérer en haut du bloc, **uniquement en mobile (`lg:hidden`)** :
+   - `renderSummaryTop()` puis `renderSummaryTotals()` AVANT le titre "Mode de paiement".
+
+5. **Pas de duplication d'état** : les deux rendus pointent vers les mêmes setters/handlers (`appliedCoupon`, `handleApplyCoupon`, `handleForwarderChange`, `setUsePoints`, etc.). Le `CheckoutShippingCalculator` n'est instancié **qu'une seule fois** par viewport grâce au `hidden lg:block` / `lg:hidden` mutuellement exclusifs → pas de double fetch des offres transitaires.
+
+6. **Breakpoint** : `lg` (1024px). Comme `useIsMobile` est à 768px, on n'utilise pas ce hook pour éviter un seuil divergent ; on reste en pur CSS Tailwind responsive. Tablettes < 1024px bénéficient donc du nouvel ordre (cohérent avec le besoin exprimé).
+
+7. **Sticky** : seul le récap desktop reste `sticky top-24`. Les blocs mobile ne sont pas sticky (sinon problème d'empilement).
+
+8. **Aucune modification** des conditions de validation (`handleProceedToPayment`), du calcul de `total`, du flux paiement, du choix transitaire, des règles RLS, des migrations, des Edge Functions, des memories.
+
+9. **i18n** : aucune nouvelle clé `t(...)` nécessaire, tout est déjà traduit.
+
+10. **QA après implémentation** :
+    - Mobile (375px) : vérifier ordre exact des sections étapes 1 & 2, vérifier que le choix transitaire met bien à jour le montant affiché juste en-dessous, que le bouton « Continuer » apparaît bien tout en bas après le Total.
+    - Tablette (820px) : même comportement mobile attendu.
+    - Desktop (≥1024px) : strictement identique à aujourd'hui (capture avant/après sidebar).
+    - Vérifier qu'il n'y a **qu'un seul** `CheckoutShippingCalculator` monté (devtools React) pour ne pas dupliquer les requêtes.
+
+---
+
+## Hors scope (explicite)
+
+- Pas de refonte visuelle des cartes.
+- Pas de changement desktop.
+- Pas de changement du parcours étape 2 → 3 (confirmation).
+- Pas de touche aux composants `ForwarderSelector`, `OperatorSelector`, `CheckoutShippingCalculator`.
+- Pas de nouveau hook, pas de nouveau contexte.
