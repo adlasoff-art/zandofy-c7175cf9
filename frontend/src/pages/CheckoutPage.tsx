@@ -2249,6 +2249,15 @@ export default function CheckoutPage() {
                     )}
                   </div>
                 )}
+
+                {/* Mobile/Tablet (< lg) — Récap commande complet déplacé en bas
+                    de l'étape paiement (items, promo, calculateur, points, totaux). */}
+                {!isDesktop && (
+                  <div className="space-y-4 pt-4 border-t border-border">
+                    {renderSummaryTop()}
+                    {renderSummaryTotals()}
+                  </div>
+                )}
               </div>
             )}
 
