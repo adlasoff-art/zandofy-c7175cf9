@@ -1946,15 +1946,6 @@ export default function CheckoutPage() {
 
             {step === "payment" && (
               <div className="bg-card rounded-lg p-6 shadow-card space-y-5">
-                {/* Mobile/Tablet (< lg) — Récap commande + totaux affichés au-dessus
-                    du mode de paiement pour que l'utilisateur voie ce qu'il paye. */}
-                {!isDesktop && (
-                  <div className="space-y-4 pb-4 border-b border-border">
-                    {renderSummaryTop()}
-                    {renderSummaryTotals()}
-                  </div>
-                )}
-
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                     <CreditCard size={18} /> {t("checkout.paymentMethod")}
@@ -1971,6 +1962,15 @@ export default function CheckoutPage() {
                   <p className="text-muted-foreground">{shipping.address}{shipping.quartier ? `, ${shipping.quartier}` : ""}{shipping.commune ? `, ${shipping.commune}` : ""}, {shipping.city}, {shipping.country}</p>
                   <p className="text-muted-foreground">{shipping.phone}</p>
                 </div>
+
+                {/* Mobile/Tablet (< lg) — Mini-doublure des totaux entre l'adresse
+                    d'expédition et la liste des moyens de paiement, pour voir le
+                    montant à payer sans scroller. */}
+                {!isDesktop && (
+                  <div className="pt-3 pb-1 border-t border-b border-border">
+                    {renderSummaryTotals()}
+                  </div>
+                )}
 
                 <div className="space-y-3">
                   {([

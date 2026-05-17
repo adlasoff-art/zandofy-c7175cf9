@@ -1,152 +1,77 @@
 ## Objectif
 
-Sur **mobile + tablette uniquement** (`< lg`, soit < 1024px), réorganiser l'ordre d'affichage des sections de la page Checkout pour éviter les va-et-vient. **La version desktop (`≥ lg`) reste strictement identique** : colonne gauche + sidebar récap à droite, aucune modification visuelle ni logique.
+Sur **mobile/tablette uniquement** (`< lg`), à l'étape 2 du checkout (`step === "payment"`), remettre le bloc « Mode de paiement » EN PREMIER, et déplacer le récapitulatif complet (items + calculateur + totaux) en BAS. En plus, insérer une **mini-doublure des totaux** (sous-total, expédition, livraison, total + bandeau « Paiement 100% sécurisé ») juste entre le récap d'adresse d'expédition et la liste des moyens de paiement, pour que le client voie le montant à payer sans scroller.
 
-Aucun changement métier, aucun changement de flux de paiement, aucune migration DB, aucun edge function. Pur réagencement responsive dans `frontend/src/pages/CheckoutPage.tsx`.
-
----
-
-## Problème actuel (mobile)
-
-Aujourd'hui la grille `grid lg:grid-cols-5` empile sur mobile dans cet ordre :
-
-```
-[Adresses enregistrées / Formulaire adresse]
-[Paiement des frais d'expédition (payer maintenant / à l'arrivée)]
-[Option de livraison (domicile / hub) + sélecteur opérateur]
-[Bouton "Continuer vers le paiement"]
-[Récapitulatif commande]            ← contient le choix transitaire !
-  ├─ Items
-  ├─ Code promo
-  ├─ Calculateur shipping + CHOIX TRANSITAIRE
-  ├─ ZandoPoints
-  └─ Sous-total / frais / Total
-```
-
-Le client doit donc **scroller tout en bas** pour choisir le transitaire, **remonter** pour choisir « payer maintenant / à l'arrivée », **remonter encore** pour cocher domicile/hub, puis redescendre cliquer « Continuer ». Même chose à l'étape paiement : le récap est en-dessous des moyens de paiement.
+Desktop (`≥ lg`) strictement inchangé. Aucun changement métier, aucune migration DB.
 
 ---
 
-## Nouvel ordre demandé (mobile/tablette)
-
-### Étape 1 — Livraison (`step === "shipping"`)
-
-```
-1. Adresses enregistrées / Formulaire adresse
-2. Récapitulatif commande (haut)
-   ├─ Items (×N)
-   ├─ Code promo
-   ├─ Calculateur shipping (aérien/maritime) + CHOIX TRANSITAIRE
-   └─ ZandoPoints
-3. Paiement des frais d'expédition (payer maintenant / à l'arrivée au Hub)
-4. Option de livraison (domicile / retrait Hub) + sélecteur opérateur
-5. Récapitulatif totaux (bas)
-   ├─ Sous-total
-   ├─ Réductions (promo, fidélité, points)
-   ├─ Frais d'expédition
-   ├─ Livraison locale
-   └─ TOTAL
-6. Bouton "Continuer vers le paiement"
-```
-
-### Étape 2 — Paiement (`step === "payment"`)
-
-```
-1. Récapitulatif commande (haut)  — items + promo + calculateur + points
-2. Récapitulatif totaux (bas) — sous-total + Total
-3. Mode de paiement
-   ├─ Bloc "Livraison à : adresse"
-   ├─ Liste des méthodes (Carte, PayPal, Mobile Money, COD, hors plateforme)
-   └─ Champs spécifiques + bouton Payer
-```
-
-### Desktop (`≥ lg`) — INCHANGÉ
-
-Colonne gauche : adresse → shipping payment → delivery option → bouton.
-Sidebar droite sticky : récap complet (items + calculateur + totaux). Identique à aujourd'hui.
-
----
-
-## Illustration ASCII
+## Ordre mobile actuel (étape paiement)
 
 ```text
-─────────────── MOBILE (avant) ───────────────   ─────────────── MOBILE (après) ───────────────
-┌───────────────────────────┐                    ┌───────────────────────────┐
-│ Adresse enregistrée       │                    │ Adresse enregistrée       │
-├───────────────────────────┤                    ├───────────────────────────┤
-│ Paiement frais expédition │ ← pas de montant   │ Récap commande (haut)     │
-│  ○ Payer maintenant       │   sans transitaire │  • Items                  │
-│  ○ Payer à l'arrivée      │                    │  • Code promo             │
-├───────────────────────────┤                    │  • Aérien / Maritime      │
-│ Option de livraison       │                    │  • CHOIX TRANSITAIRE  ⭐  │
-│  ○ Livraison à domicile   │                    │  • ZandoPoints            │
-│  ○ Retrait Hub            │                    ├───────────────────────────┤
-├───────────────────────────┤                    │ Paiement frais expédition │ ← montant exact
-│ [Continuer vers paiement] │ ← clic trop tôt    │  ○ Payer maintenant       │
-├───────────────────────────┤                    │  ○ Payer à l'arrivée      │
-│ Récap commande            │                    ├───────────────────────────┤
-│  • Items                  │                    │ Option de livraison       │
-│  • Code promo             │                    │  ○ Domicile (+ opérateur) │
-│  • CHOIX TRANSITAIRE  ⭐  │ ← découvert tard  │  ○ Retrait Hub            │
-│  • ZandoPoints            │                    ├───────────────────────────┤
-│  • Sous-total / TOTAL     │                    │ Récap totaux (bas)        │
-└───────────────────────────┘                    │  Sous-total ... TOTAL     │
-                                                  ├───────────────────────────┤
-                                                  │ [Continuer vers paiement] │
-                                                  └───────────────────────────┘
-
-─────────────── DESKTOP (inchangé) ───────────────
-┌─────────────────────────────┬───────────────────────────┐
-│ Adresse                     │ Récap commande (sticky)   │
-│ Paiement frais expédition   │  Items                    │
-│ Option de livraison         │  Code promo               │
-│ [Continuer vers paiement]   │  Calculateur + transitaire│
-│                             │  Sous-total / TOTAL       │
-└─────────────────────────────┴───────────────────────────┘
+┌──────────────────────────────────────┐
+│ [Récap commande complet]             │ ← items, promo, calculateur, points
+│ [Récap totaux + sécurisé]            │ ← sous-total, frais, total
+├──────────────────────────────────────┤
+│ Mode de paiement (titre + retour)    │
+│ Récap adresse expédition             │
+│ Liste méthodes (Carte, MoMo, …)      │
+│ Champs spécifiques + bouton Payer    │
+└──────────────────────────────────────┘
 ```
 
----
+## Nouvel ordre mobile (étape paiement)
 
-## Détails techniques (pour l'agent / Cursor)
+```text
+┌──────────────────────────────────────┐
+│ Mode de paiement (titre + retour)    │
+│ Récap adresse expédition             │
+│ ⭐ MINI-TOTAUX (doublure)            │
+│    • Sous-total                      │
+│    • Frais d'expédition              │
+│    • Livraison locale                │
+│    • TOTAL                           │
+│    • « Paiement 100% sécurisé »      │
+│ Liste méthodes (Carte, MoMo, …)      │
+│ Champs spécifiques + bouton Payer    │
+├──────────────────────────────────────┤
+│ [Récap commande complet]             │ ← inchangé, descend en bas
+│ [Récap totaux + sécurisé]            │ ← inchangé, descend en bas
+└──────────────────────────────────────┘
+```
 
-Fichier unique modifié : **`frontend/src/pages/CheckoutPage.tsx`** (aucun autre fichier).
-
-1. **Extraire 2 sous-blocs JSX** déjà présents dans la sidebar actuelle (lignes ~2055–2244) en fonctions locales internes au composant (pas de nouveaux fichiers, pour minimiser le diff) :
-   - `renderSummaryTop()` → titre, items, code promo, `CheckoutShippingCalculator` (qui porte le choix transitaire), ZandoPoints, notice de plafond de réductions.
-   - `renderSummaryTotals()` → bloc sous-total / réductions / shipping / livraison locale / Total + bandeau « Paiement sécurisé ».
-
-2. **Sidebar desktop** (`lg:col-span-2`) : devient `hidden lg:block`. Contient `renderSummaryTop()` + `renderSummaryTotals()` exactement comme aujourd'hui (sticky, même styles).
-
-3. **Colonne principale, étape `shipping`** : insérer, **uniquement en mobile (`lg:hidden`)**, dans cet ordre :
-   - juste après le bloc adresses/formulaire → `renderSummaryTop()` dans une `Card` identique (`bg-card rounded-lg p-5 shadow-card space-y-4`).
-   - le bloc "Paiement des frais d'expédition" et "Option de livraison" restent à leur place actuelle.
-   - juste avant le `<Button type="submit">Continuer vers le paiement` → `renderSummaryTotals()`.
-
-4. **Colonne principale, étape `payment`** : insérer en haut du bloc, **uniquement en mobile (`lg:hidden`)** :
-   - `renderSummaryTop()` puis `renderSummaryTotals()` AVANT le titre "Mode de paiement".
-
-5. **Pas de duplication d'état** : les deux rendus pointent vers les mêmes setters/handlers (`appliedCoupon`, `handleApplyCoupon`, `handleForwarderChange`, `setUsePoints`, etc.). Le `CheckoutShippingCalculator` n'est instancié **qu'une seule fois** par viewport grâce au `hidden lg:block` / `lg:hidden` mutuellement exclusifs → pas de double fetch des offres transitaires.
-
-6. **Breakpoint** : `lg` (1024px). Comme `useIsMobile` est à 768px, on n'utilise pas ce hook pour éviter un seuil divergent ; on reste en pur CSS Tailwind responsive. Tablettes < 1024px bénéficient donc du nouvel ordre (cohérent avec le besoin exprimé).
-
-7. **Sticky** : seul le récap desktop reste `sticky top-24`. Les blocs mobile ne sont pas sticky (sinon problème d'empilement).
-
-8. **Aucune modification** des conditions de validation (`handleProceedToPayment`), du calcul de `total`, du flux paiement, du choix transitaire, des règles RLS, des migrations, des Edge Functions, des memories.
-
-9. **i18n** : aucune nouvelle clé `t(...)` nécessaire, tout est déjà traduit.
-
-10. **QA après implémentation** :
-    - Mobile (375px) : vérifier ordre exact des sections étapes 1 & 2, vérifier que le choix transitaire met bien à jour le montant affiché juste en-dessous, que le bouton « Continuer » apparaît bien tout en bas après le Total.
-    - Tablette (820px) : même comportement mobile attendu.
-    - Desktop (≥1024px) : strictement identique à aujourd'hui (capture avant/après sidebar).
-    - Vérifier qu'il n'y a **qu'un seul** `CheckoutShippingCalculator` monté (devtools React) pour ne pas dupliquer les requêtes.
+Desktop : sidebar sticky inchangée.
 
 ---
 
-## Hors scope (explicite)
+## Détails techniques
 
-- Pas de refonte visuelle des cartes.
-- Pas de changement desktop.
-- Pas de changement du parcours étape 2 → 3 (confirmation).
-- Pas de touche aux composants `ForwarderSelector`, `OperatorSelector`, `CheckoutShippingCalculator`.
-- Pas de nouveau hook, pas de nouveau contexte.
+Fichier unique modifié : **`frontend/src/pages/CheckoutPage.tsx`**.
+
+1. **Bloc actuel lignes 1951–1956** (`{!isDesktop && (<div>{renderSummaryTop()}{renderSummaryTotals()}</div>)}` placé en HAUT de la carte payment) → **déplacé tout en bas** de ce même `<div className="bg-card …">` (juste avant la balise fermante ligne ~2253, après le bouton Payer).
+
+2. **Insertion d'une mini-doublure** entre le bloc « Shipping summary » (ligne 1968–1973) et `<div className="space-y-3">` (ligne 1975, début de la liste des méthodes). Cette doublure réutilise **exactement** `renderSummaryTotals()` (qui contient déjà sous-total, frais d'expédition, livraison, total et la bannière « Paiement sécurisé / données chiffrées »). Wrapper : `{!isDesktop && (<div className="pt-3 pb-2 border-t border-b border-border">{renderSummaryTotals()}</div>)}`.
+
+3. **Aucune duplication d'état** : `renderSummaryTotals()` est une fonction pure du state — l'appeler deux fois en JSX est sans effet sur les setters/fetches. `CheckoutShippingCalculator` n'est pas dans `renderSummaryTotals` (il est dans `renderSummaryTop`), donc pas de risque de double instanciation.
+
+4. **Desktop (`isDesktop === true`)** : tous les ajouts sont gardés par `!isDesktop` → 0 changement visuel sur la sidebar sticky.
+
+5. **Étape 1 (`step === "shipping"`)** : aucun changement.
+
+6. Pas de nouvelle clé i18n, pas de hook, pas de contexte, pas d'edge function, pas de migration.
+
+---
+
+## QA
+
+- Mobile 375px, étape paiement : vérifier ordre exact (titre paiement → adresse → mini-totaux → méthodes → bouton Payer → récap complet en bas).
+- Vérifier que le mini-bloc reflète bien le `total` courant (changement de méthode COD ↔ Card recompute).
+- Vérifier qu'il n'y a qu'**un seul** `CheckoutShippingCalculator` monté.
+- Desktop ≥1024px : capture sidebar identique à avant.
+- Étape 1 (shipping) : aucun changement visuel.
+
+## Hors scope
+
+- Pas de touche au flux de validation / paiement.
+- Pas de modification desktop.
+- Pas de refonte des cartes ni des composants enfants.
