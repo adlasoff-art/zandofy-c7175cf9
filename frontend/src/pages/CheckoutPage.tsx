@@ -258,6 +258,23 @@ export default function CheckoutPage() {
   const [countryBlocked, setCountryBlocked] = useState(false);
   const [countryBlockMessage, setCountryBlockMessage] = useState("");
 
+  // Lot UX Mobile — `isDesktop` doit être déclaré AVANT tout early return
+  // (utilisateur non connecté, KYC bloqué, panier vide) pour respecter les
+  // Rules of Hooks. Sinon le nombre de hooks change entre deux rendus et
+  // l'ErrorBoundary attrape un crash React.
+  const [isDesktop, setIsDesktop] = useState<boolean>(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(min-width: 1024px)").matches
+      : true,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+
   // Validate country+city against active_countries
   const validateCountryCity = useCallback(async (country: string, city: string) => {
     if (!country) { setCountryBlocked(false); return; }
