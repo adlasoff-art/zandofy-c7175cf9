@@ -1,77 +1,173 @@
-## Objectif
+# Diagnostic complet et solution unique — Paiement carte Keccel
 
-Sur **mobile/tablette uniquement** (`< lg`), à l'étape 2 du checkout (`step === "payment"`), remettre le bloc « Mode de paiement » EN PREMIER, et déplacer le récapitulatif complet (items + calculateur + totaux) en BAS. En plus, insérer une **mini-doublure des totaux** (sous-total, expédition, livraison, total + bandeau « Paiement 100% sécurisé ») juste entre le récap d'adresse d'expédition et la liste des moyens de paiement, pour que le client voie le montant à payer sans scroller.
+## Diagnostic franc
 
-Desktop (`≥ lg`) strictement inchangé. Aucun changement métier, aucune migration DB.
+Le bug critique n’est pas un problème de secret, ni de domaine public, ni de configuration `SITE_BASE_URL` d’après ce que tu confirmes. Le défaut principal est dans le code applicatif : le checkout accepte un paiement carte comme “commande confirmée” même quand aucune redirection vers Keccel n’a eu lieu.
 
----
+### Le flux cassé actuel
 
-## Ordre mobile actuel (étape paiement)
-
-```text
-┌──────────────────────────────────────┐
-│ [Récap commande complet]             │ ← items, promo, calculateur, points
-│ [Récap totaux + sécurisé]            │ ← sous-total, frais, total
-├──────────────────────────────────────┤
-│ Mode de paiement (titre + retour)    │
-│ Récap adresse expédition             │
-│ Liste méthodes (Carte, MoMo, …)      │
-│ Champs spécifiques + bouton Payer    │
-└──────────────────────────────────────┘
-```
-
-## Nouvel ordre mobile (étape paiement)
+Dans `frontend/src/pages/CheckoutPage.tsx`, branche carte :
 
 ```text
-┌──────────────────────────────────────┐
-│ Mode de paiement (titre + retour)    │
-│ Récap adresse expédition             │
-│ ⭐ MINI-TOTAUX (doublure)            │
-│    • Sous-total                      │
-│    • Frais d'expédition              │
-│    • Livraison locale                │
-│    • TOTAL                           │
-│    • « Paiement 100% sécurisé »      │
-│ Liste méthodes (Carte, MoMo, …)      │
-│ Champs spécifiques + bouton Payer    │
-├──────────────────────────────────────┤
-│ [Récap commande complet]             │ ← inchangé, descend en bas
-│ [Récap totaux + sécurisé]            │ ← inchangé, descend en bas
-└──────────────────────────────────────┘
+Client clique Valider
+  -> création commande
+  -> appel keccel-cardpay
+  -> si redirect_url existe : redirection Keccel
+  -> sinon : afficher Commande confirmée
 ```
 
-Desktop : sidebar sticky inchangée.
+Le dernier cas est inacceptable pour un paiement carte. Pour une carte bancaire, il n’y a que deux états valides à ce moment-là :
 
----
+```text
+URL Keccel reçue -> redirection obligatoire
+URL Keccel absente -> échec d'initiation du paiement
+```
 
-## Détails techniques
+Il ne doit jamais y avoir :
 
-Fichier unique modifié : **`frontend/src/pages/CheckoutPage.tsx`**.
+```text
+URL Keccel absente -> Commande confirmée
+```
 
-1. **Bloc actuel lignes 1951–1956** (`{!isDesktop && (<div>{renderSummaryTop()}{renderSummaryTotals()}</div>)}` placé en HAUT de la carte payment) → **déplacé tout en bas** de ce même `<div className="bg-card …">` (juste avant la balise fermante ligne ~2253, après le bouton Payer).
+C’est exactement ce qui a créé le cas que tu as vu : côté client la commande paraît validée, alors que côté admin elle reste en attente de paiement puis finit échouée après expiration.
 
-2. **Insertion d'une mini-doublure** entre le bloc « Shipping summary » (ligne 1968–1973) et `<div className="space-y-3">` (ligne 1975, début de la liste des méthodes). Cette doublure réutilise **exactement** `renderSummaryTotals()` (qui contient déjà sous-total, frais d'expédition, livraison, total et la bannière « Paiement sécurisé / données chiffrées »). Wrapper : `{!isDesktop && (<div className="pt-3 pb-2 border-t border-b border-border">{renderSummaryTotals()}</div>)}`.
+## Ce qui a changé il y a 7 jours
 
-3. **Aucune duplication d'état** : `renderSummaryTotals()` est une fonction pure du state — l'appeler deux fois en JSX est sans effet sur les setters/fetches. `CheckoutShippingCalculator` n'est pas dans `renderSummaryTotals` (il est dans `renderSummaryTop`), donc pas de risque de double instanciation.
+Le commit `f71ab0f9` a remplacé une ancienne fonction Keccel longue, expérimentale, avec plusieurs tentatives de payload, par une fonction plus courte et conforme à la règle officielle du projet :
 
-4. **Desktop (`isDesktop === true`)** : tous les ajouts sont gardés par `!isDesktop` → 0 changement visuel sur la sidebar sticky.
+```text
+merchantcode, reference, amount, currency, description, callbackurl, returnurl
+```
 
-5. **Étape 1 (`step === "shipping"`)** : aucun changement.
+Cette partie “payload unique lowercase” est cohérente avec `SAFETY_POLICY.md` section 7. Je ne propose donc pas de revenir à des variantes dangereuses ou non confirmées par Keccel.
 
-6. Pas de nouvelle clé i18n, pas de hook, pas de contexte, pas d'edge function, pas de migration.
+Le vrai problème senior est ailleurs : même si la fonction Keccel renvoie `success: true` sans URL exploitable, ou si la réponse contient une URL sous une clé inattendue, le frontend ne doit jamais transformer ça en confirmation client.
 
----
+## Solution unique proposée
 
-## QA
+Mettre en place un contrat strict “carte = redirection obligatoire + confirmation uniquement après paiement”.
 
-- Mobile 375px, étape paiement : vérifier ordre exact (titre paiement → adresse → mini-totaux → méthodes → bouton Payer → récap complet en bas).
-- Vérifier que le mini-bloc reflète bien le `total` courant (changement de méthode COD ↔ Card recompute).
-- Vérifier qu'il n'y a qu'**un seul** `CheckoutShippingCalculator` monté.
-- Desktop ≥1024px : capture sidebar identique à avant.
-- Étape 1 (shipping) : aucun changement visuel.
+```text
+Checkout carte
+  -> créer commande en attente de paiement
+  -> appeler keccel-cardpay
+  -> si URL Keccel valide : rediriger immédiatement
+  -> sinon : marquer la commande payment_failed et afficher erreur
 
-## Hors scope
+Retour / webhook Keccel
+  -> seul le webhook ou la page retour peut confirmer le paiement
+  -> jamais la page checkout avant redirection
+```
 
-- Pas de touche au flux de validation / paiement.
-- Pas de modification desktop.
-- Pas de refonte des cartes ni des composants enfants.
+## Changements à appliquer
+
+### 1. Frontend checkout : supprimer le fallback dangereux
+
+Fichier : `frontend/src/pages/CheckoutPage.tsx`
+
+Remplacer la branche actuelle :
+
+```text
+pas de redirect_url -> goToStep("confirmation")
+```
+
+par :
+
+```text
+pas de redirect_url -> marquer orderIds en payment_failed -> afficher erreur paiement
+```
+
+Effet immédiat : même si Keccel répond mal, le client ne verra plus jamais “Commande confirmée” sans redirection carte.
+
+### 2. Edge function Keccel : rendre l’absence d’URL terminale
+
+Fichiers :
+- `supabase/functions/keccel-cardpay/index.ts`
+- `frontend/supabase/functions/keccel-cardpay/index.ts` miroir du projet
+
+Garder le payload officiel en 7 champs lowercase, mais renforcer la validation de réponse :
+
+```text
+Keccel code != 0 -> success:false
+Keccel code == 0 + URL présente -> success:true + redirect_url
+Keccel code == 0 + URL absente -> success:false + diagnostic clair
+```
+
+Je ne réintroduis pas les anciennes variantes `returnUrl`, champs client, `language`, `customerEmail`, etc., car elles sont explicitement interdites par la politique Keccel actuelle du projet.
+
+### 3. Extraction robuste de l’URL sans modifier le payload envoyé
+
+Toujours envoyer le payload officiel, mais accepter plusieurs noms de champ en réponse si Keccel varie son JSON :
+
+```text
+checkoutUrl
+checkout_url
+paymentUrl
+payment_url
+redirectUrl
+redirect_url
+url
+```
+
+C’est sans risque côté contrat Keccel, car on ne change pas la requête envoyée ; on rend seulement la lecture de réponse plus tolérante.
+
+### 4. Page retour paiement : ne confirmer que si transaction payée
+
+Fichier : `frontend/src/pages/PaymentReturnPage.tsx`
+
+Garder le comportement actuel de vérification/polling, mais vérifier qu’aucun paramètre d’URL ne suffit à afficher un succès sans transaction réellement `success`.
+
+Objectif : éviter un second point faible où une URL de retour pourrait afficher un succès trop tôt.
+
+## Contrôle après correction
+
+### Test négatif obligatoire
+
+Simuler une réponse Keccel sans URL :
+
+```json
+{ "success": true, "redirect_url": null }
+```
+
+Résultat attendu :
+
+```text
+pas de page Commande confirmée
+commande marquée payment_failed
+message d’erreur paiement affiché au client
+```
+
+### Test positif obligatoire
+
+Réponse Keccel avec URL :
+
+```json
+{ "success": true, "redirect_url": "https://..." }
+```
+
+Résultat attendu :
+
+```text
+redirection immédiate vers la passerelle Keccel
+commande reste awaiting_payment jusqu'au webhook/retour
+confirmation uniquement après paiement confirmé
+```
+
+### Test de non-régression
+
+Vérifier que ces flux ne changent pas :
+
+```text
+Mobile Money
+paiement à la livraison
+paiement hors plateforme
+layout checkout mobile
+```
+
+## Déploiement attendu
+
+Ce correctif doit partir via le workflow normal GitHub, puis être déployé sur la production publique `zandofy.com`. Aucun changement de domaine, aucun changement de variable d’environnement, aucune migration base de données n’est nécessaire.
+
+## Résultat attendu
+
+Après ce correctif, il devient impossible qu’un paiement carte affiche “Commande confirmée” tant que le client n’a pas été redirigé vers Keccel puis confirmé par le retour/webhook de paiement.
