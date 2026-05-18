@@ -258,6 +258,23 @@ export default function CheckoutPage() {
   const [countryBlocked, setCountryBlocked] = useState(false);
   const [countryBlockMessage, setCountryBlockMessage] = useState("");
 
+  // Lot UX Mobile — `isDesktop` doit être déclaré AVANT tout early return
+  // (utilisateur non connecté, KYC bloqué, panier vide) pour respecter les
+  // Rules of Hooks. Sinon le nombre de hooks change entre deux rendus et
+  // l'ErrorBoundary attrape un crash React.
+  const [isDesktop, setIsDesktop] = useState<boolean>(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(min-width: 1024px)").matches
+      : true,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+
   // Validate country+city against active_countries
   const validateCountryCity = useCallback(async (country: string, city: string) => {
     if (!country) { setCountryBlocked(false); return; }
@@ -291,16 +308,26 @@ export default function CheckoutPage() {
     queryKey: ["client-delivery-sub-checkout", user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data } = await fromTable("store_package_subscriptions")
-        .select("*, service_packages(name)")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .gt("paid_until", new Date().toISOString())
-        .maybeSingle();
-      return data;
+      try {
+        const { data, error } = await fromTable("store_package_subscriptions")
+          .select("*, service_packages(name)")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .gt("paid_until", new Date().toISOString())
+          .maybeSingle();
+        if (error) {
+          console.warn("[CheckoutPage] clientDeliverySub query failed (non-blocking):", error);
+          return null;
+        }
+        return data;
+      } catch (e) {
+        console.warn("[CheckoutPage] clientDeliverySub threw (non-blocking):", e);
+        return null;
+      }
     },
     enabled: !!user,
     staleTime: 60 * 1000,
+    retry: false,
   });
 
   const hasActiveDeliverySub = !!clientDeliverySub;
@@ -1374,18 +1401,8 @@ export default function CheckoutPage() {
   // (récap haut après l'adresse, totaux juste avant le bouton Continuer)
   // pour éviter les va-et-vient. On rend les blocs UNE SEULE FOIS via
   // un état `isDesktop` afin de ne pas dupliquer le CheckoutShippingCalculator.
-  const [isDesktop, setIsDesktop] = useState<boolean>(() =>
-    typeof window !== "undefined"
-      ? window.matchMedia("(min-width: 1024px)").matches
-      : true,
-  );
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mql = window.matchMedia("(min-width: 1024px)");
-    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, []);
+  // NOTE : `isDesktop` est déclaré tout en haut du composant (avant les early returns)
+  // pour respecter les Rules of Hooks. Voir la déclaration près des autres useState.
 
   const renderSummaryTop = () => (
     <>
