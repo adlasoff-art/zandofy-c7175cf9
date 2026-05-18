@@ -907,7 +907,17 @@ export default function CheckoutPage() {
           user_id: user!.id,
           store_id: storeId !== "default" ? storeId : null,
           origin_country: orderOriginCountry,
-          status: (paymentMethod === "mobile_money" || paymentMethod === "off_platform") ? "awaiting_payment" : "pending",
+          // Toute commande dont le paiement est asynchrone (webhook ou validation hors plateforme)
+          // commence en `awaiting_payment` — elle n'est PAS encore une commande à notifier.
+          // Seul COD (cash à la livraison) commence en `pending` car il n'y a aucun paiement à attendre.
+          status:
+            (paymentMethod === "mobile_money" ||
+              paymentMethod === "card" ||
+              paymentMethod === "paypal" ||
+              paymentMethod === "stripe" ||
+              paymentMethod === "off_platform")
+              ? "awaiting_payment"
+              : "pending",
           payment_method: paymentMethod,
           shipping_first_name: shipping.firstName,
           shipping_last_name: shipping.lastName,
