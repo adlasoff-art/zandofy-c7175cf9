@@ -171,7 +171,9 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
       .from("orders")
       .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected, delivery_operator_id")
       .eq("store_id", storeId)
-      .not("status", "in", '("payment_failed")')
+      // Exclure les commandes non payées (`awaiting_payment`) du listing vendeur :
+      // une commande n'est "réelle" qu'après confirmation du paiement (webhook).
+      .not("status", "in", '("awaiting_payment","payment_failed")')
       .order("created_at", { ascending: false }) as any;
 
     if (error) {
