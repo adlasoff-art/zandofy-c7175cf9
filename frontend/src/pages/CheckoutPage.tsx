@@ -1220,13 +1220,7 @@ export default function CheckoutPage() {
         if (!data) throw new Error("Pas de réponse de la passerelle de paiement");
         if (data.success === false) {
           console.error("keccel-cardpay API error:", data);
-          const d = data?.details ?? {};
-          const parts: string[] = [];
-          if (d.keccel_description) parts.push(d.keccel_description);
-          if (d.httpStatus) parts.push(`HTTP ${d.httpStatus}`);
-          if (d.diagnostic_id) parts.push(`diag ${d.diagnostic_id}`);
-          const detail = parts.length ? ` — ${parts.join(" · ")}` : "";
-          throw new Error((data.error || "Erreur de la passerelle de paiement") + detail);
+          throw new Error("Redirection carte indisponible. Veuillez réessayer ou choisir Mobile Money.");
         }
         if (data.redirect_url) {
           window.location.href = data.redirect_url;
@@ -1246,7 +1240,7 @@ export default function CheckoutPage() {
               .in("id", orderIds)
               .eq("status", "awaiting_payment");
           }
-          throw new Error("La passerelle de paiement n'a pas renvoyé d'URL. Paiement non initié — veuillez réessayer.");
+          throw new Error("Redirection carte indisponible. Veuillez réessayer ou choisir Mobile Money.");
         }
       } catch (err: any) {
         // Mark any created orders as payment_failed so they don't appear as active
