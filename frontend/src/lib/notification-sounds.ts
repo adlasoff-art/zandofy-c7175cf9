@@ -40,6 +40,33 @@ export function playNotificationSound() {
   }
 }
 
+/** Play a soft "negative" tone for payment/order failures.
+ *  Two short descending tones — distinct from the success chime so vendors and
+ *  admins can immediately tell apart a real order from a failed payment.
+ */
+export function playFailureSound() {
+  try {
+    const ctx = getAudioContext();
+    const now = ctx.currentTime;
+
+    // Two descending notes: low to lower
+    [380, 260].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.12, now + i * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 0.32);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + i * 0.15);
+      osc.stop(now + i * 0.15 + 0.35);
+    });
+  } catch (e) {
+    console.warn("Could not play failure sound:", e);
+  }
+}
+
 /** Play a bright Shopify-style "ka-ching" bell — a satisfying cash-register chime */
 export function playOrderAlertSound() {
   try {
