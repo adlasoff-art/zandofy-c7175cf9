@@ -32,15 +32,25 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Find orders stuck in awaiting_payment for > 6 minutes
-    // (3 min KelPay gateway + 3 min grace for last manual "Verify" click)
-    const expirationCutoff = new Date(Date.now() - 6 * 60 * 1000).toISOString();
+    // Cutoffs adaptés au mode de paiement :
+    //  - Mobile Money : 6 min  (3 min KelPay + 3 min de grâce — comportement historique)
+    //  - Carte / PayPal / Stripe : 15 min (le client doit saisir ses infos sur la
+    //    passerelle Mastercard/Keccel, ça prend plus de temps qu'un push USSD)
+    //  - off_platform : 24 h  (validation manuelle vendeur — ne pas expirer agressivement)
+    const now = Date.now();
+    const cutoffMM = new Date(now - 6 * 60 * 1000).toISOString();
+    const cutoffCard = new Date(now - 15 * 60 * 1000).toISOString();
+    const cutoffOffPlatform = new Date(now - 24 * 60 * 60 * 1000).toISOString();
 
     const { data: expiredOrders, error: selectError } = await supabase
       .from("orders")
-      .select("id, order_ref, user_id")
+      .select("id, order_ref, user_id, payment_method, created_at")
       .eq("status", "awaiting_payment")
-      .lt("created_at", expirationCutoff);
+      .or(
+        `and(payment_method.eq.mobile_money,created_at.lt.${cutoffMM}),` +
+        `and(payment_method.in.(card,paypal,stripe),created_at.lt.${cutoffCard}),` +
+        `and(payment_method.eq.off_platform,created_at.lt.${cutoffOffPlatform})`
+      );
 
     if (selectError) {
       console.error("Error finding expired orders:", selectError);

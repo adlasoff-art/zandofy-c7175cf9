@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNotifications } from "@/hooks/use-notifications";
-import { playNotificationSound, setAppBadge } from "@/lib/notification-sounds";
+import { playNotificationSound, playFailureSound, setAppBadge } from "@/lib/notification-sounds";
 
 /**
  * Joue un son et met à jour le badge OS quand le compteur non-lu augmente.
@@ -8,7 +8,7 @@ import { playNotificationSound, setAppBadge } from "@/lib/notification-sounds";
  * de lancer un second polling indépendant — réduction du Disk IO sur la table notifications.
  */
 export function NotificationListener() {
-  const { unreadCount } = useNotifications();
+  const { unreadCount, notifications } = useNotifications();
   const hasInteracted = useRef(false);
   const lastCountRef = useRef<number | null>(null);
 
@@ -28,11 +28,22 @@ export function NotificationListener() {
   useEffect(() => {
     const prev = lastCountRef.current;
     if (prev !== null && unreadCount > prev && hasInteracted.current) {
-      playNotificationSound();
+      // Choisir le son selon la nouvelle notification la plus récente :
+      //  - "Paiement échoué" / "Paiement expiré" -> son d'échec (court, descendant)
+      //  - tout le reste -> son neutre (chime ascendant)
+      const latest = notifications[0];
+      const t = (latest?.title || "").toLowerCase();
+      const isFailure =
+        t.includes("échoué") ||
+        t.includes("expir") ||
+        t.includes("failed") ||
+        t.includes("annul");
+      if (isFailure) playFailureSound();
+      else playNotificationSound();
     }
     lastCountRef.current = unreadCount;
     setAppBadge(unreadCount);
-  }, [unreadCount]);
+  }, [unreadCount, notifications]);
 
   return null;
 }

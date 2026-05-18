@@ -43,8 +43,12 @@ export function OrderAlertListener() {
 
     let query = supabase
       .from("orders")
-      .select("order_ref, store_id, total, created_at")
+      .select("order_ref, store_id, total, created_at, status")
       .gt("created_at", lastSeenRef.current)
+      // Ne JAMAIS alerter pour une commande encore en attente de paiement (carte/MM/PayPal/Stripe/off-platform)
+      // ni pour les commandes échouées/annulées/retournées. Seules les commandes payées et actives doivent
+      // déclencher l'alerte "Nouvelle commande !".
+      .not("status", "in", '("awaiting_payment","payment_failed","cancelled","returned")')
       .order("created_at", { ascending: true })
       .limit(20);
 
