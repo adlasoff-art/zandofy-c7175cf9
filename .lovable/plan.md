@@ -1,173 +1,143 @@
-# Diagnostic complet et solution unique — Paiement carte Keccel
+## Diagnostic
 
-## Diagnostic franc
+La capture montre maintenant une erreur “Keccel n’a pas renvoyé d’URL de paiement exploitable”. Cette erreur protège contre l’ancien bug grave : afficher “Commande confirmée” sans redirection ni paiement.
 
-Le bug critique n’est pas un problème de secret, ni de domaine public, ni de configuration `SITE_BASE_URL` d’après ce que tu confirmes. Le défaut principal est dans le code applicatif : le checkout accepte un paiement carte comme “commande confirmée” même quand aucune redirection vers Keccel n’a eu lieu.
+Mais elle révèle le vrai problème restant : notre fonction `keccel-cardpay` reçoit une réponse acceptée par Keccel, mais ne récupère pas l’URL finale de paiement carte.
 
-### Le flux cassé actuel
-
-Dans `frontend/src/pages/CheckoutPage.tsx`, branche carte :
+Le flux attendu doit être :
 
 ```text
-Client clique Valider
-  -> création commande
-  -> appel keccel-cardpay
-  -> si redirect_url existe : redirection Keccel
-  -> sinon : afficher Commande confirmée
+Client choisit Carte bancaire
+  -> Confirmer la commande
+  -> appel Keccel CardPay avec montant + référence + returnurl + callbackurl
+  -> Keccel crée une session
+  -> Zandofy redirige vers l’URL Mastercard ap-gateway / checkout
+  -> webhook/retour confirme ensuite le paiement
 ```
 
-Le dernier cas est inacceptable pour un paiement carte. Pour une carte bancaire, il n’y a que deux états valides à ce moment-là :
+Il ne faut pas rediriger manuellement vers `https://terminal.keccel.com/payment.php?m=jam` comme solution principale, parce que ce terminal oblige potentiellement le client à refaire un choix de mode de paiement. Cette URL peut seulement servir de secours si Keccel la renvoie explicitement, pas comme remplacement de la session Mastercard.
+
+## Ce qui est probablement cassé
+
+D’après les URLs que tu donnes, l’URL utile est du type :
 
 ```text
-URL Keccel reçue -> redirection obligatoire
-URL Keccel absente -> échec d'initiation du paiement
+https://ap-gateway.mastercard.com/checkout/pay/SESSION...
 ```
 
-Il ne doit jamais y avoir :
+Le code actuel extrait seulement quelques clés de premier niveau (`checkoutUrl`, `paymentUrl`, `redirectUrl`, `url`). Si Keccel renvoie la session Mastercard sous une autre clé, dans une clé avec autre casse, ou imbriquée dans un objet, notre fonction conclut à tort : “pas d’URL exploitable”.
+
+## Solution à appliquer
+
+### 1. Garder la sécurité actuelle
+
+Ne jamais rétablir l’ancien fallback :
 
 ```text
-URL Keccel absente -> Commande confirmée
+pas d’URL -> Commande confirmée
 ```
 
-C’est exactement ce qui a créé le cas que tu as vu : côté client la commande paraît validée, alors que côté admin elle reste en attente de paiement puis finit échouée après expiration.
+Pour carte bancaire, ce comportement reste interdit.
 
-## Ce qui a changé il y a 7 jours
+### 2. Corriger l’extraction d’URL dans `keccel-cardpay`
 
-Le commit `f71ab0f9` a remplacé une ancienne fonction Keccel longue, expérimentale, avec plusieurs tentatives de payload, par une fonction plus courte et conforme à la règle officielle du projet :
+Dans les deux copies :
+
+- `supabase/functions/keccel-cardpay/index.ts`
+- `frontend/supabase/functions/keccel-cardpay/index.ts`
+
+remplacer l’extraction actuelle par une extraction robuste qui :
+
+- scanne récursivement toute la réponse JSON Keccel ;
+- accepte les clés probables : `checkoutUrl`, `checkout_url`, `paymentUrl`, `payment_url`, `redirectUrl`, `redirect_url`, `url`, `paymentLink`, `payment_link`, `checkout`, `link`, `href` ;
+- accepte surtout toute valeur string qui contient une URL `https://ap-gateway.mastercard.com/checkout/pay/SESSION...` ;
+- priorise l’URL Mastercard `ap-gateway.mastercard.com/checkout/pay/SESSION...` si plusieurs URLs existent ;
+- ne prend pas une URL callback/return Zandofy comme URL de paiement ;
+- ne génère jamais un numéro de session Mastercard côté Zandofy, car cette session doit être créée par Keccel/Mastercard.
+
+### 3. Garder le payload Keccel officiel
+
+Ne pas faire de boucle de variantes et ne pas ajouter de champs non validés.
+
+Payload conservé :
 
 ```text
 merchantcode, reference, amount, currency, description, callbackurl, returnurl
 ```
 
-Cette partie “payload unique lowercase” est cohérente avec `SAFETY_POLICY.md` section 7. Je ne propose donc pas de revenir à des variantes dangereuses ou non confirmées par Keccel.
+Le diagnostic reste côté lecture de réponse, pas côté modification de la requête.
 
-Le vrai problème senior est ailleurs : même si la fonction Keccel renvoie `success: true` sans URL exploitable, ou si la réponse contient une URL sous une clé inattendue, le frontend ne doit jamais transformer ça en confirmation client.
+### 4. Améliorer le message d’erreur client
 
-## Solution unique proposée
-
-Mettre en place un contrat strict “carte = redirection obligatoire + confirmation uniquement après paiement”.
+Le toast mobile actuel expose trop de détails techniques (`HTTP 200`, description complète, diagnostic brut). Le remplacer par un message court :
 
 ```text
-Checkout carte
-  -> créer commande en attente de paiement
-  -> appeler keccel-cardpay
-  -> si URL Keccel valide : rediriger immédiatement
-  -> sinon : marquer la commande payment_failed et afficher erreur
-
-Retour / webhook Keccel
-  -> seul le webhook ou la page retour peut confirmer le paiement
-  -> jamais la page checkout avant redirection
+Redirection carte indisponible. Veuillez réessayer ou choisir Mobile Money.
 ```
 
-## Changements à appliquer
+Le `diagnostic_id` doit rester dans les logs et détails console pour support/admin, pas dans un gros toast client.
 
-### 1. Frontend checkout : supprimer le fallback dangereux
+### 5. Sécuriser `PaymentReturnPage`
 
-Fichier : `frontend/src/pages/CheckoutPage.tsx`
+Corriger le point faible actuel : si aucune transaction n’est trouvée, `status=success` dans l’URL ne doit jamais afficher “Paiement confirmé”.
 
-Remplacer la branche actuelle :
+Règle :
 
 ```text
-pas de redirect_url -> goToStep("confirmation")
+succès affiché uniquement si payment_transactions.status = success
 ```
 
-par :
+Sinon : pending/failed, mais jamais success uniquement sur paramètre URL.
 
-```text
-pas de redirect_url -> marquer orderIds en payment_failed -> afficher erreur paiement
-```
+## Tests à faire après implémentation
 
-Effet immédiat : même si Keccel répond mal, le client ne verra plus jamais “Commande confirmée” sans redirection carte.
+### Test négatif
 
-### 2. Edge function Keccel : rendre l’absence d’URL terminale
-
-Fichiers :
-- `supabase/functions/keccel-cardpay/index.ts`
-- `frontend/supabase/functions/keccel-cardpay/index.ts` miroir du projet
-
-Garder le payload officiel en 7 champs lowercase, mais renforcer la validation de réponse :
-
-```text
-Keccel code != 0 -> success:false
-Keccel code == 0 + URL présente -> success:true + redirect_url
-Keccel code == 0 + URL absente -> success:false + diagnostic clair
-```
-
-Je ne réintroduis pas les anciennes variantes `returnUrl`, champs client, `language`, `customerEmail`, etc., car elles sont explicitement interdites par la politique Keccel actuelle du projet.
-
-### 3. Extraction robuste de l’URL sans modifier le payload envoyé
-
-Toujours envoyer le payload officiel, mais accepter plusieurs noms de champ en réponse si Keccel varie son JSON :
-
-```text
-checkoutUrl
-checkout_url
-paymentUrl
-payment_url
-redirectUrl
-redirect_url
-url
-```
-
-C’est sans risque côté contrat Keccel, car on ne change pas la requête envoyée ; on rend seulement la lecture de réponse plus tolérante.
-
-### 4. Page retour paiement : ne confirmer que si transaction payée
-
-Fichier : `frontend/src/pages/PaymentReturnPage.tsx`
-
-Garder le comportement actuel de vérification/polling, mais vérifier qu’aucun paramètre d’URL ne suffit à afficher un succès sans transaction réellement `success`.
-
-Objectif : éviter un second point faible où une URL de retour pourrait afficher un succès trop tôt.
-
-## Contrôle après correction
-
-### Test négatif obligatoire
-
-Simuler une réponse Keccel sans URL :
+Réponse Keccel code 0 sans aucune URL Mastercard ni URL de paiement :
 
 ```json
-{ "success": true, "redirect_url": null }
+{ "code": "0", "description": "..." }
 ```
 
 Résultat attendu :
 
 ```text
-pas de page Commande confirmée
-commande marquée payment_failed
-message d’erreur paiement affiché au client
+pas de Commande confirmée
+commande payment_failed
+message client court
+logs avec diagnostic_id
 ```
 
-### Test positif obligatoire
+### Test positif
 
-Réponse Keccel avec URL :
+Réponse Keccel contenant quelque part :
 
-```json
-{ "success": true, "redirect_url": "https://..." }
+```text
+https://ap-gateway.mastercard.com/checkout/pay/SESSION...
 ```
+
+même si l’URL est imbriquée ou sous une clé inconnue.
 
 Résultat attendu :
 
 ```text
-redirection immédiate vers la passerelle Keccel
-commande reste awaiting_payment jusqu'au webhook/retour
-confirmation uniquement après paiement confirmé
+redirection immédiate vers Mastercard
+commande awaiting_payment
+confirmation seulement après webhook/retour confirmé
 ```
 
-### Test de non-régression
+### Non-régression
 
-Vérifier que ces flux ne changent pas :
+Ne pas modifier :
 
 ```text
 Mobile Money
 paiement à la livraison
 paiement hors plateforme
 layout checkout mobile
+variables/domaines de production
 ```
 
-## Déploiement attendu
+## Déploiement
 
-Ce correctif doit partir via le workflow normal GitHub, puis être déployé sur la production publique `zandofy.com`. Aucun changement de domaine, aucun changement de variable d’environnement, aucune migration base de données n’est nécessaire.
-
-## Résultat attendu
-
-Après ce correctif, il devient impossible qu’un paiement carte affiche “Commande confirmée” tant que le client n’a pas été redirigé vers Keccel puis confirmé par le retour/webhook de paiement.
+Aucun changement de domaine, aucun sous-domaine à ajouter, aucune variable d’environnement et aucune migration DB. La correction doit partir par le workflow GitHub normal vers `zandofy.com`.

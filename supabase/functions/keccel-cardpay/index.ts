@@ -172,23 +172,53 @@ Deno.serve(async (req) => {
     }
 
     const keccelOk = parsed && String(parsed.code) === "0";
-    // Tolérant : on n'a pas changé la requête envoyée, mais on accepte plusieurs
-    // clés possibles dans la réponse Keccel (au cas où le format évolue).
-    function extractRedirect(p: any): string | null {
-      if (!p || typeof p !== "object") return null;
-      const keys = [
+    // Extraction tolérante : on ne change pas le payload envoyé, mais on scanne
+    // récursivement TOUTE la réponse Keccel pour trouver l'URL de paiement
+    // (typiquement une session Mastercard ap-gateway). On exclut explicitement
+    // nos propres callback/return URLs pour ne jamais les confondre avec
+    // l'URL de paiement.
+    function extractRedirect(p: any, ownUrls: string[]): string | null {
+      if (!p) return null;
+      const found: string[] = [];
+      const preferredKeys = new Set([
         "checkoutUrl", "checkout_url",
         "paymentUrl", "payment_url",
         "redirectUrl", "redirect_url",
-        "url",
-      ];
-      for (const k of keys) {
-        const v = p[k];
-        if (typeof v === "string" && /^https?:\/\//i.test(v)) return v;
+        "paymentLink", "payment_link",
+        "url", "link", "href", "checkout",
+      ]);
+      const preferred: string[] = [];
+      function walk(node: any, parentKey?: string) {
+        if (!node) return;
+        if (typeof node === "string") {
+          if (/^https?:\/\//i.test(node) && !ownUrls.includes(node)) {
+            found.push(node);
+            if (parentKey && preferredKeys.has(parentKey)) preferred.push(node);
+          }
+          return;
+        }
+        if (Array.isArray(node)) {
+          for (const item of node) walk(item, parentKey);
+          return;
+        }
+        if (typeof node === "object") {
+          for (const [k, v] of Object.entries(node)) walk(v, k);
+        }
       }
-      return null;
+      walk(p);
+      // Priorité absolue : session Mastercard ap-gateway
+      const mastercard = [...preferred, ...found].find(u =>
+        /ap-gateway\.mastercard\.com\/checkout\/pay\/SESSION/i.test(u)
+      );
+      if (mastercard) return mastercard;
+      // Sinon : clé préférée
+      if (preferred.length > 0) return preferred[0];
+      // Sinon : première URL trouvée qui n'est pas une de nos propres URLs
+      return found[0] ?? null;
     }
-    const redirectUrl: string | null = keccelOk ? extractRedirect(parsed) : null;
+    const redirectUrl: string | null = keccelOk
+      ? extractRedirect(parsed, [callbackUrl, returnUrl])
+      : null;
     // Contrat strict : carte = redirection obligatoire. Pas d'URL => échec.
     const success = Boolean(keccelOk && redirectUrl);
 
