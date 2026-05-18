@@ -1,143 +1,159 @@
-## Diagnostic
+## Diagnostic — pourquoi des commandes carte « non payées » apparaissent comme nouvelles
 
-La capture montre maintenant une erreur “Keccel n’a pas renvoyé d’URL de paiement exploitable”. Cette erreur protège contre l’ancien bug grave : afficher “Commande confirmée” sans redirection ni paiement.
+### Ce qui se passe aujourd'hui
 
-Mais elle révèle le vrai problème restant : notre fonction `keccel-cardpay` reçoit une réponse acceptée par Keccel, mais ne récupère pas l’URL finale de paiement carte.
+1. **Insertion immédiate en `pending`** — `CheckoutPage.tsx` ligne 910 :
 
-Le flux attendu doit être :
+   ```text
+   status = (mobile_money || off_platform) ? "awaiting_payment" : "pending"
+   ```
 
-```text
-Client choisit Carte bancaire
-  -> Confirmer la commande
-  -> appel Keccel CardPay avec montant + référence + returnurl + callbackurl
-  -> Keccel crée une session
-  -> Zandofy redirige vers l’URL Mastercard ap-gateway / checkout
-  -> webhook/retour confirme ensuite le paiement
-```
+   Donc une commande carte est créée directement en `pending` avant tout appel Keccel. Les vendeurs et l'admin la voient immédiatement comme « nouvelle commande ».
 
-Il ne faut pas rediriger manuellement vers `https://terminal.keccel.com/payment.php?m=jam` comme solution principale, parce que ce terminal oblige potentiellement le client à refaire un choix de mode de paiement. Cette URL peut seulement servir de secours si Keccel la renvoie explicitement, pas comme remplacement de la session Mastercard.
+2. **Notifications déclenchées par `pending`** — `frontend/src/services/order-notifications.ts` :
 
-## Ce qui est probablement cassé
+   ```text
+   NOTIFIABLE_STATUSES = ["pending", "confirmed", "in_shipping", ...]
+   ```
 
-D’après les URLs que tu donnes, l’URL utile est du type :
+   Tout passage à `pending` envoie push + mail + son vendeur/admin, même si le client n'a pas encore vu la page Mastercard.
 
-```text
-https://ap-gateway.mastercard.com/checkout/pay/SESSION...
-```
+3. **Vendeur ne filtre pas `awaiting_payment`** — `VendorOrderManager.tsx` ligne 174 :
 
-Le code actuel extrait seulement quelques clés de premier niveau (`checkoutUrl`, `paymentUrl`, `redirectUrl`, `url`). Si Keccel renvoie la session Mastercard sous une autre clé, dans une clé avec autre casse, ou imbriquée dans un objet, notre fonction conclut à tort : “pas d’URL exploitable”.
+   ```text
+   .not("status", "in", '("payment_failed")')
+   ```
 
-## Solution à appliquer
+   Les commandes en attente de paiement carte sont visibles côté vendeur.
 
-### 1. Garder la sécurité actuelle
+4. **Aucune expiration pour carte** — Mobile Money a un timer 3+3 min. Carte n'a aucun garde-fou : si le client ferme l'onglet Mastercard sans payer, la commande reste indéfiniment en `awaiting_payment` (ou `pending` si l'extraction d'URL échoue, voir bug récent).
 
-Ne jamais rétablir l’ancien fallback :
+5. **Webhook OK** — `kelpay-webhook` fait déjà la bonne chose : il passe `awaiting_payment → pending` puis appelle `notify-order-status`. Le problème est donc en amont (création) et en aval (timeout), pas dans le webhook.
 
-```text
-pas d’URL -> Commande confirmée
-```
+## Solution proposée
 
-Pour carte bancaire, ce comportement reste interdit.
+### 1. Créer la commande carte directement en `awaiting_payment`
 
-### 2. Corriger l’extraction d’URL dans `keccel-cardpay`
-
-Dans les deux copies :
-
-- `supabase/functions/keccel-cardpay/index.ts`
-- `frontend/supabase/functions/keccel-cardpay/index.ts`
-
-remplacer l’extraction actuelle par une extraction robuste qui :
-
-- scanne récursivement toute la réponse JSON Keccel ;
-- accepte les clés probables : `checkoutUrl`, `checkout_url`, `paymentUrl`, `payment_url`, `redirectUrl`, `redirect_url`, `url`, `paymentLink`, `payment_link`, `checkout`, `link`, `href` ;
-- accepte surtout toute valeur string qui contient une URL `https://ap-gateway.mastercard.com/checkout/pay/SESSION...` ;
-- priorise l’URL Mastercard `ap-gateway.mastercard.com/checkout/pay/SESSION...` si plusieurs URLs existent ;
-- ne prend pas une URL callback/return Zandofy comme URL de paiement ;
-- ne génère jamais un numéro de session Mastercard côté Zandofy, car cette session doit être créée par Keccel/Mastercard.
-
-### 3. Garder le payload Keccel officiel
-
-Ne pas faire de boucle de variantes et ne pas ajouter de champs non validés.
-
-Payload conservé :
+`CheckoutPage.tsx` ligne 910 :
 
 ```text
-merchantcode, reference, amount, currency, description, callbackurl, returnurl
+status = (card || paypal || stripe || mobile_money || off_platform)
+   ? "awaiting_payment"
+   : "pending"
 ```
 
-Le diagnostic reste côté lecture de réponse, pas côté modification de la requête.
+`pending` ne doit être atteint **que** par :
+- COD (cash à la livraison, pas de webhook attendu)
+- webhook KelPay/Keccel après paiement confirmé (déjà en place)
+- validation manuelle off-platform par le vendeur (déjà en place)
 
-### 4. Améliorer le message d’erreur client
+### 2. Ne notifier qu'à la transition `awaiting_payment → pending`
 
-Le toast mobile actuel expose trop de détails techniques (`HTTP 200`, description complète, diagnostic brut). Le remplacer par un message court :
+Aujourd'hui `notify-order-status` est appelé depuis le webhook avec `newStatus="pending"` — c'est bon. Il faut juste s'assurer qu'aucun autre endroit ne déclenche une notification « nouvelle commande » au moment de l'INSERT :
+
+- Vérifier qu'aucun trigger DB sur `INSERT orders` n'envoie déjà push/mail. Si oui, le conditionner à `NEW.status = 'pending'` au lieu de tout INSERT.
+- Le checkout côté frontend ne doit **pas** appeler `triggerOrderStatusNotification` après l'insert. Seul le webhook le fait.
+
+### 3. Masquer `awaiting_payment` côté vendeur et admin (liste « nouvelles commandes »)
+
+- `VendorOrderManager.tsx` ligne 174 : exclure `awaiting_payment` du listing principal. Optionnel : un onglet séparé « En attente de paiement » discret, sans son ni badge.
+- `AdminOrdersPage.tsx` : conserver la visibilité (admin doit voir), mais retirer `awaiting_payment` des KPIs « commandes valides » et des compteurs de tête. Le total « 28 commandes en attente » doit refléter uniquement `pending` (payées non encore confirmées par le vendeur).
+
+### 4. Expiration automatique des cartes non payées
+
+Aligner sur Mobile Money :
+
+- Côté client `CheckoutPage.tsx` (déjà partiellement fait pour MM) : timer de **15 minutes** après redirection Mastercard. Au-delà, marquer la commande `payment_failed` si toujours `awaiting_payment`.
+- Côté serveur : un cron (réutiliser un cron existant) qui passe en `payment_failed` toute commande carte/paypal/stripe restée en `awaiting_payment` depuis plus de **30 minutes** sans `payment_transactions.status = success`. C'est le filet de sécurité si le client ferme l'onglet.
+
+### 5. Sons distincts succès vs échec
+
+`frontend/src/lib/notification-sounds.ts` : ajouter un mapping par type de notification.
 
 ```text
-Redirection carte indisponible. Veuillez réessayer ou choisir Mobile Money.
+order.created (paiement confirmé) -> son "new-order.mp3" (actuel)
+order.payment_failed              -> son "failure.mp3" (court, neutre, non urgent)
 ```
 
-Le `diagnostic_id` doit rester dans les logs et détails console pour support/admin, pas dans un gros toast client.
+Le hook `use-notifications` choisit le son selon `notification.type` ou un nouveau champ `severity`.
 
-### 5. Sécuriser `PaymentReturnPage`
+### 6. Non-régression
 
-Corriger le point faible actuel : si aucune transaction n’est trouvée, `status=success` dans l’URL ne doit jamais afficher “Paiement confirmé”.
+Ne pas toucher :
 
-Règle :
+- payload Keccel `keccel-cardpay` (7 champs lowercase)
+- logique Mobile Money (timer 3+3 min déjà OK)
+- COD et off-platform (création directe pertinente)
+- domaines / variables d'environnement / migrations existantes
+
+## Impact attendu
 
 ```text
-succès affiché uniquement si payment_transactions.status = success
+Avant :
+  client clique "Payer par carte"
+  → commande pending immédiate
+  → push vendeur + admin
+  → client ferme onglet Mastercard
+  → commande reste pending pour toujours
+  → KPI saturé
+
+Après :
+  client clique "Payer par carte"
+  → commande awaiting_payment (invisible vendeur, visible admin onglet dédié)
+  → aucune notification
+  → si Mastercard confirme via webhook → pending + push + mail
+  → sinon (timeout 15 min client / 30 min serveur) → payment_failed
 ```
 
-Sinon : pending/failed, mais jamais success uniquement sur paramètre URL.
+## Détails techniques
 
-## Tests à faire après implémentation
-
-### Test négatif
-
-Réponse Keccel code 0 sans aucune URL Mastercard ni URL de paiement :
-
-```json
-{ "code": "0", "description": "..." }
-```
-
-Résultat attendu :
+### Fichiers à modifier
 
 ```text
-pas de Commande confirmée
-commande payment_failed
-message client court
-logs avec diagnostic_id
+frontend/src/pages/CheckoutPage.tsx
+  - ligne 910 : étendre awaiting_payment à card/paypal/stripe
+  - ajouter timer client 15 min pour card (similaire MM)
+
+frontend/src/components/vendor/VendorOrderManager.tsx
+  - ligne 174 : exclure awaiting_payment
+
+frontend/src/pages/admin/AdminOrdersPage.tsx
+  - séparer awaiting_payment des KPIs « valides » et « en attente »
+  - ajouter onglet dédié si besoin
+
+frontend/src/lib/notification-sounds.ts
+  - mapping son par type/severity
+
+frontend/src/hooks/use-notifications.ts
+  - jouer son selon type
+
+supabase/functions/<cron existant ou nouveau>/index.ts
+  - sweeper 30 min pour card/paypal/stripe en awaiting_payment
+
+supabase/migrations/<nouveau>.sql (si trigger DB notifie sur INSERT orders)
+  - conditionner à status='pending' uniquement
 ```
 
-### Test positif
-
-Réponse Keccel contenant quelque part :
+### Tests à faire
 
 ```text
-https://ap-gateway.mastercard.com/checkout/pay/SESSION...
+1. Paiement carte annulé (ferme onglet Mastercard)
+   → vendeur ne reçoit RIEN
+   → après 15 min : commande payment_failed côté client
+   → après 30 min : sweeper serveur confirme payment_failed
+
+2. Paiement carte réussi (webhook OK)
+   → commande passe awaiting_payment → pending
+   → vendeur reçoit push + mail + son "nouvelle commande"
+   → KPI admin "valides" +1
+
+3. Mobile Money inchangé (timer 3+3 min existant)
+
+4. COD inchangé (création directe en pending)
+
+5. Off-platform inchangé (validation manuelle vendeur)
 ```
 
-même si l’URL est imbriquée ou sous une clé inconnue.
+### Déploiement
 
-Résultat attendu :
-
-```text
-redirection immédiate vers Mastercard
-commande awaiting_payment
-confirmation seulement après webhook/retour confirmé
-```
-
-### Non-régression
-
-Ne pas modifier :
-
-```text
-Mobile Money
-paiement à la livraison
-paiement hors plateforme
-layout checkout mobile
-variables/domaines de production
-```
-
-## Déploiement
-
-Aucun changement de domaine, aucun sous-domaine à ajouter, aucune variable d’environnement et aucune migration DB. La correction doit partir par le workflow GitHub normal vers `zandofy.com`.
+Aucun changement de domaine, secret ou architecture. Migrations SQL uniquement si un trigger DB est trouvé. Sortie par workflow GitHub vers `zandofy.com`.
