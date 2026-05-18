@@ -171,8 +171,26 @@ Deno.serve(async (req) => {
       console.error(`[${diagnosticId}] Keccel network error:`, e);
     }
 
-    const success = parsed && String(parsed.code) === "0";
-    const redirectUrl: string | null = success ? (parsed?.checkoutUrl || null) : null;
+    const keccelOk = parsed && String(parsed.code) === "0";
+    // Tolérant : on n'a pas changé la requête envoyée, mais on accepte plusieurs
+    // clés possibles dans la réponse Keccel (au cas où le format évolue).
+    function extractRedirect(p: any): string | null {
+      if (!p || typeof p !== "object") return null;
+      const keys = [
+        "checkoutUrl", "checkout_url",
+        "paymentUrl", "payment_url",
+        "redirectUrl", "redirect_url",
+        "url",
+      ];
+      for (const k of keys) {
+        const v = p[k];
+        if (typeof v === "string" && /^https?:\/\//i.test(v)) return v;
+      }
+      return null;
+    }
+    const redirectUrl: string | null = keccelOk ? extractRedirect(parsed) : null;
+    // Contrat strict : carte = redirection obligatoire. Pas d'URL => échec.
+    const success = Boolean(keccelOk && redirectUrl);
 
     // Diagnostic (best-effort, jamais bloquant)
     try {
@@ -206,12 +224,26 @@ Deno.serve(async (req) => {
     }
 
     if (!success) {
+      // Marquer la commande payment_failed côté serveur pour cohérence admin.
+      if (pType === "order") {
+        await supabase
+          .from("orders")
+          .update({ status: "payment_failed" })
+          .eq("id", order.id)
+          .in("status", ["pending", "awaiting_payment"]);
+      }
+      const reason = !keccelOk
+        ? `Keccel a refusé le paiement (code ${parsed?.code ?? "?"})`
+        : "Keccel n'a pas renvoyé d'URL de paiement exploitable";
       return errorResponse(
-        `Keccel a refusé le paiement (diag ${diagnosticId}). HTTP ${httpStatus} — ${parsed?.description ?? "réponse vide"}.`,
+        `${reason} (diag ${diagnosticId}). HTTP ${httpStatus} — ${parsed?.description ?? "réponse vide"}.`,
         {
           diagnostic_id: diagnosticId,
           httpStatus,
           keccel_description: parsed?.description ?? null,
+          keccel_ok: keccelOk,
+          redirect_url_present: Boolean(redirectUrl),
+          response_keys: parsed && typeof parsed === "object" ? Object.keys(parsed) : [],
           body: rawBody.slice(0, 500),
         }
       );

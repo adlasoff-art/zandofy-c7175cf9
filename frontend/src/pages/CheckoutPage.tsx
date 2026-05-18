@@ -1235,11 +1235,18 @@ export default function CheckoutPage() {
           window.location.href = data.fallback_terminal_url;
           return;
         } else {
-          // No redirect URL — show confirmation page
-          setOrderId(orderRef);
-          await removeSelectedItems();
-          goToStep("confirmation");
-          setProcessing(false);
+          // SÉCURITÉ CRITIQUE : pour un paiement carte, l'absence d'URL de
+          // redirection signifie que le paiement n'a JAMAIS été initié côté
+          // passerelle. On ne doit JAMAIS afficher "Commande confirmée" ici.
+          // On marque les commandes en payment_failed et on lève une erreur.
+          if (orderIds.length > 0) {
+            await supabase
+              .from("orders")
+              .update({ status: "payment_failed" } as any)
+              .in("id", orderIds)
+              .eq("status", "awaiting_payment");
+          }
+          throw new Error("La passerelle de paiement n'a pas renvoyé d'URL. Paiement non initié — veuillez réessayer.");
         }
       } catch (err: any) {
         // Mark any created orders as payment_failed so they don't appear as active
