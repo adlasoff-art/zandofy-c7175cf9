@@ -1,58 +1,88 @@
-# Diagnostic page blanche prod + preload hero
+# Correctifs erreurs console prod
 
-## Constat
+## Diagnostic
 
-1. **Warning console** : `The resource ...banners/...webp was preloaded using link preload, but not used within a few seconds...`
-   → **Bénin**. Le script inline dans `frontend/index.html` (lignes 36-89) précharge **toujours** l'image du premier hero_slide, même sur `/auth`, `/account`, etc. où `HeroBanner` n'est jamais monté. Ce warning n'a aucun impact fonctionnel.
+Deux erreurs distinctes (les warnings "preload not used" sont une conséquence, pas la cause).
 
-2. **Page blanche** : symptôme distinct du warning. Causes probables, classées par vraisemblance :
-   - **A. Service Worker servant des chunks JS périmés** après le déploiement d'hier. `sw.js` (lignes 159-169) sert les JS/CSS en *stale-while-revalidate* depuis `STATIC_CACHE`. Après deploy, le nouveau `index.html` (network-first) référence de nouveaux hash de chunks ; les anciens chunks restent en cache mais les nouveaux peuvent ne pas être encore présents → si un import dynamique échoue de façon silencieuse (ex. lazy route), React reste à blanc.
-   - **B. Erreur runtime non capturée** sur la route d'entrée. Les logs Lovable Cloud ne reflètent **pas** la prod (`vpt...yxf`), donc on ne peut pas trancher sans la console réelle.
-   - **C. SW de prod cassé** : on voit dans les error_reports preview des `Failed to update ServiceWorker ... 404 sw.js?v=1.10.2`. Si la version prod a un mismatch similaire, le SW courant peut continuer à servir un `index.html` cohérent mais des chunks orphelins.
+### 1. `401` sur `/rest/v1/cms_banners` (depuis `index.html`)
 
-## Plan d'action (2 phases)
+Le script inline dans `frontend/index.html` (lignes 73-91) fait un `fetch()` direct vers Supabase avec une **clé anon hardcodée** :
 
-### Phase 1 — Nettoyer et instrumenter (sans casser)
+```
+KEY = 'eyJ...iat:1750161437...' (juin 2025)
+```
 
-1. **Conditionner le preload hero au chemin `/`**
-   - Fichier : `frontend/index.html` (script inline lignes 36-89)
-   - Ajouter en début de l'IIFE : `if (location.pathname !== '/' && location.pathname !== '/index.html') return;`
-   - Idem dans `frontend/src/components/HeroBanner.tsx` : ne pas pousser dans `localStorage.z_lcp_hero_url` une URL qui sera rejouée hors home (déjà OK, mais on garde un garde-fou).
-   - Résultat : disparition immédiate du warning console sur `/auth`, `/account`, etc.
+Cette clé est figée dans le HTML — elle ne suit pas `VITE_SUPABASE_PUBLISHABLE_KEY` qui est injectée au build via Vercel. Si la clé anon prod a été rotée (ou si la valeur déployée diffère), l'inline fetch échoue en 401 alors que le bundle React continue de fonctionner avec la bonne clé.
 
-2. **Durcir le SW pour éviter les chunks orphelins (cause A)**
-   - Fichier : `frontend/public/sw.js`
-   - Pour les requêtes vers `/assets/*.js` et `/assets/*.css` (Vercel met les chunks hashés ici), passer en **network-first** au lieu de stale-while-revalidate. Coût : un round-trip de plus, mais ces fichiers sont `Cache-Control: immutable` côté Vercel (`vercel.json` headers `/assets/(.*)`), donc le navigateur cache de toute façon — le bénéfice du SW est nul ici et le risque (chunks périmés) est réel.
-   - Bumper `STATIC_CACHE` de `zandofy-static-v8` → `v9` pour évacuer les anciennes versions au prochain `activate`.
+→ **Conséquence visible** : aucune (le composant `HeroBanner` re-fetch correctement), mais ça pollue la console et casse le préchargement LCP.
 
-3. **Ajouter un kill-switch fallback côté `main.tsx`**
-   - Déjà présent : `chunk_reload_attempted` recharge une fois sur erreur de chunk. Étendre : si après reload on détecte encore un échec → désinscrire le SW et vider les caches, puis recharger.
-   - Ceci protège les utilisateurs déjà bloqués sur prod aujourd'hui (4000 visites/jour).
+### 2. `400` sur `/rest/v1/profiles?select=created_at,residence_country,residence_city`
 
-### Phase 2 — Vérification
+Les colonnes `residence_country` et `residence_city` **n'existent pas** dans la table `profiles` côté prod (`vpttoqojmiqxgudknyxf`). Elles sont référencées dans :
+- `frontend/src/hooks/use-automation.ts` (l.99-109) — appelé par les workflows marketing
+- `frontend/src/pages/DashboardPage.tsx`
+- `frontend/src/pages/admin/AdminNotificationsPage.tsx`
+- `frontend/src/components/admin/UserDetailDrawer.tsx`
 
-1. Build + déploiement staging (`develop`), ouvrir `https://studio-staging.zandofy.com/auth` :
-   - Console **sans** warning preload.
-   - Devtools → Application → Service Workers : version `zandofy-static-v9` active, anciens caches supprimés.
-2. Simuler un déploiement (modifier un import lazy, redéployer) → vérifier que le SW ne sert plus de chunk périmé.
-3. Si OK, promouvoir vers `main` (prod).
-4. Communiquer aux utilisateurs déjà bloqués : un **Ctrl+Shift+R** suffira (ou ils tomberont automatiquement sur le fallback de désinscription SW).
+Soit la migration qui ajoute ces colonnes n'a jamais été déployée en prod, soit le code a été écrit en anticipation. Cas typique de divergence schéma staging/prod déjà documenté en mémoire (`rls-staging-prod-divergence`).
 
-## Fichiers modifiés
+→ **Conséquence visible** : le hook `useAutomation` lève une erreur en boucle côté client → bruit console + workflows marketing partiellement cassés.
 
-- `frontend/index.html` — guard `location.pathname === '/'`
-- `frontend/src/components/HeroBanner.tsx` — guard symétrique (défensif)
-- `frontend/public/sw.js` — network-first pour `/assets/*`, bump cache `v8 → v9`
-- `frontend/src/main.tsx` — fallback désinscription SW après second échec chunk
+---
+
+## Plan d'exécution
+
+### Phase 1 — Stopper la fuite (front, sans toucher au schéma)
+
+**Fichier `frontend/index.html`** — supprimer la dépendance à la clé hardcodée :
+
+Deux options possibles, je recommande **l'option B** (plus simple, zéro régression) :
+
+- **Option A** : injecter la clé anon au build via un placeholder remplacé par Vite (ex. `__VITE_SUPABASE_ANON__`). Plus propre mais nécessite un plugin Vite ou un `transformIndexHtml`.
+- **Option B (recommandée)** : **retirer le bloc B** (fetch direct cms_banners depuis index.html). Garder le bloc A (preload depuis `localStorage.z_lcp_hero_url`) qui couvre 95 % des visites récurrentes. `HeroBanner.tsx` continue de remplir le cache après le premier rendu. On perd ~200 ms de LCP sur la **toute première visite** d'un nouveau visiteur, mais on élimine la dette de la clé hardcodée.
+
+**Fichier `frontend/src/hooks/use-automation.ts`** — rendre la query tolérante :
+
+Wrapper le `select("created_at, residence_country, residence_city")` :
+1. Essayer d'abord les 3 colonnes.
+2. Si erreur PostgREST `42703` (colonne inexistante) → fallback `select("created_at")` et laisser `userCountry`/`userCity` à `null`.
+3. Ne **pas** propager l'erreur (les workflows marketing doivent dégrader gracieusement).
+
+Pareil dans les 3 autres fichiers qui sélectionnent ces colonnes — audit rapide pour décider entre tolérance ou suppression du champ selon que l'UI affiche la donnée ou non.
+
+### Phase 2 — Réconcilier le schéma prod (DB)
+
+Créer une migration `frontend/supabase/migrations/{ts}_profiles_residence_columns.sql` :
+
+```sql
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS residence_country text,
+  ADD COLUMN IF NOT EXISTS residence_city text;
+```
+
+À déployer en prod via GitHub Actions (`deploy-edge-functions.yml` n'applique que les edges — vérifier qu'un workflow `supabase db push` tourne sur `main`, sinon appliquer manuellement via le pipeline existant).
+
+Une fois la migration en prod, retirer le fallback de tolérance ajouté en Phase 1 (ou le laisser comme garde-fou, peu coûteux).
+
+### Phase 3 — Vérification
+
+1. Build local : `bun run build` → vérifier qu'aucune référence à la clé hardcodée ne reste.
+2. Déployer staging → ouvrir `/` puis `/dashboard` → console propre (0 erreur 400/401, 0 warning preload).
+3. Vérifier que `HeroBanner` s'affiche normalement et que `z_lcp_hero_url` est rempli après 1 visite.
+4. Puis prod.
+
+---
+
+## Fichiers touchés
+
+- `frontend/index.html` (retrait bloc B)
+- `frontend/src/hooks/use-automation.ts` (tolérance schéma)
+- `frontend/src/pages/DashboardPage.tsx` (audit)
+- `frontend/src/pages/admin/AdminNotificationsPage.tsx` (audit)
+- `frontend/src/components/admin/UserDetailDrawer.tsx` (audit)
+- `frontend/supabase/migrations/{ts}_profiles_residence_columns.sql` (nouveau)
 
 ## Hors scope
 
-- Pas de changement DB, edge functions, ni env.
-- Pas de modif de routes ni de logique métier.
-- L'investigation root-cause définitive de la page blanche nécessite un message console depuis la prod (Chrome devtools sur zandofy.com pendant le bug). Si le warning preload disparaît mais que la page reste blanche, **la cause B (erreur runtime)** sera confirmée et je demanderai la stack trace réelle.
-
-## Note importante
-
-Le warning preload **n'est pas** la cause de la page blanche. C'est seulement la seule chose que la console affiche parce que le reste du JS n'a pas eu le temps de s'exécuter (cause A ou B). En corrigeant le SW (cause A la plus probable vu le contexte deploy d'hier) on couvre 80% du risque. Si après merge sur prod le problème persiste, j'aurai besoin de :
-1. La console prod complète (Chrome DevTools → Console → tout)
-2. L'onglet Network filtre JS, voir s'il y a des 404 sur les chunks `/assets/*.js`
+- Rotation de clé anon (si c'est la cause réelle du 401, à confirmer avec toi).
+- Refonte du LCP preload via injection Vite (à faire dans un second temps si on veut récupérer les ~200 ms de la première visite).
