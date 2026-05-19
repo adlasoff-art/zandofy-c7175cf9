@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DashboardPeriodSelector, type PeriodKey } from "@/components/admin/dashboard/DashboardPeriodSelector";
@@ -11,6 +11,7 @@ import { VendorsTab } from "@/components/admin/dashboard/VendorsTab";
 import { ClientsTab } from "@/components/admin/dashboard/ClientsTab";
 import { SystemHealthWidget } from "@/components/admin/SystemHealthWidget";
 import { useQueryClient } from "@tanstack/react-query";
+import { useVisibilityAwareInterval } from "@/hooks/use-visibility-aware-interval";
 import { LayoutDashboard, BarChart3, Truck, Store, Users, Receipt } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -18,26 +19,24 @@ export default function AdminDashboard() {
   const [geoFilters, setGeoFilters] = useState<GlobalFilters>({ country: "all", city: "all" });
   const queryClient = useQueryClient();
 
-  // Polling for orders (15s) — Realtime removed for security
-  useEffect(() => {
-    const interval = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-recent-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-sales-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-orders-detail"] });
-    }, 15000);
-    return () => clearInterval(interval);
+  // Polling commandes : 45 s en avant-plan, pas en arrière-plan.
+  // Inclut désormais la query consolidée "admin-overview".
+  const pollOrders = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-recent-orders"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-sales-orders"] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard-orders-detail"] });
   }, [queryClient]);
+  useVisibilityAwareInterval(pollOrders, { activeMs: 45_000, hiddenMs: 0, runOnFocus: true });
 
-  // Polling for product/store counters (30s) — replaces removed Realtime channels
-  useEffect(() => {
-    const interval = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-stores"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-vendor-stats"] });
-    }, 30000);
-    return () => clearInterval(interval);
+  // Polling compteurs produits / boutiques / vendeurs : 90 s.
+  const pollCounters = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-stores"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-vendor-stats"] });
   }, [queryClient]);
+  useVisibilityAwareInterval(pollCounters, { activeMs: 90_000, hiddenMs: 0, runOnFocus: true });
 
   return (
     <AdminLayout title="Tableau de bord">

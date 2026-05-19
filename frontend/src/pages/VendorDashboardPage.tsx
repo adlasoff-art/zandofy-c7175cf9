@@ -174,69 +174,25 @@ export default function VendorDashboardPage() {
       // Load order counters
       await fetchOrderCounters(activeStore.id);
 
-      // Load conversations for this store
-      const { data: convs } = await supabase
-        .from("conversations")
-        .select("id, user_id, product_id, updated_at")
-        .eq("store_id", activeStore.id)
-        .order("updated_at", { ascending: false });
+      // Lot 4 — un seul appel RPC remplace le N+1 (2 requêtes par conversation).
+      const { data: convRows, error: convErr } = await (supabase as any)
+        .rpc("vendor_conversation_summary", { _store_id: activeStore.id });
 
-      if (!convs || convs.length === 0) {
+      if (convErr || !convRows) {
         setConversations([]);
-        setLoading(false);
-        hasLoadedRef.current = true;
-        // No realtime setup needed — polling handles updates
-        return;
+      } else {
+        const items: VendorConversation[] = (convRows as any[]).map((c) => ({
+          id: c.id,
+          user_id: c.user_id,
+          product_id: c.product_id,
+          updated_at: c.updated_at,
+          customer_email: c.customer_email || "Client",
+          product_name: c.product_name || null,
+          last_message: c.last_message || null,
+          unread_count: Number(c.unread_count || 0),
+        }));
+        setConversations(items);
       }
-
-      // Fetch customer profiles and product names
-      const userIds = [...new Set(convs.map((c) => c.user_id))];
-      const productIds = convs.map((c) => c.product_id).filter(Boolean) as string[];
-
-      const [profilesRes, productsRes] = await Promise.all([
-        supabase.from("profiles").select("id, email").in("id", userIds),
-        productIds.length > 0
-          ? supabase.from("products").select("id, name_fr").in("id", productIds)
-          : Promise.resolve({ data: [] }),
-      ]);
-
-      const profileMap = new Map((profilesRes.data || []).map((p) => [p.id, p]));
-      const productMap = new Map((productsRes.data || []).map((p) => [p.id, p]));
-
-      const items: VendorConversation[] = [];
-
-      for (const conv of convs) {
-        const { data: lastMsg } = await supabase
-          .from("messages")
-          .select("content")
-          .eq("conversation_id", conv.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const { count } = await supabase
-          .from("messages")
-          .select("id", { count: "exact", head: true })
-          .eq("conversation_id", conv.id)
-          .eq("is_read", false)
-          .neq("sender_id", user!.id);
-
-        const profile = profileMap.get(conv.user_id);
-        const product = conv.product_id ? productMap.get(conv.product_id) : null;
-
-        items.push({
-          id: conv.id,
-          user_id: conv.user_id,
-          product_id: conv.product_id,
-          updated_at: conv.updated_at,
-          customer_email: profile?.email || "Client",
-          product_name: product?.name_fr || null,
-          last_message: lastMsg?.content || null,
-          unread_count: count || 0,
-        });
-      }
-
-      setConversations(items);
       setLoading(false);
       hasLoadedRef.current = true;
     }

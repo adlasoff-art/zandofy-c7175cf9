@@ -10413,6 +10413,10 @@ export type Database = {
         }
         Returns: string
       }
+      admin_dashboard_overview: {
+        Args: { _city?: string; _country?: string; _since?: string }
+        Returns: Json
+      }
       admin_get_user_label: {
         Args: { p_user_id: string }
         Returns: {
@@ -11049,6 +11053,10 @@ export type Database = {
           revenue: number
           units_sold: number
         }[]
+      }
+      vendor_conversation_summary: {
+        Args: { _store_id: string }
+        Returns: Json
       }
       verify_order_pickup_code: {
         Args: { _code: string; _order_id: string }
