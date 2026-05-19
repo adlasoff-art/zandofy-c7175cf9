@@ -70,25 +70,11 @@
       try {
         preload(localStorage.getItem('z_lcp_hero_url'));
       } catch(_) {}
-      // B) Fetch direct du premier hero_slide actif (parallèle du JS bundle).
-      // La clé anon publique prod est safe à mettre en clair (RLS protège la base).
-      try {
-        var SB  = 'https://vpttoqojmiqxgudknyxf.supabase.co';
-        var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwdHRvcW9qbWlxeGd1ZGtueXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxNjE0MzcsImV4cCI6MjA2NTczNzQzN30.ZqJUUN6DqXrXJ7CcjmmMRrcVtDkQ4zYM4nhP8mC4_zE';
-        fetch(SB + '/rest/v1/cms_banners?select=image_url&position=eq.hero_slide&is_active=eq.true&order=sort_order.asc&limit=1', {
-          headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, Accept: 'application/json' },
-          // High priority: same critical bucket as the bundle.
-          // @ts-ignore
-          priority: 'high'
-        })
-        .then(function(r){ return r.ok ? r.json() : null; })
-        .then(function(rows){
-          if (!rows || !rows[0] || !rows[0].image_url) return;
-          preload(rows[0].image_url);
-          try { localStorage.setItem('z_lcp_hero_url', rows[0].image_url); } catch(_) {}
-        })
-        .catch(function(){ /* silent — React fallback prend le relais */ });
-      } catch(_) {}
+      // B) Le fetch direct cms_banners depuis index.html a été retiré : la clé
+      // anon hardcodée se désynchronisait avec celle injectée au build,
+      // provoquant des 401 silencieux. HeroBanner.tsx remplit z_lcp_hero_url
+      // après le premier rendu : les visites suivantes bénéficient toujours
+      // du preload via le bloc A.
     })();
   </script>
 
