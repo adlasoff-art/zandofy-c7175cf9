@@ -40,4 +40,8 @@ type: feature
 - Timeline : libellé `notes_updated` = "Message envoyé au client"
 
 ## Reste à faire (lots ultérieurs)
-- H7 : push web pour transitaire + opérateur (déjà partiel)
+
+## H7 — Push web transitaire + opérateur
+- `notify-operator-new-order` : `sendWebPushSafe` vers `delivery_operators.owner_user_id` (déjà en place)
+- `notify-forwarder-handoff` : `sendWebPushSafe` vers `forwarders.owner_user_id` + `linked_transporter_user_id` (tag `forwarder-handoff-${handoffId}`, url `/forwarder`, requireInteraction)
+- Email forwarder reste best-effort après le push
