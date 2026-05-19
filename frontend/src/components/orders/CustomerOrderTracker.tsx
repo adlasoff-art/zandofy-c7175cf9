@@ -2,8 +2,9 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { DeliveryMap, type MapMarker } from "@/components/DeliveryMap";
-import { Truck, MapPin, Package, ExternalLink, Phone, Star, RefreshCw, Plane, Ship } from "lucide-react";
+import { Truck, MapPin, Package, ExternalLink, Phone, Star, RefreshCw, Plane, Ship, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 
 /**
  * Lot 12 — Customer-side real-time order tracker.
@@ -87,6 +88,7 @@ interface TrackingPayload {
 const POLL_INTERVAL_ACTIVE_MS = 15_000;
 const POLL_INTERVAL_HIDDEN_MS = 0; // stop polling when tab hidden
 const ACTIVE_STATUSES = new Set(["pending", "confirmed", "processing", "shipped", "ready_for_pickup", "out_for_delivery"]);
+const SWITCHABLE_TO_PICKUP = new Set(["shipped", "arrived_at_hub", "at_hub", "assigning_rider", "rider_assigned"]);
 
 function formatRelativeTime(iso: string, locale: string): string {
   const diffSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
@@ -104,6 +106,7 @@ export function CustomerOrderTracker({ orderId }: { orderId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -148,6 +151,36 @@ export function CustomerOrderTracker({ orderId }: { orderId: string }) {
   }, [orderId]);
 
   const isActive = data ? ACTIVE_STATUSES.has(data.order.status) : false;
+
+  const canSwitchToHub =
+    data?.order?.delivery_choice === "home" &&
+    SWITCHABLE_TO_PICKUP.has(data.order.status);
+
+  const switchToHubPickup = async () => {
+    if (!data || switching) return;
+    const ok = window.confirm(
+      locale === "fr"
+        ? "Basculer cette commande en retrait à l'agence ? Le coursier ne passera plus."
+        : "Switch this order to hub pickup? The rider will be cancelled."
+    );
+    if (!ok) return;
+    setSwitching(true);
+    try {
+      const { data: res, error: err } = await supabase.functions.invoke("switch-to-hub-pickup", {
+        body: { order_id: orderId },
+      });
+      if (err) throw err;
+      const code = (res as any)?.pickup_code;
+      toast.success(
+        locale === "fr" ? "Retrait au hub activé" : "Hub pickup activated",
+        { description: code ? `Code: ${code}` : undefined }
+      );
+    } catch (e: any) {
+      toast.error(e?.message ?? "Error");
+    } finally {
+      setSwitching(false);
+    }
+  };
 
   const markers = useMemo<MapMarker[]>(() => {
     if (!data) return [];
@@ -320,6 +353,31 @@ export function CustomerOrderTracker({ orderId }: { orderId: string }) {
             <div className="font-mono font-bold text-lg tracking-[0.3em] text-primary">{data.order.pickup_code}</div>
           </div>
         </div>
+      )}
+
+      {/* H4 — switch home → hub_pickup last minute */}
+      {canSwitchToHub && (
+        <button
+          onClick={switchToHubPickup}
+          disabled={switching}
+          className="w-full bg-card border border-primary/40 hover:bg-primary/5 transition-colors rounded-lg p-3 flex items-center gap-3 text-left disabled:opacity-60"
+        >
+          {switching ? (
+            <Loader2 className="h-5 w-5 animate-spin text-primary shrink-0" />
+          ) : (
+            <MapPin className="h-5 w-5 text-primary shrink-0" />
+          )}
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-foreground">
+              {locale === "fr" ? "Récupérer plutôt à l'agence" : "Pick up at the hub instead"}
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              {locale === "fr"
+                ? "Annule la livraison à domicile et génère un code de retrait."
+                : "Cancels home delivery and generates a pickup code."}
+            </div>
+          </div>
+        </button>
       )}
 
       {/* Empty state */}
