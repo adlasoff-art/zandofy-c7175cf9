@@ -110,6 +110,7 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
   const [trackingDraft, setTrackingDraft] = useState<
     Record<string, { number: string; carrier: string; url: string }>
   >({});
+  const [tab, setTab] = useState<"new" | "in_progress" | "delivered" | "cancelled">("new");
 
   const fetchHandoffs = async () => {
     if (forwarderIds.length === 0) {
@@ -273,6 +274,25 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
     );
   }
 
+  const counts = {
+    new: rows.filter((r) => r.status === "pending" || r.status === "notified").length,
+    in_progress: rows.filter((r) => r.status === "acknowledged" || r.status === "in_transit").length,
+    delivered: rows.filter((r) => r.status === "delivered").length,
+    cancelled: rows.filter((r) => r.status === "cancelled").length,
+  };
+  const filteredRows = rows.filter((r) => {
+    if (tab === "new") return r.status === "pending" || r.status === "notified";
+    if (tab === "in_progress") return r.status === "acknowledged" || r.status === "in_transit";
+    if (tab === "delivered") return r.status === "delivered";
+    return r.status === "cancelled";
+  });
+  const TABS: { key: typeof tab; label: string }[] = [
+    { key: "new", label: `Nouveaux (${counts.new})` },
+    { key: "in_progress", label: `En cours (${counts.in_progress})` },
+    { key: "delivered", label: `Arrivés au hub (${counts.delivered})` },
+    { key: "cancelled", label: `Annulés (${counts.cancelled})` },
+  ];
+
   return (
     <section className="rounded-xl border border-border bg-card overflow-hidden">
       <header className="flex items-center justify-between gap-3 p-4 border-b border-border bg-muted/20">
@@ -281,7 +301,7 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
             <Package size={18} className="text-primary" /> Commandes à traiter
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {rows.length} commande{rows.length > 1 ? "s" : ""} reçue{rows.length > 1 ? "s" : ""}
+            {filteredRows.length} commande{filteredRows.length > 1 ? "s" : ""} affichée{filteredRows.length > 1 ? "s" : ""}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchHandoffs}>
@@ -289,13 +309,29 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
         </Button>
       </header>
 
-      {rows.length === 0 ? (
+      <div className="flex gap-1.5 overflow-x-auto px-4 py-2 border-b border-border bg-background/40">
+        {TABS.map((tt) => (
+          <button
+            key={tt.key}
+            onClick={() => setTab(tt.key)}
+            className={`px-3 py-1.5 text-[11px] rounded-full border whitespace-nowrap transition-colors ${
+              tab === tt.key
+                ? "bg-foreground text-card border-foreground"
+                : "bg-card text-foreground border-border"
+            }`}
+          >
+            {tt.label}
+          </button>
+        ))}
+      </div>
+
+      {filteredRows.length === 0 ? (
         <div className="p-8 text-center text-sm text-muted-foreground">
-          Aucune commande à traiter pour le moment.
+          Aucune commande dans cet onglet.
         </div>
       ) : (
         <div className="divide-y divide-border">
-          {rows.map((row) => {
+          {filteredRows.map((row) => {
             const meta = STATUS_META[row.status];
             const actions = NEXT_ACTIONS[row.status] ?? [];
             const payload = row.notification_payload ?? {};
