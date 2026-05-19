@@ -1831,6 +1831,7 @@ export default function CheckoutPage() {
                     </p>
                     <div className="space-y-2">
                       {[
+                        { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait à l'agence (hub)", desc: "Récupérez votre colis au point de collecte, à l'agence du transitaire (gratuit)", disabled: false },
                         {
                           key: "home_delivery" as DeliveryOption,
                           label: "🚚 Livraison à domicile",
@@ -1843,7 +1844,6 @@ export default function CheckoutPage() {
                                 : "Recevez votre colis directement chez vous",
                           disabled: (lastMileResult ? !lastMileResult.deliverable : false) || (!operatorCoverageLoading && !hasOperatorCoverage),
                         },
-                        { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait au Hub", desc: "Récupérez votre colis au point de collecte (gratuit)", disabled: false },
                       ].map(opt => (
                         <button
                           key={opt.key}
@@ -1874,7 +1874,7 @@ export default function CheckoutPage() {
                     {/* Zone not deliverable warning */}
                     {lastMileResult && !lastMileResult.deliverable && deliveryOption === "home_delivery" && (
                       <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded">
-                        ⚠️ Livraison non disponible dans votre zone{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}. Veuillez choisir le retrait au Hub.
+                        ⚠️ Livraison non disponible dans votre zone{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}. Veuillez choisir le retrait à l'agence (hub).
                       </p>
                     )}
 
@@ -1886,11 +1886,11 @@ export default function CheckoutPage() {
                           {shipping.commune ? `${shipping.commune}, ` : ""}{shipping.city}.
                         </p>
                         <p className="text-[11px] text-muted-foreground">
-                          Vous pouvez choisir le retrait au Hub ou nous demander d'étendre la couverture.
+                          Vous pouvez choisir le retrait à l'agence (hub) ou nous demander d'étendre la couverture.
                         </p>
                         <div className="flex flex-wrap gap-2">
                           <Button size="sm" variant="default" onClick={() => setDeliveryOption("hub_pickup")}>
-                            🏪 Choisir le retrait au Hub
+                            🏪 Choisir le retrait à l'agence (hub)
                           </Button>
                           <RequestCoverageButton
                             countryCode={shipping.country}
