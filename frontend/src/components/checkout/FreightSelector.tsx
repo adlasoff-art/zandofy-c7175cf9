@@ -153,10 +153,19 @@ export function FreightSelector({
           (o) => o.has_profile_for_zone !== false,
         ).length;
         onAvailabilityChange?.(selectableCount);
-        // Lot 4G — Pas de pré-sélection : le client doit choisir activement.
-        setSelectedId(null);
+        // UX Polissage — Pré-sélection automatique de l'offre la moins chère
+        // sélectionnable (tri déjà fait dans `sortedOffers`).
+        const cheapest = res
+          .filter((o) => o.has_profile_for_zone !== false)
+          .sort((a, b) => a.quote.total - b.quote.total)[0] ?? null;
         setConsolidationChoice("split");
-        onChange(null, "split");
+        if (cheapest) {
+          setSelectedId(cheapest.profile_id);
+          onChange(cheapest, "split");
+        } else {
+          setSelectedId(null);
+          onChange(null, "split");
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
