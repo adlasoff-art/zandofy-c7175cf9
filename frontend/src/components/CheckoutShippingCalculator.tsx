@@ -582,11 +582,25 @@ export function CheckoutShippingCalculator({
         })}
       </div>
 
+      {/* Notice tarifs indicatifs (basés sur le poids/CBM réel) */}
+      <div className="flex items-start gap-2 text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-md px-2.5 py-2 mt-3">
+        <Info size={12} className="shrink-0 mt-0.5 text-primary" />
+        <p>
+          Les tarifs <strong className="text-foreground">Aérien</strong> et{" "}
+          <strong className="text-foreground">Maritime</strong> affichés ici sont{" "}
+          <strong className="text-foreground">indicatifs</strong>, calculés sur le poids
+          (ou le CBM) réel des produits sélectionnés. Le{" "}
+          <strong className="text-foreground">tarif réel facturé</strong> est celui défini
+          par le transitaire que vous choisirez plus bas dans la section
+          « Choisissez un transitaire ».
+        </p>
+      </div>
+
       {/* Sea mode threshold hint */}
       {isSeaBlocked && seaHasQuotes && seaThreshold && (() => {
         const freightGap = preciseRound(seaThreshold.min_subtotal - seaQuoteTotal, 2);
         return (
-          <div className="flex items-start gap-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-2">
+          <div className="flex items-start gap-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-2 mt-3">
             <Ship size={12} className="shrink-0 mt-0.5" />
             <div>
               <p className="font-medium">{t("shipping.seaUnavailableTitle") || "🚢 Maritime indisponible — seuil de fret non atteint"}</p>

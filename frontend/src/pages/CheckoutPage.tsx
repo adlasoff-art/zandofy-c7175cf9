@@ -1555,7 +1555,9 @@ export default function CheckoutPage() {
           </div>
         )}
         <div className="flex justify-between">
-          <span className="text-muted-foreground">{t("checkout.shipping")} ({shippingMode})</span>
+          <span className="text-muted-foreground">
+            {t("checkout.shipping")} ({shippingMode === "air" ? "Aérien" : shippingMode === "sea" ? "Maritime" : shippingMode === "road" ? "Routier" : shippingMode === "rail" ? "Ferroviaire" : shippingMode})
+          </span>
           {shippingPaymentChoice === "pay_on_arrival" && shippingCost > 0 ? (
             <span className="text-amber-600 font-medium text-xs">
               {formatPrice(shippingCost)} — {t("checkout.onArrival") || "à l'arrivée"}
@@ -1585,7 +1587,7 @@ export default function CheckoutPage() {
         {deliveryOption === "hub_pickup" && (
           <div className="flex justify-between">
             <span className="text-muted-foreground">{t("checkout.delivery") || "Livraison"}</span>
-            <span className="text-primary font-medium">{t("checkout.hubPickupFree") || "Retrait Hub (gratuit)"}</span>
+            <span className="text-primary font-medium">{t("checkout.hubPickupFree") || "Retrait à l'agence (gratuit)"}</span>
           </div>
         )}
         <div className="flex justify-between font-bold text-foreground pt-2 border-t border-border text-base">
@@ -1794,7 +1796,7 @@ export default function CheckoutPage() {
                       <div className="space-y-2">
                         {[
                           { key: "pay_now" as const, label: t("checkout.payNow") || "Payer maintenant", desc: `${t("checkout.includeInTotal") || "Inclure"} ${amountLabel} ${t("checkout.inTotal") || "dans le total"}` },
-                          { key: "pay_on_arrival" as const, label: t("checkout.payOnHubArrival") || "Payer à l'arrivée au Hub", desc: `${t("checkout.payOnHubArrivalDesc") || "Régler"} ${amountLabel} ${t("checkout.payOnHubArrivalDesc2") || "quand le colis arrive au hub (avant livraison)"}` },
+                          { key: "pay_on_arrival" as const, label: t("checkout.payOnHubArrival") || "Payer à l'arrivée à l'agence du transitaire (hub)", desc: `${t("checkout.payOnHubArrivalDesc") || "Régler"} ${amountLabel} ${t("checkout.payOnHubArrivalDesc2") || "à l'arrivée du colis à l'agence du transitaire (hub), avant la livraison"}` },
                         ].map(opt => (
                           <button
                             key={opt.key}
@@ -1829,6 +1831,7 @@ export default function CheckoutPage() {
                     </p>
                     <div className="space-y-2">
                       {[
+                        { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait à l'agence (hub)", desc: "Récupérez votre colis au point de collecte, à l'agence du transitaire (gratuit)", disabled: false },
                         {
                           key: "home_delivery" as DeliveryOption,
                           label: "🚚 Livraison à domicile",
@@ -1841,7 +1844,6 @@ export default function CheckoutPage() {
                                 : "Recevez votre colis directement chez vous",
                           disabled: (lastMileResult ? !lastMileResult.deliverable : false) || (!operatorCoverageLoading && !hasOperatorCoverage),
                         },
-                        { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait au Hub", desc: "Récupérez votre colis au point de collecte (gratuit)", disabled: false },
                       ].map(opt => (
                         <button
                           key={opt.key}
@@ -1872,7 +1874,7 @@ export default function CheckoutPage() {
                     {/* Zone not deliverable warning */}
                     {lastMileResult && !lastMileResult.deliverable && deliveryOption === "home_delivery" && (
                       <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded">
-                        ⚠️ Livraison non disponible dans votre zone{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}. Veuillez choisir le retrait au Hub.
+                        ⚠️ Livraison non disponible dans votre zone{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}. Veuillez choisir le retrait à l'agence (hub).
                       </p>
                     )}
 
@@ -1884,11 +1886,11 @@ export default function CheckoutPage() {
                           {shipping.commune ? `${shipping.commune}, ` : ""}{shipping.city}.
                         </p>
                         <p className="text-[11px] text-muted-foreground">
-                          Vous pouvez choisir le retrait au Hub ou nous demander d'étendre la couverture.
+                          Vous pouvez choisir le retrait à l'agence (hub) ou nous demander d'étendre la couverture.
                         </p>
                         <div className="flex flex-wrap gap-2">
                           <Button size="sm" variant="default" onClick={() => setDeliveryOption("hub_pickup")}>
-                            🏪 Choisir le retrait au Hub
+                            🏪 Choisir le retrait à l'agence (hub)
                           </Button>
                           <RequestCoverageButton
                             countryCode={shipping.country}
@@ -2002,9 +2004,9 @@ export default function CheckoutPage() {
 
                 <div className="space-y-3">
                   {([
+                    { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, M-Pesa, Airtel Money, AfriMoney", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
                     { id: "card" as const, label: "Carte bancaire (Visa/Mastercard)", sub: "Paiement sécurisé via Keccel", icon: <CreditCard size={20} />, configKey: "stripe" as const },
                     { id: "paypal" as const, label: "PayPal", sub: "Paiement via votre compte PayPal", icon: <CreditCard size={20} />, configKey: "paypal" as const },
-                    { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, M-Pesa, Airtel Money, AfriMoney", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
                     { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
                     { id: "off_platform" as const, label: "Paiement hors plateforme", sub: "Transfert direct, puis envoyez la preuve", icon: <Banknote size={20} />, configKey: "off_platform" as const },
                   ]).filter(m => (m.id === "card" ? paymentConfig?.stripe !== false : m.id === "paypal" ? (paymentConfig as any)?.paypal !== false : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).filter(m => m.id !== "off_platform" || vendorOffPlatformAllowed).filter(m => m.id !== "mobile_money" || vendorMobileMoneyAllowed).filter(m => m.id !== "card" || vendorCardAllowed).map(method => (
