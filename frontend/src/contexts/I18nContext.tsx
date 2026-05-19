@@ -667,7 +667,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "checkout.payOnHubArrivalDesc": "Régler",
     "checkout.payOnHubArrivalDesc2": "quand le colis arrive au hub (avant livraison)",
     // General
-    "general.seeMore": "Voir Plus",
+    "general.seeMore": "Voir plus de produits",
     "general.loading": "Chargement...",
     "general.loadingMore": "Chargement...",
     "general.allSeen": "Vous avez tout vu ✨",
@@ -2170,7 +2170,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "checkout.payOnHubArrivalDesc": "Pay",
     "checkout.payOnHubArrivalDesc2": "when the package arrives at the hub (before delivery)",
     // General
-    "general.seeMore": "See More",
+    "general.seeMore": "See more products",
     "general.loading": "Loading...",
     "general.loadingMore": "Loading...",
     "general.allSeen": "You've seen it all ✨",
