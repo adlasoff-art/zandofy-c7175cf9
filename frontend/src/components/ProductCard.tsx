@@ -106,7 +106,6 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
           sizes="(max-width: 640px) 50vw, 170px"
           quality={60}
           priority={priority}
-          loading={priority ? "eager" : "lazy"}
         />
         {secondImage && hovered && (
           <OptimizedImage
@@ -116,7 +115,6 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
             widths={[160, 240, 360]}
             sizes="(max-width: 640px) 50vw, 170px"
             quality={60}
-            loading="lazy"
           />
         )}
 
