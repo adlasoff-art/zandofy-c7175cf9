@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Truck, ChevronDown, ChevronUp, BadgeCheck, AlertTriangle, Package, Boxes, MapPin, Plane, Ship, TramFront, Info, Sparkles, Lock, MailPlus } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
