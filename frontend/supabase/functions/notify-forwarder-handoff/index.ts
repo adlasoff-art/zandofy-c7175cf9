@@ -12,6 +12,7 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { sendEmail } from "../_shared/email.ts";
+import { sendWebPushSafe } from "../_shared/web-push.ts";
 
 const ALLOWED_HEADERS =
   "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
@@ -108,11 +109,33 @@ Deno.serve(async (req) => {
     // Forwarder contact
     const { data: forwarder } = await svc
       .from("forwarders")
-      .select("id, name, contact_email")
+      .select("id, name, contact_email, owner_user_id, linked_transporter_user_id")
       .eq("id", handoff.forwarder_id)
       .maybeSingle();
+
+    // Web Push best-effort (owner + linked transporter user)
+    const pushUserIds = Array.from(
+      new Set(
+        [forwarder?.owner_user_id, forwarder?.linked_transporter_user_id].filter(
+          Boolean,
+        ) as string[],
+      ),
+    );
+    if (pushUserIds.length) {
+      await sendWebPushSafe(svc, {
+        userIds: pushUserIds,
+        payload: {
+          title: "📦 Nouvelle expédition à traiter",
+          body: `Commande ${order.order_ref ?? order.id} — ${order.shipping_city ?? ""} ${order.shipping_country ?? ""}`.trim(),
+          url: "/forwarder",
+          tag: `forwarder-handoff-${handoff.id}`,
+          requireInteraction: true,
+        },
+      });
+    }
+
     if (!forwarder?.contact_email || !EMAIL_REGEX.test(forwarder.contact_email)) {
-      // No email configured — silently skip (in-app notif still delivered by trigger)
+      // No email configured — silently skip email (in-app + push déjà envoyés)
       return new Response(JSON.stringify({ success: true, skipped: "no_contact_email" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
