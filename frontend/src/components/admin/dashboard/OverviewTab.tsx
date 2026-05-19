@@ -4,7 +4,6 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Loader2, Users, Package, ShoppingBag, DollarSign, Store as StoreIcon, CheckCircle2, Clock, XCircle, Ban, ShieldAlert, RotateCcw, CreditCard, AlertTriangle, TrendingUp, Wallet, Receipt, Truck, Home } from "lucide-react";
 import { KpiCard, KpiCardRow, statusColor, statusLabels } from "./shared";
-import { NON_REVENUE_ORDER_STATUSES, REAL_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
 import type { PeriodKey } from "./DashboardPeriodSelector";
 import { getPeriodDate } from "./DashboardPeriodSelector";
 import type { GlobalFilters } from "./DashboardGlobalFilters";
@@ -17,100 +16,28 @@ export function OverviewTab({ period, geoFilters }: Props) {
   const country = geoFilters?.country !== "all" ? geoFilters?.country : undefined;
   const city = geoFilters?.city !== "all" ? geoFilters?.city : undefined;
 
-  const { data: profileCount = 0, isLoading: lp } = useQuery({
-    queryKey: ["admin-profiles-count"],
+  // Lot 1 — un seul appel RPC agrégé côté Postgres remplace 8 useQuery client.
+  const { data: overview, isLoading: lo } = useQuery({
+    queryKey: ["admin-overview", period, country, city],
     queryFn: async () => {
-      const { count } = await supabase.from("profiles").select("*", { count: "exact", head: true });
-      return count ?? 0;
-    },
-  });
-
-  const { data: orderStats, isLoading: lo } = useQuery({
-    queryKey: ["admin-order-stats", period, country, city],
-    queryFn: async () => {
-      let q = (supabase as any).from("orders").select("total, status, shipping_payment_status, last_mile_payment_status, shipping_cost, last_mile_fee, shipping_payment_proof_url, last_mile_payment_proof_url, shipping_country, shipping_city").gte("created_at", since);
-      if (country) q = q.eq("shipping_country", country);
-      if (city) q = q.eq("shipping_city", city);
-      const { data } = await q;
-      if (!data) return { count: 0, revenue: 0, currentRevenue: 0, cancelledRevenue: 0, cancelledCount: 0, deliveredCount: 0, pendingCount: 0, failedAmount: 0, failedCount: 0, byStatus: {} as Record<string, number>, proofShippingPaid: 0, proofLastMilePaid: 0 };
-      const byStatus: Record<string, number> = {};
-      let revenue = 0, currentRevenue = 0, cancelledRevenue = 0, cancelledCount = 0, deliveredCount = 0, pendingCount = 0, failedAmount = 0, failedCount = 0, opCount = 0;
-      let proofShippingPaid = 0, proofLastMilePaid = 0;
-      data.forEach((o: any) => {
-        byStatus[o.status] = (byStatus[o.status] || 0) + 1;
-        if (o.status === "cancelled" || o.status === "returned") { cancelledRevenue += Number(o.total); cancelledCount++; }
-        if (!NON_REVENUE_ORDER_STATUSES.includes(o.status as never)) { opCount++; currentRevenue += Number(o.total); }
-        if (REAL_REVENUE_ORDER_STATUSES.includes(o.status as never)) { revenue += Number(o.total); }
-        if (o.status === "delivered") deliveredCount++;
-        if (o.status === "pending") pendingCount++;
-        if (o.status === "payment_failed" || o.status === "awaiting_payment") { failedAmount += Number(o.total); failedCount++; }
-        if (o.shipping_payment_status === "paid" && o.shipping_payment_proof_url) proofShippingPaid += Number(o.shipping_cost || 0);
-        if (o.last_mile_payment_status === "paid" && o.last_mile_payment_proof_url) proofLastMilePaid += Number(o.last_mile_fee || 0);
+      const { data, error } = await (supabase as any).rpc("admin_dashboard_overview", {
+        _since: since,
+        _country: country ?? null,
+        _city: city ?? null,
       });
-      return { count: opCount, revenue, currentRevenue, cancelledRevenue, cancelledCount, deliveredCount, pendingCount, failedAmount, failedCount, byStatus, proofShippingPaid, proofLastMilePaid };
+      if (error) throw error;
+      return data as any;
     },
   });
 
-  const { data: productCount = 0 } = useQuery({
-    queryKey: ["admin-products-count"],
-    queryFn: async () => { const { count } = await supabase.from("products").select("*", { count: "exact", head: true }); return count ?? 0; },
-  });
-
-  const { data: storeCount = 0 } = useQuery({
-    queryKey: ["admin-stores-count"],
-    queryFn: async () => { const { count } = await supabase.from("stores").select("*", { count: "exact", head: true }); return count ?? 0; },
-  });
-
-  const { data: disputeStats } = useQuery({
-    queryKey: ["admin-dispute-stats", period],
-    queryFn: async () => {
-      const { data } = await supabase.from("disputes").select("status").gte("created_at", since);
-      if (!data) return { total: 0, open: 0 };
-      return { total: data.length, open: data.filter(d => d.status === "open").length };
-    },
-  });
-
-  const { data: returnStats } = useQuery({
-    queryKey: ["admin-return-stats", period],
-    queryFn: async () => {
-      const { data } = await supabase.from("return_requests").select("status").gte("created_at", since);
-      if (!data) return { total: 0, pending: 0 };
-      return { total: data.length, pending: data.filter(r => r.status === "pending").length };
-    },
-  });
-
-  const { data: paymentStats } = useQuery({
-    queryKey: ["admin-payment-stats-v2", period],
-    queryFn: async () => {
-      const { data } = await (supabase as any).from("payment_transactions").select("status, amount, method, payment_type").gte("created_at", since);
-      if (!data) return { successful: 0, failed: 0, pending: 0, totalAmount: 0, orderAmount: 0, shippingAmount: 0, lastMileAmount: 0, mobileMoneyGross: 0, gatewayFees: 0, netRevenue: 0 };
-
-      const successful = data.filter((p: any) => p.status === "success" || p.status === "completed");
-      const mobileMoneySuccessful = successful.filter((p: any) => p.method === "mobile_money");
-
-      let orderAmount = 0, shippingAmount = 0, lastMileAmount = 0;
-      successful.forEach((p: any) => {
-        const amt = Number(p.amount);
-        const pType = p.payment_type || "order";
-        if (pType === "shipping") shippingAmount += amt;
-        else if (pType === "last_mile") lastMileAmount += amt;
-        else orderAmount += amt;
-      });
-
-      const mobileMoneyGross = mobileMoneySuccessful.reduce((s: number, p: any) => s + Number(p.amount), 0);
-      const gatewayFeePct = 2.5;
-      const gatewayFees = Math.round(mobileMoneyGross * gatewayFeePct) / 100;
-      const netRevenue = mobileMoneyGross - gatewayFees;
-
-      return {
-        successful: successful.length,
-        pending: data.filter((p: any) => p.status === "pending").length,
-        failed: data.filter((p: any) => p.status === "failed").length,
-        totalAmount: successful.reduce((s: number, p: any) => s + Number(p.amount), 0),
-        orderAmount, shippingAmount, lastMileAmount, mobileMoneyGross, gatewayFees, netRevenue,
-      };
-    },
-  });
+  const orderStats = overview?.orderStats as any;
+  const paymentStats = overview?.paymentStats as any;
+  const disputeStats = overview?.disputeStats as any;
+  const returnStats = overview?.returnStats as any;
+  const profileCount = Number(overview?.profileCount ?? 0);
+  const productCount = Number(overview?.productCount ?? 0);
+  const storeCount = Number(overview?.storeCount ?? 0);
+  const lp = lo;
 
   const { data: gatewayFeePct = 2.5 } = useQuery({
     queryKey: ["admin-gateway-fee-pct"],
@@ -124,24 +51,9 @@ export function OverviewTab({ period, geoFilters }: Props) {
   const actualGatewayFees = Math.round(mobileMoneyGross * gatewayFeePct) / 100;
   const actualNetRevenue = mobileMoneyGross - actualGatewayFees;
 
-  const { data: roleCounts = [] } = useQuery({
-    queryKey: ["admin-role-counts"],
-    queryFn: async () => {
-      const { data } = await supabase.from("user_roles").select("role");
-      if (!data) return [];
-      const map: Record<string, number> = {};
-      data.forEach((r) => { map[r.role] = (map[r.role] || 0) + 1; });
-      return Object.entries(map).map(([role, count]) => ({ role, count }));
-    },
-  });
-
-  const { data: recentOrders = [], isLoading: loadingRecent } = useQuery({
-    queryKey: ["admin-recent-orders"],
-    queryFn: async () => {
-      const { data } = await supabase.from("orders").select("order_ref, shipping_first_name, shipping_last_name, total, status, created_at").order("created_at", { ascending: false }).limit(8);
-      return data ?? [];
-    },
-  });
+  const roleCounts: { role: string; count: number }[] = overview?.roleCounts ?? [];
+  const recentOrders: any[] = overview?.recentOrders ?? [];
+  const loadingRecent = lo;
 
   const loading = lp || lo;
   const roleLabels: Record<string, string> = {
