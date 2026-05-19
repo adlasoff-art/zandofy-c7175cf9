@@ -1,88 +1,54 @@
-# Correctifs erreurs console prod
+# Audit lenteur images — Flash Sales et cartes produit
 
 ## Diagnostic
 
-Deux erreurs distinctes (les warnings "preload not used" sont une conséquence, pas la cause).
+Mesures à partir du code (`FlashSales.tsx`, `ProductCard.tsx`, `OptimizedImage.tsx`, `use-lazy-image.ts`) :
 
-### 1. `401` sur `/rest/v1/cms_banners` (depuis `index.html`)
+1. **Double chargement systématique par carte**. `ProductCard` rend *toujours* `OptimizedImage` pour `product.image` ET pour `secondImage` (image de survol), même quand la souris n'a jamais survolé la carte et même sur mobile (pas de hover). Le navigateur télécharge donc **2 images par produit**, soit ~16 fichiers pour la rangée Super Promo. Sur mobile c'est 100% de bande passante gaspillée.
 
-Le script inline dans `frontend/index.html` (lignes 73-91) fait un `fetch()` direct vers Supabase avec une **clé anon hardcodée** :
+2. **Toutes les cartes Flash Sales se déclenchent en même temps**. Le scroll horizontal place les 8 cartes dans le viewport simultanément → `useLazyImage` les marque toutes `inView` en même temps → 8 (×2 avec point 1 = 16) requêtes parallèles vers `/storage/v1/render/image/...`. L'endpoint Supabase Image Transformation est lent au premier hit (resize à la volée), donc beaucoup de requêtes concurrentes saturent le navigateur et l'origine.
 
-```
-KEY = 'eyJ...iat:1750161437...' (juin 2025)
-```
+3. **Tailles `srcset` trop larges pour le slot réel**. Les cartes font 155–170 px CSS (`min-w-[155px]` / `md:min-w-[170px]`). `OptimizedImage` propose `widths={[200, 400, 600]}` avec `sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 240px"`. Sur mobile 50vw ≈ 190 px → le navigateur choisit la variante 400w (×2 = 800 px d'image pour afficher 190 px). Idem desktop : 240 px de slot, on sert du 400w. Surdimensionné d'un facteur ~2.
 
-Cette clé est figée dans le HTML — elle ne suit pas `VITE_SUPABASE_PUBLISHABLE_KEY` qui est injectée au build via Vercel. Si la clé anon prod a été rotée (ou si la valeur déployée diffère), l'inline fetch échoue en 401 alors que le bundle React continue de fonctionner avec la bonne clé.
+4. **Qualité 70 sur des vignettes**. Acceptable mais 60 suffit largement à cette taille et économise ~20 % de poids.
 
-→ **Conséquence visible** : aucune (le composant `HeroBanner` re-fetch correctement), mais ça pollue la console et casse le préchargement LCP.
+5. **Pas de hiérarchisation**. Les 2–3 premières cartes visibles devraient être prioritaires, le reste différé. Aujourd'hui tout est traité avec la même priorité, donc le navigateur partage la bande passante équitablement et rien n'arrive vite.
 
-### 2. `400` sur `/rest/v1/profiles?select=created_at,residence_country,residence_city`
+6. **Cache CDN OK** : les URLs Supabase render sont déterministes (même query string), donc une fois chauffées elles passent en cache. Le problème vient des premiers hits + du volume.
 
-Les colonnes `residence_country` et `residence_city` **n'existent pas** dans la table `profiles` côté prod (`vpttoqojmiqxgudknyxf`). Elles sont référencées dans :
-- `frontend/src/hooks/use-automation.ts` (l.99-109) — appelé par les workflows marketing
-- `frontend/src/pages/DashboardPage.tsx`
-- `frontend/src/pages/admin/AdminNotificationsPage.tsx`
-- `frontend/src/components/admin/UserDetailDrawer.tsx`
+## Plan d'optimisation (frontend uniquement, zéro changement backend)
 
-Soit la migration qui ajoute ces colonnes n'a jamais été déployée en prod, soit le code a été écrit en anticipation. Cas typique de divergence schéma staging/prod déjà documenté en mémoire (`rls-staging-prod-divergence`).
+### 1. `frontend/src/components/ProductCard.tsx` — supprimer le pré-chargement de l'image de survol
+- Ne rendre `<OptimizedImage secondImage>` **que** lorsque `hovered === true` (et conserver une transition d'opacité simple via `key` ou montage différé).
+- Gain attendu : −50 % de requêtes images sur toutes les pages avec ProductCard, surtout sur mobile.
 
-→ **Conséquence visible** : le hook `useAutomation` lève une erreur en boucle côté client → bruit console + workflows marketing partiellement cassés.
+### 2. `frontend/src/components/ProductCard.tsx` — resserrer `widths` / `sizes` / `quality`
+- `widths={[160, 240, 360]}` (couvre DPR 1/1.5/2 pour un slot 155–170 px).
+- `sizes="(max-width: 640px) 50vw, 170px"` (sans étape intermédiaire trompeuse).
+- `quality={60}` au lieu de 70 pour les vignettes.
+- Gain : −40 à −60 % de poids par image.
 
----
+### 3. `frontend/src/components/FlashSales.tsx` — prioriser les 2 premières cartes
+- Passer une prop `priority` à `ProductCard` (et au final à `OptimizedImage`) pour `index < 2` : `fetchpriority="high"` + `loading="eager"`.
+- Les autres restent en `loading="lazy"` natif et perdent la dépendance à `useLazyImage` (qui de toute façon les active toutes en bloc).
 
-## Plan d'exécution
+### 4. `frontend/src/components/ProductCard.tsx` — retirer le gate IntersectionObserver redondant
+- Supprimer `useLazyImage` pour le rendu (garder éventuellement le `ref` pour analytics). S'appuyer sur `loading="lazy"` + `fetchpriority` natifs.
+- Bénéfice : le navigateur planifie mieux les téléchargements (queue progressive selon la visibilité réelle au scroll, pas un burst quand la section entière apparaît).
+- Le skeleton shimmer reste affiché tant que `onLoad` n'a pas tiré.
 
-### Phase 1 — Stopper la fuite (front, sans toucher au schéma)
+### 5. `frontend/src/components/OptimizedImage.tsx` — petites finitions
+- Quand `widths.length` est faible, ne pas générer 5 URLs inutiles : passer `widths` reçus tels quels (déjà le cas, juste vérifier qu'on ne retombe pas sur les `DEFAULT_WIDTHS`).
+- Aucune modif d'API publique.
 
-**Fichier `frontend/index.html`** — supprimer la dépendance à la clé hardcodée :
+## Détails techniques
 
-Deux options possibles, je recommande **l'option B** (plus simple, zéro régression) :
+- Pas de migration, pas de fonction edge, pas de changement Supabase.
+- Cible : `frontend/src/components/ProductCard.tsx`, `frontend/src/components/FlashSales.tsx`, éventuellement `frontend/src/components/OptimizedImage.tsx`.
+- Compatible avec les autres consommateurs de `ProductCard` (ProductGrid, TopTrends, Recommendations) — ils bénéficient des mêmes gains sans changement d'appel.
+- Vérification : recharger `/`, observer DevTools → Network → Img : moins de requêtes, poids < 20 ko / vignette, premières images Super Promo dans le viewport servies avec `fetchpriority=high`.
 
-- **Option A** : injecter la clé anon au build via un placeholder remplacé par Vite (ex. `__VITE_SUPABASE_ANON__`). Plus propre mais nécessite un plugin Vite ou un `transformIndexHtml`.
-- **Option B (recommandée)** : **retirer le bloc B** (fetch direct cms_banners depuis index.html). Garder le bloc A (preload depuis `localStorage.z_lcp_hero_url`) qui couvre 95 % des visites récurrentes. `HeroBanner.tsx` continue de remplir le cache après le premier rendu. On perd ~200 ms de LCP sur la **toute première visite** d'un nouveau visiteur, mais on élimine la dette de la clé hardcodée.
+## Hors scope (à confirmer si tu veux que je traite aussi)
 
-**Fichier `frontend/src/hooks/use-automation.ts`** — rendre la query tolérante :
-
-Wrapper le `select("created_at, residence_country, residence_city")` :
-1. Essayer d'abord les 3 colonnes.
-2. Si erreur PostgREST `42703` (colonne inexistante) → fallback `select("created_at")` et laisser `userCountry`/`userCity` à `null`.
-3. Ne **pas** propager l'erreur (les workflows marketing doivent dégrader gracieusement).
-
-Pareil dans les 3 autres fichiers qui sélectionnent ces colonnes — audit rapide pour décider entre tolérance ou suppression du champ selon que l'UI affiche la donnée ou non.
-
-### Phase 2 — Réconcilier le schéma prod (DB)
-
-Créer une migration `frontend/supabase/migrations/{ts}_profiles_residence_columns.sql` :
-
-```sql
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS residence_country text,
-  ADD COLUMN IF NOT EXISTS residence_city text;
-```
-
-À déployer en prod via GitHub Actions (`deploy-edge-functions.yml` n'applique que les edges — vérifier qu'un workflow `supabase db push` tourne sur `main`, sinon appliquer manuellement via le pipeline existant).
-
-Une fois la migration en prod, retirer le fallback de tolérance ajouté en Phase 1 (ou le laisser comme garde-fou, peu coûteux).
-
-### Phase 3 — Vérification
-
-1. Build local : `bun run build` → vérifier qu'aucune référence à la clé hardcodée ne reste.
-2. Déployer staging → ouvrir `/` puis `/dashboard` → console propre (0 erreur 400/401, 0 warning preload).
-3. Vérifier que `HeroBanner` s'affiche normalement et que `z_lcp_hero_url` est rempli après 1 visite.
-4. Puis prod.
-
----
-
-## Fichiers touchés
-
-- `frontend/index.html` (retrait bloc B)
-- `frontend/src/hooks/use-automation.ts` (tolérance schéma)
-- `frontend/src/pages/DashboardPage.tsx` (audit)
-- `frontend/src/pages/admin/AdminNotificationsPage.tsx` (audit)
-- `frontend/src/components/admin/UserDetailDrawer.tsx` (audit)
-- `frontend/supabase/migrations/{ts}_profiles_residence_columns.sql` (nouveau)
-
-## Hors scope
-
-- Rotation de clé anon (si c'est la cause réelle du 401, à confirmer avec toi).
-- Refonte du LCP preload via injection Vite (à faire dans un second temps si on veut récupérer les ~200 ms de la première visite).
+- Erreur runtime actuelle « No QueryClient set » visible dans le preview Lovable — ne touche pas la prod si ton `QueryClientProvider` est bien monté dans `main.tsx` côté prod. Je peux vérifier dans la même passe si tu le demandes.
+- Activation d'AVIF côté `OptimizedImage` (Supabase supporte `format=avif`) : gain réel mais demande de valider la compat sur ton parc utilisateurs ; à traiter dans un lot séparé.
