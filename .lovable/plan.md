@@ -1,80 +1,125 @@
+## Plan d'implémentation — Workflow Commande → Transitaire → Hub → Opérateur
 
-# Polissage UX du checkout
+Décision : on **garde tous les champs existants** (handoffs + orders) et on ajoute les automatisations + UX manquantes pour rendre la chaîne 100 % opérationnelle, en restant rationnel (pas d'ajout superflu, pas de duplication).
 
-Toutes les modifications sont front uniquement (présentation + petits comportements). Aucune logique métier, aucune migration.
+---
 
-## 1. Étape "Livraison" — Paiement des frais d'expédition
-Fichier : `frontend/src/pages/CheckoutPage.tsx` (≈ ligne 1796).
+### Lot H1 — Apparition du handoff côté transitaire seulement quand le vendeur expédie
 
-- Remplacer le libellé « Payer à l'arrivée au Hub » par **« Payer à l'arrivée à l'agence du transitaire (hub) »**.
-- Mettre à jour le sous-texte : « Régler {montant} à l'arrivée du colis à l'agence du transitaire (hub), avant la livraison ».
-- L'option **« Payer maintenant »** reste sélectionnée par défaut (déjà le cas via `shippingPaymentChoice` initial — vérifier et le forcer si besoin).
+**Problème actuel** : dès la validation de la commande, le trigger crée `forwarder_handoffs` en `pending` et le transitaire le voit déjà.
 
-## 2. Étape "Livraison" — Option de livraison (≈ ligne 1825)
-- **Inverser l'ordre** : afficher d'abord **« 🏪 Retrait à l'agence (hub) »**, puis **« 🚚 Livraison à domicile »**.
-- Sous-texte de l'option agence : « Récupérez votre colis au point de collecte, à l'agence du transitaire (gratuit) ».
-- Mettre à jour les textes connexes qui parlent encore de « Retrait au Hub » :
-  - bannière "zone non desservie" (≈ 1875),
-  - bloc "Aucun livreur ne dessert…" (≈ 1887, 1891),
-  - récap totaux ligne `hub_pickup` (≈ 1588) → afficher **« Retrait à l'agence (gratuit) »**.
+**Cible** : le transitaire ne voit la commande **qu'à partir de `orders.status = 'in_shipping'`** (= le vendeur a confirmé l'envoi par son fournisseur).
 
-## 3. Onglets Aérien / Maritime — notice "tarif indicatif"
-Fichier : `frontend/src/components/CheckoutShippingCalculator.tsx` (≈ ligne 583-604).
+**Changements DB** :
+- Garder la création du handoff au checkout (déjà en place, ligne minimale).
+- Ajouter colonne `forwarder_handoffs.visible_to_forwarder boolean default false`.
+- Trigger `AFTER UPDATE` sur `orders` : quand `status` passe à `in_shipping`, mettre `visible_to_forwarder = true` + `status = 'notified'` + `notified_at = now()` sur le handoff actif et appeler `notify-forwarder-handoff` via `pg_net`.
+- Adapter la policy RLS forwarder pour filtrer `visible_to_forwarder = true`.
+- Adapter `ForwarderHandoffsPanel` (filtre côté requête déjà couvert par RLS).
 
-- Ajouter, **juste après la rangée d'onglets de modes**, une petite notice info (icône `Info`, texte muted, marges aérées) :
-  > « Les tarifs Aérien et Maritime affichés ici sont **indicatifs**, calculés sur le poids/CBM réel des produits sélectionnés. Le **tarif réel facturé** est celui défini par le transitaire que vous choisirez plus bas (section "Choisissez un transitaire"). »
-- Ajouter un `mt-3` au bloc « 🚢 Maritime indisponible — seuil de fret non atteint » pour qu'il descende légèrement et laisse respirer la nouvelle notice.
-- Renommer partout dans ce composant et dans les libellés `MODE_META` les occurrences de « Sea » restantes en **« Maritime »** (vérifier `freight.panel.mode.sea`, `shipping.mode.sea`, etc. dans `I18nContext.tsx` — déjà OK pour FR, juste s'assurer qu'aucun "Sea" anglais ne fuit dans l'UI FR).
+---
 
-## 4. FreightSelector — pré-sélection + radio + adresse cliquable mobile
-Fichier : `frontend/src/components/checkout/FreightSelector.tsx`.
+### Lot H2 — Notes du transitaire = notification client
 
-### 4a. Sélection par défaut du transitaire le moins cher
-- Dans `useEffect` de chargement (ligne 156-159), au lieu de `setSelectedId(null)` + `onChange(null)`, **pré-sélectionner `cheapestSelectableId`** quand au moins une offre est éligible, et appeler `onChange(cheapestOffer, "split")`.
-- Conserver la logique "Required" si jamais aucune offre sélectionnable.
+Aujourd'hui un changement de `internal_notes` génère un événement `notes_updated` dans la timeline mais **ne notifie pas** le client.
 
-### 4b. Radio button visible à gauche du logo
-Dans `OfferCard` (Cas 2 et Cas 3) :
-- Ajouter, **à gauche du logo**, un cercle radio identique à celui de l'option "Payer maintenant" :
-  ```tsx
-  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-    isSelected ? "border-primary" : "border-border"
-  }`}>
-    {isSelected && <div className="w-2 h-2 rounded-full bg-primary" />}
-  </div>
-  ```
-- Réajuster les `gap-` pour conserver la lisibilité.
-- Conserver `BadgeCheck` ou le retirer s'il devient redondant (à garder pour cohérence visuelle, c'est ok).
+**Changements** :
+- Renommer en UI : "Note interne" → **"Message au client"** (champ `internal_notes` réutilisé tel quel pour ne rien casser).
+- Trigger DB existant `forwarder_handoff_events` : sur insertion d'un event `notes_updated`, appeler `notify-handoff-status-customer` avec un payload `type='note'` (nouveau code).
+- Edge function `notify-handoff-status-customer` : ajouter cas `note` → email + push + notif in-app au client, contenu = la nouvelle note.
+- Throttle : max 1 notif/30 min par handoff (anti-spam) ; condensation des notes multiples dans un seul email si plusieurs notes en moins de 30 min.
 
-### 4c. Adresse de récupération — accessible au tap (mobile)
-- Remplacer le `Tooltip` actuel (qui ne s'ouvre qu'au hover) par un **`Popover`** Radix (`@/components/ui/popover`) avec le pin `MapPin` comme trigger.
-- Le `PopoverTrigger` reste un bouton rond, **agrandi** : `h-6 w-6` (vs `h-4 w-4`), icône `MapPin size={12}`.
-- `onClick={(e) => e.stopPropagation()}` pour ne pas re-sélectionner la carte involontairement.
-- Le `Popover` s'ouvre au tap mobile **et** au clic desktop ; l'adresse reste affichée jusqu'au clic extérieur.
+---
 
-## 5. Récap totaux — terminologie expédition
-Fichier : `frontend/src/pages/CheckoutPage.tsx` (≈ ligne 1558).
+### Lot H3 — Bascule automatique "Arrivé au hub" → suite du workflow
 
-- Remplacer `{t("checkout.shipping")} ({shippingMode})` par un libellé qui mappe :
-  - `air` → « Expédition (Aérien) »
-  - `sea` → « Expédition (Maritime) »
-  - autre → label depuis `MODE_META`.
-- Ligne `hub_pickup` (1588) : utiliser **« Retrait à l'agence (gratuit) »** (cohérent avec point 2).
+Quand le transitaire passe `forwarder_handoffs.status = 'delivered'` :
 
-## 6. Étape "Paiement" — ordre des méthodes
-Fichier : `frontend/src/pages/CheckoutPage.tsx` (≈ ligne 2004-2010).
+**Trigger DB nouveau** sur `forwarder_handoffs` AFTER UPDATE :
+1. Passer `orders.status` à `'shipped'` (= "Arrivée au hub").
+2. Générer `pickup_code` (8 caractères alphanumériques) + `pickup_code_generated_at = now()`.
+3. Lire `orders.delivery_choice` :
+   - `'home'` → mettre `operator_acceptance_status='pending'`, `operator_assigned_at=now()`, `operator_response_deadline = now() + interval '30 min'`, appeler `notify-operator-new-order` via `pg_net`.
+   - `'hub_pickup'` → mettre `operator_acceptance_status='not_applicable'`, passer `orders.status` à `'ready_for_pickup'` directement, envoyer le `pickup_code` au client par email + push.
 
-- Réordonner le tableau de méthodes pour que **Mobile Money** soit **en première position**, puis **Carte bancaire**, puis PayPal, COD, off-platform.
-- `paymentMethod` reste initialisé à `"mobile_money"` (déjà le cas ligne 121).
-- Vérifier que la transition vers l'étape paiement scrolle bien en haut (déjà fait via `window.scrollTo({ top: 0 })` ligne 119).
+---
 
-## Hors-scope
-- Aucune modification backend / RPC / migration.
-- Aucun changement de logique pricing, eligibility, ni du moteur transitaires.
-- Pas de retouche aux pages admin / vendeur.
+### Lot H4 — Le client peut basculer `home` → `hub_pickup` à la dernière minute
 
-## Vérifications de fin
-- Build TS clean.
-- Vue checkout mobile (375px) : radio + pin agrandi visibles, popover s'ouvre au tap.
-- Vue desktop : popover s'ouvre au clic ; le hover précédent n'est plus requis.
-- L'ordre des moyens de paiement affiche Mobile Money en premier, sélectionné.
+**UI client** (`CustomerOrderTracker`) :
+- Quand `orders.status = 'shipped'` ET `delivery_choice = 'home'` ET `operator_acceptance_status` ∈ {`pending`, `accepted`} ET pas encore `out_for_delivery` → afficher bouton **"Finalement, je viens récupérer au hub"**.
+- Confirmation modale rappelant le code de retrait + adresse de l'agence.
+
+**Edge function nouvelle** `switch-to-hub-pickup` (verify_jwt=true, owner only) :
+- Vérifie que `orders.status` ∈ {`shipped`, `assigning_rider`, `rider_assigned`}.
+- Met `delivery_choice='hub_pickup'`, `delivery_operator_id=NULL`, `operator_acceptance_status='not_applicable'`, `assigned_rider_id=NULL`.
+- Passe `orders.status` à `'ready_for_pickup'`.
+- Envoie email/push à l'opérateur "Commande annulée — client a choisi le retrait".
+- Renvoie le `pickup_code` au client.
+
+Limite : interdit si `out_for_delivery` ou `delivered` (rider déjà en route).
+
+---
+
+### Lot H5 — Étape `ready_for_pickup` complète côté hub
+
+- `ShipperDashboardPage` (espace hub) : nouvel onglet **"Retraits clients"** listant les `orders` avec `status='ready_for_pickup'` ET `delivery_choice='hub_pickup'`.
+- Saisie du `pickup_code` par le staff hub → RPC `verify_hub_pickup(order_id, code)` :
+  - Vérifie code + non expiré.
+  - Met `pickup_code_verified_at=now()`, `pickup_verified_by=auth.uid()`.
+  - Demande upload obligatoire `hub_pickup_proof_url` (photo client + colis).
+  - Passe `orders.status='delivered'`.
+  - Notifie le client (email + push) "Colis remis, merci !".
+
+---
+
+### Lot H6 — Espace transitaire : afficher les onglets cohérents
+
+`ForwarderHandoffsPanel` : ajouter onglets pour clarifier la vie d'un handoff :
+- **Nouveaux** (`notified`, vendeur vient d'expédier) — appelle à action.
+- **En cours** (`acknowledged`, `in_transit`).
+- **Arrivés au hub** (`delivered`, historique 30 j).
+- **Annulés**.
+
+Aucun nouveau champ DB. Pur filtre frontend.
+
+---
+
+### Lot H7 — Notifications push transitaire & opérateur
+
+- Activer `sendWebPushSafe` (déjà importé dans `notify-handoff-status-customer`) pour aussi cibler l'owner du transitaire dans `notify-forwarder-handoff`.
+- Idem dans `notify-operator-new-order` (déjà partiel).
+
+---
+
+### Détails techniques globaux
+
+- Toutes les migrations dans `frontend/supabase/migrations/` (source de vérité) + déploiement via GitHub Actions sur prod (`vpt...yxf`).
+- Edge functions touchées : `notify-forwarder-handoff` (modifs payload), `notify-handoff-status-customer` (cas `note`), `notify-operator-new-order` (push), **nouvelle** `switch-to-hub-pickup`.
+- RPC nouveau : `verify_hub_pickup(p_order_id uuid, p_code text)` SECURITY DEFINER + RLS staff hub uniquement.
+- I18n : ajouter clés FR/EN pour les nouveaux textes UI (`forwarder.message_to_customer`, `customer.switch_to_hub`, `hub.verify_pickup`, etc.).
+- Mise à jour mémoire : étendre `mem://features/forwarders-and-logistics-system` et `mem://features/multi-operator-delivery-system` avec ces règles de visibilité + bascule.
+
+---
+
+### Ordre de livraison proposé
+
+1. **H1** (visibilité différée transitaire) — fondation indispensable.
+2. **H3** (bascule auto delivered → shipped + opérateur ou pickup) — débloque la chaîne.
+3. **H4** (bascule client home → hub) — finalise le choix client.
+4. **H5** (workflow staff hub `ready_for_pickup`) — boucle la branche pickup.
+5. **H2** (notes = notif client) — UX.
+6. **H6** (onglets transitaire) — UX.
+7. **H7** (push manquants) — finition.
+
+H1 → H5 sont couplés (mêmes triggers/migrations) : je propose de les livrer dans **un seul lot de migrations + edge functions**, puis H2/H6/H7 dans un second passage plus léger.
+
+---
+
+### Ce que je n'ai pas touché (rationalité)
+
+- Pas de nouveau statut handoff (`pending/notified/acknowledged/in_transit/delivered/cancelled` suffisent).
+- Pas de nouvelle table : tout réutilise `forwarder_handoffs`, `forwarder_handoff_events`, `orders`.
+- Pas de modification des champs paiement / acompte / multi-leg — gardés pour l'avenir comme demandé.
+
+Confirme-moi pour que je lance d'abord le **bloc H1+H3+H4+H5** (migrations + edge fns), puis enchaîne H2/H6/H7.

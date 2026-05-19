@@ -3307,6 +3307,7 @@ export type Database = {
           tracking_number: string | null
           tracking_url: string | null
           updated_at: string
+          visible_to_forwarder: boolean
         }
         Insert: {
           acknowledged_at?: string | null
@@ -3339,6 +3340,7 @@ export type Database = {
           tracking_number?: string | null
           tracking_url?: string | null
           updated_at?: string
+          visible_to_forwarder?: boolean
         }
         Update: {
           acknowledged_at?: string | null
@@ -3371,6 +3373,7 @@ export type Database = {
           tracking_number?: string | null
           tracking_url?: string | null
           updated_at?: string
+          visible_to_forwarder?: boolean
         }
         Relationships: [
           {
@@ -11056,6 +11059,10 @@ export type Database = {
       }
       vendor_conversation_summary: {
         Args: { _store_id: string }
+        Returns: Json
+      }
+      verify_hub_pickup: {
+        Args: { p_code: string; p_order_id: string; p_proof_url?: string }
         Returns: Json
       }
       verify_order_pickup_code: {
