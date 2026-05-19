@@ -15,10 +15,13 @@ import type { Product } from "@/services/api";
 interface ProductCardProps {
   product: Product;
   index?: number;
+  /** Mark this card as LCP-priority (eager + fetchpriority=high). */
+  priority?: boolean;
 }
 
-export const ProductCard = memo(function ProductCard({ product, index = 0 }: ProductCardProps) {
-  const { ref, inView, loaded, onLoad } = useLazyImage(product.image);
+export const ProductCard = memo(function ProductCard({ product, index = 0, priority = false }: ProductCardProps) {
+  const [loaded, setLoaded] = useState(false);
+  const onLoad = useCallback(() => setLoaded(true), []);
   const [imgError, setImgError] = useState(false);
   const [hovered, setHovered] = useState(false);
   const { addItem } = useCart();
@@ -81,7 +84,6 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
 
   return (
     <div
-      ref={ref}
       className="group relative bg-card overflow-hidden rounded-sm shadow-card hover:shadow-card-hover transition-shadow duration-200 ease-in-out border border-border/40 flex flex-col h-full"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -89,34 +91,33 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
     >
       {/* Image — fixed aspect ratio, object-contain to avoid blur */}
       <div className="relative aspect-[3/4] overflow-hidden bg-muted shrink-0">
-        {!loaded && inView && (
+        {!loaded && (
           <div className="absolute inset-0 skeleton-shimmer" />
         )}
-        {inView && (
-          <>
-            <OptimizedImage
-              src={imgError ? "/placeholder.svg" : product.image}
-              alt={product.nameFr}
-              className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
-                loaded ? "opacity-100" : "opacity-0"
-              } ${hovered && secondImage ? "opacity-0 scale-105" : ""}`}
-              onLoad={onLoad}
-              onError={handleImgError}
-              widths={[200, 400, 600]}
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px"
-            />
-            {secondImage && (
-              <OptimizedImage
-                src={secondImage}
-                alt={product.nameFr}
-                className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
-                  hovered ? "opacity-100 scale-100" : "opacity-0 scale-95"
-                }`}
-                widths={[200, 400, 600]}
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px"
-              />
-            )}
-          </>
+        <OptimizedImage
+          src={imgError ? "/placeholder.svg" : product.image}
+          alt={product.nameFr}
+          className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
+            loaded ? "opacity-100" : "opacity-0"
+          } ${hovered && secondImage ? "opacity-0 scale-105" : ""}`}
+          onLoad={onLoad}
+          onError={handleImgError}
+          widths={[160, 240, 360]}
+          sizes="(max-width: 640px) 50vw, 170px"
+          quality={60}
+          priority={priority}
+          loading={priority ? "eager" : "lazy"}
+        />
+        {secondImage && hovered && (
+          <OptimizedImage
+            src={secondImage}
+            alt={product.nameFr}
+            className="absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out opacity-100 scale-100"
+            widths={[160, 240, 360]}
+            sizes="(max-width: 640px) 50vw, 170px"
+            quality={60}
+            loading="lazy"
+          />
         )}
 
         {/* Discount badge - top left */}
