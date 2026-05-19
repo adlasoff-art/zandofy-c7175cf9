@@ -715,6 +715,11 @@ function OfferCard({
           : "border-border bg-background hover:border-primary/50"
       }`}
     >
+      <div className={`w-4 h-4 mt-0.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+        isSelected ? "border-primary" : "border-border"
+      }`}>
+        {isSelected && <div className="w-2 h-2 rounded-full bg-primary" />}
+      </div>
       {offer.forwarder_logo_url ? (
         <img
           src={offer.forwarder_logo_url}
@@ -743,25 +748,23 @@ function OfferCard({
           )}
           {isSelected && <BadgeCheck size={11} className="text-primary" />}
           {pickup_address && (
-            <TooltipProvider delayDuration={120}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                    aria-label={t("freight.pickupAddress") || "Adresse de récupération"}
-                  >
-                    <MapPin size={9} />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-sm text-[11px] break-words">
-                  <p className="font-semibold mb-0.5">{t("freight.pickupAddress") || "Adresse de récupération"}</p>
-                  <p className="whitespace-pre-line break-words text-muted-foreground">{pickup_address}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Popover>
+              <PopoverTrigger asChild>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary hover:bg-primary/20 active:bg-primary/25 transition-colors"
+                  aria-label={t("freight.pickupAddress") || "Adresse de récupération"}
+                >
+                  <MapPin size={12} />
+                </span>
+              </PopoverTrigger>
+              <PopoverContent side="top" align="start" className="max-w-sm w-auto text-[11px] break-words p-3" onClick={(e) => e.stopPropagation()}>
+                <p className="font-semibold mb-0.5">{t("freight.pickupAddress") || "Adresse de récupération"}</p>
+                <p className="whitespace-pre-line break-words text-muted-foreground">{pickup_address}</p>
+              </PopoverContent>
+            </Popover>
           )}
         </div>
         {transitLabel && (
