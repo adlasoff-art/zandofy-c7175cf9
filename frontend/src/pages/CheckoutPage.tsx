@@ -1555,7 +1555,9 @@ export default function CheckoutPage() {
           </div>
         )}
         <div className="flex justify-between">
-          <span className="text-muted-foreground">{t("checkout.shipping")} ({shippingMode})</span>
+          <span className="text-muted-foreground">
+            {t("checkout.shipping")} ({shippingMode === "air" ? "Aérien" : shippingMode === "sea" ? "Maritime" : shippingMode === "road" ? "Routier" : shippingMode === "rail" ? "Ferroviaire" : shippingMode})
+          </span>
           {shippingPaymentChoice === "pay_on_arrival" && shippingCost > 0 ? (
             <span className="text-amber-600 font-medium text-xs">
               {formatPrice(shippingCost)} — {t("checkout.onArrival") || "à l'arrivée"}
@@ -1585,7 +1587,7 @@ export default function CheckoutPage() {
         {deliveryOption === "hub_pickup" && (
           <div className="flex justify-between">
             <span className="text-muted-foreground">{t("checkout.delivery") || "Livraison"}</span>
-            <span className="text-primary font-medium">{t("checkout.hubPickupFree") || "Retrait Hub (gratuit)"}</span>
+            <span className="text-primary font-medium">{t("checkout.hubPickupFree") || "Retrait à l'agence (gratuit)"}</span>
           </div>
         )}
         <div className="flex justify-between font-bold text-foreground pt-2 border-t border-border text-base">
@@ -1794,7 +1796,7 @@ export default function CheckoutPage() {
                       <div className="space-y-2">
                         {[
                           { key: "pay_now" as const, label: t("checkout.payNow") || "Payer maintenant", desc: `${t("checkout.includeInTotal") || "Inclure"} ${amountLabel} ${t("checkout.inTotal") || "dans le total"}` },
-                          { key: "pay_on_arrival" as const, label: t("checkout.payOnHubArrival") || "Payer à l'arrivée au Hub", desc: `${t("checkout.payOnHubArrivalDesc") || "Régler"} ${amountLabel} ${t("checkout.payOnHubArrivalDesc2") || "quand le colis arrive au hub (avant livraison)"}` },
+                          { key: "pay_on_arrival" as const, label: t("checkout.payOnHubArrival") || "Payer à l'arrivée à l'agence du transitaire (hub)", desc: `${t("checkout.payOnHubArrivalDesc") || "Régler"} ${amountLabel} ${t("checkout.payOnHubArrivalDesc2") || "à l'arrivée du colis à l'agence du transitaire (hub), avant la livraison"}` },
                         ].map(opt => (
                           <button
                             key={opt.key}
