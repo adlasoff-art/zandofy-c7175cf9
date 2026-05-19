@@ -45,7 +45,7 @@ const EVENT_META: Record<
   delivered: { label: "Livré", icon: PackageCheck, tone: "default" },
   cancelled: { label: "Annulé", icon: XCircle, tone: "destructive" },
   tracking_updated: { label: "Tracking mis à jour", icon: Hash, tone: "secondary" },
-  notes_updated: { label: "Notes mises à jour", icon: StickyNote, tone: "outline" },
+  notes_updated: { label: "Message envoyé au client", icon: StickyNote, tone: "default" },
   deposit_paid: { label: "Acompte encaissé", icon: Wallet, tone: "default" },
   balance_paid: { label: "Solde encaissé", icon: Wallet, tone: "default" },
   field_updated: { label: "Champ modifié", icon: Pencil, tone: "outline" },

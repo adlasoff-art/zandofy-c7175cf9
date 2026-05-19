@@ -416,12 +416,15 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
 
                 <details className="text-xs">
                   <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                    Notes internes
+                    Message au client
                   </summary>
                   <div className="mt-2 space-y-2">
+                    <p className="text-[11px] text-muted-foreground">
+                      Ce message sera envoyé au client (notification, email, push). Anti-spam : 1 envoi / 30 min.
+                    </p>
                     <Textarea
                       rows={2}
-                      placeholder="Suivi interne, n° de tracking, remarques…"
+                      placeholder="Message visible par le client (ex : arrivée à Shanghai, douane en cours…)"
                       defaultValue={row.internal_notes ?? ""}
                       onChange={(e) => setNotesDraft((prev) => ({ ...prev, [row.id]: e.target.value }))}
                     />
@@ -432,7 +435,7 @@ export function ForwarderHandoffsPanel({ forwarderIds, forwarderNames }: Props) 
                         disabled={savingId === row.id}
                         onClick={() => saveNotes(row)}
                       >
-                        Enregistrer la note
+                        Envoyer au client
                       </Button>
                     </div>
                   </div>

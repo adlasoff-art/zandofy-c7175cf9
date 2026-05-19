@@ -51,7 +51,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { handoffId } = await req.json();
+    const body = await req.json();
+    const { handoffId, type, note } = body ?? {};
     if (!handoffId) {
       return new Response(JSON.stringify({ error: "handoffId required" }), {
         status: 400,
@@ -66,7 +67,7 @@ Deno.serve(async (req) => {
 
     const { data: handoff, error: hErr } = await svc
       .from("forwarder_handoffs")
-      .select("id, order_id, status, forwarder_id")
+      .select("id, order_id, status, forwarder_id, internal_notes")
       .eq("id", handoffId)
       .maybeSingle();
     if (hErr || !handoff) {
@@ -76,7 +77,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    const meta = STATUS_LABEL[handoff.status as string];
+    let meta: { title: string; intro: string } | undefined;
+    if (type === "note") {
+      const noteText = (note ?? handoff.internal_notes ?? "").toString().trim();
+      if (!noteText) {
+        return new Response(JSON.stringify({ skipped: "empty_note" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      meta = {
+        title: "Message de votre transitaire",
+        intro: noteText,
+      };
+    } else {
+      meta = STATUS_LABEL[handoff.status as string];
+    }
     if (!meta) {
       return new Response(JSON.stringify({ skipped: "no_email_for_status" }), {
         status: 200,
@@ -140,7 +156,7 @@ Deno.serve(async (req) => {
           title: meta.title,
           body: `Commande ${orderRef} — ${meta.intro}`.slice(0, 200),
           url: `/orders/${order.id}`,
-          tag: `handoff-${order.id}-${handoff.status ?? ""}`,
+          tag: `handoff-${order.id}-${type === "note" ? "note-" + Date.now() : (handoff.status ?? "")}`,
         },
       });
     }
