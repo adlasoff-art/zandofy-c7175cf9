@@ -83,7 +83,7 @@ export default function PopularPage() {
                 >
                   {loadingMore ? (
                     <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Chargement...</span>
-                  ) : "Voir Plus"}
+                  ) : "Voir plus de produits"}
                 </button>
               ) : products.length > 0 ? (
                 <p className="text-xs text-muted-foreground">Vous avez tout vu ✨</p>
