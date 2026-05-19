@@ -1,6 +1,5 @@
 import { Heart, ShoppingCart, Plus, Star, Trophy, Check, Award, GitCompareArrows } from "lucide-react";
 import { useState, useCallback, useRef, memo } from "react";
-import { useLazyImage } from "@/hooks/use-lazy-image";
 import { useCart } from "@/contexts/CartContext";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { useAuth } from "@/contexts/AuthContext";
