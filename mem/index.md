@@ -26,6 +26,7 @@
 
 ### E-commerce Features & Logistics
 - [Multi-Operator Delivery](mem://features/multi-operator-delivery-system) — Lot 11B last-mile par entreprises
+- [Handoff Hub Operator Workflow](mem://features/handoff-hub-operator-workflow) — H1-H6 visibilité différée transitaire, bascule auto au hub, switch client home→pickup, onglets transitaire
 - [Customer Order Tracking](mem://features/customer-order-tracking) — Lot 12 RPC get_customer_tracking + polling 10s + carte Leaflet rider+destination
 - [Dual-Code Security](mem://features/dual-code-pickup-delivery-security) — pickup_code + delivery_code (Phase 10.5)
 - [Forwarders & Logistics](mem://features/forwarders-and-logistics-system)
