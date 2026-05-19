@@ -95,18 +95,33 @@ export function useAutomation() {
             .not("status", "in", '("cancelled","returned")');
           hasOrder = (count ?? 0) > 0;
 
-          const { data: profile } = await (supabase as any)
-            .from("profiles")
-            .select("created_at, residence_country, residence_city")
-            .eq("id", user.id)
-            .maybeSingle();
+          // Tolérance schéma : si residence_country/city n'existent pas encore
+          // en prod (migration non déployée), on retombe sur created_at seul.
+          let profile: any = null;
+          {
+            const res = await (supabase as any)
+              .from("profiles")
+              .select("created_at, residence_country, residence_city")
+              .eq("id", user.id)
+              .maybeSingle();
+            if (res.error && (res.error.code === "42703" || /residence_/.test(res.error.message ?? ""))) {
+              const fallback = await (supabase as any)
+                .from("profiles")
+                .select("created_at")
+                .eq("id", user.id)
+                .maybeSingle();
+              profile = fallback.data ?? null;
+            } else {
+              profile = res.data ?? null;
+            }
+          }
           if (profile?.created_at) {
             daysSinceSignup = Math.floor(
               (Date.now() - new Date(profile.created_at).getTime()) / (1000 * 60 * 60 * 24)
             );
           }
-          userCountry = (profile as any)?.residence_country ?? null;
-          userCity = (profile as any)?.residence_city ?? null;
+          userCountry = profile?.residence_country ?? null;
+          userCity = profile?.residence_city ?? null;
 
           const { data: roleRows } = await (supabase as any)
             .from("user_roles")
