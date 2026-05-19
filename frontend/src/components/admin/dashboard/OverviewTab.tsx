@@ -182,7 +182,7 @@ export function OverviewTab({ period, geoFilters }: Props) {
                     <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${statusColor[status] || "bg-muted text-muted-foreground"}`}>
                       {statusLabels[status] || status}
                     </span>
-                    <span className="text-sm font-semibold text-foreground">{count}</span>
+                    <span className="text-sm font-semibold text-foreground">{count as number}</span>
                   </div>
                 ))}
               </div>
