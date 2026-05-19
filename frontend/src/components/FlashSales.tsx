@@ -99,7 +99,7 @@ export function FlashSales() {
             : products.map((product, i) => (
                 <div key={product.id} className="min-w-[155px] w-[155px] md:min-w-[170px] md:w-[170px] shrink-0 snap-start">
                   <Link to={`/product/${product.slug || product.id}`}>
-                    <ProductCard product={product} index={i} />
+                    <ProductCard product={product} index={i} priority={i < 2} />
                   </Link>
                 </div>
               ))}
