@@ -29,6 +29,15 @@ type: feature
 ## H6 — Onglets transitaire
 - `ForwarderHandoffsPanel` : 4 onglets Nouveaux / En cours / Arrivés au hub / Annulés
 
+## H2 — Notes transitaire = message client
+- `log_handoff_event` enrichi : log `notes_updated` quand `internal_notes` change
+- Trigger `trg_notify_customer_handoff_note` (AFTER UPDATE OF internal_notes) :
+  - skip si note vide ou inchangée
+  - throttle 30 min via `forwarder_handoff_events` count
+  - in-app notif + appel `notify-handoff-status-customer` payload `{type:'note', note}`
+- Edge function `notify-handoff-status-customer` gère `type='note'` (email + push)
+- UI `ForwarderHandoffsPanel` : "Notes internes" → "Message au client", CTA "Envoyer au client"
+- Timeline : libellé `notes_updated` = "Message envoyé au client"
+
 ## Reste à faire (lots ultérieurs)
-- H2 : notes internes = notification client (renommer "Note interne" → "Message au client", trigger sur events `notes_updated`)
 - H7 : push web pour transitaire + opérateur (déjà partiel)
