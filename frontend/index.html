@@ -35,6 +35,10 @@
             the React component still renders the image normally afterwards. -->
   <script>
     (function(){
+      // LCP hero preload is only useful on the home route. Skip on /auth,
+      // /account, etc. to avoid "preload not used" console warnings.
+      var p = location.pathname;
+      if (p !== '/' && p !== '/index.html') return;
       function toRender(u, w){
         if (!u) return u;
         try {
