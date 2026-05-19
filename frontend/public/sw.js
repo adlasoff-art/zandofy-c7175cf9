@@ -1,5 +1,5 @@
-const CACHE_NAME = "zandofy-v8";
-const STATIC_CACHE = "zandofy-static-v8";
+const CACHE_NAME = "zandofy-v9";
+const STATIC_CACHE = "zandofy-static-v9";
 const API_CACHE = "zandofy-api-v2";
 const IMG_CACHE = "zandofy-images-v2";
 const CATALOG_CACHE = "zandofy-catalog-v1";
@@ -156,7 +156,27 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Static assets (JS/CSS): stale-while-revalidate
+  // Hashed build assets (/assets/*.js, /assets/*.css): NETWORK-FIRST.
+  // Vercel sets Cache-Control: immutable for these — the browser cache already
+  // handles repeat hits. Serving stale chunks from the SW after a deploy is
+  // the #1 cause of post-deploy white screens, so we always try network first
+  // and only fall back to cache when offline.
+  if (url.pathname.startsWith("/assets/")) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request).then((c) => c || new Response("", { status: 504 })))
+    );
+    return;
+  }
+
+  // Other static assets: stale-while-revalidate
   event.respondWith(
     caches.open(STATIC_CACHE).then(async (cache) => {
       const cached = await cache.match(request);

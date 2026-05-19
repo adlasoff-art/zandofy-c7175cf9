@@ -17,9 +17,31 @@ function isChunkLoadError(error: unknown): boolean {
 
 function handleChunkReload(): void {
   const key = "chunk_reload_attempted";
-  if (sessionStorage.getItem(key)) return; // already tried once
-  sessionStorage.setItem(key, "1");
-  window.location.reload();
+  const attempts = Number(sessionStorage.getItem(key) || "0");
+  if (attempts >= 2) return; // already escalated to SW nuke
+  sessionStorage.setItem(key, String(attempts + 1));
+
+  if (attempts === 0) {
+    // First chunk error: just reload (often picks up a fresh index.html)
+    window.location.reload();
+    return;
+  }
+
+  // Second chunk error: SW is likely serving orphaned chunks. Nuke caches +
+  // unregister all SWs, then hard-reload. Protects users stuck on stale builds.
+  (async () => {
+    try {
+      if ("caches" in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map((n) => caches.delete(n)));
+      }
+      if ("serviceWorker" in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+    } catch {}
+    window.location.reload();
+  })();
 }
 
 // Clear the flag on successful load so future deploys can retry
