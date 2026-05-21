@@ -166,6 +166,20 @@ const PRODUCT_SELECT_FALLBACK = `
   stores!products_store_id_fkey(id, name, is_verified, verified_years, created_at, is_online, sales_count, followers_count)
 `;
 
+// Lightweight SELECT for product LISTINGS (grids, carousels, search results).
+// Excludes heavy embeds (product_colors.image_url, full size measurements,
+// stores override fields) to drastically reduce seq_scan pressure on
+// product_images / product_colors / product_sizes in production.
+// Use PRODUCT_SELECT (above) only on the product detail page.
+export const PRODUCT_LIST_SELECT = `
+  *,
+  categories(name, name_fr),
+  product_images(image_url, position),
+  product_colors(color_hex, color_name),
+  product_sizes(size_label),
+  stores!products_store_id_fkey(id, name, is_verified, is_certified, is_online, shop_type)
+`;
+
 export async function fetchProducts(params?: {
   category?: string;
   limit?: number;
@@ -213,11 +227,11 @@ export async function fetchProducts(params?: {
   };
 
   // Try main query first
-  let { data, error } = await tryFetch(PRODUCT_SELECT);
+  let { data, error } = await tryFetch(PRODUCT_LIST_SELECT);
 
   // If main query fails (e.g. missing columns), try fallback
   if (error) {
-    console.warn("[fetchProducts] Primary query failed, trying fallback:", error.message);
+    console.warn("[fetchProducts] Light query failed, trying fallback:", error.message);
     const fallback = await tryFetch(PRODUCT_SELECT_FALLBACK);
     data = fallback.data;
     error = fallback.error;
@@ -347,7 +361,7 @@ export async function fetchProductBySlug(
     product_images(image_url, position),
     product_colors(color_hex, color_name, image_url),
     product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
-    stores!products_store_id_fkey(id, name, logo_url, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, whatsapp_number, rating, response_rate, response_time)
+    stores!products_store_id_fkey(id, name, logo_url, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, rating, response_rate, response_time)
   `;
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
@@ -366,6 +380,46 @@ export async function fetchProductBySlug(
 
   const product = mapProduct(data);
   product.store = data.stores;
+
+  // La table `stores` est protégée par RLS (seuls owner/staff/admin la lisent
+  // directement). Pour les visiteurs anonymes/clients, l'embed
+  // `stores!products_store_id_fkey` revient quasi systématiquement vide. On
+  // recharge donc systématiquement la boutique depuis la vue publique
+  // `stores_public` dès qu'on a un `store_id`, afin que l'encart fournisseur
+  // (logo, badges, boutons de contact) reste visible pour tout le monde.
+  if (data.store_id) {
+    try {
+      const fullCols =
+        "id, name, slug, logo_url, banner_url, description, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, rating, response_rate, response_time, shop_type";
+      let publicStore: any = null;
+      const res = await (supabase as any)
+        .from("stores_public")
+        .select(fullCols)
+        .eq("id", data.store_id)
+        .maybeSingle();
+      if (res.error) {
+        // Fallback colonnes minimales si la vue déployée diffère
+        const safe = await (supabase as any)
+          .from("stores_public")
+          .select(
+            "id, name, slug, logo_url, is_verified, is_certified, verified_years, created_at, followers_count, products_count, sales_count, is_online, rating"
+          )
+          .eq("id", data.store_id)
+          .maybeSingle();
+        publicStore = safe.data;
+        if (safe.error) {
+          console.warn("stores_public fallback failed:", safe.error.message);
+        }
+      } else {
+        publicStore = res.data;
+      }
+      if (publicStore) {
+        product.store = publicStore;
+      }
+    } catch (e) {
+      // Silencieux : on garde l'embed (potentiellement null) sans casser la page.
+    }
+  }
 
   // Load dynamic variant selections with type info
   try {

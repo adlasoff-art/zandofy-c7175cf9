@@ -16,7 +16,7 @@ import {
   Box, UserCheck, Users, Gift, XCircle, RotateCcw, Bike, Home, Store, Hash, Train,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { mapInternalShipment, detectCarrier, type TrackingResult } from "@/lib/tracking-providers";
+import { mapInternalShipment, detectCarrier, fetchExternalTracking, type TrackingResult } from "@/lib/tracking-providers";
 import { STATUS_CONFIG, STATUS_FLOW, CUSTOMER_TRACKING_STEPS, getStepIndex } from "@/lib/order-status";
 import { useI18n } from "@/contexts/I18nContext";
 import { DeliveryMap } from "@/components/DeliveryMap";
@@ -47,6 +47,8 @@ interface OrderTrackingResult {
   shipping_address: string | null; shipping_city: string | null; shipping_country: string | null;
   tracking_number: string | null;
   assigned_rider_name: string | null; assigned_rider_id: string | null;
+  delivery_operator_id?: string | null;
+  delivery_operator_name?: string | null;
   delivery_choice: string | null;
   last_mile_fee: number | null;
   last_mile_payment_method: string | null;
@@ -59,17 +61,17 @@ interface OrderTrackingResult {
 
 // ── Shipment / Delivery constants ──
 const SHIPMENT_STEPS = [
-  { key: "loading", label: "Chargement", icon: Package },
-  { key: "in_transit", label: "En transit", icon: Plane },
-  { key: "customs", label: "Douanes", icon: MapPin },
-  { key: "arrived", label: "Arrivé", icon: CheckCircle2 },
-  { key: "delivered", label: "Livré", icon: CheckCircle2 },
+  { key: "loading", labelKey: "tracking.steps.loading", icon: Package },
+  { key: "in_transit", labelKey: "tracking.steps.inTransit", icon: Plane },
+  { key: "customs", labelKey: "tracking.steps.customs", icon: MapPin },
+  { key: "arrived", labelKey: "tracking.steps.arrived", icon: CheckCircle2 },
+  { key: "delivered", labelKey: "tracking.steps.delivered", icon: CheckCircle2 },
 ];
 
 const DELIVERY_STEPS = [
-  { key: "pending", label: "En attente", icon: Clock },
-  { key: "in_progress", label: "En cours", icon: Truck },
-  { key: "delivered", label: "Livré", icon: CheckCircle2 },
+  { key: "pending", labelKey: "tracking.steps.pending", icon: Clock },
+  { key: "in_progress", labelKey: "tracking.steps.inProgress", icon: Truck },
+  { key: "delivered", labelKey: "tracking.steps.delivered", icon: CheckCircle2 },
 ];
 
 const modeIcons: Record<string, typeof Plane> = { air: Plane, sea: Ship, road: Truck, rail: Train };
@@ -81,6 +83,7 @@ function getStepIdx(steps: { key: string }[], status: string) {
 
 // ── Reusable simple Timeline (shipment/delivery) ──
 function Timeline({ steps, currentStatus }: { steps: typeof SHIPMENT_STEPS; currentStatus: string }) {
+  const { t } = useI18n();
   const activeIdx = getStepIdx(steps, currentStatus);
   return (
     <div className="flex items-start gap-0 w-full overflow-x-auto py-4">
@@ -102,7 +105,7 @@ function Timeline({ steps, currentStatus }: { steps: typeof SHIPMENT_STEPS; curr
               {isCurrent ? <CircleDot size={18} /> : done ? <Icon size={18} /> : <Circle size={18} />}
             </div>
             <span className={cn("text-xs mt-2 text-center font-medium", isCurrent ? "text-primary" : done ? "text-foreground" : "text-muted-foreground")}>
-              {step.label}
+              {t(step.labelKey)}
             </span>
           </div>
         );
@@ -113,6 +116,8 @@ function Timeline({ steps, currentStatus }: { steps: typeof SHIPMENT_STEPS; curr
 
 // ── 9-Step Order Timeline (3 rows × 3, snake flow) ──
 function OrderTimeline({ currentStatus, history }: { currentStatus: string; history: OrderTrackingResult["history"] }) {
+  const { locale } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "fr-FR";
   const isCancelled = currentStatus === "cancelled";
   const isReturned = currentStatus === "returned";
   const activeIdx = getStepIndex(currentStatus);
@@ -144,9 +149,9 @@ function OrderTimeline({ currentStatus, history }: { currentStatus: string; hist
         </span>
         {ts && (
           <span className="text-[10px] text-muted-foreground">
-            {new Date(ts).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+            {new Date(ts).toLocaleDateString(dateLocale, { day: "numeric", month: "short" })}
             {" "}
-            {new Date(ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+            {new Date(ts).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" })}
           </span>
         )}
       </div>
@@ -226,6 +231,7 @@ function OrderTimeline({ currentStatus, history }: { currentStatus: string; hist
 
 // ── Delivery Choice Panel ──
 function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResult; onChoiceMade: () => void }) {
+  const { t, formatPrice } = useI18n();
   const [choosing, setChoosing] = useState(false);
   const [lastMileResult, setLastMileResult] = useState<LastMileFeeResult | null>(null);
   const [lmLoading, setLmLoading] = useState(true);
@@ -269,10 +275,10 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
         .update(updates)
         .eq("id", order.id);
       if (error) throw error;
-      toast.success(choice === "home" ? "Livraison à domicile choisie !" : "Récupération au Hub choisie !");
+      toast.success(choice === "home" ? t("tracking.choice.successHome") : t("tracking.choice.successPickup"));
       onChoiceMade();
     } catch (e: any) {
-      toast.error(e.message || "Erreur");
+      toast.error(e.message || t("tracking.errorGeneric"));
     } finally {
       setChoosing(false);
     }
@@ -283,16 +289,14 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
   return (
     <div className="border border-primary/30 bg-primary/5 rounded-xl p-4 space-y-3">
       <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-        <MapPin size={16} className="text-primary" /> Choisissez votre mode de réception
+        <MapPin size={16} className="text-primary" /> {t("tracking.choice.title")}
       </h3>
-      <p className="text-xs text-muted-foreground">
-        Votre commande est arrivée au Hub ! Comment souhaitez-vous la récupérer ?
-      </p>
+      <p className="text-xs text-muted-foreground">{t("tracking.choice.subtitle")}</p>
 
       {/* Zone not deliverable warning */}
       {lastMileResult && !lastMileResult.deliverable && (
         <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded">
-          ⚠️ Livraison à domicile non disponible dans votre zone{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}. Veuillez récupérer au Hub.
+          {t("tracking.choice.notDeliverable")}{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}
         </p>
       )}
 
@@ -308,13 +312,13 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
             <Home size={18} className="text-primary" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">Livraison à domicile</p>
+            <p className="text-sm font-semibold text-foreground">{t("tracking.choice.home")}</p>
             {lmLoading ? (
-              <p className="text-xs text-muted-foreground">Calcul des frais...</p>
+              <p className="text-xs text-muted-foreground">{t("tracking.choice.homeCalculating")}</p>
             ) : lastMileFee > 0 ? (
-              <p className="text-xs text-muted-foreground">Frais : ${lastMileFee.toFixed(2)} — à payer à la réception</p>
+              <p className="text-xs text-muted-foreground">{t("tracking.choice.homeFee", { fee: formatPrice(lastMileFee) })}</p>
             ) : (
-              <p className="text-xs text-muted-foreground">Un livreur sera assigné</p>
+              <p className="text-xs text-muted-foreground">{t("tracking.choice.homeAssign")}</p>
             )}
           </div>
         </button>
@@ -328,8 +332,8 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
             <Store size={18} className="text-accent-foreground" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">Récupérer au Hub</p>
-            <p className="text-xs text-muted-foreground">Gratuit — code de confirmation</p>
+            <p className="text-sm font-semibold text-foreground">{t("tracking.choice.pickup")}</p>
+            <p className="text-xs text-muted-foreground">{t("tracking.choice.pickupFree")}</p>
           </div>
         </button>
       </div>
@@ -342,6 +346,7 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
 
 // ── Confirmation Code Entry (Hub Pickup) ──
 function ConfirmationCodeEntry({ order, onConfirmed }: { order: OrderTrackingResult; onConfirmed: () => void }) {
+  const { t } = useI18n();
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
 
@@ -356,11 +361,11 @@ function ConfirmationCodeEntry({ order, onConfirmed }: { order: OrderTrackingRes
       if (data?.error) {
         toast.error(data.error);
       } else if (data?.success) {
-        toast.success("Commande récupérée avec succès !");
+        toast.success(t("tracking.code.success"));
         onConfirmed();
       }
     } catch (e: any) {
-      toast.error(e.message || "Erreur");
+      toast.error(e.message || t("tracking.errorGeneric"));
     } finally {
       setVerifying(false);
     }
@@ -369,23 +374,21 @@ function ConfirmationCodeEntry({ order, onConfirmed }: { order: OrderTrackingRes
   return (
     <div className="border border-primary/30 bg-primary/5 rounded-xl p-4 space-y-3">
       <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-        <Hash size={16} className="text-primary" /> Code de confirmation
+        <Hash size={16} className="text-primary" /> {t("tracking.code.title")}
       </h3>
-      <p className="text-xs text-muted-foreground">
-        Entrez le code de confirmation fourni par le vendeur pour valider la récupération de votre colis.
-      </p>
+      <p className="text-xs text-muted-foreground">{t("tracking.code.desc")}</p>
       <div className="flex gap-2">
         <input
           type="text"
           value={code}
           onChange={e => setCode(e.target.value.toUpperCase())}
-          placeholder="Ex: A3B7K2"
+          placeholder={t("tracking.code.placeholder")}
           maxLength={6}
           className="flex-1 px-3 py-2.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono text-center tracking-widest uppercase"
           style={{ fontSize: "16px" }}
         />
         <Button onClick={handleVerify} disabled={verifying || code.trim().length < 6}>
-          {verifying ? <Loader2 size={14} className="animate-spin" /> : "Valider"}
+          {verifying ? <Loader2 size={14} className="animate-spin" /> : t("tracking.code.validate")}
         </Button>
       </div>
     </div>
@@ -394,6 +397,7 @@ function ConfirmationCodeEntry({ order, onConfirmed }: { order: OrderTrackingRes
 
 // ── Live Rider Tracking Map (bidirectional) ──
 function LiveRiderMap({ deliveryId, orderId, userId }: { deliveryId: string; orderId?: string; userId?: string }) {
+  const { t } = useI18n();
   const [riderLat, setRiderLat] = useState<number | null>(null);
   const [riderLng, setRiderLng] = useState<number | null>(null);
 
@@ -409,8 +413,8 @@ function LiveRiderMap({ deliveryId, orderId, userId }: { deliveryId: string; ord
     return (
       <div className="bg-muted/30 rounded-xl p-6 text-center">
         <Bike size={24} className="text-muted-foreground mx-auto mb-2" />
-        <p className="text-sm text-muted-foreground">En attente de la position du livreur...</p>
-        <p className="text-xs text-muted-foreground mt-1">Votre position GPS est partagée avec le livreur</p>
+        <p className="text-sm text-muted-foreground">{t("tracking.live.waiting")}</p>
+        <p className="text-xs text-muted-foreground mt-1">{t("tracking.live.shared")}</p>
       </div>
     );
   }
@@ -419,7 +423,7 @@ function LiveRiderMap({ deliveryId, orderId, userId }: { deliveryId: string; ord
     <div>
       <div className="flex items-center gap-2 mb-2">
         <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-        <span className="text-xs font-medium text-foreground">Livreur en route — GPS bidirectionnel actif</span>
+        <span className="text-xs font-medium text-foreground">{t("tracking.live.active")}</span>
       </div>
       <DeliveryMap riderLat={riderLat} riderLng={riderLng} showPolylines showEta className="h-[300px]" />
     </div>
@@ -428,6 +432,7 @@ function LiveRiderMap({ deliveryId, orderId, userId }: { deliveryId: string; ord
 
 // ── Rider Profile Banner (visible to customer) ──
 function RiderProfileBanner({ riderId, riderName }: { riderId: string; riderName: string }) {
+  const { t } = useI18n();
   const { data: profile } = useQuery({
     queryKey: ["rider-profile", riderId],
     queryFn: async () => {
@@ -460,9 +465,9 @@ function RiderProfileBanner({ riderId, riderName }: { riderId: string; riderName
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground">Votre livreur : {displayName}</p>
+        <p className="text-sm font-semibold text-foreground">{t("tracking.rider.banner")} {displayName}</p>
         {avgRating && (
-          <p className="text-xs text-muted-foreground">⭐ {avgRating.avg}/5 ({avgRating.count} avis)</p>
+          <p className="text-xs text-muted-foreground">{t("tracking.rider.reviews", { avg: avgRating.avg, count: avgRating.count })}</p>
         )}
       </div>
     </div>
@@ -472,7 +477,8 @@ function RiderProfileBanner({ riderId, riderName }: { riderId: string; riderName
 // ── Main Page ──
 export default function TrackingPage() {
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t, formatPrice, locale } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "fr-FR";
   const { ref: urlRef } = useParams<{ ref?: string }>();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState("order");
@@ -511,9 +517,9 @@ export default function TrackingPage() {
 
   // Fetch order + history
   const fetchOrder = useCallback(async (orderRef: string) => {
-    const { data: order } = await supabase
+    const { data: order } = await (supabase as any)
       .from("orders")
-      .select("id, order_ref, status, total, shipping_address, shipping_city, shipping_country, tracking_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, last_mile_payment_method, confirmation_code, created_at, updated_at, store_id")
+      .select("id, order_ref, status, total, shipping_address, shipping_city, shipping_country, tracking_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, last_mile_payment_method, confirmation_code, created_at, updated_at, store_id, delivery_operator_id")
       .eq("order_ref", orderRef)
       .maybeSingle();
 
@@ -523,6 +529,17 @@ export default function TrackingPage() {
     if (order.store_id) {
       const { data: store } = await supabase.from("stores").select("name").eq("id", order.store_id).single();
       storeName = store?.name || null;
+    }
+
+    // Lot 11B Phase B4 — Hub UI : nom de l'opérateur (entreprise de livraison) si attribué
+    let operatorName: string | null = null;
+    if ((order as any).delivery_operator_id) {
+      const { data: op } = await (supabase as any)
+        .from("delivery_operators")
+        .select("company_name")
+        .eq("id", (order as any).delivery_operator_id)
+        .maybeSingle();
+      operatorName = op?.company_name || null;
     }
 
     const { data: history } = await supabase
@@ -558,6 +575,8 @@ export default function TrackingPage() {
       store_name: storeName,
       history: (history || []) as OrderTrackingResult["history"],
       delivery_id: deliveryData?.id || null,
+      delivery_operator_id: (order as any).delivery_operator_id || null,
+      delivery_operator_name: operatorName,
     };
   }, []);
 
@@ -615,12 +634,25 @@ export default function TrackingPage() {
         if (data && data.length > 0) setDelivery(data[0] as unknown as DeliveryResult);
         else setNotFound(true);
       } else if (tab === "global") {
+        // 1) Internal Zandofy shipment first (free, instant)
         const { data } = await supabase.rpc("track_shipment", { p_awb_bl: trimmed });
         if (data && data.length > 0) {
           setGlobalResult(mapInternalShipment(data[0] as unknown as ShipmentResult));
         } else {
-          detectCarrier(trimmed);
-          setNotFound(true);
+          // 2) Fallback to 17track edge function (international carriers)
+          const ext = await fetchExternalTracking(trimmed);
+          if (ext.result) {
+            setGlobalResult(ext.result);
+          } else {
+            if (ext.configured && ext.error) {
+              // Provider configured but couldn't find the number
+              toast.error(ext.error === "Tracking number not found"
+                ? t("tracking.notFoundExtCarriers")
+                : `${t("tracking.externalErrorPrefix")} ${ext.error}`);
+            }
+            detectCarrier(trimmed);
+            setNotFound(true);
+          }
         }
       }
     } catch {
@@ -670,7 +702,7 @@ export default function TrackingPage() {
 
               <TabsContent value="order">
                 <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input placeholder="Ex: ORD-ABC123" value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
+                  <Input placeholder={t("tracking.placeholder.order")} value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
                   <Button type="submit" disabled={loading || !query.trim()}>
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                     <span className="ml-2 hidden sm:inline">{t("tracking.track")}</span>
@@ -681,7 +713,7 @@ export default function TrackingPage() {
 
               <TabsContent value="shipment">
                 <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input placeholder="Ex: AWB-2026-001" value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
+                  <Input placeholder={t("tracking.placeholder.shipment")} value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
                   <Button type="submit" disabled={loading || !query.trim()}>
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                     <span className="ml-2 hidden sm:inline">{t("tracking.search")}</span>
@@ -691,7 +723,7 @@ export default function TrackingPage() {
 
               <TabsContent value="delivery">
                 <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input placeholder="Ex: ORD-ABC123" value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
+                  <Input placeholder={t("tracking.placeholder.order")} value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
                   <Button type="submit" disabled={loading || !query.trim()}>
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                     <span className="ml-2 hidden sm:inline">{t("tracking.search")}</span>
@@ -701,7 +733,7 @@ export default function TrackingPage() {
 
               <TabsContent value="global">
                 <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input placeholder="DHL, FedEx, UPS, EMS..." value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
+                  <Input placeholder={t("tracking.placeholder.global")} value={query} onChange={(e) => setQuery(e.target.value)} className="flex-1" maxLength={100} />
                   <Button type="submit" disabled={loading || !query.trim()}>
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <Globe size={16} />}
                     <span className="ml-2 hidden sm:inline">{t("tracking.tracker")}</span>
@@ -750,8 +782,19 @@ export default function TrackingPage() {
               {orderResult.tracking_number && (
                 <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-3 py-2">
                   <Package size={14} className="text-primary shrink-0" />
-                  <span className="text-muted-foreground">N° de suivi :</span>
+                  <span className="text-muted-foreground">{t("tracking.trackingNumberLabel")}</span>
                   <span className="font-mono font-semibold text-foreground">{orderResult.tracking_number}</span>
+                </div>
+              )}
+
+              {/* Lot 11B Phase B4 — Opérateur de livraison (entreprise) */}
+              {orderResult.delivery_operator_name && (
+                <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-3 py-2">
+                  <Truck size={14} className="text-primary shrink-0" />
+                  <span className="text-muted-foreground">{t("tracking.transporterLabel")}</span>
+                  <span className="font-semibold text-foreground">
+                    {orderResult.delivery_operator_name}
+                  </span>
                 </div>
               )}
 
@@ -759,7 +802,7 @@ export default function TrackingPage() {
               {orderResult.assigned_rider_name && (
                 <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-3 py-2">
                   <Bike size={14} className="text-primary shrink-0" />
-                  <span className="text-muted-foreground">Livreur :</span>
+                  <span className="text-muted-foreground">{t("tracking.riderLabel")}</span>
                   <Link
                     to={`/tracking?tab=delivery&ref=${orderResult.order_ref}`}
                     className="font-semibold text-primary hover:underline cursor-pointer"
@@ -772,8 +815,8 @@ export default function TrackingPage() {
               {/* Confirmation code — visible to customer */}
               {orderResult.confirmation_code && orderResult.status !== "delivered" && (
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
-                  <p className="text-xs font-semibold text-foreground">🔐 Votre code de confirmation</p>
-                  <p className="text-[11px] text-muted-foreground">Présentez ce code lors de la réception de votre colis.</p>
+                  <p className="text-xs font-semibold text-foreground">{t("tracking.confirmationCodeTitle")}</p>
+                  <p className="text-[11px] text-muted-foreground">{t("tracking.confirmationCodeDesc")}</p>
                   <div className="bg-background border border-border rounded-lg px-4 py-3 text-center">
                     <span className="font-mono font-bold text-xl tracking-[0.3em] text-primary">{orderResult.confirmation_code}</span>
                   </div>
@@ -811,15 +854,15 @@ export default function TrackingPage() {
                   {orderResult.delivery_choice === "home_delivery" ? (
                     <>
                       <Home size={14} className="text-primary shrink-0" />
-                      <span className="text-foreground">Livraison à domicile</span>
+                      <span className="text-foreground">{t("tracking.choiceInfo.home")}</span>
                       {orderResult.last_mile_fee && orderResult.last_mile_fee > 0 && (
-                        <span className="text-muted-foreground ml-1">— ${orderResult.last_mile_fee.toFixed(2)}</span>
+                        <span className="text-muted-foreground ml-1">— {formatPrice(orderResult.last_mile_fee)}</span>
                       )}
                     </>
                   ) : (
                     <>
                       <Store size={14} className="text-primary shrink-0" />
-                      <span className="text-foreground">Récupération au Hub</span>
+                      <span className="text-foreground">{t("tracking.choiceInfo.pickup")}</span>
                     </>
                   )}
                 </div>
@@ -829,7 +872,7 @@ export default function TrackingPage() {
               {orderResult.delivery_id && (
                 <div className="border-t border-border pt-4">
                   <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <Bike size={16} className="text-primary" /> Suivi en direct — GPS bidirectionnel
+                    <Bike size={16} className="text-primary" /> {t("tracking.live.title")}
                   </h3>
                   <LiveRiderMap deliveryId={orderResult.delivery_id} orderId={orderResult.id} userId={user?.id} />
                 </div>
@@ -837,7 +880,7 @@ export default function TrackingPage() {
 
               {/* Rider profile visible to customer */}
               {orderResult.assigned_rider_id && orderResult.status === "out_for_delivery" && (
-                <RiderProfileBanner riderId={orderResult.assigned_rider_id} riderName={orderResult.assigned_rider_name || "Livreur"} />
+                <RiderProfileBanner riderId={orderResult.assigned_rider_id} riderName={orderResult.assigned_rider_name || t("tracking.rider.default")} />
               )}
 
               {/* Ephemeral chat during delivery */}
@@ -845,7 +888,7 @@ export default function TrackingPage() {
                 <DeliveryChat
                   orderId={orderResult.id}
                   deliveryId={orderResult.delivery_id}
-                  otherPartyName={orderResult.assigned_rider_name || "Votre livreur"}
+                  otherPartyName={orderResult.assigned_rider_name || t("tracking.rider.defaultChat")}
                 />
               )}
 
@@ -854,7 +897,7 @@ export default function TrackingPage() {
                 <RiderRatingModal
                   orderId={orderResult.id}
                   riderId={orderResult.assigned_rider_id}
-                  riderName={orderResult.assigned_rider_name || "Livreur"}
+                  riderName={orderResult.assigned_rider_name || t("tracking.rider.default")}
                   userId={user.id}
                   deliveryId={orderResult.delivery_id}
                   tippingEnabled={tippingEnabled}
@@ -867,17 +910,17 @@ export default function TrackingPage() {
               <div className="grid grid-cols-2 gap-4 text-sm border-t border-border pt-4">
                 <div>
                   <span className="text-muted-foreground">{t("cart.total")}</span>
-                  <p className="font-semibold text-foreground">${orderResult.total.toFixed(2)}</p>
+                  <p className="font-semibold text-foreground">{formatPrice(orderResult.total)}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Date</span>
+                  <span className="text-muted-foreground">{t("tracking.dateLabel")}</span>
                   <p className="font-medium text-foreground">
-                    {new Date(orderResult.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                    {new Date(orderResult.created_at).toLocaleDateString(dateLocale, { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                 </div>
                 {/* Full address */}
                 <div className="col-span-2">
-                  <span className="text-muted-foreground">Adresse de livraison</span>
+                  <span className="text-muted-foreground">{t("tracking.address")}</span>
                   <p className="font-medium text-foreground">
                     {[orderResult.shipping_address, orderResult.shipping_city, orderResult.shipping_country].filter(Boolean).join(", ") || "—"}
                   </p>
@@ -887,7 +930,7 @@ export default function TrackingPage() {
               {/* History log */}
               {orderResult.history.length > 0 && (
                 <div className="border-t border-border pt-4">
-                  <h3 className="text-sm font-semibold text-foreground mb-3">Historique</h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-3">{t("tracking.history")}</h3>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {[...orderResult.history].reverse().map((h, i) => {
                       const cfg = STATUS_CONFIG[h.status];
@@ -899,7 +942,7 @@ export default function TrackingPage() {
                             {h.notes && <span className="text-muted-foreground ml-1">— {h.notes}</span>}
                           </div>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {new Date(h.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                            {new Date(h.created_at).toLocaleDateString(dateLocale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                           </span>
                         </div>
                       );
@@ -911,7 +954,7 @@ export default function TrackingPage() {
               {/* Real-time indicator */}
               <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t border-border">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Mis à jour en temps réel
+                {t("tracking.realtimeUpdate")}
               </div>
             </CardContent>
           </Card>
@@ -940,13 +983,13 @@ export default function TrackingPage() {
               </div>
               <Timeline steps={SHIPMENT_STEPS} currentStatus={shipment.status} />
               <div className="grid grid-cols-2 gap-4 text-sm border-t border-border pt-4">
-                <div><span className="text-muted-foreground">Mode</span><p className="font-medium text-foreground capitalize">{shipment.mode}</p></div>
-                <div><span className="text-muted-foreground">Articles</span><p className="font-medium text-foreground">{shipment.items_count}</p></div>
-                <div><span className="text-muted-foreground">ETA</span><p className="font-medium text-foreground">{shipment.eta || "—"}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.shipmentDetails.mode")}</span><p className="font-medium text-foreground capitalize">{shipment.mode}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.shipmentDetails.items")}</span><p className="font-medium text-foreground">{shipment.items_count}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.eta")}</span><p className="font-medium text-foreground">{shipment.eta || "—"}</p></div>
                 <div>
-                  <span className="text-muted-foreground">Mise à jour</span>
+                  <span className="text-muted-foreground">{t("tracking.shipmentDetails.update")}</span>
                   <p className="font-medium text-foreground">
-                    {new Date(shipment.updated_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    {new Date(shipment.updated_at).toLocaleDateString(dateLocale, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
               </div>
@@ -977,13 +1020,13 @@ export default function TrackingPage() {
               </div>
               <Timeline steps={DELIVERY_STEPS} currentStatus={delivery.status} />
               <div className="grid grid-cols-2 gap-4 text-sm border-t border-border pt-4">
-                <div><span className="text-muted-foreground">Client</span><p className="font-medium text-foreground">{delivery.customer_name}</p></div>
-                <div><span className="text-muted-foreground">Date</span><p className="font-medium text-foreground">{new Date(delivery.delivery_date).toLocaleDateString("fr-FR")}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.client")}</span><p className="font-medium text-foreground">{delivery.customer_name}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.dateLabel")}</span><p className="font-medium text-foreground">{new Date(delivery.delivery_date).toLocaleDateString(dateLocale)}</p></div>
                 {delivery.delivered_at && (
                   <div className="col-span-2">
                     <span className="text-muted-foreground">{t("tracking.delivered")}</span>
                     <p className="font-medium text-foreground">
-                      {new Date(delivery.delivered_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {new Date(delivery.delivered_at).toLocaleDateString(dateLocale, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
                 )}
@@ -1023,18 +1066,18 @@ export default function TrackingPage() {
                     <p className="text-sm font-medium text-foreground">{event.description}</p>
                     <p className="text-xs text-muted-foreground">
                       {event.location && `${event.location} — `}
-                      {event.timestamp && new Date(event.timestamp).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {event.timestamp && new Date(event.timestamp).toLocaleDateString(dateLocale, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
                 ))}
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm border-t border-border pt-4">
-                <div><span className="text-muted-foreground">Transporteur</span><p className="font-medium text-foreground">{globalResult.carrier}</p></div>
-                <div><span className="text-muted-foreground">ETA</span><p className="font-medium text-foreground">{globalResult.estimated_delivery || "—"}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.carrier")}</span><p className="font-medium text-foreground">{globalResult.carrier}</p></div>
+                <div><span className="text-muted-foreground">{t("tracking.eta")}</span><p className="font-medium text-foreground">{globalResult.estimated_delivery || "—"}</p></div>
                 <div className="col-span-2">
-                  <span className="text-muted-foreground">Mise à jour</span>
+                  <span className="text-muted-foreground">{t("tracking.shipmentDetails.update")}</span>
                   <p className="font-medium text-foreground">
-                    {new Date(globalResult.last_update).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    {new Date(globalResult.last_update).toLocaleDateString(dateLocale, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
               </div>

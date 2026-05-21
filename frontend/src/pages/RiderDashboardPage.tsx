@@ -15,6 +15,7 @@ import { generateConfirmationCode } from "@/components/vendor/OrderTransitionMod
 import { STATUS_CONFIG } from "@/lib/order-status";
 import { DeliveryChat } from "@/components/delivery/DeliveryChat";
 import { fromTable } from "@/lib/supabase-helpers";
+import { PickupCodeWidget } from "@/components/logistics/PickupCodeWidget";
 
 type DeliveryStatus = "pending" | "in_progress" | "delivered";
 const statusLabels: Record<DeliveryStatus, string> = { pending: "À livrer", in_progress: "En cours", delivered: "Livré" };
@@ -334,8 +335,8 @@ export default function RiderDashboardPage() {
         const path = `signatures/${id}-${Date.now()}.png`;
         const { error: sigErr } = await supabase.storage.from("delivery-proofs").upload(path, blob, { cacheControl: "31536000" });
         if (!sigErr) {
-          const { data: urlData } = supabase.storage.from("delivery-proofs").getPublicUrl(path);
-          updates.signature_url = urlData.publicUrl;
+          // Bucket privé : on stocke le path. L'affichage utilise getDeliveryProofUrl().
+          updates.signature_url = path;
         }
       }
 
@@ -344,8 +345,7 @@ export default function RiderDashboardPage() {
         const path = `photos/${id}-${Date.now()}.${ext}`;
         const { error: photoErr } = await supabase.storage.from("delivery-proofs").upload(path, proofPhoto, { cacheControl: "31536000" });
         if (!photoErr) {
-          const { data: urlData } = supabase.storage.from("delivery-proofs").getPublicUrl(path);
-          updates.proof_photo_url = urlData.publicUrl;
+          updates.proof_photo_url = path;
         }
       }
 
@@ -592,6 +592,13 @@ export default function RiderDashboardPage() {
                                 <Banknote size={14} /> Confirmer paiement cash reçu
                               </button>
                             )}
+                          </div>
+                        )}
+
+                        {/* Pickup code (hub → rider handoff, Phase 10.5) */}
+                        {["arrived_at_hub", "ready_for_pickup", "at_hub"].includes(o.status) && (
+                          <div className="border-t border-border pt-3">
+                            <PickupCodeWidget orderId={o.id} mode="rider" />
                           </div>
                         )}
 

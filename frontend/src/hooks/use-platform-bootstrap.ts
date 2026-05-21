@@ -43,6 +43,11 @@ export function usePlatformBootstrap() {
             "ui_config",
             "visual_search_enabled",
             "maintenance_mode",
+            "cookie_settings",
+            "cms_texts",
+            "app_promo",
+            "referral_settings",
+            "seo_enabled",
           ]);
         const map: PlatformSettingsMap = {};
         for (const row of data ?? []) map[(row as any).key] = (row as any).value;

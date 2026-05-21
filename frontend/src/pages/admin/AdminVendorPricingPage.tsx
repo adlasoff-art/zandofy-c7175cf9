@@ -1,7 +1,8 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Search, Store, Save, Loader2, ShieldAlert, Settings } from "lucide-react";
+import { Search, Store, Save, Loader2, ShieldAlert, Settings, Plus, Trash2 } from "lucide-react";
 import { AdminCreateStoreDialog } from "@/components/admin/AdminCreateStoreDialog";
 import { AdminWebhookRequests } from "@/components/admin/AdminWebhookRequests";
+import { FreightSimulatorToggle } from "@/components/admin/vendor-pricing/FreightSimulatorToggle";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,14 +14,29 @@ function GlobalPricingDefaults({ defaults }: { defaults: any }) {
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [txFee, setTxFee] = useState<string>("");
+  const defaultTiers = [
+    { max_cost: 10, multiplier: 3.0 },
+    { max_cost: 30, multiplier: 2.5 },
+    { max_cost: 80, multiplier: 2.0 },
+    { max_cost: 200, multiplier: 1.5 },
+    { max_cost: null as number | null, multiplier: 1.3 },
+  ];
+  const [tiers, setTiers] = useState<{ max_cost: number | null; multiplier: number }[]>(
+    Array.isArray(defaults?.tiers) && defaults.tiers.length > 0 ? defaults.tiers : defaultTiers
+  );
 
   const currentFee = txFee || String(defaults?.transaction_fee_pct ?? 5);
 
   const handleSave = async () => {
     setSaving(true);
+    // Validate tiers: max_cost ascending, exactly one null at the end
+    const cleaned = tiers
+      .map((t) => ({ max_cost: t.max_cost === null || t.max_cost === undefined ? null : Number(t.max_cost), multiplier: Number(t.multiplier) }))
+      .filter((t) => !Number.isNaN(t.multiplier) && t.multiplier > 0);
     const newValue = {
       ...defaults,
       transaction_fee_pct: Number(currentFee) || 5,
+      tiers: cleaned,
     };
     const { error } = await supabase
       .from("platform_settings")
@@ -47,7 +63,7 @@ function GlobalPricingDefaults({ defaults }: { defaults: any }) {
           <input type="number" value={defaults?.margin_pct ?? 15} readOnly className="w-full px-2 py-1.5 text-sm bg-muted/50 border border-border rounded-md cursor-not-allowed" />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground block mb-1">Multiplicateur</label>
+          <label className="text-xs text-muted-foreground block mb-1">Multiplicateur (de base)</label>
           <input type="number" value={defaults?.multiplier ?? 3} readOnly className="w-full px-2 py-1.5 text-sm bg-muted/50 border border-border rounded-md cursor-not-allowed" />
         </div>
         <div>
@@ -72,6 +88,66 @@ function GlobalPricingDefaults({ defaults }: { defaults: any }) {
             {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
             Sauvegarder
           </button>
+        </div>
+      </div>
+
+      {/* Degressive multiplier tiers */}
+      <div className="border-t border-border pt-3 mt-2 space-y-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-foreground">Multiplicateur dégressif (par tranche de coût d'achat)</p>
+            <p className="text-[10px] text-muted-foreground">Le multiplicateur s'ajuste selon le coût d'achat. Laissez la dernière ligne avec coût max vide (= ∞).</p>
+          </div>
+          <button
+            onClick={() => setTiers((t) => [...t.slice(0, -1), { max_cost: (t[t.length - 2]?.max_cost ?? 0) + 50, multiplier: 1.5 }, t[t.length - 1] || { max_cost: null, multiplier: 1.3 }])}
+            className="text-xs flex items-center gap-1 px-2 py-1 border border-border rounded-md hover:bg-muted"
+          >
+            <Plus size={12} /> Ajouter une tranche
+          </button>
+        </div>
+        <div className="space-y-1.5">
+          {tiers.map((tier, idx) => {
+            const isLast = idx === tiers.length - 1;
+            return (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-20">{isLast ? "≥ dernier" : "Coût <"}</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={tier.max_cost ?? ""}
+                  placeholder={isLast ? "∞" : "10"}
+                  disabled={isLast}
+                  onChange={(e) => {
+                    const v = e.target.value === "" ? null : Number(e.target.value);
+                    setTiers((arr) => arr.map((t, i) => i === idx ? { ...t, max_cost: v } : t));
+                  }}
+                  className="w-24 px-2 py-1 text-xs bg-muted border border-border rounded-md disabled:opacity-50"
+                />
+                <span className="text-xs text-muted-foreground">×</span>
+                <input
+                  type="number"
+                  min={0.1}
+                  step={0.1}
+                  value={tier.multiplier}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    setTiers((arr) => arr.map((t, i) => i === idx ? { ...t, multiplier: v } : t));
+                  }}
+                  className="w-20 px-2 py-1 text-xs bg-muted border border-border rounded-md"
+                />
+                {!isLast && tiers.length > 2 && (
+                  <button
+                    onClick={() => setTiers((arr) => arr.filter((_, i) => i !== idx))}
+                    className="p-1 text-destructive hover:text-destructive/80"
+                    title="Supprimer la tranche"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -344,6 +420,9 @@ export default function AdminVendorPricingPage() {
       <div className="space-y-4 max-w-4xl">
         {/* Global defaults section */}
         <GlobalPricingDefaults defaults={globalDefaults} />
+
+        {/* Vendor features toggles */}
+        <FreightSimulatorToggle />
 
         {/* Webhook API requests pending approval */}
         <AdminWebhookRequests />

@@ -8,6 +8,7 @@ import {
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { toast } from "sonner";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
+import { SearchableCombobox } from "@/components/ui/SearchableCombobox";
 import { MediaUploader } from "@/components/vendor/MediaUploader";
 import { ShippingEstimator } from "@/components/vendor/ShippingEstimator";
 import { PromotionTimer } from "@/components/vendor/PromotionTimer";
@@ -15,6 +16,7 @@ import { ProductVariantsEditor, type SizeVariant, type ColorVariant, type Dynami
 import { PricingCalculator } from "@/components/vendor/PricingCalculator";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
+import { generateProductSlug } from "@/utils/productSlug";
 
 interface Supplier {
   id: string;
@@ -426,9 +428,19 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     }
     setSaving(true);
 
+    // Generate or refresh the URL slug from the (French) name so product
+    // pages render as /product/<slug> instead of /product/<uuid>.
+    const displayName = form.name_fr || form.name;
+    const needsNewSlug =
+      !editing || !(editing as any).slug || (editing as any).name_fr !== displayName;
+    const slug = needsNewSlug
+      ? await generateProductSlug(displayName, editing?.id)
+      : (editing as any).slug;
+
     const payload = {
       name: form.name || form.name_fr,
       name_fr: form.name_fr,
+      slug,
       price: form.price,
       original_price: form.original_price || null,
       currency: form.currency,
@@ -643,6 +655,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             price={form.price}
             originalPrice={form.original_price}
             storeId={storeId}
+            categoryId={form.category_id || undefined}
             onCostRealChange={(v) => setForm((f) => ({ ...f, cost_real: v }))}
             onCostCalcChange={(v) => setForm((f) => ({ ...f, cost_calc: v }))}
             onAutoPricingChange={(v) => setForm((f) => ({ ...f, auto_pricing_enabled: v }))}
@@ -684,62 +697,60 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             <Field label="Taille du mannequin (ex: M, XL, 42)" value={form.model_size} onChange={(v) => setForm({ ...form, model_size: v })} />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground">Catégorie</label>
-            <select
-              className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md"
+            <SearchableCombobox
+              label="Catégorie"
+              placeholder="— Aucune —"
+              noneLabel="— Aucune —"
+              searchPlaceholder="Rechercher une catégorie..."
               value={form.category_id}
-              onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-            >
-              <option value="">— Aucune —</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name_fr}</option>
-              ))}
-            </select>
+              onChange={(v) => setForm({ ...form, category_id: v })}
+              options={categories.map((c) => ({ value: c.id, label: c.name_fr }))}
+            />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground">Tag Tendance</label>
-            <select
-              className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md"
+            <SearchableCombobox
+              label="Tag Tendance"
+              placeholder="— Aucun —"
+              noneLabel="— Aucun —"
+              searchPlaceholder="Rechercher un tag..."
               value={form.trend_tag_id}
-              onChange={(e) => setForm({ ...form, trend_tag_id: e.target.value })}
-            >
-              <option value="">— Aucun —</option>
-              {trendTags.map((t) => (
-                <option key={t.id} value={t.id}>{t.name_fr}</option>
-              ))}
-            </select>
+              onChange={(v) => setForm({ ...form, trend_tag_id: v })}
+              options={trendTags.map((t) => ({ value: t.id, label: t.name_fr }))}
+            />
           </div>
           {suppliersEnabled && (
           <div className="space-y-2">
-            <label className="text-xs text-muted-foreground">🏭 Fournisseur</label>
-            <div className="relative mt-1">
-              <select
-                className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md"
-                value={form.supplier_id}
-                onChange={(e) => {
-                  const newSupplierId = e.target.value;
-                  setForm({ ...form, supplier_id: newSupplierId, supplier_product_id: "" });
-                  if (newSupplierId) {
-                    setLoadingSupplierProducts(true);
-                    (supabase as any)
-                      .from("supplier_products")
-                      .select("id, label, product_url, image_url")
-                      .eq("supplier_id", newSupplierId)
-                      .order("position")
-                      .then(({ data }: any) => {
-                        setSupplierProductOptions(data || []);
-                        setLoadingSupplierProducts(false);
-                      });
-                  } else {
-                    setSupplierProductOptions([]);
-                  }
-                }}
-              >
-                <option value="">— Aucun —</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.agent_name}{s.platform_name ? ` (${s.platform_name})` : ""}</option>
-                ))}
-              </select>
+            <SearchableCombobox
+              label="🏭 Fournisseur"
+              placeholder="— Aucun —"
+              noneLabel="— Aucun —"
+              searchPlaceholder="Rechercher un fournisseur..."
+              value={form.supplier_id}
+              onChange={(newSupplierId) => {
+                setForm({ ...form, supplier_id: newSupplierId, supplier_product_id: "" });
+                if (newSupplierId) {
+                  setLoadingSupplierProducts(true);
+                  (supabase as any)
+                    .from("supplier_products")
+                    .select("id, label, product_url, image_url")
+                    .eq("supplier_id", newSupplierId)
+                    .order("position")
+                    .then(({ data }: any) => {
+                      setSupplierProductOptions(data || []);
+                      setLoadingSupplierProducts(false);
+                    });
+                } else {
+                  setSupplierProductOptions([]);
+                }
+              }}
+              options={suppliers.map((s) => ({
+                value: s.id,
+                label: s.agent_name,
+                sublabel: s.platform_name || undefined,
+                imageUrl: s.product_image_url || undefined,
+              }))}
+            />
+            <div className="relative">
               {/* Supplier thumbnail preview */}
               {form.supplier_id && (() => {
                 const sel = suppliers.find(s => s.id === form.supplier_id);
@@ -835,7 +846,23 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             <label className="text-xs font-semibold text-foreground">📦 Poids & Dimensions (pour estimation fret)</label>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Poids (grammes)" type="number" value={String(form.weight_grams)} onChange={(v) => setForm({ ...form, weight_grams: Number(v) })} />
+            <div>
+              <Field
+                label="Poids unitaire en grammes (ex : 100 g = 0,1 kg)"
+                type="number"
+                value={String(form.weight_grams)}
+                onChange={(v) => setForm({ ...form, weight_grams: Number(v) })}
+              />
+              {form.weight_grams >= 1000 && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 flex items-start gap-1">
+                  <span>⚠️</span>
+                  <span>
+                    Vous avez saisi <strong>{form.weight_grams} g</strong> ({(form.weight_grams / 1000).toFixed(2)} kg) pour <em>une seule unité</em>.
+                    Si l'article pèse moins de 1 kg, divisez par 1000 (ex&nbsp;: 1 kg = 1000 g, 100 g = 100).
+                  </span>
+                </p>
+              )}
+            </div>
             <Field label="Longueur (cm)" type="number" value={String(form.length_cm)} onChange={(v) => setForm({ ...form, length_cm: Number(v) })} />
           </div>
           <div className="grid grid-cols-2 gap-3">

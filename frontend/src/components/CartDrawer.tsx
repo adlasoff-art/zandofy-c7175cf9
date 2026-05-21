@@ -6,8 +6,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Minus, Plus, Trash2, ShoppingBag, CheckSquare, Square } from "lucide-react";
+import { imgUrl } from "@/lib/image-url";
 import { Link } from "react-router-dom";
 import { CartItemVariantEditor } from "@/components/CartItemVariantEditor";
+import { CartFreightPreview } from "@/components/cart/CartFreightPreview";
 
 export function CartDrawer() {
   const {
@@ -16,7 +18,7 @@ export function CartDrawer() {
     toggleSelected, selectAll, deselectAll,
   } = useCart();
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t, formatPrice } = useI18n();
 
   const allSelected = items.length > 0 && items.every(i => i.selected);
   const noneSelected = items.every(i => !i.selected);
@@ -70,7 +72,7 @@ export function CartDrawer() {
                       onCheckedChange={() => toggleSelected(item.id)}
                     />
                   </div>
-                  <img src={item.image} alt={item.nameFr} className="w-20 h-24 object-cover rounded-sm shrink-0" />
+                  <img src={imgUrl(item.image, { width: 160 })} alt={item.nameFr} className="w-20 h-24 object-cover rounded-sm shrink-0" loading="lazy" decoding="async" />
                   <div className="flex-1 min-w-0 space-y-1">
                     <p className="text-sm font-medium text-foreground line-clamp-2">{item.nameFr}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -86,7 +88,7 @@ export function CartDrawer() {
                       {item.size && <span>{t("search.size")}: {item.size}</span>}
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-foreground">${(item.price * item.quantity).toFixed(2)}</span>
+                      <span className="font-bold text-foreground">{formatPrice(item.price * item.quantity)}</span>
                       <div className="flex items-center gap-1">
                         <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-7 h-7 flex items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground">
                           <Minus size={14} />
@@ -118,8 +120,16 @@ export function CartDrawer() {
             <div className="border-t border-border pt-4 space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t("cart.subtotal")} ({selectedCount} {t("cart.selected")})</span>
-                <span className="font-bold text-foreground">${selectedSubtotal.toFixed(2)}</span>
+                <span className="font-bold text-foreground">{formatPrice(selectedSubtotal)}</span>
               </div>
+              {user && selectedCount > 0 && (
+                <CartFreightPreview
+                  userId={user.id}
+                  items={items
+                    .filter((i) => i.selected && i.productId)
+                    .map((i) => ({ productId: i.productId, quantity: i.quantity }))}
+                />
+              )}
               <p className="text-xs text-muted-foreground">{t("cart.shippingAtCheckout")}</p>
               {noneSelected ? (
                 <Button className="w-full h-12 font-bold" disabled>
@@ -127,7 +137,7 @@ export function CartDrawer() {
                 </Button>
               ) : (
                 <Link to="/checkout" onClick={() => setDrawerOpen(false)}>
-                  <Button className="w-full h-12 font-bold">{t("cart.order")} ({selectedCount}) — ${selectedSubtotal.toFixed(2)}</Button>
+                  <Button className="w-full h-12 font-bold">{t("cart.order")} ({selectedCount}) — {formatPrice(selectedSubtotal)}</Button>
                 </Link>
               )}
             </div>

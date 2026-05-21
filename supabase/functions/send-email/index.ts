@@ -1,4 +1,4 @@
-import nodemailer from "npm:nodemailer@6.9.16";
+import { sendEmail } from "../_shared/email.ts";
 
 const ALLOWED_HEADERS =
   "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
@@ -116,35 +116,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const smtpHost = Deno.env.get("SMTP_HOST");
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-    const smtpUser = Deno.env.get("SMTP_USER");
-    const smtpPass = Deno.env.get("SMTP_PASS");
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-
-    if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
-      return new Response(
-        JSON.stringify({ error: "SMTP configuration is incomplete" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const transport = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-    });
-
-    await transport.sendMail({
-      from: fromEmail,
-      to,
+    await sendEmail({      to,
       subject,
       html,
     });

@@ -1,9 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Homepage -->
   <url><loc>https://zandofy.com/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+
+  <!-- Top-level navigation (sitelinks candidates) -->
+  <url><loc>https://zandofy.com/stores</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://zandofy.com/popular</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://zandofy.com/trends</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://zandofy.com/search</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://zandofy.com/blog</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://zandofy.com/help</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://zandofy.com/affiliate-program</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://zandofy.com/loyalty-program</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://zandofy.com/become-vendor</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://zandofy.com/about</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://zandofy.com/faq</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://zandofy.com/careers</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://zandofy.com/pricing</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://zandofy.com/social-responsibility</loc><changefreq>yearly</changefreq><priority>0.5</priority></url>
   <url><loc>https://zandofy.com/terms</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
   <url><loc>https://zandofy.com/privacy</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
-  <url><loc>https://zandofy.com/search</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
 </urlset>

@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 import { Bell, X } from "lucide-react";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/contexts/I18nContext";
 
 export function PushPermissionPrompt() {
   const { supported, permission, isSubscribed, loading, subscribe } = usePushNotifications();
+  const { t } = useI18n();
   const [dismissed, setDismissed] = useState(false);
   const [visible, setVisible] = useState(false);
 
@@ -45,16 +47,14 @@ export function PushPermissionPrompt() {
           <Bell size={18} className="text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-foreground">Activer les notifications</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Recevez des alertes en temps réel sur vos commandes, livraisons et promotions.
-          </p>
+          <p className="text-sm font-bold text-foreground">{t("push.prompt.title")}</p>
+          <p className="text-xs text-muted-foreground mt-1">{t("push.prompt.desc")}</p>
           <div className="flex gap-2 mt-3">
             <Button size="sm" onClick={handleAccept} disabled={loading} className="text-xs">
-              {loading ? "Activation…" : "Activer"}
+              {loading ? t("push.prompt.activating") : t("push.prompt.activate")}
             </Button>
             <Button size="sm" variant="ghost" onClick={handleDismiss} className="text-xs">
-              Plus tard
+              {t("push.prompt.later")}
             </Button>
           </div>
         </div>

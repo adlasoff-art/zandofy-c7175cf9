@@ -14,12 +14,19 @@ import { UserSearchSelect, type SelectedUser } from "@/components/admin/notifica
 import { SmsConfigPanel } from "@/components/admin/notifications/SmsConfigPanel";
 import { CampaignsPanel } from "@/components/admin/notifications/CampaignsPanel";
 import { ensureFreshSession, parseEdgeFunctionError } from "@/services/admin-email";
+import { PwaUpdateBroadcastCard } from "@/components/admin/PwaUpdateBroadcastCard";
 
 type Channel = "push" | "email" | "sms";
-type Audience = "all" | "vendors" | "shippers" | "riders" | "customers";
+type Audience = "all" | "vendors" | "forwarders" | "shippers" | "operators" | "riders" | "customers";
 
 const audienceToRole: Record<Audience, string | null> = {
-  all: null, vendors: "vendor", shippers: "shipper", riders: "rider", customers: null,
+  all: null,
+  vendors: "vendor",
+  forwarders: "forwarder",
+  shippers: "shipper",
+  operators: "operator",
+  riders: "rider",
+  customers: null,
 };
 
 const db = supabase as any;
@@ -48,7 +55,9 @@ export default function AdminNotificationsPage() {
   const audienceOptions: { key: Audience; label: string; icon: React.ElementType }[] = [
     { key: "all", label: "Tous", icon: Users },
     { key: "vendors", label: "Vendeurs", icon: Store },
-    { key: "shippers", label: "Transporteurs", icon: Truck },
+    { key: "forwarders", label: "Transitaires", icon: Truck },
+    { key: "shippers", label: "Hubs locaux", icon: Truck },
+    { key: "operators", label: "Entreprises de livraison", icon: Truck },
     { key: "riders", label: "Livreurs", icon: Bike },
     { key: "customers", label: "Clients", icon: Users },
   ];
@@ -237,6 +246,7 @@ export default function AdminNotificationsPage() {
           <TabsTrigger value="campaigns" className="text-xs gap-1"><Calendar size={12} /> Campagnes auto</TabsTrigger>
           <TabsTrigger value="sms-config" className="text-xs gap-1"><Settings size={12} /> Config SMS</TabsTrigger>
           <TabsTrigger value="deliverability" className="text-xs gap-1"><TestTube size={12} /> Test email</TabsTrigger>
+          <TabsTrigger value="pwa-update" className="text-xs gap-1"><Bell size={12} /> Mise à jour PWA</TabsTrigger>
         </TabsList>
 
         {/* ── Tab: Compose & Send ── */}
@@ -441,6 +451,11 @@ export default function AdminNotificationsPage() {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        {/* ── Tab: PWA Update Broadcast ── */}
+        <TabsContent value="pwa-update">
+          <PwaUpdateBroadcastCard />
         </TabsContent>
       </Tabs>
     </AdminLayout>

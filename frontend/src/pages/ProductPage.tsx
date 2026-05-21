@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchProductBySlug, fetchProducts, fetchPricingTiers, type Product } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
+import { imgUrl, imgSrcSet } from "@/lib/image-url";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { Footer } from "@/components/Footer";
@@ -39,6 +40,7 @@ import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimat
 import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd, buildJsonLdGraph } from "@/components/SEOHead";
 import { optimizeImageUrl } from "@/utils/image-url";
 import { VariantOrderDrawer } from "@/components/VariantOrderDrawer";
+import { slugify } from "@/utils/slugify";
 
 // ─── Gallery from product_images ──────────────────────────────
 interface GalleryItem {
@@ -72,7 +74,7 @@ const SIZE_REGIONS: Record<string, string[]> = {
 
 // ─── Component ─────────────────────────────────
 export default function ProductPage() {
-  const { t } = useI18n();
+  const { t, formatPrice } = useI18n();
   const { addItem } = useCart();
   const { toast } = useToast();
   const { isInWishlist, toggleWishlist } = useWishlist();
@@ -81,6 +83,7 @@ export default function ProductPage() {
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedDynamic, setSelectedDynamic] = useState<Record<string, string>>({});
   const [sizeRegion, setSizeRegion] = useState("EU");
   const [copied, setCopied] = useState(false);
   const wishlisted = id ? isInWishlist(id) : false;
@@ -239,9 +242,10 @@ export default function ProductPage() {
     sku: product.sku,
     storeName: (product as any).store?.name,
   });
+  const categorySlug = slugify(product.category || product.categoryFr || "produit");
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
-    { name: "Accueil", url: "/" },
-    { name: product.categoryFr || "Produit", url: `/category/${(product.categoryFr || "produit").toLowerCase()}` },
+    { name: t("general.home") || "Accueil", url: "/" },
+    { name: product.categoryFr || "Produit", url: `/category/${categorySlug}` },
     { name: product.nameFr || "Produit", url: `/product/${product.slug || product.id}` },
   ]);
 
@@ -260,9 +264,9 @@ export default function ProductPage() {
         {/* Breadcrumbs */}
         <Breadcrumb className="mb-4">
           <BreadcrumbList>
-            <BreadcrumbItem><BreadcrumbLink asChild><Link to="/">Accueil</Link></BreadcrumbLink></BreadcrumbItem>
+            <BreadcrumbItem><BreadcrumbLink asChild><Link to="/">{t("general.home") || "Accueil"}</Link></BreadcrumbLink></BreadcrumbItem>
             <BreadcrumbSeparator />
-            <BreadcrumbItem><BreadcrumbLink href="#">{product.categoryFr}</BreadcrumbLink></BreadcrumbItem>
+            <BreadcrumbItem><BreadcrumbLink asChild><Link to={`/category/${categorySlug}`}>{product.categoryFr}</Link></BreadcrumbLink></BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem><BreadcrumbPage>{product.nameFr}</BreadcrumbPage></BreadcrumbItem>
           </BreadcrumbList>
@@ -276,7 +280,7 @@ export default function ProductPage() {
             productId={product.id}
             originCountry={product.originCountry}
             productSku={product.sku}
-            productPrice={`$${currentUnitPrice.toFixed(2)}`}
+            productPrice={formatPrice(currentUnitPrice)}
             productImage={gallery[0]?.url || product.image}
           />
         )}
@@ -297,6 +301,7 @@ export default function ProductPage() {
                         <Camera size={14} className="text-muted-foreground" />
                       </div>
                     ) : (
+<<<<<<< HEAD
                       <img
                         src={optimizeImageUrl(item.url, 120)}
                         alt={`Vue ${i + 1}`}
@@ -304,6 +309,9 @@ export default function ProductPage() {
                         loading="lazy"
                         decoding="async"
                       />
+=======
+                      <img src={imgUrl(item.url, { width: 160 })} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+>>>>>>> origin/main
                     )}
                   </button>
                 ))}
@@ -366,6 +374,7 @@ export default function ProductPage() {
                             <Camera size={12} className="text-muted-foreground" />
                           </div>
                         ) : (
+<<<<<<< HEAD
                           <img
                         src={optimizeImageUrl(item.url, 120)}
                         alt={`Vue ${i + 1}`}
@@ -373,6 +382,9 @@ export default function ProductPage() {
                         loading="lazy"
                         decoding="async"
                       />
+=======
+                          <img src={imgUrl(item.url, { width: 120 })} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+>>>>>>> origin/main
                         )}
                       </button>
                     ))}
@@ -388,31 +400,31 @@ export default function ProductPage() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm">
                     <ShieldCheck size={14} className="text-primary shrink-0" />
-                    <span className="text-muted-foreground">Garantie qualité Zandofy</span>
+                  <span className="text-muted-foreground">{t("product.qualityGuarantee")}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Truck size={14} className="text-primary shrink-0" />
                     <span className="text-muted-foreground">
                       {(product as any).shopType === "local"
-                        ? "🏪 En stock local · Livraison 1-2 jours"
-                        : "Expédition rapide sous 24-48h"}
+                      ? t("product.localStock")
+                      : t("product.fastShipping")}
                     </span>
                   </div>
                   {(product as any).shopType === "local" && (
                     <div className="flex items-center gap-2 text-sm">
                       <MapPin size={14} className="text-emerald-600 shrink-0" />
-                      <span className="text-emerald-600 font-medium">Stock physique disponible</span>
+                    <span className="text-emerald-600 font-medium">{t("product.physicalStockAvailable")}</span>
                     </div>
                   )}
                   {(product as any).store?.is_verified && (product as any).store?.verified_years > 0 && (
                     <div className="flex items-center gap-2 text-sm">
                       <Award size={14} className="text-primary shrink-0" />
-                      <span className="text-muted-foreground">Fournisseur vérifié avec {(product as any).store?.verified_years_override ?? (product as any).store?.verified_years}+ ans d'expérience</span>
+                    <span className="text-muted-foreground">{t("product.verifiedSupplier")} {(product as any).store?.verified_years_override ?? (product as any).store?.verified_years}+ {t("product.yearsExperience")}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2 text-sm">
                     <Users size={14} className="text-primary shrink-0" />
-                     <span className="text-muted-foreground">{product.reviewCount > 0 ? `${product.reviewCount.toLocaleString()}+ clients satisfaits` : "Soyez le premier à donner votre avis"}</span>
+                   <span className="text-muted-foreground">{product.reviewCount > 0 ? `${product.reviewCount.toLocaleString()}+ ${t("product.satisfiedCustomers")}` : t("product.beFirstReview")}</span>
                   </div>
                 </div>
               </div>
@@ -421,12 +433,13 @@ export default function ProductPage() {
               {relatedProducts && relatedProducts.length > 0 && (
                 <div className="border border-border rounded-sm p-4 space-y-2">
                   <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    💡 Articles similaires
+                  💡 {t("product.similarItems")}
                   </h3>
                   <div className="grid grid-cols-3 gap-2">
                     {relatedProducts.slice(0, 6).map((p) => (
                       <Link to={`/product/${(p as any).slug || p.id}`} key={p.id} className="group">
                         <div className="aspect-square rounded-sm overflow-hidden bg-muted">
+<<<<<<< HEAD
                           <img
                             src={optimizeImageUrl(p.image, 200)}
                             alt={p.nameFr}
@@ -434,12 +447,15 @@ export default function ProductPage() {
                             loading="lazy"
                             decoding="async"
                           />
+=======
+                          <img src={imgUrl(p.image, { width: 200 })} alt={p.nameFr} className="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" decoding="async" />
+>>>>>>> origin/main
                         </div>
                         <p className="text-xs text-foreground mt-1 truncate">{p.nameFr}</p>
                         <div className="flex items-center gap-1.5">
-                          <p className="text-xs font-semibold text-primary">${p.price.toFixed(2)}</p>
+                        <p className="text-xs font-semibold text-primary">{formatPrice(p.price)}</p>
                           {(p.salesCount ?? 0) > 0 && (
-                            <span className="text-[10px] text-muted-foreground">{p.salesCount} vendus</span>
+                          <span className="text-[10px] text-muted-foreground">{p.salesCount} {t("product.sold")}</span>
                           )}
                         </div>
                       </Link>
@@ -453,16 +469,16 @@ export default function ProductPage() {
           {/* ─── RIGHT: Product Info (sticky) ─── */}
           <div className="lg:sticky lg:top-4 lg:self-start space-y-4">
             {/* Title + Share */}
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 pb-3 border-b border-border/50">
               <h1 className="text-lg md:text-xl font-semibold text-foreground leading-tight flex-1 line-clamp-2">{product.nameFr}</h1>
               <Popover>
                 <PopoverTrigger asChild>
-                  <button className="shrink-0 w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" aria-label="Partager"><Share2 size={16} /></button>
+                  <button className="shrink-0 w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" aria-label={t("product.shareAria") || "Partager"}><Share2 size={16} /></button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-48 p-1">
                   {(() => {
                     const productUrl = `${window.location.origin}/product/${product.slug || product.id}`;
-                    const shareText = `${product.nameFr}${product.sku ? `\nSKU : ${product.sku}` : ""}${product.price ? `\nPrix : $${product.price.toFixed(2)}` : ""}\n${productUrl}`;
+                    const shareText = `${product.nameFr}${product.sku ? `\nSKU: ${product.sku}` : ""}${product.price ? `\n${formatPrice(product.price)}` : ""}\n${productUrl}`;
                     return (
                       <>
                         <a
@@ -490,12 +506,12 @@ export default function ProductPage() {
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(productUrl);
-                            toast({ title: "Lien copié !", description: "Le lien du produit a été copié dans le presse-papiers." });
+                            toast({ title: t("product.linkCopied") || "Lien copié !", description: t("product.linkCopiedDesc") || "Le lien du produit a été copié dans le presse-papiers." });
                           }}
                           className="flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors w-full"
                         >
                           <LinkIcon size={16} className="text-muted-foreground" />
-                          Copier le lien
+                          {t("product.copyLink") || "Copier le lien"}
                         </button>
                       </>
                     );
@@ -507,10 +523,10 @@ export default function ProductPage() {
             {/* SKU + Rating */}
             <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
               <span className="inline-flex items-center gap-1">{productSku}
-                <button onClick={copySku} className="text-primary hover:text-primary/80 transition-colors" aria-label="Copier le SKU">{copied ? <Check size={13} /> : <Copy size={13} />}</button>
+                <button onClick={copySku} className="text-primary hover:text-primary/80 transition-colors" aria-label={t("product.copySkuAria") || "Copier le SKU"}>{copied ? <Check size={13} /> : <Copy size={13} />}</button>
               </span>
               <span className="inline-flex items-center gap-1"><Star size={13} className="fill-accent text-accent" />{product.rating}</span>
-              <span>({product.reviewCount > 0 ? `${product.reviewCount.toLocaleString()} avis` : "0 avis"})</span>
+              <span>({product.reviewCount > 0 ? t("product.reviewsCount", { count: product.reviewCount.toLocaleString() }) : t("product.noReviews")})</span>
             </div>
 
             {/* Pricing - dynamic based on quantity tier */}
@@ -519,15 +535,15 @@ export default function ProductPage() {
                 <span className="text-sm">$</span><span className="text-3xl leading-none">{Math.floor(currentUnitPrice)}</span><span className="text-sm">.{(currentUnitPrice % 1).toFixed(2).slice(2)}</span>
               </span>
               {currentUnitPrice < product.price && (
-                <span className="text-base text-muted-foreground line-through">${product.price.toFixed(2)}</span>
+                <span className="text-base text-muted-foreground line-through">{formatPrice(product.price)}</span>
               )}
               {!tieredResult && product.originalPrice && (
-                <span className="text-base text-muted-foreground line-through">${product.originalPrice.toFixed(2)}</span>
+                <span className="text-base text-muted-foreground line-through">{formatPrice(product.originalPrice)}</span>
               )}
             {product.isSale && product.discount && <span className="text-sm font-bold text-sale bg-sale/10 px-2 py-0.5 rounded">-{product.discount}%</span>}
               {tieredResult && tieredResult.tier.discountValue > 0 && (
                 <span className="text-sm font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                  Palier {tieredResult.tier.tierLabel}
+                  {t("product.tierLabel", { label: tieredResult.tier.tierLabel })}
                 </span>
               )}
             </div>
@@ -538,12 +554,12 @@ export default function ProductPage() {
               className="w-full flex items-center justify-between px-4 py-3 bg-muted/50 hover:bg-muted rounded-lg border border-border transition-colors group"
             >
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-semibold text-foreground">Sélectionner les options</span>
+                <span className="text-sm font-semibold text-foreground">{t("product.selectOptions")}</span>
                 {(product.colors?.length ?? 0) > 0 && (
-                  <span className="text-xs text-muted-foreground">{product.colors!.length} couleur{product.colors!.length > 1 ? "s" : ""}</span>
+                  <span className="text-xs text-muted-foreground">{t("product.colorsCount", { count: product.colors!.length, plural: product.colors!.length > 1 ? "s" : "" })}</span>
                 )}
                 {(product.sizes?.length ?? 0) > 0 && (
-                  <span className="text-xs text-muted-foreground">· {product.sizes!.length} taille{product.sizes!.length > 1 ? "s" : ""}</span>
+                  <span className="text-xs text-muted-foreground">· {t("product.sizesCount", { count: product.sizes!.length, plural: product.sizes!.length > 1 ? "s" : "" })}</span>
                 )}
                 {((product as any).dynamicVariants || []).map((dv: any) => (
                   <span key={dv.typeId} className="text-xs text-muted-foreground">· {dv.options.length} {dv.typeName.toLowerCase()}{dv.options.length > 1 ? "s" : ""}</span>
@@ -574,7 +590,7 @@ export default function ProductPage() {
             {(product as any).sellerRank && (product as any).sellerRank <= 10 && (
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[hsl(var(--badge-bestseller))] border border-[hsl(var(--badge-bestseller-border))]">
                 <Award size={16} className="text-[hsl(var(--badge-bestseller-icon))]" />
-                <span className="font-semibold text-sm text-[hsl(var(--badge-bestseller-foreground))]">#{(product as any).sellerRank} Meilleur Fournisseur en {product.categoryFr}</span>
+                <span className="font-semibold text-sm text-[hsl(var(--badge-bestseller-foreground))]">{t("product.bestSupplierIn", { rank: (product as any).sellerRank, category: product.categoryFr })}</span>
               </div>
             )}
 
@@ -602,11 +618,11 @@ export default function ProductPage() {
             {product.colors && product.colors.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">Couleur ({product.colors.length})</span>
+                  <span className="text-sm font-medium text-foreground">{t("product.colorWithCount", { count: product.colors.length })}</span>
                   <Sheet>
-                    <SheetTrigger asChild><button className="text-xs text-primary underline">Voir en grand</button></SheetTrigger>
+                    <SheetTrigger asChild><button className="text-xs text-primary underline">{t("product.viewLarge")}</button></SheetTrigger>
                     <SheetContent side="right" className="w-full sm:max-w-md">
-                      <SheetHeader><SheetTitle>Sélectionner une couleur</SheetTitle></SheetHeader>
+                      <SheetHeader><SheetTitle>{t("product.selectColor")}</SheetTitle></SheetHeader>
                       <div className="grid grid-cols-2 gap-3 mt-4">
                         {product.colors.map((color, i) => (
                           <button key={color} onClick={() => setSelectedColor(i)} className={`aspect-[3/4] rounded-sm overflow-hidden border-2 transition-colors ${selectedColor === i ? "border-primary" : "border-border/40"}`}>
@@ -619,7 +635,7 @@ export default function ProductPage() {
                 </div>
                 <div className="flex gap-2">
                   {product.colors.map((color, i) => (
-                    <button key={color} onClick={() => setSelectedColor(i)} className={`w-8 h-8 rounded-full border-2 transition-all ${selectedColor === i ? "border-primary ring-2 ring-primary/30 scale-110" : "border-border"}`} style={{ backgroundColor: color }} aria-label={`Couleur ${i + 1}`} />
+                    <button key={color} onClick={() => setSelectedColor(i)} className={`w-8 h-8 rounded-full border-2 transition-all ${selectedColor === i ? "border-primary ring-2 ring-primary/30 scale-110" : "border-border"}`} style={{ backgroundColor: color }} aria-label={t("product.colorAria", { index: i + 1 })} />
                   ))}
                 </div>
               </div>
@@ -629,7 +645,7 @@ export default function ProductPage() {
             {product.sizes && product.sizes.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">Taille</span>
+                  <span className="text-sm font-medium text-foreground">{t("product.sizeLabel")}</span>
                   <div className="flex items-center gap-2">
                     <Select value={sizeRegion} onValueChange={setSizeRegion}>
                       <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
@@ -637,13 +653,13 @@ export default function ProductPage() {
                     </Select>
                     <Dialog>
                       <DialogTrigger asChild>
-                        <button className="text-xs text-primary underline inline-flex items-center gap-1"><Ruler size={12} /> Guide des tailles</button>
+                        <button className="text-xs text-primary underline inline-flex items-center gap-1"><Ruler size={12} /> {t("product.sizeGuide")}</button>
                       </DialogTrigger>
                       <DialogContent>
-                        <DialogHeader><DialogTitle>Guide des tailles</DialogTitle></DialogHeader>
+                        <DialogHeader><DialogTitle>{t("product.sizeGuide")}</DialogTitle></DialogHeader>
                         <div className="overflow-auto">
                           <table className="w-full text-sm border-collapse">
-                            <thead><tr className="bg-muted"><th className="p-2 text-left text-muted-foreground">Taille</th><th className="p-2 text-left text-muted-foreground">Poitrine (cm)</th><th className="p-2 text-left text-muted-foreground">Taille (cm)</th><th className="p-2 text-left text-muted-foreground">Hanches (cm)</th></tr></thead>
+                            <thead><tr className="bg-muted"><th className="p-2 text-left text-muted-foreground">{t("product.sizeCol")}</th><th className="p-2 text-left text-muted-foreground">{t("product.bust")} (cm)</th><th className="p-2 text-left text-muted-foreground">{t("product.waist")} (cm)</th><th className="p-2 text-left text-muted-foreground">{t("product.hips")} (cm)</th></tr></thead>
                             <tbody>{["XS","S","M","L","XL","XXL"].map((s,i) => (<tr key={s} className="border-b border-border"><td className="p-2 font-medium">{s}</td><td className="p-2">{78+i*4}–{82+i*4}</td><td className="p-2">{60+i*4}–{64+i*4}</td><td className="p-2">{84+i*4}–{88+i*4}</td></tr>))}</tbody>
                           </table>
                         </div>
@@ -665,27 +681,36 @@ export default function ProductPage() {
                 <span className="text-sm font-medium text-foreground">{dv.icon ? `${dv.icon} ` : ""}{dv.typeName}{dv.unit ? ` (${dv.unit})` : ""}</span>
                 <div className="flex flex-wrap gap-2">
                   {dv.options.map((opt: any) => (
-                    <span key={opt.id} className="min-w-[40px] h-9 px-3 rounded-sm border border-border text-sm font-medium flex items-center justify-center text-foreground">
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setSelectedDynamic((prev) => ({ ...prev, [dv.typeId]: opt.label }))}
+                      className={`min-w-[40px] h-9 px-3 rounded-sm border text-sm font-medium transition-all ${
+                        selectedDynamic[dv.typeId] === opt.label
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border text-foreground hover:border-primary"
+                      }`}
+                    >
                       {opt.label}
-                    </span>
+                    </button>
                   ))}
                 </div>
               </div>
             ))}
 
             {/* Loyalty info */}
-            <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-sm">🎁 Gagnez jusqu'à <span className="font-semibold text-primary">{loyaltyPoints} points</span> fidélité, calculés au checkout.</p>
+            <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-sm">{t("product.loyaltyPoints", { points: loyaltyPoints })}</p>
 
             {/* ═══ QUANTITY + TOTAL + CTA ═══ */}
             <div className="space-y-3 pt-1">
               {/* Total + savings */}
               <div className="flex items-center justify-between bg-muted/50 px-3 py-2 rounded-sm">
-                <span className="text-sm text-muted-foreground">Total ({currentQty} pcs)</span>
+                <span className="text-sm text-muted-foreground">{t("product.totalLabel", { qty: currentQty })}</span>
                 <div className="text-right">
-                  <span className="text-lg font-bold text-foreground">${totalPrice.toFixed(2)}</span>
+                  <span className="text-lg font-bold text-foreground">{formatPrice(totalPrice)}</span>
                   {totalSavings > 0 && (
                     <p className="text-xs font-semibold text-primary">
-                      Vous économisez ${totalSavings.toFixed(2)} sur cette commande
+                      {t("product.youSave", { amount: formatPrice(totalSavings) })}
                     </p>
                   )}
                 </div>
@@ -708,7 +733,7 @@ export default function ProductPage() {
                 <Button size="lg" className="h-10 text-sm font-bold gap-2 w-full" onClick={() => {
                   if (!product) return;
                   if (currentQty < moq) {
-                    toast({ title: "Quantité insuffisante", description: `La quantité minimale est de ${moq} pièces.`, variant: "destructive" });
+                    toast({ title: t("product.insufficientQty"), description: t("product.insufficientQtyDesc", { moq }), variant: "destructive" });
                     return;
                   }
                   addItem({
@@ -719,14 +744,23 @@ export default function ProductPage() {
                     price: currentUnitPrice,
                     originalPrice: product.originalPrice,
                     color: product.colors?.[selectedColor] || null,
-                    size: selectedSize,
+                    size: (() => {
+                      const dynParts = Object.entries(selectedDynamic)
+                        .map(([typeId, label]) => {
+                          const dv = ((product as any).dynamicVariants || []).find((d: any) => d.typeId === typeId);
+                          return dv ? `${dv.typeName}: ${label}` : null;
+                        })
+                        .filter(Boolean);
+                      const parts = [selectedSize, ...dynParts].filter(Boolean);
+                      return parts.length > 0 ? parts.join(" / ") : null;
+                    })(),
                     quantity: currentQty,
                     moq: moq,
                   });
                 }}><ShoppingCart size={18} />{t("product.addToCart")}</Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Quantité minimale : <span className="font-medium text-foreground">{moq} pièce{moq > 1 ? "s" : ""}</span>
+                {t("product.minQty")} <span className="font-medium text-foreground">{moq} {t("product.pieces", { plural: moq > 1 ? "s" : "" })}</span>
               </p>
             </div>
 
@@ -736,7 +770,7 @@ export default function ProductPage() {
               <div className="px-4 py-3 space-y-2">
                 <div className="flex items-center gap-2 text-sm">
                   <Truck size={16} className="text-primary shrink-0" />
-                  <span className="font-medium text-foreground">Estimer les frais de livraison</span>
+                  <span className="font-medium text-foreground">{t("product.shippingEstimate")}</span>
                 </div>
                 <PrecisionShippingEstimate
                   productWeightGrams={product.weightGrams}
@@ -755,26 +789,26 @@ export default function ProductPage() {
                 <DialogTrigger asChild>
                   <button className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left hover:bg-muted/50 transition-colors">
                     <RotateCcw size={18} className="text-primary shrink-0" />
-                    <span className="flex-1 font-medium text-foreground">Politique de retour</span>
+                    <span className="flex-1 font-medium text-foreground">{t("product.returnPolicy")}</span>
                     <ChevronRight size={14} className="text-muted-foreground" />
                   </button>
                 </DialogTrigger>
                 <DialogContent>
-                  <DialogHeader><DialogTitle className="flex items-center gap-2"><RotateCcw size={18} /> Politique de retour</DialogTitle></DialogHeader>
+                  <DialogHeader><DialogTitle className="flex items-center gap-2"><RotateCcw size={18} /> {t("product.returnPolicy")}</DialogTitle></DialogHeader>
                   <div className="space-y-3 text-sm">
                     <div className="flex items-start gap-3 p-3 bg-secondary/50 rounded-sm">
                       <Check size={16} className="text-primary mt-0.5 shrink-0" />
-                      <div><span className="font-semibold text-foreground">Retour sous 30 jours</span><p className="text-muted-foreground mt-1">Pour les produits vendus localement, vous pouvez retourner les articles dans leur état d'origine. Les frais de retour sont à la charge du client.</p></div>
+                      <div><span className="font-semibold text-foreground">{t("product.return30Days")}</span><p className="text-muted-foreground mt-1">{t("product.return30DaysDesc")}</p></div>
                     </div>
                     <div className="flex items-start gap-3 p-3 bg-secondary/50 rounded-sm">
                       <Check size={16} className="text-primary mt-0.5 shrink-0" />
-                      <div><span className="font-semibold text-foreground">Échange (produits locaux)</span><p className="text-muted-foreground mt-1">Échange possible pour une autre taille ou couleur sur les produits disponibles localement.</p></div>
+                      <div><span className="font-semibold text-foreground">{t("product.exchange")}</span><p className="text-muted-foreground mt-1">{t("product.exchangeDesc")}</p></div>
                     </div>
                     <div className="flex items-start gap-3 p-3 bg-secondary/50 rounded-sm">
                       <Check size={16} className="text-primary mt-0.5 shrink-0" />
-                      <div><span className="font-semibold text-foreground">Remboursement sous 14 à 30 jours</span><p className="text-muted-foreground mt-1">Le délai de remboursement varie de 14 à 30 jours selon le montant de la commande, après réception et vérification de l'article.</p></div>
+                      <div><span className="font-semibold text-foreground">{t("product.refund14to30")}</span><p className="text-muted-foreground mt-1">{t("product.refund14to30Desc")}</p></div>
                     </div>
-                    <p className="text-xs text-muted-foreground italic">Les retours et échanges ne s'appliquent qu'aux produits vendus localement. Les produits importés ne sont pas éligibles au retour sauf en cas de défaut avéré.</p>
+                    <p className="text-xs text-muted-foreground italic">{t("product.returnDisclaimer")}</p>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -836,30 +870,30 @@ export default function ProductPage() {
               <div className="border border-border rounded-sm px-4 py-3 space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                   <Ruler size={16} className="text-primary shrink-0" />
-                  Poids & Dimensions
+                  {t("product.weightDimensions")}
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   {product.weightGrams && (
                     <div className="bg-muted/50 p-2 rounded-sm text-center">
-                      <span className="text-muted-foreground block">Poids</span>
+                      <span className="text-muted-foreground block">{t("product.weight")}</span>
                       <span className="font-semibold text-foreground">{product.weightGrams >= 1000 ? `${(product.weightGrams / 1000).toFixed(1)} kg` : `${product.weightGrams} g`}</span>
                     </div>
                   )}
                   {product.lengthCm && (
                     <div className="bg-muted/50 p-2 rounded-sm text-center">
-                      <span className="text-muted-foreground block">Longueur</span>
+                      <span className="text-muted-foreground block">{t("product.length")}</span>
                       <span className="font-semibold text-foreground">{product.lengthCm} cm</span>
                     </div>
                   )}
                   {product.widthCm && (
                     <div className="bg-muted/50 p-2 rounded-sm text-center">
-                      <span className="text-muted-foreground block">Largeur</span>
+                      <span className="text-muted-foreground block">{t("product.width")}</span>
                       <span className="font-semibold text-foreground">{product.widthCm} cm</span>
                     </div>
                   )}
                   {product.heightCm && (
                     <div className="bg-muted/50 p-2 rounded-sm text-center">
-                      <span className="text-muted-foreground block">Hauteur</span>
+                      <span className="text-muted-foreground block">{t("product.height")}</span>
                       <span className="font-semibold text-foreground">{product.heightCm} cm</span>
                     </div>
                   )}
@@ -870,17 +904,17 @@ export default function ProductPage() {
             <Accordion type="multiple" className="border border-border rounded-sm">
               {/* Description */}
               <AccordionItem value="description" className="border-b border-border last:border-0">
-                <AccordionTrigger className="px-4 py-3 text-sm font-medium hover:no-underline">Description du produit</AccordionTrigger>
+                <AccordionTrigger className="px-4 py-3 text-sm font-medium hover:no-underline">{t("product.description")}</AccordionTrigger>
                 <AccordionContent className="px-4">
                   <table className="w-full text-sm">
                     <tbody>
                       {[
-                        ["Matière", product.material || "—"],
-                        ["Type", product.categoryFr || "—"],
-                        ["Style", product.style || "—"],
-                        ["Saison", (product as any).season || "—"],
-                        ["Entretien", (product as any).careInstructions || "—"],
-                        ["Origine", product.originCountry ? getCountryName(product.originCountry) : "—"],
+                        [t("product.material"), product.material || "—"],
+                        [t("product.type"), product.categoryFr || "—"],
+                        [t("product.style"), product.style || "—"],
+                        [t("product.season"), (product as any).season || "—"],
+                        [t("product.careInstructions"), (product as any).careInstructions || "—"],
+                        [t("product.origin"), product.originCountry ? getCountryName(product.originCountry) : "—"],
                       ].filter(([, value]) => value !== "—").map(([label, value]) => (
                         <tr key={label} className="border-b border-border/50 last:border-0">
                           <td className="py-2 text-muted-foreground w-1/3">{label}</td>
@@ -894,7 +928,7 @@ export default function ProductPage() {
 
               {/* Size & Fit */}
               <AccordionItem value="size-fit" className="border-b border-border last:border-0">
-                <AccordionTrigger className="px-4 py-3 text-sm font-medium hover:no-underline">Tailles & Mensurations</AccordionTrigger>
+                <AccordionTrigger className="px-4 py-3 text-sm font-medium hover:no-underline">{t("product.sizesMeasurements")}</AccordionTrigger>
                 <AccordionContent className="px-4">
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
@@ -909,28 +943,28 @@ export default function ProductPage() {
                       </Select>
                     </div>
                     <table className="w-full text-xs border-collapse">
-                      <thead><tr className="bg-muted"><th className="p-2 text-left text-muted-foreground">Taille</th><th className="p-2 text-left text-muted-foreground">Buste</th><th className="p-2 text-left text-muted-foreground">Taille</th><th className="p-2 text-left text-muted-foreground">Hanches</th></tr></thead>
+                      <thead><tr className="bg-muted"><th className="p-2 text-left text-muted-foreground">{t("product.sizeCol")}</th><th className="p-2 text-left text-muted-foreground">{t("product.bust")}</th><th className="p-2 text-left text-muted-foreground">{t("product.waist")}</th><th className="p-2 text-left text-muted-foreground">{t("product.hips")}</th></tr></thead>
                       <tbody>{["XS","S","M","L","XL","XXL"].map((s,i) => {
                         const factor = sizeUnit === "IN" ? 0.3937 : 1;
                         const fmt = (v: number) => sizeUnit === "IN" ? v.toFixed(1) : String(v);
                         return (<tr key={s} className="border-b border-border/50"><td className="p-2 font-medium">{s}</td><td className="p-2">{fmt((78+i*4)*factor)}–{fmt((82+i*4)*factor)}</td><td className="p-2">{fmt((60+i*4)*factor)}–{fmt((64+i*4)*factor)}</td><td className="p-2">{fmt((84+i*4)*factor)}–{fmt((88+i*4)*factor)}</td></tr>);
                       })}</tbody>
                     </table>
-                    <p className="text-xs text-muted-foreground italic">Le mannequin porte la taille {(product as any).model_size || "M"} (175cm, 60kg).</p>
+                    <p className="text-xs text-muted-foreground italic">{t("product.modelWears", { size: (product as any).model_size || "M" })}</p>
                   </div>
                 </AccordionContent>
               </AccordionItem>
 
               {/* About Store */}
               <AccordionItem value="about-store" className="last:border-0">
-                <AccordionTrigger className="px-4 py-3 text-sm font-medium hover:no-underline">À propos du fournisseur</AccordionTrigger>
+                <AccordionTrigger className="px-4 py-3 text-sm font-medium hover:no-underline">{t("product.aboutSupplier")}</AccordionTrigger>
                 <AccordionContent className="px-4">
                   {(product as any).store ? (
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
                         <div className="relative shrink-0">
                           {(product as any).store.logo_url ? (
-                            <img src={(product as any).store.logo_url} alt={(product as any).store.name} className="w-12 h-12 rounded-full object-cover border border-border" />
+                            <img src={imgUrl((product as any).store.logo_url, { width: 96 })} alt={(product as any).store.name} className="w-12 h-12 rounded-full object-cover border border-border" loading="lazy" decoding="async" />
                           ) : (
                             <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
                               <Store size={20} className="text-primary-foreground" />
@@ -946,12 +980,12 @@ export default function ProductPage() {
                             )}
                             <span className={`w-2 h-2 rounded-full ${(product as any).store.is_online ? "bg-emerald-500" : "bg-amber-500/60"}`} />
                             <span className={`text-xs ${(product as any).store.is_online ? "text-emerald-600" : "text-amber-600"}`}>
-                              {(product as any).store.is_online ? "En ligne" : "Hors ligne"}
+                              {(product as any).store.is_online ? t("product.online") : t("product.offline")}
                             </span>
                           </div>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <MapPin size={11} /> {product.originCountry ? getCountryName(product.originCountry) : "—"} {(product as any).store.is_verified && (
-                              <span>· Vérifié {(product as any).store.verified_years_override ?? (product as any).store.verified_years ?? 0} ans</span>
+                              <span>· {t("product.verifiedYearsLabel", { years: (product as any).store.verified_years_override ?? (product as any).store.verified_years ?? 0 })}</span>
                             )}
                           </div>
                         </div>
@@ -960,23 +994,23 @@ export default function ProductPage() {
                         <div className="bg-muted/50 p-2 rounded-sm text-center">
                           <Users size={14} className="mx-auto mb-1 text-primary" />
                           <span className="font-semibold text-foreground">{(product as any).store.sales_override ?? (product as any).store.sales_count ?? 0}</span>
-                          <p className="text-muted-foreground">Vendus</p>
+                          <p className="text-muted-foreground">{t("product.salesLabel")}</p>
                         </div>
                         <div className="bg-muted/50 p-2 rounded-sm text-center">
                           <TrendingUp size={14} className="mx-auto mb-1 text-primary" />
                           <span className="font-semibold text-foreground">{(product as any).store.sales_trend || "—"}</span>
-                          <p className="text-muted-foreground">Croissance</p>
+                          <p className="text-muted-foreground">{t("product.growth")}</p>
                         </div>
                       </div>
                       <div className="flex gap-2">
                         <a href={`/store/${(product as any).store.id}`}>
-                          <Button variant="outline" size="sm" className="flex-1 text-xs">Tous les articles</Button>
+                          <Button variant="outline" size="sm" className="flex-1 text-xs">{t("product.allItems")}</Button>
                         </a>
                         <FollowStoreButton storeId={(product as any).store.id} storeName={(product as any).store.name} size="sm" />
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">Informations du fournisseur non disponibles.</p>
+                    <p className="text-sm text-muted-foreground">{t("product.supplierInfoUnavailable")}</p>
                   )}
                 </AccordionContent>
               </AccordionItem>
@@ -991,8 +1025,8 @@ export default function ProductPage() {
         {relatedProducts && relatedProducts.length > 0 && (
           <section className="mt-12 mb-8">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-foreground">Les clients ont aussi consulté</h2>
-              <Link to="/" className="text-sm text-primary hover:underline">Voir plus</Link>
+              <h2 className="text-lg font-semibold text-foreground">{t("product.alsoViewed")}</h2>
+              <Link to="/" className="text-sm text-primary hover:underline">{t("product.seeMore")}</Link>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {relatedProducts.filter(p => p.id !== product.id).slice(0, 15).map((p, i) => (
@@ -1012,7 +1046,7 @@ export default function ProductPage() {
         product={product}
         colors={(product as any).productColors || product.colors?.map((hex: string, i: number) => ({
           hex,
-          name: (product as any).colorNames?.[i] || `Couleur ${i + 1}`,
+          name: (product as any).colorNames?.[i] || t("product.colorFallback", { index: i + 1 }),
           imageUrl: (product as any).colorImages?.[i] || null,
         })) || []}
         sizes={product.sizes?.map((s: string) => ({ label: s })) || []}

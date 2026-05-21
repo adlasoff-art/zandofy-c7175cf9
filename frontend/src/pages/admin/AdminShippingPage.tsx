@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { DynamicShippingCalculator } from "@/components/DynamicShippingCalculator";
 import { DeliveryZonesManager } from "@/components/admin/DeliveryZonesManager";
+import { ForwarderProfilesAdminPanel } from "@/components/admin/forwarders/ForwarderProfilesAdminPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GeoFieldsRow } from "@/components/address/GeoFieldsRow";
 import { toast } from "sonner";
 import {
   fetchShippingZones, fetchShippingRoutes, fetchShippingDefaults, fetchCategorySurcharges,
@@ -156,9 +158,23 @@ function ZoneDialog({ open, onClose, zone, onSave }: {
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Code pays (ISO)</Label><Input value={form.country_code} onChange={e => setForm(f => ({ ...f, country_code: e.target.value.toUpperCase() }))} placeholder="CN, CD, US" maxLength={3} /></div>
-            <div><Label>Ville</Label><Input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} placeholder="Kinshasa" /></div>
+          <div className="rounded-md border border-border/60 p-3 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Sélection liée aux Zones Géographiques admin (Pays → Ville).
+              Pour les villes internationales non encore référencées, utilisez la recherche ci-dessus.
+            </p>
+            <GeoFieldsRow
+              value={{ country: form.country_code, city: form.city }}
+              onChange={(patch) =>
+                setForm((f) => ({
+                  ...f,
+                  country_code: patch.country ?? f.country_code,
+                  city: patch.city !== undefined ? patch.city : (patch.country !== undefined ? "" : f.city),
+                  zone_type: "city",
+                }))
+              }
+              levels={["country", "city"]}
+            />
           </div>
         </div>
         <DialogFooter>
@@ -751,15 +767,33 @@ const AdminShippingPage: React.FC = () => {
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Main Content */}
         <div className="flex-1 space-y-6">
-          <Tabs defaultValue="calculator">
-            <TabsList>
+          <Tabs defaultValue="profiles">
+            <TabsList className="flex-wrap h-auto">
+              <TabsTrigger value="profiles" className="gap-1">
+                ✨ Profils transitaires
+                <Badge variant="default" className="ml-1 h-4 px-1 text-[10px]">NOUVEAU</Badge>
+              </TabsTrigger>
               <TabsTrigger value="calculator"><Globe size={14} className="mr-1" />Calculateur</TabsTrigger>
-              <TabsTrigger value="routes">Tarifs & Routes</TabsTrigger>
-              <TabsTrigger value="zones">Zones</TabsTrigger>
+              <TabsTrigger value="routes" className="gap-1">
+                Tarifs & Routes
+                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">legacy</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="zones" className="gap-1">
+                Zones
+                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">legacy</Badge>
+              </TabsTrigger>
               <TabsTrigger value="cities"><MapPin size={14} className="mr-1" />Villes</TabsTrigger>
-              <TabsTrigger value="defaults">Défauts</TabsTrigger>
+              <TabsTrigger value="defaults" className="gap-1">
+                Défauts
+                <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">legacy</Badge>
+              </TabsTrigger>
               <TabsTrigger value="surcharges">Surcharges</TabsTrigger>
             </TabsList>
+
+            {/* ── New: Forwarder Profiles (read-only consolidated view) ── */}
+            <TabsContent value="profiles" className="space-y-4">
+              <ForwarderProfilesAdminPanel />
+            </TabsContent>
 
             {/* ── Dynamic Calculator Tab ── */}
             <TabsContent value="calculator" className="space-y-4">

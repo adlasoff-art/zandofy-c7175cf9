@@ -5,6 +5,7 @@ import { useRoles } from "@/hooks/use-roles";
 import { playOrderAlertSound } from "@/lib/notification-sounds";
 import { toast } from "sonner";
 import { ShoppingBag } from "lucide-react";
+import { useVisibilityAwareInterval } from "@/hooks/use-visibility-aware-interval";
 
 /**
  * Polls for new orders and plays a distinct alert sound
@@ -32,41 +33,49 @@ export function OrderAlertListener() {
       });
   }, [user, isVendor]);
 
-  useEffect(() => {
-    if (!user || loading) return;
-    if (!isAdmin && !isManager && !isVendor) return;
+  const enabled = !!user && !loading && (isAdmin || isManager || isVendor);
 
-    const checkNewOrders = async () => {
-      let query = supabase
-        .from("orders")
-        .select("order_ref, store_id, total")
-        .gt("created_at", lastSeenRef.current)
-        .order("created_at", { ascending: true });
+  const checkNewOrders = async () => {
+    if (!enabled) return;
+    // Un vendeur sans store n'a rien à interroger : on évite un scan inutile.
+    const isVendorOnly = isVendor && !isAdmin && !isManager;
+    if (isVendorOnly && storeIdsRef.current.length === 0) return;
 
-      // Vendors only see their own store's orders
-      if (isVendor && !isAdmin && !isManager && storeIdsRef.current.length > 0) {
-        query = query.in("store_id", storeIdsRef.current);
-      }
+    let query = supabase
+      .from("orders")
+      .select("order_ref, store_id, total, created_at, status")
+      .gt("created_at", lastSeenRef.current)
+      // Ne JAMAIS alerter pour une commande encore en attente de paiement (carte/MM/PayPal/Stripe/off-platform)
+      // ni pour les commandes échouées/annulées/retournées. Seules les commandes payées et actives doivent
+      // déclencher l'alerte "Nouvelle commande !".
+      .not("status", "in", '("awaiting_payment","payment_failed","cancelled","returned")')
+      .order("created_at", { ascending: true })
+      .limit(20);
 
-      const { data } = await query;
-      if (data && data.length > 0) {
-        playOrderAlertSound();
-        // Show toast for the latest order
-        const latest = data[data.length - 1] as any;
-        toast("🛒 Nouvelle commande !", {
-          description: `Réf: ${latest.order_ref} — $${latest.total}`,
-          icon: <ShoppingBag size={16} />,
-          duration: 8000,
-        });
-        // Update cursor to latest order
-        lastSeenRef.current = new Date().toISOString();
-      }
-    };
+    if (isVendorOnly) {
+      query = query.in("store_id", storeIdsRef.current);
+    }
 
-    // Poll every 15s
-    const interval = setInterval(checkNewOrders, 15000);
-    return () => clearInterval(interval);
-  }, [user, loading, isAdmin, isManager, isVendor]);
+    const { data } = await query;
+    if (data && data.length > 0) {
+      playOrderAlertSound();
+      const latest = data[data.length - 1] as any;
+      toast("🛒 Nouvelle commande !", {
+        description: `Réf: ${latest.order_ref} — $${latest.total}`,
+        icon: <ShoppingBag size={16} />,
+        duration: 8000,
+      });
+      lastSeenRef.current = new Date().toISOString();
+    }
+  };
+
+  // Polling adaptatif (30s focus / 90s hidden) au lieu de 15s constants.
+  useVisibilityAwareInterval(checkNewOrders, {
+    activeMs: 30_000,
+    hiddenMs: 90_000,
+    enabled,
+    runImmediately: false,
+  } as any);
 
   return null;
 }

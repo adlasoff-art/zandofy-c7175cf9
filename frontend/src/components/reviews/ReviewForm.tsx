@@ -7,6 +7,7 @@ import { StarRatingInput } from "./StarRatingInput";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ImagePlus, X, Loader2, BadgeCheck, ShieldAlert } from "lucide-react";
+import { sanitizeExtension } from "@/utils/sanitize-filename";
 
 interface ReviewFormProps {
   productId: string;
@@ -66,7 +67,7 @@ export function ReviewForm({ productId, onSuccess }: ReviewFormProps) {
       // Upload images
       const imageUrls: string[] = [];
       for (const file of images) {
-        const ext = file.name.split(".").pop();
+        const ext = sanitizeExtension(file.name, "jpg");
         const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
         const { error: uploadErr } = await supabase.storage
           .from("review-images")

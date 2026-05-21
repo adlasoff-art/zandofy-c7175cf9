@@ -26,10 +26,15 @@ import { VendorPaymentNumbers } from "@/components/vendor/VendorPaymentNumbers";
 import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
 import { VendorPricingTab } from "@/components/vendor/VendorPricingTab";
 import { VendorAutonomousTab } from "@/components/vendor/VendorAutonomousTab";
+import { VendorKybV2Tab } from "@/components/vendor/VendorKybV2Tab";
+import { VendorAnalyticsProTab } from "@/components/vendor/VendorAnalyticsProTab";
+import { VendorFreightSimulator } from "@/components/vendor/VendorFreightSimulator";
+import VendorOriginCountriesCard from "@/components/vendor/VendorOriginCountriesCard";
+import { GeoFieldsRow, type GeoFieldsValue } from "@/components/address/GeoFieldsRow";
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
-  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign,
+  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign, Calculator, ShieldCheck, LineChart,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { ACTIVE_ORDER_STATUSES, NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
@@ -84,9 +89,21 @@ export default function VendorDashboardPage() {
   const [noStore, setNoStore] = useState(false);
   const [selectedConv, setSelectedConv] = useState<VendorConversation | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "team" | "suppliers" | "pricing" | "autonomous" | "settings">("catalogue");
+  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "analytics_pro" | "team" | "suppliers" | "pricing" | "autonomous" | "freight_sim" | "kyb" | "settings">("catalogue");
   const [orderCounters, setOrderCounters] = useState<OrderCounters>({ total: 0, in_progress: 0, delivered: 0 });
   const [suppliersEnabled, setSuppliersEnabled] = useState(false);
+  const { data: vendorFeaturesConfig } = useQuery({
+    queryKey: ["vendor-features-config"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("platform_settings")
+        .select("value")
+        .eq("key", "vendor_features_config")
+        .maybeSingle();
+      return (data?.value as { freight_simulator_enabled?: boolean }) || {};
+    },
+  });
+  const freightSimEnabled = !!vendorFeaturesConfig?.freight_simulator_enabled;
 
   // Presence heartbeat — marks store as online while vendor is on dashboard
   useStorePresence(store?.id);
@@ -157,69 +174,25 @@ export default function VendorDashboardPage() {
       // Load order counters
       await fetchOrderCounters(activeStore.id);
 
-      // Load conversations for this store
-      const { data: convs } = await supabase
-        .from("conversations")
-        .select("id, user_id, product_id, updated_at")
-        .eq("store_id", activeStore.id)
-        .order("updated_at", { ascending: false });
+      // Lot 4 — un seul appel RPC remplace le N+1 (2 requêtes par conversation).
+      const { data: convRows, error: convErr } = await (supabase as any)
+        .rpc("vendor_conversation_summary", { _store_id: activeStore.id });
 
-      if (!convs || convs.length === 0) {
+      if (convErr || !convRows) {
         setConversations([]);
-        setLoading(false);
-        hasLoadedRef.current = true;
-        // No realtime setup needed — polling handles updates
-        return;
+      } else {
+        const items: VendorConversation[] = (convRows as any[]).map((c) => ({
+          id: c.id,
+          user_id: c.user_id,
+          product_id: c.product_id,
+          updated_at: c.updated_at,
+          customer_email: c.customer_email || "Client",
+          product_name: c.product_name || null,
+          last_message: c.last_message || null,
+          unread_count: Number(c.unread_count || 0),
+        }));
+        setConversations(items);
       }
-
-      // Fetch customer profiles and product names
-      const userIds = [...new Set(convs.map((c) => c.user_id))];
-      const productIds = convs.map((c) => c.product_id).filter(Boolean) as string[];
-
-      const [profilesRes, productsRes] = await Promise.all([
-        supabase.from("profiles").select("id, email").in("id", userIds),
-        productIds.length > 0
-          ? supabase.from("products").select("id, name_fr").in("id", productIds)
-          : Promise.resolve({ data: [] }),
-      ]);
-
-      const profileMap = new Map((profilesRes.data || []).map((p) => [p.id, p]));
-      const productMap = new Map((productsRes.data || []).map((p) => [p.id, p]));
-
-      const items: VendorConversation[] = [];
-
-      for (const conv of convs) {
-        const { data: lastMsg } = await supabase
-          .from("messages")
-          .select("content")
-          .eq("conversation_id", conv.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const { count } = await supabase
-          .from("messages")
-          .select("id", { count: "exact", head: true })
-          .eq("conversation_id", conv.id)
-          .eq("is_read", false)
-          .neq("sender_id", user!.id);
-
-        const profile = profileMap.get(conv.user_id);
-        const product = conv.product_id ? productMap.get(conv.product_id) : null;
-
-        items.push({
-          id: conv.id,
-          user_id: conv.user_id,
-          product_id: conv.product_id,
-          updated_at: conv.updated_at,
-          customer_email: profile?.email || "Client",
-          product_name: product?.name_fr || null,
-          last_message: lastMsg?.content || null,
-          unread_count: count || 0,
-        });
-      }
-
-      setConversations(items);
       setLoading(false);
       hasLoadedRef.current = true;
     }
@@ -303,7 +276,10 @@ export default function VendorDashboardPage() {
     ...(suppliersEnabled ? [{ key: "suppliers" as const, label: "Fournisseurs", icon: Truck }] : []),
     { key: "pricing" as const, label: "Tarification", icon: DollarSign },
     { key: "autonomous" as const, label: "Autonome", icon: Globe },
+    ...(freightSimEnabled ? [{ key: "freight_sim" as const, label: "Simulateur fret", icon: Calculator }] : []),
+    { key: "kyb" as const, label: "Vérification KYB", icon: ShieldCheck },
     { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
+    { key: "analytics_pro" as const, label: "Analytics Pro", icon: LineChart },
     ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
     { key: "messages" as const, label: "Messages", icon: MessageCircle },
     { key: "settings" as const, label: "Paramètres", icon: Settings },
@@ -341,7 +317,10 @@ export default function VendorDashboardPage() {
       {activeTab === "suppliers" && <VendorSuppliersTab storeId={store!.id} />}
       {activeTab === "pricing" && <VendorPricingTab storeId={store!.id} />}
       {activeTab === "autonomous" && <VendorAutonomousTab storeId={store!.id} />}
+      {activeTab === "freight_sim" && freightSimEnabled && <VendorFreightSimulator />}
+      {activeTab === "kyb" && <VendorKybV2Tab storeId={store!.id} />}
       {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
+      {activeTab === "analytics_pro" && <VendorAnalyticsProTab storeId={store!.id} />}
       {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
       {activeTab === "messages" && (
         <>
@@ -785,8 +764,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
 
   // Location fields
   const [storeAddress, setStoreAddress] = useState("");
-  const [storeCity, setStoreCity] = useState("");
-  const [storeCountry, setStoreCountry] = useState("");
+  const [geo, setGeo] = useState<GeoFieldsValue>({});
+  // legacy display values (kept in DB columns city/country for backwards compat)
+  const [legacyCity, setLegacyCity] = useState("");
+  const [legacyCountry, setLegacyCountry] = useState("");
 
   // SEO fields
   const [seoTitle, setSeoTitle] = useState("");
@@ -798,10 +779,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
     // Load banner_url + SEO + presence + location
     (supabase as any)
       .from("stores")
-      .select("meta_title, meta_description, seo_keywords, banner_url, presence_visible, address, city, country")
+      .select("meta_title, meta_description, seo_keywords, banner_url, presence_visible, address, city, country, country_code, province_id, city_id, commune_id")
       .eq("id", store.id)
       .single()
-      .then(({ data }: any) => {
+      .then(async ({ data }: any) => {
         if (data) {
           setSeoTitle(data.meta_title || "");
           setSeoDesc(data.meta_description || "");
@@ -809,8 +790,34 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
           setBannerPreview(data.banner_url || null);
           setPresenceVisible(data.presence_visible !== false);
           setStoreAddress(data.address || "");
-          setStoreCity(data.city || "");
-          setStoreCountry(data.country || "");
+          setLegacyCity(data.city || "");
+          setLegacyCountry(data.country || "");
+
+          // Hydrate combobox: resolve city / commune names from UUIDs
+          let cityName = "";
+          let communeName = "";
+          if (data.city_id) {
+            const { data: cityRow } = await (supabase as any)
+              .from("cities")
+              .select("name")
+              .eq("id", data.city_id)
+              .maybeSingle();
+            cityName = cityRow?.name || "";
+          }
+          if (data.commune_id) {
+            const { data: comRow } = await (supabase as any)
+              .from("communes")
+              .select("name")
+              .eq("id", data.commune_id)
+              .maybeSingle();
+            communeName = comRow?.name || "";
+          }
+          setGeo({
+            country: data.country_code || "",
+            province_id: data.province_id || "",
+            city: cityName,
+            commune: communeName,
+          });
         }
         setSeoLoading(false);
       });
@@ -876,6 +883,39 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   const handleSave = async () => {
     setSaving(true);
     const keywords = seoKeywords.split(",").map((k) => k.trim()).filter(Boolean);
+
+    // Resolve city_id, commune_id, country display name from combobox selections
+    let cityId: string | null = null;
+    let communeId: string | null = null;
+    let countryName: string = legacyCountry;
+
+    if (geo.country) {
+      const { data: countryRow } = await (supabase as any)
+        .from("countries")
+        .select("name")
+        .eq("code", geo.country)
+        .maybeSingle();
+      if (countryRow?.name) countryName = countryRow.name;
+    }
+    if (geo.country && geo.city) {
+      const { data: cityRow } = await (supabase as any)
+        .from("cities")
+        .select("id")
+        .eq("country_code", geo.country)
+        .ilike("name", geo.city)
+        .maybeSingle();
+      cityId = cityRow?.id || null;
+    }
+    if (cityId && geo.commune) {
+      const { data: comRow } = await (supabase as any)
+        .from("communes")
+        .select("id")
+        .eq("city_id", cityId)
+        .ilike("name", geo.commune)
+        .maybeSingle();
+      communeId = comRow?.id || null;
+    }
+
     const { error } = await (supabase as any)
       .from("stores")
       .update({
@@ -884,8 +924,14 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
         meta_description: seoDesc.trim() || null,
         seo_keywords: keywords.length > 0 ? keywords : null,
         address: storeAddress.trim() || null,
-        city: storeCity.trim() || null,
-        country: storeCountry.trim() || null,
+        // Structured (used by transitaires / forwarders matching)
+        country_code: geo.country || null,
+        province_id: geo.province_id || null,
+        city_id: cityId,
+        commune_id: communeId,
+        // Legacy text columns kept in sync for shipping labels & store page display
+        city: geo.city || null,
+        country: countryName || null,
       })
       .eq("id", store.id);
 
@@ -948,6 +994,9 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
           </button>
         </div>
       </div>
+
+      {/* ═══ PAYS D'ORIGINE D'EXPÉDITION ═══ */}
+      <VendorOriginCountriesCard storeId={store.id} />
 
       {/* ═══ PHOTO DE PROFIL & BANNIÈRE ═══ */}
       <div className="bg-card border border-border rounded-lg p-4 space-y-4">
@@ -1068,35 +1117,24 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
         <p className="text-xs text-muted-foreground">
           Ces informations apparaissent sur votre page boutique et sur les étiquettes d'expédition.
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label className="text-xs text-muted-foreground block mb-1">Adresse</label>
-            <input
-              value={storeAddress}
-              onChange={(e) => setStoreAddress(e.target.value)}
-              placeholder="123 Avenue Commerce"
-              className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground block mb-1">Ville</label>
-            <input
-              value={storeCity}
-              onChange={(e) => setStoreCity(e.target.value)}
-              placeholder="Kinshasa"
-              className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground block mb-1">Pays</label>
-            <input
-              value={storeCountry}
-              onChange={(e) => setStoreCountry(e.target.value)}
-              placeholder="RD Congo"
-              className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Adresse (rue, numéro)</label>
+          <input
+            value={storeAddress}
+            onChange={(e) => setStoreAddress(e.target.value)}
+            placeholder="123 Avenue Commerce"
+            className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+          />
         </div>
+        <GeoFieldsRow
+          value={geo}
+          onChange={(patch) => setGeo((prev) => ({ ...prev, ...patch }))}
+          levels={["country", "province", "city", "commune"]}
+          required={["country", "city"]}
+        />
+        <p className="text-[11px] text-muted-foreground">
+          Le pays et la ville sont essentiels : ils déterminent les transitaires éligibles pour acheminer vos commandes vers les clients.
+        </p>
       </div>
 
       {/* WhatsApp Section */}

@@ -74,6 +74,44 @@
     --cert-rider-foreground: 0 0% 100%;
     --cert-client: 210 60% 60%;
     --cert-client-foreground: 0 0% 100%;
+
+    /* Operator dashboard palette (Lot 11B) — palette froide bleu/cyan logistique */
+    --operator-primary: 210 90% 35%;
+    --operator-primary-foreground: 0 0% 100%;
+    --operator-accent: 195 85% 45%;
+    --operator-accent-foreground: 0 0% 100%;
+    --operator-bg: 215 30% 97%;
+    --operator-surface: 0 0% 100%;
+    --operator-border: 215 25% 88%;
+    --operator-muted: 215 20% 50%;
+    --operator-success: 152 69% 40%;
+    --operator-warning: 38 92% 50%;
+    --operator-danger: 0 75% 55%;
+    --operator-sidebar-bg: 215 35% 12%;
+    --operator-sidebar-fg: 215 15% 92%;
+    --operator-sidebar-active: 195 85% 45%;
+    --operator-sidebar-border: 215 30% 18%;
+    --operator-gradient: linear-gradient(135deg, hsl(210 90% 35%), hsl(195 85% 45%));
+    --operator-shadow: 0 4px 20px -4px hsl(210 90% 35% / 0.18);
+
+    /* Forwarder dashboard palette — bleu profond fret international */
+    --forwarder-primary: 222 80% 38%;
+    --forwarder-primary-foreground: 0 0% 100%;
+    --forwarder-accent: 188 75% 42%;
+    --forwarder-accent-foreground: 0 0% 100%;
+    --forwarder-bg: 220 30% 97%;
+    --forwarder-surface: 0 0% 100%;
+    --forwarder-border: 220 25% 88%;
+    --forwarder-muted: 220 20% 48%;
+    --forwarder-success: 152 69% 40%;
+    --forwarder-warning: 38 92% 50%;
+    --forwarder-danger: 0 75% 55%;
+    --forwarder-sidebar-bg: 222 38% 13%;
+    --forwarder-sidebar-fg: 220 15% 92%;
+    --forwarder-sidebar-active: 188 75% 48%;
+    --forwarder-sidebar-border: 222 30% 19%;
+    --forwarder-gradient: linear-gradient(135deg, hsl(222 80% 38%), hsl(188 75% 42%));
+    --forwarder-shadow: 0 4px 20px -4px hsl(222 80% 38% / 0.18);
   }
 
   .dark {
@@ -132,6 +170,25 @@
     --cert-rider-foreground: 0 0% 100%;
     --cert-client: 210 60% 65%;
     --cert-client-foreground: 0 0% 100%;
+
+    /* Operator dashboard palette — variant sombre */
+    --operator-primary: 195 85% 55%;
+    --operator-primary-foreground: 215 35% 10%;
+    --operator-accent: 200 90% 60%;
+    --operator-accent-foreground: 215 35% 10%;
+    --operator-bg: 215 30% 8%;
+    --operator-surface: 215 25% 12%;
+    --operator-border: 215 25% 22%;
+    --operator-muted: 215 15% 65%;
+    --operator-success: 152 69% 50%;
+    --operator-warning: 38 92% 55%;
+    --operator-danger: 0 75% 60%;
+    --operator-sidebar-bg: 215 40% 6%;
+    --operator-sidebar-fg: 215 15% 90%;
+    --operator-sidebar-active: 195 85% 55%;
+    --operator-sidebar-border: 215 30% 14%;
+    --operator-gradient: linear-gradient(135deg, hsl(195 85% 45%), hsl(200 90% 60%));
+    --operator-shadow: 0 4px 20px -4px hsl(195 85% 55% / 0.25);
   }
 }
 

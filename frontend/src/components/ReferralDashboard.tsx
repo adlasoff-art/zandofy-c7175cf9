@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "@/contexts/I18nContext";
 import {
   Users, Copy, Share2, Gift, Loader2, Coins, Clock, CheckCircle2,
   MessageCircle, ArrowUpRight, Wallet, CreditCard, AlertTriangle,
@@ -35,6 +36,7 @@ interface PointTransaction {
 
 export function ReferralDashboard() {
   const { user } = useAuth();
+  const { t, locale } = useI18n();
   const [referralCode, setReferralCode] = useState("");
   const [referrals, setReferrals] = useState<ReferralData[]>([]);
   const [wallet, setWallet] = useState<PointsWallet>({ balance: 0, pending_balance: 0, total_earned: 0, total_spent: 0 });
@@ -68,7 +70,7 @@ export function ReferralDashboard() {
       const refereeIds = refs.map(r => r.referee_id);
       const { data: profiles } = await supabase.from("profiles").select("id, email").in("id", refereeIds);
       const emailMap = new Map((profiles || []).map(p => [p.id, p.email]));
-      setReferrals(refs.map(r => ({ ...r, referee_email: emailMap.get(r.referee_id) || "Utilisateur" })));
+      setReferrals(refs.map(r => ({ ...r, referee_email: emailMap.get(r.referee_id) || t("referral.list.user") })));
     } else {
       setReferrals([]);
     }
@@ -101,18 +103,18 @@ export function ReferralDashboard() {
 
   const copyCode = () => {
     navigator.clipboard.writeText(referralCode);
-    toast.success("Code copié !");
+    toast.success(t("referral.codeCopied"));
   };
 
   const siteUrl = import.meta.env.VITE_SITE_URL || "https://zandofy.com";
 
   const shareWhatsApp = () => {
-    const msg = `🎁 Rejoins Zandofy avec mon code ${referralCode} et obtiens une réduction sur ta première commande ! ${siteUrl}/auth?ref=${referralCode}`;
+    const msg = t("referral.share.whatsappMsg", { code: referralCode, url: siteUrl });
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
   const shareSMS = () => {
-    const msg = `Rejoins Zandofy avec mon code ${referralCode} et obtiens une réduction ! ${siteUrl}/auth?ref=${referralCode}`;
+    const msg = t("referral.share.smsMsg", { code: referralCode, url: siteUrl });
     window.open(`sms:?body=${encodeURIComponent(msg)}`, "_blank");
   };
 
@@ -146,10 +148,10 @@ export function ReferralDashboard() {
       user_id: user.id,
       type: "spent",
       amount: -giftCardAmount,
-      description: `Conversion en carte cadeau ${code} (${giftCardAmount} pts → $${dollarValue.toFixed(2)})`,
+      description: t("referral.giftCard.txDesc", { code, pts: giftCardAmount, amount: dollarValue.toFixed(2) }),
     });
 
-    toast.success(`Carte cadeau créée : ${code} — Valeur : $${dollarValue.toFixed(2)}`);
+    toast.success(t("referral.giftCard.created", { code, amount: dollarValue.toFixed(2) }));
     setGiftCardAmount(0);
     setConvertingGiftCard(false);
     load();
@@ -169,39 +171,39 @@ export function ReferralDashboard() {
       <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-xl p-5">
         <div className="flex items-center gap-2 mb-3">
           <Wallet size={18} className="text-primary" />
-          <h3 className="text-sm font-bold text-foreground">ZandoPoints</h3>
+          <h3 className="text-sm font-bold text-foreground">{t("referral.points.title")}</h3>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-card/80 rounded-lg p-3 text-center">
             <Coins size={16} className="mx-auto text-primary mb-1" />
             <p className="text-2xl font-bold text-primary">{wallet.balance}</p>
-            <p className="text-[10px] text-muted-foreground">Disponibles</p>
+            <p className="text-[10px] text-muted-foreground">{t("referral.points.available")}</p>
           </div>
           <div className="bg-card/80 rounded-lg p-3 text-center">
             <Clock size={16} className="mx-auto text-amber-500 mb-1" />
             <p className="text-2xl font-bold text-foreground">{wallet.pending_balance}</p>
-            <p className="text-[10px] text-muted-foreground">En attente</p>
+            <p className="text-[10px] text-muted-foreground">{t("referral.points.pending")}</p>
           </div>
           <div className="bg-card/80 rounded-lg p-3 text-center">
             <ArrowUpRight size={16} className="mx-auto text-emerald-500 mb-1" />
             <p className="text-2xl font-bold text-foreground">{wallet.total_earned}</p>
-            <p className="text-[10px] text-muted-foreground">Total gagné</p>
+            <p className="text-[10px] text-muted-foreground">{t("referral.points.totalEarned")}</p>
           </div>
           <div className="bg-card/80 rounded-lg p-3 text-center">
             <Gift size={16} className="mx-auto text-blue-500 mb-1" />
             <p className="text-2xl font-bold text-foreground">{wallet.total_spent}</p>
-            <p className="text-[10px] text-muted-foreground">Total dépensé</p>
+            <p className="text-[10px] text-muted-foreground">{t("referral.points.totalSpent")}</p>
           </div>
         </div>
         <p className="text-[10px] text-muted-foreground mt-2 text-center">
-          {pointsPerDollar} points = $1 · Utilisable uniquement pour vos achats sur Zandofy
+          {t("referral.points.rate", { rate: pointsPerDollar })}
         </p>
         {wallet.balance > 0 && monthsUntilExpiry <= 3 && (
           <div className="mt-2 flex items-center gap-1.5 justify-center text-[10px] text-amber-600 dark:text-amber-400">
             <AlertTriangle size={12} />
             {monthsUntilExpiry === 0
-              ? "Vos points risquent d'expirer bientôt !"
-              : `Vos points expirent dans ${monthsUntilExpiry} mois d'inactivité`}
+              ? t("referral.points.expirySoon")
+              : t("referral.points.expiryIn", { months: monthsUntilExpiry })}
           </div>
         )}
       </div>
@@ -211,10 +213,10 @@ export function ReferralDashboard() {
         <div className="bg-card border border-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-3">
             <CreditCard size={18} className="text-primary" />
-            <h3 className="text-sm font-bold text-foreground">Convertir en carte cadeau</h3>
+            <h3 className="text-sm font-bold text-foreground">{t("referral.giftCard.title")}</h3>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
-            Transformez vos ZandoPoints en carte cadeau. Taux : {pointsPerDollar} pts = $1.
+            {t("referral.giftCard.desc", { rate: pointsPerDollar })}
           </p>
           <div className="flex items-center gap-2">
             <input
@@ -223,7 +225,7 @@ export function ReferralDashboard() {
               max={wallet.balance}
               value={giftCardAmount || ""}
               onChange={(e) => setGiftCardAmount(Math.min(Number(e.target.value), wallet.balance))}
-              placeholder={`Max: ${wallet.balance} pts`}
+              placeholder={t("referral.giftCard.placeholder", { max: wallet.balance })}
               className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-background"
             />
             <button
@@ -232,12 +234,12 @@ export function ReferralDashboard() {
               className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1.5"
             >
               {convertingGiftCard ? <Loader2 size={14} className="animate-spin" /> : <Gift size={14} />}
-              Convertir
+              {t("referral.giftCard.convert")}
             </button>
           </div>
           {giftCardAmount > 0 && (
             <p className="text-xs text-primary font-medium mt-2 text-center">
-              {giftCardAmount} pts → ${(giftCardAmount / pointsPerDollar).toFixed(2)} USD
+              {t("referral.giftCard.preview", { pts: giftCardAmount, amount: (giftCardAmount / pointsPerDollar).toFixed(2) })}
             </p>
           )}
         </div>
@@ -247,7 +249,7 @@ export function ReferralDashboard() {
       <div className="bg-card border border-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-3">
           <Share2 size={18} className="text-primary" />
-          <h3 className="text-sm font-bold text-foreground">Parrainage</h3>
+          <h3 className="text-sm font-bold text-foreground">{t("referral.title")}</h3>
         </div>
 
         <div className="flex items-center gap-2 mb-4">
@@ -281,13 +283,13 @@ export function ReferralDashboard() {
         <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-border">
           <div className="text-center">
             <p className="text-2xl font-bold text-foreground">{referrals.length}</p>
-            <p className="text-[10px] text-muted-foreground">Filleuls</p>
+            <p className="text-[10px] text-muted-foreground">{t("referral.stats.referees")}</p>
           </div>
           <div className="text-center">
             <p className="text-2xl font-bold text-primary">
               {referrals.reduce((s, r) => s + r.rewarded_orders_count, 0)}
             </p>
-            <p className="text-[10px] text-muted-foreground">Commandes récompensées</p>
+            <p className="text-[10px] text-muted-foreground">{t("referral.stats.rewardedOrders")}</p>
           </div>
         </div>
       </div>
@@ -296,7 +298,7 @@ export function ReferralDashboard() {
       {referrals.length > 0 && (
         <div className="bg-card border border-border rounded-xl p-5">
           <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-            <Users size={16} className="text-primary" /> Mes filleuls ({referrals.length})
+            <Users size={16} className="text-primary" /> {t("referral.list.title", { count: referrals.length })}
           </h3>
           <div className="space-y-2">
             {referrals.map(ref => (
@@ -304,13 +306,13 @@ export function ReferralDashboard() {
                 <div>
                   <p className="text-sm font-medium text-foreground">{ref.referee_email}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    {ref.rewarded_orders_count}/{ref.max_rewarded_orders} commandes · {ref.commission_pct}% commission
+                    {t("referral.list.summary", { used: ref.rewarded_orders_count, max: ref.max_rewarded_orders, pct: ref.commission_pct })}
                   </p>
                 </div>
                 <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                   ref.status === "active" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
                 }`}>
-                  {ref.status === "active" ? "Actif" : "Terminé"}
+                  {ref.status === "active" ? t("referral.list.statusActive") : t("referral.list.statusEnded")}
                 </span>
               </div>
             ))}
@@ -325,14 +327,14 @@ export function ReferralDashboard() {
           className="w-full flex items-center justify-between"
         >
           <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-            <Coins size={16} className="text-primary" /> Historique des points
+            <Coins size={16} className="text-primary" /> {t("referral.tx.title")}
           </h3>
-          <span className="text-xs text-primary">{showTransactions ? "Masquer" : "Voir"}</span>
+          <span className="text-xs text-primary">{showTransactions ? t("referral.tx.hide") : t("referral.tx.show")}</span>
         </button>
         {showTransactions && (
           <div className="mt-3 space-y-2">
             {transactions.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-4">Aucune transaction</p>
+              <p className="text-xs text-muted-foreground text-center py-4">{t("referral.tx.empty")}</p>
             ) : (
               transactions.map(tx => (
                 <div key={tx.id} className="flex items-center justify-between p-2 border-b border-border last:border-0">
@@ -345,7 +347,7 @@ export function ReferralDashboard() {
                     <div>
                       <p className="text-xs text-foreground">{tx.description || tx.type}</p>
                       <p className="text-[10px] text-muted-foreground">
-                        {new Date(tx.created_at).toLocaleDateString("fr-FR")}
+                        {new Date(tx.created_at).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR")}
                       </p>
                     </div>
                   </div>

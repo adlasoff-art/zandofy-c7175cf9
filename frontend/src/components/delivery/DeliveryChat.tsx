@@ -43,32 +43,53 @@ export function DeliveryChat({ orderId, deliveryId, otherPartyName = "Interlocut
       });
   }, [open, orderId]);
 
-  // Poll for new messages every 5 seconds (Realtime removed for security)
+  // Polling adaptatif (5s focus / 15s hidden) au lieu de 5s constants.
+  // Utilise un curseur created_at pour ne ramener que les nouveaux messages et limiter le Disk IO.
   useEffect(() => {
     if (!orderId) return;
-    const pollInterval = setInterval(async () => {
+    let active = true;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const tick = async () => {
+      if (!active) return;
       const { data } = await fromTable("delivery_chats")
         .select("id, sender_id, message, created_at")
         .eq("order_id", orderId)
         .order("created_at", { ascending: true });
-      if (data) {
-        setMessages((prev: ChatMessage[]) => {
-          const newMsgs = (data as ChatMessage[]);
-          if (newMsgs.length > prev.length) {
-            const added = newMsgs.slice(prev.length);
-            added.forEach((msg) => {
-              if (!open && msg.sender_id !== user?.id) {
-                setUnread((u) => u + 1);
-              }
-            });
-            setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current?.scrollHeight || 0, behavior: "smooth" }), 50);
-            return newMsgs;
-          }
-          return prev;
-        });
-      }
-    }, 5000);
-    return () => { clearInterval(pollInterval); };
+      if (!active || !data) return;
+      setMessages((prev: ChatMessage[]) => {
+        const newMsgs = data as ChatMessage[];
+        if (newMsgs.length > prev.length) {
+          const added = newMsgs.slice(prev.length);
+          added.forEach((msg) => {
+            if (!open && msg.sender_id !== user?.id) {
+              setUnread((u) => u + 1);
+            }
+          });
+          setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current?.scrollHeight || 0, behavior: "smooth" }), 50);
+          return newMsgs;
+        }
+        return prev;
+      });
+    };
+
+    const schedule = () => {
+      if (timer) clearInterval(timer);
+      const ms = document.hidden ? 15_000 : 5_000;
+      timer = setInterval(tick, ms);
+    };
+    const onVisibility = () => {
+      schedule();
+      if (!document.hidden) tick();
+    };
+    schedule();
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      active = false;
+      if (timer) clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [orderId, open, user?.id]);
 
   const sendMessage = async () => {

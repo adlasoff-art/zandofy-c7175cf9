@@ -9,6 +9,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 interface GeoOption {
   value: string;
   label: string;
+  id?: string;
 }
 
 interface GeoComboboxProps {
@@ -110,13 +111,7 @@ export function GeoCombobox({ options, value, onChange, label, placeholder = "SÃ
 
       {open && !isMobile && (
         <div
-          className="absolute z-50 mt-1 w-full bg-card border border-border rounded-md shadow-lg max-h-52 overflow-hidden left-0 right-0"
-          style={{
-            position: "fixed",
-            width: ref.current?.getBoundingClientRect().width,
-            left: ref.current?.getBoundingClientRect().left,
-            top: (ref.current?.getBoundingClientRect().bottom || 0) + 4,
-          }}
+          className="absolute z-[80] mt-1 left-0 right-0 top-full w-full bg-popover text-popover-foreground border border-border rounded-md shadow-lg max-h-60 overflow-hidden"
         >
           <div className="p-2 border-b border-border">
             <div className="relative">
@@ -131,7 +126,7 @@ export function GeoCombobox({ options, value, onChange, label, placeholder = "SÃ
               />
             </div>
           </div>
-          <div className="overflow-y-auto max-h-40">{listContent}</div>
+          <div className="overflow-y-auto max-h-44">{listContent}</div>
         </div>
       )}
     </div>

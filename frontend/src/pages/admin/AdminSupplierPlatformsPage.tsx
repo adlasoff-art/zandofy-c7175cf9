@@ -50,7 +50,7 @@ export default function AdminSupplierPlatformsPage() {
     const compressed = await compressImage(file);
     const ext = compressed.name.split(".").pop();
     const path = `platforms/${prefix}-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("supplier-images").upload(path, compressed);
+    const { error } = await supabase.storage.from("supplier-images").upload(path, compressed, { cacheControl: "31536000" });
     if (error) return null;
     const { data: urlData } = supabase.storage.from("supplier-images").getPublicUrl(path);
     return urlData.publicUrl;

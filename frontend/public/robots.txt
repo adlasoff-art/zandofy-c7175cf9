@@ -1,4 +1,5 @@
 User-agent: *
+Allow: /
 Disallow: /dashboard
 Disallow: /admin
 Disallow: /vendor
@@ -6,5 +7,31 @@ Disallow: /driver
 Disallow: /rider
 Disallow: /shipper
 Disallow: /auth
+Disallow: /checkout
+Disallow: /cart
+Disallow: /reset-password
+Disallow: /onboarding
+Disallow: /impersonate
+Disallow: /wp-admin
+Disallow: /wp-content
+Disallow: /wp-includes
 
+# Allow major crawlers explicitly
+User-agent: Googlebot
+Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /vendor
+Disallow: /driver
+Disallow: /rider
+Disallow: /shipper
+Disallow: /auth
+Disallow: /checkout
+Disallow: /cart
+Disallow: /reset-password
+Disallow: /onboarding
+Disallow: /impersonate
+
+Host: https://zandofy.com
+Sitemap: https://zandofy.com/sitemap.xml
 Sitemap: https://zandofy.com/sitemap-dynamic.xml

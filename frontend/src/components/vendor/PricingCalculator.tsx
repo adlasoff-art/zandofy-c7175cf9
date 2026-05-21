@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { Switch } from "@/components/ui/switch";
-import { Calculator, TrendingUp, Info } from "lucide-react";
+import { Calculator, TrendingUp, Info, BookmarkCheck } from "lucide-react";
 import {
   calculateSalePrice,
   calculateOldPrice,
   getMaxExtraMargin,
   calculateMarginPercent,
+  resolveMultiplier,
+  DEFAULT_TIERS,
   DEFAULT_PRICING,
   type PricingDefaults,
+  type PricingTier,
 } from "@/lib/pricing-utils";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -19,6 +22,7 @@ interface PricingCalculatorProps {
   price: number;
   originalPrice: number | null;
   storeId: string;
+  categoryId?: string | null;
   onCostRealChange: (v: number) => void;
   onCostCalcChange: (v: number) => void;
   onAutoPricingChange: (v: boolean) => void;
@@ -29,7 +33,7 @@ interface PricingCalculatorProps {
 
 export function PricingCalculator({
   costReal, costCalc, autoPricingEnabled, vendorExtraMargin,
-  price, originalPrice, storeId,
+  price, originalPrice, storeId, categoryId,
   onCostRealChange, onCostCalcChange, onAutoPricingChange,
   onVendorExtraMarginChange, onPriceChange, onOriginalPriceChange,
 }: PricingCalculatorProps) {
@@ -40,6 +44,13 @@ export function PricingCalculator({
     vendor_extra_margin_enabled?: boolean;
     margin_pct?: number;
     multiplier?: number;
+  } | null>(null);
+  const [isPlatformOwned, setIsPlatformOwned] = useState<boolean>(false);
+  const [categoryOverride, setCategoryOverride] = useState<{
+    margin_pct: number | null;
+    multiplier: number | null;
+    tiers: PricingTier[] | null;
+    description: string | null;
   } | null>(null);
 
   useEffect(() => {
@@ -58,6 +69,7 @@ export function PricingCalculator({
             max_extra_margin_under_50: Number(v.max_extra_margin_under_50) || 0.50,
             max_extra_margin_over_100: Number(v.max_extra_margin_over_100) || 1.00,
             transaction_fee_pct: Number(v.transaction_fee_pct) || 5,
+            tiers: Array.isArray(v.tiers) && v.tiers.length > 0 ? v.tiers : DEFAULT_TIERS,
           });
         }
       });
@@ -71,11 +83,55 @@ export function PricingCalculator({
       .then(({ data }: any) => {
         if (data) setOverrides(data);
       });
+
+    // Load store's platform-owned flag
+    (supabase as any)
+      .from("stores")
+      .select("is_platform_owned")
+      .eq("id", storeId)
+      .maybeSingle()
+      .then(({ data }: any) => {
+        if (data) setIsPlatformOwned(!!data.is_platform_owned);
+      });
   }, [storeId]);
 
+  // Load category-level pricing override (if any)
+  useEffect(() => {
+    if (!categoryId) { setCategoryOverride(null); return; }
+    (supabase as any)
+      .from("category_pricing_overrides")
+      .select("margin_pct, multiplier, tiers, description, active")
+      .eq("category_id", categoryId)
+      .maybeSingle()
+      .then(({ data }: any) => {
+        if (data && data.active) {
+          setCategoryOverride({
+            margin_pct: data.margin_pct,
+            multiplier: data.multiplier,
+            tiers: Array.isArray(data.tiers) ? data.tiers : null,
+            description: data.description,
+          });
+        } else {
+          setCategoryOverride(null);
+        }
+      });
+  }, [categoryId]);
+
   // Per-store overrides take priority, then global defaults
-  const effectiveMarginPct = overrides?.margin_pct ?? settings.margin_pct;
-  const effectiveMultiplier = overrides?.multiplier ?? settings.multiplier;
+  const effectiveMarginPct =
+    overrides?.margin_pct ?? categoryOverride?.margin_pct ?? settings.margin_pct;
+
+  // Multiplier resolution priority: vendor override → category override (fixed) → tiers (category > global) → fallback
+  const effectiveTiers: PricingTier[] | null =
+    categoryOverride?.tiers && categoryOverride.tiers.length > 0
+      ? categoryOverride.tiers
+      : (settings.tiers && settings.tiers.length > 0 ? settings.tiers : DEFAULT_TIERS);
+
+  const effectiveMultiplier = resolveMultiplier(costCalc, {
+    forcedMultiplier: overrides?.multiplier ?? categoryOverride?.multiplier ?? null,
+    tiers: effectiveTiers,
+    defaultMultiplier: settings.multiplier,
+  });
   const effectiveTransactionFee = settings.transaction_fee_pct;
   const vendorExtraMarginAllowed = overrides?.vendor_extra_margin_enabled ?? false;
 
@@ -113,6 +169,21 @@ export function PricingCalculator({
 
   const inputClass = "w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20";
 
+  // Build a short human-readable summary of the active tiers (e.g. "×3 si <$10 … ×1.3 si ≥$200")
+  const tiersSummary = (() => {
+    if (!effectiveTiers || effectiveTiers.length === 0) return null;
+    const sorted = [...effectiveTiers].sort((a, b) => {
+      if (a.max_cost == null) return 1;
+      if (b.max_cost == null) return -1;
+      return a.max_cost - b.max_cost;
+    });
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    const firstLabel = first.max_cost != null ? `×${first.multiplier} si <$${first.max_cost}` : `×${first.multiplier}`;
+    const lastLabel = last.max_cost == null ? `×${last.multiplier} si ≥$${sorted[sorted.length - 2]?.max_cost ?? 0}` : `×${last.multiplier}`;
+    return `${firstLabel} … ${lastLabel}`;
+  })();
+
   return (
     <div className="border border-primary/20 bg-primary/5 rounded-lg p-4 space-y-4">
       <div className="flex items-center justify-between">
@@ -128,9 +199,31 @@ export function PricingCalculator({
 
       {autoPricingEnabled && (
         <>
+          {isPlatformOwned && (
+            <div className="text-[11px] bg-primary/5 border border-primary/20 rounded-md p-2 flex items-start gap-1.5 text-foreground/80">
+              <Info size={12} className="text-primary mt-0.5 shrink-0" />
+              <span>
+                <strong className="text-foreground">Tarification plateforme :</strong> marge {effectiveMarginPct}% × multiplicateur dégressif{tiersSummary ? ` (${tiersSummary})` : ""}.
+                {categoryOverride?.description && (
+                  <> Catégorie : <em>{categoryOverride.description}</em>.</>
+                )}
+                {" "}Le prix final reflète automatiquement cette logique.
+              </span>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Coût d'achat réel ($)</label>
+              <label className="text-xs text-muted-foreground block mb-1 flex items-center gap-1">
+                <span>Coût d'achat réel ($)</span>
+                {costReal > 0 && (
+                  <span
+                    title="Ce montant est mémorisé et reste visible à chaque réouverture du produit pour comparer la marge réelle."
+                    className="inline-flex items-center gap-0.5 text-[9px] px-1 py-[1px] rounded-full bg-primary/10 text-primary border border-primary/20"
+                  >
+                    <BookmarkCheck size={9} /> Mémorisé
+                  </span>
+                )}
+              </label>
               <input
                 type="number"
                 min={0}
@@ -144,7 +237,9 @@ export function PricingCalculator({
                 className={inputClass}
                 placeholder="Ex: 3.50"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">Achat + transport fournisseur</p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Achat + transport fournisseur — référence conservée pour calculer une remise.
+              </p>
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Coût d'achat calcul ($)</label>

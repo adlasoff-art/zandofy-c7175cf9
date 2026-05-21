@@ -12,10 +12,22 @@ Deno.serve(async (req) => {
 
   try {
     const { createClient } = await import("npm:@supabase/supabase-js@2");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
+      SUPABASE_URL,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    // Helper: rewrite plain links in HTML to go through the tracker
+    const rewriteEmailLinks = (html: string, workflowId: string, userId: string, variant: string): string => {
+      return html.replace(
+        /href=["'](https?:\/\/[^"'<>\s]+|\/[^"'<>\s]*)["']/gi,
+        (_match, url) => {
+          const trackerUrl = `${SUPABASE_URL}/functions/v1/track-automation-click?w=${workflowId}&u=${userId}&c=email&v=${variant}&to=${encodeURIComponent(url)}`;
+          return `href="${trackerUrl}"`;
+        }
+      );
+    };
 
     // 1. Get active workflows with push/email channels and delay > 0
     const { data: workflows, error: wfErr } = await supabaseAdmin
@@ -55,6 +67,16 @@ Deno.serve(async (req) => {
 
         if (!subs || subs.length === 0) continue;
 
+        // Variant assignment + content merge
+        const { data: variantLabel } = await supabaseAdmin.rpc("assign_automation_variant", {
+          p_workflow_id: wf.id, p_user_id: userId, p_anon_id: null,
+        });
+        const v = (variantLabel as string) || "A";
+        const { data: contentJson } = await supabaseAdmin.rpc("get_automation_content", {
+          p_workflow_id: wf.id, p_variant: v,
+        });
+        const content = (contentJson as any) || {};
+
         // Record progress (skip actual push send — use existing push-notifications function)
         await supabaseAdmin.from("automation_user_progress").insert({
           user_id: userId,
@@ -63,6 +85,7 @@ Deno.serve(async (req) => {
           last_displayed_at: new Date().toISOString(),
           status: "sent",
           sent_at: new Date().toISOString(),
+          assigned_variant: v,
         });
 
         // Invoke the existing push-notifications function
@@ -70,10 +93,16 @@ Deno.serve(async (req) => {
           await supabaseAdmin.functions.invoke("push-notifications", {
             body: {
               user_ids: [userId],
-              title: wf.push_title,
-              body: wf.push_body,
+              title: content.push_title || wf.push_title,
+              body: content.push_body || wf.push_body,
               url: wf.popup_cta_link || "/",
             },
+          });
+          await supabaseAdmin.from("automation_events").insert({
+            workflow_id: wf.id,
+            user_id: userId,
+            event_type: "delivered_push",
+            variant_label: v,
           });
         } catch (pushErr) {
           console.error(`Push failed for user ${userId}:`, pushErr);
@@ -117,15 +146,29 @@ Deno.serve(async (req) => {
 
           if (!profile?.email) continue;
 
+          // Variant assignment + content merge
+          const { data: variantLabel } = await supabaseAdmin.rpc("assign_automation_variant", {
+            p_workflow_id: wf.id, p_user_id: userId, p_anon_id: null,
+          });
+          const v = (variantLabel as string) || "A";
+          const { data: contentJson } = await supabaseAdmin.rpc("get_automation_content", {
+            p_workflow_id: wf.id, p_variant: v,
+          });
+          const content = (contentJson as any) || {};
+          const subject = content.email_subject || wf.email_subject;
+          const baseHtml = content.email_html_content || wf.email_html_content;
+
           try {
-            const htmlContent = wf.email_html_content
+            let htmlContent = baseHtml
               .replace(/\{\{first_name\}\}/g, profile.first_name || "")
               .replace(/\{\{email\}\}/g, profile.email);
+            // Rewrite all links to go through tracker
+            htmlContent = rewriteEmailLinks(htmlContent, wf.id, userId, v);
 
             await transporter.sendMail({
               from: `Zandofy <${fromEmail}>`,
               to: profile.email,
-              subject: wf.email_subject,
+              subject,
               html: htmlContent,
             });
 
@@ -136,11 +179,27 @@ Deno.serve(async (req) => {
               last_displayed_at: new Date().toISOString(),
               status: "sent",
               sent_at: new Date().toISOString(),
+              assigned_variant: v,
+            });
+
+            await supabaseAdmin.from("automation_events").insert({
+              workflow_id: wf.id,
+              user_id: userId,
+              event_type: "delivered_email",
+              variant_label: v,
+              metadata: { email: profile.email, variant: v },
             });
 
             totalProcessed++;
-          } catch (emailErr) {
+          } catch (emailErr: any) {
             console.error(`Email failed for ${profile.email}:`, emailErr);
+            await supabaseAdmin.from("automation_events").insert({
+              workflow_id: wf.id,
+              user_id: userId,
+              event_type: "failed_email",
+              variant_label: v,
+              metadata: { error: String(emailErr?.message || emailErr) },
+            });
           }
 
           // Stagger: 2-3 min between emails (random 120-180s)
@@ -167,7 +226,7 @@ Deno.serve(async (req) => {
 
 async function getEligibleUsers(supabase: any, wf: any): Promise<string[]> {
   // Build query for profiles created within the workflow's time window
-  let query = supabase.from("profiles").select("id, created_at");
+  let query = supabase.from("profiles").select("id, created_at, residence_country, residence_city");
 
   // Filter by days since signup
   if (wf.delay_days > 0) {
@@ -189,7 +248,31 @@ async function getEligibleUsers(supabase: any, wf: any): Promise<string[]> {
   const { data: profiles } = await query.limit(100);
   if (!profiles || profiles.length === 0) return [];
 
-  const userIds = profiles.map((p: any) => p.id);
+  // Geo filtering (countries / cities)
+  let filtered = profiles as any[];
+  if (Array.isArray(wf.condition_countries) && wf.condition_countries.length > 0) {
+    const set = new Set(wf.condition_countries.map((c: string) => c.toLowerCase()));
+    filtered = filtered.filter((p) => p.residence_country && set.has(String(p.residence_country).toLowerCase()));
+  }
+  if (Array.isArray(wf.condition_cities) && wf.condition_cities.length > 0) {
+    const set = new Set(wf.condition_cities.map((c: string) => c.toLowerCase()));
+    filtered = filtered.filter((p) => p.residence_city && set.has(String(p.residence_city).toLowerCase()));
+  }
+
+  let userIds = filtered.map((p: any) => p.id);
+
+  // Role filtering via user_roles
+  if (Array.isArray(wf.condition_roles) && wf.condition_roles.length > 0 && userIds.length > 0) {
+    const { data: rolesRows } = await supabase
+      .from("user_roles")
+      .select("user_id, role")
+      .in("user_id", userIds)
+      .in("role", wf.condition_roles);
+    const allowed = new Set((rolesRows || []).map((r: any) => r.user_id));
+    userIds = userIds.filter((id: string) => allowed.has(id));
+  }
+
+  if (userIds.length === 0) return [];
 
   // Filter out users who already received this workflow
   const { data: progress } = await supabase

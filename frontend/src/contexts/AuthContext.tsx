@@ -9,6 +9,8 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isBanned: boolean;
+  isRecoveringPassword: boolean;
+  clearRecoveryFlag: () => void;
   signOut: () => Promise<void>;
 }
 
@@ -17,6 +19,8 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   isBanned: false,
+  isRecoveringPassword: false,
+  clearRecoveryFlag: () => {},
   signOut: async () => {},
 });
 
@@ -27,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isBanned, setIsBanned] = useState(false);
+  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
 
   const ensureProfile = useCallback(async (authUser: User) => {
     try {
@@ -95,6 +100,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        if (event === "PASSWORD_RECOVERY") {
+          setIsRecoveringPassword(true);
+          if (typeof window !== "undefined" && window.location.pathname !== "/reset-password") {
+            window.history.replaceState({}, "", "/reset-password");
+            // Trigger react-router to pick up the new path
+            window.dispatchEvent(new PopStateEvent("popstate"));
+          }
+        }
         if (session?.user) {
           void ensureProfile(session.user);
           if (event === "SIGNED_IN") {
@@ -164,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, isBanned, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, isBanned, isRecoveringPassword, clearRecoveryFlag: () => setIsRecoveringPassword(false), signOut }}>
       {children}
     </AuthContext.Provider>
   );

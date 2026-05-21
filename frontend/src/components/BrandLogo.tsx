@@ -17,16 +17,20 @@ export function BrandLogo({ variant = "header", className = "" }: BrandLogoProps
     : "text-base tracking-[0.08em] text-foreground";
 
   const imgClass = variant === "header" ? "h-8 md:h-10 w-auto" : "h-7 w-auto";
-  // Explicit dimensions to prevent CLS while logo loads
   const imgHeight = variant === "header" ? 40 : 28;
-  const imgWidth = variant === "header" ? 140 : 100;
+  // For logo_only mode we reserve width via aspect-ratio (no text to hold the row).
+  // For logo_and_text we let the text reserve the row width — réserver une largeur
+  // fantôme sur le wrapper poussait "Zandofy" loin du logo (bug rapporté).
+  const ratio = (branding as any)?.logo_aspect_ratio || 3.5;
+  const imgWidth = Math.round(imgHeight * ratio);
+  const wrapperStyle = { aspectRatio: String(ratio) } as React.CSSProperties;
 
   // fetchpriority must be lowercase to be a valid HTML attribute (avoids React warning)
   const imgExtra = { fetchpriority: "high" } as any;
 
   if (mode === "logo_only" && logoUrl) {
     return (
-      <Link to="/" className={`shrink-0 ${className}`}>
+      <Link to="/" className={`shrink-0 inline-block ${variant === "header" ? "h-8 md:h-10" : "h-7"} ${className}`} style={wrapperStyle}>
         <img src={logoUrl} alt="Zandofy" width={imgWidth} height={imgHeight} className={imgClass} {...imgExtra} />
       </Link>
     );
@@ -34,7 +38,7 @@ export function BrandLogo({ variant = "header", className = "" }: BrandLogoProps
 
   if (mode === "logo_and_text" && logoUrl) {
     return (
-      <Link to="/" className={`flex items-end gap-2 shrink-0 ${className}`}>
+      <Link to="/" className={`flex items-center gap-1.5 shrink-0 ${className}`}>
         <img src={logoUrl} alt="Zandofy" width={imgWidth} height={imgHeight} className={imgClass} {...imgExtra} />
         <span className={textStyle} style={{ fontFamily: "'Outfit', sans-serif", fontWeight: variant === "header" ? 700 : 400, lineHeight: 1 }}>
           Zandofy

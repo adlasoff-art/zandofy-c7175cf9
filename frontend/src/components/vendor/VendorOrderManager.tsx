@@ -5,6 +5,7 @@ import { Loader2, Package, ChevronDown, ChevronUp, XCircle, MapPin, Hash, User a
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { Button } from "@/components/ui/button";
 import { PaymentProofUpload } from "@/components/PaymentProofUpload";
+import { DeliveryProofImage } from "@/components/DeliveryProofImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
@@ -27,6 +28,7 @@ import { fr } from "date-fns/locale";
 import { getColorDisplay } from "@/utils/colorName";
 import { ShippingLabelPreview } from "@/components/shipping/ShippingLabelPreview";
 import { Checkbox } from "@/components/ui/checkbox";
+import { FreightDetailsPanel } from "@/components/orders/FreightDetailsPanel";
 
 interface OrderItem {
   id: string;
@@ -64,6 +66,8 @@ interface Order {
   supplier_order_number: string | null;
   assigned_rider_name: string | null;
   assigned_rider_id: string | null;
+  delivery_operator_id?: string | null;
+  delivery_operator_name?: string | null;
   delivery_choice: string | null;
   last_mile_fee: number | null;
   confirmation_code: string | null;
@@ -138,17 +142,14 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [showLabelPreview, setShowLabelPreview] = useState(false);
 
-  // Check if store has self-delivery
+  // Lot 11B Phase B4 — Cleanup vendeur :
+  // Le last-mile est désormais opéré exclusivement par les opérateurs de livraison
+  // tiers (table `delivery_operators`) ou par la flotte plateforme. Les vendeurs
+  // n'auto-livrent plus, donc on force `hasSelfDelivery = false`. L'ancien champ
+  // `vendor_subscriptions.can_self_deliver` est conservé pour rétro-compatibilité
+  // sur les écrans admin mais n'a plus d'effet côté vendeur.
   useEffect(() => {
-    async function check() {
-      const { data } = await supabase
-        .from("vendor_subscriptions")
-        .select("can_self_deliver")
-        .eq("store_id", storeId)
-        .maybeSingle();
-      setHasSelfDelivery(data?.can_self_deliver || false);
-    }
-    check();
+    setHasSelfDelivery(false);
   }, [storeId]);
 
   // Check if shipping labels are enabled for this store
@@ -168,9 +169,11 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected")
+      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected, delivery_operator_id")
       .eq("store_id", storeId)
-      .not("status", "in", '("payment_failed")')
+      // Exclure les commandes non payées (`awaiting_payment`) du listing vendeur :
+      // une commande n'est "réelle" qu'après confirmation du paiement (webhook).
+      .not("status", "in", '("awaiting_payment","payment_failed")')
       .order("created_at", { ascending: false }) as any;
 
     if (error) {
@@ -215,10 +218,31 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
       "hub_pickup_proof_url",
     ]);
 
-    setOrders(ordersWithOptionalFields.map((o) => ({
+    // Lot 11B Phase B4 — Hub UI : enrichir avec le nom de l'opérateur de livraison
+    const operatorIds = Array.from(
+      new Set(
+        ordersWithOptionalFields
+          .map((o: any) => o.delivery_operator_id)
+          .filter(Boolean),
+      ),
+    );
+    const operatorNameMap = new Map<string, string>();
+    if (operatorIds.length > 0) {
+      const { data: ops } = await (supabase as any)
+        .from("delivery_operators")
+        .select("id, company_name")
+        .in("id", operatorIds);
+      (ops || []).forEach((op: any) => operatorNameMap.set(op.id, op.company_name));
+    }
+
+    setOrders(ordersWithOptionalFields.map((o: any) => ({
       ...o,
       items: itemMap.get(o.id) || [],
       history: historyMap.get(o.id) || [],
+      delivery_operator_id: o.delivery_operator_id || null,
+      delivery_operator_name: o.delivery_operator_id
+        ? operatorNameMap.get(o.delivery_operator_id) || null
+        : null,
     })));
     setLoading(false);
   }, [storeId]);
@@ -497,6 +521,9 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   </div>
                 )}
 
+                {/* Lot 4H — Détail freight (transitaire, sous-colis, mode split/groupé) */}
+                <FreightDetailsPanel orderId={order.id} actor="vendor" />
+
                 {/* Edit tracking button — available when in_shipping or later, before delivered */}
                 {["in_shipping", "shipped", "assigning_rider", "rider_assigned", "out_for_delivery"].includes(order.status) && (
                   <button
@@ -514,6 +541,15 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                     <Bike size={12} className="text-primary shrink-0" />
                     <span className="text-muted-foreground">Livreur :</span>
                     <a href="/tracking" className="font-bold text-primary hover:underline">{order.assigned_rider_name}</a>
+                  </div>
+                )}
+
+                {/* Lot 11B Phase B4 — Opérateur de livraison */}
+                {order.delivery_operator_name && (
+                  <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
+                    <Truck size={12} className="text-primary shrink-0" />
+                    <span className="text-muted-foreground">Transporteur :</span>
+                    <span className="font-bold text-foreground">{order.delivery_operator_name}</span>
                   </div>
                 )}
 
@@ -570,12 +606,15 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                     {order.shipping_payment_proof_url ? (
                       <div className="space-y-2">
                         <p className="text-xs text-muted-foreground">Le client a envoyé une preuve de paiement :</p>
-                        <img
-                          src={order.shipping_payment_proof_url}
+                        <DeliveryProofImage
+                          pathOrUrl={order.shipping_payment_proof_url}
                           alt="Preuve de paiement"
                           className="w-full max-w-xs rounded-lg border border-border object-cover cursor-pointer"
-                          onClick={() => window.open(order.shipping_payment_proof_url!, '_blank')}
-                          decoding="async"
+                          onClick={async () => {
+                            const { getDeliveryProofUrl } = await import("@/lib/delivery-proof-urls");
+                            const u = await getDeliveryProofUrl(order.shipping_payment_proof_url);
+                            if (u) window.open(u, '_blank');
+                          }}
                         />
                         <div className="flex gap-2">
                           <Button

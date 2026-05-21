@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "@/contexts/I18nContext";
 import { Crown, ChevronRight, Loader2, Award } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,6 +17,7 @@ interface Tier {
 
 export function LoyaltyProgress() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [stats, setStats] = useState<{ total_orders: number; total_spent: number } | null>(null);
   const [currentTier, setCurrentTier] = useState("client");
@@ -68,14 +70,14 @@ export function LoyaltyProgress() {
     setRequesting(false);
     if (error) { toast.error(error.message); return; }
     setExistingRequest(nextTier.tier_name);
-    toast.success(`Demande pour le badge ${nextTier.badge_label} envoyée !`);
+    toast.success(t("loyalty.requestSuccess", { name: nextTier.badge_label }));
   };
 
   return (
     <div className="bg-card border border-border rounded-xl p-5">
       <div className="flex items-center gap-2 mb-4">
         <Crown size={18} className="text-primary" />
-        <h3 className="text-sm font-bold text-foreground">Programme de fidélité</h3>
+        <h3 className="text-sm font-bold text-foreground">{t("loyalty.title")}</h3>
       </div>
 
       {/* Current tier */}
@@ -84,10 +86,10 @@ export function LoyaltyProgress() {
           <Award size={18} className="text-primary" />
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">Votre badge actuel</p>
-          <p className="font-bold text-foreground">{currentTierObj?.badge_label || "Client"}</p>
+          <p className="text-xs text-muted-foreground">{t("loyalty.currentBadge")}</p>
+          <p className="font-bold text-foreground">{currentTierObj?.badge_label || t("loyalty.client")}</p>
           {currentTierObj && Number(currentTierObj.discount_pct) > 0 && (
-            <p className="text-xs text-primary font-medium">-{currentTierObj.discount_pct}% sur toutes vos commandes</p>
+            <p className="text-xs text-primary font-medium">{t("loyalty.discountAll", { pct: currentTierObj.discount_pct })}</p>
           )}
         </div>
       </div>
@@ -96,13 +98,13 @@ export function LoyaltyProgress() {
       {nextTier ? (
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">
-            Prochain objectif : <span className="font-semibold text-foreground">{nextTier.badge_label}</span> (-{nextTier.discount_pct}%)
+            {t("loyalty.next")} <span className="font-semibold text-foreground">{nextTier.badge_label}</span> {t("loyalty.nextPct", { pct: nextTier.discount_pct })}
           </p>
 
           <div>
             <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-              <span>Commandes : {stats.total_orders}/{nextTier.min_orders}</span>
-              <span>{ordersRemaining > 0 ? `${ordersRemaining} restantes` : "✓"}</span>
+              <span>{t("loyalty.orders", { current: stats.total_orders, target: nextTier.min_orders })}</span>
+              <span>{ordersRemaining > 0 ? t("loyalty.ordersRemaining", { count: ordersRemaining }) : "✓"}</span>
             </div>
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${ordersProgress}%` }} />
@@ -111,8 +113,8 @@ export function LoyaltyProgress() {
 
           <div>
             <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-              <span>Dépensé : ${stats.total_spent.toLocaleString()}/${nextTier.min_spent.toLocaleString()}</span>
-              <span>{spentRemaining > 0 ? `$${spentRemaining.toLocaleString()} restant` : "✓"}</span>
+              <span>{t("loyalty.spent", { current: stats.total_spent.toLocaleString(), target: nextTier.min_spent.toLocaleString() })}</span>
+              <span>{spentRemaining > 0 ? t("loyalty.spentRemaining", { amount: spentRemaining.toLocaleString() }) : "✓"}</span>
             </div>
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${spentProgress}%` }} />
@@ -123,7 +125,7 @@ export function LoyaltyProgress() {
             <div className="mt-3">
               {existingRequest ? (
                 <div className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center font-medium">
-                  Demande de badge en cours de traitement...
+                  {t("loyalty.requestPending")}
                 </div>
               ) : (
                 <button
@@ -132,14 +134,14 @@ export function LoyaltyProgress() {
                   className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
                 >
                   {requesting ? <Loader2 size={14} className="animate-spin" /> : <Crown size={14} />}
-                  Demander le badge {nextTier.badge_label}
+                  {t("loyalty.requestBtn", { name: nextTier.badge_label })}
                 </button>
               )}
             </div>
           )}
         </div>
       ) : (
-        <p className="text-xs text-emerald-600 font-medium">🎉 Vous avez atteint le niveau maximum !</p>
+        <p className="text-xs text-emerald-600 font-medium">{t("loyalty.maxLevel")}</p>
       )}
     </div>
   );

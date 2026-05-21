@@ -10,7 +10,6 @@ import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { CartProvider } from "@/contexts/CartContext";
 import { WishlistProvider } from "@/contexts/WishlistContext";
 import { CompareProvider } from "@/contexts/CompareContext";
-import { CompareBar } from "@/components/CompareBar";
 import { CartDrawer } from "@/components/CartDrawer";
 import { SupportDrawer } from "@/components/support/SupportDrawer";
 import { SupportDrawerProvider, useSupportDrawer } from "@/contexts/SupportDrawerContext";
@@ -38,6 +37,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoadingSkeleton } from "@/components/PageLoadingSkeleton";
 import { RoleGuard } from "@/components/admin/RoleGuard";
 import { BanGuard } from "@/components/BanGuard";
+import { RecoveryGuard } from "@/components/RecoveryGuard";
 import { useGeoBlocking } from "@/hooks/useGeoBlocking";
 import { GeoBlockScreen } from "@/components/security/GeoBlockScreen";
 
@@ -57,6 +57,11 @@ function lazyRetry(importFn: () => Promise<{ default: ComponentType<any> }>) {
 
 // Lazy-loaded routes
 const Index = lazyRetry(() => import("./pages/Index"));
+// Lazy-loaded UI components that pull heavy deps (framer-motion).
+// CompareBar is invisible until the user adds an item to compare → safe to defer.
+const CompareBar = lazy(() =>
+  import("@/components/CompareBar").then((m) => ({ default: m.CompareBar }))
+);
 const CategoryPage = lazyRetry(() => import("./pages/CategoryPage"));
 const ProductPage = lazyRetry(() => import("./pages/ProductPage"));
 const StorePage = lazyRetry(() => import("./pages/StorePage"));
@@ -69,6 +74,7 @@ const DashboardPage = lazyRetry(() => import("./pages/DashboardPage"));
 const VendorDashboardPage = lazyRetry(() => import("./pages/VendorDashboardPage"));
 const ShipperDashboardPage = lazyRetry(() => import("./pages/ShipperDashboardPage"));
 const RiderDashboardPage = lazyRetry(() => import("./pages/RiderDashboardPage"));
+const RiderInvitePage = lazyRetry(() => import("./pages/RiderInvitePage"));
 const SearchPage = lazyRetry(() => import("./pages/SearchPage"));
 const WishlistPage = lazyRetry(() => import("./pages/WishlistPage"));
 const SharedWishlistPage = lazyRetry(() => import("./pages/SharedWishlistPage"));
@@ -95,6 +101,7 @@ const OnboardingPage = lazyRetry(() => import("./pages/OnboardingPage"));
 const PricingPage = lazyRetry(() => import("./pages/PricingPage"));
 const TrendsPage = lazyRetry(() => import("./pages/TrendsPage"));
 const PopularPage = lazyRetry(() => import("./pages/PopularPage"));
+const CarrierDashboardPage = lazyRetry(() => import("./pages/CarrierDashboardPage"));
 
 // Admin pages
 const AdminDashboard = lazyRetry(() => import("./pages/admin/AdminDashboard"));
@@ -103,6 +110,7 @@ const AdminCMSPage = lazyRetry(() => import("./pages/admin/AdminCMSPage"));
 const AdminCategoriesPage = lazyRetry(() => import("./pages/admin/AdminCategoriesPage"));
 const AdminOrdersPage = lazyRetry(() => import("./pages/admin/AdminOrdersPage"));
 const AdminLogisticsPage = lazyRetry(() => import("./pages/admin/AdminLogisticsPage"));
+const AdminForwardersPage = lazyRetry(() => import("./pages/admin/AdminForwardersPage"));
 const AdminNotificationsPage = lazyRetry(() => import("./pages/admin/AdminNotificationsPage"));
 const AdminSettingsPage = lazyRetry(() => import("./pages/admin/AdminSettingsPage"));
 const AdminShippingPage = lazyRetry(() => import("./pages/admin/AdminShippingPage"));
@@ -130,18 +138,47 @@ const AdminVariantTypesPage = lazyRetry(() => import("./pages/admin/AdminVariant
 const AdminAnalyticsPage = lazyRetry(() => import("./pages/admin/AdminAnalyticsPage"));
 const AdminEmailTemplatesPage = lazyRetry(() => import("./pages/admin/AdminEmailTemplatesPage"));
 const AdminKycPage = lazyRetry(() => import("./pages/admin/AdminKycPage"));
+const AdminKybKycV2Page = lazyRetry(() => import("./pages/admin/AdminKybKycV2Page"));
 const AdminFeaturedPlacementsPage = lazyRetry(() => import("./pages/admin/AdminFeaturedPlacementsPage"));
 const AdminVendorAccountingPage = lazyRetry(() => import("./pages/admin/AdminVendorAccountingPage"));
 const AdminFlashSalesPage = lazyRetry(() => import("./pages/admin/AdminFlashSalesPage"));
 const AdminSupplierPlatformsPage = lazyRetry(() => import("./pages/admin/AdminSupplierPlatformsPage"));
 const AdminStoreModerationPage = lazyRetry(() => import("./pages/admin/AdminStoreModerationPage"));
 const AdminStoreTransfersPage = lazyRetry(() => import("./pages/admin/AdminStoreTransfersPage"));
+const AdminOperatorsPage = lazyRetry(() => import("./pages/admin/AdminOperatorsPage"));
+const AdminOperatorQuotaRequestsPage = lazyRetry(() => import("./pages/admin/AdminOperatorQuotaRequestsPage"));
+const AdminOperatorRateCapsPage = lazyRetry(() => import("./pages/admin/AdminOperatorRateCapsPage"));
+const AdminOperatorRatesPendingPage = lazyRetry(() => import("./pages/admin/AdminOperatorRatesPendingPage"));
+const AdminOperatorRatesPage = lazyRetry(() => import("./pages/admin/AdminOperatorRatesPage"));
+const AdminCoverageRequestsPage = lazyRetry(() => import("./pages/admin/AdminCoverageRequestsPage"));
+const AdminOperatorsPerformancePage = lazyRetry(() => import("./pages/admin/AdminOperatorsPerformancePage"));
 const AdminStoreChangeRequestsPage = lazyRetry(() => import("./pages/admin/AdminStoreChangeRequestsPage"));
 const AdminServicePlansPage = lazyRetry(() => import("./pages/admin/AdminServicePlansPage"));
 const AdminDeliveryPlansPage = lazyRetry(() => import("./pages/admin/AdminDeliveryPlansPage"));
 const AdminServicePackagesPage = lazyRetry(() => import("./pages/admin/AdminServicePackagesPage"));
 const AdminErrorReportsPage = lazyRetry(() => import("./pages/admin/AdminErrorReportsPage"));
+const AdminHealthPage = lazyRetry(() => import("./pages/admin/AdminHealthPage"));
 const ImpersonatePage = lazyRetry(() => import("./pages/ImpersonatePage"));
+const SourcingPage = lazyRetry(() => import("./pages/SourcingPage"));
+const AdminProductSourcingPage = lazyRetry(() => import("./pages/admin/AdminProductSourcingPage"));
+
+// Operator (Lot 11B Phase B2)
+const BecomeOperatorPage = lazyRetry(() => import("./pages/BecomeOperatorPage"));
+const BecomeForwarderPage = lazyRetry(() => import("./pages/BecomeForwarderPage"));
+const OperatorLayout = lazyRetry(() => import("./layouts/OperatorLayout"));
+const OperatorDashboardPage = lazyRetry(() => import("./pages/operator/OperatorDashboardPage"));
+const OperatorOrdersPage = lazyRetry(() => import("./pages/operator/OperatorOrdersPage"));
+const OperatorFleetPage = lazyRetry(() => import("./pages/operator/OperatorFleetPage"));
+const OperatorCoveragePage = lazyRetry(() => import("./pages/operator/OperatorCoveragePage"));
+const OperatorRatesPage = lazyRetry(() => import("./pages/operator/OperatorRatesPage"));
+const OperatorBillingPage = lazyRetry(() => import("./pages/operator/OperatorBillingPage"));
+const OperatorSettingsPage = lazyRetry(() => import("./pages/operator/OperatorSettingsPage"));
+const ForwarderDashboardPage = lazyRetry(() => import("./pages/forwarder/ForwarderDashboardPage"));
+const ForwarderProfilesPage = lazyRetry(() => import("./pages/forwarder/ForwarderProfilesPage"));
+const ForwarderCoveragePage = lazyRetry(() => import("./pages/forwarder/ForwarderCoveragePage"));
+const ForwarderHandoffsPage = lazyRetry(() => import("./pages/forwarder/ForwarderHandoffsPage"));
+const ForwarderSettingsPage = lazyRetry(() => import("./pages/forwarder/ForwarderSettingsPage"));
+const ForwarderLayout = lazyRetry(() => import("./layouts/ForwarderLayout"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchOnWindowFocus: false } },
@@ -203,7 +240,9 @@ const App = () => (
             <SupportDrawerProvider>
             <ScrollRestoration />
              <CartDrawer />
-            <CompareBar />
+            <Suspense fallback={null}>
+              <CompareBar />
+            </Suspense>
             <SupportDrawerWrapper />
             <MobileBottomNav />
             <PWAInstallBanner />
@@ -214,6 +253,7 @@ const App = () => (
             <AutomationPopup />
             <MaintenanceGuard>
             <BanGuard>
+            <RecoveryGuard />
             <Suspense fallback={<PageLoadingSkeleton />}>
               <Routes>
                 <Route path="/banned" element={<BannedPage />} />
@@ -235,6 +275,8 @@ const App = () => (
                 <Route path="/vendor" element={<VendorDashboardPage />} />
                 <Route path="/shipper" element={<ShipperDashboardPage />} />
                 <Route path="/rider" element={<RiderDashboardPage />} />
+                <Route path="/rider-invite" element={<RiderInvitePage />} />
+                <Route path="/carrier" element={<CarrierDashboardPage />} />
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/wishlist" element={<WishlistPage />} />
                 <Route path="/wishlist/shared/:userId" element={<SharedWishlistPage />} />
@@ -255,6 +297,7 @@ const App = () => (
                 <Route path="/blog/:slug" element={<BlogPostPage />} />
                 <Route path="/compare" element={<ComparePage />} />
                 <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/sourcing" element={<SourcingPage />} />
                 {/* Admin routes */}
                 <Route path="/admin" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDashboard /></RoleGuard>} />
                 <Route path="/admin/users" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminUsersPage /></RoleGuard>} />
@@ -266,6 +309,7 @@ const App = () => (
                 <Route path="/admin/review-moderation" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminReviewModerationPage /></RoleGuard>} />
                 <Route path="/admin/support" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminSupportPage /></RoleGuard>} />
                 <Route path="/admin/logistics" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminLogisticsPage /></RoleGuard>} />
+                <Route path="/admin/forwarders" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminForwardersPage /></RoleGuard>} />
                 <Route path="/admin/notifications" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminNotificationsPage /></RoleGuard>} />
                 <Route path="/admin/settings" element={<RoleGuard allowedRoles={["admin"]}><AdminSettingsPage /></RoleGuard>} />
                 <Route path="/admin/shipping" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminShippingPage /></RoleGuard>} />
@@ -276,6 +320,8 @@ const App = () => (
                 <Route path="/admin/vendor-pricing" element={<RoleGuard allowedRoles={["admin"]}><AdminVendorPricingPage /></RoleGuard>} />
                 <Route path="/admin/audit" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminAuditPage /></RoleGuard>} />
                 <Route path="/admin/error-reports" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminErrorReportsPage /></RoleGuard>} />
+                <Route path="/admin/health" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminHealthPage /></RoleGuard>} />
+                <Route path="/admin/sourcing" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminProductSourcingPage /></RoleGuard>} />
                 <Route path="/admin/loyalty" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminLoyaltyPage /></RoleGuard>} />
                 <Route path="/admin/points" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminPointsPage /></RoleGuard>} />
                 <Route path="/admin/coupons" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminCouponsPage /></RoleGuard>} />
@@ -290,17 +336,58 @@ const App = () => (
                 <Route path="/admin/analytics" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminAnalyticsPage /></RoleGuard>} />
                 <Route path="/admin/email-templates" element={<RoleGuard allowedRoles={["admin"]}><AdminEmailTemplatesPage /></RoleGuard>} />
                 <Route path="/admin/kyc" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminKycPage /></RoleGuard>} />
+                <Route path="/admin/kyb-kyc-v2" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminKybKycV2Page /></RoleGuard>} />
                 <Route path="/admin/featured-placements" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminFeaturedPlacementsPage /></RoleGuard>} />
                 <Route path="/admin/vendor-accounting" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminVendorAccountingPage /></RoleGuard>} />
                 <Route path="/admin/flash-sales" element={<RoleGuard allowedRoles={["admin"]}><AdminFlashSalesPage /></RoleGuard>} />
                 <Route path="/admin/supplier-platforms" element={<RoleGuard allowedRoles={["admin"]}><AdminSupplierPlatformsPage /></RoleGuard>} />
                 <Route path="/admin/store-moderation" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminStoreModerationPage /></RoleGuard>} />
                 <Route path="/admin/store-transfers" element={<RoleGuard allowedRoles={["admin"]}><AdminStoreTransfersPage /></RoleGuard>} />
+                <Route path="/admin/operators" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminOperatorsPage /></RoleGuard>} />
+                <Route path="/admin/operator-quota-requests" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminOperatorQuotaRequestsPage /></RoleGuard>} />
+                <Route path="/admin/operator-rate-caps" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminOperatorRateCapsPage /></RoleGuard>} />
+                <Route path="/admin/operator-rates-pending" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminOperatorRatesPendingPage /></RoleGuard>} />
+                <Route path="/admin/operators/:operatorId/rates" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminOperatorRatesPage /></RoleGuard>} />
+                <Route path="/admin/operators-performance" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminOperatorsPerformancePage /></RoleGuard>} />
+                <Route path="/admin/coverage-requests" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminCoverageRequestsPage /></RoleGuard>} />
                 <Route path="/admin/store-change-requests" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminStoreChangeRequestsPage /></RoleGuard>} />
                 <Route path="/admin/service-plans" element={<RoleGuard allowedRoles={["admin"]}><AdminServicePlansPage /></RoleGuard>} />
                 <Route path="/admin/delivery-plans" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminDeliveryPlansPage /></RoleGuard>} />
                 <Route path="/admin/service-packages" element={<RoleGuard allowedRoles={["admin"]}><AdminServicePackagesPage /></RoleGuard>} />
                 <Route path="/impersonate" element={<ImpersonatePage />} />
+                {/* Operator (Lot 11B Phase B2) */}
+                <Route path="/become-operator" element={<BecomeOperatorPage />} />
+                <Route path="/become-forwarder" element={<BecomeForwarderPage />} />
+                <Route
+                  path="/operator"
+                  element={
+                    <RoleGuard allowedRoles={["operator", "admin", "manager"]}>
+                      <OperatorLayout />
+                    </RoleGuard>
+                  }
+                >
+                  <Route index element={<OperatorDashboardPage />} />
+                  <Route path="orders" element={<OperatorOrdersPage />} />
+                  <Route path="fleet" element={<OperatorFleetPage />} />
+                  <Route path="coverage" element={<OperatorCoveragePage />} />
+                  <Route path="rates" element={<OperatorRatesPage />} />
+                  <Route path="billing" element={<OperatorBillingPage />} />
+                  <Route path="settings" element={<OperatorSettingsPage />} />
+                </Route>
+                <Route
+                  path="/forwarder"
+                  element={
+                    <RoleGuard allowedRoles={["forwarder", "admin", "manager"]}>
+                      <ForwarderLayout />
+                    </RoleGuard>
+                  }
+                >
+                  <Route index element={<ForwarderDashboardPage />} />
+                  <Route path="profiles" element={<ForwarderProfilesPage />} />
+                  <Route path="coverage" element={<ForwarderCoveragePage />} />
+                  <Route path="handoffs" element={<ForwarderHandoffsPage />} />
+                  <Route path="settings" element={<ForwarderSettingsPage />} />
+                </Route>
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

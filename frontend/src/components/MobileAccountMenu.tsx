@@ -26,6 +26,7 @@ import {
   Loader2,
   AlertTriangle,
   RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useCertification } from "@/hooks/use-certification";
@@ -33,7 +34,7 @@ import { CertificationBadge } from "@/components/CertificationBadge";
 
 export function MobileAccountMenu() {
   const { user, loading: authLoading, signOut } = useAuth();
-  const { isAdmin, isManager, isVendor, isShipper, isRider, isStaff, loading: rolesLoading } = useRoles();
+  const { isAdmin, isManager, isVendor, isShipper, isRider, isOperator, isForwarder, isStaff, loading: rolesLoading } = useRoles();
   const { t } = useI18n();
   const { isCertified } = useCertification();
   const [suppliersEnabled, setSuppliersEnabled] = useState(false);
@@ -78,54 +79,59 @@ export function MobileAccountMenu() {
   const initials = (firstName?.[0] ?? email?.[0] ?? "U").toUpperCase();
 
   const roleLinks: { show: boolean; to: string; icon: React.ElementType; label: string; color: string }[] = [
-    { show: isStaff, to: "/admin", icon: ShieldCheck, label: "Administration", color: "text-red-500" },
-    { show: isVendor, to: "/vendor", icon: Store, label: "Espace Vendeur", color: "text-emerald-500" },
-    { show: isShipper, to: "/shipper", icon: Truck, label: "Espace Expéditeur", color: "text-blue-500" },
-    { show: isRider, to: "/rider", icon: Bike, label: "Espace Livreur", color: "text-orange-500" },
+    { show: isStaff, to: "/admin", icon: ShieldCheck, label: t("account.role.admin") || "Administration", color: "text-red-500" },
+    { show: isVendor, to: "/vendor", icon: Store, label: t("account.role.vendor") || "Espace Vendeur", color: "text-emerald-500" },
+    { show: isShipper, to: "/shipper", icon: Truck, label: t("account.role.shipper") || "Espace Expéditeur", color: "text-blue-500" },
+    { show: isRider, to: "/rider", icon: Bike, label: t("account.role.rider") || "Espace Livreur", color: "text-orange-500" },
+    { show: isOperator, to: "/operator", icon: Truck, label: t("account.role.operator") || "Espace Opérateur", color: "text-cyan-500" },
+    { show: isForwarder, to: "/forwarder", icon: Package, label: t("account.role.forwarder") || "Espace Transitaire", color: "text-purple-500" },
   ];
 
   const visibleRoleLinks = roleLinks.filter((r) => r.show);
 
   const menuSections = [
     {
-      title: "Mon espace",
+      title: t("account.section.mySpace") || "Mon espace",
       items: [
-        { to: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
-        { to: "/dashboard?tab=orders", icon: FileText, label: "Mes commandes" },
-        { to: "/dashboard?tab=subscriptions", icon: Award, label: "Mes abonnements" },
-        { to: "/wishlist", icon: Heart, label: "Liste de souhaits" },
-        { to: "/messages", icon: MessageSquare, label: "Messages" },
-        ...(isVendor && suppliersEnabled ? [{ to: "/vendor?tab=suppliers", icon: Package, label: "Fournisseurs" }] : []),
+        { to: "/dashboard", icon: LayoutDashboard, label: t("account.item.dashboard") || "Tableau de bord" },
+        { to: "/dashboard?tab=orders", icon: FileText, label: t("account.item.orders") || "Mes commandes" },
+        { to: "/dashboard?tab=subscriptions", icon: Award, label: t("account.item.subscriptions") || "Mes abonnements" },
+        { to: "/wishlist", icon: Heart, label: t("account.item.wishlist") || "Liste de souhaits" },
+        { to: "/messages", icon: MessageSquare, label: t("account.item.messages") || "Messages" },
+        { to: "/sourcing", icon: Sparkles, label: t("account.item.sourcing") || "Trouvez-moi ce produit" },
+        ...(isVendor && suppliersEnabled ? [{ to: "/vendor?tab=suppliers", icon: Package, label: t("account.item.suppliers") || "Fournisseurs" }] : []),
       ],
     },
     {
-      title: "Fidélité & Parrainage",
+      title: t("account.section.loyalty") || "Fidélité & Parrainage",
       items: [
-        { to: "/dashboard?tab=overview", icon: Award, label: "Programme de fidélité" },
-        { to: "/dashboard?tab=referral", icon: Users, label: "Parrainage & Affiliation" },
+        { to: "/dashboard?tab=overview", icon: Award, label: t("account.item.loyalty") || "Programme de fidélité" },
+        { to: "/dashboard?tab=referral", icon: Users, label: t("account.item.referral") || "Parrainage & Affiliation" },
       ],
     },
     {
-      title: "Réclamations",
+      title: t("account.section.disputes") || "Réclamations",
       items: [
-        { to: "/dashboard?tab=disputes", icon: AlertTriangle, label: "Litiges" },
-        { to: "/dashboard?tab=returns", icon: RotateCcw, label: "Retours" },
+        { to: "/dashboard?tab=disputes", icon: AlertTriangle, label: t("account.item.disputes") || "Litiges" },
+        { to: "/dashboard?tab=returns", icon: RotateCcw, label: t("account.item.returns") || "Retours" },
       ],
     },
-    ...(!isVendor ? [{
-      title: "Opportunités",
+    ...((!isVendor || !isOperator || !isForwarder) ? [{
+      title: t("account.section.opportunities") || "Opportunités",
       items: [
-        { to: "/become-vendor", icon: Store, label: "Devenir vendeur" },
-      ],
+        ...(!isVendor ? [{ to: "/become-vendor", icon: Store, label: t("account.item.becomeVendor") || "Devenir vendeur" }] : []),
+        ...(!isOperator ? [{ to: "/become-operator", icon: Truck, label: t("account.item.becomeOperator") || "Devenir opérateur de livraison" }] : []),
+        ...(!isForwarder ? [{ to: "/become-forwarder", icon: Package, label: t("account.item.becomeForwarder") || "Devenir transitaire" }] : []),
+      ].filter(Boolean) as { to: string; icon: React.ElementType; label: string }[],
     }] : []),
     {
-      title: "Paramètres du compte",
+      title: t("account.section.settings") || "Paramètres du compte",
       items: [
-        { to: "/dashboard?tab=profile", icon: User, label: "Profil" },
-        { to: "/dashboard?tab=addresses", icon: MapPin, label: "Adresses" },
-        { to: "/dashboard?tab=notifications", icon: Bell, label: "Notifications" },
-        { to: "/dashboard?tab=kyc", icon: BadgeCheck, label: "Vérification KYC" },
-        { to: "/dashboard?tab=profile", icon: KeyRound, label: "Sécurité & mot de passe" },
+        { to: "/dashboard?tab=profile", icon: User, label: t("account.item.profile") || "Profil" },
+        { to: "/dashboard?tab=addresses", icon: MapPin, label: t("account.item.addresses") || "Adresses" },
+        { to: "/dashboard?tab=notifications", icon: Bell, label: t("account.item.notifications") || "Notifications" },
+        { to: "/dashboard?tab=kyc", icon: BadgeCheck, label: t("account.item.kyc") || "Vérification KYC" },
+        { to: "/dashboard?tab=profile", icon: KeyRound, label: t("account.item.security") || "Sécurité & mot de passe" },
       ],
     },
   ];
@@ -152,7 +158,7 @@ export function MobileAccountMenu() {
       {visibleRoleLinks.length > 0 && (
         <div className="px-4 pt-4 pb-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Mes interfaces
+            {t("account.myInterfaces") || "Mes interfaces"}
           </p>
           <div className="flex flex-col gap-2">
             {visibleRoleLinks.map((r) => (
@@ -201,7 +207,7 @@ export function MobileAccountMenu() {
           className="w-full flex items-center justify-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 py-3 text-destructive font-medium active:scale-[0.98] transition-transform"
         >
           <LogOut size={18} />
-          Déconnexion
+          {t("account.logout") || "Déconnexion"}
         </button>
       </div>
     </div>

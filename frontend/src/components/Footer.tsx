@@ -5,12 +5,12 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useFooterTheme } from "@/hooks/use-footer-theme";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 
 const paymentMethods = ["Visa", "Mastercard", "Orange Money", "Airtel Money", "M-PESA", "Apple Pay"];
 
 export function Footer() {
   const { t, formatPrice } = useI18n();
-  const [freeShippingAmount, setFreeShippingAmount] = useState(999);
   const ft = useFooterTheme();
 
   const [footerConfig, setFooterConfig] = useState({
@@ -21,24 +21,20 @@ export function Footer() {
     address: "Worldwide",
   });
 
+  // Footer config + free shipping threshold from consolidated bootstrap cache.
+  const { value: fc } = useBootstrapSetting<any>("footer_config");
+  const { value: fst } = useBootstrapSetting<any>("free_shipping_threshold");
   useEffect(() => {
-    supabase.from("platform_settings").select("key, value").in("key", ["footer_config", "free_shipping_threshold"]).then(({ data }) => {
-      data?.forEach(row => {
-        const v = row.value as any;
-        if (row.key === "footer_config") {
-          setFooterConfig(prev => ({
-            description: v.description || prev.description,
-            social_links: { ...prev.social_links, ...v.social_links },
-            newsletter_email: v.newsletter_email || prev.newsletter_email,
-            phone: v.phone || prev.phone,
-            address: v.address || prev.address,
-          }));
-        } else if (row.key === "free_shipping_threshold" && v.enabled) {
-          setFreeShippingAmount(Number(v.amount) || 999);
-        }
-      });
-    });
-  }, []);
+    if (!fc) return;
+    setFooterConfig(prev => ({
+      description: fc.description || prev.description,
+      social_links: { ...prev.social_links, ...(fc.social_links || {}) },
+      newsletter_email: fc.newsletter_email || prev.newsletter_email,
+      phone: fc.phone || prev.phone,
+      address: fc.address || prev.address,
+    }));
+  }, [fc]);
+  const freeShippingAmount = fst?.enabled ? (Number(fst.amount) || 999) : 999;
 
   const footerSections = [
     {
@@ -70,6 +66,8 @@ export function Footer() {
         { label: t("footer.giftCard"), to: "/dashboard" },
         { label: t("footer.loyaltyProgram"), to: "/loyalty-program" },
         { label: t("footer.sellOnZandofy"), to: "/become-vendor" },
+        { label: t("header.becomeOperator") || "Devenir opérateur de livraison", to: "/become-operator" },
+        { label: t("header.becomeForwarder") || "Devenir transitaire", to: "/become-forwarder" },
         { label: t("footer.topTrends"), to: "/trends" },
         { label: t("footer.mostPopular"), to: "/popular" },
       ],

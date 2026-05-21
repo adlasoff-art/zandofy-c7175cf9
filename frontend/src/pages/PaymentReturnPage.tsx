@@ -35,7 +35,9 @@ export default function PaymentReturnPage() {
   useEffect(() => {
     async function fetchTransaction() {
       if (!ref && !orderId) {
-        setStatus(statusParam === "success" ? "success" : statusParam === "failed" ? "failed" : statusParam === "cancelled" ? "cancelled" : "pending");
+        // Sécurité : sans transaction identifiable, on ne peut JAMAIS afficher
+        // "Paiement confirmé" sur la seule foi d'un paramètre d'URL.
+        setStatus(statusParam === "failed" ? "failed" : statusParam === "cancelled" ? "cancelled" : "pending");
         return;
       }
 
@@ -68,7 +70,8 @@ export default function PaymentReturnPage() {
           if (order) setOrderRef(order.order_ref);
         }
       } else {
-        setStatus(statusParam === "success" ? "success" : statusParam === "failed" ? "failed" : "pending");
+        // Aucune transaction trouvée : ne jamais confirmer un succès via URL seule.
+        setStatus(statusParam === "failed" ? "failed" : "pending");
       }
     }
 

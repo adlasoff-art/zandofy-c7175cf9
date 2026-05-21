@@ -8,6 +8,7 @@ interface SEOHeadProps {
   canonical?: string;
   ogImage?: string;
   ogType?: string;
+<<<<<<< HEAD
   /** Single schema object, or multiple nodes (wrapped in @graph automatically). */
   jsonLd?: Record<string, any> | Record<string, any>[];
 }
@@ -25,12 +26,17 @@ function normalizeJsonLd(jsonLd: Record<string, any> | Record<string, any>[]): R
     return buildJsonLdGraph(...jsonLd);
   }
   return jsonLd;
+=======
+  jsonLd?: Record<string, any>;
+  /** Force noindex,nofollow regardless of global SEO toggle (private pages). */
+  noindex?: boolean;
+>>>>>>> origin/main
 }
 
 const SITE_NAME = "Zandofy";
 const SITE_URL = import.meta.env.VITE_SITE_URL || "https://zandofy.com";
 
-export function SEOHead({ title, description, canonical, ogImage, ogType = "website", jsonLd }: SEOHeadProps) {
+export function SEOHead({ title, description, canonical, ogImage, ogType = "website", jsonLd, noindex }: SEOHeadProps) {
   const { seoEnabled } = useSeoEnabled();
   const seoConfig = useSeoConfig();
 
@@ -48,8 +54,8 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
       el.content = content;
     };
 
-    // When SEO is disabled, force noindex/nofollow
-    if (!seoEnabled) {
+    // When SEO is disabled OR page explicitly requests noindex
+    if (!seoEnabled || noindex) {
       setMeta("robots", "noindex, nofollow");
       return () => {
         document.querySelector('script[data-seo-jsonld]')?.remove();
@@ -155,7 +161,7 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
     return () => {
       document.querySelector('script[data-seo-jsonld]')?.remove();
     };
-  }, [title, description, canonical, ogImage, ogType, jsonLd, seoEnabled, seoConfig]);
+  }, [title, description, canonical, ogImage, ogType, jsonLd, seoEnabled, seoConfig, noindex]);
 
   return null;
 }

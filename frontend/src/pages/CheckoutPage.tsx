@@ -12,7 +12,18 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckoutShippingCalculator } from "@/components/CheckoutShippingCalculator";
+import type { ForwarderChoice } from "@/components/checkout/ForwarderSelector";
+import type { ConsolidationChoice } from "@/components/checkout/FreightSelector";
+import {
+  lockFreightQuote,
+  consumeFreightQuote,
+  type EligibleFreightOffer,
+} from "@/services/freightQuoteCheckout";
+import type { FreightGroupSelection } from "@/components/checkout/MultiOriginFreightSelector";
 import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
+import { OperatorSelector } from "@/components/checkout/OperatorSelector";
+import { useOperatorQuotes, type OperatorQuote } from "@/hooks/useOperatorQuotes";
+import { RequestCoverageButton } from "@/components/checkout/RequestCoverageButton";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
 import { CascadingAddressFields } from "@/components/address/CascadingAddressFields";
 import { useI18n } from "@/contexts/I18nContext";
@@ -25,6 +36,7 @@ import { useKycStatus } from "@/hooks/use-kyc";
 import { KycBanner } from "@/components/kyc/KycBanner";
 import { getColorDisplay } from "@/utils/colorName";
 import { useStorePaymentNumbers } from "@/hooks/use-store-payment-numbers";
+import { PaymentWaitingPanel } from "@/components/payments/PaymentWaitingPanel";
 
 type Step = "shipping" | "payment" | "confirmation";
 type PaymentMethod = "stripe" | "card" | "paypal" | "mobile_money" | "cod" | "off_platform";
@@ -89,7 +101,7 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { t } = useI18n();
+  const { t, formatPrice } = useI18n();
   const { data: paymentConfig } = usePaymentMethods();
   const { isVerified: isKycVerified, isOrderBlocked, needsKyc, kycStatus } = useKycStatus();
 
@@ -118,6 +130,9 @@ export default function CheckoutPage() {
   const [lastMilePayment, setLastMilePayment] = useState<LastMilePayment>("pay_with_shipping");
   const [lastMileResult, setLastMileResult] = useState<LastMileFeeResult | null>(null);
   const [lastMileLoading, setLastMileLoading] = useState(false);
+
+  // Lot 11B Phase B4 — Sélection d'opérateur de livraison (entreprise tierce ou plateforme)
+  const [selectedOperator, setSelectedOperator] = useState<OperatorQuote | null>(null);
 
   // Deferred payment retry state
   const [retryPhone, setRetryPhone] = useState("");
@@ -156,6 +171,70 @@ export default function CheckoutPage() {
   const [dynamicShippingCost, setDynamicShippingCost] = useState<number | null>(null);
   const [shippingMode, setShippingMode] = useState<string>("air");
 
+  // Forwarder selection (Lot 3)
+  const [selectedForwarder, setSelectedForwarder] = useState<ForwarderChoice | null>(null);
+  const [forwarderUnassigned, setForwarderUnassigned] = useState(false);
+
+  // Lot 11B Phase B8 — Vérifier la couverture opérateur pour activer "Livraison à domicile"
+  const { data: operatorQuotesForCoverage, isLoading: operatorCoverageLoading } = useOperatorQuotes({
+    city: shipping.city,
+    countryCode: shipping.country,
+    commune: shipping.commune,
+    quartier: shipping.quartier,
+    enabled: !!shipping.city && !!shipping.country,
+  });
+  const hasOperatorCoverage = (operatorQuotesForCoverage?.length ?? 0) > 0;
+
+  // Auto-fallback : si la zone perd sa couverture opérateur et que home_delivery était choisi,
+  // basculer en "none" et désélectionner l'opérateur précédent.
+  useEffect(() => {
+    if (deliveryOption === "home_delivery" && !operatorCoverageLoading && !hasOperatorCoverage) {
+      setDeliveryOption("none");
+      setSelectedOperator(null);
+      toast({
+        title: "Livraison à domicile indisponible",
+        description: "Aucun livreur partenaire ne dessert votre nouvelle zone. Choisissez le retrait au Hub.",
+        variant: "destructive",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasOperatorCoverage, operatorCoverageLoading]);
+
+  const handleForwarderChange = useCallback((choice: ForwarderChoice | null, unassigned: boolean) => {
+    setSelectedForwarder(choice);
+    setForwarderUnassigned(unassigned);
+  }, []);
+
+  // Lot 4D — Nouveau moteur freight (offre Lot 3A si profil éligible)
+  const [selectedFreightOffer, setSelectedFreightOffer] = useState<EligibleFreightOffer | null>(null);
+  const [freightChoice, setFreightChoice] = useState<ConsolidationChoice>("split");
+  const [freightOffersAvailable, setFreightOffersAvailable] = useState(0);
+  const handleFreightOfferChange = useCallback(
+    (offer: EligibleFreightOffer | null, choice?: ConsolidationChoice) => {
+      setSelectedFreightOffer(offer);
+      setFreightChoice(choice ?? "split");
+    },
+    [],
+  );
+  const handleFreightAvailabilityChange = useCallback((count: number) => {
+    setFreightOffersAvailable(count);
+  }, []);
+
+  // Lot 11C Phase 2 — Mapping des sélections multi-groupes (1 par origine×store).
+  // Quand le panier contient ≥2 groupes (store × origine), chaque groupe doit avoir
+  // son propre transitaire. Si vide, on retombe sur le flux mono-offre legacy.
+  const [freightGroups, setFreightGroups] = useState<Record<string, FreightGroupSelection>>({});
+  const handleFreightGroupsChange = useCallback(
+    (sels: Record<string, FreightGroupSelection>) => {
+      setFreightGroups(sels);
+    },
+    [],
+  );
+  const isMultiGroupCheckout = Object.keys(freightGroups).length > 1;
+  const freightGroupsAllSelected =
+    isMultiGroupCheckout &&
+    Object.values(freightGroups).every((s) => !!s.offer);
+
   // Free shipping threshold from platform settings
   const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(50);
   const [freeShippingEnabled, setFreeShippingEnabled] = useState(true);
@@ -178,6 +257,23 @@ export default function CheckoutPage() {
   // Country/city eligibility state
   const [countryBlocked, setCountryBlocked] = useState(false);
   const [countryBlockMessage, setCountryBlockMessage] = useState("");
+
+  // Lot UX Mobile — `isDesktop` doit être déclaré AVANT tout early return
+  // (utilisateur non connecté, KYC bloqué, panier vide) pour respecter les
+  // Rules of Hooks. Sinon le nombre de hooks change entre deux rendus et
+  // l'ErrorBoundary attrape un crash React.
+  const [isDesktop, setIsDesktop] = useState<boolean>(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(min-width: 1024px)").matches
+      : true,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
 
   // Validate country+city against active_countries
   const validateCountryCity = useCallback(async (country: string, city: string) => {
@@ -212,16 +308,26 @@ export default function CheckoutPage() {
     queryKey: ["client-delivery-sub-checkout", user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data } = await fromTable("store_package_subscriptions")
-        .select("*, service_packages(name)")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .gt("paid_until", new Date().toISOString())
-        .maybeSingle();
-      return data;
+      try {
+        const { data, error } = await fromTable("store_package_subscriptions")
+          .select("*, service_packages(name)")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .gt("paid_until", new Date().toISOString())
+          .maybeSingle();
+        if (error) {
+          console.warn("[CheckoutPage] clientDeliverySub query failed (non-blocking):", error);
+          return null;
+        }
+        return data;
+      } catch (e) {
+        console.warn("[CheckoutPage] clientDeliverySub threw (non-blocking):", e);
+        return null;
+      }
     },
     enabled: !!user,
     staleTime: 60 * 1000,
+    retry: false,
   });
 
   const hasActiveDeliverySub = !!clientDeliverySub;
@@ -315,14 +421,40 @@ export default function CheckoutPage() {
     };
   }, []);
 
+  // Filet de sécurité : abandon propre si l'utilisateur ferme la page pendant
+  // un paiement en attente (sendBeacon survit à la fermeture de l'onglet).
+  useEffect(() => {
+    if (!paymentPending || paymentOrderIds.length === 0) return;
+    const beaconAbandon = () => {
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mark-payment-abandoned`;
+        const payload = JSON.stringify({
+          order_ids: paymentOrderIds,
+          reference: paymentReference,
+        });
+        const blob = new Blob([payload], { type: "application/json" });
+        navigator.sendBeacon?.(url, blob);
+      } catch {
+        // best-effort
+      }
+    };
+    window.addEventListener("beforeunload", beaconAbandon);
+    return () => window.removeEventListener("beforeunload", beaconAbandon);
+  }, [paymentPending, paymentOrderIds, paymentReference]);
+
   const handleShippingCostChange = useCallback((cost: number, mode: string) => {
     setDynamicShippingCost(cost > 0 ? cost : null);
     setShippingMode(mode);
   }, []);
 
-  const shippingCost = dynamicShippingCost !== null
-    ? dynamicShippingCost
-    : (freeShippingEnabled && subtotal >= freeShippingThreshold ? 0 : FALLBACK_SHIPPING_COST);
+  // Lot Very Speed — Priorité absolue à l'offre transitaire sélectionnée par le client.
+  // Tant qu'aucune offre n'est sélectionnée, le shippingCost reste 0 (et le bouton
+  // "Payer maintenant" affichera "—" pour forcer le choix). Plus de fallback 5.99.
+  const shippingCost = selectedFreightOffer
+    ? Number(selectedFreightOffer.quote.total) || 0
+    : (dynamicShippingCost !== null
+        ? dynamicShippingCost
+        : (freeShippingEnabled && subtotal >= freeShippingThreshold ? 0 : 0));
 
   // Raw discount calculations
   const rawCouponPct = appliedCoupon
@@ -355,7 +487,12 @@ export default function CheckoutPage() {
   const effectiveShipping = shippingPaymentChoice === "pay_on_arrival" ? 0 : shippingCost;
   
   // Last-mile fee calculation — waived if client has active delivery subscription
-  const rawLastMileFee = deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
+  // Si un opérateur tiers est sélectionné, son tarif prime sur le calcul commune/quartier.
+  const operatorFee =
+    deliveryOption === "home_delivery" && selectedOperator ? selectedOperator.fee : 0;
+  const fallbackLastMileFee =
+    deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
+  const rawLastMileFee = selectedOperator ? operatorFee : fallbackLastMileFee;
   const lastMileFee = hasActiveDeliverySub ? 0 : rawLastMileFee;
   const effectiveLastMile = deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping" ? lastMileFee : 0;
   
@@ -375,6 +512,11 @@ export default function CheckoutPage() {
       })
       .catch(() => setLastMileLoading(false));
   }, [deliveryOption, shipping.commune, shipping.quartier, shipping.city, shipping.country]);
+
+  // Reset operator selection lorsque l'option de livraison ou l'adresse change
+  useEffect(() => {
+    setSelectedOperator(null);
+  }, [deliveryOption, shipping.city, shipping.commune, shipping.quartier, shipping.country]);
 
   // Load saved addresses
   useEffect(() => {
@@ -430,13 +572,19 @@ export default function CheckoutPage() {
     setCouponLoading(true);
     const code = couponCode.trim().toUpperCase();
 
-    // 1. Try global coupons first
-    const { data: globalData } = await supabase
-      .from("coupons")
-      .select("code, discount_type, discount_value, min_order_amount, max_uses, current_uses, expires_at")
-      .eq("code", code)
-      .eq("is_active", true)
-      .maybeSingle();
+    // 1. Try global coupons first (via RPC sécurisée — la table n'est plus listable)
+    type CouponRow = {
+      code: string;
+      discount_type: string;
+      discount_value: number;
+      min_order_amount: number | null;
+      max_uses: number | null;
+      current_uses: number;
+      expires_at: string | null;
+    };
+    const { data: globalRows } = await (supabase.rpc as any)("validate_coupon", { p_code: code });
+    const globalData: CouponRow | null =
+      Array.isArray(globalRows) && globalRows.length > 0 ? (globalRows[0] as CouponRow) : null;
 
     // 2. Try store coupons
     const { data: storeData } = await supabase
@@ -568,6 +716,53 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Lot 4G — Si des transitaires sont disponibles, le client doit en choisir un.
+    // Lot 11C Phase 2 — En multi-groupes, exiger un transitaire pour CHAQUE groupe.
+    if (isMultiGroupCheckout) {
+      if (!freightGroupsAllSelected) {
+        const total = Object.keys(freightGroups).length;
+        const done = Object.values(freightGroups).filter((s) => s.offer).length;
+        toast({
+          title: "Transitaires requis",
+          description: `Veuillez choisir un transitaire pour chacun des ${total} colis (${done}/${total} choisis).`,
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (freightOffersAvailable > 0 && !selectedFreightOffer) {
+      toast({
+        title: "Transitaire requis",
+        description: "Veuillez sélectionner un transitaire avant de continuer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Lot 11B Phase B8 — Le client doit choisir un mode de livraison
+    if (deliveryOption === "none") {
+      toast({
+        title: "Mode de livraison requis",
+        description: "Veuillez choisir entre la livraison à domicile ou le retrait au Hub.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Si livraison à domicile : un livreur doit être sélectionné (sauf abonnement actif)
+    if (
+      deliveryOption === "home_delivery" &&
+      !hasActiveDeliverySub &&
+      hasOperatorCoverage &&
+      !selectedOperator
+    ) {
+      toast({
+        title: "Livreur requis",
+        description: "Veuillez sélectionner un livreur pour finaliser votre livraison à domicile.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Save address if checked
     if (saveAddress && user) {
       const { error } = await supabase.from("saved_addresses").insert({
@@ -603,29 +798,125 @@ export default function CheckoutPage() {
 
     const productIds = [...new Set(items.map((i) => i.productId).filter(Boolean))];
     const { data: prods } = productIds.length > 0
-      ? await supabase.from("products").select("id, store_id").in("id", productIds)
+      ? await supabase.from("products").select("id, store_id, origin_country, store:stores(country)").in("id", productIds)
       : { data: [] };
     const storeMap = new Map((prods || []).map((p) => [p.id, p.store_id]));
+    // Lot 11C — Map productId → pays d'origine (ISO2). Sert à persister
+    // orders.origin_country pour la segmentation multi-origines (Phase 2).
+    // Origine effective = origin_country produit > stores.country (fallback).
+    const originMap = new Map(
+      (prods || []).map((p: any) => [
+        p.id,
+        ((p.origin_country || p.store?.country || "") || "").toUpperCase() || null,
+      ]),
+    );
 
+    // Lot 11C Phase 2 — Segmentation par (store_id, origin_country) si multi-groupes
+    // sélectionnés au checkout, sinon par store_id seul (legacy).
+    const useMultiGroup = isMultiGroupCheckout;
     const storeGroups = new Map<string, typeof items>();
     items.forEach((item) => {
       const sid = storeMap.get(item.productId) || "default";
-      const arr = storeGroups.get(sid) || [];
+      const origin = (originMap.get(item.productId) || "UNKNOWN") as string;
+      const groupKey = useMultiGroup ? `${sid}|${origin}` : sid;
+      const arr = storeGroups.get(groupKey) || [];
       arr.push(item);
-      storeGroups.set(sid, arr);
+      storeGroups.set(groupKey, arr);
     });
 
     const createdOrderIds: string[] = [];
     const storeEntries = [...storeGroups.entries()];
     const needsSuffix = storeEntries.length > 1;
 
+    // Lot 4D / 11C Phase 2 — Lock des devis freight AVANT création des orders.
+    // Mono-groupe → 1 seul devis verrouillé pour la 1re sous-order.
+    // Multi-groupes → 1 devis verrouillé par groupe (mappé via groupKey).
+    let lockedFreightQuoteId: string | null = null;
+    let lockedFreightTotal: number | null = null;
+    const lockedQuotesByGroup = new Map<string, { quoteId: string; total: number; offer: EligibleFreightOffer }>();
+
+    if (useMultiGroup && user) {
+      for (const [groupKey, sel] of Object.entries(freightGroups)) {
+        if (!sel.offer) continue;
+        try {
+          const qid = await lockFreightQuote({
+            userId: user.id,
+            offer: sel.offer,
+            items: sel.offer.quote.lines.map((l: any) => ({ quantity: l.quantity ?? 1 })),
+            consolidationChoice: sel.choice,
+          });
+          if (qid) {
+            const { data: lockedQ } = await (supabase as any)
+              .from("freight_quotes")
+              .select("quoted_price")
+              .eq("id", qid)
+              .maybeSingle();
+            const persisted = Number((lockedQ as any)?.quoted_price);
+            const total = Number.isFinite(persisted) && persisted > 0
+              ? persisted
+              : Number(sel.offer.quote.total) || 0;
+            lockedQuotesByGroup.set(groupKey, { quoteId: qid, total, offer: sel.offer });
+          }
+        } catch (err) {
+          console.warn("[CheckoutPage] lockFreightQuote (group) failed", { groupKey, err });
+        }
+      }
+    } else if (selectedFreightOffer && user) {
+      try {
+        lockedFreightQuoteId = await lockFreightQuote({
+          userId: user.id,
+          offer: selectedFreightOffer,
+          items: selectedFreightOffer.quote.lines.map((l: any) => ({
+            quantity: l.quantity ?? 1,
+          })),
+          consolidationChoice: freightChoice,
+        });
+        // Lot 11A — Source unique de vérité : si le devis est verrouillé,
+        // re-lire son quoted_price persisté pour aligner orders.shipping_cost.
+        // Évite la désynchro UI ($15.50) vs DB ($0.00) observée sur ZND-MOFRHBGT.
+        if (lockedFreightQuoteId) {
+          const { data: lockedQ } = await (supabase as any)
+            .from("freight_quotes")
+            .select("quoted_price")
+            .eq("id", lockedFreightQuoteId)
+            .maybeSingle();
+          const persisted = Number((lockedQ as any)?.quoted_price);
+          if (Number.isFinite(persisted) && persisted > 0) {
+            lockedFreightTotal = persisted;
+          }
+        }
+      } catch (err) {
+        console.warn("[CheckoutPage] lockFreightQuote failed (non-blocking)", err);
+      }
+    }
+
     for (let idx = 0; idx < storeEntries.length; idx++) {
-      const [storeId, storeItems] = storeEntries[idx];
+      const [groupKey, storeItems] = storeEntries[idx];
+      // En multi-groupes : groupKey = `${storeId}|${origin}`. Sinon : storeId seul.
+      const [storeId, groupOriginRaw] = useMultiGroup ? groupKey.split("|") : [groupKey, undefined];
       const orderSubtotal = storeItems.reduce((s, i) => s + i.price * i.quantity, 0);
+      // Lot 11C — Origine effective de la sous-commande : si tous les produits
+      // partagent la même origine, on la persiste ; sinon NULL (multi-origines).
+      const orderOrigins = [
+        ...new Set(
+          storeItems
+            .map((i: any) => originMap.get(i.productId))
+            .filter((c: any): c is string => !!c),
+        ),
+      ];
+      const orderOriginCountry = useMultiGroup
+        ? (groupOriginRaw && groupOriginRaw !== "UNKNOWN" ? groupOriginRaw : null)
+        : (orderOrigins.length === 1 ? orderOrigins[0] : null);
       
       // Proportional shipping & discount distribution
       const ratio = subtotal > 0 ? orderSubtotal / subtotal : 0;
-      const orderShippingCost = preciseRound(shippingCost * ratio, 2);
+      // Lot 11C Phase 2 — En multi-groupes, le shipping = devis du groupe (pas de ratio).
+      // Sinon : ratio sur le total verrouillé (mono-devis).
+      const groupQuote = useMultiGroup ? lockedQuotesByGroup.get(groupKey) : null;
+      const orderShippingCost = useMultiGroup
+        ? preciseRound(groupQuote?.total ?? 0, 2)
+        : preciseRound((lockedFreightTotal ?? shippingCost) * ratio, 2);
+      const orderFreightQuoteId = useMultiGroup ? (groupQuote?.quoteId ?? null) : lockedFreightQuoteId;
       const orderDiscount = preciseRound(discountAmount * ratio, 2);
       const orderPointsDiscount = preciseRound(pointsDiscount * ratio, 2);
       
@@ -642,7 +933,18 @@ export default function CheckoutPage() {
         .insert({
           user_id: user!.id,
           store_id: storeId !== "default" ? storeId : null,
-          status: (paymentMethod === "mobile_money" || paymentMethod === "off_platform") ? "awaiting_payment" : "pending",
+          origin_country: orderOriginCountry,
+          // Toute commande dont le paiement est asynchrone (webhook ou validation hors plateforme)
+          // commence en `awaiting_payment` — elle n'est PAS encore une commande à notifier.
+          // Seul COD (cash à la livraison) commence en `pending` car il n'y a aucun paiement à attendre.
+          status:
+            (paymentMethod === "mobile_money" ||
+              paymentMethod === "card" ||
+              paymentMethod === "paypal" ||
+              paymentMethod === "stripe" ||
+              paymentMethod === "off_platform")
+              ? "awaiting_payment"
+              : "pending",
           payment_method: paymentMethod,
           shipping_first_name: shipping.firstName,
           shipping_last_name: shipping.lastName,
@@ -661,12 +963,54 @@ export default function CheckoutPage() {
           order_ref: orderRef,
           coupon_code: appliedCoupon?.code || null,
           discount_amount: orderDiscount,
-          // Off-platform: force all logistics payments to deferred
-          shipping_payment_status: (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform) ? "deferred" : "paid",
+          // Off-platform: force all logistics payments to deferred.
+          // "Paid" est attribué SEULEMENT après confirmation du paiement (webhook KelPay / retour Keccel).
+          // En attendant : "unpaid" pour les paiements asynchrones, "paid" pour COD/cash où la commande
+          // n'attend pas de webhook (la livraison est facturée à l'arrivée).
+          shipping_payment_status:
+            (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform)
+              ? "deferred"
+              : (paymentMethod === "mobile_money" || paymentMethod === "card" || paymentMethod === "paypal" || paymentMethod === "stripe")
+                ? "unpaid"
+                : "paid",
           delivery_choice: deliveryOption !== "none" ? deliveryOption : null,
           last_mile_fee: deliveryOption === "home_delivery" ? lastMileFee : 0,
+          // Lot 11B Phase B4 — opérateur de livraison sélectionné (NULL = flotte plateforme par défaut)
+          delivery_operator_id:
+            deliveryOption === "home_delivery" && selectedOperator
+              ? selectedOperator.operator_id
+              : null,
+          // Lot 11B Phase B7 — workflow d'acceptation opérateur (30 min pour répondre)
+          operator_acceptance_status:
+            deliveryOption === "home_delivery" && selectedOperator
+              ? "pending"
+              : "not_applicable",
+          operator_assigned_at:
+            deliveryOption === "home_delivery" && selectedOperator
+              ? new Date().toISOString()
+              : null,
+          operator_response_deadline:
+            deliveryOption === "home_delivery" && selectedOperator
+              ? new Date(Date.now() + 30 * 60 * 1000).toISOString()
+              : null,
           last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
-          last_mile_payment_status: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? "deferred" : (lastMilePayment === "pay_with_shipping" ? "paid" : "deferred")) : null,
+          last_mile_payment_status:
+            deliveryOption === "home_delivery" && lastMileFee > 0
+              ? (isOffPlatform
+                  ? "deferred"
+                  : (lastMilePayment === "pay_with_shipping"
+                      ? ((paymentMethod === "mobile_money" || paymentMethod === "card" || paymentMethod === "paypal" || paymentMethod === "stripe")
+                          ? "unpaid"
+                          : "paid")
+                      : "deferred"))
+              : null,
+          // Lot 3 — Forwarder assignment (silent fallback when no eligible forwarder)
+          forwarder_id: selectedForwarder?.forwarder_id ?? null,
+          forwarder_tier: selectedForwarder?.tier ?? null,
+          forwarder_quoted_price: selectedForwarder ? preciseRound(selectedForwarder.quoted_price * ratio, 2) : null,
+          forwarder_unassigned: !selectedForwarder && forwarderUnassigned,
+          // Lot 4D — Devis freight verrouillé (nouveau moteur Lot 3A)
+          freight_quote_id: orderFreightQuoteId,
         } as any)
         .select("id")
         .single();
@@ -685,6 +1029,54 @@ export default function CheckoutPage() {
             size: item.size || null,
           }))
         );
+
+        // Lot 11B Phase B4 — Notification opérateur (non-bloquant)
+        if (selectedOperator?.operator_id) {
+          try {
+            await supabase.functions.invoke("notify-operator-new-order", {
+              body: { order_id: order.id },
+            });
+          } catch (e) {
+            console.warn("[notify-operator-new-order] non-blocking error:", e);
+          }
+        }
+
+        // Lot 3 — Create shipment_assignments row when a forwarder was selected
+        if (selectedForwarder?.forwarder_id) {
+          // shipment_assignments: mode NOT NULL, status IN ('assigned', ...).
+          // Forwarders only handle air/sea; coerce other modes to 'air' as a safe default.
+          const assignmentMode =
+            shippingMode === "sea" || shippingMode === "air" ? shippingMode : "air";
+          await (supabase as any).from("shipment_assignments").insert({
+            order_id: order.id,
+            forwarder_id: selectedForwarder.forwarder_id,
+            tier: selectedForwarder.tier,
+            mode: assignmentMode,
+            quoted_price: preciseRound(selectedForwarder.quoted_price * ratio, 2),
+            status: "assigned",
+          });
+        }
+
+        // Lot 4D / 11C Phase 2 — Consume le devis freight lié à cette sous-order.
+        // Multi-groupes : 1 devis = 1 sous-order. Mono : 1 devis sur la 1re sous-order.
+        const quoteToConsume = useMultiGroup ? orderFreightQuoteId : (idx === 0 ? lockedFreightQuoteId : null);
+        if (quoteToConsume) {
+          try {
+            await consumeFreightQuote(quoteToConsume, order.id);
+            // Lot 4I — Notifier le transitaire par email (non-bloquant).
+            // Le handoff + notif in-app sont déjà créés par le trigger DB
+            // (trg_create_forwarder_handoff sur freight_quotes.status='consumed').
+            try {
+              await supabase.functions.invoke("notify-forwarder-handoff", {
+                body: { orderId: order.id },
+              });
+            } catch (notifErr) {
+              console.warn("[CheckoutPage] notify-forwarder-handoff failed (non-blocking)", notifErr);
+            }
+          } catch (err) {
+            console.warn("[CheckoutPage] consumeFreightQuote failed (non-blocking)", err);
+          }
+        }
       }
     }
 
@@ -777,6 +1169,15 @@ export default function CheckoutPage() {
               const newStatus = payload.new?.status;
               if (newStatus === "success") {
                 await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
+                // Logistique payée avec la commande : marquer "paid" maintenant
+                await (supabase as any).from("orders")
+                  .update({ shipping_payment_status: "paid" } as any)
+                  .in("id", orderIds)
+                  .eq("shipping_payment_status", "unpaid");
+                await (supabase as any).from("orders")
+                  .update({ last_mile_payment_status: "paid" } as any)
+                  .in("id", orderIds)
+                  .eq("last_mile_payment_status", "unpaid");
                 setPaymentPending(false);
                 removeSelectedItems();
                 goToStep("confirmation");
@@ -807,6 +1208,8 @@ export default function CheckoutPage() {
             });
             if (checkData?.status === "success") {
               await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
+              await (supabase as any).from("orders").update({ shipping_payment_status: "paid" }).in("id", orderIds).eq("shipping_payment_status", "unpaid");
+              await (supabase as any).from("orders").update({ last_mile_payment_status: "paid" }).in("id", orderIds).eq("last_mile_payment_status", "unpaid");
               setPaymentPending(false);
               await removeSelectedItems();
               goToStep("confirmation");
@@ -854,7 +1257,7 @@ export default function CheckoutPage() {
         if (!data) throw new Error("Pas de réponse de la passerelle de paiement");
         if (data.success === false) {
           console.error("keccel-cardpay API error:", data);
-          throw new Error(data.error || "Erreur de la passerelle de paiement");
+          throw new Error("Redirection carte indisponible. Veuillez réessayer ou choisir Mobile Money.");
         }
         if (data.redirect_url) {
           window.location.href = data.redirect_url;
@@ -863,11 +1266,18 @@ export default function CheckoutPage() {
           window.location.href = data.fallback_terminal_url;
           return;
         } else {
-          // No redirect URL — show confirmation page
-          setOrderId(orderRef);
-          await removeSelectedItems();
-          goToStep("confirmation");
-          setProcessing(false);
+          // SÉCURITÉ CRITIQUE : pour un paiement carte, l'absence d'URL de
+          // redirection signifie que le paiement n'a JAMAIS été initié côté
+          // passerelle. On ne doit JAMAIS afficher "Commande confirmée" ici.
+          // On marque les commandes en payment_failed et on lève une erreur.
+          if (orderIds.length > 0) {
+            await supabase
+              .from("orders")
+              .update({ status: "payment_failed" } as any)
+              .in("id", orderIds)
+              .eq("status", "awaiting_payment");
+          }
+          throw new Error("Redirection carte indisponible. Veuillez réessayer ou choisir Mobile Money.");
         }
       } catch (err: any) {
         // Mark any created orders as payment_failed so they don't appear as active
@@ -918,6 +1328,8 @@ export default function CheckoutPage() {
         if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
         if (paymentOrderIds.length > 0) {
           await supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
+          await (supabase as any).from("orders").update({ shipping_payment_status: "paid" }).in("id", paymentOrderIds).eq("shipping_payment_status", "unpaid");
+          await (supabase as any).from("orders").update({ last_mile_payment_status: "paid" }).in("id", paymentOrderIds).eq("last_mile_payment_status", "unpaid");
         }
         setPaymentPending(false);
         await removeSelectedItems();
@@ -949,6 +1361,32 @@ export default function CheckoutPage() {
     toast({ title: "Paiement annulé", description: "Vous pouvez réessayer avec un autre moyen de paiement.", variant: "destructive" });
   };
 
+  /**
+   * Auto-abandon : compte à rebours expiré + 60s sans action OU fermeture de page.
+   * Vérifie une dernière fois auprès de KelPay puis bascule en payment_failed.
+   */
+  const handleAutoAbandonPayment = async () => {
+    if (paymentOrderIds.length === 0) return;
+    try {
+      await supabase.functions.invoke("mark-payment-abandoned", {
+        body: { order_ids: paymentOrderIds, reference: paymentReference },
+      });
+    } catch (e) {
+      console.warn("auto-abandon failed:", e);
+    }
+    if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
+    setPaymentPending(false);
+    setPaymentTransactionId(null);
+    setPaymentReference(null);
+    toast({
+      title: "Paiement non confirmé",
+      description: "Le paiement n'a pas été validé à temps. Vous pouvez relancer depuis votre tableau de bord.",
+      variant: "destructive",
+    });
+  };
+
+
+
   const updateField = (field: keyof ShippingInfo, value: string) =>
     setShipping(prev => ({ ...prev, [field]: value }));
 
@@ -956,6 +1394,214 @@ export default function CheckoutPage() {
     "Domicile": <Home size={14} />,
     "Bureau": <Briefcase size={14} />,
   };
+
+  // Lot UX Mobile — Réagencement de la checkout sur < lg (mobile + tablette).
+  // Sur desktop (≥1024px), la sidebar récap reste à droite (inchangé).
+  // Sur mobile/tablette, le récap est intégré dans la colonne principale
+  // (récap haut après l'adresse, totaux juste avant le bouton Continuer)
+  // pour éviter les va-et-vient. On rend les blocs UNE SEULE FOIS via
+  // un état `isDesktop` afin de ne pas dupliquer le CheckoutShippingCalculator.
+  // NOTE : `isDesktop` est déclaré tout en haut du composant (avant les early returns)
+  // pour respecter les Rules of Hooks. Voir la déclaration près des autres useState.
+
+  const renderSummaryTop = () => (
+    <>
+      <h3 className="font-bold text-foreground">{t("checkout.orderSummary")} ({items.length})</h3>
+
+      <div className="space-y-3 max-h-48 overflow-y-auto">
+        {items.map(item => (
+          <div key={item.id} className="flex gap-3">
+            <img src={item.image} alt={item.nameFr} className="w-14 h-16 object-cover rounded-sm shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground line-clamp-1">{item.nameFr}</p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                {item.color && (() => {
+                  const cd = getColorDisplay(item.color);
+                  return cd ? (
+                    <span className="inline-flex items-center gap-1">
+                      {cd.hex && <span className="w-3 h-3 rounded-full border border-border inline-block" style={{ backgroundColor: cd.hex }} />}
+                      <span>{cd.name}</span>
+                    </span>
+                  ) : null;
+                })()}
+                {item.size && <span>{item.size}</span>}
+                <span>× {item.quantity}</span>
+              </div>
+              <p className="text-sm font-bold text-foreground">{formatPrice(item.price * item.quantity)}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Coupon */}
+      <div className="border-t border-border pt-3">
+        {appliedCoupon ? (
+          <div className="flex items-center justify-between bg-primary/5 p-2 rounded-lg">
+            <div className="flex items-center gap-2 text-sm">
+              <Tag size={14} className="text-primary" />
+              <span className="font-medium text-primary">{appliedCoupon.code}</span>
+              <span className="text-muted-foreground">
+                (-{appliedCoupon.discount_type === "percentage" ? `${appliedCoupon.discount_value}%` : `$${appliedCoupon.discount_value}`})
+              </span>
+            </div>
+            <button onClick={() => { setAppliedCoupon(null); setCouponCode(""); }} className="text-muted-foreground hover:text-destructive">
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Input
+              placeholder={t("checkout.promoCode")}
+              value={couponCode}
+              onChange={e => setCouponCode(e.target.value.toUpperCase())}
+              className="text-sm h-9"
+              onKeyDown={e => e.key === "Enter" && handleApplyCoupon()}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleApplyCoupon}
+              disabled={couponLoading}
+              className="shrink-0 h-9"
+            >
+              {couponLoading ? <Loader2 size={14} className="animate-spin" /> : t("checkout.apply")}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Dynamic Shipping Calculator */}
+      <div className="border-t border-border pt-3">
+        <CheckoutShippingCalculator
+          shippingCity={shipping.city}
+          cartItems={items.map(i => ({ productId: i.productId, quantity: i.quantity }))}
+          cartSubtotal={subtotal}
+          onShippingCostChange={handleShippingCostChange}
+          onForwarderChange={handleForwarderChange}
+          onFreightOfferChange={handleFreightOfferChange}
+          onFreightAvailabilityChange={handleFreightAvailabilityChange}
+          onFreightGroupsChange={handleFreightGroupsChange}
+        />
+      </div>
+
+      {/* ZandoPoints */}
+      {pointsBalance > 0 && (
+        <div className="border-t border-border pt-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 text-sm">
+              <Coins size={14} className="text-primary" />
+              <span className="font-medium text-foreground">ZandoPoints</span>
+              <span className="text-xs text-muted-foreground">({pointsBalance} pts)</span>
+            </div>
+            <button
+              onClick={() => { setUsePoints(!usePoints); if (!usePoints) setPointsToUse(Math.min(pointsBalance, Math.floor(subtotal - discountAmount))); }}
+              className={`text-xs font-medium px-2 py-1 rounded-full transition-colors ${
+                usePoints ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {usePoints ? "Activé" : "Utiliser"}
+            </button>
+          </div>
+          {usePoints && (
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min={0}
+                max={Math.min(pointsBalance, Math.floor(subtotal - discountAmount + shippingCost))}
+                value={pointsToUse}
+                onChange={e => setPointsToUse(Number(e.target.value))}
+                className="flex-1 accent-primary"
+              />
+              <span className="text-sm font-bold text-primary w-24 text-right">{pointsToUse} pts ({formatPrice(pointsToUse / pointsPerDollar)})</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Discount cap notice */}
+      {discountCapped && (
+        <div className="border-t border-border pt-3">
+          <p className="text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1.5 rounded">
+            ⚠️ Le cumul des réductions a été plafonné à {maxTotalDiscountPct}% du sous-total.
+          </p>
+        </div>
+      )}
+    </>
+  );
+
+  const renderSummaryTotals = () => (
+    <>
+      <div className="border-t border-border pt-3 space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{t("cart.subtotal")}</span>
+          <span className="text-foreground">{formatPrice(subtotal)}</span>
+        </div>
+        {couponDiscount > 0 && (
+          <div className="flex justify-between text-primary">
+            <span>{t("checkout.promoCode")}</span>
+            <span>-{formatPrice(couponDiscount)}</span>
+          </div>
+        )}
+        {loyaltyDiscount > 0 && (
+          <div className="flex justify-between text-primary">
+            <span>{loyaltyBadge} (-{loyaltyPct}%)</span>
+            <span>-{formatPrice(loyaltyDiscount)}</span>
+          </div>
+        )}
+        {pointsDiscount > 0 && (
+          <div className="flex justify-between text-primary">
+            <span>ZandoPoints</span>
+            <span>-{formatPrice(pointsDiscount)}</span>
+          </div>
+        )}
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">
+            {t("checkout.shipping")} ({shippingMode === "air" ? "Aérien" : shippingMode === "sea" ? "Maritime" : shippingMode === "road" ? "Routier" : shippingMode === "rail" ? "Ferroviaire" : shippingMode})
+          </span>
+          {shippingPaymentChoice === "pay_on_arrival" && shippingCost > 0 ? (
+            <span className="text-amber-600 font-medium text-xs">
+              {formatPrice(shippingCost)} — {t("checkout.onArrival") || "à l'arrivée"}
+            </span>
+          ) : (
+            <span className={shippingCost === 0 ? "text-primary font-medium" : "text-foreground"}>
+              {shippingCost === 0 ? t("cart.free") : formatPrice(shippingCost)}
+            </span>
+          )}
+        </div>
+        {deliveryOption === "home_delivery" && hasActiveDeliverySub && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">{t("checkout.localDelivery") || "Livraison locale"}</span>
+            <span className="text-primary font-medium text-xs">{t("checkout.includedPlan") || "Incluse (forfait"} {deliverySubName})</span>
+          </div>
+        )}
+        {deliveryOption === "home_delivery" && lastMileFee > 0 && !hasActiveDeliverySub && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">{t("checkout.localDelivery") || "Livraison locale"}</span>
+            {lastMilePayment === "pay_cash_on_delivery" ? (
+              <span className="text-amber-600 font-medium text-xs">{formatPrice(lastMileFee)} — {t("checkout.onReceipt") || "à la réception"}</span>
+            ) : (
+              <span className="text-foreground">{formatPrice(lastMileFee)}</span>
+            )}
+          </div>
+        )}
+        {deliveryOption === "hub_pickup" && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">{t("checkout.delivery") || "Livraison"}</span>
+            <span className="text-primary font-medium">{t("checkout.hubPickupFree") || "Retrait à l'agence (gratuit)"}</span>
+          </div>
+        )}
+        <div className="flex justify-between font-bold text-foreground pt-2 border-t border-border text-base">
+          <span>{t("cart.total")}</span>
+          <span>{formatPrice(total)}</span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <ShieldCheck size={14} className="text-primary shrink-0" />
+        <span>{t("checkout.securePayment")}</span>
+      </div>
+    </>
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -1119,16 +1765,38 @@ export default function CheckoutPage() {
                     </>
                   ) : null}
 
+                  {/* Mobile/Tablet (< lg) — Récapitulatif commande (haut) inséré
+                      juste après l'adresse, avant les choix de paiement frais
+                      d'expédition. Sur desktop, ce bloc est dans la sidebar. */}
+                  {!isDesktop && (
+                    <div className="pt-3 border-t border-border space-y-4">
+                      {renderSummaryTop()}
+                    </div>
+                  )}
+
                   {/* Deferred shipping payment option */}
-                  {shippingCost > 0 && (
+                  {shippingCost > 0 && (() => {
+                    // Lot Very Speed — Si un transitaire est requis (offres dispos) mais aucun
+                    // n'est sélectionné, ne pas afficher de montant fantôme : afficher "—".
+                    const awaitingForwarderChoice =
+                      freightOffersAvailable > 0 && !selectedFreightOffer;
+                    const amountLabel = awaitingForwarderChoice
+                      ? "—"
+                      : formatPrice(shippingCost);
+                    return (
                     <div className="pt-3 border-t border-border space-y-2">
                       <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                        <Truck size={14} className="text-primary" /> Paiement des frais d'expédition
+                        <Truck size={14} className="text-primary" /> {t("checkout.shippingPaymentTitle") || "Paiement des frais d'expédition"}
                       </p>
+                      {awaitingForwarderChoice && (
+                        <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                          {t("checkout.selectForwarderHint") || "Sélectionnez un transitaire ci-dessus pour voir le montant exact."}
+                        </p>
+                      )}
                       <div className="space-y-2">
                         {[
-                          { key: "pay_now" as const, label: "Payer maintenant", desc: `Inclure $${shippingCost.toFixed(2)} dans le total` },
-                          { key: "pay_on_arrival" as const, label: "Payer à l'arrivée au Hub", desc: "Régler les frais d'expédition quand la commande arrive (obligatoire avant livraison)" },
+                          { key: "pay_now" as const, label: t("checkout.payNow") || "Payer maintenant", desc: `${t("checkout.includeInTotal") || "Inclure"} ${amountLabel} ${t("checkout.inTotal") || "dans le total"}` },
+                          { key: "pay_on_arrival" as const, label: t("checkout.payOnHubArrival") || "Payer à l'arrivée à l'agence du transitaire (hub)", desc: `${t("checkout.payOnHubArrivalDesc") || "Régler"} ${amountLabel} ${t("checkout.payOnHubArrivalDesc2") || "à l'arrivée du colis à l'agence du transitaire (hub), avant la livraison"}` },
                         ].map(opt => (
                           <button
                             key={opt.key}
@@ -1153,7 +1821,8 @@ export default function CheckoutPage() {
                         ))}
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Delivery option: home vs hub */}
                    <div className="pt-3 border-t border-border space-y-2">
@@ -1162,8 +1831,19 @@ export default function CheckoutPage() {
                     </p>
                     <div className="space-y-2">
                       {[
-                        { key: "home_delivery" as DeliveryOption, label: "🚚 Livraison à domicile", desc: lastMileLoading ? "Calcul en cours..." : lastMileResult && lastMileResult.fee > 0 ? `Frais estimés : $${lastMileResult.fee.toFixed(2)}` : "Recevez votre colis directement chez vous", disabled: lastMileResult ? !lastMileResult.deliverable : false },
-                        { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait au Hub", desc: "Récupérez votre colis au point de collecte (gratuit)", disabled: false },
+                        { key: "hub_pickup" as DeliveryOption, label: "🏪 Retrait à l'agence (hub)", desc: "Récupérez votre colis au point de collecte, à l'agence du transitaire (gratuit)", disabled: false },
+                        {
+                          key: "home_delivery" as DeliveryOption,
+                          label: "🚚 Livraison à domicile",
+                          desc: operatorCoverageLoading || lastMileLoading
+                            ? "Recherche des livreurs..."
+                            : !hasOperatorCoverage
+                              ? "Aucun livreur ne dessert encore votre quartier"
+                              : lastMileResult && lastMileResult.fee > 0
+                                ? `${t("checkout.estimatedFees") || "Frais estimés"} : ${formatPrice(lastMileResult.fee)}`
+                                : "Recevez votre colis directement chez vous",
+                          disabled: (lastMileResult ? !lastMileResult.deliverable : false) || (!operatorCoverageLoading && !hasOperatorCoverage),
+                        },
                       ].map(opt => (
                         <button
                           key={opt.key}
@@ -1194,8 +1874,32 @@ export default function CheckoutPage() {
                     {/* Zone not deliverable warning */}
                     {lastMileResult && !lastMileResult.deliverable && deliveryOption === "home_delivery" && (
                       <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded">
-                        ⚠️ Livraison non disponible dans votre zone{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}. Veuillez choisir le retrait au Hub.
+                        ⚠️ Livraison non disponible dans votre zone{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}. Veuillez choisir le retrait à l'agence (hub).
                       </p>
+                    )}
+
+                    {/* No operator coverage — proposer demande couverture + hub */}
+                    {!operatorCoverageLoading && !hasOperatorCoverage && shipping.city && shipping.country && (
+                      <div className="bg-muted/50 border border-border rounded-lg p-3 space-y-2">
+                        <p className="text-xs font-medium text-foreground">
+                          Aucun livreur ne dessert encore {shipping.quartier ? `${shipping.quartier}, ` : ""}
+                          {shipping.commune ? `${shipping.commune}, ` : ""}{shipping.city}.
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Vous pouvez choisir le retrait à l'agence (hub) ou nous demander d'étendre la couverture.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="default" onClick={() => setDeliveryOption("hub_pickup")}>
+                            🏪 Choisir le retrait à l'agence (hub)
+                          </Button>
+                          <RequestCoverageButton
+                            countryCode={shipping.country}
+                            city={shipping.city}
+                            commune={shipping.commune}
+                            quartier={shipping.quartier}
+                          />
+                        </div>
+                      </div>
                     )}
 
                     {/* Active delivery subscription banner */}
@@ -1207,14 +1911,26 @@ export default function CheckoutPage() {
                       </div>
                     )}
 
+                    {/* Lot 11B Phase B4 — Sélection d'un opérateur de livraison tiers */}
+                    {deliveryOption === "home_delivery" && !hasActiveDeliverySub && (
+                      <OperatorSelector
+                        city={shipping.city}
+                        countryCode={shipping.country}
+                        commune={shipping.commune}
+                        quartier={shipping.quartier}
+                        selectedOperatorId={selectedOperator?.operator_id ?? null}
+                        onSelect={setSelectedOperator}
+                      />
+                    )}
+
                     {/* Last-mile payment choice */}
                     {deliveryOption === "home_delivery" && lastMileResult?.deliverable && lastMileFee > 0 && !hasActiveDeliverySub && (
                       <div className="bg-muted/50 rounded-lg p-3 space-y-2 mt-2">
-                        <p className="text-xs font-medium text-foreground">Paiement de la livraison locale : ${lastMileFee.toFixed(2)}</p>
+                        <p className="text-xs font-medium text-foreground">{t("checkout.localDeliveryPayment") || "Paiement de la livraison locale"} : {formatPrice(lastMileFee)}</p>
                         <div className="space-y-1.5">
                           {[
-                            { key: "pay_with_shipping" as LastMilePayment, label: "Inclure dans le total", desc: `Ajouter $${lastMileFee.toFixed(2)} au paiement` },
-                            { key: "pay_cash_on_delivery" as LastMilePayment, label: "Payer à la réception", desc: "Régler au livreur à la livraison" },
+                            { key: "pay_with_shipping" as LastMilePayment, label: t("checkout.includeInTotal") || "Inclure dans le total", desc: `${t("checkout.addToPayment") || "Ajouter"} ${formatPrice(lastMileFee)} ${t("checkout.toPayment") || "au paiement"}` },
+                            { key: "pay_cash_on_delivery" as LastMilePayment, label: t("checkout.payOnDelivery") || "Payer à la réception", desc: t("checkout.payOnDeliveryDesc") || "Régler au livreur à la livraison" },
                           ].map(opt => (
                             <button
                               key={opt.key}
@@ -1242,6 +1958,15 @@ export default function CheckoutPage() {
                     )}
                   </div>
 
+                  {/* Mobile/Tablet (< lg) — Totaux récap juste avant le bouton
+                      Continuer, après toutes les sélections (transitaire,
+                      paiement frais, option livraison). */}
+                  {!isDesktop && (
+                    <div className="pt-3 border-t border-border space-y-3">
+                      {renderSummaryTotals()}
+                    </div>
+                  )}
+
                   <Button type="submit" className="w-full h-12 font-bold mt-2">
                     {t("checkout.continueToPayment")} <ChevronRight size={16} />
                   </Button>
@@ -1268,11 +1993,20 @@ export default function CheckoutPage() {
                   <p className="text-muted-foreground">{shipping.phone}</p>
                 </div>
 
+                {/* Mobile/Tablet (< lg) — Mini-doublure des totaux entre l'adresse
+                    d'expédition et la liste des moyens de paiement, pour voir le
+                    montant à payer sans scroller. */}
+                {!isDesktop && (
+                  <div className="pt-3 pb-1 border-t border-b border-border">
+                    {renderSummaryTotals()}
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   {([
+                    { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, M-Pesa, Airtel Money, AfriMoney", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
                     { id: "card" as const, label: "Carte bancaire (Visa/Mastercard)", sub: "Paiement sécurisé via Keccel", icon: <CreditCard size={20} />, configKey: "stripe" as const },
                     { id: "paypal" as const, label: "PayPal", sub: "Paiement via votre compte PayPal", icon: <CreditCard size={20} />, configKey: "paypal" as const },
-                    { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, M-Pesa, Airtel Money, AfriMoney", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
                     { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
                     { id: "off_platform" as const, label: "Paiement hors plateforme", sub: "Transfert direct, puis envoyez la preuve", icon: <Banknote size={20} />, configKey: "off_platform" as const },
                   ]).filter(m => (m.id === "card" ? paymentConfig?.stripe !== false : m.id === "paypal" ? (paymentConfig as any)?.paypal !== false : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).filter(m => m.id !== "off_platform" || vendorOffPlatformAllowed).filter(m => m.id !== "mobile_money" || vendorMobileMoneyAllowed).filter(m => m.id !== "card" || vendorCardAllowed).map(method => (
@@ -1352,19 +2086,19 @@ export default function CheckoutPage() {
 
                 {paymentMethod === "mobile_money" && paymentPending && (
                   <div className="space-y-4 pt-2 border-t border-border">
-                    <div className="flex flex-col items-center gap-3 py-4 text-center">
-                      <Loader2 size={32} className="animate-spin text-primary" />
-                      <p className="text-sm font-medium text-foreground">En attente de validation...</p>
-                      <p className="text-xs text-muted-foreground max-w-xs">
-                        Ouvrez l'application {mobileMoneyProvider === "orange_money" ? "Orange Money" : mobileMoneyProvider === "mpesa" ? "M-Pesa" : mobileMoneyProvider === "airtel_money" ? "Airtel Money" : "AfriMoney"} sur votre téléphone et validez le paiement avec votre PIN.
-                      </p>
-                    </div>
-                    <Button variant="outline" onClick={handleCheckPaymentStatus} className="w-full">
-                      <ShieldCheck size={14} className="mr-2" /> Vérifier le statut du paiement
-                    </Button>
-                    <Button variant="destructive" onClick={handleCancelPaymentWait} className="w-full">
-                      <X size={14} className="mr-2" /> Annuler l'attente
-                    </Button>
+                    <PaymentWaitingPanel
+                      durationSeconds={180}
+                      providerLabel={
+                        mobileMoneyProvider === "orange_money" ? "Orange Money" :
+                        mobileMoneyProvider === "mpesa" ? "M-Pesa" :
+                        mobileMoneyProvider === "airtel_money" ? "Airtel Money" : "AfriMoney"
+                      }
+                      reference={paymentReference}
+                      checking={processing}
+                      onCheck={handleCheckPaymentStatus}
+                      onCancel={handleCancelPaymentWait}
+                      onAutoAbandon={handleAutoAbandonPayment}
+                    />
 
                     {/* Retry with different number */}
                     {!showRetryForm ? (
@@ -1440,7 +2174,12 @@ export default function CheckoutPage() {
                                     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "payment_transactions", filter: `reference=eq.${data.reference}` },
                                       (payload: any) => {
                                         const ns = payload.new?.status;
-                                        if (ns === "success") { supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment"); setPaymentPending(false); removeSelectedItems(); goToStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel); }
+                                        if (ns === "success") {
+                                          supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
+                                          (supabase as any).from("orders").update({ shipping_payment_status: "paid" }).in("id", paymentOrderIds).eq("shipping_payment_status", "unpaid");
+                                          (supabase as any).from("orders").update({ last_mile_payment_status: "paid" }).in("id", paymentOrderIds).eq("last_mile_payment_status", "unpaid");
+                                          setPaymentPending(false); removeSelectedItems(); goToStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel);
+                                        }
                                         else if (ns === "failed") { supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds); setPaymentPending(false); toast({ title: "Paiement échoué", variant: "destructive" }); supabase.removeChannel(channel); }
                                       }
                                     ).subscribe();
@@ -1464,7 +2203,7 @@ export default function CheckoutPage() {
                 {paymentMethod === "cod" && (
                   <div className="pt-2 border-t border-border">
                     <p className="text-sm text-muted-foreground">
-                      Montant à payer à la livraison : <strong className="text-foreground">${total.toFixed(2)}</strong>
+                      {t("checkout.codAmountDue") || "Montant à payer à la livraison"} : <strong className="text-foreground">{formatPrice(total)}</strong>
                     </p>
                   </div>
                 )}
@@ -1472,7 +2211,7 @@ export default function CheckoutPage() {
                 {paymentMethod === "off_platform" && (
                   <div className="pt-2 border-t border-border space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      Montant à payer : <strong className="text-foreground">${total.toFixed(2)}</strong>
+                      {t("checkout.amountDue") || "Montant à payer"} : <strong className="text-foreground">{formatPrice(total)}</strong>
                     </p>
 
                     {/* Payment numbers */}
@@ -1530,7 +2269,7 @@ export default function CheckoutPage() {
                       {processing ? (
                         <><Loader2 size={16} className="animate-spin mr-2" /> {t("checkout.processing")}</>
                       ) : (
-                        `${t("checkout.placeOrder")} — $${total.toFixed(2)}`
+                        `${t("checkout.placeOrder")} — ${formatPrice(total)}`
                       )}
                     </Button>
                     {!termsAccepted && (
@@ -1538,6 +2277,15 @@ export default function CheckoutPage() {
                         Veuillez accepter les conditions pour continuer.
                       </p>
                     )}
+                  </div>
+                )}
+
+                {/* Mobile/Tablet (< lg) — Récap commande complet déplacé en bas
+                    de l'étape paiement (items, promo, calculateur, points, totaux). */}
+                {!isDesktop && (
+                  <div className="space-y-4 pt-4 border-t border-border">
+                    {renderSummaryTop()}
+                    {renderSummaryTotals()}
                   </div>
                 )}
               </div>
@@ -1568,7 +2316,7 @@ export default function CheckoutPage() {
                 )}
                 {appliedCoupon && (
                   <p className="text-sm text-primary font-medium">
-                    {t("checkout.promoCode")} {appliedCoupon.code} — -${discountAmount.toFixed(2)}
+                    {t("checkout.promoCode")} {appliedCoupon.code} — -{formatPrice(discountAmount)}
                   </p>
                 )}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
@@ -1584,193 +2332,11 @@ export default function CheckoutPage() {
           </div>
 
           {/* Order summary sidebar */}
-          {step !== "confirmation" && (
+          {step !== "confirmation" && isDesktop && (
             <div className="lg:col-span-2">
               <div className="bg-card rounded-lg p-5 shadow-card sticky top-24 space-y-4">
-                <h3 className="font-bold text-foreground">{t("checkout.orderSummary")} ({items.length})</h3>
-
-                <div className="space-y-3 max-h-48 overflow-y-auto">
-                  {items.map(item => (
-                    <div key={item.id} className="flex gap-3">
-                      <img src={item.image} alt={item.nameFr} className="w-14 h-16 object-cover rounded-sm shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground line-clamp-1">{item.nameFr}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          {item.color && (() => {
-                            const cd = getColorDisplay(item.color);
-                            return cd ? (
-                              <span className="inline-flex items-center gap-1">
-                                {cd.hex && <span className="w-3 h-3 rounded-full border border-border inline-block" style={{ backgroundColor: cd.hex }} />}
-                                <span>{cd.name}</span>
-                              </span>
-                            ) : null;
-                          })()}
-                          {item.size && <span>{item.size}</span>}
-                          <span>× {item.quantity}</span>
-                        </div>
-                        <p className="text-sm font-bold text-foreground">${(item.price * item.quantity).toFixed(2)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Coupon */}
-                <div className="border-t border-border pt-3">
-                  {appliedCoupon ? (
-                    <div className="flex items-center justify-between bg-primary/5 p-2 rounded-lg">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Tag size={14} className="text-primary" />
-                        <span className="font-medium text-primary">{appliedCoupon.code}</span>
-                        <span className="text-muted-foreground">
-                          (-{appliedCoupon.discount_type === "percentage" ? `${appliedCoupon.discount_value}%` : `$${appliedCoupon.discount_value}`})
-                        </span>
-                      </div>
-                      <button onClick={() => { setAppliedCoupon(null); setCouponCode(""); }} className="text-muted-foreground hover:text-destructive">
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder={t("checkout.promoCode")}
-                        value={couponCode}
-                        onChange={e => setCouponCode(e.target.value.toUpperCase())}
-                        className="text-sm h-9"
-                        onKeyDown={e => e.key === "Enter" && handleApplyCoupon()}
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleApplyCoupon}
-                        disabled={couponLoading}
-                        className="shrink-0 h-9"
-                      >
-                        {couponLoading ? <Loader2 size={14} className="animate-spin" /> : t("checkout.apply")}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Dynamic Shipping Calculator */}
-                <div className="border-t border-border pt-3">
-                  <CheckoutShippingCalculator
-                    shippingCity={shipping.city}
-                    cartItems={items.map(i => ({ productId: i.productId, quantity: i.quantity }))}
-                    cartSubtotal={subtotal}
-                    onShippingCostChange={handleShippingCostChange}
-                  />
-                </div>
-
-                {/* ZandoPoints */}
-                {pointsBalance > 0 && (
-                  <div className="border-t border-border pt-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Coins size={14} className="text-primary" />
-                        <span className="font-medium text-foreground">ZandoPoints</span>
-                        <span className="text-xs text-muted-foreground">({pointsBalance} pts)</span>
-                      </div>
-                      <button
-                        onClick={() => { setUsePoints(!usePoints); if (!usePoints) setPointsToUse(Math.min(pointsBalance, Math.floor(subtotal - discountAmount))); }}
-                        className={`text-xs font-medium px-2 py-1 rounded-full transition-colors ${
-                          usePoints ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {usePoints ? "Activé" : "Utiliser"}
-                      </button>
-                    </div>
-                    {usePoints && (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="range"
-                          min={0}
-                          max={Math.min(pointsBalance, Math.floor(subtotal - discountAmount + shippingCost))}
-                          value={pointsToUse}
-                          onChange={e => setPointsToUse(Number(e.target.value))}
-                          className="flex-1 accent-primary"
-                        />
-                        <span className="text-sm font-bold text-primary w-24 text-right">{pointsToUse} pts (${(pointsToUse / pointsPerDollar).toFixed(2)})</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Discount cap notice */}
-                {discountCapped && (
-                  <div className="border-t border-border pt-3">
-                    <p className="text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1.5 rounded">
-                      ⚠️ Le cumul des réductions a été plafonné à {maxTotalDiscountPct}% du sous-total.
-                    </p>
-                  </div>
-                )}
-
-                <div className="border-t border-border pt-3 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t("cart.subtotal")}</span>
-                    <span className="text-foreground">${subtotal.toFixed(2)}</span>
-                  </div>
-                  {couponDiscount > 0 && (
-                    <div className="flex justify-between text-primary">
-                      <span>{t("checkout.promoCode")}</span>
-                      <span>-${couponDiscount.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {loyaltyDiscount > 0 && (
-                    <div className="flex justify-between text-primary">
-                      <span>{loyaltyBadge} (-{loyaltyPct}%)</span>
-                      <span>-${loyaltyDiscount.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {pointsDiscount > 0 && (
-                    <div className="flex justify-between text-primary">
-                      <span>ZandoPoints</span>
-                      <span>-${pointsDiscount.toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Expédition ({shippingMode})</span>
-                    {shippingPaymentChoice === "pay_on_arrival" && shippingCost > 0 ? (
-                      <span className="text-amber-600 font-medium text-xs">
-                        ${shippingCost.toFixed(2)} — à l'arrivée
-                      </span>
-                    ) : (
-                      <span className={shippingCost === 0 ? "text-primary font-medium" : "text-foreground"}>
-                        {shippingCost === 0 ? t("cart.free") : `$${shippingCost.toFixed(2)}`}
-                      </span>
-                    )}
-                  </div>
-                  {deliveryOption === "home_delivery" && hasActiveDeliverySub && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Livraison locale</span>
-                      <span className="text-primary font-medium text-xs">Incluse (forfait {deliverySubName})</span>
-                    </div>
-                  )}
-                  {deliveryOption === "home_delivery" && lastMileFee > 0 && !hasActiveDeliverySub && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Livraison locale</span>
-                      {lastMilePayment === "pay_cash_on_delivery" ? (
-                        <span className="text-amber-600 font-medium text-xs">${lastMileFee.toFixed(2)} — à la réception</span>
-                      ) : (
-                        <span className="text-foreground">${lastMileFee.toFixed(2)}</span>
-                      )}
-                    </div>
-                  )}
-                  {deliveryOption === "hub_pickup" && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Livraison</span>
-                      <span className="text-primary font-medium">Retrait Hub (gratuit)</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between font-bold text-foreground pt-2 border-t border-border text-base">
-                    <span>{t("cart.total")}</span>
-                    <span>${total.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <ShieldCheck size={14} className="text-primary shrink-0" />
-                  <span>Paiement 100% sécurisé · Données chiffrées</span>
-                </div>
+                {renderSummaryTop()}
+                {renderSummaryTotals()}
               </div>
             </div>
           )}

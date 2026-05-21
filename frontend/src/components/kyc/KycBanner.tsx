@@ -2,6 +2,7 @@ import { ShieldAlert, ShieldCheck, Clock, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KycStatusBadge } from "./KycStatusBadge";
 import type { KycStatus } from "@/hooks/use-kyc";
+import { useI18n } from "@/contexts/I18nContext";
 
 interface Props {
   kycStatus: KycStatus;
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function KycBanner({ kycStatus, needsKyc, isOrderBlocked, onStartKyc }: Props) {
+  const { t } = useI18n();
   if (kycStatus === "approved" || !needsKyc) return null;
 
   return (
@@ -32,21 +34,21 @@ export function KycBanner({ kycStatus, needsKyc, isOrderBlocked, onStartKyc }: P
         <div className="flex-1 space-y-1">
           <p className="text-sm font-medium text-foreground">
             {isOrderBlocked
-              ? "Vérification requise pour continuer"
+              ? t("kyc.banner.required")
               : kycStatus === "pending"
-                ? "Vérification en cours d'examen"
+                ? t("kyc.banner.pending")
                 : kycStatus === "rejected" || kycStatus === "resubmission_required"
-                  ? "Vérification à resoumettre"
-                  : "Complétez votre vérification d'identité"}
+                  ? t("kyc.banner.resubmit")
+                  : t("kyc.banner.start")}
           </p>
           <p className="text-xs text-muted-foreground">
             {isOrderBlocked
-              ? "Vous avez atteint la limite de commandes. Complétez votre vérification d'identité pour continuer à commander."
+              ? t("kyc.banner.requiredDesc")
               : kycStatus === "pending"
-                ? "Votre demande est en cours d'examen. Vous recevrez une notification sous 24-48h."
+                ? t("kyc.banner.pendingDesc")
                 : kycStatus === "rejected" || kycStatus === "resubmission_required"
-                  ? "Votre précédente soumission n'a pas été acceptée. Veuillez corriger et resoumettre."
-                  : "Débloquez les options de paiement avancées et la livraison à domicile."}
+                  ? t("kyc.banner.resubmitDesc")
+                  : t("kyc.banner.startDesc")}
           </p>
         </div>
         <KycStatusBadge status={kycStatus} />
@@ -54,7 +56,7 @@ export function KycBanner({ kycStatus, needsKyc, isOrderBlocked, onStartKyc }: P
 
       {kycStatus !== "pending" && (
         <Button size="sm" className="w-full sm:w-auto" onClick={onStartKyc}>
-          {kycStatus === "rejected" || kycStatus === "resubmission_required" ? "Resoumettre" : "Commencer la vérification"}
+          {kycStatus === "rejected" || kycStatus === "resubmission_required" ? t("kyc.banner.resubmitBtn") : t("kyc.banner.startBtn")}
           <ArrowRight size={14} className="ml-1" />
         </Button>
       )}

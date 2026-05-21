@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Loader2 } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { APP_VERSION, SHOW_UPDATE_PROMPT } from "@/version";
 
-const APP_VERSION = "1.8.5";
 const PWA_UPDATE_LOCK_KEY = "pwa-update-lock";
 const PWA_UPDATE_DONE_KEY = "pwa-update-done";
 
@@ -17,6 +17,8 @@ export function PWAUpdatePrompt() {
   const { locale } = useI18n();
 
   useEffect(() => {
+    // Patch silencieux : on n'affiche jamais la modale, le SW se met à jour seul.
+    if (!SHOW_UPDATE_PROMPT) return;
     // If we already completed an update for this version, never show again
     if (localStorage.getItem(PWA_UPDATE_DONE_KEY) === APP_VERSION) return;
 

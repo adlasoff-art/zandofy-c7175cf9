@@ -1,1 +1,46 @@
 project_id = "uogkklwfvwoxkifpkzpu"
+
+[functions.notify-handoff-status-customer]
+verify_jwt = false
+
+[functions.watermark-image]
+verify_jwt = false
+
+[functions.become-operator-submit]
+verify_jwt = false
+
+[functions.operator-invite-rider]
+verify_jwt = false
+
+[functions.operator-assign-rider-to-order]
+verify_jwt = false
+
+[functions.operator-request-quota-increase]
+verify_jwt = false
+
+[functions.admin-approve-operator]
+verify_jwt = false
+
+[functions.admin-reject-operator]
+verify_jwt = false
+
+[functions.admin-suspend-operator]
+verify_jwt = false
+
+[functions.admin-review-quota-request]
+verify_jwt = false
+
+[functions.notify-operator-new-order]
+verify_jwt = false
+
+[functions.operator-decide-order]
+verify_jwt = false
+
+[functions.expire-operator-assignments]
+verify_jwt = false
+
+[functions.admin-create-operator-rate]
+verify_jwt = true
+
+[functions.admin-update-operator-rate]
+verify_jwt = true

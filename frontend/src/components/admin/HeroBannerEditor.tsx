@@ -9,6 +9,7 @@ import {
   Image, Plus, Edit2, Trash2, Eye, EyeOff, Save, X, Upload, Loader2,
   ChevronLeft, ChevronRight, PanelLeft, Columns3, PanelRight,
 } from "lucide-react";
+import { sanitizeFilename } from "@/utils/sanitize-filename";
 
 type Zone = "hero_left" | "hero_slide" | "hero_right";
 
@@ -72,7 +73,7 @@ export function HeroBannerEditor() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const path = `banners/${Date.now()}_${file.name}`;
+    const path = `banners/${Date.now()}_${sanitizeFilename(file.name)}`;
     const { error } = await supabase.storage.from("cms-assets").upload(path, file, { cacheControl: "31536000" });
     if (error) {
       toast({ title: "Erreur upload", description: error.message, variant: "destructive" });

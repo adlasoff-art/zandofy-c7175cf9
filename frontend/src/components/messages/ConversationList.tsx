@@ -11,6 +11,7 @@ export interface ConversationItem {
   id: string;
   store_id: string;
   product_id: string | null;
+  product_slug: string | null;
   updated_at: string;
   store_name: string;
   store_logo: string | null;
@@ -107,7 +108,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
     const [storesRes, productsRes, profilesRes] = await Promise.all([
       supabase.from("stores").select("id, name, logo_url, is_online").in("id", storeIds),
       productIds.length > 0
-        ? supabase.from("products").select("id, name_fr, image, price").in("id", productIds)
+        ? supabase.from("products").select("id, name_fr, image, price, slug").in("id", productIds)
         : Promise.resolve({ data: [] }),
       otherUserIds.length > 0
         ? supabase.from("profiles").select("id, first_name, last_name, avatar_url").in("id", otherUserIds)
@@ -155,6 +156,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
         id: conv.id,
         store_id: conv.store_id,
         product_id: conv.product_id,
+        product_slug: (product as any)?.slug ?? null,
         updated_at: conv.updated_at,
         store_name: store?.name || "Boutique",
         store_logo: store?.logo_url || null,

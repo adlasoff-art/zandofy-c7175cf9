@@ -1,4 +1,4 @@
-import { Search, ShoppingBag, Heart, User, Menu, X, Headphones, Globe, ChevronRight, LogOut, MessageCircle, ChevronDown, PackageSearch, Sun, Moon, Monitor, Bell } from "lucide-react";
+import { Search, ShoppingBag, Heart, User, Menu, X, Headphones, Globe, ChevronRight, LogOut, MessageCircle, ChevronDown, PackageSearch, Sun, Moon, Monitor, Bell, Sparkles } from "lucide-react";
 import { useState, useRef, useEffect, Component, lazy, Suspense, type ReactNode, type ErrorInfo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -21,6 +21,8 @@ import { useWishlist } from "@/contexts/WishlistContext";
 import { useI18n, LOCALES, CURRENCIES, type CurrencyCode } from "@/contexts/I18nContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useHeaderTheme } from "@/hooks/use-header-theme";
+import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
+import { slugify } from "@/utils/slugify";
 
 // Mini error boundary to prevent Radix crashes from taking down the whole page
 class SafeRadix extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
@@ -69,7 +71,7 @@ export function Header() {
   const megaTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const userMenuRef = useRef<HTMLDivElement>(null);
   const { user, signOut } = useAuth();
-  const { isStaff } = useRoles();
+  const { isStaff, isOperator, isForwarder } = useRoles();
   const { setDrawerOpen, itemCount } = useCart();
   const unreadCount = useUnreadMessages();
   const unreadSupportCount = useUnreadSupport();
@@ -78,15 +80,8 @@ export function Header() {
   const { theme, setTheme } = useTheme();
   const headerTheme = useHeaderTheme();
 
-  // Top bar config from CMS
-  const { data: topBarConfig } = useQuery({
-    queryKey: ["topbar-config"],
-    queryFn: async () => {
-      const { data } = await supabase.from("platform_settings").select("value").eq("key", "topbar_config").maybeSingle();
-      return (data?.value || null) as unknown as TopBarConfig | null;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+  // Top bar config — read from consolidated bootstrap cache (no extra request).
+  const { value: topBarConfig } = useBootstrapSetting<TopBarConfig | null>("topbar_config", null);
 
   const topBarMessages = (() => {
     if (!topBarConfig?.enabled) return [];
@@ -242,6 +237,17 @@ export function Header() {
             </button>
 
             {user && (
+              <Link
+                to="/sourcing"
+                className="p-2 text-foreground hover:text-primary transition-colors"
+                aria-label={t("header.findProduct") || "Trouvez-moi ce produit"}
+                title={t("header.findProduct") || "Trouvez-moi ce produit"}
+              >
+                <Sparkles size={20} />
+              </Link>
+            )}
+
+            {user && (
               <SafeRadix fallback={<Link to="/dashboard" className="p-2 text-foreground hover:text-primary"><Bell size={20} /></Link>}>
                 <Suspense fallback={<span className="p-2 text-foreground"><Bell size={20} /></span>}>
                   <NotificationCenter />
@@ -300,6 +306,16 @@ export function Header() {
                     <Link to="/messages" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.messages")} {unreadCount > 0 && `(${unreadCount})`}</Link>
                     <Link to="/vendor" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.vendorSpace")}</Link>
                     <Link to="/become-vendor" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">{t("header.becomeVendor")}</Link>
+                    {isOperator ? (
+                      <Link to="/operator" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.operatorSpace") || "Espace opérateur"}</Link>
+                    ) : (
+                      <Link to="/become-operator" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">{t("header.becomeOperator") || "Devenir opérateur de livraison"}</Link>
+                    )}
+                    {isForwarder ? (
+                      <Link to="/forwarder" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.forwarderSpace") || "Espace transitaire"}</Link>
+                    ) : (
+                      <Link to="/become-forwarder" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">{t("header.becomeForwarder") || "Devenir transitaire"}</Link>
+                    )}
                     {isStaff && <Link to="/admin" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.admin")}</Link>}
                     <button onClick={async () => { setUserMenuOpen(false); await signOut(); }} className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-muted transition-colors flex items-center gap-2">
                       <LogOut size={14} /> {t("header.logout")}
@@ -399,7 +415,7 @@ export function Header() {
                     {isExpanded && subs.length > 0 && (
                       <div className="bg-muted/30">
                         <Link
-                          to={`/category/${cat.name.toLowerCase()}`}
+                          to={`/category/${slugify(cat.name)}`}
                           onClick={() => setMobileOpen(false)}
                           className="block py-2 px-8 text-sm text-primary font-medium hover:bg-muted transition-colors"
                         >
@@ -408,7 +424,7 @@ export function Header() {
                         {subs.map((sub) => (
                           <Link
                             key={sub.id}
-                            to={`/category/${sub.name.toLowerCase()}`}
+                            to={`/category/${slugify(sub.name)}`}
                             onClick={() => setMobileOpen(false)}
                             className="block py-2 px-8 text-sm text-foreground hover:bg-muted hover:text-primary transition-colors"
                           >

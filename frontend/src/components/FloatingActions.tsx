@@ -1,8 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { ArrowUp, Smartphone, X } from "lucide-react";
 import { useUIConfig } from "@/contexts/UIConfigContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { QRCode } from "react-qrcode-logo";
+
+// QRCode is ~30KB and only needed inside the app-download popup → defer.
+const QRCode = lazy(() =>
+  import("react-qrcode-logo").then((m) => ({ default: m.QRCode }))
+);
 
 export function FloatingActions() {
   const [showScroll, setShowScroll] = useState(false);
@@ -79,6 +83,7 @@ export function FloatingActions() {
             {/* Real QR Code */}
             <div className="flex justify-center mb-2">
               <div className="p-3 bg-background rounded-xl border border-border">
+                <Suspense fallback={<div style={{ width: 140, height: 140 }} />}>
                 <QRCode
                   value="https://zandofy.com"
                   size={140}
@@ -90,6 +95,7 @@ export function FloatingActions() {
                   removeQrCodeBehindLogo
                   ecLevel="M"
                 />
+                </Suspense>
               </div>
             </div>
 

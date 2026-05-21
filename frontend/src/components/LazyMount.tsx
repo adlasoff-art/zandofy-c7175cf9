@@ -17,7 +17,7 @@ interface LazyMountProps {
 export function LazyMount({
   children,
   minHeight = 200,
-  rootMargin = "400px",
+  rootMargin = "300px",
   className,
 }: LazyMountProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -47,7 +47,22 @@ export function LazyMount({
     return () => obs.disconnect();
   }, [shown, rootMargin]);
 
-  if (shown) return <>{children}</>;
+  if (shown) {
+    // After mount, keep content-visibility:auto so off-screen sections skip
+    // rendering/painting work (saves main-thread time on long pages).
+    const intrinsic = typeof minHeight === "number" ? `${minHeight}px` : minHeight;
+    return (
+      <div
+        style={{
+          contentVisibility: "auto",
+          containIntrinsicSize: `1px ${intrinsic}`,
+        } as React.CSSProperties}
+        className={className}
+      >
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div

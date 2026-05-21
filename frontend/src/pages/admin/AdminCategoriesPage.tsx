@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Plus, Edit2, Trash2, ChevronRight, ChevronUp, ChevronDown, Loader2, X, Save, Upload, Image, GripVertical } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -57,6 +57,72 @@ export default function AdminCategoriesPage() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // Category-level pricing override state (loaded when editing an existing category)
+  const [pricingOverride, setPricingOverride] = useState<{
+    enabled: boolean;
+    margin_pct: string;
+    multiplier: string;
+    description: string;
+    inherit_to_children: boolean;
+    existingId: string | null;
+    loading: boolean;
+    saving: boolean;
+  }>({ enabled: false, margin_pct: "", multiplier: "", description: "", inherit_to_children: true, existingId: null, loading: false, saving: false });
+
+  useEffect(() => {
+    if (!showForm || form.mode !== "edit" || !form.id) {
+      setPricingOverride({ enabled: false, margin_pct: "", multiplier: "", description: "", inherit_to_children: true, existingId: null, loading: false, saving: false });
+      return;
+    }
+    setPricingOverride((p) => ({ ...p, loading: true }));
+    (supabase as any)
+      .from("category_pricing_overrides")
+      .select("id, margin_pct, multiplier, description, inherit_to_children, active")
+      .eq("category_id", form.id)
+      .maybeSingle()
+      .then(({ data }: any) => {
+        if (data) {
+          setPricingOverride({
+            enabled: !!data.active,
+            margin_pct: data.margin_pct != null ? String(data.margin_pct) : "",
+            multiplier: data.multiplier != null ? String(data.multiplier) : "",
+            description: data.description ?? "",
+            inherit_to_children: data.inherit_to_children ?? true,
+            existingId: data.id,
+            loading: false,
+            saving: false,
+          });
+        } else {
+          setPricingOverride({ enabled: false, margin_pct: "", multiplier: "", description: "", inherit_to_children: true, existingId: null, loading: false, saving: false });
+        }
+      });
+  }, [showForm, form.mode, form.id]);
+
+  const savePricingOverride = async () => {
+    if (!form.id) return;
+    setPricingOverride((p) => ({ ...p, saving: true }));
+    const payload: any = {
+      category_id: form.id,
+      margin_pct: pricingOverride.margin_pct ? Number(pricingOverride.margin_pct) : null,
+      multiplier: pricingOverride.multiplier ? Number(pricingOverride.multiplier) : null,
+      description: pricingOverride.description || null,
+      inherit_to_children: pricingOverride.inherit_to_children,
+      active: pricingOverride.enabled,
+      updated_at: new Date().toISOString(),
+    };
+    let error;
+    if (pricingOverride.existingId) {
+      const res = await (supabase as any).from("category_pricing_overrides").update(payload).eq("id", pricingOverride.existingId);
+      error = res.error;
+    } else {
+      const res = await (supabase as any).from("category_pricing_overrides").insert(payload);
+      error = res.error;
+    }
+    setPricingOverride((p) => ({ ...p, saving: false }));
+    if (error) toast.error(error.message);
+    else toast.success("Tarification de la catégorie enregistrée");
+  };
 
   const { data: categories = [], isLoading } = useQuery({
     queryKey: ["admin-categories"],
@@ -147,7 +213,7 @@ export default function AdminCategoriesPage() {
     const nameWithoutExt = file.name.replace(/\.[^.]+$/, "");
     const safeName = slugify(nameWithoutExt) || "image";
     const path = `categories/${Date.now()}_${safeName}.${ext}`;
-    const { error } = await supabase.storage.from("cms-assets").upload(path, file);
+    const { error } = await supabase.storage.from("cms-assets").upload(path, file, { cacheControl: "31536000" });
     if (error) { toast.error(error.message); setUploading(false); return; }
     const { data: urlData } = supabase.storage.from("cms-assets").getPublicUrl(path);
     setForm(f => ({ ...f, image_url: urlData.publicUrl }));
@@ -236,6 +302,52 @@ export default function AdminCategoriesPage() {
               {saveMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {form.mode === "edit" ? "Enregistrer" : "Ajouter"}
             </button>
+
+            {form.mode === "edit" && form.id && (
+              <div className="border-t border-border pt-4 mt-2 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Tarification spécifique (optionnel)</p>
+                    <p className="text-[10px] text-muted-foreground">Surcharge la marge / le multiplicateur global pour les produits de cette catégorie.</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={pricingOverride.enabled}
+                    onChange={(e) => setPricingOverride((p) => ({ ...p, enabled: e.target.checked }))}
+                  />
+                </div>
+                {pricingOverride.enabled && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-muted-foreground block mb-1">Marge (%) — vide = global</label>
+                        <input type="number" min={0} step={0.5} value={pricingOverride.margin_pct} onChange={(e) => setPricingOverride((p) => ({ ...p, margin_pct: e.target.value }))} placeholder="ex: 12" className="w-full px-2 py-1.5 text-xs bg-muted border border-border rounded-md" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-muted-foreground block mb-1">Multiplicateur fixe — vide = tranches</label>
+                        <input type="number" min={0} step={0.1} value={pricingOverride.multiplier} onChange={(e) => setPricingOverride((p) => ({ ...p, multiplier: e.target.value }))} placeholder="ex: 2" className="w-full px-2 py-1.5 text-xs bg-muted border border-border rounded-md" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-1">Description (visible vendeurs)</label>
+                      <input type="text" value={pricingOverride.description} onChange={(e) => setPricingOverride((p) => ({ ...p, description: e.target.value }))} placeholder="ex: Marge réduite 12% — high-tech compétitif" className="w-full px-2 py-1.5 text-xs bg-muted border border-border rounded-md" />
+                    </div>
+                    <label className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <input type="checkbox" checked={pricingOverride.inherit_to_children} onChange={(e) => setPricingOverride((p) => ({ ...p, inherit_to_children: e.target.checked }))} />
+                      Hériter aux sous-catégories
+                    </label>
+                  </div>
+                )}
+                <button
+                  onClick={savePricingOverride}
+                  disabled={pricingOverride.saving || pricingOverride.loading}
+                  className="text-xs px-3 py-1.5 border border-border rounded-md hover:bg-muted flex items-center gap-1 disabled:opacity-50"
+                >
+                  {pricingOverride.saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                  Enregistrer la tarification
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -9,6 +9,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { MAINTENANCE_QUERY_KEY } from "@/hooks/use-maintenance-mode";
 
 interface FreeShippingConfig {
   enabled: boolean;
@@ -76,6 +78,7 @@ export default function AdminSettingsPage() {
   ]);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [gatewayFees, setGatewayFees] = useState({ mobile_money_fee_pct: 2.5 });
   const [reviewBonus, setReviewBonus] = useState({ bonus_pct: 0.10 });
@@ -163,6 +166,25 @@ export default function AdminSettingsPage() {
       return updated;
     });
   }, [savePaymentMethods]);
+
+  // Auto-save maintenance toggle for instant kill-switch behavior
+  const saveMaintenance = useCallback(async (config: MaintenanceConfig) => {
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "maintenance_mode", value: config as any, updated_at: now }, { onConflict: "key" });
+    if (error) {
+      toast({ title: "Erreur", description: "Impossible de basculer la maintenance : " + error.message, variant: "destructive" });
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: MAINTENANCE_QUERY_KEY });
+    toast({
+      title: config.enabled ? "Maintenance activée" : "Maintenance désactivée",
+      description: config.enabled
+        ? "Les visiteurs verront la page maintenance dans les 30 secondes."
+        : "L'accès au site est rétabli.",
+    });
+  }, [toast, queryClient]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -455,13 +477,24 @@ export default function AdminSettingsPage() {
               </div>
               <Switch
                 checked={maintenance.enabled}
-                onCheckedChange={(checked) => setMaintenance(prev => ({
-                  ...prev,
-                  enabled: checked,
-                  end_time: checked ? new Date(Date.now() + prev.duration_minutes * 60 * 1000).toISOString() : prev.end_time,
-                }))}
+                onCheckedChange={(checked) => {
+                  setMaintenance(prev => {
+                    const next = {
+                      ...prev,
+                      enabled: checked,
+                      end_time: checked
+                        ? new Date(Date.now() + prev.duration_minutes * 60 * 1000).toISOString()
+                        : prev.end_time,
+                    };
+                    saveMaintenance(next);
+                    return next;
+                  });
+                }}
               />
             </div>
+            <p className="text-[11px] text-muted-foreground -mt-2 px-1">
+              Bascule immédiate : instantanée pour les nouveaux visiteurs, ≤ 30 s pour ceux déjà sur le site.
+            </p>
             {maintenance.enabled && (
               <div className="space-y-3">
                 <div>

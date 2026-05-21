@@ -2,7 +2,7 @@
 // Returns all critical platform_settings in a single CDN-cached response.
 // Replaces 8+ sequential client requests on first paint.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,6 +25,11 @@ const BOOTSTRAP_KEYS = [
   "ui_config",
   "visual_search_enabled",
   "maintenance_mode",
+  "cookie_settings",
+  "cms_texts",
+  "app_promo",
+  "referral_settings",
+  "seo_enabled",
 ];
 
 Deno.serve(async (req) => {

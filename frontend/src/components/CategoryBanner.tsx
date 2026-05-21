@@ -4,12 +4,17 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { slugify } from "@/utils/slugify";
+import { useI18n } from "@/contexts/I18nContext";
 
 const MOBILE_COLS = 5;
 const MOBILE_MAX_ROWS = 2;
 
 export function CategoryBanner() {
   const [expanded, setExpanded] = useState(false);
+  const { locale, t } = useI18n();
+  const getLabel = (c: { name?: string | null; name_fr?: string | null }) =>
+    (locale === "fr" ? (c.name_fr ?? c.name) : (c.name ?? c.name_fr)) ?? "";
 
   const { data: categories, isLoading, isError, error } = useQuery({
     queryKey: ["category-banner"],
@@ -43,7 +48,7 @@ export function CategoryBanner() {
 
   if (isLoading) {
     return (
-      <section className="py-4 bg-card" style={{ minHeight: 180 }}>
+      <section className="py-4 bg-card" style={{ minHeight: 240 }}>
         <div className="container">
           <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-3">
             {Array.from({ length: 10 }).map((_, i) => (
@@ -67,7 +72,7 @@ export function CategoryBanner() {
   const showAll = expanded || !hasMoreOnMobile;
 
   return (
-    <section className="py-4 bg-card" style={{ minHeight: 180 }}>
+    <section className="py-4 bg-card" style={{ minHeight: 240 }}>
       <div className="container">
         {/* Mobile: grid 5 cols, collapsible */}
         <div className="sm:hidden">
@@ -77,14 +82,14 @@ export function CategoryBanner() {
               .map((cat: any) => (
                 <Link
                   key={cat.id}
-                  to={`/category/${cat.name.toLowerCase()}`}
+                  to={`/category/${slugify(cat.name)}`}
                   className="flex flex-col items-center gap-1 group"
                 >
                   <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-border group-hover:border-primary transition-colors bg-muted flex items-center justify-center">
                     {cat.image_url ? (
                       <img
                         src={cat.image_url}
-                        alt={cat.name_fr}
+                        alt={getLabel(cat)}
                         width={56}
                         height={56}
                         className="w-full h-full object-cover"
@@ -95,12 +100,12 @@ export function CategoryBanner() {
                       <span className="text-xl">{cat.icon}</span>
                     ) : (
                       <span className="text-[10px] font-bold text-primary">
-                        {cat.name_fr.slice(0, 2).toUpperCase()}
+                        {getLabel(cat).slice(0, 2).toUpperCase()}
                       </span>
                     )}
                   </div>
                   <span className="text-[10px] text-foreground text-center leading-tight font-medium line-clamp-2 max-w-[60px]">
-                    {cat.name_fr}
+                    {getLabel(cat)}
                   </span>
                 </Link>
               ))}
@@ -112,9 +117,9 @@ export function CategoryBanner() {
               className="flex items-center justify-center gap-1 w-full mt-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               {expanded ? (
-                <>Réduire <ChevronUp size={14} /></>
+                <>{t("common.collapse") || "Réduire"} <ChevronUp size={14} /></>
               ) : (
-                <>Voir tout ({categories.length}) <ChevronDown size={14} /></>
+                <>{t("common.showAll") || "Voir tout"} ({categories.length}) <ChevronDown size={14} /></>
               )}
 
             </button>
@@ -126,14 +131,14 @@ export function CategoryBanner() {
           {categories.map((cat: any) => (
             <Link
               key={cat.id}
-              to={`/category/${cat.name.toLowerCase()}`}
+              to={`/category/${slugify(cat.name)}`}
               className="flex flex-col items-center gap-1.5 group"
             >
               <div className="w-16 h-16 md:w-[72px] md:h-[72px] rounded-full overflow-hidden border-2 border-border group-hover:border-primary transition-colors bg-muted flex items-center justify-center">
                 {cat.image_url ? (
                   <img
                     src={cat.image_url}
-                    alt={cat.name_fr}
+                    alt={getLabel(cat)}
                     width={72}
                     height={72}
                     className="w-full h-full object-cover"
@@ -144,12 +149,12 @@ export function CategoryBanner() {
                   <span className="text-2xl">{cat.icon}</span>
                 ) : (
                   <span className="text-xs font-bold text-primary">
-                    {cat.name_fr.slice(0, 2).toUpperCase()}
+                    {getLabel(cat).slice(0, 2).toUpperCase()}
                   </span>
                 )}
               </div>
               <span className="text-[11px] text-foreground text-center leading-tight font-medium">
-                {cat.name_fr}
+                {getLabel(cat)}
               </span>
             </Link>
           ))}

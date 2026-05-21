@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "./AdminSidebar";
+import { HealthAlertBanner } from "./HealthAlertBanner";
 import { useRoles } from "@/hooks/use-roles";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShieldCheck, Home, User, Store, Truck, LogOut, ChevronDown, LayoutDashboard } from "lucide-react";
@@ -117,6 +118,7 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
               </DropdownMenu>
             </div>
           </header>
+          <HealthAlertBanner />
           <div className="p-4 md:p-6 max-w-7xl">
             {children}
           </div>

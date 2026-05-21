@@ -26,6 +26,30 @@ interface ErrorReport {
   componentStack?: string;
 }
 
+/**
+ * Patterns d'erreurs environnementales (chunk loading, lazy null-context)
+ * filtrés pour éviter de polluer le centre de notifications admin avec
+ * des doublons auto-récupérables (lazyRetry recharge déjà la page).
+ */
+const NOISY_PATTERNS: RegExp[] = [
+  /Failed to fetch dynamically imported module/i,
+  /Importing a module script failed/i,
+  /error loading dynamically imported module/i,
+  /ChunkLoadError/i,
+  /Loading chunk \d+ failed/i,
+  /Loading CSS chunk \d+ failed/i,
+  /Cannot read properties of null \(reading 'useState'\)/i,
+  /Cannot read properties of null \(reading 'useContext'\)/i,
+  /Cannot read properties of null \(reading 'useEffect'\)/i,
+  /Cannot read properties of null \(reading 'useRef'\)/i,
+  /null is not an object \(evaluating .*use(State|Context|Effect|Ref)/i,
+];
+
+function isNoisyError(error: Error): boolean {
+  const msg = error?.message || String(error);
+  return NOISY_PATTERNS.some((re) => re.test(msg));
+}
+
 function detectBrowser(): string {
   const ua = navigator.userAgent;
   if (ua.includes("Firefox")) return "Firefox";
@@ -55,6 +79,12 @@ function isPWA(): boolean {
 
 export async function reportError({ error, componentStack }: ErrorReport) {
   try {
+    // Skip noisy/environmental errors (chunk loading, lazy null-context)
+    if (isNoisyError(error)) {
+      console.info("[ErrorReporter] Noisy error filtered out:", error.message);
+      return;
+    }
+
     // Rate-limit: avoid flooding the DB with repeated errors
     if (isRateLimited()) {
       console.warn("[ErrorReporter] Rate-limited, skipping report");

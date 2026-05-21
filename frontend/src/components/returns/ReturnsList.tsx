@@ -1,27 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useI18n } from "@/contexts/I18nContext";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { fr, enUS } from "date-fns/locale";
 import { RotateCcw, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const STATUS_MAP: Record<string, { label: string; class: string }> = {
-  pending: { label: "En attente", class: "bg-amber-100 text-amber-700" },
-  approved: { label: "Approuvé", class: "bg-emerald-100 text-emerald-700" },
-  rejected: { label: "Refusé", class: "bg-destructive/10 text-destructive" },
-  refunded: { label: "Remboursé", class: "bg-blue-100 text-blue-700" },
-};
-
-const REASON_MAP: Record<string, string> = {
-  defective: "Produit défectueux",
-  wrong_item: "Mauvais article",
-  not_as_described: "Non conforme",
-  size_issue: "Problème de taille",
-  changed_mind: "Changement d'avis",
-  damaged: "Produit endommagé",
-  other: "Autre",
+const STATUS_CLASS: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-700",
+  approved: "bg-emerald-100 text-emerald-700",
+  rejected: "bg-destructive/10 text-destructive",
+  refunded: "bg-blue-100 text-blue-700",
 };
 
 interface Props {
@@ -30,6 +21,8 @@ interface Props {
 
 export function ReturnsList({ onOpenDispute }: Props) {
   const { user } = useAuth();
+  const { t, locale, formatPrice } = useI18n();
+  const dateLocale = locale === "en" ? enUS : fr;
 
   const { data: returns = [], isLoading } = useQuery({
     queryKey: ["my-returns", user?.id],
@@ -52,7 +45,7 @@ export function ReturnsList({ onOpenDispute }: Props) {
     return (
       <div className="text-center py-12">
         <RotateCcw size={32} className="mx-auto text-muted-foreground mb-2" />
-        <p className="text-sm text-muted-foreground">Aucune demande de retour</p>
+        <p className="text-sm text-muted-foreground">{t("returns.list.empty") || "Aucune demande de retour"}</p>
       </div>
     );
   }
@@ -60,24 +53,26 @@ export function ReturnsList({ onOpenDispute }: Props) {
   return (
     <div className="space-y-3">
       {returns.map(ret => {
-        const st = STATUS_MAP[ret.status] || STATUS_MAP.pending;
+        const stClass = STATUS_CLASS[ret.status] || STATUS_CLASS.pending;
+        const stLabel = t(`returns.status.${ret.status}`) || t("returns.status.pending");
+        const reasonLabel = t(`returns.reason.${ret.reason}`) || ret.reason;
         return (
           <div key={ret.id} className="bg-card border border-border rounded-lg p-4 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <RotateCcw size={14} className="text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">{REASON_MAP[ret.reason] || ret.reason}</span>
+                <span className="text-sm font-medium text-foreground">{reasonLabel}</span>
               </div>
-              <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.class}`}>{st.label}</span>
+              <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${stClass}`}>{stLabel}</span>
             </div>
             {ret.description && <p className="text-xs text-muted-foreground">{ret.description}</p>}
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{format(new Date(ret.created_at), "dd MMM yyyy", { locale: fr })}</span>
-              <span className="font-medium text-foreground">${Number(ret.refund_amount).toFixed(2)}</span>
+              <span>{format(new Date(ret.created_at), "dd MMM yyyy", { locale: dateLocale })}</span>
+              <span className="font-medium text-foreground">{formatPrice(Number(ret.refund_amount))}</span>
             </div>
             {ret.admin_notes && (
               <p className="text-xs bg-muted/50 rounded p-2 text-muted-foreground">
-                <strong>Note admin :</strong> {ret.admin_notes}
+                <strong>{t("returns.list.adminNote") || "Note admin :"}</strong> {ret.admin_notes}
               </p>
             )}
             {ret.status === "rejected" && onOpenDispute && (
@@ -87,7 +82,7 @@ export function ReturnsList({ onOpenDispute }: Props) {
                 className="text-xs"
                 onClick={() => onOpenDispute(ret.id, ret.order_id, ret.store_id)}
               >
-                <AlertTriangle size={12} className="mr-1" /> Ouvrir un litige
+                <AlertTriangle size={12} className="mr-1" /> {t("returns.list.openDispute") || "Ouvrir un litige"}
               </Button>
             )}
           </div>

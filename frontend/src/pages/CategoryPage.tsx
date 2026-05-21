@@ -3,6 +3,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
+import { PRODUCT_LIST_SELECT } from "@/services/api";
 import { Footer } from "@/components/Footer";
 import { ProductCard } from "@/components/ProductCard";
 import { FloatingActions } from "@/components/FloatingActions";
@@ -17,6 +18,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { SlidersHorizontal, X } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { slugify } from "@/utils/slugify";
 
 function mapProduct(row: any) {
   const sortedImages = (row.product_images || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
@@ -53,7 +55,9 @@ const SPECIAL_SLUGS = ["nouveautes", "soldes"];
 
 export default function CategoryPage() {
   const { slug } = useParams<{ slug: string }>();
-  const { t } = useI18n();
+  const { t, locale, formatPrice } = useI18n();
+  const labelOf = (c: { name?: string | null; name_fr?: string | null }) =>
+    locale === "fr" ? (c.name_fr ?? c.name ?? "") : (c.name ?? c.name_fr ?? "");
   const isSpecial = SPECIAL_SLUGS.includes(slug?.toLowerCase() || "");
 
   // Filters state
@@ -81,15 +85,18 @@ export default function CategoryPage() {
       if (isSpecial) return { id: slug!, name: slug!, name_fr: slug === "nouveautes" ? "Nouveautés" : "Soldes", icon: slug === "nouveautes" ? "🆕" : "🔥", subcategories: [], parent: null };
       
       const decodedSlug = decodeURIComponent(slug || "").toLowerCase().trim();
+      const normalizedSlug = slugify(decodedSlug);
       const { data, error } = await supabase
         .from("categories")
         .select("id, name, name_fr, icon, parent_id, image_url")
         .order("name");
       if (error) throw error;
       const all = data || [];
-      // Match by name, name_fr, or ID — case-insensitive, trimmed
+      // Match by slugified name, slugified name_fr, raw name, name_fr, or ID
       const match = all.find(
         (c) =>
+          slugify(c.name) === normalizedSlug ||
+          slugify(c.name_fr) === normalizedSlug ||
           c.name.toLowerCase().trim() === decodedSlug ||
           c.name_fr.toLowerCase().trim() === decodedSlug ||
           c.id === slug
@@ -111,7 +118,7 @@ export default function CategoryPage() {
 
       let query = supabase
         .from("products")
-        .select(`*, categories(name, name_fr), product_images(image_url, position), product_colors(color_hex, color_name), product_sizes(size_label), stores!products_store_id_fkey(is_certified, is_verified)`)
+        .select(PRODUCT_LIST_SELECT)
         .eq("publish_status", "published");
 
       if (slug?.toLowerCase() === "nouveautes") {
@@ -128,7 +135,9 @@ export default function CategoryPage() {
         query = query.in("category_id", catIds);
       }
 
-      const { data, error } = await query.order("created_at", { ascending: false });
+      const { data, error } = await query
+        .order("created_at", { ascending: false })
+        .limit(48);
       if (error) throw error;
       return (data || []).map(mapProduct);
     },
@@ -210,8 +219,11 @@ export default function CategoryPage() {
     );
   }
 
-  const seoTitle = `${category.name_fr} — Acheter en ligne`;
-  const seoDesc = `Découvrez ${filteredProducts?.length || 0} produits ${category.name_fr} sur Zandofy. Livraison rapide, prix compétitifs.`;
+  const catLabel = labelOf(category);
+  const seoTitle = `${catLabel} — ${t("category.online") || "Acheter en ligne"}`;
+  const seoDesc = locale === "fr"
+    ? `Découvrez ${filteredProducts?.length || 0} produits ${catLabel} sur Zandofy. Livraison rapide, prix compétitifs.`
+    : `Discover ${filteredProducts?.length || 0} ${catLabel} products on Zandofy. Fast delivery, competitive prices.`;
 
   return (
     <div className="min-h-screen bg-background">
@@ -221,8 +233,8 @@ export default function CategoryPage() {
         canonical={`/category/${slug}`}
         jsonLd={buildBreadcrumbJsonLd([
           { name: "Accueil", url: "/" },
-          ...(category.parent ? [{ name: category.parent.name_fr || category.parent.name || "Catégorie", url: `/category/${category.parent.name.toLowerCase()}` }] : []),
-          { name: category.name_fr || category.name || slug, url: `/category/${slug}` },
+          ...(category.parent ? [{ name: category.parent.name_fr || category.parent.name || "Catégorie", url: `/category/${slugify(category.parent.name)}` }] : []),
+          { name: category.name_fr || category.name || slug, url: `/category/${slugify(category.name || slug || "")}` },
         ])}
       />
       <Header />
@@ -236,13 +248,13 @@ export default function CategoryPage() {
               <>
                 <BreadcrumbItem>
                   <BreadcrumbLink asChild>
-                    <Link to={`/category/${category.parent.name.toLowerCase()}`}>{category.parent.name_fr}</Link>
+                    <Link to={`/category/${slugify(category.parent.name)}`}>{labelOf(category.parent)}</Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
               </>
             )}
-            <BreadcrumbItem><BreadcrumbPage>{category.name_fr}</BreadcrumbPage></BreadcrumbItem>
+            <BreadcrumbItem><BreadcrumbPage>{catLabel}</BreadcrumbPage></BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
 
@@ -251,7 +263,7 @@ export default function CategoryPage() {
           <div className="flex items-center gap-3">
             {category.icon && <span className="text-3xl">{category.icon}</span>}
             <div>
-              <h1 className="text-2xl font-bold text-foreground">{category.name_fr}</h1>
+              <h1 className="text-2xl font-bold text-foreground">{catLabel}</h1>
               <p className="text-sm text-muted-foreground mt-1">
                 {filteredProducts?.length || 0} {t("filter.products")}
               </p>
@@ -267,11 +279,11 @@ export default function CategoryPage() {
               {category.subcategories.map((sub: any) => (
                 <Link
                   key={sub.id}
-                  to={`/category/${sub.name.toLowerCase()}`}
+                  to={`/category/${slugify(sub.name)}`}
                   className="px-4 py-2 text-sm rounded-full border border-border bg-card text-foreground hover:border-primary hover:text-primary transition-colors"
                 >
                   {sub.icon && <span className="mr-1">{sub.icon}</span>}
-                  {sub.name_fr}
+                  {labelOf(sub)}
                 </Link>
               ))}
             </div>
@@ -328,9 +340,9 @@ export default function CategoryPage() {
                 className="mt-2"
               />
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>${priceRange[0]}</span>
+                <span>{formatPrice(priceRange[0])}</span>
                 <span>—</span>
-                <span>${priceRange[1]}</span>
+                <span>{formatPrice(priceRange[1])}</span>
               </div>
             </div>
 
@@ -383,7 +395,7 @@ export default function CategoryPage() {
           <div className="flex flex-wrap gap-1.5 mb-4">
             {(priceRange[0] > 0 || priceRange[1] < 10000) && (
               <Badge variant="outline" className="gap-1 text-xs">
-                ${priceRange[0]} - ${priceRange[1]}
+                {formatPrice(priceRange[0])} - {formatPrice(priceRange[1])}
                 <X size={10} className="cursor-pointer" onClick={() => setPriceRange([0, 10000])} />
               </Badge>
             )}

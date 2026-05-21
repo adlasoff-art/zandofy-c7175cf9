@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Megaphone, Cookie, Plus, Trash2, Save, Loader2, Eye, Zap } from "lucide-react";
+import { Megaphone, Cookie, Plus, Trash2, Save, Loader2, Eye, Zap, BarChart3 } from "lucide-react";
 import { AdminAutomationsTab } from "@/components/admin/AdminAutomationsTab";
+import { AdminAutomationAnalyticsTab } from "@/components/admin/AdminAutomationAnalyticsTab";
 
 interface PopupRow {
   id: string;
@@ -43,7 +44,7 @@ export default function AdminPopupsPage() {
   const [popups, setPopups] = useState<PopupRow[]>([]);
   const [cookie, setCookie] = useState<CookieConfig>(DEFAULT_COOKIE);
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState<"popups" | "cookies" | "automations">("popups");
+  const [tab, setTab] = useState<"popups" | "cookies" | "automations" | "analytics">("popups");
 
   // New popup form
   const [newPopup, setNewPopup] = useState({
@@ -129,12 +130,13 @@ export default function AdminPopupsPage() {
 
   return (
     <AdminLayout title="Popups & Cookies">
-      <div className="max-w-3xl space-y-6">
+      <div className={`${tab === "analytics" ? "max-w-6xl" : "max-w-3xl"} space-y-6`}>
         {/* Tabs */}
         <div className="flex gap-1 border-b border-border">
           {[
             { key: "popups" as const, label: "Annonces commerciales", icon: Megaphone },
             { key: "automations" as const, label: "Automations", icon: Zap },
+            { key: "analytics" as const, label: "Analytics", icon: BarChart3 },
             { key: "cookies" as const, label: "Gestion cookies", icon: Cookie },
           ].map(({ key, label, icon: Icon }) => (
             <button
@@ -218,6 +220,8 @@ export default function AdminPopupsPage() {
         )}
 
         {tab === "automations" && <AdminAutomationsTab />}
+
+        {tab === "analytics" && <AdminAutomationAnalyticsTab />}
 
         {tab === "cookies" && (
           <section className="bg-card border border-border rounded-xl p-5 space-y-4">

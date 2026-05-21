@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Bell, Package, MessageCircle, Tag, Info, Check, CheckCheck, Trash2, X, BellRing, Star, ShieldAlert } from "lucide-react";
 import { useNotifications, type Notification } from "@/hooks/use-notifications";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
@@ -113,12 +112,11 @@ function PushToggle() {
 export function NotificationCenter({ trigger }: { trigger?: React.ReactNode }) {
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
   const { t, locale } = useI18n();
 
   const handleNavigate = (link: string) => {
     setOpen(false);
-    navigate(link);
+    window.location.assign(link);
   };
 
   const defaultTrigger = (

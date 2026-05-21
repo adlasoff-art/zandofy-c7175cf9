@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface GeoOption {
   value: string;
   label: string;
+  id?: string;
 }
 
 interface GeoOptionWithId extends GeoOption {
@@ -58,7 +59,7 @@ export function useGeoData(
       q = q.eq("province_id", provinceId);
     }
     q.then(({ data }: any) => {
-      setCities((data || []).map((c: any) => ({ value: c.name, label: c.name })));
+      setCities((data || []).map((c: any) => ({ value: c.name, label: c.name, id: c.id })));
     });
   }, [countryCode, provinceId]);
 

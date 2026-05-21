@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fromTable } from "@/lib/supabase-helpers";
 import { Check, Package, Truck, Crown, Warehouse } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useI18n } from "@/contexts/I18nContext";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -10,6 +11,7 @@ import { SubscriptionCheckoutDialog } from "@/components/payments/SubscriptionCh
 
 export function CustomerPricingTab() {
   const { user } = useAuth();
+  const { t, locale } = useI18n();
   const queryClient = useQueryClient();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [checkoutPkg, setCheckoutPkg] = useState<any>(null);
@@ -57,10 +59,8 @@ export function CustomerPricingTab() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-foreground">Mes abonnements</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Souscrivez à un forfait pour profiter de la livraison à domicile et d'autres avantages.
-        </p>
+        <h2 className="text-lg font-bold text-foreground">{t("subscription.title")}</h2>
+        <p className="text-sm text-muted-foreground mt-1">{t("subscription.subtitle")}</p>
       </div>
 
       {/* Current subscription */}
@@ -68,13 +68,13 @@ export function CustomerPricingTab() {
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-1">
             <Crown size={18} className="text-primary" />
-            <h3 className="text-sm font-bold text-foreground">Votre forfait actuel</h3>
+            <h3 className="text-sm font-bold text-foreground">{t("subscription.current")}</h3>
           </div>
           <p className="text-sm text-foreground font-medium">{currentSub.service_packages?.name}</p>
           <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
-            <span>Cycle : {currentSub.billing_cycle === "yearly" ? "Annuel" : "Mensuel"}</span>
+            <span>{t("subscription.cycleLabel", { cycle: currentSub.billing_cycle === "yearly" ? t("subscription.cycle.yearly") : t("subscription.cycle.monthly") })}</span>
             {currentSub.paid_until && (
-              <span>Valide jusqu'au : {new Date(currentSub.paid_until).toLocaleDateString("fr-FR")}</span>
+              <span>{t("subscription.validUntil", { date: new Date(currentSub.paid_until).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR") })}</span>
             )}
           </div>
         </div>
@@ -84,11 +84,11 @@ export function CustomerPricingTab() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Package size={18} className="text-primary" />
-          <h3 className="text-sm font-bold text-foreground">Forfaits disponibles</h3>
+          <h3 className="text-sm font-bold text-foreground">{t("subscription.available")}</h3>
         </div>
         <div className="flex items-center gap-2">
           <Label htmlFor="client-billing-toggle" className={`text-xs ${billingCycle === "monthly" ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
-            Mensuel
+            {t("subscription.cycle.monthly")}
           </Label>
           <Switch
             id="client-billing-toggle"
@@ -96,7 +96,7 @@ export function CustomerPricingTab() {
             onCheckedChange={(checked) => setBillingCycle(checked ? "yearly" : "monthly")}
           />
           <Label htmlFor="client-billing-toggle" className={`text-xs ${billingCycle === "yearly" ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
-            Annuel
+            {t("subscription.cycle.yearly")}
           </Label>
         </div>
       </div>
@@ -109,7 +109,7 @@ export function CustomerPricingTab() {
       ) : packages.length === 0 ? (
         <div className="text-center py-8 bg-card border border-border rounded-lg">
           <Package size={32} className="mx-auto text-muted-foreground/30 mb-2" />
-          <p className="text-sm text-muted-foreground">Aucun forfait client disponible pour le moment.</p>
+          <p className="text-sm text-muted-foreground">{t("subscription.empty")}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -127,26 +127,26 @@ export function CustomerPricingTab() {
               >
                 <div className="flex items-center justify-between mb-1">
                   <h4 className="text-sm font-bold text-foreground">{pkg.name}</h4>
-                  {isCurrent && <Badge className="text-[10px]">Actuel</Badge>}
+                  {isCurrent && <Badge className="text-[10px]">{t("subscription.currentBadge")}</Badge>}
                 </div>
                 {pkg.description && <p className="text-xs text-muted-foreground">{pkg.description}</p>}
 
                 <div className="mt-3">
                   <span className="text-xl font-bold text-foreground">${price}</span>
-                  <span className="text-xs text-muted-foreground">/{billingCycle === "yearly" ? "an" : "mois"}</span>
+                  <span className="text-xs text-muted-foreground">{billingCycle === "yearly" ? t("subscription.perYear") : t("subscription.perMonth")}</span>
                 </div>
 
                 <ul className="mt-3 space-y-1.5 flex-1 text-xs text-muted-foreground">
                   {pkg.max_deliveries_per_day > 0 && (
                     <li className="flex items-center gap-2">
                       <Truck size={12} className="text-primary shrink-0" />
-                      {pkg.max_deliveries_per_day} livraisons/jour incluses
+                      {t("subscription.deliveriesIncluded", { count: pkg.max_deliveries_per_day })}
                     </li>
                   )}
                   {pkg.hub_storage_free_kg > 0 && (
                     <li className="flex items-center gap-2">
                       <Warehouse size={12} className="text-primary shrink-0" />
-                      {pkg.hub_storage_free_kg} kg de stockage Hub gratuit
+                      {t("subscription.hubFreeKg", { kg: pkg.hub_storage_free_kg })}
                     </li>
                   )}
                   {services.length > 0 && services.map((svc: string, idx: number) => (
@@ -162,7 +162,7 @@ export function CustomerPricingTab() {
                   onClick={() => !isCurrent && handleSubscribe(pkg)}
                   className="w-full mt-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                 >
-                  {isCurrent ? "Forfait actuel" : "Souscrire"}
+                  {isCurrent ? t("subscription.currentBtn") : t("subscription.subscribe")}
                 </button>
               </div>
             );

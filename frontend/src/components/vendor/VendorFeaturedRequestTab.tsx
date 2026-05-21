@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
+import { sanitizeExtension } from "@/utils/sanitize-filename";
 
 interface Props {
   storeId: string;
@@ -75,7 +76,7 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
 
   const uploadImage = async (): Promise<string | null> => {
     if (!imageFile || !user) return null;
-    const ext = imageFile.name.split(".").pop();
+    const ext = sanitizeExtension(imageFile.name, "jpg");
     const path = `featured/${user.id}/${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("cms-assets").upload(path, imageFile, { upsert: true, cacheControl: "31536000" });
     if (error) throw error;

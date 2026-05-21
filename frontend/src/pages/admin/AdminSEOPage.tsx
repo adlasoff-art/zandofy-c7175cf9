@@ -10,6 +10,9 @@ import { SeoSocialSection } from "@/components/admin/seo/SeoSocialSection";
 import { SeoVerificationSection } from "@/components/admin/seo/SeoVerificationSection";
 import { SeoSerpPreview } from "@/components/admin/seo/SeoSerpPreview";
 import { SeoStoresSection } from "@/components/admin/seo/SeoStoresSection";
+import { SeoWatermarkSection } from "@/components/admin/seo/SeoWatermarkSection";
+import { SeoSocialRescrapeSection } from "@/components/admin/seo/SeoSocialRescrapeSection";
+import { SeoPageOverridesSection } from "@/components/admin/seo/SeoPageOverridesSection";
 
 interface SeoConfigState {
   site_title: string;
@@ -111,6 +114,10 @@ export default function AdminSEOPage() {
     if (r1.error || r2.error) {
       toast({ title: "Erreur", description: (r1.error || r2.error)?.message, variant: "destructive" });
     } else {
+      // Fire-and-forget: purge meta-injector edge cache so bots see new SEO immediately.
+      try {
+        fetch("/api/meta-injector", { method: "GET", headers: { "x-purge-cache": "1" } }).catch(() => {});
+      } catch { /* ignore */ }
       toast({
         title: "SEO mis à jour",
         description: seoEnabled
@@ -186,6 +193,12 @@ export default function AdminSEOPage() {
         />
 
         <SeoStoresSection />
+
+        <SeoWatermarkSection />
+
+        <SeoSocialRescrapeSection />
+
+        <SeoPageOverridesSection />
 
         <button
           onClick={handleSave}

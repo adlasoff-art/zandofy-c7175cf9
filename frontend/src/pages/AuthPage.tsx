@@ -13,6 +13,7 @@ import { useGeoDetection } from "@/hooks/use-geo-detection";
 import { useActiveGeo } from "@/hooks/useActiveGeo";
 import { LegalModal } from "@/components/auth/LegalModal";
 import { HoneypotField, isHoneypotTriggered } from "@/components/security/FormProtection";
+import { SEOHead } from "@/components/SEOHead";
 import {
   signInWithGoogle,
   checkRateLimit,
@@ -46,10 +47,22 @@ export default function AuthPage() {
 
   const searchParams = new URLSearchParams(window.location.search);
   const refCode = searchParams.get("ref") || "";
+  const redirectTo = searchParams.get("redirect") || "/";
+  const initialMode = searchParams.get("mode") === "signup" ? "signup" : "login";
+  const prefillEmail = searchParams.get("email") || "";
 
   useEffect(() => {
-    if (user) navigate("/", { replace: true });
-  }, [user, navigate]);
+    if (user) {
+      const safeRedirect = redirectTo.startsWith("/") ? redirectTo : "/";
+      navigate(safeRedirect, { replace: true });
+    }
+  }, [user, navigate, redirectTo]);
+
+  useEffect(() => {
+    setMode(initialMode);
+    if (prefillEmail && !email) setEmail(prefillEmail);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pwStrength = mode === "signup" ? getPasswordStrength(password) : null;
 
@@ -209,6 +222,7 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <SEOHead title="Connexion" description="Connectez-vous à votre compte Zandofy." noindex />
       <header className="border-b border-border bg-card">
         <div className="container flex items-center h-14">
           <a href="/" className="text-xl font-bold tracking-[0.18em] uppercase text-foreground" style={{ fontWeight: 800 }}>

@@ -11,28 +11,36 @@ import { toast } from "sonner";
 import { UserDetailDrawer } from "@/components/admin/UserDetailDrawer";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import type { AppRole } from "@/hooks/use-roles";
+import { ALL_APP_ROLES, ROLE_LABELS_FR } from "@/lib/role-labels";
 
-type RoleFilter = "all" | AppRole;
+type RoleFilter = "all" | "customer" | AppRole;
 type StatusFilter = "all" | "active" | "banned" | "online" | "offline";
 type GenderFilter = "all" | "male" | "female" | "other";
 type AgeFilter = "all" | "18-25" | "26-35" | "36-45" | "46+";
 type ChartPeriod = "day" | "week" | "month" | "year";
 
-const ALL_ROLES: AppRole[] = ["admin", "manager", "vendor", "shipper", "rider"];
+const ALL_ROLES: AppRole[] = ALL_APP_ROLES;
 
 const roleIcons: Record<string, React.ElementType> = {
-  vendor: Store, shipper: Truck, rider: Bike, customer: UserCheck, admin: ShieldCheck, manager: ShieldCheck,
+  vendor: Store,
+  forwarder: Truck,
+  shipper: Truck,
+  operator: Truck,
+  rider: Bike,
+  customer: UserCheck,
+  admin: ShieldCheck,
+  manager: ShieldCheck,
 };
 
-const roleLabels: Record<string, string> = {
-  vendor: "Vendeur", shipper: "Transporteur", rider: "Livreur", customer: "Client", admin: "Admin", manager: "Manager",
-};
+const roleLabels = ROLE_LABELS_FR;
 
 const roleBadgeColors: Record<string, string> = {
   admin: "bg-destructive/10 text-destructive",
   manager: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
   vendor: "bg-primary/10 text-primary",
+  forwarder: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300",
   shipper: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  operator: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
   rider: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
 };
 
@@ -95,28 +103,31 @@ export default function AdminUsersPage() {
     roles: ((userRolesMap as Record<string, string[]>)[p.id] || []) as AppRole[],
   })), [profiles, userRolesMap]);
 
-  // Online count: is_online = true AND last_seen_at within 2 minutes
-  const TWO_MIN_AGO = useMemo(() => new Date(Date.now() - 2 * 60 * 1000).toISOString(), []);
+  // Online count: is_online = true AND last_seen_at within 5 minutes (Lot 18C — aligné sur heartbeat 120 s).
+  const ONLINE_THRESHOLD = useMemo(() => new Date(Date.now() - 5 * 60 * 1000).toISOString(), []);
   const onlineCount = useMemo(() =>
-    users.filter(u => u.is_online && u.last_seen_at && u.last_seen_at > TWO_MIN_AGO).length,
-    [users, TWO_MIN_AGO]
+    users.filter(u => u.is_online && u.last_seen_at && u.last_seen_at > ONLINE_THRESHOLD).length,
+    [users, ONLINE_THRESHOLD]
   );
 
   const filtered = useMemo(() => users.filter((u) => {
     const matchesSearch = !search ||
       `${u.first_name} ${u.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
       (u.email || "").toLowerCase().includes(search.toLowerCase());
-    const matchesRole = roleFilter === "all" || u.roles.includes(roleFilter);
+    const matchesRole =
+      roleFilter === "all" ||
+      (roleFilter === "customer" && u.roles.length === 0) ||
+      (roleFilter !== "customer" && u.roles.includes(roleFilter as AppRole));
     const matchesStatus =
       statusFilter === "all" ||
       (statusFilter === "banned" && u.is_banned) ||
       (statusFilter === "active" && !u.is_banned) ||
-      (statusFilter === "online" && u.is_online && u.last_seen_at && u.last_seen_at > TWO_MIN_AGO) ||
-      (statusFilter === "offline" && (!u.is_online || !u.last_seen_at || u.last_seen_at <= TWO_MIN_AGO));
+      (statusFilter === "online" && u.is_online && u.last_seen_at && u.last_seen_at > ONLINE_THRESHOLD) ||
+      (statusFilter === "offline" && (!u.is_online || !u.last_seen_at || u.last_seen_at <= ONLINE_THRESHOLD));
     const matchesGender = genderFilter === "all" || (u.gender || "").toLowerCase() === genderFilter;
     const matchesAgeFilter = matchesAge(u.birth_year, ageFilter);
     return matchesSearch && matchesRole && matchesStatus && matchesGender && matchesAgeFilter;
-  }), [users, search, roleFilter, statusFilter, genderFilter, ageFilter, TWO_MIN_AGO]);
+  }), [users, search, roleFilter, statusFilter, genderFilter, ageFilter, ONLINE_THRESHOLD]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
@@ -193,7 +204,7 @@ export default function AdminUsersPage() {
     });
   }, [users, chartPeriod]);
 
-  const isUserOnline = (u: any) => u.is_online && u.last_seen_at && u.last_seen_at > TWO_MIN_AGO;
+  const isUserOnline = (u: any) => u.is_online && u.last_seen_at && u.last_seen_at > ONLINE_THRESHOLD;
 
   return (
     <AdminLayout title="Gestion des utilisateurs">
@@ -326,19 +337,27 @@ export default function AdminUsersPage() {
 
       {/* Role filter chips */}
       <div className="flex gap-1.5 overflow-x-auto mb-4 pb-1">
-        {(["all", ...ALL_ROLES] as RoleFilter[]).map((r) => (
-          <button
-            key={r}
-            onClick={() => handleRoleFilter(r)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${
-              roleFilter === r
-                ? "bg-foreground text-background border-foreground"
-                : "bg-card text-foreground border-border hover:border-foreground"
-            }`}
-          >
-            {r === "all" ? `Tous (${profiles.length})` : roleLabels[r]}
-          </button>
-        ))}
+        {(["all", "customer", ...ALL_ROLES] as RoleFilter[]).map((r) => {
+          const count =
+            r === "all"
+              ? profiles.length
+              : r === "customer"
+              ? users.filter((u) => u.roles.length === 0).length
+              : users.filter((u) => u.roles.includes(r as AppRole)).length;
+          return (
+            <button
+              key={r}
+              onClick={() => handleRoleFilter(r)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${
+                roleFilter === r
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-card text-foreground border-border hover:border-foreground"
+              }`}
+            >
+              {r === "all" ? `Tous (${count})` : `${roleLabels[r]} (${count})`}
+            </button>
+          );
+        })}
       </div>
 
       {/* Table */}
