@@ -56,13 +56,13 @@ export function FlashSales() {
   if (!loading && products.length === 0) return null;
 
   return (
-    <section id="flash" className="py-6 bg-card">
+    <section id="flash" className="py-6 bg-card" aria-labelledby="home-flash-heading">
       <div className="container">
         {/* Section header — stacks vertically on mobile */}
         <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between mb-4">
           <div className="flex items-center gap-2">
-            <h2 className="text-base md:text-lg font-bold text-foreground flex items-center gap-1.5 whitespace-nowrap">
-              <Flame size={18} className="text-sale" />
+            <h2 id="home-flash-heading" className="text-base md:text-lg font-bold text-foreground flex items-center gap-1.5 whitespace-nowrap">
+              <Flame size={18} className="text-sale" aria-hidden />
               {t("home.flashSales")}
             </h2>
             <ChevronRight size={16} className="text-muted-foreground hidden md:block" />

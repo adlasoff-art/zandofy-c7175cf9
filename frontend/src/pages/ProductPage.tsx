@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimate";
-import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd } from "@/components/SEOHead";
+import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd, buildJsonLdGraph } from "@/components/SEOHead";
 import { VariantOrderDrawer } from "@/components/VariantOrderDrawer";
 
 // ─── Gallery from product_images ──────────────────────────────
@@ -259,9 +259,8 @@ export default function ProductPage() {
         canonical={`/product/${product.slug || product.id}`}
         ogImage={gallery[0]?.url || product.image}
         ogType="product"
-        jsonLd={productJsonLd}
+        jsonLd={buildJsonLdGraph(productJsonLd, breadcrumbJsonLd)}
       />
-      <SEOHead title="" description="" jsonLd={breadcrumbJsonLd} />
       <Header />
       <main className="max-w-7xl mx-auto px-4 py-4">
         {/* Breadcrumbs */}

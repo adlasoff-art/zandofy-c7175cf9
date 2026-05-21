@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 
 interface RecommendedProduct {
   id: string;
+  slug?: string | null;
   name: string;
   price: number;
   image: string;
@@ -39,7 +40,7 @@ export function RecommendationsSection() {
 
         let query = supabase
           .from("products")
-          .select("id, name, price, rating, product_images(image_url, position), gender_target")
+          .select("id, slug, name, price, rating, product_images(image_url, position), gender_target")
           .eq("publish_status", "published")
           .order("rating", { ascending: false })
           .limit(30);
@@ -77,6 +78,7 @@ export function RecommendationsSection() {
         setProducts(
           filtered.map((p: any) => ({
             id: p.id,
+            slug: p.slug,
             name: p.name,
             price: Number(p.price),
             rating: p.rating,
@@ -86,7 +88,7 @@ export function RecommendationsSection() {
       } catch {
         const { data: popular } = await supabase
           .from("products")
-          .select("id, name, price, rating, product_images(image_url, position)")
+          .select("id, slug, name, price, rating, product_images(image_url, position)")
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
           .limit(8);
@@ -94,6 +96,7 @@ export function RecommendationsSection() {
         setProducts(
           (popular || []).map((p: any) => ({
             id: p.id,
+            slug: p.slug,
             name: p.name,
             price: Number(p.price),
             rating: p.rating,
@@ -119,10 +122,10 @@ export function RecommendationsSection() {
   if (!products.length) return null;
 
   return (
-    <section className="container py-6">
+    <section className="container py-6" aria-labelledby="home-recommendations-heading">
       <div className="flex items-center gap-2 mb-4">
-        <Sparkles size={20} className="text-primary" />
-        <h2 className="text-lg font-bold text-foreground">
+        <Sparkles size={20} className="text-primary" aria-hidden />
+        <h2 id="home-recommendations-heading" className="text-lg font-bold text-foreground">
           {user ? t("home.forYou") : t("home.popularProducts")}
         </h2>
       </div>
@@ -131,7 +134,7 @@ export function RecommendationsSection() {
         {products.map((product) => (
           <Link
             key={product.id}
-            to={`/product/${product.id}`}
+            to={`/product/${product.slug || product.id}`}
             className="group bg-card border border-border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
           >
             <div className="aspect-square overflow-hidden">
