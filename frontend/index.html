@@ -26,20 +26,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-<<<<<<< HEAD
-  <!-- Hero LCP preload: injected at runtime from CMS (see HeroBanner.tsx) -->
-=======
-  <!-- LCP image preload — two strategies running together for max coverage:
-         A) Synchronous: localStorage cache from previous visits (instant, zero cost).
-         B) Async fetch (in parallel of the JS bundle): asks Supabase for the first
-            active hero_slide image, posts a <link rel=preload> as soon as it arrives.
-            On 4G the fetch completes well before React mounts HeroBanner → the image
-            gets discovered up to 2 s earlier. Zero risk: any failure is silent and
-            the React component still renders the image normally afterwards. -->
+  <!-- LCP image preload — localStorage from previous visits (see HeroBanner.tsx) -->
   <script>
     (function(){
-      // LCP hero preload is only useful on the home route. Skip on /auth,
-      // /account, etc. to avoid "preload not used" console warnings.
       var p = location.pathname;
       if (p !== '/' && p !== '/index.html') return;
       function toRender(u, w){
@@ -58,7 +47,6 @@
         if (!u || !/^https:\/\//.test(u)) return;
         var orig = u;
         u = toRender(orig, 1280);
-        // Avoid duplicate <link> if both A and B succeed with the same URL.
         if (document.querySelector('link[rel="preload"][as="image"][href="' + u + '"]')) return;
         var l = document.createElement('link');
         l.rel = 'preload';
@@ -69,18 +57,11 @@
         l.setAttribute('fetchpriority', 'high');
         document.head.appendChild(l);
       }
-      // A) Cache localStorage (visites suivantes — zéro latence)
       try {
         preload(localStorage.getItem('z_lcp_hero_url'));
       } catch(_) {}
-      // B) Le fetch direct cms_banners depuis index.html a été retiré : la clé
-      // anon hardcodée se désynchronisait avec celle injectée au build,
-      // provoquant des 401 silencieux. HeroBanner.tsx remplit z_lcp_hero_url
-      // après le premier rendu : les visites suivantes bénéficient toujours
-      // du preload via le bloc A.
     })();
   </script>
->>>>>>> origin/main
 
   <!-- Critical font: Inter only — render-blocking minimal weights.
        Other families (Outfit/DM Sans/Poppins/Roboto/Plus Jakarta) are loaded

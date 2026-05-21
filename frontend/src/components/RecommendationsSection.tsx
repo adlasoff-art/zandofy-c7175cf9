@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { Sparkles, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { optimizeImageUrl } from "@/utils/image-url";
+import { imgUrl } from "@/lib/image-url";
 
 interface RecommendedProduct {
   id: string;
@@ -42,11 +42,7 @@ export function RecommendationsSection() {
 
         const { data: allProducts } = await supabase
           .from("products")
-<<<<<<< HEAD
-          .select("id, slug, name, price, rating, product_images(image_url, position), gender_target")
-=======
-          .select("id, name, name_fr, price, rating, product_images(image_url, position), gender_target")
->>>>>>> origin/main
+          .select("id, slug, name, name_fr, price, rating, product_images(image_url, position), gender_target")
           .eq("publish_status", "published")
           .order("rating", { ascending: false })
           .limit(60);
@@ -83,7 +79,7 @@ export function RecommendationsSection() {
         const topIds = new Set(topRow.map(p => p.id));
         const { data: poolData } = await supabase
           .from("products")
-          .select("id, name, name_fr, price, rating, product_images(image_url, position)")
+          .select("id, slug, name, name_fr, price, rating, product_images(image_url, position)")
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
           .limit(80);
@@ -110,11 +106,7 @@ export function RecommendationsSection() {
       } catch {
         const { data: popular } = await supabase
           .from("products")
-<<<<<<< HEAD
-          .select("id, slug, name, price, rating, product_images(image_url, position)")
-=======
-          .select("id, name, name_fr, price, rating, product_images(image_url, position)")
->>>>>>> origin/main
+          .select("id, slug, name, name_fr, price, rating, product_images(image_url, position)")
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
           .limit(8);
@@ -168,13 +160,8 @@ export function RecommendationsSection() {
           >
             <div className="aspect-square overflow-hidden">
               <img
-<<<<<<< HEAD
-                src={optimizeImageUrl(product.image, 320)}
-                alt={product.name}
-=======
-                src={product.image}
+                src={imgUrl(product.image, { width: 320 })}
                 alt={displayName}
->>>>>>> origin/main
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 loading="lazy"
               />

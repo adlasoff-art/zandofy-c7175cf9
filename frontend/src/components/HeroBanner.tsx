@@ -4,11 +4,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
-<<<<<<< HEAD
-import { HERO_LCP_WIDTH, optimizeImageUrl } from "@/utils/image-url";
-=======
 import { imgUrl, imgSrcSet } from "@/lib/image-url";
->>>>>>> origin/main
 
 interface BannerItem {
   id: string;
@@ -86,28 +82,6 @@ export function HeroBanner() {
     if (heroSlides.length === 0) return;
     goTo((current - 1 + heroSlides.length) % heroSlides.length, "right");
   }, [current, heroSlides.length, goTo]);
-
-  // LCP preload — first active hero slide from CMS (replaces static index.html preload)
-  useEffect(() => {
-    const firstUrl = heroSlides[0]?.image_url;
-    if (!firstUrl) return;
-
-    const href = optimizeImageUrl(firstUrl, HERO_LCP_WIDTH);
-    let link = document.querySelector('link[data-hero-preload]') as HTMLLinkElement | null;
-    if (!link) {
-      link = document.createElement("link");
-      link.rel = "preload";
-      link.as = "image";
-      link.setAttribute("data-hero-preload", "true");
-      document.head.appendChild(link);
-    }
-    link.href = href;
-    link.setAttribute("fetchpriority", "high");
-
-    return () => {
-      document.querySelector('link[data-hero-preload]')?.remove();
-    };
-  }, [heroSlides]);
 
   // Auto-play
   useEffect(() => {
@@ -211,13 +185,9 @@ export function HeroBanner() {
                 }}
               >
                 <img
-<<<<<<< HEAD
-                  src={optimizeImageUrl(slide.image_url || "/placeholder.svg", i === 0 ? HERO_LCP_WIDTH : 640)}
-=======
                   src={imgUrl(slide.image_url, { width: 1280, quality: 75 }) || "/placeholder.svg"}
                   srcSet={slide.image_url ? imgSrcSet(slide.image_url, [640, 1024, 1280], { quality: 75 }) : undefined}
                   sizes="(max-width: 1024px) 100vw, 1024px"
->>>>>>> origin/main
                   alt={slide.title}
                   className="w-full h-full object-cover"
                   loading={i === 0 ? "eager" : "lazy"}

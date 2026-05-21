@@ -37,22 +37,15 @@ Cloudflare: DNS, cache, WAF in front of Vercel and Supabase public endpoints.
 
 ## Deprecated (removed from active architecture)
 
-<<<<<<< HEAD
 - Coolify, docker-compose deploy path
 - `api.zandofy.com`, `supabasa.*`, `studio-staging.zandofy.com`
 - `frontend/supabase/` (consolidated to root `supabase/`)
 - Root `src/` Lovable relic
-=======
-The following files are infrastructure-sensitive and must be edited carefully:
+- `docker-compose.yaml`, `backend/Dockerfile` (legacy — not used with Vercel)
 
-- `docker-compose.yaml`
-- `docker-compose.prod.yml`
-- `backend/Dockerfile`
-- `frontend/Dockerfile`
+## Architectural rule
 
-## Architectural Rule
-
-Feature work should not silently modify deployment, domains, ports, or variable naming. Those changes must be deliberate, documented, and reviewed.
+Feature work should not silently modify deployment, domains, ports, or variable naming.
 
 ## Rôles applicatifs (`app_role`)
 
@@ -76,4 +69,3 @@ vendor → forwarder → shipper → operator → rider → customer
 - Clés i18n associées : `role.<rolename>` et `role.<rolename>.plural` dans `frontend/src/contexts/I18nContext.tsx`.
 - Règles métier détaillées (qui livre, qui reçoit le cargo, garde-fous d'attribution) : voir `mem://auth/logistics-roles-canonical`.
 - Plus jamais le libellé « Transporteur » seul — ambigu entre `shipper` et `forwarder`.
->>>>>>> origin/main

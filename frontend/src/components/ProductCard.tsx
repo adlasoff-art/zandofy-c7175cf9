@@ -10,8 +10,6 @@ import { useTrackProductClick } from "@/hooks/use-analytics";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { formatStoreYears } from "@/lib/store-years";
 import type { Product } from "@/services/api";
-import { buildImageSrcSet, optimizeImageUrl, PRODUCT_CARD_WIDTHS } from "@/utils/image-url";
-
 interface ProductCardProps {
   product: Product;
   index?: number;
@@ -40,11 +38,6 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
   const secondImage = galleryImages && galleryImages.length > 1
     ? galleryImages.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))[1]?.image_url
     : null;
-  const rawDisplayImage = hovered && secondImage ? secondImage : (imgError ? "/placeholder.svg" : product.image);
-  const displayImage = optimizeImageUrl(rawDisplayImage, 400);
-  const displaySrcSet = buildImageSrcSet(rawDisplayImage, PRODUCT_CARD_WIDTHS);
-  const cardSizes = "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw";
-
   // Determine first available variant defaults
   const firstColor = product.colors?.[0] ?? null;
   const firstSize = product.sizes?.[0] ?? null;
@@ -97,38 +90,6 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
         {!loaded && (
           <div className="absolute inset-0 skeleton-shimmer" />
         )}
-<<<<<<< HEAD
-        {inView && (
-          <>
-            <img
-              src={displayImage}
-              srcSet={displaySrcSet}
-              sizes={cardSizes}
-              alt={product.nameFr}
-              decoding="async"
-              className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
-                loaded ? "opacity-100" : "opacity-0"
-              } ${hovered && secondImage ? "opacity-0 scale-105" : ""}`}
-              loading={index < 6 ? "eager" : "lazy"}
-              {...(index < 2 ? ({ fetchpriority: "high" } as React.HTMLAttributes<HTMLImageElement>) : {})}
-              onLoad={onLoad}
-              onError={handleImgError}
-            />
-            {secondImage && (
-              <img
-                src={optimizeImageUrl(secondImage, 400)}
-                srcSet={buildImageSrcSet(secondImage, PRODUCT_CARD_WIDTHS)}
-                sizes={cardSizes}
-                alt={product.nameFr}
-                decoding="async"
-                className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
-                  hovered ? "opacity-100 scale-100" : "opacity-0 scale-95"
-                }`}
-                loading="lazy"
-              />
-            )}
-          </>
-=======
         <OptimizedImage
           src={imgError ? "/placeholder.svg" : product.image}
           alt={product.nameFr}
@@ -140,7 +101,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
           widths={[160, 240, 360]}
           sizes="(max-width: 640px) 50vw, 170px"
           quality={60}
-          priority={priority}
+          priority={priority || index < 2}
         />
         {secondImage && hovered && (
           <OptimizedImage
@@ -151,7 +112,6 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
             sizes="(max-width: 640px) 50vw, 170px"
             quality={60}
           />
->>>>>>> origin/main
         )}
 
         {/* Discount badge - top left */}

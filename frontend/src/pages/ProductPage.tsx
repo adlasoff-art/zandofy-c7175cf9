@@ -38,7 +38,6 @@ import {
 import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimate";
 import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd, buildJsonLdGraph } from "@/components/SEOHead";
-import { optimizeImageUrl } from "@/utils/image-url";
 import { VariantOrderDrawer } from "@/components/VariantOrderDrawer";
 import { slugify } from "@/utils/slugify";
 
@@ -301,17 +300,7 @@ export default function ProductPage() {
                         <Camera size={14} className="text-muted-foreground" />
                       </div>
                     ) : (
-<<<<<<< HEAD
-                      <img
-                        src={optimizeImageUrl(item.url, 120)}
-                        alt={`Vue ${i + 1}`}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                      />
-=======
                       <img src={imgUrl(item.url, { width: 160 })} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
->>>>>>> origin/main
                     )}
                   </button>
                 ))}
@@ -329,7 +318,7 @@ export default function ProductPage() {
                   />
                 ) : (
                   <ImageZoomLens
-                    src={optimizeImageUrl(gallery[selectedImage]?.url || product.image, 1200)}
+                    src={imgUrl(gallery[selectedImage]?.url || product.image, { width: 1200, quality: 80 })}
                     alt={product.nameFr}
                     className="w-full h-full"
                     zoomFactor={2.5}
@@ -374,17 +363,7 @@ export default function ProductPage() {
                             <Camera size={12} className="text-muted-foreground" />
                           </div>
                         ) : (
-<<<<<<< HEAD
-                          <img
-                        src={optimizeImageUrl(item.url, 120)}
-                        alt={`Vue ${i + 1}`}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                      />
-=======
                           <img src={imgUrl(item.url, { width: 120 })} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
->>>>>>> origin/main
                         )}
                       </button>
                     ))}
@@ -439,17 +418,7 @@ export default function ProductPage() {
                     {relatedProducts.slice(0, 6).map((p) => (
                       <Link to={`/product/${(p as any).slug || p.id}`} key={p.id} className="group">
                         <div className="aspect-square rounded-sm overflow-hidden bg-muted">
-<<<<<<< HEAD
-                          <img
-                            src={optimizeImageUrl(p.image, 200)}
-                            alt={p.nameFr}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                            loading="lazy"
-                            decoding="async"
-                          />
-=======
                           <img src={imgUrl(p.image, { width: 200 })} alt={p.nameFr} className="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" decoding="async" />
->>>>>>> origin/main
                         </div>
                         <p className="text-xs text-foreground mt-1 truncate">{p.nameFr}</p>
                         <div className="flex items-center gap-1.5">

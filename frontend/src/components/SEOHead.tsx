@@ -8,9 +8,10 @@ interface SEOHeadProps {
   canonical?: string;
   ogImage?: string;
   ogType?: string;
-<<<<<<< HEAD
   /** Single schema object, or multiple nodes (wrapped in @graph automatically). */
   jsonLd?: Record<string, any> | Record<string, any>[];
+  /** Force noindex,nofollow regardless of global SEO toggle (private pages). */
+  noindex?: boolean;
 }
 
 /** Combine multiple JSON-LD nodes into one script (valid for Google). */
@@ -26,11 +27,6 @@ function normalizeJsonLd(jsonLd: Record<string, any> | Record<string, any>[]): R
     return buildJsonLdGraph(...jsonLd);
   }
   return jsonLd;
-=======
-  jsonLd?: Record<string, any>;
-  /** Force noindex,nofollow regardless of global SEO toggle (private pages). */
-  noindex?: boolean;
->>>>>>> origin/main
 }
 
 const SITE_NAME = "Zandofy";
