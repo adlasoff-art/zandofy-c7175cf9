@@ -37,6 +37,7 @@ import {
 import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimate";
 import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd, buildJsonLdGraph } from "@/components/SEOHead";
+import { optimizeImageUrl } from "@/utils/image-url";
 import { VariantOrderDrawer } from "@/components/VariantOrderDrawer";
 
 // ─── Gallery from product_images ──────────────────────────────
@@ -56,14 +57,7 @@ function getGalleryItems(product: Product): GalleryItem[] {
         type: img.image_url.match(/\.(mp4|webm|mov)$/i) ? "video" as const : "image" as const,
       }));
   }
-  // Fallback: generate mock gallery from main image
-  const base = product.image.split("?")[0];
-  return [
-    { url: product.image, type: "image" },
-    { url: `${base}?w=600&h=800&fit=crop&crop=top`, type: "image" },
-    { url: `${base}?w=600&h=800&fit=crop&crop=center`, type: "image" },
-    { url: `${base}?w=600&h=800&fit=crop&crop=bottom`, type: "image" },
-  ];
+  return [{ url: product.image, type: "image" as const }];
 }
 
 const SIZE_REGIONS: Record<string, string[]> = {
@@ -303,7 +297,13 @@ export default function ProductPage() {
                         <Camera size={14} className="text-muted-foreground" />
                       </div>
                     ) : (
-                      <img src={item.url} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" />
+                      <img
+                        src={optimizeImageUrl(item.url, 120)}
+                        alt={`Vue ${i + 1}`}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     )}
                   </button>
                 ))}
@@ -321,7 +321,7 @@ export default function ProductPage() {
                   />
                 ) : (
                   <ImageZoomLens
-                    src={gallery[selectedImage]?.url || ""}
+                    src={optimizeImageUrl(gallery[selectedImage]?.url || product.image, 1200)}
                     alt={product.nameFr}
                     className="w-full h-full"
                     zoomFactor={2.5}
@@ -366,7 +366,13 @@ export default function ProductPage() {
                             <Camera size={12} className="text-muted-foreground" />
                           </div>
                         ) : (
-                          <img src={item.url} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" />
+                          <img
+                        src={optimizeImageUrl(item.url, 120)}
+                        alt={`Vue ${i + 1}`}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
                         )}
                       </button>
                     ))}
@@ -421,7 +427,13 @@ export default function ProductPage() {
                     {relatedProducts.slice(0, 6).map((p) => (
                       <Link to={`/product/${(p as any).slug || p.id}`} key={p.id} className="group">
                         <div className="aspect-square rounded-sm overflow-hidden bg-muted">
-                          <img src={p.image} alt={p.nameFr} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          <img
+                            src={optimizeImageUrl(p.image, 200)}
+                            alt={p.nameFr}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            loading="lazy"
+                            decoding="async"
+                          />
                         </div>
                         <p className="text-xs text-foreground mt-1 truncate">{p.nameFr}</p>
                         <div className="flex items-center gap-1.5">

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { HERO_LCP_WIDTH, optimizeImageUrl } from "@/utils/image-url";
 
 interface BannerItem {
   id: string;
@@ -81,6 +82,28 @@ export function HeroBanner() {
     if (heroSlides.length === 0) return;
     goTo((current - 1 + heroSlides.length) % heroSlides.length, "right");
   }, [current, heroSlides.length, goTo]);
+
+  // LCP preload — first active hero slide from CMS (replaces static index.html preload)
+  useEffect(() => {
+    const firstUrl = heroSlides[0]?.image_url;
+    if (!firstUrl) return;
+
+    const href = optimizeImageUrl(firstUrl, HERO_LCP_WIDTH);
+    let link = document.querySelector('link[data-hero-preload]') as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "preload";
+      link.as = "image";
+      link.setAttribute("data-hero-preload", "true");
+      document.head.appendChild(link);
+    }
+    link.href = href;
+    link.setAttribute("fetchpriority", "high");
+
+    return () => {
+      document.querySelector('link[data-hero-preload]')?.remove();
+    };
+  }, [heroSlides]);
 
   // Auto-play
   useEffect(() => {
@@ -176,7 +199,7 @@ export function HeroBanner() {
                 }}
               >
                 <img
-                  src={slide.image_url || "/placeholder.svg"}
+                  src={optimizeImageUrl(slide.image_url || "/placeholder.svg", i === 0 ? HERO_LCP_WIDTH : 640)}
                   alt={slide.title}
                   className="w-full h-full object-cover"
                   loading={i === 0 ? "eager" : "lazy"}

@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { Sparkles, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { optimizeImageUrl } from "@/utils/image-url";
 
 interface RecommendedProduct {
   id: string;
@@ -139,7 +140,7 @@ export function RecommendationsSection() {
           >
             <div className="aspect-square overflow-hidden">
               <img
-                src={product.image}
+                src={optimizeImageUrl(product.image, 320)}
                 alt={product.name}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 loading="lazy"
