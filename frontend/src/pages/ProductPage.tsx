@@ -7,6 +7,10 @@ import { fetchProductBySlug, fetchProducts, fetchPricingTiers, type Product } fr
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { imgUrl, imgSrcSet } from "@/lib/image-url";
+import { OptimizedImage } from "@/components/OptimizedImage";
+
+const PDP_THUMB_WIDTHS = [120, 160, 240] as const;
+const PDP_MAIN_WIDTHS = [600, 900, 1200] as const;
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { Footer } from "@/components/Footer";
@@ -37,7 +41,7 @@ import {
 } from "lucide-react";
 import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimate";
-import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd, buildJsonLdGraph } from "@/components/SEOHead";
+import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd, buildJsonLdGraph, buildMarketplaceFaqJsonLd } from "@/components/SEOHead";
 import { VariantOrderDrawer } from "@/components/VariantOrderDrawer";
 import { slugify } from "@/utils/slugify";
 
@@ -256,7 +260,7 @@ export default function ProductPage() {
         canonical={`/product/${product.slug || product.id}`}
         ogImage={gallery[0]?.url || product.image}
         ogType="product"
-        jsonLd={buildJsonLdGraph(productJsonLd, breadcrumbJsonLd)}
+        jsonLd={buildJsonLdGraph(productJsonLd, breadcrumbJsonLd, buildMarketplaceFaqJsonLd())}
       />
       <Header />
       <main className="max-w-7xl mx-auto px-4 py-4">
@@ -300,7 +304,13 @@ export default function ProductPage() {
                         <Camera size={14} className="text-muted-foreground" />
                       </div>
                     ) : (
-                      <img src={imgUrl(item.url, { width: 160 })} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                      <OptimizedImage
+                        src={item.url}
+                        alt={`Vue ${i + 1}`}
+                        widths={[...PDP_THUMB_WIDTHS]}
+                        sizes="64px"
+                        className="w-full h-full object-cover"
+                      />
                     )}
                   </button>
                 ))}
@@ -319,6 +329,8 @@ export default function ProductPage() {
                 ) : (
                   <ImageZoomLens
                     src={imgUrl(gallery[selectedImage]?.url || product.image, { width: 1200, quality: 80 })}
+                    srcSet={imgSrcSet(gallery[selectedImage]?.url || product.image, [...PDP_MAIN_WIDTHS], { quality: 80 })}
+                    sizes="(max-width: 1024px) 100vw, 50vw"
                     alt={product.nameFr}
                     className="w-full h-full"
                     zoomFactor={2.5}
@@ -363,7 +375,13 @@ export default function ProductPage() {
                             <Camera size={12} className="text-muted-foreground" />
                           </div>
                         ) : (
-                          <img src={imgUrl(item.url, { width: 120 })} alt={`Vue ${i + 1}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                          <OptimizedImage
+                            src={item.url}
+                            alt={`Vue ${i + 1}`}
+                            widths={[...PDP_THUMB_WIDTHS]}
+                            sizes="120px"
+                            className="w-full h-full object-cover"
+                          />
                         )}
                       </button>
                     ))}

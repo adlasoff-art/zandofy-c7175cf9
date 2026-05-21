@@ -1,6 +1,17 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const SITE_URL = "https://zandofy.com";
+const SITE_URL = "https://www.zandofy.com";
+
+/** Match frontend `slugify()` for category URLs. */
+function slugify(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-|-$/g, "");
+}
 
 Deno.serve(async () => {
   try {
@@ -55,9 +66,11 @@ Deno.serve(async () => {
       xml += `  <url><loc>${SITE_URL}/product/${productPath}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}<changefreq>weekly</changefreq><priority>0.8</priority></url>\n`;
     }
 
-    // Categories
+    // Categories — slug must match CategoryPage / CategoryBanner (slugify name)
     for (const c of categories || []) {
-      xml += `  <url><loc>${SITE_URL}/category/${encodeURIComponent(c.name.toLowerCase())}</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>\n`;
+      const catSlug = slugify(c.name || "");
+      if (!catSlug) continue;
+      xml += `  <url><loc>${SITE_URL}/category/${catSlug}</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>\n`;
     }
 
     // Stores (use slug when available, fallback to id)

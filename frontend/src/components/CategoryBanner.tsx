@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { slugify } from "@/utils/slugify";
 import { useI18n } from "@/contexts/I18nContext";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 const MOBILE_COLS = 5;
 const MOBILE_MAX_ROWS = 2;
@@ -87,14 +88,14 @@ export function CategoryBanner() {
                 >
                   <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-border group-hover:border-primary transition-colors bg-muted flex items-center justify-center">
                     {cat.image_url ? (
-                      <img
+                      <OptimizedImage
                         src={cat.image_url}
                         alt={getLabel(cat)}
                         width={56}
                         height={56}
+                        widths={[56, 112, 168]}
+                        sizes="56px"
                         className="w-full h-full object-cover"
-                        loading="lazy"
-                        decoding="async"
                       />
                     ) : cat.icon ? (
                       <span className="text-xl">{cat.icon}</span>
@@ -136,14 +137,14 @@ export function CategoryBanner() {
             >
               <div className="w-16 h-16 md:w-[72px] md:h-[72px] rounded-full overflow-hidden border-2 border-border group-hover:border-primary transition-colors bg-muted flex items-center justify-center">
                 {cat.image_url ? (
-                  <img
+                  <OptimizedImage
                     src={cat.image_url}
                     alt={getLabel(cat)}
                     width={72}
                     height={72}
+                    widths={[72, 144, 216]}
+                    sizes="(max-width: 768px) 64px, 72px"
                     className="w-full h-full object-cover"
-                    loading="lazy"
-                    decoding="async"
                   />
                 ) : cat.icon ? (
                   <span className="text-2xl">{cat.icon}</span>

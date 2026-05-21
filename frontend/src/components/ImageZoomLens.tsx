@@ -3,6 +3,8 @@ import { useState, useRef, useCallback, memo } from "react";
 interface ImageZoomLensProps {
   src: string;
   alt: string;
+  srcSet?: string;
+  sizes?: string;
   className?: string;
   zoomFactor?: number;
 }
@@ -15,6 +17,8 @@ interface ImageZoomLensProps {
 export const ImageZoomLens = memo(function ImageZoomLens({
   src,
   alt,
+  srcSet,
+  sizes,
   className = "",
   zoomFactor = 2.5,
 }: ImageZoomLensProps) {
@@ -50,9 +54,12 @@ export const ImageZoomLens = memo(function ImageZoomLens({
       {/* Base image — object-contain to avoid blur/crop */}
       <img
         src={src}
+        srcSet={srcSet}
+        sizes={sizes}
         alt={alt}
         className="w-full h-full object-contain"
         draggable={false}
+        decoding="async"
       />
 
       {/* Zoomed overlay on hover */}

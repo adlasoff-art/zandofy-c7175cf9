@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { fetchProducts, fetchTrendTags, fetchCategories, type Product, type TrendTag } from "@/services/api";
-import { supabase } from "@/integrations/supabase/client";
 import { ChevronRight, TrendingUp, Flame, Users } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 
@@ -42,62 +41,15 @@ export function ProductGrid() {
     fetchTrendTags().then(setTrendTags);
   }, []);
 
-  // Load popular products: 8 most sold + 2 most favorited + 2 most in cart
+  // Popular products via API (no direct wishlists/cart_items reads — RLS-safe, fewer queries)
   useEffect(() => {
     setPopularLoading(true);
-    (async () => {
-      // 8 most sold
-      const topSold = await fetchProducts({ limit: 8, orderBy: "popular" });
-
-      // 2 most favorited (by wishlist count)
-      const { data: topWishlisted } = await supabase
-        .from("wishlists")
-        .select("product_id")
-        .limit(100);
-      const wishCounts: Record<string, number> = {};
-      (topWishlisted || []).forEach((w: any) => {
-        wishCounts[w.product_id] = (wishCounts[w.product_id] || 0) + 1;
-      });
-      const topWishIds = Object.entries(wishCounts)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 10)
-        .map(([id]) => id);
-
-      // 2 most added to cart
-      const { data: topCarted } = await supabase
-        .from("cart_items")
-        .select("product_id")
-        .limit(100);
-      const cartCounts: Record<string, number> = {};
-      (topCarted || []).forEach((c: any) => {
-        cartCounts[c.product_id] = (cartCounts[c.product_id] || 0) + 1;
-      });
-      const topCartIds = Object.entries(cartCounts)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 10)
-        .map(([id]) => id);
-
-      // Fetch extra products for favorites and cart
-      const existingIds = new Set(topSold.map(p => p.id));
-      const extraIds = [...topWishIds, ...topCartIds].filter(id => !existingIds.has(id));
-
-      let extraProducts: typeof topSold = [];
-      if (extraIds.length > 0) {
-        const allExtra = await fetchProducts({ limit: 50 });
-        const wishProducts = topWishIds
-          .filter(id => !existingIds.has(id))
-          .map(id => allExtra.find(p => p.id === id))
-          .filter(Boolean) as typeof topSold;
-        const cartProducts = topCartIds
-          .filter(id => !existingIds.has(id) && !wishProducts.some(p => p.id === id))
-          .map(id => allExtra.find(p => p.id === id))
-          .filter(Boolean) as typeof topSold;
-        extraProducts = [...wishProducts.slice(0, 2), ...cartProducts.slice(0, 2)];
-      }
-
-      setPopularProducts([...topSold, ...extraProducts].slice(0, 12));
-      setPopularLoading(false);
-    })();
+    fetchProducts({ limit: 12, orderBy: "popular" })
+      .then((items) => {
+        setPopularProducts(items);
+        setPopularLoading(false);
+      })
+      .catch(() => setPopularLoading(false));
   }, []);
 
   // Load category sections on mount

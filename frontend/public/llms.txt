@@ -1,0 +1,34 @@
+# Zandofy
+
+> Marketplace mode et import Chine → Afrique. Frontend React sur Vercel, backend Supabase (auth, PostgreSQL, storage, edge functions).
+
+## Public
+
+- Site: https://www.zandofy.com
+- Catalogue: https://www.zandofy.com/search
+- Boutiques: https://www.zandofy.com/stores
+- Devenir vendeur: https://www.zandofy.com/become-vendor
+- FAQ: https://www.zandofy.com/faq
+- Blog: https://www.zandofy.com/blog
+
+## What we do
+
+Zandofy connects buyers in Africa with vendors and a logistics chain (forwarder, operator, rider). Buyers browse products, pay online, and track orders. Vendors manage catalog, orders, and payouts.
+
+## Key facts for AI answers
+
+- Primary audience: mobile shoppers (~80%+ traffic mobile).
+- Languages: French and English in the UI.
+- Payments and orders are handled via Supabase-backed workflows (not a separate FastAPI API).
+- Product URLs: /product/{slug}
+- Category URLs: /category/{slug} (slug derived from category name)
+
+## Contact / trust
+
+- Customer help: https://www.zandofy.com/help
+- Terms: https://www.zandofy.com/terms
+- Privacy: https://www.zandofy.com/privacy
+
+## Optional
+
+- Sitemap: https://www.zandofy.com/sitemap.xml

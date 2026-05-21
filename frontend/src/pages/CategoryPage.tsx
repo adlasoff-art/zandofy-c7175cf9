@@ -11,7 +11,7 @@ import {
   Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SEOHead, buildBreadcrumbJsonLd } from "@/components/SEOHead";
+import { SEOHead, buildBreadcrumbJsonLd, buildProductItemListJsonLd, buildJsonLdGraph } from "@/components/SEOHead";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -231,11 +231,24 @@ export default function CategoryPage() {
         title={seoTitle}
         description={seoDesc}
         canonical={`/category/${slug}`}
-        jsonLd={buildBreadcrumbJsonLd([
-          { name: "Accueil", url: "/" },
-          ...(category.parent ? [{ name: category.parent.name_fr || category.parent.name || "Catégorie", url: `/category/${slugify(category.parent.name)}` }] : []),
-          { name: category.name_fr || category.name || slug, url: `/category/${slugify(category.name || slug || "")}` },
-        ])}
+        jsonLd={buildJsonLdGraph(
+          buildBreadcrumbJsonLd([
+            { name: "Accueil", url: "/" },
+            ...(category.parent ? [{ name: category.parent.name_fr || category.parent.name || "Catégorie", url: `/category/${slugify(category.parent.name)}` }] : []),
+            { name: category.name_fr || category.name || slug, url: `/category/${slugify(category.name || slug || "")}` },
+          ]),
+          buildProductItemListJsonLd(
+            (filteredProducts || []).map((p) => ({
+              id: p.id,
+              slug: p.slug,
+              name: locale === "fr" ? p.nameFr : p.name,
+              image: p.image,
+              price: p.price,
+              currency: p.currency,
+            })),
+            catLabel,
+          ),
+        )}
       />
       <Header />
       <main className="max-w-7xl mx-auto px-4 py-4">
