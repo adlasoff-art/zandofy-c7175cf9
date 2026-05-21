@@ -195,7 +195,7 @@ function CmsThemeInjector() { useCmsTheme(); usePlatformFont(); return null; }
 
 function GeoBlockGuard({ children }: { children: React.ReactNode }) {
   const { blocked, loading } = useGeoBlocking();
-  if (loading) return null;
+  if (loading) return <PageLoadingSkeleton />;
   if (blocked) return <GeoBlockScreen />;
   return <>{children}</>;
 }

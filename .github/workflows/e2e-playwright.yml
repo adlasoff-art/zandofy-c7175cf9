@@ -40,22 +40,26 @@ jobs:
       - name: Prepare Vite env for E2E build
         if: ${{ github.event.inputs.base_url == '' }}
         run: |
-          if [ -n "${{ secrets.VITE_SUPABASE_URL }}" ]; then
+          cp .env.e2e .env.production.local
+          if [ -n "${{ secrets.VITE_SUPABASE_URL }}" ] && [ -n "${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" ]; then
             {
               echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}"
               echo "VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}"
               echo "VITE_SUPABASE_PROJECT_ID=${{ secrets.VITE_SUPABASE_PROJECT_ID }}"
               echo "VITE_SITE_URL=https://www.zandofy.com"
             } > .env.production.local
-            echo "Using GitHub secrets for Vite build."
+            echo "Vite build: GitHub secrets override .env.e2e"
           else
-            cp .env.e2e .env.production.local
-            echo "No VITE_* secrets — using frontend/.env.e2e (public anon key)."
+            echo "Vite build: frontend/.env.e2e (public anon key)"
           fi
 
       - name: Build app for E2E
         if: ${{ github.event.inputs.base_url == '' }}
         run: bun run build
+
+      - name: Verify Supabase env baked into bundle
+        if: ${{ github.event.inputs.base_url == '' }}
+        run: grep -q "vpttoqojmiqxgudknyxf" dist/assets/index-*.js
 
       - name: Run smoke tests
         env:

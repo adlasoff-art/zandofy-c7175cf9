@@ -13,10 +13,12 @@ export function useGeoBlocking() {
     "geo_blocked_countries"
   );
 
+  // Fail-open while bootstrap loads: empty list until settings arrive (never blank the whole app).
   const blockedCountries = (value?.blocked ?? []).map((c) => c.toUpperCase());
-  const loading = geo.loading || isLoading;
+  const loading = geo.loading;
   const blocked =
     !loading &&
+    !isLoading &&
     geo.country_code !== "" &&
     blockedCountries.length > 0 &&
     blockedCountries.includes(geo.country_code.toUpperCase());
