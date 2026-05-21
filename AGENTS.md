@@ -7,91 +7,118 @@ description: Project-wide operating agreement for humans and AI agents
 ## Mission
 
 Zandofy is developed through a controlled workflow:
-- Lovable generates scoped product code.
-- GitHub is the single source of truth.
-- Cursor AI reviews, integrates, and stabilizes.
-- Coolify deploys staging and production from GitHub.
-- Human validation is required before production release.
 
-## Branching Strategy
+- **Lovable** generates scoped product code (frontend, optional SQL, optional Edge Functions).
+- **GitHub** is the single source of truth.
+- **Cursor AI** reviews, integrates, and stabilizes before production impact.
+- **Human validation** is required before production database changes.
 
-- `main` = production-ready branch
-- `develop` = staging branch
-- `feature/*` = one feature at a time
-- `hotfix/*` = urgent production fixes
+## Stack (current — do not suggest alternatives unless asked)
 
-## Deployment Strategy
+| Layer | Technology |
+|-------|------------|
+| Frontend | React + TypeScript + Vite → **Vercel** (`https://www.zandofy.com`) |
+| Backend | **Supabase Pro** (Auth, PostgreSQL, Storage, Realtime, Edge Functions) |
+| CDN | **Cloudflare** (DNS, cache, WAF) — R2 not in use yet |
+| PWA | Service worker (`frontend/public/sw.js`) |
 
-- `develop` deploys to staging.
-- `main` deploys to production.
-- No manual production-only change is considered complete until it is reflected back in GitHub.
+**Not in use (do not mention or recreate):** FastAPI, Coolify, `api.zandofy.com`, `supabasa.*`, `studio-staging.zandofy.com`.
 
-## AI Roles
+## Supabase environments
+
+Two separate Supabase projects (staging + production). Each has its own database, keys, and Edge Function deployments.
+
+- **Staging** — test schema changes and features first.
+- **Production** — live users (~4000+ accounts); treat with extreme care.
+
+Frontend `VITE_*` variables point to the Supabase project for that Vercel environment.
+
+## Git branches
+
+| Branch | Intended use |
+|--------|----------------|
+| `main` | Production frontend (Vercel production) |
+| `develop` | Staging / integration (when branch protection allows) |
+| `RemStaging` | Optional staging alias |
+| `feature/*` | One feature at a time |
+
+**Current operational note:** Lovable may push to `main` when branch rules block other branches. Prefer restoring `develop` + protected `main` when possible.
+
+## Deployment workflow
+
+### Frontend (Vercel)
+
+1. Code merged to the branch connected to the target Vercel project.
+2. Vercel builds `frontend/` (`npm run build` → `dist/`).
+3. No backend secrets on Vercel — only `VITE_*` public keys.
+
+### Database (manual SQL — critical)
+
+1. Every schema change = one new file in **`supabase/migrations/`** (repository root).
+2. Human runs the SQL in **Supabase SQL Editor → staging project** first.
+3. Validate (smoke tests: auth, product list, checkout, vendor dashboard).
+4. Run the **same file** in **production** SQL Editor.
+5. Never apply production-only SQL that is not committed in GitHub.
+
+### Edge Functions
+
+- Source of truth: **`supabase/functions/`** (repository root).
+- Deploy to staging Supabase, test, then deploy to production.
+
+## Repository layout
+
+```
+frontend/          # React app (Vercel root)
+supabase/
+  migrations/      # ONLY place for SQL migrations
+  functions/       # ONLY place for Edge Functions
+docs/              # Human + AI instructions
+.cursor/rules/     # Cursor agent rules
+```
+
+**Do not use:** `frontend/supabase/` (removed — legacy), root `src/` (removed — legacy Lovable).
+
+## AI roles
 
 ### Lovable may work on
 
-- frontend UI and pages
-- React components and hooks
-- TypeScript client logic
-- isolated feature work
-- explicit Supabase Edge Functions when requested
-- explicit Supabase migrations when requested
+- `frontend/src/**` (UI, pages, components, hooks)
+- New files in `supabase/migrations/` when explicitly asked for DB changes
+- New or updated files in `supabase/functions/` when explicitly asked
 
-### Lovable must not change without explicit approval
+### Lovable must not change without explicit human approval
 
-- `docker-compose.yaml`
-- `docker-compose.prod.yml`
-- `backend/Dockerfile`
-- `frontend/Dockerfile`
-- deployment ports
-- domains and routing
-- environment variable names
-- infrastructure architecture
-- Git workflow
-- AI rules files
-- `AGENTS.md`
+- `frontend/vercel.json`, deployment ports, domains
+- `VITE_*` variable names
+- `AGENTS.md`, `.cursor/rules/`, `docs/LOVABLE_INSTRUCTIONS.md`
+- Destructive SQL (`DROP TABLE`, `DROP COLUMN`, `TRUNCATE`)
+- Mixing staging and production credentials
 
 ### Cursor AI responsibilities
 
-- review generated code before integration
-- identify backend, DB, env, Docker, and deployment implications
-- stabilize changes before merge to `develop` or `main`
-- document missing migrations, variables, or rollout steps
+- Review Lovable output before trusting production
+- Flag DB, RLS, Edge Function, and env impacts
+- Deliver migration SQL safe for staging → production
+- Keep documentation aligned with this file
 
-## Database Rules
+## Database rules
 
-- Schema changes must be represented by committed migrations.
-- Do not rely on undocumented manual DB edits.
-- `frontend/supabase/migrations/` is the source of truth for Supabase schema changes.
+- Schema changes = committed migration in `supabase/migrations/`.
+- Prefer additive changes (`ADD COLUMN`, new tables, new policies).
+- Enable RLS on every new table.
+- Do not rely on undocumented manual prod edits.
+- See `.cursor/rules/05-database-safety.mdc` for full safety protocol.
 
-## Environment Rules
+## Environment rules
 
-- Frontend public build-time variables use the `VITE_*` prefix.
-- Backend secrets must never appear in frontend files.
-- Any new environment variable must be documented in `.env.example` and project docs.
-- Renaming existing environment variables requires explicit approval.
+- Public frontend variables: `VITE_*` prefix only.
+- Never put service role keys or secrets in frontend code.
+- Document new variables in `.env.example`.
+- Do not rename existing `VITE_*` without explicit approval.
 
-## Environment Model
+## Safety rules
 
-### Staging (suffix `-staging`)
-
-- frontend: `https://studio-staging.zandofy.com`
-- backend: `https://api-staging.zandofy.com`
-- supabase: `https://supabasa-staging.zandofy.com`
-- database: instance Supabase derrière `supabasa-staging.zandofy.com` (base dédiée staging)
-
-### Production
-
-- frontend: `https://zandofy.com`
-- backend: `https://api.zandofy.com`
-- supabase: `https://supabasa.zandofy.com`
-- database: instance Supabase derrière `supabasa.zandofy.com` (base dédiée production)
-
-Staging et production sont entièrement séparés (domaines, bases, variables).
-
-## Safety Rules
-
-- Do not casually edit deployment-sensitive files.
+- Treat Lovable output as draft until reviewed.
 - Do not silently change domains, ports, or URLs.
-- Do not mix staging and production variables.
-- Treat Lovable output as draft code until reviewed and integrated.
+- Do not break existing tables or delete user data.
+- Staging and production Supabase projects must stay isolated.
