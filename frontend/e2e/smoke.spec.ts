@@ -5,6 +5,8 @@ import { test, expect } from "@playwright/test";
  * Sert de "canary" pour garantir que la base URL Playwright est joignable.
  */
 test("home page loads", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  // Reject Lovable preview gate ("Login" / "Internal Lovable project")
   await expect(page).toHaveTitle(/Zandofy/i);
+  await expect(page.getByRole("heading", { level: 1 })).toBeAttached();
 });

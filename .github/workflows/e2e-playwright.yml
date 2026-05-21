@@ -5,10 +5,15 @@ on:
     paths:
       - "frontend/**"
       - ".github/workflows/e2e-playwright.yml"
+  push:
+    branches: [develop]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/e2e-playwright.yml"
   workflow_dispatch:
     inputs:
       base_url:
-        description: "Base URL à tester (vide = preview Lovable)"
+        description: "Base URL externe (vide = build local + vite preview)"
         required: false
         default: ""
 
@@ -32,9 +37,19 @@ jobs:
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
 
+      # PR/push: build + preview local. workflow_dispatch + base_url: test URL externe.
+      - name: Build app for E2E
+        if: ${{ github.event.inputs.base_url == '' }}
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
+          VITE_SITE_URL: https://www.zandofy.com
+        run: bun run build
+
       - name: Run smoke tests
         env:
-          PLAYWRIGHT_BASE_URL: ${{ github.event.inputs.base_url }}
+          PLAYWRIGHT_BASE_URL: ${{ github.event.inputs.base_url || 'http://127.0.0.1:5173' }}
         run: bunx playwright test smoke
 
       - name: Upload Playwright report
