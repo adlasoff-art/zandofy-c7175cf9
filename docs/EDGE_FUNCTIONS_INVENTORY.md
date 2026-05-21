@@ -6,6 +6,8 @@ Déployer **uniquement** depuis [`supabase/functions/`](../supabase/functions/).
 
 Le dossier [`frontend/supabase/`](../frontend/supabase/) est **déprécié** (copie Lovable historique). Ne plus y modifier ni déployer.
 
+**CI** : [`.github/workflows/deploy-edge-functions.yml`](../.github/workflows/deploy-edge-functions.yml) déploie depuis la **racine** du repo (`supabase/functions/`), pas depuis `frontend/`.
+
 ## Fonctions versionnées dans Git (racine)
 
 | Fonction | Rôle indicatif |

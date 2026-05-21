@@ -1,46 +1,216 @@
+# Zandofy — Edge Functions (source of truth: supabase/functions/)
+# Deploy via .github/workflows/deploy-edge-functions.yml from repository root.
 project_id = "uogkklwfvwoxkifpkzpu"
-
-[functions.notify-handoff-status-customer]
-verify_jwt = false
-
-[functions.watermark-image]
-verify_jwt = false
-
-[functions.become-operator-submit]
-verify_jwt = false
-
-[functions.operator-invite-rider]
-verify_jwt = false
-
-[functions.operator-assign-rider-to-order]
-verify_jwt = false
-
-[functions.operator-request-quota-increase]
-verify_jwt = false
 
 [functions.admin-approve-operator]
 verify_jwt = false
 
-[functions.admin-reject-operator]
+[functions.admin-approve-operator-rate]
 verify_jwt = false
 
-[functions.admin-suspend-operator]
-verify_jwt = false
+[functions.admin-archive-operator]
+verify_jwt = true
 
-[functions.admin-review-quota-request]
-verify_jwt = false
-
-[functions.notify-operator-new-order]
-verify_jwt = false
-
-[functions.operator-decide-order]
-verify_jwt = false
-
-[functions.expire-operator-assignments]
+[functions.admin-create-operator]
 verify_jwt = false
 
 [functions.admin-create-operator-rate]
 verify_jwt = true
 
+[functions.admin-reject-operator]
+verify_jwt = false
+
+[functions.admin-reject-operator-rate]
+verify_jwt = false
+
+[functions.admin-review-kyb-document]
+verify_jwt = true
+
+[functions.admin-review-quota-request]
+verify_jwt = false
+
+[functions.admin-suspend-operator]
+verify_jwt = false
+
+[functions.admin-update-operator]
+verify_jwt = true
+
 [functions.admin-update-operator-rate]
 verify_jwt = true
+
+[functions.admin-users]
+verify_jwt = true
+
+[functions.ai-recommendations]
+verify_jwt = true
+
+[functions.ai-user-analysis]
+verify_jwt = true
+
+[functions.apply-dispute-refund]
+verify_jwt = false
+
+[functions.auto-suspend-underperforming-operators]
+verify_jwt = false
+
+[functions.become-forwarder-submit]
+verify_jwt = false
+
+[functions.become-operator-submit]
+verify_jwt = false
+
+[functions.calculate-shipping]
+verify_jwt = false
+
+[functions.cleanup-sourcing]
+verify_jwt = true
+
+[functions.expire-operator-assignments]
+verify_jwt = false
+
+[functions.expire-pending-orders]
+verify_jwt = false
+
+[functions.generate-invoice]
+verify_jwt = false
+
+[functions.generate-shipping-labels]
+verify_jwt = false
+
+[functions.generate-sitemap]
+verify_jwt = false
+
+[functions.get-store-whatsapp]
+verify_jwt = false
+
+[functions.impersonate-user]
+verify_jwt = true
+
+[functions.keccel-cardpay]
+verify_jwt = false
+
+[functions.kelpay-callback]
+verify_jwt = false
+
+[functions.kelpay-check]
+verify_jwt = false
+
+[functions.kelpay-payment]
+verify_jwt = false
+
+[functions.kelpay-webhook]
+verify_jwt = false
+
+[functions.mark-payment-abandoned]
+verify_jwt = false
+
+[functions.notify-admin-operator-rate]
+verify_jwt = false
+
+[functions.notify-app-update]
+verify_jwt = false
+
+[functions.notify-expiring-points]
+verify_jwt = false
+
+[functions.notify-forwarder-handoff]
+verify_jwt = false
+
+[functions.notify-handoff-status-customer]
+verify_jwt = false
+
+[functions.notify-operator-new-order]
+verify_jwt = false
+
+[functions.notify-order-status]
+verify_jwt = false
+
+[functions.notify-sourcing-response]
+verify_jwt = true
+
+[functions.operator-accept-rider-invite]
+verify_jwt = false
+
+[functions.operator-assign-rider-to-order]
+verify_jwt = false
+
+[functions.operator-decide-order]
+verify_jwt = false
+
+[functions.operator-invite-rider]
+verify_jwt = false
+
+[functions.operator-remind-rider-kyc]
+verify_jwt = false
+
+[functions.operator-request-quota-increase]
+verify_jwt = false
+
+[functions.operator-upload-kyb-document]
+verify_jwt = true
+
+[functions.platform-bootstrap]
+verify_jwt = false
+
+[functions.process-automation]
+verify_jwt = false
+
+[functions.process-automation-workflows]
+verify_jwt = false
+
+[functions.process-dispute-sla]
+verify_jwt = false
+
+[functions.process-vendor-analytics-emails]
+verify_jwt = false
+
+[functions.push-notifications]
+verify_jwt = true
+
+[functions.request-delivery-coverage]
+verify_jwt = true
+
+[functions.request-forwarder-coverage]
+verify_jwt = false
+
+[functions.run-campaign]
+verify_jwt = false
+
+[functions.run-healthchecks]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = true
+
+[functions.send-vendor-email]
+verify_jwt = false
+
+[functions.share-proxy]
+verify_jwt = false
+
+[functions.sourcing-email-digest]
+verify_jwt = false
+
+[functions.subscribe-payment]
+verify_jwt = false
+
+[functions.switch-to-hub-pickup]
+verify_jwt = false
+
+[functions.track-automation-click]
+verify_jwt = false
+
+[functions.track-shipment-17track]
+verify_jwt = false
+
+[functions.vendor-order-webhook]
+verify_jwt = false
+
+[functions.verify-confirmation-code]
+verify_jwt = false
+
+[functions.visual-search]
+verify_jwt = false
+
+[functions.watermark-image]
+verify_jwt = false
