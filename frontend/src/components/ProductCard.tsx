@@ -10,7 +10,6 @@ import { useTrackProductClick } from "@/hooks/use-analytics";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { formatStoreYears } from "@/lib/store-years";
 import type { Product } from "@/services/api";
-
 interface ProductCardProps {
   product: Product;
   index?: number;
@@ -39,8 +38,6 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
   const secondImage = galleryImages && galleryImages.length > 1
     ? galleryImages.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))[1]?.image_url
     : null;
-  const displayImage = hovered && secondImage ? secondImage : (imgError ? "/placeholder.svg" : product.image);
-
   // Determine first available variant defaults
   const firstColor = product.colors?.[0] ?? null;
   const firstSize = product.sizes?.[0] ?? null;
@@ -104,7 +101,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
           widths={[160, 240, 360]}
           sizes="(max-width: 640px) 50vw, 170px"
           quality={60}
-          priority={priority}
+          priority={priority || index < 2}
         />
         {secondImage && hovered && (
           <OptimizedImage

@@ -10,7 +10,8 @@ type: feature
 - `@playwright/test` v1.59+
 - Config : `frontend/playwright.config.ts`
 - Specs : `frontend/e2e/*.spec.ts` (séparé de Vitest qui cible `src/**`)
-- CI : `.github/workflows/e2e-playwright.yml` (smoke sur chaque PR `frontend/**`)
+- CI : `.github/workflows/e2e-playwright.yml` — **build + vite preview local** (ne plus cibler l’URL preview Lovable protégée par login)
+- Build CI : secrets GitHub `VITE_*` **ou** fallback `frontend/.env.e2e` (clé anon publique prod, déjà dans `api/meta-injector.ts`)
 
 ## Commandes
 ```bash

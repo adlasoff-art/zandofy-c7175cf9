@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimate";
-import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd } from "@/components/SEOHead";
+import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd, buildJsonLdGraph } from "@/components/SEOHead";
 import { VariantOrderDrawer } from "@/components/VariantOrderDrawer";
 import { slugify } from "@/utils/slugify";
 
@@ -58,14 +58,7 @@ function getGalleryItems(product: Product): GalleryItem[] {
         type: img.image_url.match(/\.(mp4|webm|mov)$/i) ? "video" as const : "image" as const,
       }));
   }
-  // Fallback: generate mock gallery from main image
-  const base = product.image.split("?")[0];
-  return [
-    { url: product.image, type: "image" },
-    { url: `${base}?w=600&h=800&fit=crop&crop=top`, type: "image" },
-    { url: `${base}?w=600&h=800&fit=crop&crop=center`, type: "image" },
-    { url: `${base}?w=600&h=800&fit=crop&crop=bottom`, type: "image" },
-  ];
+  return [{ url: product.image, type: "image" as const }];
 }
 
 const SIZE_REGIONS: Record<string, string[]> = {
@@ -263,9 +256,8 @@ export default function ProductPage() {
         canonical={`/product/${product.slug || product.id}`}
         ogImage={gallery[0]?.url || product.image}
         ogType="product"
-        jsonLd={productJsonLd}
+        jsonLd={buildJsonLdGraph(productJsonLd, breadcrumbJsonLd)}
       />
-      <SEOHead title="" description="" jsonLd={breadcrumbJsonLd} />
       <Header />
       <main className="max-w-7xl mx-auto px-4 py-4">
         {/* Breadcrumbs */}
@@ -326,7 +318,7 @@ export default function ProductPage() {
                   />
                 ) : (
                   <ImageZoomLens
-                    src={gallery[selectedImage]?.url || ""}
+                    src={imgUrl(gallery[selectedImage]?.url || product.image, { width: 1200, quality: 80 })}
                     alt={product.nameFr}
                     className="w-full h-full"
                     zoomFactor={2.5}

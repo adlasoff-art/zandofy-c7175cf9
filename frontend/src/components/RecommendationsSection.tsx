@@ -4,9 +4,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { Sparkles, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { imgUrl } from "@/lib/image-url";
 
 interface RecommendedProduct {
   id: string;
+  slug?: string | null;
   name: string;
   nameFr?: string | null;
   price: number;
@@ -40,7 +42,7 @@ export function RecommendationsSection() {
 
         const { data: allProducts } = await supabase
           .from("products")
-          .select("id, name, name_fr, price, rating, product_images(image_url, position), gender_target")
+          .select("id, slug, name, name_fr, price, rating, product_images(image_url, position), gender_target")
           .eq("publish_status", "published")
           .order("rating", { ascending: false })
           .limit(60);
@@ -77,7 +79,7 @@ export function RecommendationsSection() {
         const topIds = new Set(topRow.map(p => p.id));
         const { data: poolData } = await supabase
           .from("products")
-          .select("id, name, name_fr, price, rating, product_images(image_url, position)")
+          .select("id, slug, name, name_fr, price, rating, product_images(image_url, position)")
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
           .limit(80);
@@ -93,6 +95,7 @@ export function RecommendationsSection() {
         setProducts(
           combined.map((p: any) => ({
             id: p.id,
+            slug: p.slug,
             name: p.name,
             nameFr: p.name_fr,
             price: Number(p.price),
@@ -103,7 +106,7 @@ export function RecommendationsSection() {
       } catch {
         const { data: popular } = await supabase
           .from("products")
-          .select("id, name, name_fr, price, rating, product_images(image_url, position)")
+          .select("id, slug, name, name_fr, price, rating, product_images(image_url, position)")
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
           .limit(8);
@@ -111,6 +114,7 @@ export function RecommendationsSection() {
         setProducts(
           (popular || []).map((p: any) => ({
             id: p.id,
+            slug: p.slug,
             name: p.name,
             nameFr: (p as any).name_fr,
             price: Number(p.price),
@@ -137,10 +141,10 @@ export function RecommendationsSection() {
   if (!products.length) return null;
 
   return (
-    <section className="container py-6">
+    <section className="container py-6" aria-labelledby="home-recommendations-heading">
       <div className="flex items-center gap-2 mb-4">
-        <Sparkles size={20} className="text-primary" />
-        <h2 className="text-lg font-bold text-foreground">
+        <Sparkles size={20} className="text-primary" aria-hidden />
+        <h2 id="home-recommendations-heading" className="text-lg font-bold text-foreground">
           {user ? t("home.forYou") : t("home.popularProducts")}
         </h2>
       </div>
@@ -151,12 +155,12 @@ export function RecommendationsSection() {
           return (
           <Link
             key={product.id}
-            to={`/product/${product.id}`}
+            to={`/product/${product.slug || product.id}`}
             className="group bg-card border border-border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
           >
             <div className="aspect-square overflow-hidden">
               <img
-                src={product.image}
+                src={imgUrl(product.image, { width: 320 })}
                 alt={displayName}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 loading="lazy"

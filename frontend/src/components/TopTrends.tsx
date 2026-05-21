@@ -47,10 +47,10 @@ export function TopTrends() {
   useEffect(() => { loadProducts(); }, []);
 
   return (
-    <section className="py-6 bg-card">
+    <section className="py-6 bg-card" aria-labelledby="home-trends-heading">
       <div className="container">
         <Link to="/trends" className="flex items-center gap-2 mb-4 group cursor-pointer">
-          <h2 className="text-base md:text-lg font-bold text-foreground group-hover:text-primary transition-colors">
+          <h2 id="home-trends-heading" className="text-base md:text-lg font-bold text-foreground group-hover:text-primary transition-colors">
             {t("home.topTrends")}
           </h2>
           <ChevronRight size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />

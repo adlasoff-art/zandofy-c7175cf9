@@ -8,9 +8,25 @@ interface SEOHeadProps {
   canonical?: string;
   ogImage?: string;
   ogType?: string;
-  jsonLd?: Record<string, any>;
+  /** Single schema object, or multiple nodes (wrapped in @graph automatically). */
+  jsonLd?: Record<string, any> | Record<string, any>[];
   /** Force noindex,nofollow regardless of global SEO toggle (private pages). */
   noindex?: boolean;
+}
+
+/** Combine multiple JSON-LD nodes into one script (valid for Google). */
+export function buildJsonLdGraph(...nodes: Record<string, any>[]) {
+  return {
+    "@context": "https://schema.org",
+    "@graph": nodes.map(({ ["@context"]: _ctx, ...node }) => node),
+  };
+}
+
+function normalizeJsonLd(jsonLd: Record<string, any> | Record<string, any>[]): Record<string, any> {
+  if (Array.isArray(jsonLd)) {
+    return buildJsonLdGraph(...jsonLd);
+  }
+  return jsonLd;
 }
 
 const SITE_NAME = "Zandofy";
@@ -107,7 +123,7 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
         script.setAttribute("data-seo-jsonld", "true");
         document.head.appendChild(script);
       }
-      script.textContent = JSON.stringify(jsonLd);
+      script.textContent = JSON.stringify(normalizeJsonLd(jsonLd));
     }
 
     // Google Analytics / GTM

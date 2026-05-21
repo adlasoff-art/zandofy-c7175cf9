@@ -1,6 +1,10 @@
 # Zandofy — Guide de Migration Complet : VPS Hostinger
 
-> **Objectif** : Déployer l'intégralité de la plateforme Zandofy sur un VPS Hostinger (4 vCPU / 16 Go RAM / 200 Go NVMe), tout en conservant Lovable + GitHub pour le développement.
+> **⚠️ DOCUMENT OBSOLÈTE (archivé)** — La stack active est **Vercel + Supabase Pro** (2 projets), pas VPS self-hosted / `api.zandofy.com`.
+> Utilisez : `AGENTS.md`, `docs/ENVIRONMENTS.md`, `supabase/README.md`, `docs/LOVABLE_INSTRUCTIONS.md`.
+> Les sections ci-dessous mentionnent des domaines et chemins (`frontend/supabase/`, Coolify) qui ne sont plus d'actualité.
+
+> **Objectif historique** : Déployer l'intégralité de la plateforme Zandofy sur un VPS Hostinger (4 vCPU / 16 Go RAM / 200 Go NVMe), tout en conservant Lovable + GitHub pour le développement.
 
 ---
 

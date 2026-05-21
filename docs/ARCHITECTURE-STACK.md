@@ -112,17 +112,16 @@ VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbG...
 VITE_SUPABASE_PROJECT_ID=uogkklwfvwoxkifpkzpu
 ```
 
-> ⚠️ Aucune variable backend (DATABASE_URL, JWT_SECRET, etc.) ne doit être sur Vercel.
+> ⚠️ Aucune variable backend (DATABASE_URL, JWT_SECRET, service role, etc.) ne doit être sur Vercel.
 
-## Migration future vers FastAPI
+## Backend métier
 
-Ce schéma est conçu pour permettre une migration progressive :
+Toute la logique serveur passe par **Supabase Edge Functions** (`supabase/functions/`) et PostgreSQL (RLS, triggers). Pas de backend FastAPI dans ce dépôt.
 
-1. **Phase actuelle** : Supabase Edge Functions pour la logique métier
-2. **Phase future** : Remplacer les Edge Functions par un backend FastAPI sur Render/self-hosted
-3. **Changement requis** : Ajouter `VITE_API_URL` et migrer les appels SDK vers `api-client.ts`
+## Migrations base de données
 
-Le code `frontend/src/services/api-client.ts` est déjà prêt pour cette transition.
+- Fichiers versionnés : `supabase/migrations/`
+- Exécution : SQL Editor du projet Supabase **staging**, puis **production** (manuel, même fichier)
 
 ## Sécurité
 
@@ -131,4 +130,4 @@ Le code `frontend/src/services/api-client.ts` est déjà prêt pour cette transi
 - **JWT** : Tokens signés par Supabase Auth
 - **CORS** : Configuré dans Supabase dashboard
 - **CSP** : Headers configurés dans vercel.json
-- **R2** : Accès via presigned URLs ou bucket public contrôlé
+- **Storage** : Supabase Storage (+ Cloudflare CDN devant assets statiques Vercel). R2 optionnel plus tard, non actif aujourd'hui.

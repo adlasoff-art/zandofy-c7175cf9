@@ -1,0 +1,59 @@
+---
+description: Database migration safety for Supabase staging and production
+alwaysApply: true
+---
+
+# Database Safety (Zandofy)
+
+## Source of truth
+
+- Migrations: `supabase/migrations/YYYYMMDDHHMMSS_description.sql`
+- Edge Functions: `supabase/functions/<name>/`
+
+Never create migrations under `frontend/supabase/` (legacy, removed).
+
+## Execution order (mandatory)
+
+1. Commit migration file to GitHub.
+2. Run in **Supabase SQL Editor — staging project**.
+3. Validate: auth login, product listing, cart/checkout smoke test, vendor order list if touched.
+4. Run the **same SQL file** in **Supabase SQL Editor — production project**.
+5. Deploy affected Edge Functions to staging, then production.
+
+## Allowed without explicit human request
+
+- `CREATE TABLE IF NOT EXISTS`
+- `ALTER TABLE ... ADD COLUMN` (nullable or with default)
+- New indexes (`CREATE INDEX IF NOT EXISTS`)
+- New RLS policies on new tables
+- `DROP POLICY IF EXISTS` + `CREATE POLICY` (policy fixes)
+
+## Forbidden unless human explicitly requests
+
+- `DROP TABLE`, `DROP COLUMN`, `TRUNCATE`
+- `RENAME` table/column (requires two-phase plan)
+- Mass `UPDATE`/`DELETE` on user data in migration files
+- Disabling RLS on existing tables
+- Changing existing `VITE_*` env var names
+
+## Migration file quality
+
+- One logical change per file when possible.
+- Comment at top: purpose, tables affected, rollback notes if any.
+- Use `IF NOT EXISTS` / `IF EXISTS` for idempotency where safe.
+- New tables: `ENABLE ROW LEVEL SECURITY` + policies in same migration.
+
+## Deliverable for every DB change
+
+When proposing schema work, always provide:
+
+1. Exact filename under `supabase/migrations/`
+2. Full SQL content
+3. Staging → production checklist
+4. Risk note for ~4000+ existing users
+
+## Production data
+
+- Assume production already has live orders, profiles, and PWA installs.
+- Never assume empty database.
+- Prefer backward-compatible API (new columns nullable) over breaking renames.

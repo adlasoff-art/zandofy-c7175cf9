@@ -1,71 +1,76 @@
-# Environments
+# Environments — Zandofy
 
-## Purpose
+## Overview
 
-This document defines the staging and production environment model for Zandofy. Staging uses the `-staging` suffix on subdomains. Production uses the main subdomains.
+| Environment | Frontend | Database / Auth / API |
+|-------------|----------|------------------------|
+| **Staging** | Vercel (branch `develop` or preview — configure per project) | Supabase project **staging** |
+| **Production** | Vercel (`main` → `https://www.zandofy.com`) | Supabase project **production** |
 
-## Staging (suffix `-staging`)
+Cloudflare sits in front of DNS/cache/WAF for `zandofy.com`.
+
+**Deprecated hostnames (do not use):** `studio-staging.zandofy.com`, `api.zandofy.com`, `api-staging.zandofy.com`, `supabasa.*`
+
+## Staging
 
 Purpose:
+
 - integration testing
+- SQL migration validation before production
 - feature validation
-- deployment rehearsal
-- base de données dédiée (données de test, pas de mélange avec prod)
 
-Public endpoints:
-- frontend: `https://studio-staging.zandofy.com`
-- backend: `https://api-staging.zandofy.com`
-- supabase: `https://supabasa-staging.zandofy.com`
+Configure in **Vercel** (preview or staging project):
 
-Expected core values (Coolify staging):
-- `SITE_BASE_URL=https://studio-staging.zandofy.com`
-- `VITE_API_URL=https://api-staging.zandofy.com`
-- `VITE_SUPABASE_URL=https://supabasa-staging.zandofy.com`
-- `VITE_SUPABASE_PUBLISHABLE_KEY` = clé anon du projet Supabase staging
-- `DATABASE_URL` = connexion vers la base Supabase staging
+- `VITE_SUPABASE_URL` = Supabase staging project URL (`https://<ref>.supabase.co`)
+- `VITE_SUPABASE_PUBLISHABLE_KEY` = staging anon key
+- `VITE_SUPABASE_PROJECT_ID` = staging project ref
+- `VITE_SITE_URL` = staging frontend URL (preview URL or dedicated domain)
+
+SQL: run new files from `supabase/migrations/` in **staging** SQL Editor first.
 
 ## Production
 
 Purpose:
-- stable public release
-- validated customer traffic
-- base de données dédiée (données réelles)
 
-Public endpoints:
-- frontend: `https://zandofy.com`
-- backend: `https://api.zandofy.com`
-- supabase: `https://supabasa.zandofy.com`
+- live traffic (~4000+ users)
+- real orders and vendor data
 
-Expected core values (Coolify production):
-- `SITE_BASE_URL=https://zandofy.com`
-- `VITE_API_URL=https://api.zandofy.com`
-- `VITE_SUPABASE_URL=https://supabasa.zandofy.com`
-- `VITE_SUPABASE_PUBLISHABLE_KEY` = clé anon du projet Supabase production
-- `DATABASE_URL` = connexion vers la base Supabase production
+Configure in **Vercel** production:
 
-## Variable Ownership
+- `VITE_SUPABASE_URL` = Supabase **production** project URL
+- `VITE_SUPABASE_PUBLISHABLE_KEY` = production anon key
+- `VITE_SUPABASE_PROJECT_ID` = production project ref
+- `VITE_SITE_URL` = `https://www.zandofy.com` (or canonical domain)
 
-### Frontend public build-time variables
+SQL: same migration file as staging, after validation.
+
+## Variable ownership
+
+### Frontend (Vercel build — `VITE_*` only)
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
 - `VITE_SUPABASE_PROJECT_ID`
-- `VITE_API_URL`
+- `VITE_SITE_URL`
 
-### Backend variables
+### Supabase secrets (Dashboard / Edge Functions only — never in frontend)
 
-- `DATABASE_URL`
-- `JWT_SECRET_KEY`
-- `CORS_ORIGINS`
-- `SITE_BASE_URL`
-- `SUPABASE_JWT_SECRET`
-- SMTP variables
-- payment variables
-- VAPID variables
+- `SUPABASE_SERVICE_ROLE_KEY`
+- KelPay / SMTP / AI API keys
+- Webhook secrets
 
 ## Rules
 
-- Frontend variables must never contain backend secrets.
-- Staging and production values must stay separate.
-- Any new variable must be added to the relevant `.env.example`.
-- Coolify values must match the branch-to-environment mapping.
+- Never commit `.env` with real keys.
+- Never put service role keys in frontend or `VITE_*`.
+- Staging and production Supabase projects stay isolated.
+- Document new `VITE_*` names in `frontend/.env.example` before use.
+
+## Git branches (target)
+
+| Branch | Typical target |
+|--------|----------------|
+| `develop` | Vercel staging + Supabase staging |
+| `main` | Vercel production + Supabase production |
+
+Operational note: if Lovable pushes to `main` directly, ensure Vercel production env vars still point to **production** Supabase only.

@@ -182,7 +182,7 @@ export function ProductGrid() {
   ];
 
   return (
-    <section id="products" className="py-6 bg-muted/30 dark:bg-muted/10">
+    <section id="products" className="py-6 bg-muted/30 dark:bg-muted/10" aria-label={t("home.all")}>
       <div className="container">
         {/* ═══════════════════════════════════════════ */}
         {/* POPULAR PRODUCTS SECTION                    */}
@@ -233,8 +233,8 @@ export function ProductGrid() {
         {/* TENDANCES — with dynamic trend tag filters  */}
         {/* ═══════════════════════════════════════════ */}
         <div className="flex items-center gap-2 mb-4">
-          <TrendingUp size={18} className="text-primary" />
-          <h2 className="text-base md:text-lg font-bold text-foreground">
+          <TrendingUp size={18} className="text-primary" aria-hidden />
+          <h2 id="home-catalog-trends-heading" className="text-base md:text-lg font-bold text-foreground">
             {t("home.trends")}
           </h2>
           <ChevronRight size={16} className="text-muted-foreground" />

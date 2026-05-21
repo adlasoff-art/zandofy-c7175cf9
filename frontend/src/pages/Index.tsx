@@ -39,9 +39,10 @@ const Index = () => {
     seoConfig.social_urls.twitter,
   ].filter(Boolean);
 
+  const pageH1 = seoConfig.site_title || seoConfig.brand_name || "Zandofy";
+
   const jsonLd = [
     {
-      "@context": "https://schema.org",
       "@type": "WebSite",
       name: seoConfig.brand_name || "Zandofy",
       url: SITE_URL,
@@ -52,7 +53,6 @@ const Index = () => {
       },
     },
     {
-      "@context": "https://schema.org",
       "@type": "Organization",
       name: seoConfig.brand_name || "Zandofy",
       url: SITE_URL,
@@ -76,7 +76,7 @@ const Index = () => {
         title={override?.title || seoConfig.site_title}
         description={override?.description || seoConfig.site_description}
         canonical="/"
-        jsonLd={jsonLd as any}
+        jsonLd={jsonLd}
       />
       <Header />
 
@@ -95,6 +95,7 @@ const Index = () => {
       )}
 
       <main>
+        <h1 className="sr-only">{pageH1}</h1>
         <HeroBanner />
         <CategoryBanner />
 

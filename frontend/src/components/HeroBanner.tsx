@@ -196,8 +196,11 @@ export function HeroBanner() {
                   height={380}
                   {...(i === 0 ? ({ fetchpriority: "high" } as any) : {})}
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent flex flex-col justify-center pl-6 md:pl-12">
-                  <h2 className="text-white text-xl md:text-4xl font-bold tracking-wide max-w-md">{slide.title}</h2>
+                <div
+                  className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent flex flex-col justify-center pl-6 md:pl-12"
+                  aria-hidden={i !== current}
+                >
+                  <p className="text-white text-xl md:text-4xl font-bold tracking-wide max-w-md">{slide.title}</p>
                   {slide.subtitle && <p className="text-white/80 text-sm md:text-base mt-1 max-w-sm">{slide.subtitle}</p>}
                   {slide.cta && (
                     <Link to={slide.link || "/"} className="mt-4 inline-block w-fit px-6 py-2.5 text-xs font-bold bg-white text-gray-900 rounded-sm hover:bg-white/90 transition-colors uppercase tracking-wider">

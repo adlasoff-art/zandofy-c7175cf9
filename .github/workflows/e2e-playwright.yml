@@ -5,10 +5,15 @@ on:
     paths:
       - "frontend/**"
       - ".github/workflows/e2e-playwright.yml"
+  push:
+    branches: [develop]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/e2e-playwright.yml"
   workflow_dispatch:
     inputs:
       base_url:
-        description: "Base URL à tester (vide = preview Lovable)"
+        description: "Base URL externe (vide = build local + vite preview)"
         required: false
         default: ""
 
@@ -32,9 +37,33 @@ jobs:
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
 
+      - name: Prepare Vite env for E2E build
+        if: ${{ github.event.inputs.base_url == '' }}
+        run: |
+          cp .env.e2e .env.production.local
+          if [ -n "${{ secrets.VITE_SUPABASE_URL }}" ] && [ -n "${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" ]; then
+            {
+              echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}"
+              echo "VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}"
+              echo "VITE_SUPABASE_PROJECT_ID=${{ secrets.VITE_SUPABASE_PROJECT_ID }}"
+              echo "VITE_SITE_URL=https://www.zandofy.com"
+            } > .env.production.local
+            echo "Vite build: GitHub secrets override .env.e2e"
+          else
+            echo "Vite build: frontend/.env.e2e (public anon key)"
+          fi
+
+      - name: Build app for E2E
+        if: ${{ github.event.inputs.base_url == '' }}
+        run: bun run build
+
+      - name: Verify Supabase env baked into bundle
+        if: ${{ github.event.inputs.base_url == '' }}
+        run: grep -q "vpttoqojmiqxgudknyxf" dist/assets/index-*.js
+
       - name: Run smoke tests
         env:
-          PLAYWRIGHT_BASE_URL: ${{ github.event.inputs.base_url }}
+          PLAYWRIGHT_BASE_URL: ${{ github.event.inputs.base_url || 'http://127.0.0.1:5173' }}
         run: bunx playwright test smoke
 
       - name: Upload Playwright report
