@@ -11,7 +11,7 @@ type: feature
 - Config : `frontend/playwright.config.ts`
 - Specs : `frontend/e2e/*.spec.ts` (séparé de Vitest qui cible `src/**`)
 - CI : `.github/workflows/e2e-playwright.yml` — **build + vite preview local** (ne plus cibler l’URL preview Lovable protégée par login)
-- Secrets GitHub requis pour le build CI : `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` (mêmes noms que Vercel)
+- Build CI : secrets GitHub `VITE_*` **ou** fallback `frontend/.env.e2e` (clé anon publique prod, déjà dans `api/meta-injector.ts`)
 
 ## Commandes
 ```bash
