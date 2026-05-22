@@ -271,7 +271,28 @@ export async function fetchTrendTags(): Promise<TrendTag[]> {
   }));
 }
 
-export async function fetchFlashSaleProducts(): Promise<(Product & { flashPrice?: number; flashEndsAt?: string })[]> {
+/** Super Promo zone: max 7 days visible (display filter only — does not clear is_sale). */
+const SUPER_PROMO_ZONE_DAYS = 7;
+
+function isWithinSuperPromoZone(row: {
+  promo_start_date?: string | null;
+  created_at?: string | null;
+}): boolean {
+  const startRaw = row.promo_start_date || row.created_at;
+  if (!startRaw) return true;
+  const startMs = new Date(startRaw).getTime();
+  if (Number.isNaN(startMs)) return true;
+  const cutoff = Date.now() - SUPER_PROMO_ZONE_DAYS * 24 * 60 * 60 * 1000;
+  return startMs >= cutoff;
+}
+
+function filterSuperPromoRows(rows: any[]): any[] {
+  return rows.filter(isWithinSuperPromoZone);
+}
+
+export async function fetchFlashSaleProducts(): Promise<
+  (Product & { flashPrice?: number; flashEndsAt?: string })[]
+> {
   const now = new Date().toISOString();
 
   // First try real flash_sales table
@@ -292,7 +313,7 @@ export async function fetchFlashSaleProducts(): Promise<(Product & { flashPrice?
     if (error || !data) return [];
 
     const flashMap = new Map(flashData.map((f: any) => [f.product_id, f]));
-    return data.map((row: any) => {
+    return filterSuperPromoRows(data).map((row: any) => {
       const p = mapProduct(row);
       const flash: any = flashMap.get(row.id);
       if (flash) {
@@ -317,7 +338,7 @@ export async function fetchFlashSaleProducts(): Promise<(Product & { flashPrice?
     return [];
   }
 
-  return (data || []).map(mapProduct);
+  return filterSuperPromoRows(data || []).map(mapProduct);
 }
 
 export async function fetchCategories(): Promise<Category[]> {

@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { slugify } from "@/utils/slugify";
+import { categoryPath } from "@/lib/category-slug";
 import { useI18n } from "@/contexts/I18nContext";
 import { OptimizedImage } from "@/components/OptimizedImage";
 
@@ -83,7 +83,7 @@ export function CategoryBanner() {
               .map((cat: any) => (
                 <Link
                   key={cat.id}
-                  to={`/category/${slugify(cat.name)}`}
+                  to={categoryPath(cat, locale)}
                   className="flex flex-col items-center gap-1 group"
                 >
                   <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-border group-hover:border-primary transition-colors bg-muted flex items-center justify-center">
@@ -132,7 +132,7 @@ export function CategoryBanner() {
           {categories.map((cat: any) => (
             <Link
               key={cat.id}
-              to={`/category/${slugify(cat.name)}`}
+              to={categoryPath(cat, locale)}
               className="flex flex-col items-center gap-1.5 group"
             >
               <div className="w-16 h-16 md:w-[72px] md:h-[72px] rounded-full overflow-hidden border-2 border-border group-hover:border-primary transition-colors bg-muted flex items-center justify-center">

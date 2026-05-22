@@ -93,9 +93,9 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
         <OptimizedImage
           src={imgError ? "/placeholder.svg" : product.image}
           alt={product.nameFr}
-          className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out ${
+          className={`absolute inset-0 w-full h-full object-contain transition-all duration-300 ease-out ${
             loaded ? "opacity-100" : "opacity-0"
-          } ${hovered && secondImage ? "opacity-0 scale-105" : ""}`}
+          } ${hovered && secondImage ? "opacity-0 md:scale-105" : ""}`}
           onLoad={onLoad}
           onError={handleImgError}
           widths={[160, 240, 360]}
@@ -107,7 +107,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
           <OptimizedImage
             src={secondImage}
             alt={product.nameFr}
-            className="absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-out opacity-100 scale-100"
+            className="absolute inset-0 w-full h-full object-contain transition-all duration-300 ease-out opacity-100 md:group-hover:scale-105"
             widths={[160, 240, 360]}
             sizes="(max-width: 640px) 50vw, 170px"
             quality={60}
