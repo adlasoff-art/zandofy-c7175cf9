@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronRight, Flame, Clock } from "lucide-react";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { fetchFlashSaleProducts, type Product } from "@/services/api";
+import { shuffleByDailySeed } from "@/lib/daily-shuffle";
 import { useI18n } from "@/contexts/I18nContext";
 
 function useCountdown(targetDate: Date) {
@@ -38,7 +39,7 @@ export function FlashSales() {
 
   useEffect(() => {
     fetchFlashSaleProducts().then((data) => {
-      setProducts(data);
+      setProducts(shuffleByDailySeed(data));
       setLoading(false);
 
       // Use earliest real promo_end_date from DB if available
@@ -60,13 +61,22 @@ export function FlashSales() {
       <div className="container">
         {/* Section header — stacks vertically on mobile */}
         <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <h2 id="home-flash-heading" className="text-base md:text-lg font-bold text-foreground flex items-center gap-1.5 whitespace-nowrap">
+          <Link
+            to="/super-promo"
+            className="flex items-center gap-2 group cursor-pointer w-fit"
+          >
+            <h2
+              id="home-flash-heading"
+              className="text-base md:text-lg font-bold text-foreground flex items-center gap-1.5 whitespace-nowrap group-hover:text-primary transition-colors"
+            >
               <Flame size={18} className="text-sale" aria-hidden />
               {t("home.flashSales")}
             </h2>
-            <ChevronRight size={16} className="text-muted-foreground hidden md:block" />
-          </div>
+            <ChevronRight
+              size={16}
+              className="text-muted-foreground group-hover:text-primary transition-colors"
+            />
+          </Link>
 
           {/* Countdown — on its own line on mobile */}
           <div className="flex items-center gap-1.5 text-xs">

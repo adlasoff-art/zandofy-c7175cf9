@@ -100,6 +100,7 @@ const PaymentReturnPage = lazyRetry(() => import("./pages/PaymentReturnPage"));
 const OnboardingPage = lazyRetry(() => import("./pages/OnboardingPage"));
 const PricingPage = lazyRetry(() => import("./pages/PricingPage"));
 const TrendsPage = lazyRetry(() => import("./pages/TrendsPage"));
+const SuperPromoPage = lazyRetry(() => import("./pages/SuperPromoPage"));
 const PopularPage = lazyRetry(() => import("./pages/PopularPage"));
 const CarrierDashboardPage = lazyRetry(() => import("./pages/CarrierDashboardPage"));
 
@@ -262,6 +263,7 @@ const App = () => (
                 <Route path="/category/:slug" element={<CategoryPage />} />
                 <Route path="/stores" element={<StoresPage />} />
                 <Route path="/trends" element={<TrendsPage />} />
+                <Route path="/super-promo" element={<SuperPromoPage />} />
                 <Route path="/popular" element={<PopularPage />} />
                 <Route path="/store/:id" element={<StorePage />} />
                 <Route path="/auth" element={<AuthPage />} />

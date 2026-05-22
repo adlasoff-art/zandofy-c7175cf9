@@ -37,6 +37,9 @@ Zandofy est une SPA React → le HTML statique servi par Vercel est identique po
 # Doit retourner du HTML avec <title> spécifique au produit
 curl -A "Googlebot/2.1" https://zandofy.com/product/<slug-existant> | grep "<title>"
 
+# WhatsApp / Facebook : og:image doit être une URL HTTPS absolue (photo produit, pas le logo seul)
+curl -A "WhatsApp/2.0" https://www.zandofy.com/product/<slug-existant> | grep og:image
+
 # Sans User-Agent bot → SPA standard (titre générique)
 curl https://zandofy.com/product/<slug-existant> | grep "<title>"
 ```
