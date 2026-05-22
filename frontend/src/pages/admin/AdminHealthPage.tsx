@@ -46,7 +46,7 @@ function StatusBadge({ status }: { status: string | null }) {
 function TypeIcon({ type }: { type: string }) {
   if (type === "edge_function") return <Zap className="h-4 w-4 text-muted-foreground" />;
   if (type === "payment_gateway") return <Activity className="h-4 w-4 text-muted-foreground" />;
-  if (type === "smtp") return <Mail className="h-4 w-4 text-muted-foreground" />;
+  if (type === "smtp" || type === "external_api") return <Mail className="h-4 w-4 text-muted-foreground" />;
   if (type === "cron") return <Clock className="h-4 w-4 text-muted-foreground" />;
   return <Activity className="h-4 w-4 text-muted-foreground" />;
 }
