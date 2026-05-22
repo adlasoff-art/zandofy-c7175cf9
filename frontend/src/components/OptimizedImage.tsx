@@ -26,6 +26,7 @@ function buildSupabaseRenderUrl(
   width: number,
   quality = 70,
   resize: "cover" | "contain" = "cover",
+  height?: number,
 ): string {
   try {
     const u = new URL(url);
@@ -35,6 +36,7 @@ function buildSupabaseRenderUrl(
     const rest = m[2]; // bucket/path
     u.pathname = `/storage/v1/render/image/${kind}/${rest}`;
     u.searchParams.set("width", String(width));
+    if (height != null) u.searchParams.set("height", String(height));
     u.searchParams.set("quality", String(quality));
     u.searchParams.set("resize", resize);
     u.searchParams.set("format", "webp");
@@ -56,30 +58,44 @@ export interface OptimizedImageProps
   sizes?: string;
   /** Qualité Supabase (1-100). */
   quality?: number;
-  /** Supabase resize mode — cover fills the card frame (default). */
+  /** Supabase resize mode — use contain for product/category thumbnails. */
   resize?: "cover" | "contain";
+  /** Optional height (px) for contain transforms (e.g. 3:4 cards). */
+  fitHeight?: number;
 }
 
 export const OptimizedImage = React.forwardRef<HTMLImageElement, OptimizedImageProps>(
   function OptimizedImage(
-    { src, alt, priority, widths = DEFAULT_WIDTHS, sizes, quality = 70, resize = "cover", ...rest },
+    {
+      src,
+      alt,
+      priority,
+      widths = DEFAULT_WIDTHS,
+      sizes,
+      quality = 70,
+      resize = "cover",
+      fitHeight,
+      ...rest
+    },
     ref,
   ) {
     const { srcSet, finalSrc } = useMemo(() => {
       if (!src || !isSupabaseStorageUrl(src)) {
         return { srcSet: undefined, finalSrc: src };
       }
+      const mid = widths[Math.floor(widths.length / 2)] ?? 600;
       const set = widths
-        .map((w) => `${buildSupabaseRenderUrl(src, w, quality, resize)} ${w}w`)
+        .map((w) => {
+          const h =
+            fitHeight != null && widths.length > 0
+              ? Math.round((fitHeight * w) / mid)
+              : fitHeight;
+          return `${buildSupabaseRenderUrl(src, w, quality, resize, h)} ${w}w`;
+        })
         .join(", ");
-      const fallback = buildSupabaseRenderUrl(
-        src,
-        widths[Math.floor(widths.length / 2)] ?? 600,
-        quality,
-        resize,
-      );
+      const fallback = buildSupabaseRenderUrl(src, mid, quality, resize, fitHeight);
       return { srcSet: set, finalSrc: fallback };
-    }, [src, widths, quality, resize]);
+    }, [src, widths, quality, resize, fitHeight]);
 
     const loading = priority ? "eager" : (rest as any).loading ?? "lazy";
     const fetchPriority = priority ? "high" : (rest as any).fetchPriority ?? "auto";
