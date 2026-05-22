@@ -7,6 +7,8 @@
  * - Falls back to "noreply@zandofy.com" if SMTP_FROM_EMAIL is not set.
  */
 
+import { resendRequestHeaders } from "./resend-http.ts";
+
 const RESEND_API_URL = "https://api.resend.com/emails";
 
 export interface SendEmailOptions {
@@ -59,7 +61,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
   const res = await fetch(RESEND_API_URL, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${apiKey}`,
+      ...resendRequestHeaders(apiKey),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),

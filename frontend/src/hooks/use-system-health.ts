@@ -99,6 +99,16 @@ export function useGlobalHealthStatus() {
   const warnCount = rows.filter((r) => r.last_status === "warn").length;
   const openCriticalIncidents = incidents.filter((i) => i.severity === "critical").length;
   let status: "ok" | "warn" | "down" = "ok";
+  if (isLoading) {
+    return {
+      status: "ok" as const,
+      downCount: 0,
+      warnCount: 0,
+      okCount: 0,
+      openIncidentsCount: 0,
+      isLoading: true,
+    };
+  }
   if (downCount > 0 || openCriticalIncidents > 0) status = "down";
   else if (warnCount > 0 || incidents.length > 0) status = "warn";
   return {
