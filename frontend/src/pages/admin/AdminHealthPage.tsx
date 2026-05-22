@@ -55,7 +55,7 @@ export default function AdminHealthPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState("overview");
 
-  const { data: rows = [], isLoading } = useSystemHealth();
+  const { data: rows = [], isLoading, isFetching, refetch: refetchHealth } = useSystemHealth();
   const { data: openIncidents = [] } = useHealthIncidents(false);
   const { data: closedIncidents = [] } = useHealthIncidents(true);
   const { data: heartbeats = [] } = useCronHeartbeats();
@@ -76,8 +76,13 @@ export default function AdminHealthPage() {
 
   const runNow = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("run-healthchecks");
+      const { data, error } = await supabase.functions.invoke("run-healthchecks", {
+        method: "POST",
+      });
       if (error) throw error;
+      if (data && typeof data === "object" && (data as { ok?: boolean }).ok === false) {
+        throw new Error((data as { error?: string }).error || "run-healthchecks failed");
+      }
       return data;
     },
     onSuccess: (data: any) => {
@@ -119,11 +124,13 @@ export default function AdminHealthPage() {
     },
   });
 
-  const globalCfg = {
-    ok: { color: "text-green-500", bg: "bg-green-500/10", icon: CheckCircle2, label: "Tout fonctionne" },
-    warn: { color: "text-amber-500", bg: "bg-amber-500/10", icon: AlertTriangle, label: "Dégradé" },
-    down: { color: "text-destructive", bg: "bg-destructive/10", icon: XCircle, label: "Incident critique" },
-  }[global.status];
+  const globalCfg = global.isLoading
+    ? { color: "text-muted-foreground", bg: "bg-muted/30", icon: RefreshCw, label: "Chargement…" }
+    : {
+        ok: { color: "text-green-500", bg: "bg-green-500/10", icon: CheckCircle2, label: "Tout fonctionne" },
+        warn: { color: "text-amber-500", bg: "bg-amber-500/10", icon: AlertTriangle, label: "Dégradé" },
+        down: { color: "text-destructive", bg: "bg-destructive/10", icon: XCircle, label: "Incident critique" },
+      }[global.status];
   const GlobalIcon = globalCfg.icon;
 
   return (
@@ -145,13 +152,18 @@ export default function AdminHealthPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  queryClient.invalidateQueries({ queryKey: ["system-health"] });
-                  queryClient.invalidateQueries({ queryKey: ["health-incidents"] });
-                  queryClient.invalidateQueries({ queryKey: ["cron-heartbeats"] });
+                disabled={isFetching}
+                onClick={async () => {
+                  await Promise.all([
+                    refetchHealth(),
+                    queryClient.refetchQueries({ queryKey: ["health-incidents"] }),
+                    queryClient.refetchQueries({ queryKey: ["cron-heartbeats"] }),
+                  ]);
+                  toast.success("Données actualisées");
                 }}
               >
-                <RefreshCw className="h-4 w-4 mr-2" /> Actualiser
+                <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+                Actualiser
               </Button>
               <Button
                 size="sm"

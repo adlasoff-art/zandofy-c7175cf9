@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "nodemailer";
 import { sendEmail } from "../_shared/email.ts";
+import { resendRequestHeaders } from "../_shared/resend-http.ts";
 
 /**
  * Lot 18 — Edge Function run-healthchecks
@@ -138,29 +139,49 @@ async function checkResend(): Promise<CheckResult> {
   try {
     const res = await fetch("https://api.resend.com/domains", {
       method: "GET",
-      headers: { Authorization: `Bearer ${apiKey}` },
+      headers: resendRequestHeaders(apiKey),
       signal: AbortSignal.timeout(10_000),
     });
     const latency = Date.now() - start;
-    const apiReachable = res.status > 0 && res.status < 600;
-    const keyValid = res.ok;
+    // 200 = full-access key OK. 403 = often send-only key (cannot list domains) — still OK for sending.
+    // 401 = invalid key. 5xx = Resend outage.
+    if (res.status === 401) {
+      return {
+        component: "email:resend",
+        component_type: "external_api",
+        status: "down",
+        latency_ms: latency,
+        http_status: res.status,
+        error_message: "Resend API key invalid or unauthorized",
+      };
+    }
+    if (res.status >= 500) {
+      return {
+        component: "email:resend",
+        component_type: "external_api",
+        status: "down",
+        latency_ms: latency,
+        http_status: res.status,
+        error_message: `Resend API HTTP ${res.status}`,
+      };
+    }
+    if (res.ok || res.status === 403) {
+      return {
+        component: "email:resend",
+        component_type: "external_api",
+        status: latency > 8000 ? "warn" : "ok",
+        latency_ms: latency,
+        http_status: res.status,
+        metadata: res.status === 403 ? { key_permission: "sending_access" } : undefined,
+      };
+    }
     return {
       component: "email:resend",
       component_type: "external_api",
-      status: !apiReachable
-        ? "down"
-        : !keyValid
-        ? "down"
-        : latency > 8000
-        ? "warn"
-        : "ok",
+      status: "warn",
       latency_ms: latency,
       http_status: res.status,
-      error_message: !apiReachable
-        ? `Resend API HTTP ${res.status}`
-        : !keyValid
-        ? "Resend API key invalid or unauthorized"
-        : undefined,
+      error_message: `Resend API HTTP ${res.status}`,
     };
   } catch (e) {
     return {
@@ -352,94 +373,99 @@ async function sendPushAlert(supabase: any, check: CheckResult) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+  const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
-  // Heartbeat de cette EF elle-même
-  await supabase.rpc("record_cron_heartbeat", {
-    _job_name: "run-healthchecks",
-    _status: "ok",
-    _expected_interval_minutes: 5,
-  });
+  try {
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  // Charge config
-  const { data: settings } = await supabase
-    .from("monitoring_settings")
-    .select("*")
-    .eq("id", 1)
-    .single();
-
-  if (settings && settings.enabled === false) {
-    return new Response(JSON.stringify({ skipped: "monitoring disabled" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    await supabase.rpc("record_cron_heartbeat", {
+      _job_name: "run-healthchecks",
+      _status: "ok",
+      _expected_interval_minutes: 5,
     });
-  }
 
-  const efThreshold = settings?.ef_latency_threshold_ms ?? 5000;
-  const kelpayThreshold = settings?.kelpay_latency_threshold_ms ?? 8000;
-  const recipients: string[] = settings?.alert_emails ?? [];
-  const emailOn = settings?.alert_email_enabled ?? true;
-  const pushOn = settings?.alert_push_enabled ?? true;
+    const { data: settings } = await supabase
+      .from("monitoring_settings")
+      .select("*")
+      .eq("id", 1)
+      .single();
 
-  const checks: CheckResult[] = [];
-
-  // 1) Payment gateways (Keccel — same hosts as production Edge Functions)
-  checks.push(await checkKelpay(kelpayThreshold));
-  checks.push(await checkKeccelCard(kelpayThreshold));
-
-  // 2) Edge Functions critiques (parallèle)
-  const efResults = await Promise.all(
-    CRITICAL_EDGE_FUNCTIONS.map((n) => checkEdgeFunctionAlive(supabase, n, efThreshold)),
-  );
-  checks.push(...efResults);
-
-  // 3) Email — Resend (primary) + optional Hostinger SMTP legacy
-  checks.push(await checkResend());
-  const smtpLegacy = await checkSmtpLegacy();
-  if (smtpLegacy) checks.push(smtpLegacy);
-
-  // 4) Cron heartbeats
-  checks.push(...(await checkCronHeartbeats(supabase)));
-
-  // Persiste tous les checks
-  await supabase.from("health_checks").insert(
-    checks.map((c) => ({
-      component: c.component,
-      component_type: c.component_type,
-      status: c.status,
-      latency_ms: c.latency_ms ?? null,
-      http_status: c.http_status ?? null,
-      error_message: c.error_message ?? null,
-      metadata: c.metadata ?? {},
-    })),
-  );
-
-  // Gère incidents + alertes
-  const channels: string[] = [];
-  if (emailOn) channels.push("email");
-  if (pushOn) channels.push("push");
-  channels.push("banner");
-
-  let alertsSent = 0;
-  for (const c of checks) {
-    const { alertNeeded } = await upsertIncident(supabase, c, channels);
-    if (alertNeeded) {
-      if (emailOn && recipients.length > 0) await sendEmailAlert(recipients, c);
-      if (pushOn) await sendPushAlert(supabase, c);
-      alertsSent++;
+    if (settings && settings.enabled === false) {
+      return new Response(JSON.stringify({ skipped: "monitoring disabled" }), {
+        headers: jsonHeaders,
+      });
     }
+
+    const efThreshold = settings?.ef_latency_threshold_ms ?? 5000;
+    const kelpayThreshold = settings?.kelpay_latency_threshold_ms ?? 8000;
+    const recipients: string[] = settings?.alert_emails ?? [];
+    const emailOn = settings?.alert_email_enabled ?? true;
+    const pushOn = settings?.alert_push_enabled ?? true;
+
+    const checks: CheckResult[] = [];
+
+    checks.push(await checkKelpay(kelpayThreshold));
+    checks.push(await checkKeccelCard(kelpayThreshold));
+
+    const efResults = await Promise.all(
+      CRITICAL_EDGE_FUNCTIONS.map((n) => checkEdgeFunctionAlive(supabase, n, efThreshold)),
+    );
+    checks.push(...efResults);
+
+    checks.push(await checkResend());
+    const smtpLegacy = await checkSmtpLegacy();
+    if (smtpLegacy) checks.push(smtpLegacy);
+
+    checks.push(...(await checkCronHeartbeats(supabase)));
+
+    const { error: insertError } = await supabase.from("health_checks").insert(
+      checks.map((c) => ({
+        component: c.component,
+        component_type: c.component_type,
+        status: c.status,
+        latency_ms: c.latency_ms ?? null,
+        http_status: c.http_status ?? null,
+        error_message: c.error_message ?? null,
+        metadata: c.metadata ?? {},
+      })),
+    );
+    if (insertError) console.error("[run-healthchecks] insert failed:", insertError);
+
+    const channels: string[] = [];
+    if (emailOn) channels.push("email");
+    if (pushOn) channels.push("push");
+    channels.push("banner");
+
+    let alertsSent = 0;
+    for (const c of checks) {
+      const { alertNeeded } = await upsertIncident(supabase, c, channels);
+      if (alertNeeded) {
+        if (emailOn && recipients.length > 0) await sendEmailAlert(recipients, c);
+        if (pushOn) await sendPushAlert(supabase, c);
+        alertsSent++;
+      }
+    }
+
+    await supabase.rpc("cleanup_old_health_checks").catch(() => {});
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        total_checks: checks.length,
+        down: checks.filter((c) => c.status === "down").length,
+        warn: checks.filter((c) => c.status === "warn").length,
+        alerts_sent: alertsSent,
+      }),
+      { headers: jsonHeaders },
+    );
+  } catch (e) {
+    console.error("[run-healthchecks] fatal:", e);
+    return new Response(
+      JSON.stringify({
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+      }),
+      { status: 200, headers: jsonHeaders },
+    );
   }
-
-  // Cleanup : retention 30j sur health_checks
-  await supabase.rpc("cleanup_old_health_checks").catch(() => {});
-
-  return new Response(
-    JSON.stringify({
-      ok: true,
-      total_checks: checks.length,
-      down: checks.filter((c) => c.status === "down").length,
-      warn: checks.filter((c) => c.status === "warn").length,
-      alerts_sent: alertsSent,
-    }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-  );
 });
