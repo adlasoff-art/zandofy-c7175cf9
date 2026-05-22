@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { PickupCodeWidget } from "@/components/logistics/PickupCodeWidget";
+import { HubClientPickupVerify } from "@/components/logistics/HubClientPickupVerify";
 
 const modeIcons: Record<string, React.ElementType> = { air: Plane, sea: Ship, road: TruckIcon, rail: Train };
 const modeLabels: Record<string, string> = { air: "Aérien", sea: "Maritime", road: "Routier", rail: "Ferroviaire" };
@@ -29,7 +30,7 @@ export default function ShipperDashboardPage() {
   const [showAdd, setShowAdd] = useState(false);
   const queryClient = useQueryClient();
 
-  // Phase 10.5 — Commandes au hub avec code de remise actif
+  // Phase 10.5 — Codes de remise au livreur (last mile)
   const { data: hubOrders = [], isLoading: hubLoading } = useQuery({
     queryKey: ["shipper-hub-orders"],
     enabled: !!user,
@@ -37,8 +38,28 @@ export default function ShipperDashboardPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_ref, status, shipping_first_name, shipping_last_name, shipping_city, total")
-        .in("status", ["arrived_at_hub", "ready_for_pickup", "at_hub"])
+        .select("id, order_ref, status, shipping_first_name, shipping_last_name, shipping_city, total, delivery_choice")
+        .in("status", ["arrived_at_hub", "ready_for_pickup", "at_hub", "shipped"])
+        .neq("delivery_choice", "hub_pickup")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // H5 — Retraits clients à l'agence (hub_pickup)
+  const { data: hubPickups = [], isLoading: hubPickupsLoading } = useQuery({
+    queryKey: ["shipper-hub-pickups"],
+    enabled: !!user,
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id, order_ref, status, shipping_first_name, shipping_last_name, shipping_city, pickup_code_verified_at")
+        .eq("delivery_choice", "hub_pickup")
+        .eq("status", "ready_for_pickup")
+        .is("pickup_code_verified_at", null)
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -265,39 +286,65 @@ export default function ShipperDashboardPage() {
       )}
 
       {tab === "hub" && (
-        <div className="px-4 mt-4 space-y-3 pb-24">
-          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <KeyRound size={16} className="text-primary" /> Colis au hub — codes de remise
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Communiquez le code à 6 chiffres au livreur uniquement après vérification de son identité.
-          </p>
-          {hubLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary" size={24} /></div>
-          ) : hubOrders.length === 0 ? (
-            <div className="text-center py-12">
-              <Package size={48} className="text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">Aucun colis en attente de remise</p>
-            </div>
-          ) : (
-            hubOrders.map((o: any) => {
-              const customer = [o.shipping_first_name, o.shipping_last_name].filter(Boolean).join(" ") || "Client";
-              return (
-                <div key={o.id} className="bg-card border border-border rounded-xl p-3 space-y-2">
-                  <div className="flex items-center justify-between">
+        <div className="px-4 mt-4 space-y-6 pb-24">
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <KeyRound size={16} className="text-primary" /> Retraits clients à l&apos;agence
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Le client présente son code à 6 chiffres. Validez la remise après vérification d&apos;identité.
+            </p>
+            {hubPickupsLoading ? (
+              <div className="flex justify-center py-6"><Loader2 className="animate-spin text-primary" size={24} /></div>
+            ) : hubPickups.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Aucun retrait client en attente</p>
+            ) : (
+              hubPickups.map((o: any) => {
+                const customer = [o.shipping_first_name, o.shipping_last_name].filter(Boolean).join(" ") || "Client";
+                return (
+                  <div key={o.id} className="bg-card border border-border rounded-xl p-3 space-y-2">
                     <div>
                       <p className="text-sm font-bold text-foreground font-mono">{o.order_ref}</p>
                       <p className="text-xs text-muted-foreground">{customer} · {o.shipping_city || "—"}</p>
                     </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                      {o.status}
-                    </span>
+                    <HubClientPickupVerify orderId={o.id} orderRef={o.order_ref} />
                   </div>
-                  <PickupCodeWidget orderId={o.id} mode="hub" />
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </section>
+
+          <section className="space-y-3 border-t border-border pt-4">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Truck size={16} className="text-primary" /> Remise au livreur (last mile)
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Communiquez le code au livreur uniquement après vérification de son identité.
+            </p>
+            {hubLoading ? (
+              <div className="flex justify-center py-6"><Loader2 className="animate-spin text-primary" size={24} /></div>
+            ) : hubOrders.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Aucun colis en attente de remise livreur</p>
+            ) : (
+              hubOrders.map((o: any) => {
+                const customer = [o.shipping_first_name, o.shipping_last_name].filter(Boolean).join(" ") || "Client";
+                return (
+                  <div key={o.id} className="bg-card border border-border rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-bold text-foreground font-mono">{o.order_ref}</p>
+                        <p className="text-xs text-muted-foreground">{customer} · {o.shipping_city || "—"}</p>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                        {o.status}
+                      </span>
+                    </div>
+                    <PickupCodeWidget orderId={o.id} mode="hub" />
+                  </div>
+                );
+              })
+            )}
+          </section>
         </div>
       )}
 

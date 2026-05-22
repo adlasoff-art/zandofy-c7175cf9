@@ -1,45 +1,54 @@
-// Helper: récupère le numéro WhatsApp d'une boutique via l'Edge Function sécurisée
-// puis ouvre wa.me dans un nouvel onglet. N'expose le numéro qu'aux utilisateurs connectés.
-//
-// IMPORTANT — fix régression "le clic n'ouvre rien" :
-// On ouvre l'onglet IMMÉDIATEMENT (synchrone, pendant le user gesture)
-// avec une page d'attente, puis on remplace son URL une fois le numéro reçu.
-// Sinon les navigateurs (Safari, Firefox strict, Chrome mobile) bloquent
-// le window.open lancé après un await.
+// Contact vendeur via WhatsApp — numéro via Edge Function get-store-whatsapp (auth requis).
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { isMobileOrPWA } from "@/lib/device";
 
-const LOADING_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>WhatsApp…</title>
-<style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;
-height:100vh;margin:0;color:#111;background:#f7f7f7}div{text-align:center}</style></head>
-<body><div><p>Ouverture de WhatsApp…</p><p style="opacity:.6;font-size:.85em">
-Ne fermez pas cet onglet.</p></div></body></html>`;
+const MIN_DIGITS = 8;
+
+export function normalizeWhatsAppDigits(raw: string): string | null {
+  const digits = String(raw).replace(/\D/g, "");
+  if (digits.length < MIN_DIGITS) return null;
+  return digits;
+}
+
+/** wa.me (universal link) + api.whatsapp.com (desktop web fallback). */
+export function buildWhatsAppUrls(digits: string, message: string) {
+  const text = encodeURIComponent(message);
+  return {
+    universal: `https://wa.me/${digits}?text=${text}`,
+    webSend: `https://api.whatsapp.com/send?phone=${digits}&text=${text}`,
+  };
+}
 
 async function fetchNumber(storeId: string) {
-  return await supabase.functions.invoke("get-store-whatsapp", {
+  return await supabase.functions.invoke<{
+    whatsapp_number?: string | null;
+    error?: string;
+    reason?: string;
+  }>("get-store-whatsapp", {
     body: { store_id: storeId },
   });
+}
+
+function openWhatsAppUrl(url: string, useSameTab: boolean) {
+  if (useSameTab) {
+    window.location.assign(url);
+    return;
+  }
+  const win = window.open(url, "_blank", "noopener,noreferrer");
+  if (!win) {
+    toast.message("Ouverture dans cet onglet…", { duration: 2000 });
+    window.location.assign(url);
+  }
 }
 
 export async function openStoreWhatsApp(
   storeId: string,
   message: string,
 ): Promise<{ ok: boolean; reason?: string }> {
-  // 1) Ouvrir l'onglet AVANT tout await pour conserver le user gesture
-  const win = typeof window !== "undefined"
-    ? window.open("", "_blank", "noopener,noreferrer")
-    : null;
-  try {
-    if (win && !win.closed) {
-      win.document.open();
-      win.document.write(LOADING_HTML);
-      win.document.close();
-    }
-  } catch {
-    /* certains navigateurs interdisent document.write sur about:blank — on ignore */
-  }
+  const useSameTab = isMobileOrPWA();
+  const loadingToast = toast.loading("Ouverture de WhatsApp…");
 
-  // 2) Récupérer le numéro (avec retry si la session est expirée)
   let res = await fetchNumber(storeId);
   if (res.error && /401|unauth/i.test(String(res.error?.message || ""))) {
     try {
@@ -50,33 +59,35 @@ export async function openStoreWhatsApp(
     res = await fetchNumber(storeId);
   }
 
-  const data = res.data as { whatsapp_number?: string | null } | null;
+  toast.dismiss(loadingToast);
+
+  const payload = res.data;
   const error = res.error;
 
   if (error) {
-    if (win && !win.closed) win.close();
     toast.error("Impossible de contacter WhatsApp pour le moment. Réessayez.");
     return { ok: false, reason: error.message };
   }
-  if (!data?.whatsapp_number) {
-    if (win && !win.closed) win.close();
+
+  if (payload?.error === "feature_disabled") {
+    toast.error("La messagerie WhatsApp n'est pas activée pour cette boutique.");
+    return { ok: false, reason: "feature_disabled" };
+  }
+
+  if (payload?.error === "no_number" || !payload?.whatsapp_number) {
     toast.error("Cette boutique n'a pas configuré de numéro WhatsApp.");
     return { ok: false, reason: "no_number" };
   }
 
-  const cleaned = String(data.whatsapp_number).replace(/\D/g, "");
-  const url = `https://wa.me/${cleaned}?text=${encodeURIComponent(message)}`;
-
-  // 3) Rediriger l'onglet d'attente, ou fallback si bloqué
-  if (win && !win.closed) {
-    try {
-      win.location.href = url;
-    } catch {
-      window.location.href = url;
-    }
-  } else {
-    // Pop-up bloqué — fallback : navigation dans l'onglet courant
-    window.location.href = url;
+  const digits = normalizeWhatsAppDigits(payload.whatsapp_number);
+  if (!digits) {
+    toast.error("Numéro WhatsApp invalide. Le vendeur doit le mettre à jour.");
+    return { ok: false, reason: "invalid_number" };
   }
+
+  const urls = buildWhatsAppUrls(digits, message);
+  const targetUrl = useSameTab ? urls.universal : urls.universal;
+
+  openWhatsAppUrl(targetUrl, useSameTab);
   return { ok: true };
 }
