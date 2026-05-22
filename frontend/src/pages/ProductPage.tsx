@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, lazy, Suspense } from "react";
+import { useState, useMemo, useRef, useEffect, lazy, Suspense, type TouchEvent } from "react";
 import { ImageZoomLens } from "@/components/ImageZoomLens";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,6 +13,7 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 
 const PDP_THUMB_WIDTHS = [120, 160, 240] as const;
 const PDP_MAIN_WIDTHS = [600, 900, 1200] as const;
+const SWIPE_THRESHOLD_PX = 50;
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { Footer } from "@/components/Footer";
@@ -80,6 +81,7 @@ const SIZE_REGIONS: Record<string, string[]> = {
 // ─── Component ─────────────────────────────────
 export default function ProductPage() {
   const { t, formatPrice } = useI18n();
+  const { user } = useAuth();
   const { addItem } = useCart();
   const { toast } = useToast();
   const { isInWishlist, toggleWishlist } = useWishlist();
@@ -214,10 +216,10 @@ export default function ProductPage() {
   const goGalleryNext = () =>
     setSelectedImage((p) => (p < gallery.length - 1 ? p + 1 : 0));
 
-  const handleGalleryTouchStart = (e: { changedTouches: { clientX: number }[] }) => {
+  const handleGalleryTouchStart = (e: TouchEvent<HTMLDivElement>) => {
     touchStartX.current = e.changedTouches[0]?.clientX ?? null;
   };
-  const handleGalleryTouchEnd = (e: { changedTouches: { clientX: number }[] }) => {
+  const handleGalleryTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
     if (touchStartX.current == null || gallery.length < 2) return;
     const delta = (e.changedTouches[0]?.clientX ?? 0) - touchStartX.current;
     touchStartX.current = null;

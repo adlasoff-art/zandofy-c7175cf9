@@ -42,11 +42,12 @@ export function useMaintenanceMode() {
     queryFn: async () => {
       try {
         const { data, error } = await withTimeout(
-          supabase
-            .from("platform_settings")
-            .select("value")
-            .eq("key", "maintenance_mode")
-            .maybeSingle(),
+          (async () =>
+            await supabase
+              .from("platform_settings")
+              .select("value")
+              .eq("key", "maintenance_mode")
+              .maybeSingle())(),
           MAINTENANCE_FETCH_MS,
         );
         if (error) throw error;

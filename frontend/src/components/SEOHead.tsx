@@ -62,7 +62,7 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
     setMeta("robots", "index, follow");
     setMeta("description", description);
 
-    const rawKw = seoConfig.default_keywords;
+    const rawKw = seoConfig.default_keywords as unknown;
     const keywords = Array.isArray(rawKw)
       ? rawKw.filter(Boolean).join(", ")
       : typeof rawKw === "string"
