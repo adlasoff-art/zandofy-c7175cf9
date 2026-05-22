@@ -1,10 +1,10 @@
 # Guidelines — images produits (homepage & grilles)
 
-Référence visuelle : **Top Tendances** (`ProductCard`, ratio **3:4**).
+Référence visuelle : **Top Tendances** (`ProductCard`, zone image **carrée** flush en haut).
 
 ## Principe d'affichage
 
-- **Grilles produit** (`ProductCard`) : vignette `rounded-lg` + `object-contain` + `resize=contain` CDN — produit entier visible (réf. Alibaba), léger `scale` au survol desktop.
+- **Grilles produit** (`ProductCard`) : `aspect-square` flush en haut (`rounded-t-sm`) + `object-contain` + `resize=contain` CDN — produit entier visible, `scale-105` au survol + 2ᵉ image galerie si disponible.
 - **Catégories rondes** : `object-contain` + `resize=contain` (jamais `cover` sur les cercles).
 - **Pour vous** : carré `object-cover` via `imgUrl` (inchangé).
 
@@ -12,8 +12,8 @@ Référence visuelle : **Top Tendances** (`ProductCard`, ratio **3:4**).
 
 | Zone | Ratio affiché | Taille source recommandée | Notes |
 |------|---------------|---------------------------|--------|
-| Grilles générales (Top Tendances, catégories, Voir plus, Super Promo) | **3:4** (portrait) | **900 × 1200 px** (min. 600 × 800) | Centrer le produit dans le cadre ; fond uni ou transparent OK |
-| Super Promo (carrousel étroit) | **3:4** (carte ~170×227 px) | **680 × 900 px** | Même ratio, fichier un peu plus léger acceptable |
+| Grilles générales (Top Tendances, catégories, Voir plus) | **1:1** (carré, ~40–45 % hauteur carte) | **800 × 800 px** (min. 600 × 600) | Centrer le produit ; fond uni ou transparent OK |
+| Super Promo (carrousel, ~8 cartes visibles desktop) | **1:1** | **800 × 800 px** | Largeur slot `calc((100%-3.5rem)/8)` sur md+ |
 | Pour vous | **1:1** (carré) | **800 × 800 px** | Produit centré, marges minimales |
 | Fiche produit — galerie | **3:4** | **1200 × 1600 px** | Image principale nette ; variantes motif : carré ou 3:4 |
 

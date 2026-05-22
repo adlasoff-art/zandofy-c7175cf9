@@ -4,6 +4,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
+import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 import { fetchProducts, fetchCategories, type Product } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { TrendingUp } from "lucide-react";
@@ -97,7 +98,7 @@ export default function TrendsPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 md:gap-2">
+          <div className={PRODUCT_GRID_CLASS}>
             {loading
               ? Array.from({ length: 18 }).map((_, i) => <ProductCardSkeleton key={i} />)
               : products.map((product, i) => (

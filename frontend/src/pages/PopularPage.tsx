@@ -4,6 +4,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
+import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 import { mapProduct, type Product, PRODUCT_LIST_SELECT } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { Flame, Loader2 } from "lucide-react";
@@ -63,7 +64,7 @@ export default function PopularPage() {
         </section>
 
         <div className="container pt-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 md:gap-2">
+          <div className={PRODUCT_GRID_CLASS}>
             {loading
               ? Array.from({ length: 18 }).map((_, i) => <ProductCardSkeleton key={i} />)
               : products.map((product, i) => (

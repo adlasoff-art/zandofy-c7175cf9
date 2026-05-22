@@ -5,6 +5,7 @@ import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { fetchProducts, type Product } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
+import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 
 export function TopTrends() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -67,7 +68,7 @@ export function TopTrends() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5 md:gap-2">
+          <div className={PRODUCT_GRID_CLASS}>
             {loading
               ? Array.from({ length: 12 }).map((_, i) => <ProductCardSkeleton key={i} />)
               : products.map((product, i) => (

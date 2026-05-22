@@ -4,6 +4,7 @@ import { ChevronRight, Flame, Clock } from "lucide-react";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { fetchFlashSaleProducts, type Product } from "@/services/api";
 import { shuffleByDailySeed } from "@/lib/daily-shuffle";
+import { SUPER_PROMO_CARD_SLOT_CLASS } from "@/lib/product-image-fit";
 import { useI18n } from "@/contexts/I18nContext";
 
 function useCountdown(targetDate: Date) {
@@ -102,12 +103,12 @@ export function FlashSales() {
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin snap-x snap-mandatory touch-pan-x">
           {loading
             ? Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="min-w-[155px] w-[155px] md:min-w-[170px] md:w-[170px] shrink-0 snap-start">
+                <div key={i} className={SUPER_PROMO_CARD_SLOT_CLASS}>
                   <ProductCardSkeleton />
                 </div>
               ))
             : products.map((product, i) => (
-                <div key={product.id} className="min-w-[155px] w-[155px] md:min-w-[170px] md:w-[170px] shrink-0 snap-start">
+                <div key={product.id} className={SUPER_PROMO_CARD_SLOT_CLASS}>
                   <Link to={`/product/${product.slug || product.id}`}>
                     <ProductCard product={product} index={i} priority={i < 2} />
                   </Link>

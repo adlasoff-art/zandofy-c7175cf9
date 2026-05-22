@@ -2,7 +2,6 @@ import { Heart, ShoppingCart, Plus, Star, Trophy, Check, Award, GitCompareArrows
 import { useState, useCallback, useRef, memo } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { OptimizedImage } from "@/components/OptimizedImage";
-import { useAuth } from "@/contexts/AuthContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useCompare } from "@/contexts/CompareContext";
 import { useI18n } from "@/contexts/I18nContext";
@@ -11,6 +10,7 @@ import { CertificationBadge } from "@/components/CertificationBadge";
 import { formatStoreYears } from "@/lib/store-years";
 import type { Product } from "@/services/api";
 import { PRODUCT_CARD_IMAGE_CLASS, PRODUCT_CARD_IMAGE_HOVER_CLASS } from "@/lib/product-image-fit";
+
 interface ProductCardProps {
   product: Product;
   index?: number;
@@ -24,7 +24,6 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
   const [imgError, setImgError] = useState(false);
   const [hovered, setHovered] = useState(false);
   const { addItem } = useCart();
-  const { user } = useAuth();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { t, formatPrice, locale } = useI18n();
   const { isInCompare, addToCompare, removeFromCompare } = useCompare();
@@ -34,14 +33,13 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
   const [cartSuccess, setCartSuccess] = useState(false);
   const successTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Second image from gallery (first variant/additional image)
   const galleryImages = (product as any).galleryImages as Array<{ image_url: string; position: number | null }> | undefined;
   const secondImage = galleryImages && galleryImages.length > 1
     ? galleryImages.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))[1]?.image_url
     : null;
-  // Determine first available variant defaults
   const firstColor = product.colors?.[0] ?? null;
   const firstSize = product.sizes?.[0] ?? null;
+  const showColors = (product.colors?.length ?? 0) > 0;
 
   const handleAddToCart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -62,7 +60,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
     setCartSuccess(true);
     clearTimeout(successTimer.current);
     successTimer.current = setTimeout(() => setCartSuccess(false), 1200);
-  }, [addItem, product, cartSuccess]);
+  }, [addItem, product, cartSuccess, firstColor, firstSize]);
 
   const handleWishlist = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -86,25 +84,22 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
       onMouseLeave={() => setHovered(false)}
       onClick={() => trackProductClick(product.id, "card")}
     >
-      {/* Image — vignette encadrée (padding + coins arrondis) */}
-      <div className="shrink-0 p-1.5">
-        <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted">
-        {!loaded && (
-          <div className="absolute inset-0 skeleton-shimmer rounded-lg" />
-        )}
+      {/* Image carrée — bord supérieur flush, ~40–45 % hauteur carte */}
+      <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-t-sm bg-muted">
+        {!loaded && <div className="absolute inset-0 skeleton-shimmer" />}
         <OptimizedImage
           src={imgError ? "/placeholder.svg" : product.image}
           alt={product.nameFr}
-          className={`${PRODUCT_CARD_IMAGE_CLASS} ${
-            loaded ? "opacity-100" : "opacity-0"
-          } ${hovered && secondImage ? "opacity-0 md:group-hover:scale-100" : ""}`}
+          className={`${PRODUCT_CARD_IMAGE_CLASS} ${loaded ? "opacity-100" : "opacity-0"} ${
+            hovered && secondImage ? "opacity-0" : ""
+          }`}
           onLoad={onLoad}
           onError={handleImgError}
           widths={[160, 240, 360]}
           sizes="(max-width: 640px) 50vw, 170px"
           quality={75}
           resize="contain"
-          fitHeight={480}
+          fitHeight={360}
           priority={priority || index < 2}
         />
         {secondImage && hovered && (
@@ -116,61 +111,56 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
             sizes="(max-width: 640px) 50vw, 170px"
             quality={75}
             resize="contain"
-            fitHeight={480}
+            fitHeight={360}
           />
         )}
 
-        {/* Discount badge - top left */}
         {product.isSale && product.discount && (
-          <span className="absolute top-1 left-1 px-2 py-1 text-xs font-bold bg-sale text-sale-foreground rounded-sm">
+          <span className="absolute top-1 left-1 z-10 px-2 py-0.5 text-xs font-bold bg-sale text-sale-foreground rounded-sm">
             -{product.discount}%
           </span>
         )}
 
-        {/* Top seller badge - bottom left */}
         {(product as any).sellerRank && (product as any).sellerRank <= 10 && (
-          <span className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-bold bg-amber-500/90 text-white rounded-sm backdrop-blur-sm">
+          <span className="absolute bottom-1 left-1 z-10 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-bold bg-amber-500/90 text-white rounded-sm backdrop-blur-sm">
             <Award size={9} />
             #{(product as any).sellerRank}
           </span>
         )}
 
-        {/* Wishlist button - top right — always visible on touch */}
         <button
+          type="button"
           onClick={handleWishlist}
-          className={`absolute top-2 right-2 w-9 h-9 bg-card/80 dark:bg-card rounded-full flex items-center justify-center touch-manipulation active-press ${
+          className={`absolute top-1.5 right-1.5 z-10 w-8 h-8 bg-card/80 dark:bg-card rounded-full flex items-center justify-center touch-manipulation active-press ${
             wishlisted ? "opacity-100 scale-110" : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
           }`}
           aria-label={wishlisted ? "Retirer des favoris" : "Ajouter aux favoris"}
-          style={{ WebkitTapHighlightColor: "transparent", transition: "opacity 0.2s, transform 0.2s" }}
+          style={{ WebkitTapHighlightColor: "transparent" }}
         >
           <Heart size={14} className={wishlisted ? "fill-sale text-sale" : "text-foreground dark:text-primary/80"} />
         </button>
 
-        {/* Compare button - below wishlist */}
         <button
+          type="button"
           onClick={handleCompare}
-          className={`absolute top-12 right-2 w-9 h-9 bg-card/80 dark:bg-card rounded-full flex items-center justify-center touch-manipulation active-press ${
+          className={`absolute top-10 right-1.5 z-10 w-8 h-8 bg-card/80 dark:bg-card rounded-full flex items-center justify-center touch-manipulation active-press ${
             compared ? "opacity-100 bg-primary/20" : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
           }`}
           aria-label={compared ? "Retirer du comparateur" : "Comparer"}
-          style={{ WebkitTapHighlightColor: "transparent", transition: "opacity 0.2s, transform 0.2s" }}
+          style={{ WebkitTapHighlightColor: "transparent" }}
         >
           <GitCompareArrows size={14} className={compared ? "text-primary" : "text-foreground dark:text-primary/80"} />
         </button>
-        </div>
       </div>
 
-      {/* Product info — flex column to push footer down */}
-      <div className="p-2 flex flex-col flex-1">
-        {/* Title — fixed 2-line height */}
-        <h3 className="text-xs text-foreground line-clamp-2 leading-relaxed min-h-[2.5rem]">
+      {/* Contenu texte — compact */}
+      <div className="px-2 pt-1.5 pb-2 flex flex-col flex-1 min-h-0">
+        <h3 className="text-xs text-foreground line-clamp-2 leading-snug min-h-[2.25rem]">
           {locale === "fr" ? product.nameFr : product.name}
         </h3>
 
-        {/* Psychological pricing */}
-        <div className="flex items-baseline gap-1.5 flex-wrap">
-          <span className="text-foreground dark:text-primary font-bold text-base">
+        <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
+          <span className="text-foreground dark:text-primary font-bold text-sm">
             {formatPrice(product.price)}
           </span>
           {product.originalPrice && (
@@ -179,14 +169,13 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
             </span>
           )}
           {product.isSale && product.discount && (
-            <span className="text-[11px] font-bold text-sale bg-sale/10 px-1 py-0.5 rounded">
+            <span className="text-[10px] font-bold text-sale bg-sale/10 px-1 py-0.5 rounded">
               -{product.discount}%
             </span>
           )}
         </div>
 
-        {/* Badges row: seniority + MOQ + origin */}
-        <div className="flex items-center gap-2 flex-wrap min-h-[1.25rem] mt-1">
+        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
           <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-certified bg-certified/10 px-1.5 py-0.5 rounded">
             <Trophy size={9} strokeWidth={2.5} />
             {formatStoreYears(product.verifiedYears ?? 0)}
@@ -204,53 +193,54 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
           )}
         </div>
 
-        {/* Local stock badge */}
         {(product as any).shopType === "local" && (
-          <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded mt-0.5">
+          <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 px-1.5 py-0.5 rounded mt-0.5 w-fit">
             🏪 En stock · Livraison rapide
           </span>
         )}
 
-        {/* Rating + Reviews */}
-        <div className="min-h-[1rem] flex items-center gap-1 mt-1">
+        <div className="flex items-center gap-1 mt-0.5 min-h-[1rem]">
           <Star size={10} className="fill-accent text-accent shrink-0" />
           <span className="text-[10px] text-muted-foreground">{product.rating > 0 ? product.rating : "—"}</span>
-          <span className="text-[10px] text-muted-foreground">| {(product as any).salesCount ?? product.reviewCount} {t("product.sold")}</span>
+          <span className="text-[10px] text-muted-foreground">
+            | {(product as any).salesCount ?? product.reviewCount} {t("product.sold")}
+          </span>
         </div>
 
-        {/* Certification badge — only if store is certified */}
         {(product as any).storeIsCertified && (
-          <div className="mt-1 flex items-center gap-1">
+          <div className="mt-0.5 flex items-center gap-1">
             <CertificationBadge type="vendor" variant="icon-only" />
           </div>
         )}
 
-        {/* Color swatches — small dots showing available colors */}
-        {product.colors && product.colors.length > 1 && (
-          <div className="flex items-center gap-0.5 mt-1 flex-wrap">
-            {product.colors.slice(0, 6).map((color, idx) =>
-              color ? (
-              <span
-                key={idx}
-                className="w-2.5 h-2.5 rounded-full border border-border/60 shrink-0"
-                style={{ backgroundColor: String(color).toLowerCase() }}
-                title={color}
-              />
-            ) : null)}
-            {product.colors.length > 6 && (
-              <span className="text-[8px] text-muted-foreground ml-0.5">+{product.colors.length - 6}</span>
+        {/* Pied : couleurs + panier sur la même ligne */}
+        <div className="flex items-center justify-between gap-2 mt-1.5 min-h-[2.25rem]">
+          <div className="flex items-center gap-1 min-w-0 flex-1">
+            {showColors ? (
+              <>
+                {product.colors!.slice(0, 6).map((color, idx) =>
+                  color ? (
+                    <span
+                      key={idx}
+                      className="w-3 h-3 rounded-full border border-border/60 shrink-0"
+                      style={{ backgroundColor: String(color).toLowerCase() }}
+                      title={color}
+                    />
+                  ) : null,
+                )}
+                {product.colors!.length > 6 && (
+                  <span className="text-[8px] text-muted-foreground">+{product.colors!.length - 6}</span>
+                )}
+              </>
+            ) : (
+              <span className="w-3 h-3 rounded-full border border-border/40 bg-muted shrink-0" aria-hidden />
             )}
           </div>
-        )}
 
-        {/* Spacer pushes footer to bottom */}
-        <div className="flex-1" />
-
-        {/* Add to cart row — always at bottom */}
-        <div className="flex items-center justify-end pt-1">
           <button
+            type="button"
             onClick={handleAddToCart}
-            className={`action-button min-w-[52px] h-11 px-[17px] rounded-full border-2 flex items-center justify-center gap-0.5 transition-all duration-75 active-press touch-manipulation ${
+            className={`action-button shrink-0 min-w-[44px] h-9 px-3 rounded-full border-2 flex items-center justify-center gap-0.5 transition-all duration-75 active-press touch-manipulation ${
               cartSuccess
                 ? "border-primary bg-primary text-primary-foreground scale-105"
                 : "border-primary bg-transparent text-primary"
@@ -259,11 +249,11 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
             style={{ WebkitTapHighlightColor: "transparent" }}
           >
             {cartSuccess ? (
-              <Check size={16} strokeWidth={3} className="animate-in zoom-in-50 duration-150" />
+              <Check size={15} strokeWidth={3} className="animate-in zoom-in-50 duration-150" />
             ) : (
               <>
-                <ShoppingCart size={14} strokeWidth={2.5} />
-                <Plus size={10} strokeWidth={3} />
+                <ShoppingCart size={13} strokeWidth={2.5} />
+                <Plus size={9} strokeWidth={3} />
               </>
             )}
           </button>
@@ -276,12 +266,15 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
 export function ProductCardSkeleton() {
   return (
     <div className="bg-card overflow-hidden rounded-sm border border-border/40 flex flex-col h-full">
-      <div className="aspect-[3/4] skeleton-shimmer" />
-      <div className="p-2 space-y-1.5">
+      <div className="aspect-square w-full skeleton-shimmer rounded-t-sm" />
+      <div className="px-2 py-2 space-y-1.5 flex-1 flex flex-col">
         <div className="h-3 w-full skeleton-shimmer rounded" />
         <div className="h-3 w-3/4 skeleton-shimmer rounded" />
-        <div className="h-4 w-16 skeleton-shimmer rounded" />
-        <div className="h-3 w-20 skeleton-shimmer rounded" />
+        <div className="h-3.5 w-16 skeleton-shimmer rounded" />
+        <div className="flex justify-between items-center mt-auto pt-1">
+          <div className="h-3 w-12 skeleton-shimmer rounded" />
+          <div className="h-9 w-9 skeleton-shimmer rounded-full" />
+        </div>
       </div>
     </div>
   );
