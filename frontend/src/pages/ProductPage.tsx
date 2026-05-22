@@ -192,18 +192,21 @@ export default function ProductPage() {
   const gallery = useMemo(() => (product ? getGalleryItems(product) : []), [product]);
   const colorOptions = useMemo(() => {
     if (!product) return [] as Array<{ hex: string; name: string; imageUrl: string | null }>;
-    if (product.productColors?.length) return product.productColors;
-    return (product.colors || []).map((hex, i) => ({
-      hex,
-      name: t("product.colorFallback", { index: i + 1 }),
-      imageUrl: null as string | null,
-    }));
+    if (product.productColors?.length) {
+      return product.productColors.filter((c) => Boolean(c.hex));
+    }
+    return (product.colors || [])
+      .filter((hex): hex is string => Boolean(hex))
+      .map((hex, i) => ({
+        hex,
+        name: t("product.colorFallback", { index: i + 1 }),
+        imageUrl: null as string | null,
+      }));
   }, [product, t]);
 
   useEffect(() => {
-    if (user?.id && product?.id) {
-      recordProductView(user.id, product.id);
-    }
+    if (!user?.id || !product?.id) return;
+    recordProductView(user.id, product.id).catch(() => {});
   }, [user?.id, product?.id]);
 
   const goGalleryPrev = () =>
@@ -485,7 +488,7 @@ export default function ProductPage() {
                     {relatedProducts.slice(0, 6).map((p) => (
                       <Link to={`/product/${(p as any).slug || p.id}`} key={p.id} className="group">
                         <div className="aspect-square rounded-sm overflow-hidden bg-muted">
-                          <img src={imgUrl(p.image, { width: 200 })} alt={p.nameFr} className="w-full h-full object-contain group-hover:scale-105 transition-transform" loading="lazy" decoding="async" />
+                          <img src={imgUrl(p.image, { width: 200, height: 200, resize: "cover" })} alt={p.nameFr} className="w-full h-full object-cover object-center" loading="lazy" decoding="async" />
                         </div>
                         <p className="text-xs text-foreground mt-1 truncate">{p.nameFr}</p>
                         <div className="flex items-center gap-1.5">
@@ -598,7 +601,7 @@ export default function ProductPage() {
                   <span className="text-xs text-muted-foreground">· {t("product.sizesCount", { count: product.sizes!.length, plural: product.sizes!.length > 1 ? "s" : "" })}</span>
                 )}
                 {((product as any).dynamicVariants || []).map((dv: any) => (
-                  <span key={dv.typeId} className="text-xs text-muted-foreground">· {dv.options.length} {dv.typeName.toLowerCase()}{dv.options.length > 1 ? "s" : ""}</span>
+                  <span key={dv.typeId} className="text-xs text-muted-foreground">· {dv.options.length} {(dv.typeName || "option").toLowerCase()}{dv.options.length > 1 ? "s" : ""}</span>
                 ))}
               </div>
               <ChevronRight size={16} className="text-muted-foreground group-hover:text-foreground transition-colors" />

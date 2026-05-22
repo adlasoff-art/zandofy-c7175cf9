@@ -10,6 +10,7 @@ import { useTrackProductClick } from "@/hooks/use-analytics";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { formatStoreYears } from "@/lib/store-years";
 import type { Product } from "@/services/api";
+import { PRODUCT_CARD_IMAGE_CLASS, PRODUCT_CARD_IMAGE_HOVER_CLASS } from "@/lib/product-image-fit";
 interface ProductCardProps {
   product: Product;
   index?: number;
@@ -85,7 +86,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
       onMouseLeave={() => setHovered(false)}
       onClick={() => trackProductClick(product.id, "card")}
     >
-      {/* Image — fixed aspect ratio, object-contain to avoid blur */}
+      {/* Image — 3:4 frame, cover (fills zone without letterboxing) */}
       <div className="relative aspect-[3/4] overflow-hidden bg-muted shrink-0">
         {!loaded && (
           <div className="absolute inset-0 skeleton-shimmer" />
@@ -93,9 +94,9 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
         <OptimizedImage
           src={imgError ? "/placeholder.svg" : product.image}
           alt={product.nameFr}
-          className={`absolute inset-0 w-full h-full object-contain transition-all duration-300 ease-out ${
+          className={`${PRODUCT_CARD_IMAGE_CLASS} ${
             loaded ? "opacity-100" : "opacity-0"
-          } ${hovered && secondImage ? "opacity-0 md:scale-105" : ""}`}
+          } ${hovered && secondImage ? "opacity-0" : ""}`}
           onLoad={onLoad}
           onError={handleImgError}
           widths={[160, 240, 360]}
@@ -107,7 +108,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
           <OptimizedImage
             src={secondImage}
             alt={product.nameFr}
-            className="absolute inset-0 w-full h-full object-contain transition-all duration-300 ease-out opacity-100 md:group-hover:scale-105"
+            className={`${PRODUCT_CARD_IMAGE_HOVER_CLASS}`}
             widths={[160, 240, 360]}
             sizes="(max-width: 640px) 50vw, 170px"
             quality={60}
@@ -221,14 +222,15 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
         {/* Color swatches — small dots showing available colors */}
         {product.colors && product.colors.length > 1 && (
           <div className="flex items-center gap-0.5 mt-1 flex-wrap">
-            {product.colors.slice(0, 6).map((color, idx) => (
+            {product.colors.slice(0, 6).map((color, idx) =>
+              color ? (
               <span
                 key={idx}
                 className="w-2.5 h-2.5 rounded-full border border-border/60 shrink-0"
-                style={{ backgroundColor: color.toLowerCase() }}
+                style={{ backgroundColor: String(color).toLowerCase() }}
                 title={color}
               />
-            ))}
+            ) : null)}
             {product.colors.length > 6 && (
               <span className="text-[8px] text-muted-foreground ml-0.5">+{product.colors.length - 6}</span>
             )}

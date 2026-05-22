@@ -6,6 +6,8 @@ interface Props {
   children: ReactNode;
   /** Optional callback to open the support drawer */
   onOpenSupport?: () => void;
+  /** When this value changes (e.g. route path), recover from a previous crash. */
+  resetKey?: string;
 }
 
 interface State {
@@ -22,6 +24,16 @@ export class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
+  }
+
+  componentDidUpdate(prevProps: Props) {
+    if (
+      this.state.hasError &&
+      prevProps.resetKey !== undefined &&
+      prevProps.resetKey !== this.props.resetKey
+    ) {
+      this.setState({ hasError: false, error: undefined, reported: false });
+    }
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
