@@ -1,6 +1,8 @@
 import { useState, useMemo, useRef, useEffect, lazy, Suspense } from "react";
 import { ImageZoomLens } from "@/components/ImageZoomLens";
 import { useI18n } from "@/contexts/I18nContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { recordProductView } from "@/lib/user-product-views";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchProductBySlug, fetchProducts, fetchPricingTiers, type Product } from "@/services/api";
@@ -95,6 +97,7 @@ export default function ProductPage() {
   const [quantity, setQuantity] = useState<number | null>(null);
   const [variantDrawerOpen, setVariantDrawerOpen] = useState(false);
   const [pointsPerDollar, setPointsPerDollar] = useState(50);
+  const touchStartX = useRef<number | null>(null);
 
   const { data: product, isLoading } = useQuery({
     queryKey: ["product", slug],
@@ -187,6 +190,48 @@ export default function ProductPage() {
   const totalSavings = tieredResult?.savings ?? 0;
 
   const gallery = useMemo(() => (product ? getGalleryItems(product) : []), [product]);
+  const colorOptions = useMemo(() => {
+    if (!product) return [] as Array<{ hex: string; name: string; imageUrl: string | null }>;
+    if (product.productColors?.length) return product.productColors;
+    return (product.colors || []).map((hex, i) => ({
+      hex,
+      name: t("product.colorFallback", { index: i + 1 }),
+      imageUrl: null as string | null,
+    }));
+  }, [product, t]);
+
+  useEffect(() => {
+    if (user?.id && product?.id) {
+      recordProductView(user.id, product.id);
+    }
+  }, [user?.id, product?.id]);
+
+  const goGalleryPrev = () =>
+    setSelectedImage((p) => (p > 0 ? p - 1 : gallery.length - 1));
+  const goGalleryNext = () =>
+    setSelectedImage((p) => (p < gallery.length - 1 ? p + 1 : 0));
+
+  const handleGalleryTouchStart = (e: { changedTouches: { clientX: number }[] }) => {
+    touchStartX.current = e.changedTouches[0]?.clientX ?? null;
+  };
+  const handleGalleryTouchEnd = (e: { changedTouches: { clientX: number }[] }) => {
+    if (touchStartX.current == null || gallery.length < 2) return;
+    const delta = (e.changedTouches[0]?.clientX ?? 0) - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) < SWIPE_THRESHOLD_PX) return;
+    if (delta < 0) goGalleryNext();
+    else goGalleryPrev();
+  };
+
+  const selectColor = (index: number) => {
+    setSelectedColor(index);
+    const imageUrl = colorOptions[index]?.imageUrl;
+    if (imageUrl) {
+      const idx = gallery.findIndex((g) => g.url === imageUrl);
+      if (idx >= 0) setSelectedImage(idx);
+    }
+  };
+
   const sizes = SIZE_REGIONS[sizeRegion] || SIZE_REGIONS.EU;
 
   const productSku = product?.sku || `SKU-${product?.id?.slice(0, 8) || "000000"}`;
@@ -315,7 +360,11 @@ export default function ProductPage() {
                   </button>
                 ))}
               </div>
-              <div className="relative flex-1 aspect-[3/4] max-h-[520px] rounded-sm overflow-hidden bg-muted">
+              <div
+                className="relative flex-1 aspect-[3/4] max-h-[520px] rounded-sm overflow-hidden bg-muted touch-pan-y"
+                onTouchStart={handleGalleryTouchStart}
+                onTouchEnd={handleGalleryTouchEnd}
+              >
                 {gallery[selectedImage]?.type === "video" ? (
                   <video
                     key={gallery[selectedImage].url}
@@ -339,8 +388,8 @@ export default function ProductPage() {
                 {product.isSale && product.discount && (
                   <span className="absolute top-3 left-3 px-3 py-1.5 text-sm font-bold bg-sale text-sale-foreground rounded-sm">-{product.discount}%</span>
                 )}
-                <button onClick={() => setSelectedImage(p => (p > 0 ? p - 1 : gallery.length - 1))} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-card/80 flex items-center justify-center hover:bg-card transition-colors"><ChevronLeft size={18} /></button>
-                <button onClick={() => setSelectedImage(p => (p < gallery.length - 1 ? p + 1 : 0))} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-card/80 flex items-center justify-center hover:bg-card transition-colors"><ChevronRight size={18} /></button>
+                <button type="button" onClick={goGalleryPrev} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-card/80 flex items-center justify-center hover:bg-card transition-colors"><ChevronLeft size={18} /></button>
+                <button type="button" onClick={goGalleryNext} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-card/80 flex items-center justify-center hover:bg-card transition-colors"><ChevronRight size={18} /></button>
                 <span className="absolute bottom-3 right-3 text-xs bg-card/80 text-foreground px-2 py-1 rounded">{selectedImage + 1}/{gallery.length}</span>
               </div>
             </div>
@@ -436,7 +485,7 @@ export default function ProductPage() {
                     {relatedProducts.slice(0, 6).map((p) => (
                       <Link to={`/product/${(p as any).slug || p.id}`} key={p.id} className="group">
                         <div className="aspect-square rounded-sm overflow-hidden bg-muted">
-                          <img src={imgUrl(p.image, { width: 200 })} alt={p.nameFr} className="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" decoding="async" />
+                          <img src={imgUrl(p.image, { width: 200 })} alt={p.nameFr} className="w-full h-full object-contain group-hover:scale-105 transition-transform" loading="lazy" decoding="async" />
                         </div>
                         <p className="text-xs text-foreground mt-1 truncate">{p.nameFr}</p>
                         <div className="flex items-center gap-1.5">
@@ -602,27 +651,59 @@ export default function ProductPage() {
             )}
 
             {/* Color Selector */}
-            {product.colors && product.colors.length > 0 && (
+            {colorOptions.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">{t("product.colorWithCount", { count: product.colors.length })}</span>
+                  <span className="text-sm font-medium text-foreground">{t("product.colorWithCount", { count: colorOptions.length })}</span>
                   <Sheet>
-                    <SheetTrigger asChild><button className="text-xs text-primary underline">{t("product.viewLarge")}</button></SheetTrigger>
+                    <SheetTrigger asChild><button type="button" className="text-xs text-primary underline">{t("product.viewLarge")}</button></SheetTrigger>
                     <SheetContent side="right" className="w-full sm:max-w-md">
                       <SheetHeader><SheetTitle>{t("product.selectColor")}</SheetTitle></SheetHeader>
                       <div className="grid grid-cols-2 gap-3 mt-4">
-                        {product.colors.map((color, i) => (
-                          <button key={color} onClick={() => setSelectedColor(i)} className={`aspect-[3/4] rounded-sm overflow-hidden border-2 transition-colors ${selectedColor === i ? "border-primary" : "border-border/40"}`}>
-                            <div className="w-full h-full" style={{ backgroundColor: color }} />
+                        {colorOptions.map((color, i) => (
+                          <button
+                            key={`${color.hex}-${i}`}
+                            type="button"
+                            onClick={() => selectColor(i)}
+                            className={`aspect-[3/4] rounded-sm overflow-hidden border-2 transition-colors bg-muted ${selectedColor === i ? "border-primary" : "border-border/40"}`}
+                          >
+                            {color.imageUrl ? (
+                              <OptimizedImage
+                                src={color.imageUrl}
+                                alt={color.name}
+                                widths={[240, 360]}
+                                sizes="50vw"
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <div className="w-full h-full" style={{ backgroundColor: color.hex }} />
+                            )}
                           </button>
                         ))}
                       </div>
                     </SheetContent>
                   </Sheet>
                 </div>
-                <div className="flex gap-2">
-                  {product.colors.map((color, i) => (
-                    <button key={color} onClick={() => setSelectedColor(i)} className={`w-8 h-8 rounded-full border-2 transition-all ${selectedColor === i ? "border-primary ring-2 ring-primary/30 scale-110" : "border-border"}`} style={{ backgroundColor: color }} aria-label={t("product.colorAria", { index: i + 1 })} />
+                <div className="flex gap-2 flex-wrap">
+                  {colorOptions.map((color, i) => (
+                    <button
+                      key={`${color.hex}-swatch-${i}`}
+                      type="button"
+                      onClick={() => selectColor(i)}
+                      className={`w-8 h-8 rounded-full border-2 overflow-hidden transition-all shrink-0 ${selectedColor === i ? "border-primary ring-2 ring-primary/30 scale-110" : "border-border"}`}
+                      style={color.imageUrl ? undefined : { backgroundColor: color.hex }}
+                      aria-label={color.name || t("product.colorAria", { index: i + 1 })}
+                    >
+                      {color.imageUrl && (
+                        <OptimizedImage
+                          src={color.imageUrl}
+                          alt={color.name}
+                          widths={[64, 96]}
+                          sizes="32px"
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </button>
                   ))}
                 </div>
               </div>

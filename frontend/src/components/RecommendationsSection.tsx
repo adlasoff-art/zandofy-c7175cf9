@@ -5,6 +5,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { Sparkles, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { imgUrl } from "@/lib/image-url";
+import { fetchRecentlyViewedProductIds } from "@/lib/user-product-views";
 
 interface RecommendedProduct {
   id: string;
@@ -91,7 +92,18 @@ export function RecommendationsSection() {
         }
         const bottomRow = pool.slice(0, 4);
 
-        const combined = [...topRow, ...bottomRow];
+        let combined = [...topRow, ...bottomRow];
+
+        if (user) {
+          const recentIds = await fetchRecentlyViewedProductIds(user.id);
+          if (recentIds.size > 0) {
+            const filtered = combined.filter((p: any) => !recentIds.has(p.id));
+            if (filtered.length >= 4) {
+              combined = filtered;
+            }
+          }
+        }
+
         setProducts(
           combined.map((p: any) => ({
             id: p.id,
@@ -158,11 +170,11 @@ export function RecommendationsSection() {
             to={`/product/${product.slug || product.id}`}
             className="group bg-card border border-border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
           >
-            <div className="aspect-square overflow-hidden">
+            <div className="aspect-square overflow-hidden bg-muted">
               <img
                 src={imgUrl(product.image, { width: 320 })}
                 alt={displayName}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                className="w-full h-full object-contain md:group-hover:scale-105 transition-transform duration-300"
                 loading="lazy"
               />
             </div>

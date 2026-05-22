@@ -1,21 +1,42 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
-import { fetchProducts, fetchTrendTags, fetchCategories, type Product, type TrendTag } from "@/services/api";
+import { fetchProducts, fetchTrendTags, fetchCategories, type Product, type TrendTag, type Category } from "@/services/api";
+import { categoryPath } from "@/lib/category-slug";
 import { ChevronRight, TrendingUp, Flame, Users } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 
 const PAGE_SIZE = 24;
 
-// Category-based sections to show between Tendances and Voir Plus
-const CATEGORY_SECTIONS = [
-  { categoryName: "Fashion", labelKey: "home.womenFashion", labelFr: "👗 Mode Femme", icon: Users },
-  { categoryName: "Electronics", labelKey: "home.electronics", labelFr: "📱 Électronique", icon: TrendingUp },
-  { categoryName: "Home & Living", labelKey: "home.homeLiving", labelFr: "🏠 Maison & Déco", icon: TrendingUp },
+// Homepage category blocks — matched flexibly against DB names (EN/FR)
+const CATEGORY_SECTION_TARGETS = [
+  {
+    keys: ["fashion", "mode", "femme", "women"],
+    labelKey: "home.womenFashion",
+    labelFr: "👗 Mode Femme",
+    icon: Users,
+  },
+  {
+    keys: ["electronics", "électronique", "electronique", "tech"],
+    labelKey: "home.electronics",
+    labelFr: "📱 Électronique",
+    icon: TrendingUp,
+  },
+  {
+    keys: ["home", "maison", "living", "déco", "deco", "house"],
+    labelKey: "home.homeLiving",
+    labelFr: "🏠 Maison & Déco",
+    icon: TrendingUp,
+  },
 ];
 
+function categoryMatchesKeys(cat: Category, keys: string[]): boolean {
+  const hay = `${cat.name} ${cat.nameFr}`.toLowerCase();
+  return keys.some((k) => hay.includes(k));
+}
+
 export function ProductGrid() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +55,9 @@ export function ProductGrid() {
   const [popularLoading, setPopularLoading] = useState(true);
 
   // Category sections
-  const [categorySections, setCategorySections] = useState<{ label: string; products: Product[] }[]>([]);
+  const [categorySections, setCategorySections] = useState<
+    { label: string; products: Product[]; href: string }[]
+  >([]);
 
   // Load trend tags on mount
   useEffect(() => {
@@ -55,22 +78,30 @@ export function ProductGrid() {
   // Load category sections on mount
   useEffect(() => {
     fetchCategories().then((cats) => {
-      CATEGORY_SECTIONS.forEach((section) => {
-        const cat = cats.find((c) => c.name === section.categoryName);
+      CATEGORY_SECTION_TARGETS.forEach((target) => {
+        const cat = cats.find((c) => categoryMatchesKeys(c, target.keys));
         if (cat) {
           fetchProducts({ categoryId: cat.id, limit: 12 }).then((data) => {
             if (data.length > 0) {
               setCategorySections((prev) => {
-                const label = t(section.labelKey) || section.labelFr;
-                if (prev.find((s) => s.label === label)) return prev;
-                return [...prev, { label, products: data }];
+                const label = t(target.labelKey) || target.labelFr;
+                const href = categoryPath(cat, locale);
+                if (prev.find((s) => s.href === href)) return prev;
+                return [
+                  ...prev,
+                  {
+                    label,
+                    products: data,
+                    href,
+                  },
+                ];
               });
             }
           });
         }
       });
     });
-  }, [t]);
+  }, [t, locale]);
 
   // Load main Tendances products when tab changes
   useEffect(() => {
@@ -165,12 +196,18 @@ export function ProductGrid() {
         {/* ═══════════════════════════════════════════ */}
         {categorySections.map((section, sIdx) => (
           <div key={sIdx} className="mb-10">
-            <div className="flex items-center gap-2 mb-4">
-              <h2 className="text-base md:text-lg font-bold text-foreground">
+            <Link
+              to={section.href}
+              className="flex items-center gap-2 mb-4 group w-fit"
+            >
+              <h2 className="text-base md:text-lg font-bold text-foreground group-hover:text-primary transition-colors">
                 {section.label}
               </h2>
-              <ChevronRight size={16} className="text-muted-foreground" />
-            </div>
+              <ChevronRight
+                size={16}
+                className="text-muted-foreground group-hover:text-primary transition-colors"
+              />
+            </Link>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 md:gap-2">
               {section.products.map((product, i) => (
                 <Link to={`/product/${product.slug || product.id}`} key={product.id} className="block">
@@ -249,7 +286,7 @@ export function ProductGrid() {
             <button
               onClick={handleLoadMore}
               disabled={loadingMore}
-              className="px-10 py-2.5 text-sm font-medium border border-foreground text-foreground bg-card hover:bg-foreground hover:text-card transition-colors disabled:opacity-50"
+              className="px-10 py-2.5 text-sm font-medium border border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:border-primary transition-colors disabled:opacity-50 shadow-sm"
             >
               {loadingMore ? t("general.loadingMore") : t("general.seeMore")}
             </button>

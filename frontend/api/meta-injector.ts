@@ -18,6 +18,16 @@
 export const config = { runtime: "edge" };
 
 const SITE_URL = "https://zandofy.com";
+
+/** Crawlers require absolute HTTPS URLs for og:image (relative paths show site logo). */
+function toAbsoluteOgImage(url: string | null | undefined): string {
+  const raw = (url || "").trim();
+  if (!raw) return `${SITE_URL}/og-default.jpg`;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith("//")) return `https:${raw}`;
+  const path = raw.startsWith("/") ? raw : `/${raw}`;
+  return `${SITE_URL.replace(/\/$/, "")}${path}`;
+}
 const SUPABASE_URL = "https://vpttoqojmiqxgudknyxf.supabase.co";
 // Public anon key — safe in client-side / edge code.
 const SUPABASE_ANON =
@@ -157,7 +167,7 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
       cfg.tagline ||
       `${brand} : marketplace mode et import. Livraison rapide en Afrique.`,
   );
-  const image = cfg.default_og_image || `${SITE_URL}/og-default.jpg`;
+  const image = toAbsoluteOgImage(cfg.default_og_image);
   const canonical = `${SITE_URL}${pathname === "/" ? "/" : pathname}`;
 
   // For sub-pages add a humanised suffix; homepage keeps the bare site title.
@@ -206,8 +216,7 @@ async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
         (a: any, b: any) => (a?.position ?? 0) - (b?.position ?? 0),
       )
     : [];
-  const image =
-    sortedImages[0]?.image_url || `${SITE_URL}/og-default.jpg`;
+  const image = toAbsoluteOgImage(sortedImages[0]?.image_url);
   const title = `${p.name} | Zandofy`;
   const description = truncate(
     p.description ||
@@ -252,7 +261,7 @@ async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
   if (!s) return null;
 
   const canonical = `${SITE_URL}/store/${s.slug || s.id}`;
-  const image = s.banner_url || s.logo_url || `${SITE_URL}/og-default.jpg`;
+  const image = toAbsoluteOgImage(s.banner_url || s.logo_url);
   const title = `${s.name} — Boutique sur Zandofy`;
   const location = [s.city, s.country].filter(Boolean).join(", ");
   const description = truncate(
@@ -298,7 +307,7 @@ async function buildCategoryMeta(slug: string): Promise<MetaPayload | null> {
   const c = rows[0];
   const displayName = c?.name_fr || c?.name || guess;
   const canonical = `${SITE_URL}/category/${slug}`;
-  const image = c?.image_url || `${SITE_URL}/og-default.jpg`;
+  const image = toAbsoluteOgImage(c?.image_url);
   const title = `${displayName} — Catalogue Zandofy`;
   const description = truncate(
     `Tous les produits ${displayName} sur Zandofy. Mode élégante & accessible, livraison rapide en Afrique.`,
@@ -329,7 +338,7 @@ async function buildBlogMeta(slug: string): Promise<MetaPayload | null> {
   if (!b) return null;
 
   const canonical = `${SITE_URL}/blog/${slug}`;
-  const image = b.og_image_url || b.cover_image_url || `${SITE_URL}/og-default.jpg`;
+  const image = toAbsoluteOgImage(b.og_image_url || b.cover_image_url);
   const title = b.meta_title || `${b.title} | Zandofy`;
   const description = truncate(b.meta_description || b.excerpt || b.title);
 
@@ -387,7 +396,7 @@ async function buildMetaForPath(pathname: string): Promise<MetaPayload | null> {
     if (override) {
       if (override.title) merged.title = override.title;
       if (override.description) merged.description = truncate(override.description);
-      if (override.og_image) merged.image = override.og_image;
+      if (override.og_image) merged.image = toAbsoluteOgImage(override.og_image);
       if (override.keywords && override.keywords.length)
         merged.keywords = override.keywords.join(", ");
       if (override.robots) merged.robots = override.robots;
@@ -405,7 +414,7 @@ function buildHeadInjection(meta: MetaPayload): string {
   const ogT = escapeHtml((meta as any).ogTitle || meta.title);
   const d = escapeHtml(meta.description);
   const c = escapeHtml(meta.canonical);
-  const img = escapeHtml(meta.image || `${SITE_URL}/og-default.jpg`);
+  const img = escapeHtml(toAbsoluteOgImage(meta.image));
   const ogType = meta.ogType || "website";
   const robots = meta.robots || "index,follow";
 
@@ -420,6 +429,7 @@ function buildHeadInjection(meta: MetaPayload): string {
 <meta property="og:title" content="${ogT}" />
 <meta property="og:description" content="${d}" />
 <meta property="og:image" content="${img}" />
+${img.startsWith("https://") ? `<meta property="og:image:secure_url" content="${img}" />` : ""}
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta name="twitter:card" content="summary_large_image" />
