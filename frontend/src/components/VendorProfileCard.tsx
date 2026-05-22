@@ -205,6 +205,7 @@ export function VendorProfileCard({ store, productName, productId, originCountry
 
                 {canWhatsApp ? (
                   <Button
+                    type="button"
                     size="sm"
                     onClick={handleWhatsApp}
                     disabled={whatsappLoading}

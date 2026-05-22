@@ -412,6 +412,7 @@ export default function StorePage() {
                     </Sheet>
                     {user && (
                       <Button
+                        type="button"
                         size="sm"
                         disabled={whatsappLoading}
                         onClick={async () => {

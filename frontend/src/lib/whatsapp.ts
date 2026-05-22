@@ -30,13 +30,23 @@ async function fetchNumber(storeId: string) {
   });
 }
 
+/** Ouvre une URL après un fetch async — éviter window.open() post-await (onglet vide). */
 function openWhatsAppUrl(url: string, useSameTab: boolean) {
   if (useSameTab) {
     window.location.assign(url);
     return;
   }
-  const win = window.open(url, "_blank", "noopener,noreferrer");
-  if (!win) {
+  // Desktop : clic programmatique sur <a> (moins bloqué qu'un popup après await)
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch {
     toast.message("Ouverture dans cet onglet…", { duration: 2000 });
     window.location.assign(url);
   }
@@ -86,7 +96,8 @@ export async function openStoreWhatsApp(
   }
 
   const urls = buildWhatsAppUrls(digits, message);
-  const targetUrl = useSameTab ? urls.universal : urls.universal;
+  // Mobile/PWA : wa.me same-tab ; desktop : api.whatsapp.com (évite onglet wa.me vide)
+  const targetUrl = useSameTab ? urls.universal : urls.webSend;
 
   openWhatsAppUrl(targetUrl, useSameTab);
   return { ok: true };
