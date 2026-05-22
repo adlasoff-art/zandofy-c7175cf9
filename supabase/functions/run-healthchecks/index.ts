@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "nodemailer";
+import { sendEmail } from "../_shared/email.ts";
 
 /**
  * Lot 18 — Edge Function run-healthchecks
@@ -67,30 +68,104 @@ async function checkEdgeFunctionAlive(supabase: any, name: string, threshold: nu
   }
 }
 
-async function checkKelpay(threshold: number): Promise<CheckResult> {
+/** DNS + HTTP reachability (aligned with kelpay-payment / keccel-cardpay). */
+async function probeGateway(
+  component: string,
+  url: string,
+  threshold: number,
+): Promise<CheckResult> {
   const start = Date.now();
+  const opts = { signal: AbortSignal.timeout(15_000) };
   try {
-    const res = await fetch("https://api.kelpay.cd/api/v1/health", {
-      method: "GET",
-      signal: AbortSignal.timeout(15_000),
-    }).catch(() => fetch("https://api.kelpay.cd/", {
-      method: "HEAD",
-      signal: AbortSignal.timeout(15_000),
-    }));
+    let res = await fetch(url, { method: "HEAD", ...opts });
+    if (res.status === 405 || res.status === 501) {
+      res = await fetch(url, { method: "GET", ...opts });
+    }
     const latency = Date.now() - start;
-    const ok = res.ok || (res.status >= 200 && res.status < 500);
+    // Any HTTP response means the gateway host is reachable (not a DNS/network failure).
+    const reachable = res.status > 0 && res.status < 600;
     return {
-      component: "gateway:kelpay",
+      component,
       component_type: "payment_gateway",
-      status: !ok ? "down" : latency > threshold ? "warn" : "ok",
+      status: !reachable ? "down" : latency > threshold ? "warn" : "ok",
       latency_ms: latency,
       http_status: res.status,
-      error_message: !ok ? `HTTP ${res.status}` : undefined,
+      error_message: !reachable ? `HTTP ${res.status}` : undefined,
+      metadata: { probe_url: url },
     };
   } catch (e) {
     return {
-      component: "gateway:kelpay",
+      component,
       component_type: "payment_gateway",
+      status: "down",
+      latency_ms: Date.now() - start,
+      error_message: e instanceof Error ? e.message : String(e),
+      metadata: { probe_url: url },
+    };
+  }
+}
+
+/** KelPay mobile money — same host as kelpay-payment. */
+async function checkKelpay(threshold: number): Promise<CheckResult> {
+  return probeGateway(
+    "gateway:kelpay",
+    "https://pay.keccel.com/",
+    threshold,
+  );
+}
+
+/** Keccel card / Mastercard redirect — same host as keccel-cardpay. */
+async function checkKeccelCard(threshold: number): Promise<CheckResult> {
+  return probeGateway(
+    "gateway:keccel-card",
+    "https://api.keccel.net/",
+    threshold,
+  );
+}
+
+/** Primary transactional email (Resend HTTP API). */
+async function checkResend(): Promise<CheckResult> {
+  const start = Date.now();
+  const apiKey = Deno.env.get("RESEND_API_KEY");
+  if (!apiKey) {
+    return {
+      component: "email:resend",
+      component_type: "external_api",
+      status: "warn",
+      error_message: "RESEND_API_KEY not configured",
+    };
+  }
+  try {
+    const res = await fetch("https://api.resend.com/domains", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    const latency = Date.now() - start;
+    const apiReachable = res.status > 0 && res.status < 600;
+    const keyValid = res.ok;
+    return {
+      component: "email:resend",
+      component_type: "external_api",
+      status: !apiReachable
+        ? "down"
+        : !keyValid
+        ? "down"
+        : latency > 8000
+        ? "warn"
+        : "ok",
+      latency_ms: latency,
+      http_status: res.status,
+      error_message: !apiReachable
+        ? `Resend API HTTP ${res.status}`
+        : !keyValid
+        ? "Resend API key invalid or unauthorized"
+        : undefined,
+    };
+  } catch (e) {
+    return {
+      component: "email:resend",
+      component_type: "external_api",
       status: "down",
       latency_ms: Date.now() - start,
       error_message: e instanceof Error ? e.message : String(e),
@@ -98,25 +173,19 @@ async function checkKelpay(threshold: number): Promise<CheckResult> {
   }
 }
 
-async function checkSmtp(): Promise<CheckResult> {
+/** Legacy Hostinger SMTP — only when SMTP_* secrets are set (notify-order-status, campaigns, etc.). */
+async function checkSmtpLegacy(): Promise<CheckResult | null> {
   const start = Date.now();
   const host = Deno.env.get("SMTP_HOST");
   const port = parseInt(Deno.env.get("SMTP_PORT") || "587", 10);
   const user = Deno.env.get("SMTP_USER");
   const pass = Deno.env.get("SMTP_PASS");
-  if (!host || !user || !pass) {
-    return {
-      component: "smtp:hostinger",
-      component_type: "smtp",
-      status: "warn",
-      error_message: "SMTP env not configured",
-    };
-  }
+  if (!host || !user || !pass) return null;
   try {
     const transporter = nodemailer.createTransport({
       host,
       port,
-      secure: false,
+      secure: port === 465,
       auth: { user, pass },
       connectionTimeout: 8000,
       greetingTimeout: 8000,
@@ -220,11 +289,32 @@ async function sendEmailAlert(
   recipients: string[],
   check: CheckResult,
 ) {
-  const host = Deno.env.get("SMTP_HOST");
-  const user = Deno.env.get("SMTP_USER");
-  const pass = Deno.env.get("SMTP_PASS");
-  if (!host || !user || !pass || recipients.length === 0) return;
+  if (recipients.length === 0) return;
+  const html = `
+    <div style="font-family:system-ui;max-width:600px;margin:auto">
+      <h2 style="color:#dc2626">Incident détecté — ${check.component}</h2>
+      <p><strong>Statut:</strong> ${check.status}</p>
+      <p><strong>Type:</strong> ${check.component_type}</p>
+      ${check.error_message ? `<p><strong>Erreur:</strong> ${check.error_message}</p>` : ""}
+      ${check.latency_ms ? `<p><strong>Latence:</strong> ${check.latency_ms}ms</p>` : ""}
+      <p><a href="https://zandofy.com/admin/health" style="color:#16a34a">→ Ouvrir le dashboard santé</a></p>
+      <hr/><small style="color:#666">Zandofy Monitoring · ${new Date().toISOString()}</small>
+    </div>
+  `;
   try {
+    if (Deno.env.get("RESEND_API_KEY")) {
+      const result = await sendEmail({
+        to: recipients,
+        subject: `[${check.status.toUpperCase()}] ${check.component}`,
+        html,
+      });
+      if (!result.ok) console.error("[run-healthchecks] Resend alert failed:", result.error);
+      return;
+    }
+    const host = Deno.env.get("SMTP_HOST");
+    const user = Deno.env.get("SMTP_USER");
+    const pass = Deno.env.get("SMTP_PASS");
+    if (!host || !user || !pass) return;
     const transporter = nodemailer.createTransport({
       host,
       port: parseInt(Deno.env.get("SMTP_PORT") || "587", 10),
@@ -234,18 +324,8 @@ async function sendEmailAlert(
     await transporter.sendMail({
       from: `"Zandofy Monitoring" <${user}>`,
       to: recipients.join(","),
-      subject: `🚨 [${check.status.toUpperCase()}] ${check.component}`,
-      html: `
-        <div style="font-family:system-ui;max-width:600px;margin:auto">
-          <h2 style="color:#dc2626">Incident détecté — ${check.component}</h2>
-          <p><strong>Statut:</strong> ${check.status}</p>
-          <p><strong>Type:</strong> ${check.component_type}</p>
-          ${check.error_message ? `<p><strong>Erreur:</strong> ${check.error_message}</p>` : ""}
-          ${check.latency_ms ? `<p><strong>Latence:</strong> ${check.latency_ms}ms</p>` : ""}
-          <p><a href="https://zandofy.com/admin/health" style="color:#16a34a">→ Ouvrir le dashboard santé</a></p>
-          <hr/><small style="color:#666">Zandofy Monitoring · ${new Date().toISOString()}</small>
-        </div>
-      `,
+      subject: `[${check.status.toUpperCase()}] ${check.component}`,
+      html,
     });
   } catch (e) {
     console.error("[run-healthchecks] email alert failed:", e);
@@ -302,8 +382,9 @@ Deno.serve(async (req) => {
 
   const checks: CheckResult[] = [];
 
-  // 1) KelPay
+  // 1) Payment gateways (Keccel — same hosts as production Edge Functions)
   checks.push(await checkKelpay(kelpayThreshold));
+  checks.push(await checkKeccelCard(kelpayThreshold));
 
   // 2) Edge Functions critiques (parallèle)
   const efResults = await Promise.all(
@@ -311,8 +392,10 @@ Deno.serve(async (req) => {
   );
   checks.push(...efResults);
 
-  // 3) SMTP
-  checks.push(await checkSmtp());
+  // 3) Email — Resend (primary) + optional Hostinger SMTP legacy
+  checks.push(await checkResend());
+  const smtpLegacy = await checkSmtpLegacy();
+  if (smtpLegacy) checks.push(smtpLegacy);
 
   // 4) Cron heartbeats
   checks.push(...(await checkCronHeartbeats(supabase)));
