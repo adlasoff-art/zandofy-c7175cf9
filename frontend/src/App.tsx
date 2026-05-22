@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
@@ -32,7 +32,7 @@ import { AnnouncementPopup } from "@/components/AnnouncementPopup";
 import { AutomationPopup } from "@/components/AutomationPopup";
 import { DynamicFavicon } from "@/components/DynamicFavicon";
 import { UserPresenceTracker } from "@/components/UserPresenceTracker";
-import { Suspense, lazy, ComponentType } from "react";
+import { Suspense, lazy, ComponentType, type ReactNode } from "react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoadingSkeleton } from "@/components/PageLoadingSkeleton";
 import { RoleGuard } from "@/components/admin/RoleGuard";
@@ -214,6 +214,12 @@ function AnalyticsTrackerInjector() {
   return null;
 }
 
+/** Resets the error screen when navigating away from a crashed page. */
+function RouteErrorBoundary({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>;
+}
+
 const App = () => (
   <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
@@ -256,6 +262,7 @@ const App = () => (
             <BanGuard>
             <RecoveryGuard />
             <Suspense fallback={<PageLoadingSkeleton />}>
+              <RouteErrorBoundary>
               <Routes>
                 <Route path="/banned" element={<BannedPage />} />
                 <Route path="/" element={<Index />} />
@@ -393,6 +400,7 @@ const App = () => (
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </RouteErrorBoundary>
             </Suspense>
             </BanGuard>
             </MaintenanceGuard>

@@ -172,9 +172,9 @@ export function RecommendationsSection() {
           >
             <div className="aspect-square overflow-hidden bg-muted">
               <img
-                src={imgUrl(product.image, { width: 320 })}
+                src={imgUrl(product.image, { width: 400, height: 400, resize: "cover" })}
                 alt={displayName}
-                className="w-full h-full object-contain md:group-hover:scale-105 transition-transform duration-300"
+                className="w-full h-full object-cover object-center"
                 loading="lazy"
               />
             </div>

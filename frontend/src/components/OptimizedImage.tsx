@@ -21,7 +21,12 @@ function isSupabaseStorageUrl(url: string): boolean {
  * Transforme une URL Supabase `/object/public/...` en `/render/image/public/...?width=…`.
  * Pour `sign`, on bascule vers `/render/image/sign/...`.
  */
-function buildSupabaseRenderUrl(url: string, width: number, quality = 70): string {
+function buildSupabaseRenderUrl(
+  url: string,
+  width: number,
+  quality = 70,
+  resize: "cover" | "contain" = "cover",
+): string {
   try {
     const u = new URL(url);
     const m = u.pathname.match(SUPABASE_OBJECT_RE);
@@ -31,7 +36,7 @@ function buildSupabaseRenderUrl(url: string, width: number, quality = 70): strin
     u.pathname = `/storage/v1/render/image/${kind}/${rest}`;
     u.searchParams.set("width", String(width));
     u.searchParams.set("quality", String(quality));
-    u.searchParams.set("resize", "contain");
+    u.searchParams.set("resize", resize);
     u.searchParams.set("format", "webp");
     return u.toString();
   } catch {
@@ -51,11 +56,13 @@ export interface OptimizedImageProps
   sizes?: string;
   /** Qualité Supabase (1-100). */
   quality?: number;
+  /** Supabase resize mode — cover fills the card frame (default). */
+  resize?: "cover" | "contain";
 }
 
 export const OptimizedImage = React.forwardRef<HTMLImageElement, OptimizedImageProps>(
   function OptimizedImage(
-    { src, alt, priority, widths = DEFAULT_WIDTHS, sizes, quality = 70, ...rest },
+    { src, alt, priority, widths = DEFAULT_WIDTHS, sizes, quality = 70, resize = "cover", ...rest },
     ref,
   ) {
     const { srcSet, finalSrc } = useMemo(() => {
@@ -63,11 +70,16 @@ export const OptimizedImage = React.forwardRef<HTMLImageElement, OptimizedImageP
         return { srcSet: undefined, finalSrc: src };
       }
       const set = widths
-        .map((w) => `${buildSupabaseRenderUrl(src, w, quality)} ${w}w`)
+        .map((w) => `${buildSupabaseRenderUrl(src, w, quality, resize)} ${w}w`)
         .join(", ");
-      const fallback = buildSupabaseRenderUrl(src, widths[Math.floor(widths.length / 2)] ?? 600, quality);
+      const fallback = buildSupabaseRenderUrl(
+        src,
+        widths[Math.floor(widths.length / 2)] ?? 600,
+        quality,
+        resize,
+      );
       return { srcSet: set, finalSrc: fallback };
-    }, [src, widths, quality]);
+    }, [src, widths, quality, resize]);
 
     const loading = priority ? "eager" : (rest as any).loading ?? "lazy";
     const fetchPriority = priority ? "high" : (rest as any).fetchPriority ?? "auto";

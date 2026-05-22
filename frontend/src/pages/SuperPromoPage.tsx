@@ -37,7 +37,7 @@ export default function SuperPromoPage() {
         </div>
         <p className="text-sm text-muted-foreground mb-6 max-w-2xl">
           {t("superPromo.pageHint") ||
-            "Les offres affichées ici changent d'ordre chaque jour et restent visibles au maximum 7 jours dans cette zone."}
+            "Les offres changent d'ordre chaque jour. La durée de 7 jours dans cette zone commence lorsque une date de début promo est définie sur le produit ; les promos admin (flash sales) restent jusqu'à leur date de fin."}
         </p>
 
         {loading ? (
