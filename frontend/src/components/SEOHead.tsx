@@ -195,7 +195,7 @@ export function buildProductJsonLd(product: {
     offers: {
       "@type": "Offer",
       priceCurrency: product.currency || "USD",
-      price: product.price.toFixed(2),
+      price: Number(product.price ?? 0).toFixed(2),
       availability: "https://schema.org/InStock",
       url: typeof window !== "undefined" ? window.location.href : "",
     },

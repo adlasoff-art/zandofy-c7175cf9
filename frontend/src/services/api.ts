@@ -112,7 +112,9 @@ export function mapProduct(row: any): Product {
     isNew: row.is_new || false,
     isSale: row.is_sale || false,
     discount: row.discount || 0,
-    colors: row.product_colors?.map((c: any) => c.color_hex) || [],
+    colors: (row.product_colors || [])
+      .map((c: any) => c.color_hex)
+      .filter((hex: string | null | undefined): hex is string => Boolean(hex)),
     sizes: row.product_sizes?.map((s: any) => s.size_label) || [],
     moq: row.moq || 1,
     verifiedYears: storeVerifiedYears,
@@ -138,11 +140,13 @@ export function mapProduct(row: any): Product {
     galleryImages: row.product_images || [],
     promoEndDate: row.promo_end_date || null,
     promoStartDate: row.promo_start_date || null,
-    productColors: (row.product_colors || []).map((c: any) => ({
-      hex: c.color_hex,
-      name: c.color_name || "",
-      imageUrl: c.image_url || null,
-    })),
+    productColors: (row.product_colors || [])
+      .filter((c: any) => c.color_hex)
+      .map((c: any) => ({
+        hex: c.color_hex,
+        name: c.color_name || "",
+        imageUrl: c.image_url || null,
+      })),
     shopType: storeData?.shop_type || "international",
   };
 }
@@ -274,13 +278,10 @@ export async function fetchTrendTags(): Promise<TrendTag[]> {
 /** Super Promo zone: max 7 days visible (display filter only — does not clear is_sale). */
 const SUPER_PROMO_ZONE_DAYS = 7;
 
-function isWithinSuperPromoZone(row: {
-  promo_start_date?: string | null;
-  created_at?: string | null;
-}): boolean {
-  const startRaw = row.promo_start_date || row.created_at;
-  if (!startRaw) return true;
-  const startMs = new Date(startRaw).getTime();
+/** 7-day window applies only when promo_start_date is set (not created_at). */
+function isWithinSuperPromoZone(row: { promo_start_date?: string | null }): boolean {
+  if (!row.promo_start_date) return true;
+  const startMs = new Date(row.promo_start_date).getTime();
   if (Number.isNaN(startMs)) return true;
   const cutoff = Date.now() - SUPER_PROMO_ZONE_DAYS * 24 * 60 * 60 * 1000;
   return startMs >= cutoff;
@@ -313,7 +314,8 @@ export async function fetchFlashSaleProducts(): Promise<
     if (error || !data) return [];
 
     const flashMap = new Map(flashData.map((f: any) => [f.product_id, f]));
-    return filterSuperPromoRows(data).map((row: any) => {
+    // Admin-picked flash_sales: always show until ends_at (no 7-day product filter).
+    return data.map((row: any) => {
       const p = mapProduct(row);
       const flash: any = flashMap.get(row.id);
       if (flash) {
@@ -384,15 +386,35 @@ export async function fetchProductBySlug(
     product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
     stores!products_store_id_fkey(id, name, logo_url, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, rating, response_rate, response_time)
   `;
+  const productSelectFallback = `
+    *,
+    categories(name, name_fr),
+    product_images(image_url, position),
+    product_colors(color_hex, color_name),
+    product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
+    stores!products_store_id_fkey(id, name, logo_url, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, rating, response_rate, response_time)
+  `;
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
 
-  const { data, error } = await (supabase
+  let { data, error } = await (supabase
     .from("products")
     .select(productSelect)
     .eq("publish_status", "published") as any)
     .eq(isUuid ? "id" : "slug", slug)
     .maybeSingle();
+
+  if (error) {
+    console.warn("[fetchProductBySlug] Retrying without color image_url:", error.message);
+    const retry = await (supabase
+      .from("products")
+      .select(productSelectFallback)
+      .eq("publish_status", "published") as any)
+      .eq(isUuid ? "id" : "slug", slug)
+      .maybeSingle();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error || !data) {
     console.error("Error fetching product:", error);
