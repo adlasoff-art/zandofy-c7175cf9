@@ -86,10 +86,11 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
       onMouseLeave={() => setHovered(false)}
       onClick={() => trackProductClick(product.id, "card")}
     >
-      {/* Image — 3:4 frame, cover (fills zone without letterboxing) */}
-      <div className="relative aspect-[3/4] overflow-hidden bg-muted shrink-0">
+      {/* Image — vignette encadrée (padding + coins arrondis) */}
+      <div className="shrink-0 p-1.5">
+        <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-muted">
         {!loaded && (
-          <div className="absolute inset-0 skeleton-shimmer" />
+          <div className="absolute inset-0 skeleton-shimmer rounded-lg" />
         )}
         <OptimizedImage
           src={imgError ? "/placeholder.svg" : product.image}
@@ -117,7 +118,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
 
         {/* Discount badge - top left */}
         {product.isSale && product.discount && (
-          <span className="absolute top-0 left-0 px-2 py-1 text-xs font-bold bg-sale text-sale-foreground">
+          <span className="absolute top-1 left-1 px-2 py-1 text-xs font-bold bg-sale text-sale-foreground rounded-sm">
             -{product.discount}%
           </span>
         )}
@@ -153,6 +154,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
         >
           <GitCompareArrows size={14} className={compared ? "text-primary" : "text-foreground dark:text-primary/80"} />
         </button>
+        </div>
       </div>
 
       {/* Product info — flex column to push footer down */}
