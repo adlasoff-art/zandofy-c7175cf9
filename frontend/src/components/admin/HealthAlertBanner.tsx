@@ -1,6 +1,6 @@
 import { AlertTriangle, X } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useHealthIncidents } from "@/hooks/use-system-health";
+import { useHealthIncidents, useSystemHealth } from "@/hooks/use-system-health";
 import { useState } from "react";
 
 /**
@@ -8,7 +8,15 @@ import { useState } from "react";
  */
 export function HealthAlertBanner() {
   const { data: incidents = [] } = useHealthIncidents(false);
-  const critical = incidents.filter((i) => i.severity === "critical");
+  const { data: rows = [] } = useSystemHealth();
+  const resendOk = rows.find((r) => r.component === "email:resend")?.last_status === "ok";
+  const critical = incidents.filter((i) => {
+    if (i.severity !== "critical") return false;
+    if (resendOk && (i.component === "smtp:hostinger" || i.component === "email:resend")) {
+      return false;
+    }
+    return true;
+  });
   const [dismissed, setDismissed] = useState<string[]>([]);
   const visible = critical.filter((i) => !dismissed.includes(i.id));
   if (visible.length === 0) return null;
