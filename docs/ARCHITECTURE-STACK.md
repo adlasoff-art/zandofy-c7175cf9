@@ -116,7 +116,7 @@ VITE_SUPABASE_PROJECT_ID=uogkklwfvwoxkifpkzpu
 
 ## Backend métier
 
-Toute la logique serveur passe par **Supabase Edge Functions** (`supabase/functions/`) et PostgreSQL (RLS, triggers). Pas de backend FastAPI dans ce dépôt.
+Toute la logique serveur passe par **Supabase Edge Functions** (`supabase/functions/`) et PostgreSQL (RLS, triggers).
 
 ## Migrations base de données
 

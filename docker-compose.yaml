@@ -1,7 +1,6 @@
 # =============================================================================
-# Zandofy — Production (Coolify attend ce nom: docker-compose.yaml)
-# Contenu identique à docker-compose.prod.yml.
-# Variables d'environnement : définir dans l'UI Coolify.
+# Zandofy — Compose local / expérimentation (NON utilisé en prod — prod = Vercel + Supabase)
+# Variables : fichier .env local non committé.
 # =============================================================================
 
 services:
@@ -67,7 +66,7 @@ services:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
         VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:-}
         VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID:-}
-        VITE_API_URL: ${VITE_API_URL:?VITE_API_URL requis en prod (ex. https://api.zandofy.com)}
+        VITE_SITE_URL: ${VITE_SITE_URL:-https://www.zandofy.com}
     restart: unless-stopped
     ports:
       - "8081:80"

@@ -26,12 +26,9 @@
 5. New migration file in `supabase/migrations/` → human runs on **staging** → tests → **production**.
 6. Edge Functions in `supabase/functions/` → deploy staging → production.
 
-## Deprecated (do not use in docs or code)
+## Legacy paths
 
-- Coolify
-- FastAPI / `backend/`
-- `api.zandofy.com`, `supabasa.*`, `studio-staging.zandofy.com`
-- `frontend/supabase/` (consolidated to root `supabase/`)
+- `frontend/supabase/` — use root `supabase/` only
 
 ## Cursor rules
 

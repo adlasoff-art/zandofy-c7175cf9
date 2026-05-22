@@ -9,8 +9,6 @@
 
 Cloudflare sits in front of DNS/cache/WAF for `zandofy.com`.
 
-**Deprecated hostnames (do not use):** `studio-staging.zandofy.com`, `api.zandofy.com`, `api-staging.zandofy.com`, `supabasa.*`
-
 ## Staging
 
 Purpose:

@@ -19,7 +19,7 @@ Zandofy connects buyers in Africa with vendors and a logistics chain (forwarder,
 
 - Primary audience: mobile shoppers (~80%+ traffic mobile).
 - Languages: French and English in the UI.
-- Payments and orders are handled via Supabase-backed workflows (not a separate FastAPI API).
+- Payments and orders are handled via Supabase (Edge Functions, PostgreSQL, RLS).
 - Product URLs: /product/{slug}
 - Category URLs: /category/{slug} (slug derived from category name)
 

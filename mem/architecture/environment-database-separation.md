@@ -9,7 +9,7 @@ type: constraint
 - Déploiement : GitHub → Vercel (frontend) + GitHub Actions (`deploy-edge-functions.yml`) → Supabase prod
 
 **Stack de staging** :
-- Frontend : `https://studio-staging.zandofy.com` (build séparé, branche `develop`)
+- Frontend : Vercel preview ou projet staging (branche `develop`)
 - Backend / DB : projet Supabase `wgi...wete` (`https://wgidwyrdnboivfphwete.supabase.co`)
 - N'est JAMAIS sollicitée par les visiteurs publics de `zandofy.com`
 

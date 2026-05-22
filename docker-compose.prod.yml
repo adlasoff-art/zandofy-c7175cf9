@@ -1,12 +1,7 @@
 # =============================================================================
-# Zandofy — Production (Coolify / déploiement)
-# Les variables d'environnement sont fournies par Coolify (ou un .env non committé).
-# Ne pas committer de fichier .env contenant des secrets.
-# =============================================================================
-# Usage local (test prod) : export les variables puis docker compose -f docker-compose.prod.yml up --build
-# Usage Coolify : attacher ce compose au repo, définir les variables dans l'UI Coolify.
-# Base externe : si PostgreSQL est géré par Coolify ou externe, déployer uniquement
-#   backend + frontend et définir DATABASE_URL (postgresql+asyncpg://...) pour le backend.
+# Zandofy — Compose legacy (local experiments only)
+# Production: Vercel (frontend) + Supabase (backend). Do not use this file for prod deploy.
+# Variables: local .env (never commit secrets).
 # =============================================================================
 
 services:
@@ -72,7 +67,7 @@ services:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
         VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:-}
         VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID:-}
-        VITE_API_URL: ${VITE_API_URL:?VITE_API_URL requis en prod (ex. https://api.zandofy.com)}
+        VITE_SITE_URL: ${VITE_SITE_URL:-https://www.zandofy.com}
     restart: unless-stopped
     ports:
       - "80:80"
