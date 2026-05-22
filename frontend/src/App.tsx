@@ -194,8 +194,8 @@ function PlatformBootstrap() { usePlatformBootstrap(); return null; }
 function CmsThemeInjector() { useCmsTheme(); usePlatformFont(); return null; }
 
 function GeoBlockGuard({ children }: { children: React.ReactNode }) {
-  const { blocked, loading } = useGeoBlocking();
-  if (loading) return <PageLoadingSkeleton />;
+  const { blocked } = useGeoBlocking();
+  // Fail-open while geo is resolving — never block the entire app on ipapi latency.
   if (blocked) return <GeoBlockScreen />;
   return <>{children}</>;
 }

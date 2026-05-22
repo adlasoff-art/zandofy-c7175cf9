@@ -12,26 +12,32 @@ export function SystemHealthWidget() {
   const { status, downCount, warnCount, okCount, openIncidentsCount, isLoading } =
     useGlobalHealthStatus();
 
-  const statusConfig = {
-    ok: {
-      icon: CheckCircle2,
-      label: "Tout fonctionne",
-      color: "text-green-500",
-      bg: "bg-green-500/10 border-green-500/30",
-    },
-    warn: {
-      icon: AlertTriangle,
-      label: "Dégradé",
-      color: "text-amber-500",
-      bg: "bg-amber-500/10 border-amber-500/30",
-    },
-    down: {
-      icon: XCircle,
-      label: "Incident en cours",
-      color: "text-destructive",
-      bg: "bg-destructive/10 border-destructive/30",
-    },
-  }[status];
+  const statusConfig =
+    {
+      ok: {
+        icon: CheckCircle2,
+        label: "Tout fonctionne",
+        color: "text-green-500",
+        bg: "bg-green-500/10 border-green-500/30",
+      },
+      warn: {
+        icon: AlertTriangle,
+        label: "Dégradé",
+        color: "text-amber-500",
+        bg: "bg-amber-500/10 border-amber-500/30",
+      },
+      down: {
+        icon: XCircle,
+        label: "Incident en cours",
+        color: "text-destructive",
+        bg: "bg-destructive/10 border-destructive/30",
+      },
+    }[status] ?? {
+      icon: Activity,
+      label: "Chargement…",
+      color: "text-muted-foreground",
+      bg: "bg-muted/30 border-border",
+    };
 
   const Icon = statusConfig.icon;
 
