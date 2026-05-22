@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { fetchProducts, fetchTrendTags, fetchCategories, type Product, type TrendTag, type Category } from "@/services/api";
 import { categoryPath } from "@/lib/category-slug";
+import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 import { ChevronRight, TrendingUp, Flame, Users } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 
@@ -179,7 +180,7 @@ export function ProductGrid() {
               </h2>
               <ChevronRight size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
             </Link>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 md:gap-2">
+            <div className={PRODUCT_GRID_CLASS}>
               {popularLoading
                 ? Array.from({ length: 12 }).map((_, i) => <ProductCardSkeleton key={i} />)
                 : popularProducts.map((product, i) => (
@@ -208,7 +209,7 @@ export function ProductGrid() {
                 className="text-muted-foreground group-hover:text-primary transition-colors"
               />
             </Link>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 md:gap-2">
+            <div className={PRODUCT_GRID_CLASS}>
               {section.products.map((product, i) => (
                 <Link to={`/product/${product.slug || product.id}`} key={product.id} className="block">
                   <ProductCard product={product} index={i} />
@@ -258,7 +259,7 @@ export function ProductGrid() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 md:gap-2">
+          <div className={PRODUCT_GRID_CLASS}>
             {loading
               ? Array.from({ length: 12 }).map((_, i) => <ProductCardSkeleton key={i} />)
               : products.map((product, i) => (
@@ -271,7 +272,7 @@ export function ProductGrid() {
 
         {/* Extra products loaded via "Voir Plus" */}
         {moreProducts.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 md:gap-2 mt-2">
+          <div className={`${PRODUCT_GRID_CLASS} mt-2`}>
             {moreProducts.map((product, i) => (
               <Link to={`/product/${product.slug || product.id}`} key={product.id} className="block">
                 <ProductCard product={product} index={i} />

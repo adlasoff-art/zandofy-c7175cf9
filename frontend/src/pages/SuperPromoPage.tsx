@@ -4,6 +4,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
+import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 import { fetchFlashSaleProducts, type Product } from "@/services/api";
 import { shuffleByDailySeed } from "@/lib/daily-shuffle";
 import { Flame } from "lucide-react";
@@ -41,7 +42,7 @@ export default function SuperPromoPage() {
         </p>
 
         {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+          <div className={PRODUCT_GRID_CLASS}>
             {Array.from({ length: 12 }).map((_, i) => (
               <ProductCardSkeleton key={i} />
             ))}
@@ -51,7 +52,7 @@ export default function SuperPromoPage() {
             {t("superPromo.empty") || "Aucune super promo pour le moment."}
           </p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+          <div className={PRODUCT_GRID_CLASS}>
             {products.map((product, i) => (
               <Link
                 key={product.id}
