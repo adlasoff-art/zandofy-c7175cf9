@@ -62,6 +62,16 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
     setMeta("robots", "index, follow");
     setMeta("description", description);
 
+    const rawKw = seoConfig.default_keywords;
+    const keywords = Array.isArray(rawKw)
+      ? rawKw.filter(Boolean).join(", ")
+      : typeof rawKw === "string"
+        ? rawKw.trim()
+        : "";
+    if (keywords) {
+      setMeta("keywords", keywords);
+    }
+
     // Google Site Verification
     if (seoConfig.google_site_verification) {
       setMeta("google-site-verification", seoConfig.google_site_verification);
@@ -201,6 +211,70 @@ export function buildProductJsonLd(product: {
 }
 
 // ─── Helper: Build BreadcrumbList JSON-LD ─────────────
+/** Product listing pages (category, search results). */
+export function buildProductItemListJsonLd(
+  products: { name: string; slug?: string; id: string; image?: string; price?: number; currency?: string }[],
+  listName: string,
+) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: listName,
+    numberOfItems: products.length,
+    itemListElement: products.slice(0, 20).map((p, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${SITE_URL}/product/${p.slug || p.id}`,
+      item: {
+        "@type": "Product",
+        name: p.name,
+        image: p.image,
+        offers: p.price != null
+          ? {
+              "@type": "Offer",
+              price: String(p.price),
+              priceCurrency: p.currency || "USD",
+            }
+          : undefined,
+      },
+    })),
+  };
+}
+
+/** Static marketplace FAQ for AEO (shipping / trust). */
+export function buildMarketplaceFaqJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: "Comment acheter sur Zandofy ?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Créez un compte, parcourez le catalogue, ajoutez des articles au panier et finalisez le paiement. Le suivi de commande est disponible dans votre espace client.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Zandofy livre-t-il en Afrique ?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Oui. Zandofy est une marketplace orientée import Chine → Afrique avec options de livraison à domicile ou retrait en hub selon la commande.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Comment devenir vendeur sur Zandofy ?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Rendez-vous sur la page Devenir vendeur pour soumettre votre boutique. L'équipe valide le profil avant publication des produits.",
+        },
+      },
+    ],
+  };
+}
+
 export function buildBreadcrumbJsonLd(items: { name: string; url: string }[]) {
   const validItems = items.filter(i => i.name && i.name.trim());
   return {
