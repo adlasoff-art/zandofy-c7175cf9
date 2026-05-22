@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { categoryPath } from "@/lib/category-slug";
 import { useI18n } from "@/contexts/I18nContext";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { CATEGORY_ICON_IMAGE_CLASS } from "@/lib/product-image-fit";
 
 const MOBILE_COLS = 5;
 const MOBILE_MAX_ROWS = 2;
@@ -95,7 +96,9 @@ export function CategoryBanner() {
                         height={56}
                         widths={[56, 112, 168]}
                         sizes="56px"
-                        className="w-full h-full object-cover"
+                        resize="contain"
+                        fitHeight={56}
+                        className={CATEGORY_ICON_IMAGE_CLASS}
                       />
                     ) : cat.icon ? (
                       <span className="text-xl">{cat.icon}</span>
@@ -144,7 +147,9 @@ export function CategoryBanner() {
                     height={72}
                     widths={[72, 144, 216]}
                     sizes="(max-width: 768px) 64px, 72px"
-                    className="w-full h-full object-cover"
+                    resize="contain"
+                    fitHeight={72}
+                    className={CATEGORY_ICON_IMAGE_CLASS}
                   />
                 ) : cat.icon ? (
                   <span className="text-2xl">{cat.icon}</span>

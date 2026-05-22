@@ -4,9 +4,9 @@ Référence visuelle : **Top Tendances** (`ProductCard`, ratio **3:4**).
 
 ## Principe d'affichage
 
-- Le cadre est rempli avec `object-cover` + `object-center` (pas de bandes vides).
-- Pas de zoom hover agressif sur les grilles.
-- Côté Supabase Storage, les vignettes utilisent `resize=cover` (voir `OptimizedImage`, `imgUrl`).
+- **Grilles produit** (`ProductCard`) : vignette `rounded-lg` + `object-contain` + `resize=contain` CDN — produit entier visible (réf. Alibaba), léger `scale` au survol desktop.
+- **Catégories rondes** : `object-contain` + `resize=contain` (jamais `cover` sur les cercles).
+- **Pour vous** : carré `object-cover` via `imgUrl` (inchangé).
 
 ## Formats par zone
 

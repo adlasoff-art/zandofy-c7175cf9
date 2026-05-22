@@ -97,22 +97,26 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
           alt={product.nameFr}
           className={`${PRODUCT_CARD_IMAGE_CLASS} ${
             loaded ? "opacity-100" : "opacity-0"
-          } ${hovered && secondImage ? "opacity-0" : ""}`}
+          } ${hovered && secondImage ? "opacity-0 md:group-hover:scale-100" : ""}`}
           onLoad={onLoad}
           onError={handleImgError}
           widths={[160, 240, 360]}
           sizes="(max-width: 640px) 50vw, 170px"
-          quality={60}
+          quality={75}
+          resize="contain"
+          fitHeight={480}
           priority={priority || index < 2}
         />
         {secondImage && hovered && (
           <OptimizedImage
             src={secondImage}
             alt={product.nameFr}
-            className={`${PRODUCT_CARD_IMAGE_HOVER_CLASS}`}
+            className={PRODUCT_CARD_IMAGE_HOVER_CLASS}
             widths={[160, 240, 360]}
             sizes="(max-width: 640px) 50vw, 170px"
-            quality={60}
+            quality={75}
+            resize="contain"
+            fitHeight={480}
           />
         )}
 
