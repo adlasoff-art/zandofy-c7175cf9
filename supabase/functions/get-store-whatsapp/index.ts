@@ -9,6 +9,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const MIN_DIGITS = 8;
+
+function normalizeDigits(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const digits = String(raw).replace(/\D/g, "");
+  if (digits.length < MIN_DIGITS) return null;
+  return digits;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -27,7 +36,6 @@ Deno.serve(async (req) => {
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Validate caller via anon client + their JWT
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -53,7 +61,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use service role to read whatsapp_number bypassing the new restrictive RLS
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
     const { data, error } = await admin
       .from("stores")
@@ -68,9 +75,36 @@ Deno.serve(async (req) => {
       });
     }
 
+    const { data: sub } = await admin
+      .from("vendor_subscriptions")
+      .select("is_whatsapp_enabled")
+      .eq("store_id", storeId)
+      .maybeSingle();
+
+    if (sub && sub.is_whatsapp_enabled === false) {
+      return new Response(
+        JSON.stringify({ error: "feature_disabled", reason: "feature_disabled" }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const digits = normalizeDigits(data.whatsapp_number);
+    if (!digits) {
+      return new Response(
+        JSON.stringify({ error: "no_number", reason: "no_number" }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     return new Response(
       JSON.stringify({
-        whatsapp_number: data.whatsapp_number ?? null,
+        whatsapp_number: digits,
         store_name: data.name ?? null,
       }),
       {
@@ -79,9 +113,12 @@ Deno.serve(async (req) => {
       },
     );
   } catch (e) {
-    return new Response(JSON.stringify({ error: "server_error", detail: String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: "server_error", detail: String(e) }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });
