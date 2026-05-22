@@ -60,6 +60,10 @@ export default function AdminHealthPage() {
   const { data: closedIncidents = [] } = useHealthIncidents(true);
   const { data: heartbeats = [] } = useCronHeartbeats();
   const global = useGlobalHealthStatus();
+  const resendOk = rows.find((r) => r.component === "email:resend")?.last_status === "ok";
+  const displayRows = rows.filter(
+    (r) => !(resendOk && r.component === "smtp:hostinger" && r.last_status !== "ok"),
+  );
 
   const { data: settings, refetch: refetchSettings } = useQuery({
     queryKey: ["monitoring-settings"],
@@ -195,6 +199,9 @@ export default function AdminHealthPage() {
 
           {/* OVERVIEW */}
           <TabsContent value="overview">
+            <p className="text-xs text-muted-foreground mb-2">
+              Le statut actuel reflète le dernier check. L&apos;uptime 24h inclut l&apos;historique (anciennes fausses alertes KelPay/Resend) et peut rester bas temporairement.
+            </p>
             <Card className="p-0 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -217,7 +224,10 @@ export default function AdminHealthPage() {
                         Aucune donnée. Cliquez sur « Lancer maintenant » pour démarrer.
                       </td></tr>
                     )}
-                    {rows.map((r) => (
+                    {displayRows.map((r) => {
+                      const histLow =
+                        r.last_status === "ok" && (r.uptime_pct_24h ?? 100) < 90;
+                      return (
                       <tr key={r.component} className="border-t hover:bg-muted/30">
                         <td className="p-3 font-mono text-xs">{r.component}</td>
                         <td className="p-3">
@@ -227,8 +237,20 @@ export default function AdminHealthPage() {
                         </td>
                         <td className="p-3"><StatusBadge status={r.last_status} /></td>
                         <td className="p-3">
-                          <span className={r.uptime_pct_24h < 95 ? "text-destructive font-medium" : ""}>
+                          <span
+                            className={
+                              histLow
+                                ? "text-muted-foreground"
+                                : r.uptime_pct_24h < 95
+                                ? "text-destructive font-medium"
+                                : ""
+                            }
+                            title={histLow ? "Uptime 24h historique — dernier check OK" : undefined}
+                          >
                             {r.uptime_pct_24h?.toFixed(1) ?? "—"}%
+                            {histLow ? (
+                              <span className="block text-[10px] text-muted-foreground">hist. 24h</span>
+                            ) : null}
                           </span>
                         </td>
                         <td className="p-3 text-muted-foreground">{r.avg_latency_ok ? `${r.avg_latency_ok}ms` : "—"}</td>
@@ -238,7 +260,8 @@ export default function AdminHealthPage() {
                             : "—"}
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>

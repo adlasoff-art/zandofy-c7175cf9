@@ -99,13 +99,27 @@ export function useCronHeartbeats() {
   });
 }
 
+/** Legacy SMTP is optional when Resend (notification centre / send-email) is OK. */
+function isOptionalEmailRow(component: string, resendOk: boolean): boolean {
+  return resendOk && component === "smtp:hostinger";
+}
+
 /** Statut global agrégé pour le widget compact */
 export function useGlobalHealthStatus() {
   const { data: rows = [], isLoading } = useSystemHealth();
   const { data: incidents = [] } = useHealthIncidents(false);
-  const downCount = rows.filter((r) => r.last_status === "down").length;
-  const warnCount = rows.filter((r) => r.last_status === "warn").length;
-  const openCriticalIncidents = incidents.filter((i) => i.severity === "critical").length;
+  const resendOk = rows.find((r) => r.component === "email:resend")?.last_status === "ok";
+  const downCount = rows.filter(
+    (r) => r.last_status === "down" && !isOptionalEmailRow(r.component, !!resendOk),
+  ).length;
+  const warnCount = rows.filter(
+    (r) => r.last_status === "warn" && !isOptionalEmailRow(r.component, !!resendOk),
+  ).length;
+  const openCriticalIncidents = incidents.filter(
+    (i) =>
+      i.severity === "critical" &&
+      !isOptionalEmailRow(i.component, !!resendOk),
+  ).length;
   let status: "ok" | "warn" | "down" = "ok";
   if (isLoading) {
     return {

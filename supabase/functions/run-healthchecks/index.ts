@@ -124,74 +124,117 @@ async function checkKeccelCard(threshold: number): Promise<CheckResult> {
   );
 }
 
-/** Primary transactional email (Resend HTTP API). */
+/**
+ * Resend health — same API as send-email / notification centre.
+ * POST /emails with empty body → 422 validation = key accepted (no email sent).
+ * GET /domains → 200 or 403 (send-only keys) = account reachable.
+ */
 async function checkResend(): Promise<CheckResult> {
   const start = Date.now();
+  const component = "email:resend";
+  const component_type = "external_api";
   const apiKey = Deno.env.get("RESEND_API_KEY");
   if (!apiKey) {
     return {
-      component: "email:resend",
-      component_type: "external_api",
+      component,
+      component_type,
       status: "warn",
       error_message: "RESEND_API_KEY not configured",
     };
   }
+
+  const latency = () => Date.now() - start;
+  const opts = { signal: AbortSignal.timeout(12_000) };
+
   try {
-    const res = await fetch("https://api.resend.com/domains", {
+    const sendProbe = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { ...resendRequestHeaders(apiKey), "Content-Type": "application/json" },
+      body: "{}",
+      ...opts,
+    });
+
+    if (sendProbe.status === 401) {
+      return {
+        component,
+        component_type,
+        status: "down",
+        latency_ms: latency(),
+        http_status: sendProbe.status,
+        error_message: "Resend API key invalid",
+        metadata: { probe: "POST /emails" },
+      };
+    }
+    if (sendProbe.status >= 500) {
+      return {
+        component,
+        component_type,
+        status: "down",
+        latency_ms: latency(),
+        http_status: sendProbe.status,
+        error_message: `Resend API HTTP ${sendProbe.status}`,
+        metadata: { probe: "POST /emails" },
+      };
+    }
+    // 422/400 = validation error but auth OK — matches production send path
+    if (sendProbe.ok || sendProbe.status === 422 || sendProbe.status === 400) {
+      return {
+        component,
+        component_type,
+        status: latency() > 8000 ? "warn" : "ok",
+        latency_ms: latency(),
+        http_status: sendProbe.status,
+        metadata: { probe: "POST /emails", deliverability: "operational" },
+      };
+    }
+
+    const domainsProbe = await fetch("https://api.resend.com/domains", {
       method: "GET",
       headers: resendRequestHeaders(apiKey),
-      signal: AbortSignal.timeout(10_000),
+      ...opts,
     });
-    const latency = Date.now() - start;
-    // 200 = full-access key OK. 403 = often send-only key (cannot list domains) — still OK for sending.
-    // 401 = invalid key. 5xx = Resend outage.
-    if (res.status === 401) {
+    if (domainsProbe.ok || domainsProbe.status === 403) {
       return {
-        component: "email:resend",
-        component_type: "external_api",
-        status: "down",
-        latency_ms: latency,
-        http_status: res.status,
-        error_message: "Resend API key invalid or unauthorized",
+        component,
+        component_type,
+        status: "ok",
+        latency_ms: latency(),
+        http_status: domainsProbe.status,
+        metadata: { probe: "GET /domains", key_permission: domainsProbe.status === 403 ? "sending_access" : "full_access" },
       };
     }
-    if (res.status >= 500) {
-      return {
-        component: "email:resend",
-        component_type: "external_api",
-        status: "down",
-        latency_ms: latency,
-        http_status: res.status,
-        error_message: `Resend API HTTP ${res.status}`,
-      };
-    }
-    if (res.ok || res.status === 403) {
-      return {
-        component: "email:resend",
-        component_type: "external_api",
-        status: latency > 8000 ? "warn" : "ok",
-        latency_ms: latency,
-        http_status: res.status,
-        metadata: res.status === 403 ? { key_permission: "sending_access" } : undefined,
-      };
-    }
+
     return {
-      component: "email:resend",
-      component_type: "external_api",
+      component,
+      component_type,
       status: "warn",
-      latency_ms: latency,
-      http_status: res.status,
-      error_message: `Resend API HTTP ${res.status}`,
+      latency_ms: latency(),
+      http_status: sendProbe.status,
+      error_message: `Resend ambiguous: send=${sendProbe.status} domains=${domainsProbe.status}`,
     };
   } catch (e) {
     return {
-      component: "email:resend",
-      component_type: "external_api",
+      component,
+      component_type,
       status: "down",
-      latency_ms: Date.now() - start,
+      latency_ms: latency(),
       error_message: e instanceof Error ? e.message : String(e),
     };
   }
+}
+
+/** When Resend works, legacy SMTP is optional — do not surface as DOWN. */
+function reconcileEmailChecks(checks: CheckResult[]): CheckResult[] {
+  const resend = checks.find((c) => c.component === "email:resend");
+  const resendOk = resend?.status === "ok";
+  if (!resendOk) return checks;
+
+  return checks.flatMap((c) => {
+    if (c.component !== "smtp:hostinger") return [c];
+    if (c.status === "ok") return [c];
+    // Hide failed optional legacy SMTP from dashboard when Resend delivers mail
+    return [];
+  });
 }
 
 /** Legacy Hostinger SMTP — only when SMTP_* secrets are set (notify-order-status, campaigns, etc.). */
@@ -222,9 +265,10 @@ async function checkSmtpLegacy(): Promise<CheckResult | null> {
     return {
       component: "smtp:hostinger",
       component_type: "smtp",
-      status: "down",
+      status: "warn",
       latency_ms: Date.now() - start,
-      error_message: e instanceof Error ? e.message : String(e),
+      error_message: `Legacy SMTP optional: ${e instanceof Error ? e.message : String(e)}`,
+      metadata: { optional_legacy: true },
     };
   }
 }
@@ -288,8 +332,11 @@ async function upsertIncident(
     return { incident: existing, alertNeeded: false };
   }
 
-  // Nouvel incident
-  const severity = check.status === "down" ? "critical" : "warn";
+  // Legacy SMTP failures are never critical when tracked separately
+  const severity =
+    check.status === "down" && check.component !== "smtp:hostinger"
+      ? "critical"
+      : "warn";
   const { data: created } = await supabase
     .from("health_incidents")
     .insert({
@@ -402,21 +449,43 @@ Deno.serve(async (req) => {
     const emailOn = settings?.alert_email_enabled ?? true;
     const pushOn = settings?.alert_push_enabled ?? true;
 
-    const checks: CheckResult[] = [];
+    const rawChecks: CheckResult[] = [];
 
-    checks.push(await checkKelpay(kelpayThreshold));
-    checks.push(await checkKeccelCard(kelpayThreshold));
+    rawChecks.push(await checkKelpay(kelpayThreshold));
+    rawChecks.push(await checkKeccelCard(kelpayThreshold));
 
     const efResults = await Promise.all(
       CRITICAL_EDGE_FUNCTIONS.map((n) => checkEdgeFunctionAlive(supabase, n, efThreshold)),
     );
-    checks.push(...efResults);
+    rawChecks.push(...efResults);
 
-    checks.push(await checkResend());
+    rawChecks.push(await checkResend());
     const smtpLegacy = await checkSmtpLegacy();
-    if (smtpLegacy) checks.push(smtpLegacy);
+    if (smtpLegacy) rawChecks.push(smtpLegacy);
 
-    checks.push(...(await checkCronHeartbeats(supabase)));
+    rawChecks.push(...(await checkCronHeartbeats(supabase)));
+
+    const checks = reconcileEmailChecks(rawChecks);
+
+    // Close stale incidents for components no longer in the check set (e.g. hidden smtp:hostinger)
+    if (checks.find((c) => c.component === "email:resend")?.status === "ok") {
+      await supabase
+        .from("health_incidents")
+        .update({
+          closed_at: new Date().toISOString(),
+          resolution_notes: "Auto-resolved: Resend deliverability OK",
+        })
+        .eq("component", "email:resend")
+        .is("closed_at", null);
+      await supabase
+        .from("health_incidents")
+        .update({
+          closed_at: new Date().toISOString(),
+          resolution_notes: "Auto-resolved: legacy SMTP optional (Resend primary)",
+        })
+        .eq("component", "smtp:hostinger")
+        .is("closed_at", null);
+    }
 
     const { error: insertError } = await supabase.from("health_checks").insert(
       checks.map((c) => ({
