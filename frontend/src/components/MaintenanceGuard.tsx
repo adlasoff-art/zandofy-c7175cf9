@@ -50,12 +50,7 @@ export function MaintenanceGuard({ children }: { children: ReactNode }) {
     !!config.end_time &&
     new Date(config.end_time).getTime() > Date.now();
 
-  // While bootstrap is in-flight, hold rendering briefly to avoid flashing the
-  // app then switching to the maintenance page. We only block on the first
-  // load (isLoading=true & no data yet) — subsequent refetches don't gate UI.
-  if (isLoading && config == null) {
-    return <div aria-hidden="true" style={{ minHeight: "100vh", background: "hsl(var(--background))" }} />;
-  }
+  // Fail-open: never blank the whole storefront if maintenance settings are slow/unreachable.
 
   // Maintenance OFF or expired → render the app
   if (!isMaintenanceActive) {

@@ -48,9 +48,13 @@ export function useSystemHealth() {
         .from("v_system_health")
         .select("*")
         .order("uptime_pct_24h", { ascending: true });
-      if (error) throw error;
+      if (error) {
+        console.warn("[useSystemHealth]", error.message);
+        return [];
+      }
       return (data as SystemHealthRow[]) ?? [];
     },
+    throwOnError: false,
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
@@ -68,9 +72,13 @@ export function useHealthIncidents(includeClosed = false) {
         .limit(50);
       if (!includeClosed) q = q.is("closed_at", null);
       const { data, error } = await q;
-      if (error) throw error;
+      if (error) {
+        console.warn("[useHealthIncidents]", error.message);
+        return [];
+      }
       return (data as HealthIncident[]) ?? [];
     },
+    throwOnError: false,
     refetchInterval: 60_000,
   });
 }

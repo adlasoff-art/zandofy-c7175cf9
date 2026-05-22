@@ -13,23 +13,13 @@ import { supabase } from "@/integrations/supabase/client";
 export type PlatformSettingsMap = Record<string, any>;
 
 const BOOTSTRAP_QUERY_KEY = ["platform-bootstrap"] as const;
+const BOOTSTRAP_TIMEOUT_MS = 10_000;
 
-export function usePlatformBootstrap() {
-  return useQuery<PlatformSettingsMap>({
-    queryKey: BOOTSTRAP_QUERY_KEY,
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke<{
-          settings: PlatformSettingsMap;
-        }>("platform-bootstrap", { method: "GET" });
-        if (error) throw error;
-        return data?.settings ?? {};
-      } catch (e) {
-        // Fallback: direct table read if edge function fails (cold start, etc.)
-        const { data } = await supabase
-          .from("platform_settings")
-          .select("key, value")
-          .in("key", [
+async function readBootstrapFromTable(): Promise<PlatformSettingsMap> {
+  const { data, error } = await supabase
+    .from("platform_settings")
+    .select("key, value")
+    .in("key", [
             "branding",
             "seo_config",
             "theme_colors",
@@ -49,9 +39,32 @@ export function usePlatformBootstrap() {
             "referral_settings",
             "seo_enabled",
           ]);
-        const map: PlatformSettingsMap = {};
-        for (const row of data ?? []) map[(row as any).key] = (row as any).value;
-        return map;
+  if (error) {
+    console.warn("[platform-bootstrap] table fallback failed:", error.message);
+    return {};
+  }
+  const map: PlatformSettingsMap = {};
+  for (const row of data ?? []) map[(row as { key: string; value: unknown }).key] = (row as { value: unknown }).value;
+  return map;
+}
+
+export function usePlatformBootstrap() {
+  return useQuery<PlatformSettingsMap>({
+    queryKey: BOOTSTRAP_QUERY_KEY,
+    queryFn: async () => {
+      try {
+        const invokePromise = supabase.functions.invoke<{
+          settings: PlatformSettingsMap;
+        }>("platform-bootstrap", { method: "GET" });
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("platform-bootstrap timeout")), BOOTSTRAP_TIMEOUT_MS)
+        );
+        const { data, error } = await Promise.race([invokePromise, timeoutPromise]);
+        if (error) throw error;
+        return data?.settings ?? {};
+      } catch (e) {
+        console.warn("[platform-bootstrap] edge invoke failed, using table:", e);
+        return readBootstrapFromTable();
       }
     },
     staleTime: 5 * 60 * 1000,

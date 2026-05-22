@@ -76,8 +76,11 @@ export default function AdminHealthPage() {
 
   const runNow = useMutation({
     mutationFn: async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
       const { data, error } = await supabase.functions.invoke("run-healthchecks", {
         method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       if (error) throw error;
       if (data && typeof data === "object" && (data as { ok?: boolean }).ok === false) {
@@ -126,11 +129,16 @@ export default function AdminHealthPage() {
 
   const globalCfg = global.isLoading
     ? { color: "text-muted-foreground", bg: "bg-muted/30", icon: RefreshCw, label: "Chargement…" }
-    : {
+    : ({
         ok: { color: "text-green-500", bg: "bg-green-500/10", icon: CheckCircle2, label: "Tout fonctionne" },
         warn: { color: "text-amber-500", bg: "bg-amber-500/10", icon: AlertTriangle, label: "Dégradé" },
         down: { color: "text-destructive", bg: "bg-destructive/10", icon: XCircle, label: "Incident critique" },
-      }[global.status];
+      }[global.status] ?? {
+        color: "text-muted-foreground",
+        bg: "bg-muted/30",
+        icon: RefreshCw,
+        label: "Chargement…",
+      });
   const GlobalIcon = globalCfg.icon;
 
   return (
