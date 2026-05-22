@@ -22,8 +22,6 @@ Zandofy is developed through a controlled workflow:
 | CDN | **Cloudflare** (DNS, cache, WAF) — R2 not in use yet |
 | PWA | Service worker (`frontend/public/sw.js`) |
 
-**Not in use (do not mention or recreate):** FastAPI, Coolify, `api.zandofy.com`, `supabasa.*`, `studio-staging.zandofy.com`.
-
 ## Supabase environments
 
 Two separate Supabase projects (staging + production). Each has its own database, keys, and Edge Function deployments.

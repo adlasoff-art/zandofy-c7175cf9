@@ -3,6 +3,8 @@
 Document de synthèse de l’audit (sécurité, conformité RGPD, qualité, maintenabilité) et des correctifs appliqués.  
 **Langue principale : français** ; termes techniques en anglais lorsque pertinent.
 
+> **Note (2026)** : Les sections qui citent `backend/app/` concernent un ancien serveur API retiré du dépôt. La stack active est **Vercel + Supabase** (RLS, Edge Functions, `frontend/`). Pour l’infra actuelle, voir `AGENTS.md` et `docs/ENVIRONMENTS.md`.
+
 ---
 
 ## 1. Sécurité & Conformité (OWASP, RGPD)

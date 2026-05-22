@@ -29,7 +29,7 @@ Describe the goal of this change and why it is needed.
 
 ## Deployment Notes
 
-- Coolify changes required:
+- Vercel / Supabase deploy steps:
 - Domain or port changes:
 - None:
 

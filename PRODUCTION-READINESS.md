@@ -1,101 +1,63 @@
 # Zandofy — Prêt pour la production
 
-Document de vérification et **tout ce que vous devez fournir** avant déploiement (GitHub → Coolify).
+Checklist et variables à fournir avant mise en ligne (**Vercel** + **Supabase**).
 
 ---
 
-## 1. Ce qui a été fait côté projet (conformité & sécurité)
+## 1. Côté projet (dépôt)
 
-| Élément | Statut |
-|--------|--------|
-| **Backend** `.env.example` | Complet avec CORS, JWT, APP_ENV, commentaires prod. |
-| **Frontend** `.env.example` | Uniquement variables `VITE_*` ; aucun secret backend. |
-| **CORS** | Liste d’origines depuis `CORS_ORIGINS` ; en prod = domaines réels. |
-| **JWT** | En prod, refus de démarrage si `JWT_SECRET_KEY` absent ou égal à `change-me-in-production`. |
-| **En-têtes de sécurité** | X-Content-Type-Options, X-Frame-Options, CSP (sauf /docs pour Swagger). |
-| **Docker** | `Dockerfile` backend + frontend ; `docker-compose.yml` (preview) ; `docker-compose.prod.yml` (prod). |
-| **Secrets** | `.env` et `*.env` dans `.gitignore` ; pas de clés committées. |
-| **AUDIT-SECURITE.md** | Checklist déploiement alignée avec ce document. |
+| Élément | Statut attendu |
+|--------|----------------|
+| Migrations SQL | Fichiers dans `supabase/migrations/` |
+| Edge Functions | Source dans `supabase/functions/` |
+| Frontend | Build `frontend/` (`npm run build`) |
+| Secrets | Aucun `.env` réel committé ; `frontend/.env.example` à jour |
 
 ---
 
-## 2. Ce que vous devez fournir (obligatoire)
+## 2. Variables obligatoires
 
-Renseigner ces valeurs **dans Coolify** (variables d’environnement du projet) ou dans un fichier `.env` **non committé** pour un déploiement manuel.
-
-### 2.1 Backend — obligatoires en production
-
-| Variable | Description | Exemple (à remplacer) |
-|----------|-------------|------------------------|
-| `APP_ENV` | Doit être `production` | `production` |
-| `JWT_SECRET_KEY` | Clé secrète forte (min. 32 caractères aléatoires) | Générer : `openssl rand -hex 32` |
-| `CORS_ORIGINS` | Origines autorisées (frontend), séparées par des virgules | `https://zandofy.com,https://www.zandofy.com` |
-| `DATABASE_URL` | Connexion PostgreSQL (async) | `postgresql+asyncpg://user:password@host:5432/dbname` |
-| **OU** (si vous utilisez le compose prod avec Postgres intégré) | | |
-| `POSTGRES_USER` | Utilisateur PostgreSQL | `zandofy` |
-| `POSTGRES_PASSWORD` | Mot de passe PostgreSQL (fort) | À définir |
-| `POSTGRES_DB` | Nom de la base | `zandofy` |
-
-### 2.2 Backend — optionnels (selon les fonctionnalités)
+### Vercel (frontend — `VITE_*` uniquement)
 
 | Variable | Description |
 |----------|-------------|
-| `SUPABASE_JWT_SECRET` | JWT Secret Supabase (Project Settings > API) si le frontend utilise Supabase Auth et que le backend valide ces tokens. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` | Envoi d’emails transactionnels. |
-| `KELPAY_MERCHANT_CODE`, `KELPAY_TOKEN` | Paiements KelPay. |
-| `KELPAY_WEBHOOK_SECRET` | Signature des webhooks KelPay (vous avez indiqué le laisser vide pour l’instant). |
-| `OPENAI_API_KEY` | Recherche visuelle (GPT-4o). |
-| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Notifications push web. |
-| `SITE_BASE_URL` | URL du site (factures, liens de reset mot de passe). Ex. `https://zandofy.com` |
+| `VITE_SUPABASE_URL` | URL du projet Supabase **production** |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Clé anon production |
+| `VITE_SUPABASE_PROJECT_ID` | Référence projet production |
+| `VITE_SITE_URL` | `https://www.zandofy.com` (ou domaine canonique) |
 
-### 2.3 Frontend (build) — obligatoires pour la prod
+### Supabase (secrets — Dashboard / Edge Functions)
 
-| Variable | Description | Exemple |
-|----------|-------------|---------|
-| `VITE_API_URL` | URL publique de l’API backend | `https://api.zandofy.com` ou `https://zandofy.com/api` |
-| `VITE_SUPABASE_URL` | URL de votre instance Supabase (cloud ou self-hosted) | `https://xxx.supabase.co` |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Clé anon/publique Supabase | (depuis le dashboard Supabase) |
-| `VITE_SUPABASE_PROJECT_ID` | ID projet Supabase | (depuis le dashboard) |
+| Variable | Description |
+|----------|-------------|
+| `SUPABASE_SERVICE_ROLE_KEY` | Jamais dans le frontend |
+| KelPay / Resend / SMTP / webhooks | Selon fonctionnalités actives |
+| Clés AI, VAPID push, etc. | Selon besoin |
 
 ---
 
-## 3. Vérifications avant déploiement
+## 3. Vérifications avant prod
 
-- [ ] **Repo GitHub** : code à jour, pas de fichier `.env` committé.
-- [ ] **Backend** : `JWT_SECRET_KEY` défini et **différent** de `change-me-in-production`.
-- [ ] **Backend** : `APP_ENV=production`.
-- [ ] **Backend** : `CORS_ORIGINS` = les domaines réels du frontend (séparés par des virgules).
-- [ ] **Backend** : `DATABASE_URL` (ou `POSTGRES_*`) pointant vers une base PostgreSQL 15+.
-- [ ] **Frontend** : `VITE_API_URL` = URL réelle de l’API en prod.
-- [ ] **Migrations** : après premier déploiement backend, exécuter une fois :  
-  `cd backend && alembic upgrade head`  
-  (ou via script/Coolify si vous l’intégrez).
-- [ ] **KelPay webhook** : vous avez choisi de le laisser non finalisé ; `KELPAY_WEBHOOK_SECRET` peut rester vide.
+- [ ] Repo GitHub à jour, pas de secrets dans l’historique récent
+- [ ] Vercel production pointe vers le projet Supabase **production** (pas staging)
+- [ ] Migrations testées sur **staging** puis appliquées sur **production** (même fichier)
+- [ ] Edge Functions déployées sur staging puis production
+- [ ] Smoke tests : auth, catalogue, checkout, dashboard vendeur
 
 ---
 
-## 4. Étapes de déploiement (rappel)
+## 4. Étapes de déploiement
 
-1. **GitHub** : push du monorepo (frontend + backend + `docker-compose.prod.yml`).
-2. **Coolify — Sources** : + Add → GitHub → sélectionner le repo Zandofy.
-3. **Coolify — Projet** : créer le projet, ajouter la ressource (Docker Compose avec `docker-compose.prod.yml` ou services séparés).
-4. **Coolify — Variables** : renseigner toutes les variables listées en §2 (obligatoires + optionnels selon besoin).
-5. **Coolify — Déploiement** : lancer le build et le déploiement.
-6. **Migrations** : exécuter `alembic upgrade head` sur la base (une fois).
-7. **DNS & SSL** : configurer le domaine et Let’s Encrypt dans Coolify pour frontend et API.
+1. **GitHub** : merge vers `main` (ou branche connectée à Vercel production).
+2. **Vercel** : build et déploiement automatique du dossier `frontend/`.
+3. **Supabase staging** : exécuter les nouvelles migrations SQL ; tester.
+4. **Supabase production** : exécuter les **mêmes** fichiers SQL ; déployer les Edge Functions.
+5. **DNS / Cloudflare** : domaine et SSL vers Vercel + endpoints Supabase.
 
 ---
 
-## 5. Génération de la clé JWT (rappel)
+## 5. Documentation liée
 
-Sous Linux/macOS (ou WSL) :
-
-```bash
-openssl rand -hex 32
-```
-
-Utiliser la sortie comme valeur de `JWT_SECRET_KEY` (sans la partager ni la committer).
-
----
-
-*Dernière mise à jour : aligné avec AUDIT-SECURITE.md et checklist production.*
+- `docs/ENVIRONMENTS.md`
+- `AGENTS.md`
+- `AUDIT-SECURITE.md` (si présent)

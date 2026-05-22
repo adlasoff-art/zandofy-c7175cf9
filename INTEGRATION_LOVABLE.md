@@ -1,12 +1,10 @@
 # Intégration Lovable ↔ Zandofy
 
-> **Document historique remplacé.** L’intégration ne passe plus par FastAPI.
-
 ## Stack actuelle
 
 | Composant | Emplacement |
 |-----------|-------------|
-| Frontend React/Vite | `frontend/` → déployé sur **Vercel** |
+| Frontend React/Vite | `frontend/` → **Vercel** |
 | Auth + DB + API | **Supabase** (projet staging + projet production) |
 | Edge Functions | `supabase/functions/` |
 | Migrations SQL | `supabase/migrations/` |
@@ -26,4 +24,4 @@ Voir **`docs/LOVABLE_INSTRUCTIONS.md`** (prompt à copier-coller).
 
 - `AGENTS.md`
 - `docs/AI-WORKFLOW.md`
-- `supabase/README.md`
+- `supabase/README.md` (si présent)

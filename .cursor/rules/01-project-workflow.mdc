@@ -11,7 +11,7 @@ alwaysApply: true
 - Edge Functions live only in **`supabase/functions/`** at repo root.
 - Run new SQL on **staging Supabase first**, then production after validation.
 - Treat Lovable-generated code as draft until reviewed.
-- Do not mention or implement **FastAPI**, **Coolify**, or deprecated domains (`supabasa.*`, `studio-staging.*`, `api.zandofy.com`).
-- Call out backend, DB, env, and deployment impacts explicitly.
+- Stack is **Vercel** (frontend) + **Supabase** (backend) only — do not add a separate Python/API server.
+- Call out DB, env, and deployment impacts explicitly.
 - Do not silently change domains, ports, or variable names.
 - Keep staging and production Supabase projects clearly separated.

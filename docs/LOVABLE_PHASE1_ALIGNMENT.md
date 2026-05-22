@@ -1,6 +1,6 @@
 # Alignement Lovable — Zandofy
 
-> Ce document remplace l’ancienne version (Coolify / FastAPI / `frontend/supabase/`).
+> Alignement Lovable sur le monorepo actuel (Vercel + Supabase).
 
 ## Document principal
 
@@ -19,8 +19,6 @@ supabase/
 
 - **Frontend** : GitHub → Vercel (`www.zandofy.com`)
 - **Base de données** : fichier SQL dans `supabase/migrations/` → SQL Editor **staging** → tests → **production**
-- **Pas de** Coolify, FastAPI, `api.zandofy.com`, `supabasa.*`
-
 ## Rôle Cursor
 
 Revue du code Lovable, migrations sûres, documentation à jour (`AGENTS.md`, rules `.cursor/rules/`).

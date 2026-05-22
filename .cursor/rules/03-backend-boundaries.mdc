@@ -1,13 +1,13 @@
 ---
-description: Backend boundaries and API integration expectations
-globs: backend/**/*
+description: Supabase Edge Function boundaries and secrets
+globs: supabase/functions/**/*
 alwaysApply: false
 ---
 
-# Backend Boundaries
+# Edge Function Boundaries
 
-- Keep backend secrets out of frontend files.
-- Preserve API contracts unless a change is explicit and coordinated.
-- If backend changes require env updates, document them.
-- If backend changes require schema changes, add or reference migrations.
-- Prefer clear service boundaries and production-safe defaults.
+- Keep service role keys and third-party secrets out of frontend files.
+- Preserve function contracts unless a change is explicit and coordinated.
+- If a function needs new env vars, document them in `.env.example` and deployment notes.
+- If a function needs schema changes, add a migration in `supabase/migrations/`.
+- Prefer production-safe defaults and minimal PII in logs.

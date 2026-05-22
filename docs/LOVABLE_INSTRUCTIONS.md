@@ -15,10 +15,6 @@ Stack actuelle (ne pas proposer d'autre backend) :
 - Backend : Supabase Pro (Auth, PostgreSQL, Storage, Realtime, Edge Functions Deno)
 - CDN : Cloudflare (cache / DNS) — pas de R2 pour l'instant
 
-INTERDIT — ne plus mentionner ni créer :
-- FastAPI, backend Python, Coolify, Docker deploy custom
-- Domaines : api.zandofy.com, supabasa.*, studio-staging.zandofy.com
-
 Dépôt GitHub = source de vérité.
 
 Chemins autorisés :
@@ -70,8 +66,7 @@ Si ta feature nécessite DB, Edge Function ou nouvelle variable d'env :
 
 ## Scope interdit
 
-- FastAPI, Coolify, docker-compose, backend/
-- Anciens domaines staging supabasa / studio-staging
+- Créer un backend Python/API séparé hors Supabase
 - Fichiers de déploiement et variables d'env sans accord
 - Migrations destructives non demandées
 

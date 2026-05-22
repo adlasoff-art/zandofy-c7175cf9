@@ -11,4 +11,4 @@ alwaysApply: false
 - Any edit must consider staging Supabase vs production Supabase env vars on Vercel.
 - Prefer minimal, explicit, justified changes.
 - Flag rollout risk before changing deployment-sensitive behavior.
-- Do not reference Coolify or FastAPI — stack is Vercel + Supabase only.
+- Production stack is Vercel (frontend) + Supabase (backend).

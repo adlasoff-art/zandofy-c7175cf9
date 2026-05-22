@@ -9,7 +9,7 @@
 | `supabase/functions/` | Edge Functions (Deno) — payments, email, sitemap, AI, etc. |
 | `docs/` | Human and AI operating instructions |
 
-There is **no** FastAPI `backend/` in the active stack. Business logic lives in Supabase (SQL, RLS, triggers, Edge Functions).
+Business logic lives in Supabase (SQL, RLS, triggers, Edge Functions). There is no separate application server in this repository.
 
 ## Environments
 
@@ -35,13 +35,11 @@ Cloudflare: DNS, cache, WAF in front of Vercel and Supabase public endpoints.
 - Contract: `AGENTS.md`
 - DB safety: `.cursor/rules/05-database-safety.mdc`
 
-## Deprecated (removed from active architecture)
+## Legacy paths (do not use)
 
-- Coolify, docker-compose deploy path
-- `api.zandofy.com`, `supabasa.*`, `studio-staging.zandofy.com`
-- `frontend/supabase/` (consolidated to root `supabase/`)
-- Root `src/` Lovable relic
-- `docker-compose.yaml`, `backend/Dockerfile` (legacy — not used with Vercel)
+- `frontend/supabase/` — consolidated to root `supabase/`
+- Root `src/` — Lovable relic
+- `docker-compose*.yml` — optional local experiments only; production frontend is Vercel
 
 ## Architectural rule
 

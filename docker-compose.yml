@@ -1,8 +1,6 @@
 # =============================================================================
-# Zandofy — Preview Frontend + Backend
-# Usage: docker compose up --build
-# Frontend: http://localhost
-# Backend API: http://localhost:8000 — Docs: http://localhost:8000/docs
+# Zandofy — Compose legacy (optional local docker preview)
+# Production: Vercel + Supabase. This file is not used for production deploy.
 # =============================================================================
 
 services:
