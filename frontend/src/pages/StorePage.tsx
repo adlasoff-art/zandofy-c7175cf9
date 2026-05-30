@@ -9,6 +9,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
+import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { FollowStoreButton } from "@/components/FollowStoreButton";
@@ -551,7 +552,7 @@ export default function StorePage() {
                   {/* Grid */}
                   <div className="flex-1">
                     {productsLoading ? (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                      <div className={PRODUCT_GRID_CLASS}>
                         {Array.from({ length: 8 }).map((_, i) => (
                           <ProductCardSkeleton key={i} />
                         ))}
@@ -559,7 +560,7 @@ export default function StorePage() {
                     ) : filteredProducts.length > 0 ? (
                       <div className={
                         viewMode === "grid"
-                          ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3"
+                          ? PRODUCT_GRID_CLASS
                           : "grid grid-cols-1 md:grid-cols-2 gap-3"
                       }>
                         {filteredProducts.map((product) => (

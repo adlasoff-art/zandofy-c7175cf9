@@ -890,6 +890,13 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
             label={t("dashboard.detail.proof.order")}
             existingUrl={order.shipping_payment_proof_url}
           />
+          {order.shipping_payment_proof_url && (
+            <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-2.5">
+              <span className="text-blue-700 dark:text-blue-400 font-medium">
+                {t("dashboard.detail.offPlatform.waiting")}
+              </span>
+            </div>
+          )}
           <p className="text-[10px] text-muted-foreground">{t("dashboard.detail.offPlatform.note")}</p>
         </div>
       )}
@@ -961,32 +968,6 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
             alt={t("dashboard.detail.hubPhotoAlt")}
             className="w-full max-w-xs rounded-lg border border-border object-cover"
           />
-        </div>
-      )}
-
-      {/* Off-platform payment: client uploads proof */}
-      {order.payment_method === "off_platform" && order.status === "awaiting_payment" && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
-            <span className="text-amber-700 dark:text-amber-400 font-medium">
-              {t("dashboard.detail.offPlatform.send")}
-            </span>
-          </div>
-          <PaymentProofUpload
-            orderId={order.id}
-            field="shipping_payment_proof_url"
-            label={t("dashboard.detail.proof.screenshot")}
-            existingUrl={order.shipping_payment_proof_url}
-          />
-        </div>
-      )}
-
-      {/* Off-platform payment: waiting for vendor validation */}
-      {order.payment_method === "off_platform" && order.status === "awaiting_payment" && order.shipping_payment_proof_url && (
-        <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-2.5">
-          <span className="text-blue-700 dark:text-blue-400 font-medium">
-            {t("dashboard.detail.offPlatform.waiting")}
-          </span>
         </div>
       )}
 

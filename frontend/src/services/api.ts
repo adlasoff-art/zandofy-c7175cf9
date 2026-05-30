@@ -201,7 +201,7 @@ export async function fetchProducts(params?: {
       .eq("publish_status", "published");
 
     if (params?.orderBy === "popular") {
-      query = query.order("review_count", { ascending: false });
+      query = query.order("sales_count", { ascending: false });
     } else {
       query = query.order("created_at", { ascending: false });
     }

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useI18n } from "@/contexts/I18nContext";
 import type { Product } from "@/services/api";
+import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 
 function mapProduct(row: any): Product {
   const sortedImages = (row.product_images || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
@@ -108,7 +109,7 @@ export default function SharedWishlistPage() {
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div className={PRODUCT_GRID_CLASS}>
             {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
           </div>
         ) : products.length === 0 ? (
@@ -119,7 +120,7 @@ export default function SharedWishlistPage() {
             <Button asChild><Link to="/">{t("wishlist.shared.discover") || "Découvrir les produits"}</Link></Button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div className={PRODUCT_GRID_CLASS}>
             {products.map(p => (
               <Link key={p.id} to={`/product/${p.slug || p.id}`} className="cursor-pointer">
                 <ProductCard product={p} />

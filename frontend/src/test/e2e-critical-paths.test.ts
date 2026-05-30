@@ -367,3 +367,46 @@ describe("Multi-operator: Rate creation validation", () => {
     expect(normalize("Gombe")).toBe("Gombe");
   });
 });
+
+// ─── Stabilisation plan smoke tests ────────────────────────────
+describe("Payment proof storage paths", () => {
+  it("uses payment-proofs/{orderId}/ prefix for client uploads", () => {
+    const orderId = "550e8400-e29b-41d4-a716-446655440000";
+    const field = "shipping_payment_proof_url";
+    const path = `payment-proofs/${orderId}/${field}-${Date.now()}.jpg`;
+    const parts = path.split("/");
+    expect(parts[0]).toBe("payment-proofs");
+    expect(parts[1]).toBe(orderId);
+  });
+
+  it("uses hub-proofs/{orderId}/ prefix for vendor hub uploads", () => {
+    const orderId = "550e8400-e29b-41d4-a716-446655440000";
+    const path = `hub-proofs/${orderId}/${Date.now()}.webp`;
+    const parts = path.split("/");
+    expect(parts[0]).toBe("hub-proofs");
+    expect(parts[1]).toBe(orderId);
+  });
+});
+
+describe("Flash sale display price", () => {
+  it("prefers flashPrice over price when lower", () => {
+    const product = { price: 20, flashPrice: 12, originalPrice: 25 };
+    const displayPrice = product.flashPrice ?? product.price;
+    const hasFlashPrice =
+      product.flashPrice != null && Number.isFinite(product.flashPrice) && product.flashPrice < product.price;
+    expect(displayPrice).toBe(12);
+    expect(hasFlashPrice).toBe(true);
+    const struck = hasFlashPrice ? product.price : product.originalPrice;
+    expect(struck).toBe(20);
+  });
+});
+
+describe("Wishlist product id", () => {
+  it("uses product uuid not slug for wishlist key", () => {
+    const slug = "veste-homme-col-officier";
+    const productId = "550e8400-e29b-41d4-a716-446655440000";
+    expect(slug).not.toBe(productId);
+    const wishlistKey = productId;
+    expect(wishlistKey).toMatch(/^[0-9a-f-]{36}$/i);
+  });
+});

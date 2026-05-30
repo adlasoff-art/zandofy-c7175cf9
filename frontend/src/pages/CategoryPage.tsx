@@ -5,7 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { PRODUCT_LIST_SELECT } from "@/services/api";
 import { Footer } from "@/components/Footer";
-import { ProductCard } from "@/components/ProductCard";
+import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
+import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 import { FloatingActions } from "@/components/FloatingActions";
 import {
   Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator,
@@ -429,11 +430,11 @@ export default function CategoryPage() {
 
         {/* Products Grid */}
         {prodsLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => <Skeleton key={i} className="aspect-[3/4] rounded-sm" />)}
+          <div className={PRODUCT_GRID_CLASS}>
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => <ProductCardSkeleton key={i} />)}
           </div>
         ) : filteredProducts && filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className={PRODUCT_GRID_CLASS}>
             {filteredProducts.map((p: any) => (
               <Link key={p.id} to={`/product/${p.slug || p.id}`} className="cursor-pointer">
                 <ProductCard product={p} />

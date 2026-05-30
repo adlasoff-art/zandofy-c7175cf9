@@ -40,6 +40,9 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
   const firstColor = product.colors?.[0] ?? null;
   const firstSize = product.sizes?.[0] ?? null;
   const showColors = (product.colors?.length ?? 0) > 0;
+  const displayPrice = product.flashPrice ?? product.price;
+  const hasFlashPrice =
+    product.flashPrice != null && Number.isFinite(product.flashPrice) && product.flashPrice < product.price;
 
   const handleAddToCart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -161,11 +164,11 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
 
         <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
           <span className="text-foreground dark:text-primary font-bold text-sm">
-            {formatPrice(product.price)}
+            {formatPrice(displayPrice)}
           </span>
-          {product.originalPrice && (
+          {(hasFlashPrice || product.originalPrice) && (
             <span className="text-[11px] text-muted-foreground line-through">
-              {formatPrice(product.originalPrice)}
+              {formatPrice(hasFlashPrice ? product.price : product.originalPrice!)}
             </span>
           )}
           {product.isSale && product.discount && (

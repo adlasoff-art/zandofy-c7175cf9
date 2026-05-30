@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/contexts/I18nContext";
 import { toast } from "sonner";
 import type { Product } from "@/services/api";
+import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 
 function mapWishlistProduct(row: any): Product {
   const sortedImages = (row.product_images || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
@@ -106,7 +107,7 @@ export default function WishlistPage() {
             <Button asChild><Link to="/auth">{t("general.loginButton")}</Link></Button>
           </div>
         ) : isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div className={PRODUCT_GRID_CLASS}>
             {Array.from({ length: 8 }).map((_, i) => (
               <ProductCardSkeleton key={i} />
             ))}
@@ -119,7 +120,7 @@ export default function WishlistPage() {
             <Button asChild><Link to="/">{t("wishlist.discover")}</Link></Button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div className={PRODUCT_GRID_CLASS}>
             {products.map((p) => (
               <Link key={p.id} to={`/product/${p.slug || p.id}`} className="cursor-pointer">
                 <ProductCard product={p} />
