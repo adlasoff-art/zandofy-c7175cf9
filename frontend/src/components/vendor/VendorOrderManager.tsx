@@ -21,6 +21,7 @@ import {
   canAdminAdvance,
 } from "@/lib/order-status";
 import { withOptionalOrderFields } from "@/lib/order-query";
+import { VENDOR_ORDERS_OR_FILTER } from "@/lib/off-platform-payment";
 import { useRoles } from "@/hooks/use-roles";
 import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, DeliveryFeeModal, EditTrackingModal, HubPickupModal, HubProofPhotoUpload, generateConfirmationCode } from "./OrderTransitionModals";
 import { format } from "date-fns";
@@ -77,11 +78,14 @@ interface Order {
   shipping_payment_proof_url: string | null;
   last_mile_payment_proof_url: string | null;
   hub_pickup_proof_url: string | null;
+  off_platform_vendor_verified_at: string | null;
+  off_platform_vendor_verified_by: string | null;
   items: OrderItem[];
   history: StatusHistoryEntry[];
 }
 
 export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false }: { storeId: string; shopType?: string; suppliersEnabled?: boolean }) {
+  const { user } = useAuth();
   const isLocalShop = shopType === "local";
   const activeFlow = isLocalShop ? LOCAL_STATUS_FLOW : STATUS_FLOW;
   const [orders, setOrders] = useState<Order[]>([]);
@@ -90,7 +94,6 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const { isAdmin, isManager } = useRoles();
   const isStaff = isAdmin || isManager;
-  const { user } = useAuth();
   const { t } = useI18n();
 
   // PII masking: detect if current user is a collaborator with restricted sub_role
@@ -171,9 +174,8 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
       .from("orders")
       .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected, delivery_operator_id")
       .eq("store_id", storeId)
-      // Exclure les commandes non payées (`awaiting_payment`) du listing vendeur :
-      // une commande n'est "réelle" qu'après confirmation du paiement (webhook).
-      .not("status", "in", '("awaiting_payment","payment_failed")')
+      // Carte/MM : awaiting_payment masqué. Hors plateforme : visible pour validation preuve.
+      .or(VENDOR_ORDERS_OR_FILTER)
       .order("created_at", { ascending: false }) as any;
 
     if (error) {
@@ -216,6 +218,8 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
       "shipping_payment_proof_url",
       "last_mile_payment_proof_url",
       "hub_pickup_proof_url",
+      "off_platform_vendor_verified_at",
+      "off_platform_vendor_verified_by",
     ]);
 
     // Lot 11B Phase B4 — Hub UI : enrichir avec le nom de l'opérateur de livraison
@@ -597,13 +601,17 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   />
                 )}
 
-                {/* Off-platform payment validation by vendor */}
+                {/* Off-platform payment validation by vendor (étape 1 — admin libère ensuite) */}
                 {order.payment_method === "off_platform" && order.status === "awaiting_payment" && (
                   <div className="space-y-2 border border-amber-200 dark:border-amber-700 rounded-lg p-3 bg-amber-50 dark:bg-amber-900/20">
                     <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                      💳 Paiement hors plateforme — Validation requise
+                      💳 Paiement hors plateforme — Validation vendeur
                     </p>
-                    {order.shipping_payment_proof_url ? (
+                    {order.off_platform_vendor_verified_at ? (
+                      <p className="text-xs text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-900/30 rounded-md p-2">
+                        Preuve validée par vous — en attente de validation administrateur avant traitement logistique.
+                      </p>
+                    ) : order.shipping_payment_proof_url ? (
                       <div className="space-y-2">
                         <p className="text-xs text-muted-foreground">Le client a envoyé une preuve de paiement :</p>
                         <DeliveryProofImage
@@ -620,19 +628,36 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                           <Button
                             size="sm"
                             className="flex-1 text-xs gap-1"
+                            disabled={!user?.id}
                             onClick={async () => {
+                              if (!user?.id) return;
+                              const now = new Date().toISOString();
                               const { error } = await supabase
                                 .from("orders")
-                                .update({ status: "pending", shipping_payment_status: "paid" } as any)
+                                .update({
+                                  off_platform_vendor_verified_at: now,
+                                  off_platform_vendor_verified_by: user.id,
+                                } as any)
                                 .eq("id", order.id);
                               if (!error) {
-                                setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "pending", shipping_payment_status: "paid" } : o));
-                                toast.success("Paiement validé — la commande passe en statut confirmé.");
-                                triggerOrderStatusNotification(order.id, "off_platform_validated");
+                                setOrders(prev =>
+                                  prev.map(o =>
+                                    o.id === order.id
+                                      ? {
+                                          ...o,
+                                          off_platform_vendor_verified_at: now,
+                                          off_platform_vendor_verified_by: user.id,
+                                        }
+                                      : o,
+                                  ),
+                                );
+                                toast.success("Preuve validée — l'administration va finaliser la commande.");
+                              } else {
+                                toast.error("Impossible d'enregistrer la validation.");
                               }
                             }}
                           >
-                            <Check size={12} /> Valider le paiement
+                            <Check size={12} /> Valider la preuve client
                           </Button>
                           <Button
                             size="sm"

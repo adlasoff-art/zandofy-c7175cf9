@@ -25,6 +25,11 @@ import {
 import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, DeliveryFeeModal } from "@/components/vendor/OrderTransitionModals";
 import { withOptionalOrderFields } from "@/lib/order-query";
 import { FreightDetailsPanel } from "@/components/orders/FreightDetailsPanel";
+import { OffPlatformReleasePanel } from "@/components/admin/OffPlatformReleasePanel";
+import {
+  blocksAdminStatusPillsForOffPlatform,
+  isOffPlatformAwaitingAdminRelease,
+} from "@/lib/off-platform-payment";
 
 function OrderItemsPanel({ orderId, order }: { orderId: string; order: any }) {
   const { data: items = [], isLoading, error } = useQuery({
@@ -144,7 +149,9 @@ const TERMINAL_STATUSES = new Set(["payment_failed", "cancelled", "returned"]);
 
 export default function AdminOrdersPage() {
   const { user, loading: authLoading } = useAuth();
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | "all" | "payment_failed">("all");
+  const [statusFilter, setStatusFilter] = useState<
+    OrderStatus | "all" | "payment_failed" | "off_platform_release"
+  >("all");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [adminOrderPage, setAdminOrderPage] = useState(1);
@@ -194,7 +201,14 @@ export default function AdminOrdersPage() {
       if (error) {
         console.error("[AdminOrdersPage] Error loading orders:", error);
       }
-      const ordersData = await withOptionalOrderFields<any>((data ?? []) as any[], ["deferred_payment_provider"]);
+      const ordersData = await withOptionalOrderFields<any>((data ?? []) as any[], [
+        "deferred_payment_provider",
+        "shipping_payment_proof_url",
+        "off_platform_vendor_verified_at",
+        "off_platform_vendor_verified_by",
+        "off_platform_admin_released_at",
+        "off_platform_admin_released_by",
+      ]);
 
       // Load order items for search by product name
       const orderIds = ordersData.map((o: any) => o.id);
@@ -255,9 +269,18 @@ export default function AdminOrdersPage() {
     return { from: null, to: null };
   }, [dateFilter, customStart, customEnd]);
 
+  const offPlatformReleaseCount = useMemo(
+    () => orders.filter((o: any) => isOffPlatformAwaitingAdminRelease(o)).length,
+    [orders],
+  );
+
   const filtered = orders.filter((o: any) => {
-    const matchStatus = statusFilter === "all" || o.status === statusFilter;
-    if (!matchStatus) return false;
+    if (statusFilter === "off_platform_release") {
+      if (!isOffPlatformAwaitingAdminRelease(o)) return false;
+    } else {
+      const matchStatus = statusFilter === "all" || o.status === statusFilter;
+      if (!matchStatus) return false;
+    }
     // Date filter
     if (dateFromTo.from || dateFromTo.to) {
       const created = new Date(o.created_at);
@@ -291,6 +314,14 @@ export default function AdminOrdersPage() {
   });
 
   const updateStatus = async (orderId: string, newStatus: string, extraFields?: Record<string, any>) => {
+    const order = orders.find((o: any) => o.id === orderId);
+    if (order && blocksAdminStatusPillsForOffPlatform(order)) {
+      toast.error(
+        "Commande hors plateforme : utilisez le panneau de libération (preuve + validation vendeur).",
+      );
+      return;
+    }
+
     setUpdatingId(orderId);
     const updateData: any = { status: newStatus, ...extraFields };
 
@@ -476,7 +507,14 @@ export default function AdminOrdersPage() {
     toast.success(`${ok} commande(s) supprimée(s)${fail ? `, ${fail} échec(s)` : ""}.`);
   };
 
-  const filterTabs: (OrderStatus | "all" | "payment_failed")[] = ["all", ...STATUS_FLOW, "cancelled", "returned", "payment_failed"];
+  const filterTabs: (OrderStatus | "all" | "payment_failed" | "off_platform_release")[] = [
+    "all",
+    "off_platform_release",
+    ...STATUS_FLOW,
+    "cancelled",
+    "returned",
+    "payment_failed",
+  ];
 
   return (
     <AdminLayout title="Commandes">
@@ -599,7 +637,11 @@ export default function AdminOrdersPage() {
               statusFilter === s ? "bg-foreground text-card border-foreground" : "bg-card text-foreground border-border"
             }`}
           >
-            {s === "all" ? "Toutes" : STATUS_CONFIG[s]?.label || s}
+            {s === "all"
+              ? "Toutes"
+              : s === "off_platform_release"
+                ? `Hors plateforme (${offPlatformReleaseCount})`
+                : STATUS_CONFIG[s]?.label || s}
           </button>
         ))}
       </div>
@@ -793,6 +835,15 @@ export default function AdminOrdersPage() {
                       {/* Produits + breakdown total */}
                       <OrderItemsPanel orderId={o.id} order={o} />
 
+                      {o.payment_method === "off_platform" && o.status === "awaiting_payment" && user?.id && (
+                        <OffPlatformReleasePanel
+                          order={o}
+                          userId={user.id}
+                          disabled={updatingId === o.id}
+                          onUpdated={() => queryClient.invalidateQueries({ queryKey: ["admin-orders"] })}
+                        />
+                      )}
+
                       {/* Next step button */}
                       {next && canAdvance && (
                         <button
@@ -810,10 +861,16 @@ export default function AdminOrdersPage() {
                         {STATUS_FLOW.map((s) => {
                           const sc = STATUS_CONFIG[s];
                           const isCurrent = o.status === s;
+                          const blockedOffPlatform = blocksAdminStatusPillsForOffPlatform(o);
                           return (
                             <button
                               key={s}
-                              disabled={isCurrent || updatingId === o.id}
+                              disabled={isCurrent || updatingId === o.id || blockedOffPlatform}
+                              title={
+                                blockedOffPlatform
+                                  ? "Utilisez le panneau hors plateforme pour libérer cette commande"
+                                  : undefined
+                              }
                               onClick={() => updateStatus(o.id, s)}
                               className={`px-2.5 py-1 text-[10px] font-medium rounded-full border transition-colors disabled:opacity-40 ${
                                 isCurrent

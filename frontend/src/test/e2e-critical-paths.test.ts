@@ -410,3 +410,36 @@ describe("Wishlist product id", () => {
     expect(wishlistKey).toMatch(/^[0-9a-f-]{36}$/i);
   });
 });
+
+describe("Off-platform dual validation", () => {
+  it("vendor filter includes only off_platform awaiting_payment", async () => {
+    const { VENDOR_ORDERS_OR_FILTER } = await import("@/lib/off-platform-payment");
+    expect(VENDOR_ORDERS_OR_FILTER).toContain("payment_method.eq.off_platform");
+    expect(VENDOR_ORDERS_OR_FILTER).toContain("status.not.in.(awaiting_payment,payment_failed)");
+  });
+
+  it("detects admin release queue after vendor verified", async () => {
+    const {
+      isOffPlatformAwaitingAdminRelease,
+      blocksAdminStatusPillsForOffPlatform,
+      canAdminReleaseOffPlatform,
+    } = await import("@/lib/off-platform-payment");
+
+    const waiting = {
+      payment_method: "off_platform",
+      status: "awaiting_payment",
+      shipping_payment_proof_url: "payment-proofs/x/a.jpg",
+      off_platform_vendor_verified_at: "2026-05-24T12:00:00Z",
+      off_platform_admin_released_at: null,
+    };
+    expect(isOffPlatformAwaitingAdminRelease(waiting)).toBe(true);
+    expect(blocksAdminStatusPillsForOffPlatform(waiting)).toBe(true);
+    expect(canAdminReleaseOffPlatform(waiting, false)).toBe(true);
+
+    const cardAwaiting = {
+      payment_method: "stripe",
+      status: "awaiting_payment",
+    };
+    expect(blocksAdminStatusPillsForOffPlatform(cardAwaiting)).toBe(false);
+  });
+});

@@ -7,7 +7,11 @@ type OptionalOrderField =
   | "deferred_payment_provider"
   | "deferred_payment_phone"
   | "delivery_date_requested"
-  | "delivery_time_requested";
+  | "delivery_time_requested"
+  | "off_platform_vendor_verified_at"
+  | "off_platform_vendor_verified_by"
+  | "off_platform_admin_released_at"
+  | "off_platform_admin_released_by";
 
 type OptionalOrderValues = Record<OptionalOrderField, string | null>;
 
@@ -19,6 +23,10 @@ const EMPTY_OPTIONAL_ORDER_VALUES: OptionalOrderValues = {
   deferred_payment_phone: null,
   delivery_date_requested: null,
   delivery_time_requested: null,
+  off_platform_vendor_verified_at: null,
+  off_platform_vendor_verified_by: null,
+  off_platform_admin_released_at: null,
+  off_platform_admin_released_by: null,
 };
 
 export async function withOptionalOrderFields<T extends { id: string }>(

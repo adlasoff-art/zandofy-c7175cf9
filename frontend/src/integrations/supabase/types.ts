@@ -1061,6 +1061,10 @@ export type Database = {
           id: string
           last_mile_fee: number | null
           last_mile_payment_method: string | null
+          off_platform_admin_released_at: string | null
+          off_platform_admin_released_by: string | null
+          off_platform_vendor_verified_at: string | null
+          off_platform_vendor_verified_by: string | null
           order_ref: string
           payment_method: string | null
           shipping_address: string | null
@@ -1091,6 +1095,10 @@ export type Database = {
           id?: string
           last_mile_fee?: number | null
           last_mile_payment_method?: string | null
+          off_platform_admin_released_at?: string | null
+          off_platform_admin_released_by?: string | null
+          off_platform_vendor_verified_at?: string | null
+          off_platform_vendor_verified_by?: string | null
           order_ref: string
           payment_method?: string | null
           shipping_address?: string | null
@@ -1121,6 +1129,10 @@ export type Database = {
           id?: string
           last_mile_fee?: number | null
           last_mile_payment_method?: string | null
+          off_platform_admin_released_at?: string | null
+          off_platform_admin_released_by?: string | null
+          off_platform_vendor_verified_at?: string | null
+          off_platform_vendor_verified_by?: string | null
           order_ref?: string
           payment_method?: string | null
           shipping_address?: string | null
