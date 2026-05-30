@@ -2279,6 +2279,32 @@ export type Database = {
         }
         Relationships: []
       }
+      user_product_views: {
+        Row: {
+          last_seen_at: string
+          product_id: string
+          user_id: string
+        }
+        Insert: {
+          last_seen_at?: string
+          product_id: string
+          user_id: string
+        }
+        Update: {
+          last_seen_at?: string
+          product_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_product_views_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string

@@ -61,22 +61,35 @@ export function PaymentProofUpload({ orderId, field, label = "Preuve de paiement
         .from("delivery-proofs")
         .upload(path, compressed, { upsert: true });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("[PaymentProofUpload] storage:", uploadError);
+        const rls = /row-level security|RLS/i.test(uploadError.message);
+        setError(
+          rls
+            ? "Envoi du fichier refusé (droits). Reconnectez-vous ou contactez le support."
+            : `Échec de l'envoi du fichier : ${uploadError.message}`,
+        );
+        return;
+      }
 
-      // Bucket privé : on stocke le path en DB.
       const { error: updateError } = await supabase
         .from("orders")
         .update({ [field]: path } as any)
         .eq("id", orderId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error("[PaymentProofUpload] orders update:", updateError);
+        setError(`Fichier envoyé mais enregistrement commande échoué : ${updateError.message}`);
+        return;
+      }
 
-      // Pour l'affichage immédiat, on génère une URL signée 24h.
       const signed = await getDeliveryProofUrl(path);
       setPreviewUrl(signed);
       onUploaded?.(path);
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de l'upload");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erreur lors de l'upload";
+      console.error("[PaymentProofUpload]", err);
+      setError(message);
     } finally {
       setUploading(false);
     }

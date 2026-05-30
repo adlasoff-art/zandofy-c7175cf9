@@ -19,7 +19,7 @@ interface RecommendedProduct {
 
 export function RecommendationsSection() {
   const { user } = useAuth();
-  const { t, locale } = useI18n();
+  const { t, locale, formatPrice } = useI18n();
   const [products, setProducts] = useState<RecommendedProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -181,7 +181,7 @@ export function RecommendationsSection() {
             <div className="p-2.5">
               <p className="text-xs font-medium text-foreground line-clamp-2 mb-1">{displayName}</p>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-primary">${product.price.toFixed(2)}</span>
+                <span className="text-sm font-bold text-primary">{formatPrice(product.price)}</span>
                 {product.rating != null && product.rating > 0 && (
                   <span className="text-[10px] text-primary">★ {product.rating}</span>
                 )}

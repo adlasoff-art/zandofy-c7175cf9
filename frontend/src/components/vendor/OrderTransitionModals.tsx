@@ -652,7 +652,7 @@ export function HubProofPhotoUpload({
     try {
       const compressed = await compressImage(file);
       const ext = "webp";
-      const path = `hub-proofs/${orderId}_${Date.now()}.${ext}`;
+      const path = `hub-proofs/${orderId}/${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from("delivery-proofs")
         .upload(path, compressed, { contentType: "image/webp", upsert: true });

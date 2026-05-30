@@ -5,7 +5,7 @@ const FOR_YOU_HIDE_DAYS = 3;
 /** Record or refresh that the user viewed a product (PDP / recommendation click). */
 export async function recordProductView(userId: string, productId: string): Promise<void> {
   const now = new Date().toISOString();
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from("user_product_views")
     .upsert(
       { user_id: userId, product_id: productId, last_seen_at: now },
@@ -23,7 +23,7 @@ export async function fetchRecentlyViewedProductIds(
 ): Promise<Set<string>> {
   const since = new Date();
   since.setDate(since.getDate() - withinDays);
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from("user_product_views")
     .select("product_id")
     .eq("user_id", userId)
@@ -32,5 +32,5 @@ export async function fetchRecentlyViewedProductIds(
     console.warn("[user_product_views] fetch failed:", error.message);
     return new Set();
   }
-  return new Set((data ?? []).map((r: { product_id: string }) => r.product_id));
+  return new Set((data ?? []).map((r) => r.product_id));
 }

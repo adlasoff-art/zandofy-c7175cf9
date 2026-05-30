@@ -47,6 +47,7 @@ import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimat
 import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd, buildJsonLdGraph, buildMarketplaceFaqJsonLd } from "@/components/SEOHead";
 import { VariantOrderDrawer } from "@/components/VariantOrderDrawer";
 import { slugify } from "@/utils/slugify";
+import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 
 // ─── Gallery from product_images ──────────────────────────────
 interface GalleryItem {
@@ -93,7 +94,6 @@ export default function ProductPage() {
   const [selectedDynamic, setSelectedDynamic] = useState<Record<string, string>>({});
   const [sizeRegion, setSizeRegion] = useState("EU");
   const [copied, setCopied] = useState(false);
-  const wishlisted = id ? isInWishlist(id) : false;
   const [shippingCountry, setShippingCountry] = useState("France");
   const [sizeUnit, setSizeUnit] = useState<"CM" | "IN">("CM");
   const [quantity, setQuantity] = useState<number | null>(null);
@@ -106,6 +106,8 @@ export default function ProductPage() {
     queryFn: () => fetchProductBySlug(slug!),
     enabled: !!slug,
   });
+
+  const wishlisted = product ? isInWishlist(product.id) : false;
 
   const { data: relatedProducts } = useQuery({
     queryKey: ["related-products", product?.categoryId],
@@ -790,7 +792,7 @@ export default function ProductPage() {
               </div>
 
               {/* Wishlist button — above action row */}
-              <button onClick={() => id && toggleWishlist(id)} className={`w-full h-10 rounded-sm border-2 flex items-center justify-center gap-2 text-sm font-medium transition-all ${wishlisted ? "border-sale bg-sale/10 text-sale" : "border-border text-muted-foreground hover:text-sale hover:border-sale"}`} aria-label="Ajouter aux favoris">
+              <button onClick={() => product && toggleWishlist(product.id)} className={`w-full h-10 rounded-sm border-2 flex items-center justify-center gap-2 text-sm font-medium transition-all ${wishlisted ? "border-sale bg-sale/10 text-sale" : "border-border text-muted-foreground hover:text-sale hover:border-sale"}`} aria-label="Ajouter aux favoris">
                 <Heart size={18} className={wishlisted ? "fill-sale" : ""} />
                 {wishlisted ? t("product.removeFromWishlist") : t("product.addToWishlist")}
               </button>
@@ -1101,7 +1103,7 @@ export default function ProductPage() {
               <h2 className="text-lg font-semibold text-foreground">{t("product.alsoViewed")}</h2>
               <Link to="/" className="text-sm text-primary hover:underline">{t("product.seeMore")}</Link>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            <div className={PRODUCT_GRID_CLASS}>
               {relatedProducts.filter(p => p.id !== product.id).slice(0, 15).map((p, i) => (
                 <Link to={`/product/${(p as any).slug || p.id}`} key={p.id}><ProductCard product={p} index={i} /></Link>
               ))}

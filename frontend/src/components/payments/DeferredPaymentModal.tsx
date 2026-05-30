@@ -201,13 +201,25 @@ export function DeferredPaymentModal({ orderId, orderRef, amount, paymentType, o
       const ext = compressed.name.split(".").pop() || "jpg";
       const path = `payment-proofs/${orderId}/${proofField}-${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage.from("delivery-proofs").upload(path, compressed, { upsert: true, cacheControl: "31536000" });
-      if (uploadError) throw uploadError;
-      // Bucket privé : on stocke le path. L'affichage utilise getDeliveryProofUrl().
-      await supabase.from("orders").update({ [proofField]: path } as any).eq("id", orderId);
+      if (uploadError) {
+        const rls = /row-level security|RLS/i.test(uploadError.message);
+        toast.error(
+          rls
+            ? "Envoi du fichier refusé (droits). Reconnectez-vous ou contactez le support."
+            : `Échec de l'envoi : ${uploadError.message}`,
+        );
+        return;
+      }
+      const { error: updateError } = await supabase.from("orders").update({ [proofField]: path } as any).eq("id", orderId);
+      if (updateError) {
+        toast.error(`Fichier envoyé mais commande non mise à jour : ${updateError.message}`);
+        return;
+      }
       setProofUploaded(true);
       toast.success("Preuve de paiement envoyée. En attente de validation.");
-    } catch (err: any) {
-      toast.error(err.message || "Erreur lors de l'upload");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erreur lors de l'upload";
+      toast.error(message);
     } finally {
       setUploading(false);
     }
