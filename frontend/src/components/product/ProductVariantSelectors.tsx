@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { Ruler } from "lucide-react";
-import { OptimizedImage } from "@/components/OptimizedImage";
+import { PdpThumbImage } from "@/components/product/PdpThumbImage";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VariantImageLightbox } from "@/components/product/VariantImageLightbox";
+import { PDP_THUMB_FRAME_CLASS } from "@/lib/product-image-fit";
 import {
   collectVariantLightboxUrls,
   resolveColorDisplayMode,
   SIZE_REGIONS,
+  PDP_THUMB_WIDTHS,
   type ColorOption,
   type GalleryItem,
 } from "@/lib/product-pdp";
@@ -98,16 +100,16 @@ export function ProductVariantSelectors({
                   key={`${color.hex}-img-${i}`}
                   type="button"
                   onClick={() => handleColor(i)}
-                  className={`w-12 h-12 md:w-14 md:h-14 rounded-sm border-2 overflow-hidden bg-muted shrink-0 transition-colors min-h-[44px] min-w-[44px] ${selectedColor === i ? "border-primary ring-2 ring-primary/30" : "border-border/40"}`}
+                  className={`${PDP_THUMB_FRAME_CLASS} w-12 h-12 md:w-14 md:h-14 rounded-sm shrink-0 min-h-[44px] min-w-[44px] ${selectedColor === i ? "border-primary ring-2 ring-primary/30" : "border-border/40"}`}
                   aria-label={color.name || t("product.colorAria", { index: i + 1 })}
                 >
                   {color.imageUrl ? (
-                    <OptimizedImage
+                    <PdpThumbImage
                       src={color.imageUrl}
                       alt={color.name}
-                      widths={[96, 128]}
+                      widths={[...PDP_THUMB_WIDTHS]}
                       sizes="56px"
-                      className="w-full h-full object-contain"
+                      fitHeight={56}
                     />
                   ) : (
                     <div className="w-full h-full" style={{ backgroundColor: color.hex }} />
@@ -122,17 +124,17 @@ export function ProductVariantSelectors({
                   key={`${color.hex}-swatch-${i}`}
                   type="button"
                   onClick={() => handleColor(i)}
-                  className={`w-11 h-11 rounded-full border-2 overflow-hidden transition-all shrink-0 min-h-[44px] min-w-[44px] ${selectedColor === i ? "border-primary ring-2 ring-primary/30 scale-105" : "border-border"}`}
+                  className={`relative w-11 h-11 rounded-full border-2 overflow-hidden transition-all shrink-0 min-h-[44px] min-w-[44px] ${selectedColor === i ? "border-primary ring-2 ring-primary/30 scale-105" : "border-border"}`}
                   style={color.imageUrl ? undefined : { backgroundColor: color.hex }}
                   aria-label={color.name || t("product.colorAria", { index: i + 1 })}
                 >
                   {color.imageUrl && (
-                    <OptimizedImage
+                    <PdpThumbImage
                       src={color.imageUrl}
                       alt={color.name}
-                      widths={[64, 96]}
+                      widths={[...PDP_THUMB_WIDTHS]}
                       sizes="44px"
-                      className="w-full h-full object-contain"
+                      fitHeight={44}
                     />
                   )}
                 </button>

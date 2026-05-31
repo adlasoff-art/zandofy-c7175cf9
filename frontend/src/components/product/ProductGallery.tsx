@@ -1,8 +1,9 @@
 import { type TouchEvent, useRef } from "react";
 import { Camera, ChevronLeft, ChevronRight } from "lucide-react";
 import { ImageZoomLens } from "@/components/ImageZoomLens";
-import { OptimizedImage } from "@/components/OptimizedImage";
+import { PdpThumbImage } from "@/components/product/PdpThumbImage";
 import { imgUrl, imgSrcSet } from "@/lib/image-url";
+import { PDP_THUMB_FRAME_CLASS } from "@/lib/product-image-fit";
 import {
   PDP_MAIN_WIDTHS,
   PDP_THUMB_WIDTHS,
@@ -27,18 +28,20 @@ function ThumbButton({
     <button
       type="button"
       onClick={onSelect}
-      className={`aspect-square w-14 md:w-16 shrink-0 rounded-sm overflow-hidden border-2 transition-colors bg-muted flex items-center justify-center ${selected ? "border-primary" : "border-border/40"} ${className}`}
+      className={`${PDP_THUMB_FRAME_CLASS} w-14 md:w-16 shrink-0 rounded-sm ${selected ? "border-primary" : "border-border/40"} ${className}`}
       aria-label={`Vue ${index + 1}`}
     >
       {item.type === "video" ? (
-        <Camera size={14} className="text-muted-foreground" />
+        <span className="absolute inset-0 flex items-center justify-center">
+          <Camera size={14} className="text-muted-foreground" />
+        </span>
       ) : (
-        <OptimizedImage
+        <PdpThumbImage
           src={item.url}
           alt={`Vue ${index + 1}`}
           widths={[...PDP_THUMB_WIDTHS]}
           sizes="64px"
-          className="w-full h-full object-contain"
+          fitHeight={64}
         />
       )}
     </button>

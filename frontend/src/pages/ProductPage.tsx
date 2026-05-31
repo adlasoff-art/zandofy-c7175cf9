@@ -8,8 +8,9 @@ import { fetchProductBySlug, fetchProducts, fetchPricingTiers, type Product } fr
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { imgUrl } from "@/lib/image-url";
-import { OptimizedImage } from "@/components/OptimizedImage";
+import { PdpThumbImage } from "@/components/product/PdpThumbImage";
 import { PDP_THUMB_WIDTHS } from "@/lib/product-pdp";
+import { PDP_THUMB_FRAME_CLASS } from "@/lib/product-image-fit";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { Footer } from "@/components/Footer";
@@ -286,38 +287,44 @@ export default function ProductPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
 
           {/* ─── LEFT: Gallery + Trust + Description + Upsells ─── */}
-          <div className="space-y-4">
-            <ProductGallery
-              gallery={gallery}
-              selectedIndex={selectedImage}
-              onSelectIndex={setSelectedImage}
-              productName={product.nameFr}
-              fallbackImage={product.image}
-              isSale={product.isSale}
-              discount={product.discount}
-              onPrev={goGalleryPrev}
-              onNext={goGalleryNext}
-            />
-
+          <div className="flex flex-col gap-4">
             {(product as any).store && (
-              <StoreTrustBlock
-                store={(product as any).store}
-                originCountry={product.originCountry}
-                productId={product.id}
-                productName={product.nameFr}
-                productSku={product.sku}
-                productPrice={formatPrice(currentUnitPrice)}
-                labels={{
-                  storeRating: t("product.storeRating"),
-                  storeResponseTime: t("product.storeResponseTime"),
-                  storeReactivity: t("product.storeReactivity"),
-                  storeReorderRate: t("product.storeReorderRate"),
-                  contactSupplier: t("product.contactSupplier"),
-                  whatsapp: "WhatsApp",
-                  visitStore: t("product.allItems"),
-                }}
-              />
+              <div className="order-1 lg:order-2">
+                <StoreTrustBlock
+                  store={(product as any).store}
+                  originCountry={product.originCountry}
+                  productId={product.id}
+                  productName={product.nameFr}
+                  productSku={product.sku}
+                  productPrice={formatPrice(currentUnitPrice)}
+                  labels={{
+                    storeRating: t("product.storeRating"),
+                    storeResponseTime: t("product.storeResponseTime"),
+                    storeReactivity: t("product.storeReactivity"),
+                    storeReorderRate: t("product.storeReorderRate"),
+                    contactSupplier: t("product.contactSupplier"),
+                    whatsapp: "WhatsApp",
+                    visitStore: t("product.allItems"),
+                    storeExpand: t("product.storeExpand"),
+                    storeCollapse: t("product.storeCollapse"),
+                  }}
+                />
+              </div>
             )}
+
+            <div className="order-2 lg:order-1">
+              <ProductGallery
+                gallery={gallery}
+                selectedIndex={selectedImage}
+                onSelectIndex={setSelectedImage}
+                productName={product.nameFr}
+                fallbackImage={product.image}
+                isSale={product.isSale}
+                discount={product.discount}
+                onPrev={goGalleryPrev}
+                onNext={goGalleryNext}
+              />
+            </div>
 
             {/* ─── Description below image (desktop only) ─── */}
             <div className="hidden lg:block space-y-4">
@@ -342,19 +349,19 @@ export default function ProductPage() {
                       <button
                         key={i}
                         onClick={() => setSelectedImage(i)}
-                        className={`aspect-square rounded-sm overflow-hidden border-2 transition-colors ${selectedImage === i ? "border-primary" : "border-border/40"}`}
+                        className={`${PDP_THUMB_FRAME_CLASS} rounded-sm ${selectedImage === i ? "border-primary" : "border-border/40"}`}
                       >
                         {item.type === "video" ? (
-                          <div className="w-full h-full bg-muted flex items-center justify-center">
+                          <span className="absolute inset-0 flex items-center justify-center">
                             <Camera size={12} className="text-muted-foreground" />
-                          </div>
+                          </span>
                         ) : (
-                          <OptimizedImage
+                          <PdpThumbImage
                             src={item.url}
                             alt={`Vue ${i + 1}`}
                             widths={[...PDP_THUMB_WIDTHS]}
                             sizes="120px"
-                            className="w-full h-full object-contain"
+                            fitHeight={120}
                           />
                         )}
                       </button>

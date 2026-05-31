@@ -42,9 +42,9 @@ Résultat attendu : **8 lignes** sur staging et prod → RLS Storage OK, pas bes
 
 ## Déploiement
 
-1. **Staging** — migrations SQL ci-dessus + checklist smoke sur `studio-staging.zandofy.com`.
-2. **Production** — même chose, fenêtre faible trafic.
-3. Déployer le frontend `develop` après les migrations SQL (UI vendeur + admin).
+1. **Staging** — exécuter les migrations SQL dans le projet Supabase **staging**, puis checklist smoke ci-dessous sur le frontend staging (prévisualisation Vercel liée à `develop`, ou URL de preview configurée).
+2. **Production** — même migrations dans le projet Supabase **production**, fenêtre faible trafic.
+3. Merger / déployer le frontend sur la branche Vercel cible **après** les migrations SQL staging validées (UI vendeur + admin).
 
 ## Checklist smoke staging
 
