@@ -464,20 +464,38 @@ export async function fetchProductBySlug(
     }
   }
 
-  // Load dynamic variant selections with type info
+  // Load dynamic variant selections + custom values (vendor-defined only)
   try {
-    const { data: selections } = await (supabase as any)
-      .from("product_variant_selections")
-      .select("variant_type_id, variant_option_id")
-      .eq("product_id", data.id);
+    const [{ data: selections }, { data: customValues }] = await Promise.all([
+      (supabase as any)
+        .from("product_variant_selections")
+        .select("variant_type_id, variant_option_id")
+        .eq("product_id", data.id),
+      (supabase as any)
+        .from("product_custom_variant_values")
+        .select("variant_type_id, custom_label")
+        .eq("product_id", data.id),
+    ]);
 
-    if (selections && selections.length > 0) {
-      const typeIds = [...new Set(selections.map((s: any) => s.variant_type_id))];
-      const optionIds = selections.map((s: any) => s.variant_option_id);
+    const typeIdSet = new Set<string>();
+    (selections || []).forEach((s: any) => typeIdSet.add(s.variant_type_id));
+    (customValues || []).forEach((c: any) => typeIdSet.add(c.variant_type_id));
+
+    if (typeIdSet.size > 0) {
+      const typeIds = [...typeIdSet];
+      const optionIds = (selections || [])
+        .map((s: any) => s.variant_option_id)
+        .filter(Boolean);
 
       const [typesRes, optionsRes] = await Promise.all([
         (supabase as any).from("variant_types").select("id, name, unit, icon").in("id", typeIds),
-        (supabase as any).from("variant_type_options").select("id, variant_type_id, label, sort_order").in("id", optionIds).order("sort_order"),
+        optionIds.length > 0
+          ? (supabase as any)
+              .from("variant_type_options")
+              .select("id, variant_type_id, label, sort_order")
+              .in("id", optionIds)
+              .order("sort_order")
+          : Promise.resolve({ data: [] }),
       ]);
 
       const typesMap = new Map((typesRes.data || []).map((t: any) => [t.id, t]));
@@ -487,16 +505,37 @@ export async function fetchProductBySlug(
         const type = typesMap.get(typeId) as any;
         if (!type) continue;
         const typeOptions = (optionsRes.data || []).filter((o: any) => o.variant_type_id === typeId);
-        dynamicVariants.push({
-          typeId: type.id,
-          typeName: type.name,
-          unit: type.unit,
-          icon: type.icon,
-          options: typeOptions.map((o: any) => ({ id: o.id, label: o.label })),
-        });
+        const seenLabels = new Set<string>();
+        const options: { id: string; label: string }[] = [];
+
+        for (const o of typeOptions) {
+          if (!seenLabels.has(o.label)) {
+            seenLabels.add(o.label);
+            options.push({ id: o.id, label: o.label });
+          }
+        }
+        for (const cv of (customValues || []).filter((c: any) => c.variant_type_id === typeId)) {
+          const label = String(cv.custom_label || "").trim();
+          if (label && !seenLabels.has(label)) {
+            seenLabels.add(label);
+            options.push({ id: `custom-${typeId}-${label}`, label });
+          }
+        }
+
+        if (options.length > 0) {
+          dynamicVariants.push({
+            typeId: type.id,
+            typeName: type.name,
+            unit: type.unit,
+            icon: type.icon,
+            options,
+          });
+        }
       }
 
-      (product as any).dynamicVariants = dynamicVariants;
+      if (dynamicVariants.length > 0) {
+        (product as any).dynamicVariants = dynamicVariants;
+      }
     }
   } catch (e) {
     // Silently fail - variants are optional

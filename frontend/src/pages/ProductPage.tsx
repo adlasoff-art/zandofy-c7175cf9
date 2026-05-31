@@ -26,6 +26,7 @@ import { ProductVariantSelectors } from "@/components/product/ProductVariantSele
 import { StoreTrustBlock } from "@/components/product/StoreTrustBlock";
 import {
   buildColorOptions,
+  getApparelSizesForPdp,
   getGalleryItems,
   SIZE_REGIONS,
 } from "@/lib/product-pdp";
@@ -195,7 +196,7 @@ export default function ProductPage() {
     }
   };
 
-  const sizes = SIZE_REGIONS[sizeRegion] || SIZE_REGIONS.EU;
+  const apparelSizes = useMemo(() => getApparelSizesForPdp(product), [product]);
 
   const productSku = product?.sku || `SKU-${product?.id?.slice(0, 8) || "000000"}`;
   const copySku = () => {
@@ -287,9 +288,23 @@ export default function ProductPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
 
           {/* ─── LEFT: Gallery + Trust + Description + Upsells ─── */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2.5 lg:gap-4">
+            <div className="order-2 lg:order-none">
+              <ProductGallery
+                gallery={gallery}
+                selectedIndex={selectedImage}
+                onSelectIndex={setSelectedImage}
+                productName={product.nameFr}
+                fallbackImage={product.image}
+                isSale={product.isSale}
+                discount={product.discount}
+                onPrev={goGalleryPrev}
+                onNext={goGalleryNext}
+              />
+            </div>
+
             {(product as any).store && (
-              <div className="order-1 lg:order-2">
+              <div className="order-1 lg:order-none">
                 <StoreTrustBlock
                   store={(product as any).store}
                   originCountry={product.originCountry}
@@ -311,20 +326,6 @@ export default function ProductPage() {
                 />
               </div>
             )}
-
-            <div className="order-2 lg:order-1">
-              <ProductGallery
-                gallery={gallery}
-                selectedIndex={selectedImage}
-                onSelectIndex={setSelectedImage}
-                productName={product.nameFr}
-                fallbackImage={product.image}
-                isSale={product.isSale}
-                discount={product.discount}
-                onPrev={goGalleryPrev}
-                onNext={goGalleryNext}
-              />
-            </div>
 
             {/* ─── Description below image (desktop only) ─── */}
             <div className="hidden lg:block space-y-4">
@@ -497,8 +498,8 @@ export default function ProductPage() {
                 {(product.colors?.length ?? 0) > 0 && (
                   <span className="text-xs text-muted-foreground">{t("product.colorsCount", { count: product.colors!.length, plural: product.colors!.length > 1 ? "s" : "" })}</span>
                 )}
-                {(product.sizes?.length ?? 0) > 0 && (
-                  <span className="text-xs text-muted-foreground">· {t("product.sizesCount", { count: product.sizes!.length, plural: product.sizes!.length > 1 ? "s" : "" })}</span>
+                {apparelSizes.length > 0 && (
+                  <span className="text-xs text-muted-foreground">· {t("product.sizesCount", { count: apparelSizes.length, plural: apparelSizes.length > 1 ? "s" : "" })}</span>
                 )}
                 {((product as any).dynamicVariants || []).map((dv: any) => (
                   <span key={dv.typeId} className="text-xs text-muted-foreground">· {dv.options.length} {(dv.typeName || "option").toLowerCase()}{dv.options.length > 1 ? "s" : ""}</span>
@@ -517,7 +518,7 @@ export default function ProductPage() {
               selectedColor={selectedColor}
               onColorSelect={selectColor}
               onOpenVariantDrawer={openVariantDrawer}
-              sizes={sizes}
+              sizes={apparelSizes}
               sizeRegion={sizeRegion}
               onSizeRegionChange={setSizeRegion}
               selectedSize={selectedSize}
@@ -768,34 +769,36 @@ export default function ProductPage() {
                 </AccordionContent>
               </AccordionItem>
 
-              {/* Size & Fit */}
-              <AccordionItem value="size-fit" className="border-b border-border last:border-0">
-                <AccordionTrigger className="px-4 py-3 text-sm font-medium hover:no-underline">{t("product.sizesMeasurements")}</AccordionTrigger>
-                <AccordionContent className="px-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="flex bg-muted rounded-sm p-0.5">
-                        {(["CM", "IN"] as const).map(u => (
-                          <button key={u} onClick={() => setSizeUnit(u)} className={`px-3 py-1 text-xs font-medium rounded-sm transition-colors ${sizeUnit === u ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}>{u}</button>
-                        ))}
+              {/* Size & Fit — only when vendor configured apparel sizes */}
+              {apparelSizes.length > 0 && (
+                <AccordionItem value="size-fit" className="border-b border-border last:border-0">
+                  <AccordionTrigger className="px-4 py-3 text-sm font-medium hover:no-underline">{t("product.sizesMeasurements")}</AccordionTrigger>
+                  <AccordionContent className="px-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex bg-muted rounded-sm p-0.5">
+                          {(["CM", "IN"] as const).map(u => (
+                            <button key={u} onClick={() => setSizeUnit(u)} className={`px-3 py-1 text-xs font-medium rounded-sm transition-colors ${sizeUnit === u ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}>{u}</button>
+                          ))}
+                        </div>
+                        <Select value={sizeRegion} onValueChange={setSizeRegion}>
+                          <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>{Object.keys(SIZE_REGIONS).map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                        </Select>
                       </div>
-                      <Select value={sizeRegion} onValueChange={setSizeRegion}>
-                        <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>{Object.keys(SIZE_REGIONS).map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <table className="w-full text-xs border-collapse">
+                        <thead><tr className="bg-muted"><th className="p-2 text-left text-muted-foreground">{t("product.sizeCol")}</th><th className="p-2 text-left text-muted-foreground">{t("product.bust")}</th><th className="p-2 text-left text-muted-foreground">{t("product.waist")}</th><th className="p-2 text-left text-muted-foreground">{t("product.hips")}</th></tr></thead>
+                        <tbody>{["XS","S","M","L","XL","XXL"].map((s,i) => {
+                          const factor = sizeUnit === "IN" ? 0.3937 : 1;
+                          const fmt = (v: number) => sizeUnit === "IN" ? v.toFixed(1) : String(v);
+                          return (<tr key={s} className="border-b border-border/50"><td className="p-2 font-medium">{s}</td><td className="p-2">{fmt((78+i*4)*factor)}–{fmt((82+i*4)*factor)}</td><td className="p-2">{fmt((60+i*4)*factor)}–{fmt((64+i*4)*factor)}</td><td className="p-2">{fmt((84+i*4)*factor)}–{fmt((88+i*4)*factor)}</td></tr>);
+                        })}</tbody>
+                      </table>
+                      <p className="text-xs text-muted-foreground italic">{t("product.modelWears", { size: (product as any).model_size || "M" })}</p>
                     </div>
-                    <table className="w-full text-xs border-collapse">
-                      <thead><tr className="bg-muted"><th className="p-2 text-left text-muted-foreground">{t("product.sizeCol")}</th><th className="p-2 text-left text-muted-foreground">{t("product.bust")}</th><th className="p-2 text-left text-muted-foreground">{t("product.waist")}</th><th className="p-2 text-left text-muted-foreground">{t("product.hips")}</th></tr></thead>
-                      <tbody>{["XS","S","M","L","XL","XXL"].map((s,i) => {
-                        const factor = sizeUnit === "IN" ? 0.3937 : 1;
-                        const fmt = (v: number) => sizeUnit === "IN" ? v.toFixed(1) : String(v);
-                        return (<tr key={s} className="border-b border-border/50"><td className="p-2 font-medium">{s}</td><td className="p-2">{fmt((78+i*4)*factor)}–{fmt((82+i*4)*factor)}</td><td className="p-2">{fmt((60+i*4)*factor)}–{fmt((64+i*4)*factor)}</td><td className="p-2">{fmt((84+i*4)*factor)}–{fmt((88+i*4)*factor)}</td></tr>);
-                      })}</tbody>
-                    </table>
-                    <p className="text-xs text-muted-foreground italic">{t("product.modelWears", { size: (product as any).model_size || "M" })}</p>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
+                  </AccordionContent>
+                </AccordionItem>
+              )}
 
               {/* About Store */}
               <AccordionItem value="about-store" className="last:border-0">
