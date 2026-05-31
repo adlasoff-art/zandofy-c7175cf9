@@ -411,6 +411,34 @@ describe("Wishlist product id", () => {
   });
 });
 
+describe("Product PDP helpers", () => {
+  it("resolveColorDisplayMode prefers image when any color has imageUrl", async () => {
+    const { resolveColorDisplayMode } = await import("@/lib/product-pdp");
+    expect(
+      resolveColorDisplayMode([
+        { hex: "#000", name: "Noir", imageUrl: "https://cdn/a.jpg" },
+        { hex: "#fff", name: "Blanc", imageUrl: null },
+      ]),
+    ).toBe("image");
+    expect(
+      resolveColorDisplayMode([{ hex: "#000", name: "Noir", imageUrl: null }]),
+    ).toBe("swatch");
+  });
+
+  it("getIncentiveTier returns second tier range", async () => {
+    const { getIncentiveTier } = await import("@/lib/product-pdp");
+    const tiers = [
+      { id: "1", tierLabel: "T1", minQuantity: 1, discountType: "percentage" as const, discountValue: 0 },
+      { id: "2", tierLabel: "T2", minQuantity: 100, discountType: "percentage" as const, discountValue: 5 },
+      { id: "3", tierLabel: "T3", minQuantity: 500, discountType: "percentage" as const, discountValue: 12 },
+    ];
+    const inc = getIncentiveTier(tiers, 10);
+    expect(inc).not.toBeNull();
+    expect(inc!.unitPrice).toBe(9.5);
+    expect(inc!.rangeLabel).toContain("100");
+  });
+});
+
 describe("Off-platform dual validation", () => {
   it("vendor filter includes only off_platform awaiting_payment", async () => {
     const { VENDOR_ORDERS_OR_FILTER } = await import("@/lib/off-platform-payment");

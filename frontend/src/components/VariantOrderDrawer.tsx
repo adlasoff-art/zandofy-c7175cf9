@@ -352,7 +352,7 @@ export function VariantOrderDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={isMobile ? "bottom" : "right"}
-        className={`p-0 flex flex-col ${isMobile ? "h-[92vh] rounded-t-2xl" : "w-[560px] max-w-[90vw]"} [&>button.absolute]:hidden`}
+        className={`p-0 flex flex-col ${isMobile ? "h-[92vh] max-h-[92dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]" : "w-[560px] max-w-[90vw]"} [&>button.absolute]:hidden`}
       >
         <div className="px-5 pt-5 pb-3 border-b border-border shrink-0">
           <div className="flex items-center justify-between mb-2">

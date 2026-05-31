@@ -1,5 +1,4 @@
-import { useState, useMemo, useRef, useEffect, lazy, Suspense, type TouchEvent } from "react";
-import { ImageZoomLens } from "@/components/ImageZoomLens";
+import { useState, useMemo, useEffect } from "react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { recordProductView } from "@/lib/user-product-views";
@@ -8,12 +7,9 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchProductBySlug, fetchProducts, fetchPricingTiers, type Product } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
-import { imgUrl, imgSrcSet } from "@/lib/image-url";
+import { imgUrl } from "@/lib/image-url";
 import { OptimizedImage } from "@/components/OptimizedImage";
-
-const PDP_THUMB_WIDTHS = [120, 160, 240] as const;
-const PDP_MAIN_WIDTHS = [600, 900, 1200] as const;
-const SWIPE_THRESHOLD_PX = 50;
+import { PDP_THUMB_WIDTHS } from "@/lib/product-pdp";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { Footer } from "@/components/Footer";
@@ -22,8 +18,16 @@ import { ProductCard } from "@/components/ProductCard";
 import { ProductReviews } from "@/components/reviews/ProductReviews";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { CertificationBadge } from "@/components/CertificationBadge";
-import { VendorProfileCard } from "@/components/VendorProfileCard";
 import { FollowStoreButton } from "@/components/FollowStoreButton";
+import { ProductGallery } from "@/components/product/ProductGallery";
+import { ProductBuyColumn } from "@/components/product/ProductBuyColumn";
+import { ProductVariantSelectors } from "@/components/product/ProductVariantSelectors";
+import { StoreTrustBlock } from "@/components/product/StoreTrustBlock";
+import {
+  buildColorOptions,
+  getGalleryItems,
+  SIZE_REGIONS,
+} from "@/lib/product-pdp";
 import { TieredPricingTable, calculateTieredPrice, type PricingTier } from "@/components/TieredPricingTable";
 import { QuantitySelector } from "@/components/QuantitySelector";
 import { FlashTimer } from "@/components/FlashTimer";
@@ -31,14 +35,12 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import {
-  Star, Heart, Share2, Copy, Check, ChevronLeft, ChevronRight, ShoppingCart,
+  Heart, Check, ChevronRight, ShoppingCart,
   BadgeCheck, Ruler, Award, Truck, RotateCcw, ShieldCheck, Camera,
   MapPin, Globe, Trophy, Store, TrendingUp, Users, Link as LinkIcon,
 } from "lucide-react";
@@ -48,36 +50,6 @@ import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd, buildJsonLdGraph, b
 import { VariantOrderDrawer } from "@/components/VariantOrderDrawer";
 import { slugify } from "@/utils/slugify";
 import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
-
-// ─── Gallery from product_images ──────────────────────────────
-interface GalleryItem {
-  url: string;
-  type: "image" | "video";
-}
-
-function getGalleryItems(product: Product): GalleryItem[] {
-  // If product has real images from DB, use them
-  const images = (product as any).galleryImages as Array<{ image_url: string; position: number | null }> | undefined;
-  if (images && images.length > 0) {
-    return images
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-      .map((img) => ({
-        url: img.image_url,
-        type: img.image_url.match(/\.(mp4|webm|mov)$/i) ? "video" as const : "image" as const,
-      }));
-  }
-  return [{ url: product.image, type: "image" as const }];
-}
-
-const SIZE_REGIONS: Record<string, string[]> = {
-  EU: ["XS", "S", "M", "L", "XL", "XXL"],
-  FR: ["34", "36", "38", "40", "42", "44"],
-  US: ["0", "2", "4", "6", "8", "10"],
-  UK: ["4", "6", "8", "10", "12", "14"],
-  JP: ["5", "7", "9", "11", "13", "15"],
-};
-
-// Reviews moved to src/components/reviews/ProductReviews.tsx
 
 // ─── Component ─────────────────────────────────
 export default function ProductPage() {
@@ -99,7 +71,6 @@ export default function ProductPage() {
   const [quantity, setQuantity] = useState<number | null>(null);
   const [variantDrawerOpen, setVariantDrawerOpen] = useState(false);
   const [pointsPerDollar, setPointsPerDollar] = useState(50);
-  const touchStartX = useRef<number | null>(null);
 
   const { data: product, isLoading } = useQuery({
     queryKey: ["product", slug],
@@ -194,19 +165,15 @@ export default function ProductPage() {
   const totalSavings = tieredResult?.savings ?? 0;
 
   const gallery = useMemo(() => (product ? getGalleryItems(product) : []), [product]);
-  const colorOptions = useMemo(() => {
-    if (!product) return [] as Array<{ hex: string; name: string; imageUrl: string | null }>;
-    if (product.productColors?.length) {
-      return product.productColors.filter((c) => Boolean(c.hex));
-    }
-    return (product.colors || [])
-      .filter((hex): hex is string => Boolean(hex))
-      .map((hex, i) => ({
-        hex,
-        name: t("product.colorFallback", { index: i + 1 }),
-        imageUrl: null as string | null,
-      }));
-  }, [product, t]);
+  const colorOptions = useMemo(
+    () =>
+      product
+        ? buildColorOptions(product, (i) => t("product.colorFallback", { index: i + 1 }))
+        : [],
+    [product, t],
+  );
+
+  const openVariantDrawer = () => setVariantDrawerOpen(true);
 
   useEffect(() => {
     if (!user?.id || !product?.id) return;
@@ -217,18 +184,6 @@ export default function ProductPage() {
     setSelectedImage((p) => (p > 0 ? p - 1 : gallery.length - 1));
   const goGalleryNext = () =>
     setSelectedImage((p) => (p < gallery.length - 1 ? p + 1 : 0));
-
-  const handleGalleryTouchStart = (e: TouchEvent<HTMLDivElement>) => {
-    touchStartX.current = e.changedTouches[0]?.clientX ?? null;
-  };
-  const handleGalleryTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
-    if (touchStartX.current == null || gallery.length < 2) return;
-    const delta = (e.changedTouches[0]?.clientX ?? 0) - touchStartX.current;
-    touchStartX.current = null;
-    if (Math.abs(delta) < SWIPE_THRESHOLD_PX) return;
-    if (delta < 0) goGalleryNext();
-    else goGalleryPrev();
-  };
 
   const selectColor = (index: number) => {
     setSelectedColor(index);
@@ -327,79 +282,42 @@ export default function ProductPage() {
           </BreadcrumbList>
         </Breadcrumb>
 
-        {/* ═══ VENDOR HEADER (above gallery) ═══ */}
-        {(product as any).store && (
-          <VendorProfileCard
-            store={(product as any).store}
-            productName={product.nameFr}
-            productId={product.id}
-            originCountry={product.originCountry}
-            productSku={product.sku}
-            productPrice={formatPrice(currentUnitPrice)}
-            productImage={gallery[0]?.url || product.image}
-          />
-        )}
-
         {/* ═══ MAIN LAYOUT ═══ */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
 
-          {/* ─── LEFT: Gallery + Description + Upsells ─── */}
+          {/* ─── LEFT: Gallery + Trust + Description + Upsells ─── */}
           <div className="space-y-4">
-            {/* Gallery — fixed height, doesn't stretch with right column */}
-            <div className="flex gap-3">
-              <div className="hidden md:flex flex-col gap-2 w-16 shrink-0">
-                {gallery.map((item, i) => (
-                  <button key={i} onClick={() => setSelectedImage(i)}
-                    className={`aspect-[3/4] rounded-sm overflow-hidden border-2 transition-colors ${selectedImage === i ? "border-primary" : "border-border/40"}`}>
-                    {item.type === "video" ? (
-                      <div className="w-full h-full bg-muted flex items-center justify-center">
-                        <Camera size={14} className="text-muted-foreground" />
-                      </div>
-                    ) : (
-                      <OptimizedImage
-                        src={item.url}
-                        alt={`Vue ${i + 1}`}
-                        widths={[...PDP_THUMB_WIDTHS]}
-                        sizes="64px"
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                  </button>
-                ))}
-              </div>
-              <div
-                className="relative flex-1 aspect-[3/4] max-h-[520px] rounded-sm overflow-hidden bg-muted touch-pan-y"
-                onTouchStart={handleGalleryTouchStart}
-                onTouchEnd={handleGalleryTouchEnd}
-              >
-                {gallery[selectedImage]?.type === "video" ? (
-                  <video
-                    key={gallery[selectedImage].url}
-                    src={gallery[selectedImage].url}
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <ImageZoomLens
-                    src={imgUrl(gallery[selectedImage]?.url || product.image, { width: 1200, quality: 80 })}
-                    srcSet={imgSrcSet(gallery[selectedImage]?.url || product.image, [...PDP_MAIN_WIDTHS], { quality: 80 })}
-                    sizes="(max-width: 1024px) 100vw, 50vw"
-                    alt={product.nameFr}
-                    className="w-full h-full"
-                    zoomFactor={2.5}
-                  />
-                )}
-                {product.isSale && product.discount && (
-                  <span className="absolute top-3 left-3 px-3 py-1.5 text-sm font-bold bg-sale text-sale-foreground rounded-sm">-{product.discount}%</span>
-                )}
-                <button type="button" onClick={goGalleryPrev} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-card/80 flex items-center justify-center hover:bg-card transition-colors"><ChevronLeft size={18} /></button>
-                <button type="button" onClick={goGalleryNext} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-card/80 flex items-center justify-center hover:bg-card transition-colors"><ChevronRight size={18} /></button>
-                <span className="absolute bottom-3 right-3 text-xs bg-card/80 text-foreground px-2 py-1 rounded">{selectedImage + 1}/{gallery.length}</span>
-              </div>
-            </div>
+            <ProductGallery
+              gallery={gallery}
+              selectedIndex={selectedImage}
+              onSelectIndex={setSelectedImage}
+              productName={product.nameFr}
+              fallbackImage={product.image}
+              isSale={product.isSale}
+              discount={product.discount}
+              onPrev={goGalleryPrev}
+              onNext={goGalleryNext}
+            />
+
+            {(product as any).store && (
+              <StoreTrustBlock
+                store={(product as any).store}
+                originCountry={product.originCountry}
+                productId={product.id}
+                productName={product.nameFr}
+                productSku={product.sku}
+                productPrice={formatPrice(currentUnitPrice)}
+                labels={{
+                  storeRating: t("product.storeRating"),
+                  storeResponseTime: t("product.storeResponseTime"),
+                  storeReactivity: t("product.storeReactivity"),
+                  storeReorderRate: t("product.storeReorderRate"),
+                  contactSupplier: t("product.contactSupplier"),
+                  whatsapp: "WhatsApp",
+                  visitStore: t("product.allItems"),
+                }}
+              />
+            )}
 
             {/* ─── Description below image (desktop only) ─── */}
             <div className="hidden lg:block space-y-4">
@@ -436,7 +354,7 @@ export default function ProductPage() {
                             alt={`Vue ${i + 1}`}
                             widths={[...PDP_THUMB_WIDTHS]}
                             sizes="120px"
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                           />
                         )}
                       </button>
@@ -510,91 +428,62 @@ export default function ProductPage() {
           </div>
 
           {/* ─── RIGHT: Product Info (sticky) ─── */}
-          <div className="lg:sticky lg:top-4 lg:self-start space-y-4">
-            {/* Title + Share */}
-            <div className="flex items-start gap-3 pb-3 border-b border-border/50">
-              <h1 className="text-lg md:text-xl font-semibold text-foreground leading-tight flex-1 line-clamp-2">{product.nameFr}</h1>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button className="shrink-0 w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" aria-label={t("product.shareAria") || "Partager"}><Share2 size={16} /></button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-48 p-1">
-                  {(() => {
-                    const productUrl = `${window.location.origin}/product/${product.slug || product.id}`;
-                    const shareText = `${product.nameFr}${product.sku ? `\nSKU: ${product.sku}` : ""}${product.price ? `\n${formatPrice(product.price)}` : ""}\n${productUrl}`;
-                    return (
-                      <>
-                        <a
-                          href={`https://wa.me/?text=${encodeURIComponent(shareText)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors w-full"
-                        >
-                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[#25D366]">
-                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                          </svg>
-                          WhatsApp
-                        </a>
-                        <a
-                          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(productUrl)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors w-full"
-                        >
-                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[#1877F2]">
-                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                          </svg>
-                          Facebook
-                        </a>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(productUrl);
-                            toast({ title: t("product.linkCopied") || "Lien copié !", description: t("product.linkCopiedDesc") || "Le lien du produit a été copié dans le presse-papiers." });
-                          }}
-                          className="flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors w-full"
-                        >
-                          <LinkIcon size={16} className="text-muted-foreground" />
-                          {t("product.copyLink") || "Copier le lien"}
-                        </button>
-                      </>
-                    );
-                  })()}
-                </PopoverContent>
-              </Popover>
-            </div>
+          <div className="lg:sticky lg:top-4 lg:self-start space-y-4 pb-[env(safe-area-inset-bottom)]">
+            <ProductBuyColumn
+              product={product}
+              productSku={productSku}
+              copied={copied}
+              onCopySku={copySku}
+              currentUnitPrice={currentUnitPrice}
+              basePrice={product.price}
+              pricingTiers={pricingTiers}
+              formatPrice={formatPrice}
+              t={t}
+              sellerRank={(product as any).sellerRank}
+              shareContent={
+                <>
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(`${product.nameFr}${product.sku ? `\nSKU: ${product.sku}` : ""}\n${formatPrice(product.price)}\n${window.location.origin}/product/${product.slug || product.id}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors w-full"
+                  >
+                    WhatsApp
+                  </a>
+                  <a
+                    href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/product/${product.slug || product.id}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors w-full"
+                  >
+                    Facebook
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/product/${product.slug || product.id}`);
+                      toast({ title: t("product.linkCopied") || "Lien copié !", description: t("product.linkCopiedDesc") });
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors w-full"
+                  >
+                    <LinkIcon size={16} className="text-muted-foreground" />
+                    {t("product.copyLink") || "Copier le lien"}
+                  </button>
+                </>
+              }
+            />
 
-            {/* SKU + Rating */}
-            <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-              <span className="inline-flex items-center gap-1">{productSku}
-                <button onClick={copySku} className="text-primary hover:text-primary/80 transition-colors" aria-label={t("product.copySkuAria") || "Copier le SKU"}>{copied ? <Check size={13} /> : <Copy size={13} />}</button>
+            {product.isSale && product.discount != null && (
+              <span className="inline-block text-sm font-bold text-sale bg-sale/10 px-2 py-0.5 rounded">
+                -{product.discount}%
               </span>
-              <span className="inline-flex items-center gap-1"><Star size={13} className="fill-accent text-accent" />{product.rating}</span>
-              <span>({product.reviewCount > 0 ? t("product.reviewsCount", { count: product.reviewCount.toLocaleString() }) : t("product.noReviews")})</span>
-            </div>
-
-            {/* Pricing - dynamic based on quantity tier */}
-            <div className="flex items-baseline gap-3">
-              <span className="text-foreground font-bold flex items-baseline">
-                <span className="text-sm">$</span><span className="text-3xl leading-none">{Math.floor(currentUnitPrice)}</span><span className="text-sm">.{(currentUnitPrice % 1).toFixed(2).slice(2)}</span>
-              </span>
-              {currentUnitPrice < product.price && (
-                <span className="text-base text-muted-foreground line-through">{formatPrice(product.price)}</span>
-              )}
-              {!tieredResult && product.originalPrice && (
-                <span className="text-base text-muted-foreground line-through">{formatPrice(product.originalPrice)}</span>
-              )}
-            {product.isSale && product.discount && <span className="text-sm font-bold text-sale bg-sale/10 px-2 py-0.5 rounded">-{product.discount}%</span>}
-              {tieredResult && tieredResult.tier.discountValue > 0 && (
-                <span className="text-sm font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                  {t("product.tierLabel", { label: tieredResult.tier.tierLabel })}
-                </span>
-              )}
-            </div>
+            )}
 
             {/* ★ SELECT OPTIONS TRIGGER (Alibaba-style) */}
             <button
-              onClick={() => setVariantDrawerOpen(true)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-muted/50 hover:bg-muted rounded-lg border border-border transition-colors group"
+              type="button"
+              onClick={openVariantDrawer}
+              className="w-full flex items-center justify-between px-4 py-3 min-h-[44px] bg-muted/50 hover:bg-muted rounded-lg border border-border transition-colors group"
             >
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold text-foreground">{t("product.selectOptions")}</span>
@@ -611,43 +500,33 @@ export default function ProductPage() {
               <ChevronRight size={16} className="text-muted-foreground group-hover:text-foreground transition-colors" />
             </button>
 
-            {/* Flash Timer FOMO */}
             {product.isSale && (
-              <FlashTimer
-                productId={product.id}
-                durationHours={24}
-                enabled={true}
-              />
+              <FlashTimer productId={product.id} durationHours={24} enabled />
             )}
 
-            {/* Short Description (conditional) */}
-            {product.shortDescription && (
-              <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">
-                {product.shortDescription}
-              </p>
-            )}
+            <ProductVariantSelectors
+              colorOptions={colorOptions}
+              gallery={gallery}
+              selectedColor={selectedColor}
+              onColorSelect={selectColor}
+              onOpenVariantDrawer={openVariantDrawer}
+              sizes={sizes}
+              sizeRegion={sizeRegion}
+              onSizeRegionChange={setSizeRegion}
+              selectedSize={selectedSize}
+              onSizeSelect={setSelectedSize}
+              dynamicVariants={(product as any).dynamicVariants || []}
+              selectedDynamic={selectedDynamic}
+              onDynamicSelect={(typeId, label) =>
+                setSelectedDynamic((prev) => ({ ...prev, [typeId]: label }))
+              }
+              t={t}
+            />
 
-            {/* Vendor card moved above gallery */}
+            <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-sm">
+              {t("product.loyaltyPoints", { points: loyaltyPoints })}
+            </p>
 
-            {/* ★ Top Seller badge (dynamic) */}
-            {(product as any).sellerRank && (product as any).sellerRank <= 10 && (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[hsl(var(--badge-bestseller))] border border-[hsl(var(--badge-bestseller-border))]">
-                <Award size={16} className="text-[hsl(var(--badge-bestseller-icon))]" />
-                <span className="font-semibold text-sm text-[hsl(var(--badge-bestseller-foreground))]">{t("product.bestSupplierIn", { rank: (product as any).sellerRank, category: product.categoryFr })}</span>
-              </div>
-            )}
-
-            {/* Zandofy Verified badge — always show seniority for verified stores */}
-            {(product as any).store?.is_verified && (
-              <div className="flex items-center gap-2">
-                <VerificationBadge variant="full" verifiedYears={(product as any).store?.verified_years_override ?? (product as any).store?.verified_years} storeCreatedAt={(product as any).store?.created_at} />
-                {(product as any).store?.is_certified && (
-                  <CertificationBadge type="vendor" variant="icon-only" />
-                )}
-              </div>
-            )}
-
-            {/* ═══ TIERED PRICING TABLE ═══ */}
             {pricingTiers.length > 1 && (
               <TieredPricingTable
                 tiers={pricingTiers}
@@ -656,125 +535,6 @@ export default function ProductPage() {
                 currency="$"
               />
             )}
-
-            {/* Color Selector */}
-            {colorOptions.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">{t("product.colorWithCount", { count: colorOptions.length })}</span>
-                  <Sheet>
-                    <SheetTrigger asChild><button type="button" className="text-xs text-primary underline">{t("product.viewLarge")}</button></SheetTrigger>
-                    <SheetContent side="right" className="w-full sm:max-w-md">
-                      <SheetHeader><SheetTitle>{t("product.selectColor")}</SheetTitle></SheetHeader>
-                      <div className="grid grid-cols-2 gap-3 mt-4">
-                        {colorOptions.map((color, i) => (
-                          <button
-                            key={`${color.hex}-${i}`}
-                            type="button"
-                            onClick={() => selectColor(i)}
-                            className={`aspect-[3/4] rounded-sm overflow-hidden border-2 transition-colors bg-muted ${selectedColor === i ? "border-primary" : "border-border/40"}`}
-                          >
-                            {color.imageUrl ? (
-                              <OptimizedImage
-                                src={color.imageUrl}
-                                alt={color.name}
-                                widths={[240, 360]}
-                                sizes="50vw"
-                                className="w-full h-full object-contain"
-                              />
-                            ) : (
-                              <div className="w-full h-full" style={{ backgroundColor: color.hex }} />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </SheetContent>
-                  </Sheet>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  {colorOptions.map((color, i) => (
-                    <button
-                      key={`${color.hex}-swatch-${i}`}
-                      type="button"
-                      onClick={() => selectColor(i)}
-                      className={`w-8 h-8 rounded-full border-2 overflow-hidden transition-all shrink-0 ${selectedColor === i ? "border-primary ring-2 ring-primary/30 scale-110" : "border-border"}`}
-                      style={color.imageUrl ? undefined : { backgroundColor: color.hex }}
-                      aria-label={color.name || t("product.colorAria", { index: i + 1 })}
-                    >
-                      {color.imageUrl && (
-                        <OptimizedImage
-                          src={color.imageUrl}
-                          alt={color.name}
-                          widths={[64, 96]}
-                          sizes="32px"
-                          className="w-full h-full object-cover"
-                        />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Size Selector */}
-            {product.sizes && product.sizes.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">{t("product.sizeLabel")}</span>
-                  <div className="flex items-center gap-2">
-                    <Select value={sizeRegion} onValueChange={setSizeRegion}>
-                      <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>{Object.keys(SIZE_REGIONS).map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                    </Select>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <button className="text-xs text-primary underline inline-flex items-center gap-1"><Ruler size={12} /> {t("product.sizeGuide")}</button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader><DialogTitle>{t("product.sizeGuide")}</DialogTitle></DialogHeader>
-                        <div className="overflow-auto">
-                          <table className="w-full text-sm border-collapse">
-                            <thead><tr className="bg-muted"><th className="p-2 text-left text-muted-foreground">{t("product.sizeCol")}</th><th className="p-2 text-left text-muted-foreground">{t("product.bust")} (cm)</th><th className="p-2 text-left text-muted-foreground">{t("product.waist")} (cm)</th><th className="p-2 text-left text-muted-foreground">{t("product.hips")} (cm)</th></tr></thead>
-                            <tbody>{["XS","S","M","L","XL","XXL"].map((s,i) => (<tr key={s} className="border-b border-border"><td className="p-2 font-medium">{s}</td><td className="p-2">{78+i*4}–{82+i*4}</td><td className="p-2">{60+i*4}–{64+i*4}</td><td className="p-2">{84+i*4}–{88+i*4}</td></tr>))}</tbody>
-                          </table>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {sizes.map(size => (
-                    <button key={size} onClick={() => setSelectedSize(size)} className={`min-w-[40px] h-9 px-3 rounded-sm border text-sm font-medium transition-all ${selectedSize === size ? "border-primary bg-primary text-primary-foreground" : "border-border text-foreground hover:border-primary"}`}>{size}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Dynamic Variants (Pointure, Volume, Écran, etc.) */}
-            {((product as any).dynamicVariants || []).map((dv: any) => (
-              <div key={dv.typeId} className="space-y-2">
-                <span className="text-sm font-medium text-foreground">{dv.icon ? `${dv.icon} ` : ""}{dv.typeName}{dv.unit ? ` (${dv.unit})` : ""}</span>
-                <div className="flex flex-wrap gap-2">
-                  {dv.options.map((opt: any) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setSelectedDynamic((prev) => ({ ...prev, [dv.typeId]: opt.label }))}
-                      className={`min-w-[40px] h-9 px-3 rounded-sm border text-sm font-medium transition-all ${
-                        selectedDynamic[dv.typeId] === opt.label
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border text-foreground hover:border-primary"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            {/* Loyalty info */}
-            <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-sm">{t("product.loyaltyPoints", { points: loyaltyPoints })}</p>
 
             {/* ═══ QUANTITY + TOTAL + CTA ═══ */}
             <div className="space-y-3 pt-1">
@@ -818,7 +578,7 @@ export default function ProductPage() {
                     image: product.image,
                     price: currentUnitPrice,
                     originalPrice: product.originalPrice,
-                    color: product.colors?.[selectedColor] || null,
+                    color: colorOptions[selectedColor]?.hex ?? product.colors?.[selectedColor] ?? null,
                     size: (() => {
                       const dynParts = Object.entries(selectedDynamic)
                         .map(([typeId, label]) => {
@@ -1119,11 +879,7 @@ export default function ProductPage() {
         open={variantDrawerOpen}
         onOpenChange={setVariantDrawerOpen}
         product={product}
-        colors={(product as any).productColors || product.colors?.map((hex: string, i: number) => ({
-          hex,
-          name: (product as any).colorNames?.[i] || t("product.colorFallback", { index: i + 1 }),
-          imageUrl: (product as any).colorImages?.[i] || null,
-        })) || []}
+        colors={colorOptions}
         sizes={product.sizes?.map((s: string) => ({ label: s })) || []}
         pricingTiers={pricingTiers}
         moq={moq}
