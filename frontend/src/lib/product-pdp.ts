@@ -24,6 +24,12 @@ export const SIZE_REGIONS: Record<string, string[]> = {
   JP: ["5", "7", "9", "11", "13", "15"],
 };
 
+/** Tailles vêtement PDP : uniquement celles enregistrées par le vendeur (product_sizes), jamais SIZE_REGIONS par défaut. */
+export function getApparelSizesForPdp(product: Product | undefined): string[] {
+  const labels = product?.sizes?.filter((s): s is string => Boolean(s?.trim())) ?? [];
+  return [...new Set(labels)];
+}
+
 export function getGalleryItems(product: Product): GalleryItem[] {
   const images = (product as { galleryImages?: Array<{ image_url: string; position: number | null }> })
     .galleryImages;

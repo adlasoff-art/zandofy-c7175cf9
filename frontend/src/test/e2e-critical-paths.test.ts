@@ -425,6 +425,13 @@ describe("Product PDP helpers", () => {
     ).toBe("swatch");
   });
 
+  it("getApparelSizesForPdp returns vendor sizes only, never default SIZE_REGIONS", async () => {
+    const { getApparelSizesForPdp } = await import("@/lib/product-pdp");
+    expect(getApparelSizesForPdp(undefined)).toEqual([]);
+    expect(getApparelSizesForPdp({ sizes: [] } as any)).toEqual([]);
+    expect(getApparelSizesForPdp({ sizes: ["M", "L", "M"] } as any)).toEqual(["M", "L"]);
+  });
+
   it("getIncentiveTier returns second tier range", async () => {
     const { getIncentiveTier } = await import("@/lib/product-pdp");
     const tiers = [
