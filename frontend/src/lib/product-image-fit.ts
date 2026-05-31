@@ -11,6 +11,18 @@ export const PRODUCT_CARD_IMAGE_HOVER_CLASS =
 /** Icônes catégories rondes — contain, pas de crop cover. */
 export const CATEGORY_ICON_IMAGE_CLASS = "w-full h-full object-contain object-center p-1";
 
+/** Vignettes PDP (galerie, variantes, vues produit) — produit entier visible, pas de crop cover. */
+export const PDP_THUMB_IMAGE_CLASS =
+  "absolute inset-0 w-full h-full object-contain object-center";
+
+export const PDP_THUMB_FRAME_CLASS =
+  "relative aspect-square overflow-hidden bg-muted border-2 transition-colors";
+
+export const PDP_THUMB_OPTIMIZED = {
+  resize: "contain" as const,
+  quality: 75,
+};
+
 /** Grilles catalogue (hors « Pour vous ») : 6 colonnes desktop. */
 export const PRODUCT_GRID_CLASS =
   "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5 md:gap-2";

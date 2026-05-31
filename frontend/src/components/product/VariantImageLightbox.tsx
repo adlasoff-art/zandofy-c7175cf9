@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { PdpThumbImage } from "@/components/product/PdpThumbImage";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { PDP_THUMB_FRAME_CLASS, PDP_THUMB_OPTIMIZED } from "@/lib/product-image-fit";
 import { PDP_THUMB_WIDTHS } from "@/lib/product-pdp";
 
 type Props = {
@@ -56,7 +58,8 @@ export function VariantImageLightbox({
             alt=""
             widths={[...PDP_THUMB_WIDTHS, 600, 900]}
             sizes="95vw"
-            className="w-full h-full object-contain"
+            className="w-full h-full object-contain object-center"
+            {...PDP_THUMB_OPTIMIZED}
           />
           {imageUrls.length > 1 && (
             <>
@@ -86,14 +89,14 @@ export function VariantImageLightbox({
                 key={url}
                 type="button"
                 onClick={() => setIndex(i)}
-                className={`w-14 h-14 shrink-0 rounded-sm border-2 overflow-hidden bg-muted ${i === index ? "border-primary" : "border-border/40"}`}
+                className={`${PDP_THUMB_FRAME_CLASS} w-14 h-14 shrink-0 rounded-sm ${i === index ? "border-primary" : "border-border/40"}`}
               >
-                <OptimizedImage
+                <PdpThumbImage
                   src={url}
                   alt=""
                   widths={[...PDP_THUMB_WIDTHS]}
                   sizes="56px"
-                  className="w-full h-full object-contain"
+                  fitHeight={56}
                 />
               </button>
             ))}

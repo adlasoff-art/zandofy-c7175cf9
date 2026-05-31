@@ -120,3 +120,13 @@ docs/              # Human + AI instructions
 - Do not silently change domains, ports, or URLs.
 - Do not break existing tables or delete user data.
 - Staging and production Supabase projects must stay isolated.
+
+## Deprecated infrastructure (never suggest or document)
+
+The following are **retired** — do not reference them in code, docs, commits, or agent replies:
+
+- **Coolify** (or any self-hosted deploy panel for this app)
+- Custom domains `studio-staging.zandofy.com`, `supabasa*.zandofy.com`, `api-staging.zandofy.com`, `api.zandofy.com` as app backends
+- A separate Python/FastAPI `backend/` service in this repo (removed; use Supabase only)
+
+**Current stack only:** Vercel (frontend) + Supabase Pro (staging + production projects) + Cloudflare (DNS/CDN).
