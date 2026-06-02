@@ -2,7 +2,7 @@ import { useState } from "react";
 import { RefreshCw, ExternalLink, Loader2, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const SITE_URL = "https://zandofy.com";
+const SITE_URL = (import.meta.env.VITE_SITE_URL || "https://zandofy.com").replace(/\/$/, "");
 
 /**
  * Permet à l'admin de :

@@ -6,47 +6,54 @@ Cette fonction n'est invoquée **que pour les bots** (Googlebot, Bingbot, Facebo
 - `/store/:slug`
 - `/category/:slug`
 - `/blog/:slug`
+- pages globales (`/faq`, `/stores`, …)
 
 ## Pourquoi
 
-Zandofy est une SPA React → le HTML statique servi par Vercel est identique pour toutes les pages. Sans pre-rendering, Google voit le même `<title>`, `og:image` et `description` partout, ce qui provoque :
-
-- **Page en double sans canonique** dans Google Search Console
-- **Détectée non indexée** sur les fiches produits
-- Aucun rich snippet (Product, Store, Article)
+Zandofy est une SPA React → le HTML statique servi par Vercel est identique pour toutes les pages. Sans injection, Meta/WhatsApp lisent `index.html` (og:url = home, og:image = `og-default.jpg`).
 
 ## Ce que fait la fonction
 
-1. Lit la requête entrante.
-2. Vérifie si l'User-Agent est dans la liste blanche bots (régex). Si non → fallback (en pratique, le rewrite Vercel ne route que les bots ici).
-3. Récupère `index.html` depuis le même déploiement Vercel.
-4. Appelle Supabase REST (anon key) pour récupérer les méta réelles du produit / boutique / catégorie / article.
-5. Strip les balises SEO statiques de `<head>` (`<title>`, `og:*`, `twitter:*`, `canonical`, `description`).
-6. Injecte les balises dynamiques + JSON-LD Product/Store/CollectionPage/BlogPosting.
-7. Retourne le HTML modifié avec `Cache-Control` (5 min edge, 10 min CDN, SWR 24h) et `Vary: User-Agent`.
+1. Le rewrite Vercel envoie le bot vers `/api/meta-injector?__pathname=/product/:slug` (voir `vercel.json`).
+2. `resolveRequestPathname` restaure le chemin public (query `__pathname`, en-têtes Vercel, ou pathname).
+3. Fetch Supabase REST (variables `SUPABASE_URL`, `SUPABASE_ANON_KEY`) pour métadonnées produit / boutique / etc.
+4. Strip les balises SEO statiques du `<head>`.
+5. Injecte `canonical`, `og:url`, `og:image` (photo produit en HTTPS absolu), Twitter, JSON-LD, optionnel `fb:app_id`.
+6. Si produit introuvable : fallback avec `og:url` = URL demandée (jamais la home) et `noindex`.
 
-## Sécurité
+## Variables Vercel (Production + Preview)
 
-- Aucun secret. Anon key uniquement (visible dans le bundle frontend).
-- Strict reads sur tables publiques (`products` filtrées sur `publish_status=published`, `stores`, `categories`, `blog_posts` filtrées sur `status=published`).
-- Pas de pass-through utilisateur, pas de cookie, pas de header Auth.
+| Variable | Description |
+|----------|-------------|
+| `SITE_URL` | Domaine canonique, ex. `https://zandofy.com` (aligné `VITE_SITE_URL`) |
+| `SUPABASE_URL` | Même valeur que `VITE_SUPABASE_URL` |
+| `SUPABASE_ANON_KEY` | Même valeur que `VITE_SUPABASE_PUBLISHABLE_KEY` |
+| `FACEBOOK_APP_ID` | Optionnel — supprime l'alerte Meta Sharing Debugger |
+
+Voir `frontend/.env.example`.
 
 ## Test après déploiement
 
 ```bash
-# Doit retourner du HTML avec <title> spécifique au produit
-curl -A "Googlebot/2.1" https://zandofy.com/product/<slug-existant> | grep "<title>"
-
-# WhatsApp / Facebook : og:image doit être une URL HTTPS absolue (photo produit, pas le logo seul)
-curl -A "WhatsApp/2.0" https://www.zandofy.com/product/<slug-existant> | grep og:image
-
-# Sans User-Agent bot → SPA standard (titre générique)
-curl https://zandofy.com/product/<slug-existant> | grep "<title>"
+curl -s -A "facebookexternalhit/1.1" "https://zandofy.com/product/<slug-publie>" | findstr /i "og:url og:image canonical BEGIN.injected"
 ```
 
-Vérifier ensuite dans Google Search Console : **URL Inspection** sur une fiche produit → "Tester l'URL en direct" → onglet "HTML rendu" doit afficher le titre dynamique.
+**Succès :**
 
-## Limites connues
+- `og:url` contient `/product/<slug>`
+- `og:image` = URL HTTPS image produit (pas `og-default.jpg` si `product_images` en base)
+- commentaire `BEGIN injected SEO (meta-injector edge fn)`
 
-- Les catégories n'ont pas de colonne `slug` en DB → on matche par `ilike` sur `name` / `name_fr` après dé-slugification basique. À améliorer en V2 (ajout colonne `slug` + index unique).
-- Pas de pré-rendu pour les bots qui n'envoient pas un UA reconnu (rare).
+Répéter avec `WhatsApp/2.0`.
+
+Sans User-Agent bot → SPA standard (normal).
+
+## Cache Meta / WhatsApp
+
+Après changement d'image : Admin SEO → re-scrape, puis [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) → **Re-collecter**. Cache Meta ~7 jours.
+
+## Limites
+
+- L'aperçu lien utilise l'**image principale** (`product_images`, `position` min), pas la vignette galerie sélectionnée à l'écran.
+- Le texte `wa.me/?text=...` ne transporte pas l'image ; la vignette vient du scraping `og:image`.
+- Catégories : pas de colonne `slug` — match `ilike` sur le nom.
