@@ -15,23 +15,47 @@
  * On any error we fall back to the original index.html so users always get a page.
  */
 
+import { isDynamicSeoPath, resolveRequestPathname } from "./meta-injector-path";
+
 export const config = { runtime: "edge" };
 
-const SITE_URL = "https://zandofy.com";
+/** Dev-only fallbacks when Vercel env vars are unset locally. */
+const DEV_SITE_URL = "https://zandofy.com";
+const DEV_SUPABASE_URL = "https://vpttoqojmiqxgudknyxf.supabase.co";
+const DEV_SUPABASE_ANON =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwdHRvcW9qbWlxeGd1ZGtueXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxNjE0MzcsImV4cCI6MjA2NTczNzQzN30.ZqJUUN6DqXrXJ7CcjmmMRrcVtDkQ4zYM4nhP8mC4_zE";
+
+function getSiteUrl(): string {
+  return (process.env.SITE_URL || DEV_SITE_URL).replace(/\/$/, "");
+}
+
+function getSupabaseUrl(): string {
+  return process.env.SUPABASE_URL || DEV_SUPABASE_URL;
+}
+
+function getSupabaseAnon(): string {
+  return (
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    DEV_SUPABASE_ANON
+  );
+}
+
+function getFacebookAppId(): string | undefined {
+  const id = process.env.FACEBOOK_APP_ID?.trim();
+  return id || undefined;
+}
 
 /** Crawlers require absolute HTTPS URLs for og:image (relative paths show site logo). */
 function toAbsoluteOgImage(url: string | null | undefined): string {
+  const site = getSiteUrl();
   const raw = (url || "").trim();
-  if (!raw) return `${SITE_URL}/og-default.jpg`;
+  if (!raw || raw === "/placeholder.svg") return `${site}/og-default.jpg`;
   if (/^https?:\/\//i.test(raw)) return raw;
   if (raw.startsWith("//")) return `https:${raw}`;
   const path = raw.startsWith("/") ? raw : `/${raw}`;
-  return `${SITE_URL.replace(/\/$/, "")}${path}`;
+  return `${site}${path}`;
 }
-const SUPABASE_URL = "https://vpttoqojmiqxgudknyxf.supabase.co";
-// Public anon key — safe in client-side / edge code.
-const SUPABASE_ANON =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwdHRvcW9qbWlxeGd1ZGtueXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxNjE0MzcsImV4cCI6MjA2NTczNzQzN30.ZqJUUN6DqXrXJ7CcjmmMRrcVtDkQ4zYM4nhP8mC4_zE";
 
 const BOT_REGEX =
   /(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|quora link preview|outbrain|vkshare|w3c_validator|redditbot|tumblr|bitlybot|nuzzel|qwantify|pinterestbot|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot)/i;
@@ -62,10 +86,10 @@ function truncate(s: string, max = 160): string {
 }
 
 async function sbFetch(path: string): Promise<any[]> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  const res = await fetch(`${getSupabaseUrl()}/rest/v1/${path}`, {
     headers: {
-      apikey: SUPABASE_ANON,
-      Authorization: `Bearer ${SUPABASE_ANON}`,
+      apikey: getSupabaseAnon(),
+      Authorization: `Bearer ${getSupabaseAnon()}`,
       Accept: "application/json",
     },
     // Cache aggressively at the edge — content rarely changes per request.
@@ -80,10 +104,12 @@ type MetaPayload = {
   description: string;
   canonical: string;
   image?: string;
+  imageAlt?: string;
   ogType?: "website" | "article" | "product";
   jsonLd?: Record<string, unknown>;
   keywords?: string;
   robots?: string;
+  ogTitle?: string;
 };
 
 // ─── Global SEO config (admin-controlled via platform_settings.seo_config) ───
@@ -168,7 +194,7 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
       `${brand} : marketplace mode et import. Livraison rapide en Afrique.`,
   );
   const image = toAbsoluteOgImage(cfg.default_og_image);
-  const canonical = `${SITE_URL}${pathname === "/" ? "/" : pathname}`;
+  const canonical = `${getSiteUrl()}${pathname === "/" ? "/" : pathname}`;
 
   // For sub-pages add a humanised suffix; homepage keeps the bare site title.
   const pageLabel: Record<string, string> = {
@@ -209,7 +235,7 @@ async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
   const p = rows[0];
   if (!p) return null;
 
-  const canonical = `${SITE_URL}/product/${p.slug || p.id}`;
+  const canonical = `${getSiteUrl()}/product/${p.slug || p.id}`;
   // Images live in `product_images` (relational), sorted by `position`.
   const sortedImages = Array.isArray(p.product_images)
     ? [...p.product_images].sort(
@@ -251,7 +277,15 @@ async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
     };
   }
 
-  return { title, description, canonical, image, ogType: "product", jsonLd };
+  return {
+    title,
+    description,
+    canonical,
+    image,
+    imageAlt: p.name,
+    ogType: "product",
+    jsonLd,
+  };
 }
 
 async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
@@ -263,7 +297,7 @@ async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
   const s = rows[0];
   if (!s) return null;
 
-  const canonical = `${SITE_URL}/store/${s.slug || s.id}`;
+  const canonical = `${getSiteUrl()}/store/${s.slug || s.id}`;
   const image = toAbsoluteOgImage(s.banner_url || s.logo_url);
   const title = `${s.name} — Boutique sur Zandofy`;
   const location = [s.city, s.country].filter(Boolean).join(", ");
@@ -309,7 +343,7 @@ async function buildCategoryMeta(slug: string): Promise<MetaPayload | null> {
   );
   const c = rows[0];
   const displayName = c?.name_fr || c?.name || guess;
-  const canonical = `${SITE_URL}/category/${slug}`;
+  const canonical = `${getSiteUrl()}/category/${slug}`;
   const image = toAbsoluteOgImage(c?.image_url);
   const title = `${displayName} — Catalogue Zandofy`;
   const description = truncate(
@@ -340,7 +374,7 @@ async function buildBlogMeta(slug: string): Promise<MetaPayload | null> {
   const b = rows[0];
   if (!b) return null;
 
-  const canonical = `${SITE_URL}/blog/${slug}`;
+  const canonical = `${getSiteUrl()}/blog/${slug}`;
   const image = toAbsoluteOgImage(b.og_image_url || b.cover_image_url);
   const title = b.meta_title || `${b.title} | Zandofy`;
   const description = truncate(b.meta_description || b.excerpt || b.title);
@@ -364,7 +398,7 @@ async function buildBlogMeta(slug: string): Promise<MetaPayload | null> {
       publisher: {
         "@type": "Organization",
         name: "Zandofy",
-        logo: { "@type": "ImageObject", url: `${SITE_URL}/icons/icon-512.png` },
+        logo: { "@type": "ImageObject", url: `${getSiteUrl()}/icons/icon-512.png` },
       },
     },
   };
@@ -393,7 +427,7 @@ async function buildMetaForPath(pathname: string): Promise<MetaPayload | null> {
     const merged: MetaPayload = base || {
       title: "Zandofy",
       description: "",
-      canonical: `${SITE_URL}${pathname}`,
+      canonical: `${getSiteUrl()}${pathname}`,
       ogType: "website",
     };
     if (override) {
@@ -404,7 +438,7 @@ async function buildMetaForPath(pathname: string): Promise<MetaPayload | null> {
         merged.keywords = override.keywords.join(", ");
       if (override.robots) merged.robots = override.robots;
       // og_title injected via separate meta tag below
-      if (override.og_title) (merged as any).ogTitle = override.og_title;
+      if (override.og_title) merged.ogTitle = override.og_title;
     }
     return merged;
   }
@@ -412,14 +446,28 @@ async function buildMetaForPath(pathname: string): Promise<MetaPayload | null> {
   return null;
 }
 
+function buildFallbackMeta(pathname: string): MetaPayload {
+  const canonical = `${getSiteUrl()}${pathname}`;
+  return {
+    title: "Zandofy",
+    description: "Marketplace Zandofy",
+    canonical,
+    image: `${getSiteUrl()}/og-default.jpg`,
+    ogType: "website",
+    robots: "noindex,nofollow",
+  };
+}
+
 function buildHeadInjection(meta: MetaPayload): string {
   const t = escapeHtml(meta.title);
-  const ogT = escapeHtml((meta as any).ogTitle || meta.title);
+  const ogT = escapeHtml(meta.ogTitle || meta.title);
   const d = escapeHtml(meta.description);
   const c = escapeHtml(meta.canonical);
   const img = escapeHtml(toAbsoluteOgImage(meta.image));
+  const imgAlt = escapeHtml(meta.imageAlt || meta.title);
   const ogType = meta.ogType || "website";
   const robots = meta.robots || "index,follow";
+  const fbAppId = getFacebookAppId();
 
   let html = `
 <!-- BEGIN injected SEO (meta-injector edge fn) -->
@@ -435,10 +483,14 @@ function buildHeadInjection(meta: MetaPayload): string {
 ${img.startsWith("https://") ? `<meta property="og:image:secure_url" content="${img}" />` : ""}
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="${imgAlt}" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${ogT}" />
 <meta name="twitter:description" content="${d}" />
 <meta name="twitter:image" content="${img}" />`;
+  if (fbAppId) {
+    html += `\n<meta property="fb:app_id" content="${escapeHtml(fbAppId)}" />`;
+  }
   if (meta.keywords) {
     html += `\n<meta name="keywords" content="${escapeHtml(meta.keywords)}" />`;
   }
@@ -448,6 +500,17 @@ ${img.startsWith("https://") ? `<meta property="og:image:secure_url" content="${
   }
   html += `\n<!-- END injected SEO -->\n`;
   return html;
+}
+
+function injectMetaIntoHtml(html: string, meta: MetaPayload): string {
+  const headOpenIdx = html.search(/<head[^>]*>/i);
+  const headCloseIdx = html.search(/<\/head>/i);
+  if (headOpenIdx === -1 || headCloseIdx === -1) return html;
+  const before = html.slice(0, html.indexOf(">", headOpenIdx) + 1);
+  const headInner = html.slice(html.indexOf(">", headOpenIdx) + 1, headCloseIdx);
+  const after = html.slice(headCloseIdx);
+  const cleanedHead = stripStaticSeo(headInner);
+  return before + cleanedHead + buildHeadInjection(meta) + after;
 }
 
 /**
@@ -493,43 +556,45 @@ export default async function handler(req: Request): Promise<Response> {
   }
   let html = await indexRes.text();
 
+  const pathname = resolveRequestPathname(req, url);
+  const isDynamic = isDynamicSeoPath(pathname);
+
   let meta: MetaPayload | null = null;
   try {
-    meta = await buildMetaForPath(url.pathname);
-  } catch {
+    meta = await buildMetaForPath(pathname);
+  } catch (err) {
+    console.warn("[meta-injector] buildMetaForPath failed", pathname, err);
     meta = null;
   }
 
-  if (meta) {
-    const headOpenIdx = html.search(/<head[^>]*>/i);
-    const headCloseIdx = html.search(/<\/head>/i);
-    if (headOpenIdx !== -1 && headCloseIdx !== -1) {
-      const before = html.slice(0, html.indexOf(">", headOpenIdx) + 1);
-      const headInner = html.slice(html.indexOf(">", headOpenIdx) + 1, headCloseIdx);
-      const after = html.slice(headCloseIdx);
-      const cleanedHead = stripStaticSeo(headInner);
-      html = before + cleanedHead + buildHeadInjection(meta) + after;
-    }
+  if (!meta && isDynamic) {
+    console.warn("[meta-injector] no meta for dynamic path, using fallback", pathname);
+    meta = buildFallbackMeta(pathname);
   }
 
-  // Use a much shorter cache for product/store/category pages so image changes
-  // (or first-time scrapes) propagate quickly to social crawlers. Global pages
-  // (FAQ, About, etc.) keep the longer cache because they change rarely.
-  const isDynamic =
-    /^\/(product|store|category|blog)\//i.test(url.pathname);
+  if (meta) {
+    html = injectMetaIntoHtml(html, meta);
+  } else if (isDynamic) {
+    html = injectMetaIntoHtml(html, buildFallbackMeta(pathname));
+  }
+
   const cacheControl = isDynamic
     ? "public, max-age=60, s-maxage=60, stale-while-revalidate=300"
     : "public, max-age=300, s-maxage=600, stale-while-revalidate=86400";
 
-  // Honor per-page robots override at the HTTP header level too.
   const xRobots = meta?.robots || "index, follow";
+  const responseHeaders: Record<string, string> = {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": cacheControl,
+    "X-Robots-Tag": xRobots,
+    Vary: "User-Agent",
+  };
+  if (process.env.VERCEL_ENV === "preview") {
+    responseHeaders["X-Debug-Pathname"] = pathname;
+  }
+
   return new Response(html, {
     status: 200,
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": cacheControl,
-      "X-Robots-Tag": xRobots,
-      Vary: "User-Agent",
-    },
+    headers: responseHeaders,
   });
 }

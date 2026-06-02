@@ -6,6 +6,8 @@ interface ImageZoomLensProps {
   srcSet?: string;
   sizes?: string;
   className?: string;
+  /** Tailwind object-fit classes for the base image (default: contain everywhere). */
+  objectClassName?: string;
   zoomFactor?: number;
 }
 
@@ -20,6 +22,7 @@ export const ImageZoomLens = memo(function ImageZoomLens({
   srcSet,
   sizes,
   className = "",
+  objectClassName = "object-contain",
   zoomFactor = 2.5,
 }: ImageZoomLensProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -57,7 +60,7 @@ export const ImageZoomLens = memo(function ImageZoomLens({
         srcSet={srcSet}
         sizes={sizes}
         alt={alt}
-        className="w-full h-full object-contain"
+        className={`w-full h-full ${objectClassName}`}
         draggable={false}
         decoding="async"
       />

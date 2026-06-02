@@ -48,7 +48,7 @@
           "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
         }
       ],
-      "destination": "/api/meta-injector"
+      "destination": "/api/meta-injector?__pathname=/product/:slug"
     },
     {
       "source": "/store/:slug",
@@ -59,7 +59,7 @@
           "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
         }
       ],
-      "destination": "/api/meta-injector"
+      "destination": "/api/meta-injector?__pathname=/store/:slug"
     },
     {
       "source": "/category/:slug",
@@ -70,7 +70,7 @@
           "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
         }
       ],
-      "destination": "/api/meta-injector"
+      "destination": "/api/meta-injector?__pathname=/category/:slug"
     },
     {
       "source": "/blog/:slug",
@@ -81,7 +81,7 @@
           "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
         }
       ],
-      "destination": "/api/meta-injector"
+      "destination": "/api/meta-injector?__pathname=/blog/:slug"
     },
     {
       "source": "/:globalPath(|faq|stores|blog|about|contact|careers|help|pricing|privacy|terms|popular|trends|search|auth|reset-password|onboarding|impersonate)",
@@ -92,7 +92,7 @@
           "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
         }
       ],
-      "destination": "/api/meta-injector"
+      "destination": "/api/meta-injector?__pathname=/$globalPath"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ],

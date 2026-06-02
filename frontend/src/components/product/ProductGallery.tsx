@@ -107,7 +107,7 @@ export function ProductGallery({
         </div>
 
         <div
-          className="relative flex-1 aspect-[3/4] max-h-[460px] lg:max-h-[520px] rounded-sm overflow-hidden bg-muted touch-pan-y"
+          className="relative flex-1 aspect-[3/4] max-h-[460px] lg:max-h-[520px] rounded-sm overflow-hidden bg-muted touch-pan-y isolate"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
@@ -119,7 +119,7 @@ export function ProductGallery({
               muted
               loop
               playsInline
-              className="w-full h-full object-contain"
+              className="w-full h-full object-cover md:object-contain"
             />
           ) : (
             <ImageZoomLens
@@ -128,20 +128,31 @@ export function ProductGallery({
               sizes="(max-width: 1024px) 100vw, 50vw"
               alt={productName}
               className="w-full h-full"
+              objectClassName="object-cover md:object-contain"
               zoomFactor={2.5}
             />
           )}
-          {isSale && discount != null && (
-            <span className="absolute top-3 left-3 px-3 py-1.5 text-sm font-bold bg-sale text-sale-foreground rounded-sm">
-              -{discount}%
-            </span>
-          )}
+
+          {/* Badges superposés sur la photo (coins intérieurs) */}
+          <div className="absolute inset-0 z-20 pointer-events-none">
+            {isSale && discount != null && (
+              <span className="absolute top-2.5 left-2.5 px-2.5 py-1 text-sm font-bold bg-sale text-sale-foreground rounded-sm shadow-sm">
+                -{discount}%
+              </span>
+            )}
+            {gallery.length > 1 && (
+              <span className="absolute bottom-2.5 right-2.5 text-xs font-medium bg-card/90 text-foreground px-2 py-1 rounded-sm shadow-sm">
+                {selectedIndex + 1}/{gallery.length}
+              </span>
+            )}
+          </div>
+
           {gallery.length > 1 && (
             <>
               <button
                 type="button"
                 onClick={onPrev}
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-card/80 flex items-center justify-center hover:bg-card transition-colors"
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-card/80 flex items-center justify-center hover:bg-card transition-colors"
                 aria-label="Image précédente"
               >
                 <ChevronLeft size={18} />
@@ -149,14 +160,11 @@ export function ProductGallery({
               <button
                 type="button"
                 onClick={onNext}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-card/80 flex items-center justify-center hover:bg-card transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-card/80 flex items-center justify-center hover:bg-card transition-colors"
                 aria-label="Image suivante"
               >
                 <ChevronRight size={18} />
               </button>
-              <span className="absolute bottom-3 right-3 text-xs bg-card/80 text-foreground px-2 py-1 rounded">
-                {selectedIndex + 1}/{gallery.length}
-              </span>
             </>
           )}
         </div>
