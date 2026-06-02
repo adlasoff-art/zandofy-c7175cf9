@@ -425,6 +425,12 @@ describe("Product PDP helpers", () => {
     ).toBe("swatch");
   });
 
+  it("formatVariantOptionRange returns numeric min-max", async () => {
+    const { formatVariantOptionRange, formatShareUnitPrice } = await import("@/lib/product-share");
+    expect(formatVariantOptionRange([{ label: "38" }, { label: "43" }, { label: "46" }])).toBe("38-46");
+    expect(formatShareUnitPrice(12.9)).toBe("$13");
+  });
+
   it("getApparelSizesForPdp returns vendor sizes only, never default SIZE_REGIONS", async () => {
     const { getApparelSizesForPdp } = await import("@/lib/product-pdp");
     expect(getApparelSizesForPdp(undefined)).toEqual([]);

@@ -9,6 +9,7 @@ import { calculateTieredPrice, type PricingTier } from "@/components/TieredPrici
 import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimate";
 import { useNavigate } from "react-router-dom";
 import type { Product } from "@/services/api";
+import { variantTypeTitle } from "@/components/product/VariantTypeLabel";
 
 interface ColorOption {
   hex: string;
@@ -147,7 +148,7 @@ export function VariantOrderDrawer({
       if (variant.options.length === 0) return;
       sections.push({
         id: `dynamic-${variant.typeId}`,
-        title: `${variant.icon ? `${variant.icon} ` : ""}${variant.typeName}${variant.unit ? ` (${variant.unit})` : ""} & Quantités`,
+        title: `${variantTypeTitle(variant)} & Quantités`,
         rows: variant.options.map((option) => {
           const key = `${currentColorName}|||dynamic|||${variant.typeId}|||${option.id}`;
           return {

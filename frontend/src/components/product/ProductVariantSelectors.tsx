@@ -4,6 +4,7 @@ import { PdpThumbImage } from "@/components/product/PdpThumbImage";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VariantImageLightbox } from "@/components/product/VariantImageLightbox";
+import { VariantTypeLabel } from "@/components/product/VariantTypeLabel";
 import { PDP_THUMB_FRAME_CLASS } from "@/lib/product-image-fit";
 import {
   collectVariantLightboxUrls,
@@ -231,11 +232,12 @@ export function ProductVariantSelectors({
 
       {dynamicVariants.map((dv) => (
         <div key={dv.typeId} className="space-y-2">
-          <span className="text-sm font-medium text-foreground">
-            {dv.icon ? `${dv.icon} ` : ""}
-            {dv.typeName}
-            {dv.unit ? ` (${dv.unit})` : ""}
-          </span>
+          <VariantTypeLabel
+            icon={dv.icon}
+            typeName={dv.typeName}
+            unit={dv.unit}
+            className="text-sm font-medium text-foreground"
+          />
           <div className="flex flex-wrap gap-2">
             {dv.options.map((opt) => (
               <button
