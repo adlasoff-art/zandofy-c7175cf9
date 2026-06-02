@@ -216,7 +216,10 @@ async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
         (a: any, b: any) => (a?.position ?? 0) - (b?.position ?? 0),
       )
     : [];
-  const image = toAbsoluteOgImage(sortedImages[0]?.image_url);
+  const featuredUrl = sortedImages.find((img: { image_url?: string }) =>
+    Boolean(img?.image_url?.trim()),
+  )?.image_url;
+  const image = toAbsoluteOgImage(featuredUrl);
   const title = `${p.name} | Zandofy`;
   const description = truncate(
     p.description ||

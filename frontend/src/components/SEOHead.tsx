@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useSeoEnabled } from "@/hooks/use-seo-enabled";
 import { useSeoConfig } from "@/hooks/use-seo-config";
+import { toAbsoluteOgImage } from "@/lib/og-image";
 
 interface SEOHeadProps {
   title: string;
@@ -77,8 +78,12 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
       setMeta("google-site-verification", seoConfig.google_site_verification);
     }
 
-    // Resolve OG image: prop > config default
-    const resolvedOgImage = ogImage || seoConfig.default_og_image || undefined;
+    // Resolve OG image: explicit prop (absolute) > config default (homepage / generic pages)
+    const resolvedOgImage = ogImage
+      ? toAbsoluteOgImage(ogImage)
+      : seoConfig.default_og_image
+        ? toAbsoluteOgImage(seoConfig.default_og_image)
+        : undefined;
 
     // Open Graph
     setMeta("og:title", fullTitle, "property");

@@ -31,6 +31,7 @@ import {
   SIZE_REGIONS,
 } from "@/lib/product-pdp";
 import { buildProductShareMessage } from "@/lib/product-share";
+import { resolveProductOgImage } from "@/lib/og-image";
 import { TieredPricingTable, calculateTieredPrice, type PricingTier } from "@/components/TieredPricingTable";
 import { QuantitySelector } from "@/components/QuantitySelector";
 import { FlashTimer } from "@/components/FlashTimer";
@@ -264,10 +265,11 @@ export default function ProductPage() {
   // integerPart/decimalPart now computed inline from currentUnitPrice
 
   const seoDescription = product.shortDescription || product.description?.slice(0, 155) || `${product.nameFr} — ${product.categoryFr} sur Zandofy`;
+  const productOgImage = resolveProductOgImage(gallery[0]?.url, product.image);
   const productJsonLd = buildProductJsonLd({
     name: product.nameFr,
     description: seoDescription,
-    image: gallery[0]?.url || product.image,
+    image: productOgImage,
     price: currentUnitPrice,
     currency: product.currency,
     rating: product.rating,
@@ -288,12 +290,12 @@ export default function ProductPage() {
         title={`${product.nameFr} — ${product.categoryFr}`}
         description={seoDescription}
         canonical={`/product/${product.slug || product.id}`}
-        ogImage={gallery[0]?.url || product.image}
+        ogImage={productOgImage}
         ogType="product"
         jsonLd={buildJsonLdGraph(productJsonLd, breadcrumbJsonLd, buildMarketplaceFaqJsonLd())}
       />
       <Header />
-      <main className="max-w-7xl mx-auto px-4 py-4">
+      <main className="max-w-7xl mx-auto px-4 py-2 lg:py-4">
         {/* Breadcrumbs */}
         <Breadcrumb className="mb-4">
           <BreadcrumbList>
@@ -306,11 +308,11 @@ export default function ProductPage() {
         </Breadcrumb>
 
         {/* ═══ MAIN LAYOUT ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-10">
 
           {/* ─── LEFT: Gallery + Trust + Description + Upsells ─── */}
-          <div className="flex flex-col gap-2.5 lg:gap-4">
-            <div className="order-2 lg:order-none">
+          <div className="flex flex-col gap-1.5 lg:gap-4">
+            <div className="order-2 lg:order-none flex flex-col gap-1">
               <ProductGallery
                 gallery={gallery}
                 selectedIndex={selectedImage}
@@ -322,6 +324,9 @@ export default function ProductPage() {
                 onPrev={goGalleryPrev}
                 onNext={goGalleryNext}
               />
+              <h1 className="lg:hidden text-lg font-semibold text-primary leading-tight line-clamp-3">
+                {product.nameFr}
+              </h1>
             </div>
 
             {(product as any).store && (

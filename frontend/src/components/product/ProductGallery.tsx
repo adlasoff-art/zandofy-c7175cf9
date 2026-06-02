@@ -92,7 +92,7 @@ export function ProductGallery({
   const current = gallery[selectedIndex];
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1 lg:space-y-2">
       <div className="flex gap-3">
         <div className="hidden md:flex flex-col gap-2 w-16 shrink-0">
           {gallery.map((item, i) => (
@@ -107,7 +107,7 @@ export function ProductGallery({
         </div>
 
         <div
-          className="relative flex-1 aspect-[3/4] max-h-[520px] rounded-sm overflow-hidden bg-muted touch-pan-y"
+          className="relative flex-1 aspect-[3/4] max-h-[460px] lg:max-h-[520px] rounded-sm overflow-hidden bg-muted touch-pan-y"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
