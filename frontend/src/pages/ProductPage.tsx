@@ -30,6 +30,7 @@ import {
   getGalleryItems,
   SIZE_REGIONS,
 } from "@/lib/product-pdp";
+import { buildProductShareMessage } from "@/lib/product-share";
 import { TieredPricingTable, calculateTieredPrice, type PricingTier } from "@/components/TieredPricingTable";
 import { QuantitySelector } from "@/components/QuantitySelector";
 import { FlashTimer } from "@/components/FlashTimer";
@@ -197,6 +198,26 @@ export default function ProductPage() {
   };
 
   const apparelSizes = useMemo(() => getApparelSizesForPdp(product), [product]);
+
+  const productShareMessage = useMemo(() => {
+    if (!product) return "";
+    const productUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/product/${product.slug || product.id}`;
+    return buildProductShareMessage({
+      productName: product.nameFr,
+      storeName: (product as { store?: { name?: string } }).store?.name,
+      unitPrice: currentUnitPrice,
+      currency: product.currency,
+      productUrl,
+      colorOptions,
+      apparelSizes,
+      dynamicVariants: ((product as { dynamicVariants?: Array<{ typeName: string; unit?: string; options: { label: string }[] }> })
+        .dynamicVariants || []),
+      weightGrams: product.weightGrams,
+      lengthCm: product.lengthCm,
+      widthCm: product.widthCm,
+      heightCm: product.heightCm,
+    });
+  }, [product, currentUnitPrice, colorOptions, apparelSizes]);
 
   const productSku = product?.sku || `SKU-${product?.id?.slice(0, 8) || "000000"}`;
   const copySku = () => {
@@ -451,7 +472,7 @@ export default function ProductPage() {
               shareContent={
                 <>
                   <a
-                    href={`https://wa.me/?text=${encodeURIComponent(`${product.nameFr}${product.sku ? `\nSKU: ${product.sku}` : ""}\n${formatPrice(product.price)}\n${window.location.origin}/product/${product.slug || product.id}`)}`}
+                    href={`https://wa.me/?text=${encodeURIComponent(productShareMessage)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors w-full"
@@ -469,23 +490,17 @@ export default function ProductPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/product/${product.slug || product.id}`);
-                      toast({ title: t("product.linkCopied") || "Lien copié !", description: t("product.linkCopiedDesc") });
+                      navigator.clipboard.writeText(productShareMessage);
+                      toast({ title: t("product.linkCopied") || "Lien copié !", description: t("product.shareCopiedDesc") || "Fiche produit copiée" });
                     }}
                     className="flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors w-full"
                   >
                     <LinkIcon size={16} className="text-muted-foreground" />
-                    {t("product.copyLink") || "Copier le lien"}
+                    {t("product.copyLink") || "Copier la fiche"}
                   </button>
                 </>
               }
             />
-
-            {product.isSale && product.discount != null && (
-              <span className="inline-block text-sm font-bold text-sale bg-sale/10 px-2 py-0.5 rounded">
-                -{product.discount}%
-              </span>
-            )}
 
             {/* ★ SELECT OPTIONS TRIGGER (Alibaba-style) */}
             <button
@@ -509,7 +524,9 @@ export default function ProductPage() {
             </button>
 
             {product.isSale && (
-              <FlashTimer productId={product.id} durationHours={24} enabled />
+              <div className="hidden lg:block">
+                <FlashTimer productId={product.id} durationHours={24} enabled />
+              </div>
             )}
 
             <ProductVariantSelectors
@@ -809,7 +826,13 @@ export default function ProductPage() {
                       <div className="flex items-center gap-3">
                         <div className="relative shrink-0">
                           {(product as any).store.logo_url ? (
-                            <img src={imgUrl((product as any).store.logo_url, { width: 96 })} alt={(product as any).store.name} className="w-12 h-12 rounded-full object-cover border border-border" loading="lazy" decoding="async" />
+                            <img
+                              src={imgUrl((product as any).store.logo_url, { width: 96, height: 96, resize: "contain" })}
+                              alt={(product as any).store.name}
+                              className="w-12 h-12 rounded-full object-contain object-center border border-border bg-muted"
+                              loading="lazy"
+                              decoding="async"
+                            />
                           ) : (
                             <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
                               <Store size={20} className="text-primary-foreground" />
