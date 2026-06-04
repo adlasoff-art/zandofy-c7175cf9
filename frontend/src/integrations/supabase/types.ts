@@ -2041,6 +2041,45 @@ export type Database = {
         }
         Relationships: []
       }
+      seo_page_overrides: {
+        Row: {
+          created_at: string
+          description: string | null
+          jsonld_extra: Json | null
+          keywords: string[] | null
+          og_image: string | null
+          og_title: string | null
+          path: string
+          robots: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          jsonld_extra?: Json | null
+          keywords?: string[] | null
+          og_image?: string | null
+          og_title?: string | null
+          path: string
+          robots?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          jsonld_extra?: Json | null
+          keywords?: string[] | null
+          og_image?: string | null
+          og_title?: string | null
+          path?: string
+          robots?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       store_coupons: {
         Row: {
           code: string

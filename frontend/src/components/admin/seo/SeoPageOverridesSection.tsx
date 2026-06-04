@@ -45,16 +45,33 @@ export function SeoPageOverridesSection() {
   const [rows, setRows] = useState<Record<string, SeoOverride>>({});
   const [activePath, setActivePath] = useState<string>("/");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    listSeoOverrides().then((list) => {
-      const map: Record<string, SeoOverride> = {};
-      for (const r of list) map[r.path] = r;
-      setRows(map);
+  const loadRows = async () => {
+    setLoading(true);
+    setLoadError(null);
+    const { rows: list, error } = await listSeoOverrides();
+    if (error) {
+      setLoadError(error);
       setLoading(false);
-    });
+      toast({
+        title: "Impossible de charger le SEO par page",
+        description: error,
+        variant: "destructive",
+      });
+      return;
+    }
+    const map: Record<string, SeoOverride> = {};
+    for (const r of list) map[r.path] = r;
+    setRows(map);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadRows();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount load only
   }, []);
 
   const current: SeoOverride =
@@ -89,13 +106,18 @@ export function SeoPageOverridesSection() {
           : current.keywords,
       robots: current.robots || "index,follow",
     };
-    const { error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("seo_page_overrides")
-      .upsert(payload, { onConflict: "path" });
+      .upsert(payload, { onConflict: "path" })
+      .select()
+      .single();
     setSaving(false);
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
       return;
+    }
+    if (data) {
+      setRows((p) => ({ ...p, [data.path]: data as SeoOverride }));
     }
     clearSeoOverridesCache();
     fetch("/api/meta-injector", { method: "GET", headers: { "x-purge-cache": "1" } }).catch(() => {});
@@ -106,6 +128,21 @@ export function SeoPageOverridesSection() {
     return (
       <section className="bg-card border border-border rounded-xl p-5">
         <Loader2 className="animate-spin text-primary" size={20} />
+      </section>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <section className="bg-card border border-border rounded-xl p-5 space-y-3">
+        <p className="text-sm text-destructive">{loadError}</p>
+        <button
+          type="button"
+          onClick={loadRows}
+          className="text-sm font-medium text-primary hover:underline"
+        >
+          Réessayer
+        </button>
       </section>
     );
   }
