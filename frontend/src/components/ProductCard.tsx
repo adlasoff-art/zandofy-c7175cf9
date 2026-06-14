@@ -1,5 +1,5 @@
 import { Heart, ShoppingCart, Plus, Star, Trophy, Check, Award, GitCompareArrows } from "lucide-react";
-import { useState, useCallback, useRef, memo } from "react";
+import { useState, useCallback, useRef, memo, useEffect } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { useWishlist } from "@/contexts/WishlistContext";
@@ -20,7 +20,13 @@ interface ProductCardProps {
 
 export const ProductCard = memo(function ProductCard({ product, index = 0, priority = false }: ProductCardProps) {
   const [loaded, setLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
   const onLoad = useCallback(() => setLoaded(true), []);
+
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img?.complete && img.naturalWidth > 0) setLoaded(true);
+  }, [product.image]);
   const [imgError, setImgError] = useState(false);
   const [hovered, setHovered] = useState(false);
   const { addItem } = useCart();
@@ -91,6 +97,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
       <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-t-sm bg-muted">
         {!loaded && <div className="absolute inset-0 skeleton-shimmer" />}
         <OptimizedImage
+          ref={imgRef}
           src={imgError ? "/placeholder.svg" : product.image}
           alt={product.nameFr}
           className={`${PRODUCT_CARD_IMAGE_CLASS} ${loaded ? "opacity-100" : "opacity-0"} ${

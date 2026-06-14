@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { fetchProducts, fetchTrendTags, fetchCategories, type Product, type TrendTag, type Category } from "@/services/api";
 import { categoryPath } from "@/lib/category-slug";
 import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
+import { readProductGridCache, writeProductGridCache } from "@/lib/product-grid-cache";
 import { ChevronRight, TrendingUp, Flame, Users } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 
@@ -36,29 +37,56 @@ function categoryMatchesKeys(cat: Category, keys: string[]): boolean {
   return keys.some((k) => hay.includes(k));
 }
 
-export function ProductGrid() {
+export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: boolean }) {
   const { t, locale } = useI18n();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cached = restoreFromCache ? readProductGridCache() : null;
+
+  const [products, setProducts] = useState<Product[]>(cached?.products ?? []);
+  const [loading, setLoading] = useState(!(cached && cached.products.length > 0));
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState(cached?.activeTab ?? "all");
   const [trendTags, setTrendTags] = useState<TrendTag[]>([]);
 
   // Infinite "Voir Plus" pagination
-  const [moreProducts, setMoreProducts] = useState<Product[]>([]);
+  const [moreProducts, setMoreProducts] = useState<Product[]>(cached?.moreProducts ?? []);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [currentOffset, setCurrentOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(cached?.hasMore ?? true);
+  const [currentOffset, setCurrentOffset] = useState(cached?.currentOffset ?? 0);
 
   // Popular section
-  const [popularProducts, setPopularProducts] = useState<Product[]>([]);
-  const [popularLoading, setPopularLoading] = useState(true);
+  const [popularProducts, setPopularProducts] = useState<Product[]>(cached?.popularProducts ?? []);
+  const [popularLoading, setPopularLoading] = useState(!(cached && cached.popularProducts.length > 0));
 
   // Category sections
   const [categorySections, setCategorySections] = useState<
     { label: string; products: Product[]; href: string }[]
-  >([]);
+  >(cached?.categorySections ?? []);
+
+  const cacheSnapshotRef = useRef({
+    products,
+    moreProducts,
+    popularProducts,
+    categorySections,
+    activeTab,
+    hasMore,
+    currentOffset,
+  });
+  cacheSnapshotRef.current = {
+    products,
+    moreProducts,
+    popularProducts,
+    categorySections,
+    activeTab,
+    hasMore,
+    currentOffset,
+  };
+
+  useEffect(() => {
+    return () => {
+      writeProductGridCache(cacheSnapshotRef.current);
+    };
+  }, []);
 
   // Load trend tags on mount
   useEffect(() => {
@@ -67,6 +95,7 @@ export function ProductGrid() {
 
   // Popular products via API (no direct wishlists/cart_items reads — RLS-safe, fewer queries)
   useEffect(() => {
+    if (cached && cached.popularProducts.length > 0) return;
     setPopularLoading(true);
     fetchProducts({ limit: 12, orderBy: "popular" })
       .then((items) => {
@@ -78,6 +107,7 @@ export function ProductGrid() {
 
   // Load category sections on mount
   useEffect(() => {
+    if (cached && cached.categorySections.length > 0) return;
     fetchCategories().then((cats) => {
       CATEGORY_SECTION_TARGETS.forEach((target) => {
         const cat = cats.find((c) => categoryMatchesKeys(c, target.keys));
@@ -106,6 +136,11 @@ export function ProductGrid() {
 
   // Load main Tendances products when tab changes
   useEffect(() => {
+    if (cached && cached.activeTab === activeTab && cached.products.length > 0 && retryKey === 0) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setMoreProducts([]);

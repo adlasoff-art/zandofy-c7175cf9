@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback } from "react";
+import { useNavigationType } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { HeroBanner } from "@/components/HeroBanner";
@@ -23,6 +24,9 @@ const SITE_URL = import.meta.env.VITE_SITE_URL || "https://zandofy.com";
 
 const Index = () => {
   const queryClient = useQueryClient();
+  const navType = useNavigationType();
+  /** Back from PDP: mount lazy sections immediately so scroll height matches saved position. */
+  const restoreHomeLayout = navType === "POP";
   const seoConfig = useSeoConfig();
   const override = useSeoOverride("/");
   const handleRefresh = useCallback(async () => {
@@ -99,13 +103,13 @@ const Index = () => {
         <HeroBanner />
         <CategoryBanner />
 
-        <LazyMount minHeight={320}>
+        <LazyMount minHeight={320} initialShown={restoreHomeLayout}>
           <Suspense fallback={<div style={{ minHeight: 320 }} />}>
             <FlashSales />
           </Suspense>
         </LazyMount>
 
-        <LazyMount minHeight={400}>
+        <LazyMount minHeight={400} initialShown={restoreHomeLayout}>
           <Suspense fallback={<div style={{ minHeight: 400 }} />}>
             <RecommendationsSection />
           </Suspense>
@@ -116,7 +120,7 @@ const Index = () => {
           <div className="flex flex-col lg:flex-row gap-4 py-4">
             {/* Featured sidebar – left on desktop */}
             <div className="order-2 lg:order-1">
-              <LazyMount minHeight={300}>
+              <LazyMount minHeight={300} initialShown={restoreHomeLayout}>
                 <Suspense fallback={<div style={{ minHeight: 300 }} />}>
                   <FeaturedSidebar />
                 </Suspense>
@@ -124,7 +128,7 @@ const Index = () => {
             </div>
             {/* TopTrends beside sidebar */}
             <div className="flex-1 min-w-0 order-1 lg:order-2">
-              <LazyMount minHeight={500}>
+              <LazyMount minHeight={500} initialShown={restoreHomeLayout}>
                 <Suspense fallback={<div style={{ minHeight: 500 }} />}>
                   <TopTrends />
                 </Suspense>
@@ -134,14 +138,14 @@ const Index = () => {
         </div>
 
         {/* ProductGrid returns to full width */}
-        <LazyMount minHeight={600}>
+        <LazyMount minHeight={600} initialShown={restoreHomeLayout}>
           <Suspense fallback={<div style={{ minHeight: 600 }} />}>
-            <ProductGrid />
+            <ProductGrid restoreFromCache={restoreHomeLayout} />
           </Suspense>
         </LazyMount>
       </main>
 
-      <LazyMount minHeight={300}>
+      <LazyMount minHeight={300} initialShown={restoreHomeLayout}>
         <Suspense fallback={<div style={{ minHeight: 300 }} />}>
           <Footer />
         </Suspense>
