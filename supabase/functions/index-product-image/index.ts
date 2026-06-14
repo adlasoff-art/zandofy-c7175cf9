@@ -2,7 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   embedImageFromUrl,
   embeddingToPgVector,
-  IMAGE_EMBEDDING_MODEL,
+  embeddingModelForStorage,
 } from "../_shared/image-embedding.ts";
 
 const corsHeaders = {
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
       .from("product_images")
       .update({
         embedding: pgVector,
-        embedding_model: IMAGE_EMBEDDING_MODEL,
+        embedding_model: embeddingModelForStorage(),
         embedded_at: new Date().toISOString(),
         embedding_status: "ready",
       })
