@@ -52,6 +52,7 @@ import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimate";
 import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd, buildJsonLdGraph, buildMarketplaceFaqJsonLd } from "@/components/SEOHead";
 import { VariantOrderDrawer } from "@/components/VariantOrderDrawer";
+import { MobileBackButton } from "@/components/navigation/MobileBackButton";
 import { slugify } from "@/utils/slugify";
 import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 
@@ -295,9 +296,12 @@ export default function ProductPage() {
         jsonLd={buildJsonLdGraph(productJsonLd, breadcrumbJsonLd, buildMarketplaceFaqJsonLd())}
       />
       <Header />
+      <div className="lg:hidden sticky top-14 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-1">
+        <MobileBackButton fallbackTo={`/category/${categorySlug}`} />
+      </div>
       <main className="max-w-7xl mx-auto px-4 py-2 lg:py-4">
-        {/* Breadcrumbs */}
-        <Breadcrumb className="mb-4">
+        {/* Breadcrumbs — desktop only */}
+        <Breadcrumb className="mb-4 hidden lg:flex">
           <BreadcrumbList>
             <BreadcrumbItem><BreadcrumbLink asChild><Link to="/">{t("general.home") || "Accueil"}</Link></BreadcrumbLink></BreadcrumbItem>
             <BreadcrumbSeparator />

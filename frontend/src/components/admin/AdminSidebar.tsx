@@ -37,6 +37,7 @@ const sidebarSections: SidebarSection[] = [
       { title: "Tableau de bord", url: "/admin", icon: LayoutDashboard },
       { title: "Commandes", url: "/admin/orders", icon: Package },
       { title: "Modération produits", url: "/admin/product-moderation", icon: ShieldCheck },
+      { title: "Catégorisation produits", url: "/admin/product-categories", icon: FolderTree },
       { title: "Modération avis", url: "/admin/review-moderation", icon: Star },
       { title: "Demandes produits", url: "/admin/sourcing", icon: PackageSearch },
     ],

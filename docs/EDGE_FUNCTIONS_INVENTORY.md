@@ -36,7 +36,9 @@ Le dossier [`frontend/supabase/`](../frontend/supabase/) est **déprécié** (co
 | track-* | Tracking colis / automations |
 | vendor-order-webhook | Webhook commande vendeur |
 | verify-confirmation-code | Codes confirmation |
-| visual-search | Recherche visuelle |
+| visual-search | Recherche visuelle (pgvector + fallback keywords) |
+| index-product-image | Embedding CLIP image principale |
+| backfill-product-embeddings | Backfill admin ~940 produits |
 | watermark-image | Filigrane images |
 
 ## Déploiement

@@ -1309,18 +1309,30 @@ export type Database = {
       }
       product_images: {
         Row: {
+          embedded_at: string | null
+          embedding: string | null
+          embedding_model: string | null
+          embedding_status: string | null
           id: string
           image_url: string
           position: number | null
           product_id: string
         }
         Insert: {
+          embedded_at?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
+          embedding_status?: string | null
           id?: string
           image_url: string
           position?: number | null
           product_id: string
         }
         Update: {
+          embedded_at?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
+          embedding_status?: string | null
           id?: string
           image_url?: string
           position?: number | null
@@ -2891,6 +2903,18 @@ export type Database = {
         Returns: number
       }
       increment_helpful: { Args: { review_id: string }; Returns: undefined }
+      match_products_by_image: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          image_id: string
+          product_id: string
+          similarity: number
+        }[]
+      }
       release_vendor_pending_funds: { Args: never; Returns: number }
       track_delivery: {
         Args: { p_order_ref: string }

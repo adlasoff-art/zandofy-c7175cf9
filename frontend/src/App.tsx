@@ -134,6 +134,7 @@ const AdminCountriesPage = lazyRetry(() => import("./pages/admin/AdminCountriesP
 const AdminPopupsPage = lazyRetry(() => import("./pages/admin/AdminPopupsPage"));
 const AdminSupportPage = lazyRetry(() => import("./pages/admin/AdminSupportPage"));
 const AdminProductModerationPage = lazyRetry(() => import("./pages/admin/AdminProductModerationPage"));
+const AdminProductCategoriesPage = lazyRetry(() => import("./pages/admin/AdminProductCategoriesPage"));
 const AdminReviewModerationPage = lazyRetry(() => import("./pages/admin/AdminReviewModerationPage"));
 const AdminVariantTypesPage = lazyRetry(() => import("./pages/admin/AdminVariantTypesPage"));
 const AdminAnalyticsPage = lazyRetry(() => import("./pages/admin/AdminAnalyticsPage"));
@@ -315,6 +316,7 @@ const App = () => (
                 <Route path="/admin/variant-types" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminVariantTypesPage /></RoleGuard>} />
                 <Route path="/admin/orders" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminOrdersPage /></RoleGuard>} />
                 <Route path="/admin/product-moderation" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminProductModerationPage /></RoleGuard>} />
+                <Route path="/admin/product-categories" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminProductCategoriesPage /></RoleGuard>} />
                 <Route path="/admin/review-moderation" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminReviewModerationPage /></RoleGuard>} />
                 <Route path="/admin/support" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminSupportPage /></RoleGuard>} />
                 <Route path="/admin/logistics" element={<RoleGuard allowedRoles={["admin", "manager"]}><AdminLogisticsPage /></RoleGuard>} />

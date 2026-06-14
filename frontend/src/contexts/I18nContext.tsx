@@ -672,6 +672,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "general.loadingMore": "Chargement...",
     "general.allSeen": "Vous avez tout vu ✨",
     "general.home": "Accueil",
+    "general.back": "Retour",
     "general.backToShop": "Retour à la boutique",
     "general.loginButton": "Se connecter",
     // Home sections
@@ -2185,6 +2186,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "general.loadingMore": "Loading...",
     "general.allSeen": "You've seen it all ✨",
     "general.home": "Home",
+    "general.back": "Back",
     "general.backToShop": "Back to shop",
     "general.loginButton": "Log in",
     // Home sections
