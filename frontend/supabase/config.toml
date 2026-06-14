@@ -44,7 +44,8 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.impersonate-user]
-verify_jwt = true
+# exchange/restore auth via one-time token or admin refresh tokens in body
+verify_jwt = false
 
 [functions.ai-user-analysis]
 verify_jwt = true

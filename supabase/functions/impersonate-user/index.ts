@@ -27,6 +27,53 @@ async function sha256Hex(input: string): Promise<string> {
   return Array.from(new Uint8Array(hashBuffer), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** Create a user session via admin generateLink + anon verifyOtp (service role verifyOtp fails). */
+async function createSessionForEmail(
+  supabaseUrl: string,
+  supabaseAnonKey: string,
+  supabaseAdmin: ReturnType<typeof createClient>,
+  email: string,
+) {
+  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+    type: "magiclink",
+    email,
+  });
+
+  if (linkError || !linkData?.properties) {
+    console.error("generateLink error:", linkError);
+    return { error: linkError?.message || "Failed to generate session" };
+  }
+
+  const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
+  const hashedToken = linkData.properties.hashed_token;
+  const emailOtp = linkData.properties.email_otp;
+
+  if (hashedToken) {
+    const { data: sessionData, error: verifyError } = await supabaseAuth.auth.verifyOtp({
+      token_hash: hashedToken,
+      type: "email",
+    });
+    if (!verifyError && sessionData?.session) {
+      return { session: sessionData.session };
+    }
+    console.error("verifyOtp token_hash/email failed:", verifyError);
+  }
+
+  if (emailOtp) {
+    const { data: sessionData, error: verifyError } = await supabaseAuth.auth.verifyOtp({
+      email,
+      token: emailOtp,
+      type: "magiclink",
+    });
+    if (!verifyError && sessionData?.session) {
+      return { session: sessionData.session };
+    }
+    console.error("verifyOtp email_otp failed:", verifyError);
+  }
+
+  return { error: "Failed to create session (verifyOtp)" };
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -151,45 +198,31 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Token expired" }, 401, corsHeaders);
       }
 
-      // Mark token as used
+      const { data: targetUser } = await supabaseAdmin.auth.admin.getUserById(tokenRecord.target_user_id);
+      if (!targetUser?.user?.email) {
+        return jsonResponse({ error: "Target user not found in auth" }, 404, corsHeaders);
+      }
+
+      const sessionResult = await createSessionForEmail(
+        supabaseUrl,
+        supabaseAnonKey,
+        supabaseAdmin,
+        targetUser.user.email,
+      );
+
+      if (!sessionResult.session) {
+        return jsonResponse(
+          { error: sessionResult.error || "Failed to create session" },
+          500,
+          corsHeaders,
+        );
+      }
+
+      // Mark token as used only after session is created (failed attempts stay retryable)
       await supabaseAdmin
         .from("impersonation_tokens")
         .update({ used: true })
         .eq("id", tokenRecord.id);
-
-      // Generate a magic link for the target user, then extract the session
-      const { data: targetUser } = await supabaseAdmin.auth.admin.getUserById(tokenRecord.target_user_id);
-      if (!targetUser?.user) {
-        return jsonResponse({ error: "Target user not found in auth" }, 404, corsHeaders);
-      }
-
-      // Use generateLink to create a magic link token
-      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-        type: "magiclink",
-        email: targetUser.user.email!,
-      });
-
-      if (linkError || !linkData) {
-        console.error("generateLink error:", linkError);
-        return jsonResponse({ error: "Failed to generate session" }, 500, corsHeaders);
-      }
-
-      // Extract the hashed_token from the link properties
-      const hashedToken = linkData.properties?.hashed_token;
-      if (!hashedToken) {
-        return jsonResponse({ error: "Failed to extract token" }, 500, corsHeaders);
-      }
-
-      // Verify the OTP to get actual session tokens
-      const { data: sessionData, error: verifyError } = await supabaseAdmin.auth.verifyOtp({
-        token_hash: hashedToken,
-        type: "magiclink",
-      });
-
-      if (verifyError || !sessionData?.session) {
-        console.error("verifyOtp error:", verifyError);
-        return jsonResponse({ error: "Failed to create session" }, 500, corsHeaders);
-      }
 
       // Get target roles
       const { data: targetRoles } = await supabaseAdmin
@@ -197,21 +230,25 @@ Deno.serve(async (req) => {
         .select("role")
         .eq("user_id", tokenRecord.target_user_id);
 
-      // Log in user_activity_logs
-      await supabaseAdmin.from("user_activity_logs").insert({
-        user_id: tokenRecord.target_user_id,
-        action: "impersonated",
-        metadata: {
-          impersonated_by: tokenRecord.admin_id,
-          timestamp: new Date().toISOString(),
-        },
-      });
+      // Log in user_activity_logs (non-blocking)
+      try {
+        await supabaseAdmin.from("user_activity_logs").insert({
+          user_id: tokenRecord.target_user_id,
+          action: "impersonated",
+          metadata: {
+            impersonated_by: tokenRecord.admin_id,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } catch (logErr) {
+        console.error("user_activity_logs insert failed:", logErr);
+      }
 
       return jsonResponse({
         success: true,
         session: {
-          access_token: sessionData.session.access_token,
-          refresh_token: sessionData.session.refresh_token,
+          access_token: sessionResult.session.access_token,
+          refresh_token: sessionResult.session.refresh_token,
         },
         admin_id: tokenRecord.admin_id,
         target: {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { parseEdgeFunctionError } from "@/services/admin-email";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 
@@ -33,7 +34,7 @@ export default function ImpersonatePage() {
           body: { action: "exchange", token },
         });
 
-        if (res.error) throw new Error(res.error.message);
+        if (res.error) throw new Error(await parseEdgeFunctionError(res.error));
         if (res.data?.error) throw new Error(res.data.error);
 
         const { session, admin_id, target } = res.data;
