@@ -14,6 +14,7 @@ import type { AppRole } from "@/hooks/use-roles";
 import { Switch } from "@/components/ui/switch";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { ALL_APP_ROLES, ROLE_LABELS_FR } from "@/lib/role-labels";
+import { parseEdgeFunctionError } from "@/services/admin-email";
 
 const ALL_ROLES: AppRole[] = ALL_APP_ROLES;
 
@@ -282,7 +283,7 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
       const res = await supabase.functions.invoke("impersonate-user", {
         body: { action: "start", targetUserId: user.id },
       });
-      if (res.error) throw new Error(res.error.message);
+      if (res.error) throw new Error(await parseEdgeFunctionError(res.error));
       if (res.data?.error) throw new Error(res.data.error);
       return res.data;
     },
