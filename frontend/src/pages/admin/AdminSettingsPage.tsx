@@ -110,6 +110,7 @@ export default function AdminSettingsPage() {
     try {
       let remaining = 1;
       let totalProcessed = 0;
+      let lastErrors: string[] = [];
       while (remaining > 0) {
         const { data, error } = await supabase.functions.invoke("backfill-product-embeddings", {
           body: { batch_size: 50 },
@@ -118,10 +119,15 @@ export default function AdminSettingsPage() {
         if (data?.error) throw new Error(data.error);
         totalProcessed += data?.processed ?? 0;
         remaining = data?.remaining ?? 0;
+        lastErrors = data?.errors ?? [];
         setBackfillProgress({ processed: totalProcessed, remaining });
         if ((data?.processed ?? 0) === 0) break;
       }
       await refetchEmbeddingStats();
+      if (totalProcessed === 0 && remaining > 0) {
+        const hint = lastErrors[0] || "Vérifiez EMBEDDING_API_KEY et les logs index-product-image.";
+        throw new Error(`Aucune image indexée (${remaining} restantes). ${hint}`);
+      }
       toast({
         title: "Indexation terminée",
         description: `${totalProcessed} image(s) principale(s) indexée(s).`,
@@ -539,7 +545,9 @@ export default function AdminSettingsPage() {
               Lancer l&apos;indexation (~940 images principales)
             </button>
             <p className="text-[10px] text-muted-foreground">
-              Requiert EMBEDDING_API_KEY (Hugging Face CLIP) sur Supabase Edge Functions. Activez le toggle ci-dessus uniquement avant vos lives.
+              Requiert EMBEDDING_API_KEY (Hugging Face CLIP, permission Inference Providers) sur les Edge Functions
+              <code className="text-[10px]">index-product-image</code> et{" "}
+              <code className="text-[10px]">backfill-product-embeddings</code>. Activez le toggle ci-dessus uniquement avant vos lives.
             </p>
           </div>
         </section>
