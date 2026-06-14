@@ -6,6 +6,7 @@ import { KelpayWebhookPanel } from "@/components/admin/KelpayWebhookPanel";
 import { MonetizationSettings } from "@/components/admin/MonetizationSettings";
 import { AdminDefaultPaymentNumbers } from "@/components/admin/AdminDefaultPaymentNumbers";
 import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -83,6 +84,58 @@ export default function AdminSettingsPage() {
   const [gatewayFees, setGatewayFees] = useState({ mobile_money_fee_pct: 2.5 });
   const [reviewBonus, setReviewBonus] = useState({ bonus_pct: 0.10 });
   const [visualSearchEnabled, setVisualSearchEnabled] = useState(false);
+  const [backfillRunning, setBackfillRunning] = useState(false);
+  const [backfillProgress, setBackfillProgress] = useState<{ processed: number; remaining: number } | null>(null);
+
+  const { data: embeddingStats, refetch: refetchEmbeddingStats } = useQuery({
+    queryKey: ["admin-embedding-stats"],
+    queryFn: async () => {
+      const statuses = ["ready", "pending", "failed", "skipped"] as const;
+      const counts: Record<string, number> = {};
+      for (const status of statuses) {
+        const { count } = await supabase
+          .from("product_images")
+          .select("id", { count: "exact", head: true })
+          .eq("embedding_status", status);
+        counts[status] = count ?? 0;
+      }
+      return counts;
+    },
+    refetchInterval: backfillRunning ? 3000 : false,
+  });
+
+  const runEmbeddingBackfill = async () => {
+    setBackfillRunning(true);
+    setBackfillProgress(null);
+    try {
+      let remaining = 1;
+      let totalProcessed = 0;
+      while (remaining > 0) {
+        const { data, error } = await supabase.functions.invoke("backfill-product-embeddings", {
+          body: { batch_size: 50 },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        totalProcessed += data?.processed ?? 0;
+        remaining = data?.remaining ?? 0;
+        setBackfillProgress({ processed: totalProcessed, remaining });
+        if ((data?.processed ?? 0) === 0) break;
+      }
+      await refetchEmbeddingStats();
+      toast({
+        title: "Indexation terminée",
+        description: `${totalProcessed} image(s) principale(s) indexée(s).`,
+      });
+    } catch (e: any) {
+      toast({
+        title: "Erreur d'indexation",
+        description: e?.message || "Échec du backfill",
+        variant: "destructive",
+      });
+    } finally {
+      setBackfillRunning(false);
+    }
+  };
 
   useEffect(() => {
     supabase
@@ -450,14 +503,44 @@ export default function AdminSettingsPage() {
             <h2 className="text-sm font-semibold text-foreground">Recherche visuelle (IA)</h2>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
-            Permet aux clients de rechercher des produits en prenant une photo ou en uploadant une image. Cette fonctionnalité nécessite une configuration IA avancée (vectoriel, etc.).
+            Permet aux clients de rechercher des produits en prenant une photo ou en uploadant une image.
+            Le toggle contrôle la visibilité du bouton caméra ; l&apos;indexation vectorielle peut tourner en arrière-plan.
           </p>
-          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg mb-4">
             <div>
               <p className="text-sm font-medium text-foreground">Activer la recherche visuelle</p>
-              <p className="text-xs text-muted-foreground">Affiche le bouton caméra dans la barre de recherche</p>
+              <p className="text-xs text-muted-foreground">Affiche le bouton caméra dans la barre de recherche (désactivé par défaut)</p>
             </div>
             <Switch checked={visualSearchEnabled} onCheckedChange={setVisualSearchEnabled} />
+          </div>
+
+          <div className="border border-border rounded-lg p-3 space-y-3">
+            <p className="text-xs font-semibold text-foreground">Indexation images (pgvector)</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+              {(["ready", "pending", "failed", "skipped"] as const).map((key) => (
+                <div key={key} className="bg-muted/40 rounded-lg p-2">
+                  <p className="text-lg font-bold text-foreground">{embeddingStats?.[key] ?? "—"}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase">{key}</p>
+                </div>
+              ))}
+            </div>
+            {backfillProgress && (
+              <p className="text-xs text-muted-foreground">
+                Batch en cours : {backfillProgress.processed} traités, {backfillProgress.remaining} restants
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={runEmbeddingBackfill}
+              disabled={backfillRunning}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg disabled:opacity-50"
+            >
+              {backfillRunning ? <Loader2 size={14} className="animate-spin" /> : null}
+              Lancer l&apos;indexation (~940 images principales)
+            </button>
+            <p className="text-[10px] text-muted-foreground">
+              Requiert EMBEDDING_API_KEY (Hugging Face CLIP) sur Supabase Edge Functions. Activez le toggle ci-dessus uniquement avant vos lives.
+            </p>
           </div>
         </section>
 
