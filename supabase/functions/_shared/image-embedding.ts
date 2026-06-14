@@ -14,7 +14,7 @@ function getApiKey(): string {
 function getModelUrl(): string {
   const override = Deno.env.get("EMBEDDING_API_URL");
   if (override) return override;
-  return `https://api-inference.huggingface.co/models/${CLIP_MODEL}`;
+  return `https://router.huggingface.co/hf-inference/models/${CLIP_MODEL}`;
 }
 
 /** Normalize CLIP embedding to unit length for cosine similarity via pgvector. */
@@ -31,6 +31,16 @@ export function embeddingToPgVector(values: number[]): string {
   return `[${values.join(",")}]`;
 }
 
+function uint8ToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
 export async function fetchImageBytes(imageUrl: string): Promise<{ bytes: Uint8Array; mime: string }> {
   const res = await fetch(imageUrl);
   if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
@@ -43,10 +53,14 @@ export async function embedImageBytes(bytes: Uint8Array, mime = "image/jpeg"): P
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("EMBEDDING_API_KEY not configured");
 
-  const res = await fetch(getModelUrl(), {
+  const modelUrl = getModelUrl();
+  const authHeaders = { Authorization: `Bearer ${apiKey}` };
+
+  // Router API: try raw bytes (legacy inference shape), then JSON base64 fallback.
+  let res = await fetch(modelUrl, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      ...authHeaders,
       "Content-Type": mime,
     },
     body: bytes,
@@ -54,7 +68,29 @@ export async function embedImageBytes(bytes: Uint8Array, mime = "image/jpeg"): P
 
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`Embedding API error ${res.status}: ${errText.slice(0, 300)}`);
+    const needsJson =
+      res.status === 404 ||
+      errText.includes("no longer supported") ||
+      errText.includes("router.huggingface.co");
+
+    if (needsJson) {
+      const base64 = uint8ToBase64(bytes);
+      const dataUrl = `data:${mime};base64,${base64}`;
+
+      res = await fetch(modelUrl, {
+        method: "POST",
+        headers: {
+          ...authHeaders,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ inputs: dataUrl }),
+      });
+    }
+
+    if (!res.ok) {
+      const retryErr = await res.text();
+      throw new Error(`Embedding API error ${res.status}: ${retryErr.slice(0, 300)}`);
+    }
   }
 
   const data = await res.json();
