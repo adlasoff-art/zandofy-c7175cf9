@@ -8,6 +8,8 @@ interface LazyMountProps {
   rootMargin?: string;
   /** Optional className applied to the placeholder wrapper. */
   className?: string;
+  /** Skip defer when restoring back navigation (keeps page height stable). */
+  initialShown?: boolean;
 }
 
 /**
@@ -19,11 +21,16 @@ export function LazyMount({
   minHeight = 200,
   rootMargin = "300px",
   className,
+  initialShown = false,
 }: LazyMountProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useState(false);
+  const [shown, setShown] = useState(initialShown);
 
   useEffect(() => {
+    if (initialShown) {
+      setShown(true);
+      return;
+    }
     if (shown) return;
     const node = ref.current;
     if (!node) return;
@@ -45,7 +52,7 @@ export function LazyMount({
     );
     obs.observe(node);
     return () => obs.disconnect();
-  }, [shown, rootMargin]);
+  }, [initialShown, shown, rootMargin]);
 
   if (shown) {
     // After mount, keep content-visibility:auto so off-screen sections skip
