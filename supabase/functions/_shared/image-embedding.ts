@@ -1,23 +1,54 @@
-const CLIP_MODEL = "openai/clip-vit-base-patch32";
+const CLIP_MODEL_HF = "openai/clip-vit-base-patch32";
+const JINA_MODEL = "jina-clip-v2";
+const JINA_API_URL = "https://api.jina.ai/v1/embeddings";
 const EMBEDDING_DIM = 512;
 
-export const IMAGE_EMBEDDING_MODEL = CLIP_MODEL;
+export const IMAGE_EMBEDDING_MODEL = CLIP_MODEL_HF;
+
+type EmbeddingTask = "retrieval.passage" | "retrieval.query";
 
 function getApiKey(): string {
   return (
     Deno.env.get("EMBEDDING_API_KEY") ||
+    Deno.env.get("JINA_API_KEY") ||
     Deno.env.get("HUGGINGFACE_API_KEY") ||
     ""
   );
 }
 
-function getModelUrl(): string {
-  const override = Deno.env.get("EMBEDDING_API_URL");
-  if (override) return override;
-  return `https://router.huggingface.co/hf-inference/models/${CLIP_MODEL}`;
+function getProvider(): "jina" | "huggingface" {
+  const explicit = Deno.env.get("EMBEDDING_PROVIDER")?.toLowerCase();
+  if (explicit === "jina") return "jina";
+  if (explicit === "huggingface" || explicit === "hf") return "huggingface";
+
+  const url = Deno.env.get("EMBEDDING_API_URL") || "";
+  if (url.includes("jina.ai")) return "jina";
+
+  const key = getApiKey();
+  if (key.startsWith("jina_")) return "jina";
+
+  return "huggingface";
 }
 
-/** Normalize CLIP embedding to unit length for cosine similarity via pgvector. */
+function getHfModelUrl(): string {
+  const override = Deno.env.get("EMBEDDING_API_URL");
+  if (override && !override.includes("jina.ai")) return override;
+  return `https://router.huggingface.co/hf-inference/models/${CLIP_MODEL_HF}`;
+}
+
+function getStoredModelName(): string {
+  const provider = getProvider();
+  if (provider === "jina") {
+    return Deno.env.get("EMBEDDING_MODEL") || JINA_MODEL;
+  }
+  return Deno.env.get("EMBEDDING_MODEL") || CLIP_MODEL_HF;
+}
+
+export function embeddingModelForStorage(): string {
+  return getStoredModelName();
+}
+
+/** Normalize embedding to unit length for cosine similarity via pgvector. */
 function normalizeVector(values: number[]): number[] {
   const slice = values.slice(0, EMBEDDING_DIM);
   while (slice.length < EMBEDDING_DIM) slice.push(0);
@@ -41,22 +72,71 @@ function uint8ToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-export async function fetchImageBytes(imageUrl: string): Promise<{ bytes: Uint8Array; mime: string }> {
-  const res = await fetch(imageUrl);
-  if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
-  const mime = res.headers.get("content-type") || "image/jpeg";
-  const buf = await res.arrayBuffer();
-  return { bytes: new Uint8Array(buf), mime };
+function parseEmbeddingVector(data: unknown): number[] | null {
+  if (!data) return null;
+
+  if (Array.isArray(data)) {
+    if (Array.isArray(data[0])) return data[0] as number[];
+    if (typeof data[0] === "number") return data as number[];
+    if (data[0] && typeof data[0] === "object") {
+      const row = data[0] as { embedding?: number[] };
+      if (Array.isArray(row.embedding)) return row.embedding;
+    }
+  }
+
+  if (typeof data === "object") {
+    const obj = data as { embedding?: number[]; data?: Array<{ embedding?: number[] }> };
+    if (Array.isArray(obj.embedding)) return obj.embedding;
+    if (Array.isArray(obj.data?.[0]?.embedding)) return obj.data![0].embedding!;
+  }
+
+  return null;
 }
 
-export async function embedImageBytes(bytes: Uint8Array, mime = "image/jpeg"): Promise<number[]> {
+async function embedViaJina(
+  imageRef: string,
+  task: EmbeddingTask = "retrieval.passage",
+): Promise<number[]> {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("EMBEDDING_API_KEY not configured");
 
-  const modelUrl = getModelUrl();
+  const apiUrl = Deno.env.get("EMBEDDING_API_URL") || JINA_API_URL;
+  const model = Deno.env.get("EMBEDDING_MODEL") || JINA_MODEL;
+
+  const res = await fetch(apiUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      dimensions: EMBEDDING_DIM,
+      task,
+      normalized: true,
+      embedding_type: "float",
+      input: [{ image: imageRef }],
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Jina embedding error ${res.status}: ${errText.slice(0, 300)}`);
+  }
+
+  const payload = await res.json();
+  const vector = parseEmbeddingVector(payload?.data) ?? parseEmbeddingVector(payload);
+  if (!vector?.length) throw new Error("Invalid Jina embedding response");
+  return normalizeVector(vector);
+}
+
+async function embedViaHuggingface(bytes: Uint8Array, mime = "image/jpeg"): Promise<number[]> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("EMBEDDING_API_KEY not configured");
+
+  const modelUrl = getHfModelUrl();
   const authHeaders = { Authorization: `Bearer ${apiKey}` };
 
-  // Router API: try raw bytes (legacy inference shape), then JSON base64 fallback.
   let res = await fetch(modelUrl, {
     method: "POST",
     headers: {
@@ -71,7 +151,9 @@ export async function embedImageBytes(bytes: Uint8Array, mime = "image/jpeg"): P
     const needsJson =
       res.status === 404 ||
       errText.includes("no longer supported") ||
-      errText.includes("router.huggingface.co");
+      errText.includes("router.huggingface.co") ||
+      errText.includes("not deployed") ||
+      errText.includes("Inference Provider");
 
     if (needsJson) {
       const base64 = uint8ToBase64(bytes);
@@ -89,30 +171,63 @@ export async function embedImageBytes(bytes: Uint8Array, mime = "image/jpeg"): P
 
     if (!res.ok) {
       const retryErr = await res.text();
-      throw new Error(`Embedding API error ${res.status}: ${retryErr.slice(0, 300)}`);
+      const hint =
+        retryErr.includes("not deployed") || retryErr.includes("Inference Provider") || res.status === 404
+          ? " Le modèle CLIP n'est pas disponible sur HF serverless. Utilisez EMBEDDING_PROVIDER=jina + clé Jina (api.jina.ai) ou un Inference Endpoint HF (EMBEDDING_API_URL)."
+          : "";
+      throw new Error(`Embedding API error ${res.status}: ${retryErr.slice(0, 280)}${hint}`);
     }
   }
 
   const data = await res.json();
-  let vector: number[] | null = null;
-
-  if (Array.isArray(data)) {
-    if (Array.isArray(data[0])) vector = data[0] as number[];
-    else if (typeof data[0] === "number") vector = data as number[];
-  } else if (data && Array.isArray(data.embedding)) {
-    vector = data.embedding;
-  }
-
-  if (!vector?.length) throw new Error("Invalid embedding response");
+  const vector = parseEmbeddingVector(data);
+  if (!vector?.length) throw new Error("Invalid Hugging Face embedding response");
   return normalizeVector(vector);
 }
 
-export async function embedImageFromUrl(imageUrl: string): Promise<number[]> {
-  const { bytes, mime } = await fetchImageBytes(imageUrl);
-  return embedImageBytes(bytes, mime);
+export async function fetchImageBytes(imageUrl: string): Promise<{ bytes: Uint8Array; mime: string }> {
+  const res = await fetch(imageUrl);
+  if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+  const mime = res.headers.get("content-type") || "image/jpeg";
+  const buf = await res.arrayBuffer();
+  return { bytes: new Uint8Array(buf), mime };
 }
 
-export async function embedImageFromBase64(imageBase64: string): Promise<number[]> {
+export async function embedImageBytes(
+  bytes: Uint8Array,
+  mime = "image/jpeg",
+  task: EmbeddingTask = "retrieval.passage",
+): Promise<number[]> {
+  if (getProvider() === "jina") {
+    const base64 = uint8ToBase64(bytes);
+    return embedViaJina(`data:${mime};base64,${base64}`, task);
+  }
+  return embedViaHuggingface(bytes, mime);
+}
+
+export async function embedImageFromUrl(
+  imageUrl: string,
+  task: EmbeddingTask = "retrieval.passage",
+): Promise<number[]> {
+  if (getProvider() === "jina") {
+    return embedViaJina(imageUrl, task);
+  }
+  const { bytes, mime } = await fetchImageBytes(imageUrl);
+  return embedViaHuggingface(bytes, mime);
+}
+
+export async function embedImageFromBase64(
+  imageBase64: string,
+  task: EmbeddingTask = "retrieval.query",
+): Promise<number[]> {
+  if (getProvider() === "jina") {
+    let ref = imageBase64;
+    if (!ref.startsWith("data:") && !ref.startsWith("http")) {
+      ref = `data:image/jpeg;base64,${ref.replace(/\s/g, "")}`;
+    }
+    return embedViaJina(ref, task);
+  }
+
   let raw = imageBase64;
   let mime = "image/jpeg";
   if (raw.startsWith("data:")) {
@@ -128,5 +243,5 @@ export async function embedImageFromBase64(imageBase64: string): Promise<number[
   const binary = atob(raw);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return embedImageBytes(bytes, mime);
+  return embedViaHuggingface(bytes, mime);
 }

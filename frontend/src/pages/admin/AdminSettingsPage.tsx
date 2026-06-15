@@ -545,9 +545,13 @@ export default function AdminSettingsPage() {
               Lancer l&apos;indexation (~940 images principales)
             </button>
             <p className="text-[10px] text-muted-foreground">
-              Requiert EMBEDDING_API_KEY (Hugging Face CLIP, permission Inference Providers) sur les Edge Functions
+              Le modèle CLIP OpenAI n&apos;est pas disponible sur l&apos;API serverless Hugging Face.
+              Secrets Edge Functions : <code className="text-[10px]">EMBEDDING_PROVIDER=jina</code>,{" "}
+              <code className="text-[10px]">EMBEDDING_API_KEY</code> = clé Jina (gratuite sur{" "}
+              <a href="https://jina.ai" className="underline" target="_blank" rel="noreferrer">jina.ai</a>, modèle{" "}
+              <code className="text-[10px]">jina-clip-v2</code>, 512 dims). Redéployez{" "}
               <code className="text-[10px]">index-product-image</code> et{" "}
-              <code className="text-[10px]">backfill-product-embeddings</code>. Activez le toggle ci-dessus uniquement avant vos lives.
+              <code className="text-[10px]">backfill-product-embeddings</code>. Activez le toggle uniquement avant vos lives.
             </p>
           </div>
         </section>
