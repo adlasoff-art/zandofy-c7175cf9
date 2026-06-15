@@ -15,4 +15,3 @@ alwaysApply: true
 - Call out DB, env, and deployment impacts explicitly.
 - Do not silently change domains, ports, or variable names.
 - Keep staging and production Supabase projects clearly separated.
-- **Never** mention Coolify, `studio-staging.zandofy.com`, `supabasa*.zandofy.com`, or a separate API server — production path is **Vercel + Supabase** only (see `AGENTS.md`).
