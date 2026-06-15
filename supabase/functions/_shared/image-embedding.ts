@@ -72,6 +72,14 @@ function uint8ToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+function resolveJinaTask(model: string, task: EmbeddingTask): EmbeddingTask {
+  // jina-clip-v2 rejects retrieval.passage for image inputs (422); use query for index + search.
+  if (model === JINA_MODEL || model.startsWith("jina-clip")) {
+    return "retrieval.query";
+  }
+  return task;
+}
+
 function parseEmbeddingVector(data: unknown): number[] | null {
   if (!data) return null;
 
@@ -102,6 +110,7 @@ async function embedViaJina(
 
   const apiUrl = Deno.env.get("EMBEDDING_API_URL") || JINA_API_URL;
   const model = Deno.env.get("EMBEDDING_MODEL") || JINA_MODEL;
+  const jinaTask = resolveJinaTask(model, task);
 
   const res = await fetch(apiUrl, {
     method: "POST",
@@ -112,7 +121,7 @@ async function embedViaJina(
     body: JSON.stringify({
       model,
       dimensions: EMBEDDING_DIM,
-      task,
+      task: jinaTask,
       normalized: true,
       embedding_type: "float",
       input: [{ image: imageRef }],
