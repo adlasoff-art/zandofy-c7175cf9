@@ -111,23 +111,53 @@ export default function AdminSettingsPage() {
       let remaining = 1;
       let totalProcessed = 0;
       let lastErrors: string[] = [];
+      let zeroBatches = 0;
+      const maxZeroBatches = 3;
+
       while (remaining > 0) {
         const { data, error } = await supabase.functions.invoke("backfill-product-embeddings", {
-          body: { batch_size: 50 },
+          body: { batch_size: 10, delay_ms: 350 },
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-        totalProcessed += data?.processed ?? 0;
+
+        const batchProcessed = data?.processed ?? 0;
+        totalProcessed += batchProcessed;
         remaining = data?.remaining ?? 0;
         lastErrors = data?.errors ?? [];
         setBackfillProgress({ processed: totalProcessed, remaining });
-        if ((data?.processed ?? 0) === 0) break;
+
+        if (batchProcessed === 0) {
+          zeroBatches += 1;
+          if (zeroBatches >= maxZeroBatches) break;
+          await new Promise((r) => setTimeout(r, 2000));
+        } else {
+          zeroBatches = 0;
+        }
+
+        // Brief pause between successful batches (Jina rate limits)
+        if (remaining > 0 && batchProcessed > 0) {
+          await new Promise((r) => setTimeout(r, 800));
+        }
       }
+
       await refetchEmbeddingStats();
+
       if (totalProcessed === 0 && remaining > 0) {
         const hint = lastErrors[0] || "Vérifiez EMBEDDING_API_KEY et les logs index-product-image.";
         throw new Error(`Aucune image indexée (${remaining} restantes). ${hint}`);
       }
+
+      if (remaining > 0) {
+        const hint = lastErrors[0] ? ` Dernière erreur : ${lastErrors[0]}` : "";
+        toast({
+          title: "Indexation interrompue",
+          description: `${totalProcessed} image(s) indexée(s), ${remaining} restante(s). Relancez le bouton pour continuer.${hint}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
         title: "Indexation terminée",
         description: `${totalProcessed} image(s) principale(s) indexée(s).`,

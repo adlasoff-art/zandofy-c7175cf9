@@ -51,7 +51,8 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const batchSize = Math.min(Math.max(Number(body.batch_size) || 50, 1), 100);
+    const batchSize = Math.min(Math.max(Number(body.batch_size) || 10, 1), 25);
+    const delayMs = Math.min(Math.max(Number(body.delay_ms) || 300, 0), 2000);
 
     const { data: pendingRows, error: listErr } = await supabaseAdmin
       .from("product_images")
@@ -67,7 +68,8 @@ Deno.serve(async (req) => {
     let processed = 0;
     const errors: string[] = [];
 
-    for (const imageId of batchIds) {
+    for (let i = 0; i < batchIds.length; i++) {
+      const imageId = batchIds[i];
       try {
         const res = await fetch(indexUrl, {
           method: "POST",
@@ -85,6 +87,9 @@ Deno.serve(async (req) => {
         }
       } catch (err) {
         errors.push(`${imageId}: ${err instanceof Error ? err.message : "error"}`);
+      }
+      if (delayMs > 0 && i < batchIds.length - 1) {
+        await new Promise((r) => setTimeout(r, delayMs));
       }
     }
 

@@ -112,31 +112,42 @@ async function embedViaJina(
   const model = Deno.env.get("EMBEDDING_MODEL") || JINA_MODEL;
   const jinaTask = resolveJinaTask(model, task);
 
-  const res = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  const body = JSON.stringify({
       model,
       dimensions: EMBEDDING_DIM,
       task: jinaTask,
       normalized: true,
       embedding_type: "float",
       input: [{ image: imageRef }],
-    }),
-  });
+    });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Jina embedding error ${res.status}: ${errText.slice(0, 300)}`);
+  let lastErr = "";
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, 500 * attempt * attempt));
+    }
+
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body,
+    });
+
+    if (res.ok) {
+      const payload = await res.json();
+      const vector = parseEmbeddingVector(payload?.data) ?? parseEmbeddingVector(payload);
+      if (!vector?.length) throw new Error("Invalid Jina embedding response");
+      return normalizeVector(vector);
+    }
+
+    lastErr = await res.text();
+    if (res.status !== 429 && res.status < 500) break;
   }
 
-  const payload = await res.json();
-  const vector = parseEmbeddingVector(payload?.data) ?? parseEmbeddingVector(payload);
-  if (!vector?.length) throw new Error("Invalid Jina embedding response");
-  return normalizeVector(vector);
+  throw new Error(`Jina embedding error: ${lastErr.slice(0, 300)}`);
 }
 
 async function embedViaHuggingface(bytes: Uint8Array, mime = "image/jpeg"): Promise<number[]> {
