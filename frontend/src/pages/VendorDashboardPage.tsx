@@ -30,6 +30,7 @@ import { VendorKybV2Tab } from "@/components/vendor/VendorKybV2Tab";
 import { VendorAnalyticsProTab } from "@/components/vendor/VendorAnalyticsProTab";
 import { VendorFreightSimulator } from "@/components/vendor/VendorFreightSimulator";
 import VendorOriginCountriesCard from "@/components/vendor/VendorOriginCountriesCard";
+import { StoreTransferSection } from "@/components/vendor/StoreTransferSection";
 import { GeoFieldsRow, type GeoFieldsValue } from "@/components/address/GeoFieldsRow";
 import { toast } from "sonner";
 import {
@@ -71,6 +72,7 @@ interface VendorStore {
   suspension_reason?: string | null;
   ban_reason?: string | null;
   suspended_activities?: string[];
+  is_platform_owned?: boolean;
 }
 
 interface OrderCounters {
@@ -147,7 +149,7 @@ export default function VendorDashboardPage() {
       // Find all stores owned by user
       const { data: storesData } = await (supabase as any)
         .from("stores")
-        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, suspension_reason, ban_reason, suspended_activities")
+        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, suspension_reason, ban_reason, suspended_activities, is_platform_owned")
         .eq("owner_id", user!.id)
         .order("created_at", { ascending: true });
 
@@ -1218,6 +1220,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
           </div>
         )}
       </div>
+
+      {!store.is_platform_owned && (
+        <StoreTransferSection storeId={store.id} />
+      )}
 
       <button
         onClick={handleSave}
