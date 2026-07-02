@@ -87,60 +87,61 @@ export default function AdminStoreTransfersPage() {
 
   const actionMutation = useMutation({
     mutationFn: async ({ id, status, notes }: { id: string; status: string; notes: string }) => {
-      const updates: any = {
+      if (status === "completed") {
+        const { data, error } = await supabase.rpc("complete_store_transfer", {
+          p_request_id: id,
+          p_admin_id: user?.id,
+          p_admin_notes: notes || null,
+        });
+        if (error) throw error;
+
+        const result = data as {
+          from_user_id: string;
+          to_user_id: string;
+          store_id: string;
+          store_name: string;
+          vendor_role_removed: boolean;
+        };
+
+        await supabase.from("notifications").insert([
+          {
+            user_id: result.from_user_id,
+            type: "system",
+            title: "Transfert approuvé",
+            message: `Le transfert de la boutique « ${result.store_name} » a été approuvé. Vous n'êtes plus propriétaire.`,
+            link: result.vendor_role_removed ? "/dashboard" : "/vendor",
+          },
+          {
+            user_id: result.to_user_id,
+            type: "system",
+            title: "Boutique transférée",
+            message: `Vous êtes désormais propriétaire de « ${result.store_name} ». Certains avantages sont réinitialisés (rétention 30j, coupons désactivés).`,
+            link: "/vendor",
+          },
+        ]);
+
+        await fromTable("admin_audit_logs").insert({
+          admin_id: user?.id,
+          action: "store_transfer_approved",
+          target_user_id: result.to_user_id,
+          details: {
+            store_id: result.store_id,
+            from: result.from_user_id,
+            to: result.to_user_id,
+            vendor_role_removed: result.vendor_role_removed,
+          },
+        });
+
+        return;
+      }
+
+      const { error } = await fromTable("store_transfer_requests").update({
         status,
         admin_notes: notes,
         reviewed_by: user?.id,
         reviewed_at: new Date().toISOString(),
-      };
-
-      const { error } = await fromTable("store_transfer_requests").update(updates).eq("id", id);
+      }).eq("id", id);
       if (error) throw error;
-
-      // If approved, transfer ownership
-      if (status === "completed") {
-        const req = requests.find((r: any) => r.id === id);
-        if (req) {
-          // Transfer store ownership
-          await supabase.from("stores").update({
-            owner_id: req.to_user_id,
-            // Reset new owner privileges
-            can_create_coupons: false,
-            collaborators_enabled: false,
-            self_delivery_enabled: false,
-            whatsapp_number: null,
-          } as any).eq("id", req.store_id);
-
-          // Reset wallet retention to 30 days
-          await fromTable("vendor_wallets").update({ retention_days: 30 }).eq("store_id", req.store_id);
-
-          // Notify both parties
-          await supabase.from("notifications").insert([
-            {
-              user_id: req.from_user_id,
-              type: "system",
-              title: "Transfert approuvé",
-              message: `Le transfert de votre boutique a été approuvé. Vous n'êtes plus propriétaire.`,
-              link: "/vendor",
-            },
-            {
-              user_id: req.to_user_id,
-              type: "system",
-              title: "Boutique transférée",
-              message: `Vous êtes désormais propriétaire de la boutique. Certains avantages sont réinitialisés (rétention 30j, coupons désactivés).`,
-              link: "/vendor",
-            },
-          ]);
-
-          // Audit log
-          await fromTable("admin_audit_logs").insert({
-            admin_id: user?.id,
-            action: "store_transfer_approved",
-            target_user_id: req.to_user_id,
-            details: { store_id: req.store_id, from: req.from_user_id, to: req.to_user_id },
-          });
-        }
-      }
     },
     onSuccess: () => {
       toast({ title: "Action effectuée" });

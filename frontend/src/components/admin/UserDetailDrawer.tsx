@@ -8,13 +8,26 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   Loader2, AlertTriangle, Ban, ShieldCheck, Mail, ChevronRight, X,
-  ClipboardList, Activity, Brain, UserCheck, LogIn, Truck
+  ClipboardList, Activity, Brain, UserCheck, LogIn, Truck, KeyRound
 } from "lucide-react";
 import type { AppRole } from "@/hooks/use-roles";
 import { Switch } from "@/components/ui/switch";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { ALL_APP_ROLES, ROLE_LABELS_FR } from "@/lib/role-labels";
 import { ensureFreshSession, throwIfEdgeFunctionError } from "@/services/admin-email";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+
+const OPERATIONAL_ROLES: AppRole[] = ["vendor", "shipper", "rider", "operator", "forwarder"];
 
 const ALL_ROLES: AppRole[] = ALL_APP_ROLES;
 
@@ -42,6 +55,7 @@ const auditActionLabels: Record<string, string> = {
   remove_role: "Rôle retiré",
   warning: "Avertissement",
   reset_password: "Réinit. mot de passe",
+  set_operational_credentials: "Identifiants opérationnels modifiés",
   impersonation_start: "Impersonation démarrée",
   impersonation_end: "Impersonation terminée",
 };
@@ -139,6 +153,12 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [showActivityLogs, setShowActivityLogs] = useState(false);
   const [showAiAnalysis, setShowAiAnalysis] = useState(false);
+  const [showCredentialsDialog, setShowCredentialsDialog] = useState(false);
+  const [credentialsEmail, setCredentialsEmail] = useState(user.email || "");
+  const [credentialsPassword, setCredentialsPassword] = useState("");
+  const [revokeOAuth, setRevokeOAuth] = useState(false);
+
+  const hasOperationalRole = user.roles.some((r) => OPERATIONAL_ROLES.includes(r));
 
   // Fetch certification status
   const { data: certStatus } = useQuery({
@@ -208,6 +228,8 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
       return res.data;
     },
   });
+
+  const usesGoogle = authDetails?.providers?.includes("google") ?? false;
 
   // Fetch audit logs for this user
   const { data: auditLogs = [] } = useQuery({
@@ -332,6 +354,42 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["user-audit-logs", user.id] });
       toast.success(`Email de réinitialisation envoyé à ${data.email}`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const setCredentialsMutation = useMutation({
+    mutationFn: async () => {
+      await ensureFreshSession();
+      const body: Record<string, unknown> = {
+        action: "set_operational_credentials",
+        userId: user.id,
+        revokeOAuth,
+      };
+      const trimmedEmail = credentialsEmail.trim().toLowerCase();
+      if (trimmedEmail && trimmedEmail !== (user.email || "").toLowerCase()) {
+        body.email = trimmedEmail;
+      }
+      if (credentialsPassword.trim()) {
+        body.password = credentialsPassword;
+      }
+      const res = await supabase.functions.invoke("admin-users", { body });
+      await throwIfEdgeFunctionError(res);
+      await logAudit("set_operational_credentials", user.id, {
+        emailChanged: Boolean(body.email),
+        passwordUpdated: Boolean(body.password),
+        oauthRevoked: revokeOAuth,
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["user-auth-details", user.id] });
+      queryClient.invalidateQueries({ queryKey: ["user-audit-logs", user.id] });
+      setShowCredentialsDialog(false);
+      setCredentialsPassword("");
+      setRevokeOAuth(false);
+      toast.success("Identifiants mis à jour. L'utilisateur doit se reconnecter.");
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -629,6 +687,22 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
               {resetPasswordMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <ChevronRight size={14} className="text-muted-foreground" />}
             </button>
 
+            {hasOperationalRole && (
+              <button
+                onClick={() => {
+                  setCredentialsEmail(user.email || "");
+                  setCredentialsPassword("");
+                  setRevokeOAuth(usesGoogle);
+                  setShowCredentialsDialog(true);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-amber-500/5 rounded-xl hover:bg-amber-500/10 transition-colors text-sm text-amber-700 dark:text-amber-300"
+              >
+                <KeyRound size={16} />
+                <span className="flex-1 text-left">Modifier email / mot de passe (rôle opérationnel)</span>
+                <ChevronRight size={14} className="text-muted-foreground" />
+              </button>
+            )}
+
             {!user.is_banned ? (
               <button
                 onClick={() => setShowBanConfirm(true)}
@@ -910,6 +984,70 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
           </div>
         </div>
       </div>
+
+      <Dialog open={showCredentialsDialog} onOpenChange={setShowCredentialsDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Identifiants opérationnels</DialogTitle>
+            <DialogDescription>
+              Compte avec rôle vendeur / logistique. Met à jour Auth, profil et contacts liés.
+              {usesGoogle && " Cochez la révocation Google pour empêcher l'ancienne connexion OAuth."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label htmlFor="cred-email">Nouvel email</Label>
+              <Input
+                id="cred-email"
+                type="email"
+                className="mt-1"
+                value={credentialsEmail}
+                onChange={(e) => setCredentialsEmail(e.target.value)}
+                placeholder="compte@entreprise.com"
+              />
+            </div>
+            <div>
+              <Label htmlFor="cred-password">Nouveau mot de passe</Label>
+              <Input
+                id="cred-password"
+                type="password"
+                className="mt-1"
+                value={credentialsPassword}
+                onChange={(e) => setCredentialsPassword(e.target.value)}
+                placeholder="Min. 8 caractères"
+                autoComplete="new-password"
+              />
+            </div>
+            {usesGoogle && (
+              <label className="flex items-start gap-2 text-sm">
+                <Checkbox
+                  checked={revokeOAuth}
+                  onCheckedChange={(v) => setRevokeOAuth(v === true)}
+                  className="mt-0.5"
+                />
+                <span>Révoquer la connexion Google (recommandé si l'employé a quitté l'équipe)</span>
+              </label>
+            )}
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setShowCredentialsDialog(false)}
+              className="px-4 py-2 text-sm rounded-lg border border-border hover:bg-muted/50"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              disabled={setCredentialsMutation.isPending}
+              onClick={() => setCredentialsMutation.mutate()}
+              className="px-4 py-2 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {setCredentialsMutation.isPending ? "Enregistrement..." : "Enregistrer"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
