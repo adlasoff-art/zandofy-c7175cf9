@@ -4,12 +4,22 @@ const ALLOWED_HEADERS =
   "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
 
 function getCorsHeaders(req: Request) {
-  const siteBase = Deno.env.get("SITE_BASE_URL") || "*";
   const origin = req.headers.get("Origin") || "";
-  const isLovablePreview = origin.includes(".lovableproject.com") || origin.includes(".lovable.app");
-  const allowed = siteBase === "*" || origin === siteBase || isLovablePreview;
+  const allowedOrigins = [
+    "https://zandofy.com",
+    "https://www.zandofy.com",
+  ];
+  const siteBase = Deno.env.get("SITE_BASE_URL");
+  if (siteBase && !allowedOrigins.includes(siteBase)) {
+    allowedOrigins.push(siteBase);
+  }
+  const isAllowed =
+    allowedOrigins.includes(origin) ||
+    origin.endsWith(".lovable.app") ||
+    origin.endsWith(".lovableproject.com") ||
+    origin.startsWith("http://localhost");
   return {
-    "Access-Control-Allow-Origin": allowed ? origin || "*" : siteBase,
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowedOrigins[0],
     "Access-Control-Allow-Headers": ALLOWED_HEADERS,
   };
 }
@@ -47,31 +57,42 @@ async function createSessionForEmail(
   const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
   const hashedToken = linkData.properties.hashed_token;
   const emailOtp = linkData.properties.email_otp;
+  let lastError = "Failed to create session (verifyOtp)";
 
   if (hashedToken) {
-    const { data: sessionData, error: verifyError } = await supabaseAuth.auth.verifyOtp({
-      token_hash: hashedToken,
-      type: "email",
-    });
-    if (!verifyError && sessionData?.session) {
-      return { session: sessionData.session };
+    for (const type of ["magiclink", "email"] as const) {
+      const { data: sessionData, error: verifyError } = await supabaseAuth.auth.verifyOtp({
+        token_hash: hashedToken,
+        type,
+      });
+      if (!verifyError && sessionData?.session) {
+        return { session: sessionData.session };
+      }
+      if (verifyError) {
+        console.error(`verifyOtp token_hash/${type} failed:`, verifyError);
+        lastError = verifyError.message;
+      }
     }
-    console.error("verifyOtp token_hash/email failed:", verifyError);
   }
 
   if (emailOtp) {
-    const { data: sessionData, error: verifyError } = await supabaseAuth.auth.verifyOtp({
-      email,
-      token: emailOtp,
-      type: "magiclink",
-    });
-    if (!verifyError && sessionData?.session) {
-      return { session: sessionData.session };
+    for (const type of ["magiclink", "email"] as const) {
+      const { data: sessionData, error: verifyError } = await supabaseAuth.auth.verifyOtp({
+        email,
+        token: emailOtp,
+        type,
+      });
+      if (!verifyError && sessionData?.session) {
+        return { session: sessionData.session };
+      }
+      if (verifyError) {
+        console.error(`verifyOtp email_otp/${type} failed:`, verifyError);
+        lastError = verifyError.message;
+      }
     }
-    console.error("verifyOtp email_otp failed:", verifyError);
   }
 
-  return { error: "Failed to create session (verifyOtp)" };
+  return { error: lastError };
 }
 
 Deno.serve(async (req) => {
@@ -149,13 +170,17 @@ Deno.serve(async (req) => {
       // Hash token before storing (never store plaintext)
       const tokenHash = await sha256Hex(tokenStr);
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-      await supabaseAdmin.from("impersonation_tokens").insert({
+      const { error: insertError } = await supabaseAdmin.from("impersonation_tokens").insert({
         token: null,
         token_hash: tokenHash,
         admin_id: adminId,
         target_user_id: targetUserId,
         expires_at: expiresAt,
       });
+      if (insertError) {
+        console.error("impersonation_tokens insert failed:", insertError);
+        return jsonResponse({ error: "Impossible de créer le token d'impersonation" }, 500, corsHeaders);
+      }
 
       // Audit log
       await supabaseAdmin.from("admin_audit_logs").insert({
@@ -183,18 +208,34 @@ Deno.serve(async (req) => {
 
       // Hash the incoming token and look up by hash
       const incomingHash = await sha256Hex(impersonationToken);
-      const { data: tokenRecord } = await supabaseAdmin
+      const { data: tokenRecord, error: tokenLookupError } = await supabaseAdmin
         .from("impersonation_tokens")
         .select("*")
         .eq("token_hash", incomingHash)
         .eq("used", false)
-        .single();
+        .maybeSingle();
 
       if (!tokenRecord) {
+        const { data: existingRecord } = await supabaseAdmin
+          .from("impersonation_tokens")
+          .select("used, expires_at")
+          .eq("token_hash", incomingHash)
+          .maybeSingle();
+
+        if (existingRecord?.used) {
+          console.error("exchange: token already used");
+          return jsonResponse({ error: "Token already used" }, 401, corsHeaders);
+        }
+        if (existingRecord && new Date(existingRecord.expires_at) < new Date()) {
+          console.error("exchange: token expired");
+          return jsonResponse({ error: "Token expired" }, 401, corsHeaders);
+        }
+        console.error("exchange: token not found", tokenLookupError);
         return jsonResponse({ error: "Invalid or expired token" }, 401, corsHeaders);
       }
 
       if (new Date(tokenRecord.expires_at) < new Date()) {
+        console.error("exchange: token expired (unused)");
         return jsonResponse({ error: "Token expired" }, 401, corsHeaders);
       }
 

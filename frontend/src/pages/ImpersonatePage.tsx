@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { parseEdgeFunctionError } from "@/services/admin-email";
+import { throwIfEdgeFunctionError } from "@/services/admin-email";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 
@@ -10,6 +10,7 @@ export default function ImpersonatePage() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState("Échange du token d'impersonation...");
+  const exchangeStarted = useRef(false);
 
   useEffect(() => {
     const token = searchParams.get("token");
@@ -17,6 +18,9 @@ export default function ImpersonatePage() {
       setError("Token d'impersonation manquant");
       return;
     }
+
+    if (exchangeStarted.current) return;
+    exchangeStarted.current = true;
 
     (async () => {
       try {
@@ -34,8 +38,7 @@ export default function ImpersonatePage() {
           body: { action: "exchange", token },
         });
 
-        if (res.error) throw new Error(await parseEdgeFunctionError(res.error));
-        if (res.data?.error) throw new Error(res.data.error);
+        await throwIfEdgeFunctionError(res);
 
         const { session, admin_id, target } = res.data;
 
