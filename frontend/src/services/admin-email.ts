@@ -23,7 +23,18 @@ export async function ensureFreshSession() {
 export async function parseEdgeFunctionError(error: any): Promise<string> {
   if (!error) return "Erreur inconnue";
 
-  // FunctionsHttpError — try to parse the response body
+  // FunctionsHttpError — try context.json() (recent supabase-js)
+  if (error.context && typeof error.context.json === "function") {
+    try {
+      const json = await error.context.json();
+      if (json?.error) return json.error;
+      if (json?.message) return json.message;
+    } catch {
+      // fall through
+    }
+  }
+
+  // FunctionsHttpError — try to parse the response body stream
   if (error.context?.body) {
     try {
       const reader = error.context.body.getReader();
@@ -41,6 +52,14 @@ export async function parseEdgeFunctionError(error: any): Promise<string> {
   }
 
   return error.message || "Erreur inconnue";
+}
+
+/**
+ * Throw if an edge function invoke returned an error (checks data.error first).
+ */
+export async function throwIfEdgeFunctionError(res: { data: any; error: any }): Promise<void> {
+  if (res.data?.error) throw new Error(res.data.error);
+  if (res.error) throw new Error(await parseEdgeFunctionError(res.error));
 }
 
 /**

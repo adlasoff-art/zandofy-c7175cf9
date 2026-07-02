@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X, Loader2, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { parseEdgeFunctionError } from "@/services/admin-email";
+import { throwIfEdgeFunctionError } from "@/services/admin-email";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -32,8 +32,7 @@ export function ImpersonationBanner() {
         },
       });
 
-      if (res.error) throw new Error(await parseEdgeFunctionError(res.error));
-      if (res.data?.error) throw new Error(res.data.error);
+      await throwIfEdgeFunctionError(res);
 
       // Restore admin session
       const { error: setSessionError } = await supabase.auth.setSession({
