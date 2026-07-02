@@ -171,7 +171,6 @@ Deno.serve(async (req) => {
       const tokenHash = await sha256Hex(tokenStr);
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
       const { error: insertError } = await supabaseAdmin.from("impersonation_tokens").insert({
-        token: null,
         token_hash: tokenHash,
         admin_id: adminId,
         target_user_id: targetUserId,
