@@ -1,10 +1,10 @@
 /**
- * Admin component to manage default platform-wide Mobile Money payment numbers.
- * These are used when a store doesn't have custom numbers enabled.
+ * Admin component to manage default platform-wide Mobile Money payment numbers
+ * and the WhatsApp China order number used in product share messages.
  */
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Phone, Loader2, Save } from "lucide-react";
+import { Phone, Loader2, Save, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface NumberEntry {
@@ -24,43 +24,72 @@ const EMPTY_NUMBERS: NumberEntry[] = [
 
 export function AdminDefaultPaymentNumbers() {
   const [numbers, setNumbers] = useState<NumberEntry[]>(EMPTY_NUMBERS);
+  const [chinaWhatsApp, setChinaWhatsApp] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase
-      .from("platform_settings")
-      .select("value")
-      .eq("key", "default_payment_numbers")
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.value && typeof data.value === "object") {
-          const v = data.value as any;
-          if (Array.isArray(v.numbers) && v.numbers.length > 0) {
-            // Merge with defaults to ensure all operators present
-            const merged = EMPTY_NUMBERS.map((def) => {
-              const found = v.numbers.find((n: NumberEntry) => n.operator === def.operator);
-              return found ? { ...def, phone_number: found.phone_number || "", display_name: found.display_name || "" } : def;
-            });
-            setNumbers(merged);
-          }
+    Promise.all([
+      supabase
+        .from("platform_settings")
+        .select("value")
+        .eq("key", "default_payment_numbers")
+        .maybeSingle(),
+      supabase
+        .from("platform_settings")
+        .select("value")
+        .eq("key", "whatsapp_china_order_number")
+        .maybeSingle(),
+    ]).then(([paymentRes, chinaRes]) => {
+      if (paymentRes.data?.value && typeof paymentRes.data.value === "object") {
+        const v = paymentRes.data.value as { numbers?: NumberEntry[] };
+        if (Array.isArray(v.numbers) && v.numbers.length > 0) {
+          const merged = EMPTY_NUMBERS.map((def) => {
+            const found = v.numbers!.find((n) => n.operator === def.operator);
+            return found
+              ? { ...def, phone_number: found.phone_number || "", display_name: found.display_name || "" }
+              : def;
+          });
+          setNumbers(merged);
         }
-        setLoading(false);
-      });
+      }
+      if (chinaRes.data?.value && typeof chinaRes.data.value === "object") {
+        const v = chinaRes.data.value as { phone?: string };
+        setChinaWhatsApp(v.phone || "");
+      }
+      setLoading(false);
+    });
   }, []);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase
+      const now = new Date().toISOString();
+      const { error: payError } = await supabase
         .from("platform_settings")
-        .upsert({
-          key: "default_payment_numbers",
-          value: { numbers } as any,
-          updated_at: new Date().toISOString(),
-        });
-      if (error) throw error;
-      toast.success("Numéros par défaut enregistrés");
+        .upsert(
+          {
+            key: "default_payment_numbers",
+            value: { numbers } as any,
+            updated_at: now,
+          },
+          { onConflict: "key" },
+        );
+      if (payError) throw payError;
+
+      const { error: chinaError } = await supabase
+        .from("platform_settings")
+        .upsert(
+          {
+            key: "whatsapp_china_order_number",
+            value: { phone: chinaWhatsApp.trim() } as any,
+            updated_at: now,
+          },
+          { onConflict: "key" },
+        );
+      if (chinaError) throw chinaError;
+
+      toast.success("Numéros enregistrés");
     } catch (e: any) {
       toast.error(e.message || "Erreur");
     } finally {
@@ -84,7 +113,7 @@ export function AdminDefaultPaymentNumbers() {
           Numéros de paiement par défaut
         </h3>
         <p className="text-xs text-muted-foreground mt-1">
-          Ces numéros s'affichent au checkout pour les boutiques qui n'ont pas de numéros personnalisés.
+          Ces numéros s&apos;affichent au checkout et dans le partage WhatsApp produit (Orange, M-Pesa, Airtel).
         </p>
       </div>
 
@@ -124,6 +153,23 @@ export function AdminDefaultPaymentNumbers() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="border border-border rounded-lg p-3 space-y-2">
+        <h4 className="text-xs font-semibold text-foreground flex items-center gap-2">
+          <MessageCircle size={14} className="text-primary" />
+          WhatsApp commandes Chine
+        </h4>
+        <p className="text-[11px] text-muted-foreground">
+          Numéro affiché dans le message de partage produit (« envoyez votre commande uniquement sur ce numéro »).
+        </p>
+        <input
+          type="tel"
+          value={chinaWhatsApp}
+          onChange={(e) => setChinaWhatsApp(e.target.value)}
+          placeholder="Ex: +447832621129"
+          className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+        />
       </div>
 
       <button

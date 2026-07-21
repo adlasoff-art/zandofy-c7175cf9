@@ -30,7 +30,7 @@ import {
   getGalleryItems,
   SIZE_REGIONS,
 } from "@/lib/product-pdp";
-import { buildProductShareMessage } from "@/lib/product-share";
+import { buildProductShareMessage, type SharePaymentNumber } from "@/lib/product-share";
 import { resolveProductOgImage } from "@/lib/og-image";
 import { TieredPricingTable, calculateTieredPrice, type PricingTier } from "@/components/TieredPricingTable";
 import { QuantitySelector } from "@/components/QuantitySelector";
@@ -81,6 +81,33 @@ export default function ProductPage() {
     queryKey: ["product", slug],
     queryFn: () => fetchProductBySlug(slug!),
     enabled: !!slug,
+  });
+
+  const { data: sharePlatformSettings } = useQuery({
+    queryKey: ["product-share-platform-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("platform_settings")
+        .select("key, value")
+        .in("key", ["default_payment_numbers", "whatsapp_china_order_number"]);
+      if (error) throw error;
+
+      let paymentNumbers: SharePaymentNumber[] = [];
+      let chinaWhatsAppNumber = "";
+
+      for (const row of data || []) {
+        if (row.key === "default_payment_numbers" && row.value && typeof row.value === "object") {
+          const v = row.value as { numbers?: SharePaymentNumber[] };
+          paymentNumbers = (v.numbers || []).filter((n) => n.phone_number?.trim());
+        }
+        if (row.key === "whatsapp_china_order_number" && row.value && typeof row.value === "object") {
+          chinaWhatsAppNumber = (row.value as { phone?: string }).phone?.trim() || "";
+        }
+      }
+
+      return { paymentNumbers, chinaWhatsAppNumber };
+    },
+    staleTime: 60_000,
   });
 
   const wishlisted = product ? isInWishlist(product.id) : false;
@@ -203,23 +230,28 @@ export default function ProductPage() {
 
   const productShareMessage = useMemo(() => {
     if (!product) return "";
-    const productUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/product/${product.slug || product.id}`;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const productUrl = `${origin}/product/${product.slug || product.id}`;
+    const store = (product as { store?: { name?: string; slug?: string; id?: string } }).store;
+    const storeSlug = store?.slug || store?.id;
+    const storeUrl = storeSlug ? `${origin}/store/${storeSlug}` : null;
     return buildProductShareMessage({
       productName: product.nameFr,
-      storeName: (product as { store?: { name?: string } }).store?.name,
+      storeName: store?.name,
+      storeUrl,
       unitPrice: currentUnitPrice,
       currency: product.currency,
       productUrl,
+      moq: product.moq || 1,
       colorOptions,
       apparelSizes,
       dynamicVariants: ((product as { dynamicVariants?: Array<{ typeName: string; unit?: string; options: { label: string }[] }> })
         .dynamicVariants || []),
       weightGrams: product.weightGrams,
-      lengthCm: product.lengthCm,
-      widthCm: product.widthCm,
-      heightCm: product.heightCm,
+      paymentNumbers: sharePlatformSettings?.paymentNumbers || [],
+      chinaWhatsAppNumber: sharePlatformSettings?.chinaWhatsAppNumber || null,
     });
-  }, [product, currentUnitPrice, colorOptions, apparelSizes]);
+  }, [product, currentUnitPrice, colorOptions, apparelSizes, sharePlatformSettings]);
 
   const productSku = product?.sku || `SKU-${product?.id?.slice(0, 8) || "000000"}`;
   const copySku = () => {
