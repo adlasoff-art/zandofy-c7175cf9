@@ -1,8 +1,8 @@
-const CACHE_NAME = "zandofy-v10";
-const STATIC_CACHE = "zandofy-static-v10";
-const API_CACHE = "zandofy-api-v3";
-const IMG_CACHE = "zandofy-images-v3";
-const CATALOG_CACHE = "zandofy-catalog-v2";
+const CACHE_NAME = "zandofy-v11";
+const STATIC_CACHE = "zandofy-static-v11";
+const API_CACHE = "zandofy-api-v4";
+const IMG_CACHE = "zandofy-images-v4";
+const CATALOG_CACHE = "zandofy-catalog-v3";
 
 const PRECACHE_URLS = ["/", "/index.html", "/offline.html", "/icons/icon-192.png", "/icons/icon-512.png"];
 const API_CACHE_MAX = 50;

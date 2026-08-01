@@ -42,8 +42,11 @@ export function CartDrawer() {
 
   const goCheckout = () => {
     setDrawerOpen(false);
-    // Let the sheet unmount before route change (avoids overlay/focus race → Oops).
-    window.setTimeout(() => navigate("/checkout"), 50);
+    // Hard navigation: avoids Sheet/Radix + lazy Checkout race that surfaces as
+    // ErrorBoundary "Oups" then works after manual reload.
+    window.setTimeout(() => {
+      window.location.assign("/checkout");
+    }, 0);
   };
 
   return (

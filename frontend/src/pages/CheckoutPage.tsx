@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, type ReactNode, type FormEvent } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +40,7 @@ import { useStorePaymentNumbers } from "@/hooks/use-store-payment-numbers";
 import { PaymentWaitingPanel } from "@/components/payments/PaymentWaitingPanel";
 import { useHomeDeliveryEnabled } from "@/hooks/use-home-delivery-enabled";
 import { MobileBackButton } from "@/components/navigation/MobileBackButton";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 type Step = "shipping" | "payment" | "confirmation";
 type PaymentMethod = "stripe" | "card" | "paypal" | "mobile_money" | "cod" | "off_platform";
@@ -549,17 +550,17 @@ export default function CheckoutPage() {
 
   const applyAddress = (addr: SavedAddress) => {
     setShipping({
-      firstName: addr.first_name,
-      lastName: addr.last_name,
+      firstName: addr.first_name || "",
+      lastName: addr.last_name || "",
       email: user?.email || "",
-      phone: addr.phone,
-      address: addr.address,
+      phone: addr.phone || "",
+      address: addr.address || "",
       quartier: addr.quartier || "",
       commune: addr.commune || "",
-      city: addr.city,
+      city: addr.city || "",
       province: addr.province || "",
       province_id: "",
-      country: addr.country,
+      country: addr.country || "CD",
       postalCode: addr.postal_code || "",
     });
   };
@@ -664,7 +665,7 @@ export default function CheckoutPage() {
     setCouponLoading(false);
   };
 
-  const steps: { key: Step; label: string; icon: React.ReactNode }[] = [
+  const steps: { key: Step; label: string; icon: ReactNode }[] = [
     { key: "shipping", label: t("checkout.shipping"), icon: <Truck size={16} /> },
     { key: "payment", label: t("checkout.payment"), icon: <CreditCard size={16} /> },
     { key: "confirmation", label: t("checkout.confirmation"), icon: <Check size={16} /> },
@@ -763,7 +764,7 @@ export default function CheckoutPage() {
   }
 
 
-  const handleShippingSubmit = async (e: React.FormEvent) => {
+  const handleShippingSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const required = ["firstName", "lastName", "phone", "address", "city", "country"] as const;
     for (const field of required) {
@@ -1456,7 +1457,7 @@ export default function CheckoutPage() {
   const updateField = (field: keyof ShippingInfo, value: string) =>
     setShipping(prev => ({ ...prev, [field]: value }));
 
-  const labelIcons: Record<string, React.ReactNode> = {
+  const labelIcons: Record<string, ReactNode> = {
     "Domicile": <Home size={14} />,
     "Bureau": <Briefcase size={14} />,
   };
@@ -1538,16 +1539,22 @@ export default function CheckoutPage() {
 
       {/* Dynamic Shipping Calculator */}
       <div className="border-t border-border pt-3">
-        <CheckoutShippingCalculator
-          shippingCity={shipping.city}
-          cartItems={items.map(i => ({ productId: i.productId, quantity: i.quantity }))}
-          cartSubtotal={subtotal}
-          onShippingCostChange={handleShippingCostChange}
-          onForwarderChange={handleForwarderChange}
-          onFreightOfferChange={handleFreightOfferChange}
-          onFreightAvailabilityChange={handleFreightAvailabilityChange}
-          onFreightGroupsChange={handleFreightGroupsChange}
-        />
+        <ErrorBoundary
+          inline
+          resetKey={`freight-${items.length}-${shipping.city}`}
+          inlineMessage="Le calcul des frais d’expédition a rencontré une erreur."
+        >
+          <CheckoutShippingCalculator
+            shippingCity={shipping.city}
+            cartItems={items.map(i => ({ productId: i.productId, quantity: i.quantity }))}
+            cartSubtotal={subtotal}
+            onShippingCostChange={handleShippingCostChange}
+            onForwarderChange={handleForwarderChange}
+            onFreightOfferChange={handleFreightOfferChange}
+            onFreightAvailabilityChange={handleFreightAvailabilityChange}
+            onFreightGroupsChange={handleFreightGroupsChange}
+          />
+        </ErrorBoundary>
       </div>
 
       {/* ZandoPoints */}
