@@ -331,7 +331,7 @@ export default function ProductPage() {
       <div className="lg:hidden sticky top-14 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-1">
         <MobileBackButton fallbackTo={`/category/${categorySlug}`} />
       </div>
-      <main className="max-w-7xl mx-auto px-4 py-2 lg:py-4">
+      <main className="max-w-7xl mx-auto px-4 py-2 lg:py-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-4">
         {/* Breadcrumbs — desktop only */}
         <Breadcrumb className="mb-4 hidden lg:flex">
           <BreadcrumbList>
@@ -947,6 +947,27 @@ export default function ProductPage() {
       </main>
       <Footer />
       <FloatingActions />
+
+      {/* Mobile sticky buy bar */}
+      {!variantDrawerOpen && (
+        <div className="lg:hidden fixed inset-x-0 bottom-14 z-40 border-t border-border bg-background/95 backdrop-blur-sm safe-area-bottom">
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-bold text-foreground truncate">{formatPrice(currentUnitPrice)}</p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {t("product.minQty")} {moq} {t("product.pieces", { plural: moq > 1 ? "s" : "" })}
+              </p>
+            </div>
+            <Button
+              size="lg"
+              className="h-11 min-h-[44px] px-5 font-bold shrink-0 active:scale-[0.98] transition-transform"
+              onClick={openVariantDrawer}
+            >
+              {t("product.selectOptions") || "Options"}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* ═══ VARIANT ORDER DRAWER (Alibaba-style) ═══ */}
       <VariantOrderDrawer

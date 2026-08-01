@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
+import { MobileBackButton } from "@/components/navigation/MobileBackButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -716,8 +717,11 @@ export default function TrackingPage() {
     <div className="min-h-screen bg-background">
       <SEOHead title={t("tracking.title")} description={t("tracking.subtitle")} />
       <Header />
+      <div className="lg:hidden sticky top-14 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-1">
+        <MobileBackButton fallbackTo="/" />
+      </div>
 
-      <main className="container py-8 md:py-12 max-w-2xl mx-auto">
+      <main className="container py-8 md:py-12 max-w-2xl mx-auto pb-24 lg:pb-12">
         {/* Hero */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">

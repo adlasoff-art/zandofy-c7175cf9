@@ -3,6 +3,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
+import { MobileBackButton } from "@/components/navigation/MobileBackButton";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 import { PredictiveSearch } from "@/components/PredictiveSearch";
@@ -270,8 +271,13 @@ export default function SearchPage() {
     <div className="min-h-screen flex flex-col bg-background">
       <SEOHead title={seoTitle} description={seoDesc} canonical={`/search${queryParam ? `?q=${encodeURIComponent(queryParam)}` : ""}`} />
       <Header />
+      {queryParam && (
+        <div className="lg:hidden sticky top-14 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-1">
+          <MobileBackButton fallbackTo="/search" />
+        </div>
+      )}
 
-      <main className="flex-1">
+      <main className="flex-1 pb-20 lg:pb-0">
         {/* Mobile search bar toggled from bottom nav */}
         {mobileSearchOpen && (
           <div className="lg:hidden px-4 py-2 border-b border-border bg-card animate-fade-in sticky top-0 z-[55] shadow-md">
@@ -344,10 +350,16 @@ export default function SearchPage() {
                   ))}
                 </div>
               ) : products.length === 0 ? (
-                <div className="text-center py-16">
-                  <Search size={40} className="mx-auto text-muted-foreground/40 mb-3" />
-                  <p className="text-sm text-muted-foreground">{t("search.noResults")}</p>
-                  <p className="text-xs text-muted-foreground/70 mt-1">{t("search.tryOther")}</p>
+                <div className="flex flex-col items-center justify-center text-center min-h-[50vh] px-4">
+                  <Search size={48} className="text-muted-foreground/40 mb-4" />
+                  <p className="text-base font-semibold text-foreground mb-1">{t("search.noResults")}</p>
+                  <p className="text-sm text-muted-foreground mb-6">{t("search.tryOther")}</p>
+                  <Link
+                    to="/"
+                    className="inline-flex items-center justify-center min-h-[44px] px-6 rounded-sm bg-primary text-primary-foreground text-sm font-semibold active:scale-[0.98] transition-transform"
+                  >
+                    {t("general.home") || "Accueil"}
+                  </Link>
                 </div>
               ) : (
                 <div className={PRODUCT_GRID_CLASS}>

@@ -20,6 +20,7 @@ import { NotificationListener } from "@/components/NotificationToast";
 import { OrderAlertListener } from "@/components/OrderAlertListener";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { ScrollRestoration } from "@/components/ScrollRestoration";
+import { MobileChromeSync } from "@/components/MobileChromeSync";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 import { useCmsTheme } from "@/hooks/use-cms-theme";
@@ -247,6 +248,7 @@ const App = () => (
             <OrderAlertListener />
             <SupportDrawerProvider>
             <ScrollRestoration />
+            <MobileChromeSync />
              <CartDrawer />
             <Suspense fallback={null}>
               <CompareBar />

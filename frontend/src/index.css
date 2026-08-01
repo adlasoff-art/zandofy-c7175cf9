@@ -342,6 +342,27 @@ img[data-fallback]::after {
   body {
     padding-bottom: 3.5rem;
   }
+  body.hide-mobile-bottom-nav {
+    padding-bottom: 0;
+  }
+}
+
+/* Short page enter fade (mobile / PWA) — toggled by MobileChromeSync */
+@media (max-width: 1023px) {
+  html.page-fade #root {
+    animation: page-fade-in 0.2s ease-out;
+  }
+}
+
+@keyframes page-fade-in {
+  from { opacity: 0.92; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.page-fade #root {
+    animation: none;
+  }
 }
 
 /* Touch scrolling */
