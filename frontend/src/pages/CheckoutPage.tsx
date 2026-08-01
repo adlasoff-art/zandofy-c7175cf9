@@ -100,7 +100,7 @@ const emptyShipping: ShippingInfo = {
 };
 
 export default function CheckoutPage() {
-  const { selectedItems: items, selectedSubtotal: subtotal, removeSelectedItems } = useCart();
+  const { selectedItems: items, selectedSubtotal: subtotal, removeSelectedItems, loading: cartLoading } = useCart();
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -729,6 +729,20 @@ export default function CheckoutPage() {
           <h1 className="text-xl font-bold text-foreground">Vérification requise</h1>
           <p className="text-muted-foreground">Vous avez atteint la limite de commandes sans vérification d'identité. Complétez votre KYC pour continuer.</p>
           <Link to="/dashboard"><Button>Compléter la vérification</Button></Link>
+        </main>
+      </div>
+    );
+  }
+
+  // Wait for cart hydration — otherwise we flash "empty" then remount full checkout
+  // (and after a hard reload / SW update this looked like a broken flow).
+  if (cartLoading && items.length === 0 && step !== "confirmation") {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container py-16 flex flex-col items-center justify-center gap-3 text-center">
+          <Loader2 size={32} className="animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">{t("checkout.loadingCart") || "Chargement du panier…"}</p>
         </main>
       </div>
     );

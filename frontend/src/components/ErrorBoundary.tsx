@@ -53,6 +53,12 @@ export class ErrorBoundary extends Component<Props, State> {
     if ("caches" in window) {
       caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
     }
+    // Reset chunk-retry lock so the next load can auto-recover once
+    try {
+      sessionStorage.removeItem("chunk_reload_attempted");
+    } catch {
+      /* ignore */
+    }
     window.location.reload();
   };
 

@@ -42,16 +42,32 @@ import { RecoveryGuard } from "@/components/RecoveryGuard";
 import { useGeoBlocking } from "@/hooks/useGeoBlocking";
 import { GeoBlockScreen } from "@/components/security/GeoBlockScreen";
 
-// Retry wrapper for lazy imports — auto-reloads on chunk failure
+// Retry wrapper for lazy imports — auto-reloads on chunk failure (common after PWA deploy)
 function lazyRetry(importFn: () => Promise<{ default: ComponentType<any> }>) {
   return lazy(() =>
-    importFn().catch((error) => {
+    importFn().catch(async (error) => {
       const key = "chunk_reload_attempted";
-      if (!sessionStorage.getItem(key)) {
-        sessionStorage.setItem(key, "1");
+      const attempts = Number(sessionStorage.getItem(key) || "0");
+      if (attempts < 2) {
+        sessionStorage.setItem(key, String(attempts + 1));
+        try {
+          if ("caches" in window) {
+            const names = await caches.keys();
+            await Promise.all(names.map((n) => caches.delete(n)));
+          }
+          if ("serviceWorker" in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            // Don't unregister forever — just drop waiting workers & force update
+            await Promise.all(regs.map((r) => r.update().catch(() => {})));
+          }
+        } catch {
+          /* ignore */
+        }
         window.location.reload();
+        // Keep the promise pending while reload runs
+        return new Promise(() => {});
       }
-      throw error; // let ErrorBoundary handle if reload already tried
+      throw error; // let ErrorBoundary handle if reloads already tried
     })
   );
 }
