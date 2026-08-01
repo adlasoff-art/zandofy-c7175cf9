@@ -28,6 +28,7 @@ import { DeliveryChat } from "@/components/delivery/DeliveryChat";
 import { RiderRatingModal } from "@/components/delivery/RiderRatingModal";
 import { fromTable } from "@/lib/supabase-helpers";
 import { calculateLastMileFee, type LastMileFeeResult } from "@/lib/last-mile-fee";
+import { useHomeDeliveryEnabled } from "@/hooks/use-home-delivery-enabled";
 
 // ── Types ──
 interface ShipmentResult {
@@ -235,9 +236,43 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
   const [choosing, setChoosing] = useState(false);
   const [lastMileResult, setLastMileResult] = useState<LastMileFeeResult | null>(null);
   const [lmLoading, setLmLoading] = useState(true);
+  const { data: homeDeliveryEnabled = false } = useHomeDeliveryEnabled();
+  const [autoHubDone, setAutoHubDone] = useState(false);
 
-  // Calculate last-mile fee from order address
+  // Kill-switch off : appliquer hub_pickup silencieusement
   useEffect(() => {
+    if (homeDeliveryEnabled || autoHubDone || order.delivery_choice) return;
+    let cancelled = false;
+    (async () => {
+      setChoosing(true);
+      try {
+        const { error } = await supabase
+          .from("orders")
+          .update({
+            delivery_choice: "hub_pickup",
+            last_mile_fee: 0,
+            last_mile_payment_status: null,
+          } as any)
+          .eq("id", order.id);
+        if (error) throw error;
+        if (!cancelled) {
+          setAutoHubDone(true);
+          onChoiceMade();
+        }
+      } catch (e: any) {
+        if (!cancelled) toast.error(e.message || t("tracking.errorGeneric"));
+      } finally {
+        if (!cancelled) setChoosing(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [homeDeliveryEnabled, autoHubDone, order.delivery_choice, order.id, onChoiceMade, t]);
+
+  // Calculate last-mile fee from order address (only when home delivery UI is shown)
+  useEffect(() => {
+    if (!homeDeliveryEnabled) return;
     const fetchFee = async () => {
       setLmLoading(true);
       const { data: orderData } = await (supabase as any)
@@ -258,24 +293,24 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
       setLmLoading(false);
     };
     fetchFee();
-  }, [order.id]);
+  }, [order.id, homeDeliveryEnabled]);
 
   const lastMileFee = lastMileResult?.fee || 0;
 
-  const handleChoice = async (choice: "home" | "pickup") => {
+  const handleChoice = async (choice: "home_delivery" | "hub_pickup") => {
     setChoosing(true);
     try {
       const updates: any = {
         delivery_choice: choice,
-        last_mile_fee: choice === "home" ? lastMileFee : 0,
-        last_mile_payment_status: choice === "home" && lastMileFee > 0 ? "deferred" : null,
+        last_mile_fee: choice === "home_delivery" ? lastMileFee : 0,
+        last_mile_payment_status: choice === "home_delivery" && lastMileFee > 0 ? "deferred" : null,
       };
       const { error } = await supabase
         .from("orders")
         .update(updates)
         .eq("id", order.id);
       if (error) throw error;
-      toast.success(choice === "home" ? t("tracking.choice.successHome") : t("tracking.choice.successPickup"));
+      toast.success(choice === "home_delivery" ? t("tracking.choice.successHome") : t("tracking.choice.successPickup"));
       onChoiceMade();
     } catch (e: any) {
       toast.error(e.message || t("tracking.errorGeneric"));
@@ -283,6 +318,14 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
       setChoosing(false);
     }
   };
+
+  if (!homeDeliveryEnabled) {
+    return choosing ? (
+      <div className="border border-border bg-muted/40 rounded-xl p-3 text-xs text-muted-foreground flex items-center gap-2">
+        <Loader2 size={14} className="animate-spin" /> Retrait à l&apos;agence (hub)…
+      </div>
+    ) : null;
+  }
 
   const homeDisabled = lastMileResult ? !lastMileResult.deliverable : false;
 
@@ -293,7 +336,6 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
       </h3>
       <p className="text-xs text-muted-foreground">{t("tracking.choice.subtitle")}</p>
 
-      {/* Zone not deliverable warning */}
       {lastMileResult && !lastMileResult.deliverable && (
         <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded">
           {t("tracking.choice.notDeliverable")}{lastMileResult.restrictionReason ? ` : ${lastMileResult.restrictionReason}` : ""}
@@ -302,7 +344,7 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
-          onClick={() => handleChoice("home")}
+          onClick={() => handleChoice("home_delivery")}
           disabled={choosing || homeDisabled || lmLoading}
           className={`flex items-center gap-3 p-3 border rounded-xl transition-colors bg-card text-left active:scale-[0.98] ${
             homeDisabled ? "border-border opacity-50 cursor-not-allowed" : "border-border hover:border-primary"
@@ -324,7 +366,7 @@ function DeliveryChoicePanel({ order, onChoiceMade }: { order: OrderTrackingResu
         </button>
 
         <button
-          onClick={() => handleChoice("pickup")}
+          onClick={() => handleChoice("hub_pickup")}
           disabled={choosing}
           className="flex items-center gap-3 p-3 border border-border rounded-xl hover:border-primary transition-colors bg-card text-left active:scale-[0.98]"
         >

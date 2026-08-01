@@ -54,6 +54,7 @@ import { KycSubmissionForm } from "@/components/kyc/KycSubmissionForm";
 import { KycStatusBadge } from "@/components/kyc/KycStatusBadge";
 import { ShieldCheck } from "lucide-react";
 import { getColorDisplay } from "@/utils/colorName";
+import { useHomeDeliveryEnabled } from "@/hooks/use-home-delivery-enabled";
 import { withOptionalOrderFields } from "@/lib/order-query";
 import { useCertification } from "@/hooks/use-certification";
 import { CertificationBadge } from "@/components/CertificationBadge";
@@ -1437,9 +1438,46 @@ function DeliveryChoicePanel({ order }: { order: OrderRow }) {
   const { t, formatPrice } = useI18n();
   const { toast } = useToast();
   const [choosing, setChoosing] = useState(false);
+  const { data: homeDeliveryEnabled = false } = useHomeDeliveryEnabled();
+  const [autoHubDone, setAutoHubDone] = useState(false);
 
   // Already chosen — don't show again
-  if (order.delivery_choice) return null;
+  const needsChoice = !order.delivery_choice;
+
+  // Kill-switch off : appliquer hub_pickup silencieusement
+  useEffect(() => {
+    if (!needsChoice || homeDeliveryEnabled || autoHubDone) return;
+    let cancelled = false;
+    (async () => {
+      setChoosing(true);
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          delivery_choice: "hub_pickup",
+          last_mile_fee: 0,
+          last_mile_payment_status: null,
+          last_mile_payment_method: null,
+        } as any)
+        .eq("id", order.id);
+      if (!cancelled) {
+        setChoosing(false);
+        setAutoHubDone(true);
+        if (!error) window.location.reload();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [needsChoice, homeDeliveryEnabled, autoHubDone, order.id]);
+
+  if (!needsChoice) return null;
+  if (!homeDeliveryEnabled) {
+    return choosing ? (
+      <div className="bg-muted/40 border border-border rounded-lg p-3 text-xs text-muted-foreground flex items-center gap-2">
+        <Loader2 size={12} className="animate-spin" /> Retrait à l&apos;agence (hub) en cours d&apos;application…
+      </div>
+    ) : null;
+  }
 
   const handleChoice = async (choice: "home_delivery" | "hub_pickup") => {
     setChoosing(true);

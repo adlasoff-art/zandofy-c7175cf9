@@ -663,9 +663,9 @@ const translations: Record<Locale, Record<string, string>> = {
     "checkout.selectForwarderHint": "Sélectionnez un transitaire ci-dessus pour voir le montant exact.",
     "checkout.payNow": "Payer maintenant",
     "checkout.inTotal": "dans le total",
-    "checkout.payOnHubArrival": "Payer à l'arrivée au Hub",
+    "checkout.payOnHubArrival": "Payer à l'arrivée à l'agence (hub)",
     "checkout.payOnHubArrivalDesc": "Régler",
-    "checkout.payOnHubArrivalDesc2": "quand le colis arrive au hub (avant livraison)",
+    "checkout.payOnHubArrivalDesc2": "à l'arrivée du colis à l'agence (hub), avant le retrait",
     // General
     "general.seeMore": "Voir plus de produits",
     "general.loading": "Chargement...",
@@ -2177,9 +2177,9 @@ const translations: Record<Locale, Record<string, string>> = {
     "checkout.selectForwarderHint": "Select a forwarder above to see the exact amount.",
     "checkout.payNow": "Pay now",
     "checkout.inTotal": "in total",
-    "checkout.payOnHubArrival": "Pay on hub arrival",
+    "checkout.payOnHubArrival": "Pay on arrival at the agency (hub)",
     "checkout.payOnHubArrivalDesc": "Pay",
-    "checkout.payOnHubArrivalDesc2": "when the package arrives at the hub (before delivery)",
+    "checkout.payOnHubArrivalDesc2": "when the package arrives at the agency (hub), before pickup",
     // General
     "general.seeMore": "See more products",
     "general.loading": "Loading...",

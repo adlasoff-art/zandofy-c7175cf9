@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { MAINTENANCE_QUERY_KEY } from "@/hooks/use-maintenance-mode";
+import { HOME_DELIVERY_ENABLED_QUERY_KEY } from "@/hooks/use-home-delivery-enabled";
 
 interface FreeShippingConfig {
   enabled: boolean;
@@ -84,6 +85,7 @@ export default function AdminSettingsPage() {
   const [gatewayFees, setGatewayFees] = useState({ mobile_money_fee_pct: 2.5 });
   const [reviewBonus, setReviewBonus] = useState({ bonus_pct: 0.10 });
   const [visualSearchEnabled, setVisualSearchEnabled] = useState(false);
+  const [homeDeliveryEnabled, setHomeDeliveryEnabled] = useState(false);
   const [backfillRunning, setBackfillRunning] = useState(false);
   const [backfillProgress, setBackfillProgress] = useState<{ processed: number; remaining: number } | null>(null);
 
@@ -177,7 +179,7 @@ export default function AdminSettingsPage() {
     supabase
       .from("platform_settings")
       .select("key, value")
-      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings", "gateway_fees", "review_bonus", "visual_search_enabled"])
+      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings", "gateway_fees", "review_bonus", "visual_search_enabled", "home_delivery_enabled"])
       .then(({ data }) => {
         data?.forEach((row) => {
           const v = row.value as any;
@@ -230,6 +232,8 @@ export default function AdminSettingsPage() {
             setReviewBonus({ bonus_pct: Number(v.bonus_pct) || 0.10 });
           } else if (row.key === "visual_search_enabled") {
             setVisualSearchEnabled(v?.enabled === true);
+          } else if (row.key === "home_delivery_enabled") {
+            setHomeDeliveryEnabled(v?.enabled === true);
           }
         });
       });
@@ -272,6 +276,32 @@ export default function AdminSettingsPage() {
       description: config.enabled
         ? "Les visiteurs verront la page maintenance dans les 30 secondes."
         : "L'accès au site est rétabli.",
+    });
+  }, [toast, queryClient]);
+
+  const saveHomeDeliveryEnabled = useCallback(async (enabled: boolean) => {
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("platform_settings")
+      .upsert(
+        { key: "home_delivery_enabled", value: { enabled } as any, updated_at: now },
+        { onConflict: "key" },
+      );
+    if (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour la livraison à domicile : " + error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    setHomeDeliveryEnabled(enabled);
+    queryClient.invalidateQueries({ queryKey: HOME_DELIVERY_ENABLED_QUERY_KEY });
+    toast({
+      title: enabled ? "Livraison à domicile activée" : "Livraison à domicile désactivée",
+      description: enabled
+        ? "Les clients peuvent à nouveau choisir le last-mile domicile au checkout."
+        : "Seul le retrait à l'agence (hub) reste disponible. L'expédition + transitaire sont inchangés.",
     });
   }, [toast, queryClient]);
 
@@ -329,7 +359,11 @@ export default function AdminSettingsPage() {
       .from("platform_settings")
       .upsert({ key: "visual_search_enabled", value: { enabled: visualSearchEnabled } as any, updated_at: now }, { onConflict: "key" });
 
-    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8 || e9 || e10 || e11;
+    const { error: e12 } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "home_delivery_enabled", value: { enabled: homeDeliveryEnabled } as any, updated_at: now }, { onConflict: "key" });
+
+    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8 || e9 || e10 || e11 || e12;
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
@@ -676,6 +710,34 @@ export default function AdminSettingsPage() {
                 </p>
               </div>
             )}
+          </div>
+        </section>
+
+        {/* Home delivery kill-switch */}
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Truck size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Livraison à domicile (last-mile)</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Contrôle l&apos;option « livraison à domicile » au checkout et après commande.
+            Désactivée : seuls l&apos;expédition + le choix du transitaire restent, avec retrait à l&apos;agence (hub) forcé.
+          </p>
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div>
+              <p className="text-sm font-medium text-foreground">Activer la livraison à domicile</p>
+              <p className="text-xs text-muted-foreground">
+                {homeDeliveryEnabled
+                  ? "Les clients peuvent choisir domicile ou retrait hub"
+                  : "Option domicile masquée — retrait hub par défaut"}
+              </p>
+            </div>
+            <Switch
+              checked={homeDeliveryEnabled}
+              onCheckedChange={(checked) => {
+                void saveHomeDeliveryEnabled(checked);
+              }}
+            />
           </div>
         </section>
 
