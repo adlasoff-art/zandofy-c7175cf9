@@ -33,7 +33,7 @@ import { AnnouncementPopup } from "@/components/AnnouncementPopup";
 import { AutomationPopup } from "@/components/AutomationPopup";
 import { DynamicFavicon } from "@/components/DynamicFavicon";
 import { UserPresenceTracker } from "@/components/UserPresenceTracker";
-import { Suspense, lazy, ComponentType, type ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageLoadingSkeleton } from "@/components/PageLoadingSkeleton";
 import { RoleGuard } from "@/components/admin/RoleGuard";
@@ -41,42 +41,12 @@ import { BanGuard } from "@/components/BanGuard";
 import { RecoveryGuard } from "@/components/RecoveryGuard";
 import { useGeoBlocking } from "@/hooks/useGeoBlocking";
 import { GeoBlockScreen } from "@/components/security/GeoBlockScreen";
-
-// Retry wrapper for lazy imports — auto-reloads on chunk failure (common after PWA deploy)
-function lazyRetry(importFn: () => Promise<{ default: ComponentType<any> }>) {
-  return lazy(() =>
-    importFn().catch(async (error) => {
-      const key = "chunk_reload_attempted";
-      const attempts = Number(sessionStorage.getItem(key) || "0");
-      if (attempts < 2) {
-        sessionStorage.setItem(key, String(attempts + 1));
-        try {
-          if ("caches" in window) {
-            const names = await caches.keys();
-            await Promise.all(names.map((n) => caches.delete(n)));
-          }
-          if ("serviceWorker" in navigator) {
-            const regs = await navigator.serviceWorker.getRegistrations();
-            // Don't unregister forever — just drop waiting workers & force update
-            await Promise.all(regs.map((r) => r.update().catch(() => {})));
-          }
-        } catch {
-          /* ignore */
-        }
-        window.location.reload();
-        // Keep the promise pending while reload runs
-        return new Promise(() => {});
-      }
-      throw error; // let ErrorBoundary handle if reloads already tried
-    })
-  );
-}
+import { lazyRetry } from "@/lib/lazy-retry";
 
 // Lazy-loaded routes
 const Index = lazyRetry(() => import("./pages/Index"));
 // Lazy-loaded UI components that pull heavy deps (framer-motion).
-// CompareBar is invisible until the user adds an item to compare → safe to defer.
-const CompareBar = lazy(() =>
+const CompareBar = lazyRetry(() =>
   import("@/components/CompareBar").then((m) => ({ default: m.CompareBar }))
 );
 const CategoryPage = lazyRetry(() => import("./pages/CategoryPage"));
@@ -232,6 +202,12 @@ function AnalyticsTrackerInjector() {
   return null;
 }
 
+/** Isolates shell chrome crashes so they reset on navigation (no stuck Oups). */
+function ShellErrorBoundary({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>;
+}
+
 /** Resets the error screen when navigating away from a crashed page. */
 function RouteErrorBoundary({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
@@ -265,12 +241,18 @@ const App = () => (
             <SupportDrawerProvider>
             <ScrollRestoration />
             <MobileChromeSync />
-             <CartDrawer />
-            <Suspense fallback={null}>
-              <CompareBar />
-            </Suspense>
+            <ShellErrorBoundary>
+              <CartDrawer />
+            </ShellErrorBoundary>
+            <ShellErrorBoundary>
+              <Suspense fallback={null}>
+                <CompareBar />
+              </Suspense>
+            </ShellErrorBoundary>
             <SupportDrawerWrapper />
-            <MobileBottomNav />
+            <ShellErrorBoundary>
+              <MobileBottomNav />
+            </ShellErrorBoundary>
             <PWAInstallBanner />
             <PWAUpdatePrompt />
             <OfflineIndicator />

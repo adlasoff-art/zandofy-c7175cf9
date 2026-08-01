@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { calculateTieredPrice, type PricingTier } from "@/components/TieredPricingTable";
 import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimate";
-import { useNavigate } from "react-router-dom";
 import type { Product } from "@/services/api";
 import { variantTypeTitle } from "@/components/product/VariantTypeLabel";
 
@@ -109,7 +108,6 @@ export function VariantOrderDrawer({
   const isMobile = useIsMobile();
   const { addItem } = useCart();
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
   const [variantQtys, setVariantQtys] = useState<Record<string, number>>({});
@@ -346,8 +344,12 @@ export function VariantOrderDrawer({
 
   const handleOrderNow = useCallback(async () => {
     await handleAddToCart();
-    navigate("/checkout");
-  }, [handleAddToCart, navigate]);
+    onOpenChange(false);
+    // Hard nav: avoid Sheet teardown + soft checkout race (same as CartDrawer).
+    window.setTimeout(() => {
+      window.location.assign("/checkout");
+    }, 0);
+  }, [handleAddToCart, onOpenChange]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

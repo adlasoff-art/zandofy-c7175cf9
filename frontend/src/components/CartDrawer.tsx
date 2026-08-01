@@ -7,24 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Minus, Plus, Trash2, ShoppingBag, CheckSquare, Square, ArrowLeft } from "lucide-react";
 import { imgUrl } from "@/lib/image-url";
-import { useNavigate } from "react-router-dom";
 import { CartItemVariantEditor } from "@/components/CartItemVariantEditor";
 import { CartFreightPreview } from "@/components/cart/CartFreightPreview";
-import { useEffect, useState } from "react";
-
-function useIsMobileCart() {
-  // Sync initial value to avoid side="right" → side="bottom" flip (Radix crash risk).
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== "undefined" ? window.matchMedia("(max-width: 1023px)").matches : false,
-  );
-  useEffect(() => {
-    const mql = window.matchMedia("(max-width: 1023px)");
-    const onChange = () => setIsMobile(mql.matches);
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, []);
-  return isMobile;
-}
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export function CartDrawer() {
   const {
@@ -34,16 +19,18 @@ export function CartDrawer() {
   } = useCart();
   const { user } = useAuth();
   const { t, formatPrice } = useI18n();
-  const isMobile = useIsMobileCart();
-  const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const allSelected = items.length > 0 && items.every(i => i.selected);
   const noneSelected = items.every(i => !i.selected);
 
   const goCheckout = () => {
     setDrawerOpen(false);
-    // Let the sheet unmount before route change (avoids overlay/focus race → Oops).
-    window.setTimeout(() => navigate("/checkout"), 50);
+    // Hard navigation: avoids Sheet/Radix + lazy Checkout race that surfaces as
+    // ErrorBoundary "Oups" then works after manual reload.
+    window.setTimeout(() => {
+      window.location.assign("/checkout");
+    }, 0);
   };
 
   return (
@@ -80,7 +67,9 @@ export function CartDrawer() {
               className="min-h-[44px] px-6"
               onClick={() => {
                 setDrawerOpen(false);
-                navigate("/auth");
+                window.setTimeout(() => {
+                  window.location.assign("/auth");
+                }, 0);
               }}
             >
               {t("cart.login")}

@@ -8,21 +8,22 @@ import { ColorPaletteEditor } from "@/components/admin/ColorPaletteEditor";
 import { PositionableBannersEditor } from "@/components/admin/PositionableBannersEditor";
 
 // Lazy-load existing tabs to keep file manageable
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
+import { lazyRetry } from "@/lib/lazy-retry";
 
-const MenusTab = lazy(() => import("@/components/admin/cms/MenusTab"));
-const PagesTab = lazy(() => import("@/components/admin/cms/PagesTab"));
-const SectionsTab = lazy(() => import("@/components/admin/cms/SectionsTab"));
-const FooterTab = lazy(() => import("@/components/admin/cms/FooterTab"));
-const TextsTab = lazy(() => import("@/components/admin/cms/TextsTab"));
-const LegalPagesTab = lazy(() => import("@/components/admin/cms/LegalPagesTab"));
-const BlogTab = lazy(() => import("@/components/admin/cms/BlogTab"));
-const JobPostingsTab = lazy(() => import("@/components/admin/cms/JobPostingsTab"));
-const BrandingTab = lazy(() => import("@/components/admin/cms/BrandingTab"));
-const TrendTagsTab = lazy(() => import("@/components/admin/cms/TrendTagsTabWrapper"));
-const TopBarEditor = lazy(() => import("@/components/admin/cms/TopBarEditor"));
-const HeaderThemeEditor = lazy(() => import("@/components/admin/cms/HeaderThemeEditor"));
-const FooterThemeEditor = lazy(() => import("@/components/admin/cms/FooterThemeEditor"));
+const MenusTab = lazyRetry(() => import("@/components/admin/cms/MenusTab"));
+const PagesTab = lazyRetry(() => import("@/components/admin/cms/PagesTab"));
+const SectionsTab = lazyRetry(() => import("@/components/admin/cms/SectionsTab"));
+const FooterTab = lazyRetry(() => import("@/components/admin/cms/FooterTab"));
+const TextsTab = lazyRetry(() => import("@/components/admin/cms/TextsTab"));
+const LegalPagesTab = lazyRetry(() => import("@/components/admin/cms/LegalPagesTab"));
+const BlogTab = lazyRetry(() => import("@/components/admin/cms/BlogTab"));
+const JobPostingsTab = lazyRetry(() => import("@/components/admin/cms/JobPostingsTab"));
+const BrandingTab = lazyRetry(() => import("@/components/admin/cms/BrandingTab"));
+const TrendTagsTab = lazyRetry(() => import("@/components/admin/cms/TrendTagsTabWrapper"));
+const TopBarEditor = lazyRetry(() => import("@/components/admin/cms/TopBarEditor"));
+const HeaderThemeEditor = lazyRetry(() => import("@/components/admin/cms/HeaderThemeEditor"));
+const FooterThemeEditor = lazyRetry(() => import("@/components/admin/cms/FooterThemeEditor"));
 
 type Tab = "hero" | "banners" | "topbar" | "header_theme" | "footer_theme" | "menus" | "pages" | "sections" | "trends" | "colors" | "branding" | "footer" | "texts" | "legal" | "blog" | "jobs";
 

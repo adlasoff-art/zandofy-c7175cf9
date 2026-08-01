@@ -17,13 +17,13 @@ export function MobileChromeSync() {
   }, [pathname]);
 
   useEffect(() => {
-    // Short fade only on mobile / PWA; skip if user prefers reduced motion
+    // Short fade only on mobile / PWA; skip immersive routes (checkout/auth) and reduced motion
+    if (shouldHideMobileBottomNav(pathname)) return;
     const mq = window.matchMedia("(max-width: 1023px)");
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (!mq.matches || reduced.matches) return;
 
     document.documentElement.classList.remove("page-fade");
-    // Force reflow so re-adding the class retriggers animation
     void document.documentElement.offsetWidth;
     document.documentElement.classList.add("page-fade");
 
@@ -31,7 +31,7 @@ export function MobileChromeSync() {
       document.documentElement.classList.remove("page-fade");
     }, 220);
     return () => window.clearTimeout(t);
-  }, [key]);
+  }, [key, pathname]);
 
   return null;
 }

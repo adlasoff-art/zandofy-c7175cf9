@@ -26,7 +26,20 @@ export function MobileBottomNav() {
   const { count: wishlistCount } = useWishlist();
   const { t } = useI18n();
 
-  if (shouldHideMobileBottomNav(location.pathname)) {
+  const isOnSearchPage = location.pathname === "/search";
+  const hideNav = shouldHideMobileBottomNav(location.pathname);
+
+  // Hooks MUST run unconditionally (hide on checkout/auth/messages used to early-return
+  // before useCallback → Rules of Hooks crash → outer ErrorBoundary "Oups").
+  const handleSearchClick = useCallback(() => {
+    if (isOnSearchPage) {
+      window.dispatchEvent(new CustomEvent(TOGGLE_SEARCH_EVENT));
+    } else {
+      navigate("/search");
+    }
+  }, [isOnSearchPage, navigate]);
+
+  if (hideNav) {
     return null;
   }
 
@@ -35,16 +48,6 @@ export function MobileBottomNav() {
     if (path === "/wishlist") return wishlistCount;
     return 0;
   };
-
-  const isOnSearchPage = location.pathname === "/search";
-
-  const handleSearchClick = useCallback(() => {
-    if (isOnSearchPage) {
-      window.dispatchEvent(new CustomEvent(TOGGLE_SEARCH_EVENT));
-    } else {
-      navigate("/search");
-    }
-  }, [isOnSearchPage, navigate]);
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border lg:hidden safe-area-bottom">

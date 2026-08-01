@@ -1,7 +1,8 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { APP_VERSION } from "./version";
+import { APP_VERSION, SHOW_UPDATE_PROMPT } from "./version";
+import { clearChunkRecoveryLocks } from "./lib/lazy-retry";
 
 // Chunk load error detection & auto-reload
 function isChunkLoadError(error: unknown): boolean {
@@ -11,24 +12,23 @@ function isChunkLoadError(error: unknown): boolean {
     msg.includes("Failed to fetch dynamically imported module") ||
     msg.includes("Loading chunk") ||
     msg.includes("Loading CSS chunk") ||
-    msg.includes("Importing a module script failed")
+    msg.includes("Importing a module script failed") ||
+    msg.includes("error loading dynamically imported module") ||
+    msg.includes("ChunkLoadError")
   );
 }
 
 function handleChunkReload(): void {
   const key = "chunk_reload_attempted";
   const attempts = Number(sessionStorage.getItem(key) || "0");
-  if (attempts >= 2) return; // already escalated to SW nuke
+  if (attempts >= 2) return;
   sessionStorage.setItem(key, String(attempts + 1));
 
   if (attempts === 0) {
-    // First chunk error: just reload (often picks up a fresh index.html)
     window.location.reload();
     return;
   }
 
-  // Second chunk error: SW is likely serving orphaned chunks. Nuke caches +
-  // unregister all SWs, then hard-reload. Protects users stuck on stale builds.
   (async () => {
     try {
       if ("caches" in window) {
@@ -39,15 +39,16 @@ function handleChunkReload(): void {
         const regs = await navigator.serviceWorker.getRegistrations();
         await Promise.all(regs.map((r) => r.unregister()));
       }
-    } catch {}
+    } catch {
+      /* ignore */
+    }
     window.location.reload();
   })();
 }
 
-// Clear the flag on successful load so future deploys can retry
-sessionStorage.removeItem("chunk_reload_attempted");
+// Healthy boot: allow future recoveries in this tab
+clearChunkRecoveryLocks();
 
-// Catch unhandled promise rejections from lazy imports
 window.addEventListener("unhandledrejection", (event) => {
   if (isChunkLoadError(event.reason)) {
     event.preventDefault();
@@ -55,7 +56,6 @@ window.addEventListener("unhandledrejection", (event) => {
   }
 });
 
-// Catch synchronous chunk errors
 window.addEventListener("error", (event) => {
   if (isChunkLoadError(event.error) || (event.message && isChunkLoadError({ message: event.message }))) {
     event.preventDefault();
@@ -63,21 +63,17 @@ window.addEventListener("error", (event) => {
   }
 });
 
-// Zandofy deploy proof — 2026-04-13T06:42Z
 createRoot(document.getElementById("root")!).render(<App />);
 
-// ─── Global error reporting (non-React errors) ──────────────────
 import("@/services/error-reporter").then(({ reportError }) => {
-  // Catch unhandled JS errors that are NOT chunk-load errors
   window.addEventListener("error", (event) => {
-    if (isChunkLoadError(event.error)) return; // already handled above
+    if (isChunkLoadError(event.error)) return;
     if (!event.error) return;
     reportError({ error: event.error });
   });
 
-  // Catch unhandled promise rejections that are NOT chunk-load errors
   window.addEventListener("unhandledrejection", (event) => {
-    if (isChunkLoadError(event.reason)) return; // already handled above
+    if (isChunkLoadError(event.reason)) return;
     const err = event.reason instanceof Error
       ? event.reason
       : new Error(String(event.reason));
@@ -85,9 +81,31 @@ import("@/services/error-reporter").then(({ reportError }) => {
   });
 });
 
-// Register service worker for PWA
+// Register single PWA service worker (push handlers live in sw.js — do not register sw-push.js)
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
+    // Retire legacy dual SW if still installed
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      regs.forEach((r) => {
+        const url = r.active?.scriptURL || r.installing?.scriptURL || r.waiting?.scriptURL || "";
+        if (url.includes("sw-push.js")) {
+          void r.unregister();
+        }
+      });
+    });
+
+    const activateWaitingSilently = (registration: ServiceWorkerRegistration) => {
+      const waiting = registration.waiting;
+      if (!waiting || SHOW_UPDATE_PROMPT) return;
+      waiting.postMessage({ type: "CLEAR_CACHES" });
+      waiting.postMessage({ type: "SKIP_WAITING" });
+      const onControllerChange = () => {
+        navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+        window.location.reload();
+      };
+      navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+    };
+
     const dispatchUpdateAvailable = (registration: ServiceWorkerRegistration) => {
       const waitingWorker = registration.waiting;
       const activeController = navigator.serviceWorker.controller;
@@ -95,11 +113,15 @@ if ("serviceWorker" in navigator) {
       if (!waitingWorker || !activeController) return;
       if (waitingWorker.scriptURL === activeController.scriptURL) return;
 
+      if (!SHOW_UPDATE_PROMPT) {
+        activateWaitingSilently(registration);
+        return;
+      }
+
       window.dispatchEvent(new CustomEvent("sw-update-available", { detail: { registration } }));
     };
 
     navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`).then((registration) => {
-      // Send Supabase config to SW so it doesn't need hardcoded keys
       const sendConfig = (sw: ServiceWorker | null) => {
         sw?.postMessage({
           type: "SW_CONFIG",
@@ -116,7 +138,6 @@ if ("serviceWorker" in navigator) {
 
       dispatchUpdateAvailable(registration);
 
-      // Check for updates periodically (every 30 min)
       setInterval(() => registration.update(), 30 * 60 * 1000);
 
       registration.addEventListener("updatefound", () => {
@@ -124,7 +145,6 @@ if ("serviceWorker" in navigator) {
         if (!newWorker) return;
 
         newWorker.addEventListener("statechange", () => {
-          // New SW installed & there's already an active one → update available
           if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
             dispatchUpdateAvailable(registration);
           }

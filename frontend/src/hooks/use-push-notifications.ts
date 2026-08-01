@@ -25,11 +25,12 @@ export function usePushNotifications() {
   const [loading, setLoading] = useState(false);
   const [supported, setSupported] = useState(false);
 
-  // Register service worker
+  // Use the main PWA SW (sw.js) — never register a second sw-push.js controller
   useEffect(() => {
     if (!supported) return;
-    navigator.serviceWorker.register("/sw-push.js").catch((err) => {
-      console.warn("SW registration failed:", err);
+    // Ensure main SW is ready; registration is owned by main.tsx
+    navigator.serviceWorker.ready.catch((err) => {
+      console.warn("SW ready failed:", err);
     });
   }, [supported]);
 
