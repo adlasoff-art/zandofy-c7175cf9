@@ -37,6 +37,7 @@ import { KycBanner } from "@/components/kyc/KycBanner";
 import { getColorDisplay } from "@/utils/colorName";
 import { useStorePaymentNumbers } from "@/hooks/use-store-payment-numbers";
 import { PaymentWaitingPanel } from "@/components/payments/PaymentWaitingPanel";
+import { useHomeDeliveryEnabled } from "@/hooks/use-home-delivery-enabled";
 
 type Step = "shipping" | "payment" | "confirmation";
 type PaymentMethod = "stripe" | "card" | "paypal" | "mobile_money" | "cod" | "off_platform";
@@ -104,6 +105,7 @@ export default function CheckoutPage() {
   const { t, formatPrice } = useI18n();
   const { data: paymentConfig } = usePaymentMethods();
   const { isVerified: isKycVerified, isOrderBlocked, needsKyc, kycStatus } = useKycStatus();
+  const { data: homeDeliveryEnabled = false } = useHomeDeliveryEnabled();
 
   // Enable real geo-IP detection only on checkout (perf: avoid blocking home rendering).
   useEffect(() => {
@@ -123,7 +125,7 @@ export default function CheckoutPage() {
   const [orderId, setOrderId] = useState<string | null>(null);
 
   // Deferred shipping payment
-  const [shippingPaymentChoice, setShippingPaymentChoice] = useState<"pay_now" | "pay_on_arrival">("pay_now");
+  const [shippingPaymentChoice, setShippingPaymentChoice] = useState<"pay_now" | "pay_on_arrival">("pay_on_arrival");
 
   // Delivery option (home vs hub)
   const [deliveryOption, setDeliveryOption] = useState<DeliveryOption>("none");
@@ -181,13 +183,22 @@ export default function CheckoutPage() {
     countryCode: shipping.country,
     commune: shipping.commune,
     quartier: shipping.quartier,
-    enabled: !!shipping.city && !!shipping.country,
+    enabled: homeDeliveryEnabled && !!shipping.city && !!shipping.country,
   });
-  const hasOperatorCoverage = (operatorQuotesForCoverage?.length ?? 0) > 0;
+  const hasOperatorCoverage = homeDeliveryEnabled && (operatorQuotesForCoverage?.length ?? 0) > 0;
+
+  // Kill-switch off : forcer retrait hub (plus de choix domicile)
+  useEffect(() => {
+    if (!homeDeliveryEnabled) {
+      setDeliveryOption("hub_pickup");
+      setSelectedOperator(null);
+    }
+  }, [homeDeliveryEnabled]);
 
   // Auto-fallback : si la zone perd sa couverture opérateur et que home_delivery était choisi,
   // basculer en "none" et désélectionner l'opérateur précédent.
   useEffect(() => {
+    if (!homeDeliveryEnabled) return;
     if (deliveryOption === "home_delivery" && !operatorCoverageLoading && !hasOperatorCoverage) {
       setDeliveryOption("none");
       setSelectedOperator(null);
@@ -198,7 +209,7 @@ export default function CheckoutPage() {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasOperatorCoverage, operatorCoverageLoading]);
+  }, [hasOperatorCoverage, operatorCoverageLoading, homeDeliveryEnabled]);
 
   const handleForwarderChange = useCallback((choice: ForwarderChoice | null, unassigned: boolean) => {
     setSelectedForwarder(choice);
@@ -738,8 +749,8 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Lot 11B Phase B8 — Le client doit choisir un mode de livraison
-    if (deliveryOption === "none") {
+    // Lot 11B Phase B8 — Le client doit choisir un mode de livraison (sauf si domicile désactivé → hub forcé)
+    if (homeDeliveryEnabled && deliveryOption === "none") {
       toast({
         title: "Mode de livraison requis",
         description: "Veuillez choisir entre la livraison à domicile ou le retrait au Hub.",
@@ -973,7 +984,11 @@ export default function CheckoutPage() {
               : (paymentMethod === "mobile_money" || paymentMethod === "card" || paymentMethod === "paypal" || paymentMethod === "stripe")
                 ? "unpaid"
                 : "paid",
-          delivery_choice: deliveryOption !== "none" ? deliveryOption : null,
+          delivery_choice: !homeDeliveryEnabled
+            ? "hub_pickup"
+            : deliveryOption !== "none"
+              ? deliveryOption
+              : null,
           last_mile_fee: deliveryOption === "home_delivery" ? lastMileFee : 0,
           // Lot 11B Phase B4 — opérateur de livraison sélectionné (NULL = flotte plateforme par défaut)
           delivery_operator_id:
@@ -1795,8 +1810,8 @@ export default function CheckoutPage() {
                       )}
                       <div className="space-y-2">
                         {[
+                          { key: "pay_on_arrival" as const, label: t("checkout.payOnHubArrival") || "Payer à l'arrivée à l'agence (hub)", desc: `${t("checkout.payOnHubArrivalDesc") || "Régler"} ${amountLabel} ${t("checkout.payOnHubArrivalDesc2") || "à l'arrivée du colis à l'agence (hub), avant le retrait"}` },
                           { key: "pay_now" as const, label: t("checkout.payNow") || "Payer maintenant", desc: `${t("checkout.includeInTotal") || "Inclure"} ${amountLabel} ${t("checkout.inTotal") || "dans le total"}` },
-                          { key: "pay_on_arrival" as const, label: t("checkout.payOnHubArrival") || "Payer à l'arrivée à l'agence du transitaire (hub)", desc: `${t("checkout.payOnHubArrivalDesc") || "Régler"} ${amountLabel} ${t("checkout.payOnHubArrivalDesc2") || "à l'arrivée du colis à l'agence du transitaire (hub), avant la livraison"}` },
                         ].map(opt => (
                           <button
                             key={opt.key}
@@ -1824,7 +1839,8 @@ export default function CheckoutPage() {
                     );
                   })()}
 
-                  {/* Delivery option: home vs hub */}
+                  {/* Delivery option: home vs hub — masqué si kill-switch off */}
+                  {homeDeliveryEnabled && (
                    <div className="pt-3 border-t border-border space-y-2">
                     <p className="text-sm font-medium text-foreground flex items-center gap-2">
                       <Home size={14} className="text-primary" /> Option de livraison
@@ -1957,6 +1973,7 @@ export default function CheckoutPage() {
                       </div>
                     )}
                   </div>
+                  )}
 
                   {/* Mobile/Tablet (< lg) — Totaux récap juste avant le bouton
                       Continuer, après toutes les sélections (transitaire,
