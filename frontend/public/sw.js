@@ -1,10 +1,11 @@
-const CACHE_NAME = "zandofy-v11";
-const STATIC_CACHE = "zandofy-static-v11";
-const API_CACHE = "zandofy-api-v4";
-const IMG_CACHE = "zandofy-images-v4";
+const CACHE_NAME = "zandofy-v12";
+const STATIC_CACHE = "zandofy-static-v12";
+const API_CACHE = "zandofy-api-v5";
+const IMG_CACHE = "zandofy-images-v5";
 const CATALOG_CACHE = "zandofy-catalog-v3";
 
-const PRECACHE_URLS = ["/", "/index.html", "/offline.html", "/icons/icon-192.png", "/icons/icon-512.png"];
+// Do NOT precache "/" or "/index.html" — stale HTML + new hashed assets = chunk Oops after deploy.
+const PRECACHE_URLS = ["/offline.html", "/icons/icon-192.png", "/icons/icon-512.png"];
 const API_CACHE_MAX = 50;
 const IMG_CACHE_MAX = 100;
 
@@ -217,9 +218,9 @@ async function syncPendingActions() {
   }
 }
 
-// Push notification handler
+// Push notification handler (+ app badge when supported)
 self.addEventListener("push", (event) => {
-  let data = { title: "Zandofy", body: "Nouvelle notification", url: "/" };
+  let data = { title: "Zandofy", body: "Nouvelle notification", url: "/dashboard" };
 
   try {
     if (event.data) data = { ...data, ...event.data.json() };
@@ -229,26 +230,57 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: data.body,
-    icon: "/icons/icon-192.png",
-    badge: "/icons/icon-192.png",
-    vibrate: [100, 50, 100],
-    data: { url: data.url || "/" },
-    tag: data.tag || "default",
+    icon: data.icon || "/icons/icon-192.png",
+    badge: data.badge || "/icons/icon-192.png",
+    vibrate: [120, 60, 120],
+    data: { url: data.url || "/dashboard" },
+    tag: data.tag || `zandofy-${Date.now()}`,
     renotify: true,
+    requireInteraction: data.requireInteraction === true,
     actions: [
       { action: "open", title: "Voir" },
       { action: "close", title: "Fermer" },
     ],
   };
 
-  event.waitUntil(self.registration.showNotification(data.title, options));
+  const tasks = [self.registration.showNotification(data.title, options)];
+
+  if (typeof self.navigator !== "undefined" && "setAppBadge" in self.navigator) {
+    try {
+      const next =
+        typeof data.unreadCount === "number" && data.unreadCount >= 0
+          ? data.unreadCount
+          : undefined;
+      tasks.push(
+        next === undefined
+          ? self.navigator.setAppBadge()
+          : self.navigator.setAppBadge(next),
+      );
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  tasks.push(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      list.forEach((c) => {
+        try {
+          c.postMessage({ type: "ZANDOFY_PUSH_RECEIVED", payload: data });
+        } catch (_) {
+          /* ignore */
+        }
+      });
+    }),
+  );
+
+  event.waitUntil(Promise.all(tasks));
 });
 
 // Handle notification click
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/";
   if (event.action === "close") return;
+  const url = event.notification.data?.url || "/dashboard";
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
@@ -263,7 +295,7 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
-// Listen for messages from the app to trigger cache clearing
+// Listen for messages from the app to trigger cache clearing / badge
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
@@ -272,14 +304,12 @@ self.addEventListener("message", (event) => {
     caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
   }
   if (event.data && event.data.type === "SW_CONFIG") {
-    // Receive Supabase config from the main app — no hardcoded keys
     _supabaseUrl = event.data.supabaseUrl || _supabaseUrl;
     _anonKey = event.data.anonKey || _anonKey;
-    // Now that we have config, cache top products
     cacheTopProducts();
   }
   if (event.data && event.data.type === "GET_OFFLINE_CATALOG") {
-    caches.open("zandofy-catalog-v1").then((cache) =>
+    caches.open(CATALOG_CACHE).then((cache) =>
       cache.match("offline-catalog").then((response) => {
         if (response) {
           response.json().then((data) => {
@@ -291,5 +321,18 @@ self.addEventListener("message", (event) => {
   }
   if (event.data && event.data.type === "REFRESH_CATALOG") {
     cacheTopProducts();
+  }
+  if (event.data && event.data.type === "ZANDOFY_SET_BADGE") {
+    if ("setAppBadge" in self.navigator) {
+      try {
+        if (typeof event.data.count === "number" && event.data.count > 0) {
+          self.navigator.setAppBadge(event.data.count);
+        } else {
+          self.navigator.clearAppBadge?.();
+        }
+      } catch (_) {
+        /* ignore */
+      }
+    }
   }
 });

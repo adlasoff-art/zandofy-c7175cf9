@@ -1,5 +1,5 @@
 import { Search, ShoppingBag, Heart, User, Menu, X, Headphones, Globe, ChevronRight, LogOut, MessageCircle, ChevronDown, PackageSearch, Sun, Moon, Monitor, Bell, Sparkles } from "lucide-react";
-import { useState, useRef, useEffect, Component, lazy, Suspense, type ReactNode, type ErrorInfo } from "react";
+import { useState, useRef, useEffect, Component, Suspense, type ReactNode, type ErrorInfo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,9 +7,10 @@ import { PredictiveSearch } from "@/components/PredictiveSearch";
 import { BrandLogo } from "@/components/BrandLogo";
 import { MegaMenu } from "@/components/MegaMenu";
 import { CurrencySwitcher } from "@/components/CurrencySwitcher";
+import { lazyRetry } from "@/lib/lazy-retry";
 
 // Lazy-load NotificationCenter to prevent Radix Popover import failures from crashing the entire Header
-const NotificationCenter = lazy(() =>
+const NotificationCenter = lazyRetry(() =>
   import("@/components/NotificationCenter").then((mod) => ({ default: mod.NotificationCenter }))
 );
 import { useAuth } from "@/contexts/AuthContext";

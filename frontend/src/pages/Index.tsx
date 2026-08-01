@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback } from "react";
+import { Suspense, useCallback } from "react";
 import { useNavigationType } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
@@ -10,15 +10,16 @@ import { SEOHead } from "@/components/SEOHead";
 import { useSeoConfig } from "@/hooks/use-seo-config";
 import { useSeoOverride } from "@/hooks/use-seo-overrides";
 import { Loader2 } from "lucide-react";
+import { lazyRetry } from "@/lib/lazy-retry";
 
 // Below-the-fold: lazy-loaded to reduce initial JS and main-thread work.
-const FlashSales = lazy(() => import("@/components/FlashSales").then(m => ({ default: m.FlashSales })));
-const TopTrends = lazy(() => import("@/components/TopTrends").then(m => ({ default: m.TopTrends })));
-const ProductGrid = lazy(() => import("@/components/ProductGrid").then(m => ({ default: m.ProductGrid })));
-const FeaturedSidebar = lazy(() => import("@/components/FeaturedSidebar").then(m => ({ default: m.FeaturedSidebar })));
-const RecommendationsSection = lazy(() => import("@/components/RecommendationsSection").then(m => ({ default: m.RecommendationsSection })));
-const Footer = lazy(() => import("@/components/Footer").then(m => ({ default: m.Footer })));
-const FloatingActions = lazy(() => import("@/components/FloatingActions").then(m => ({ default: m.FloatingActions })));
+const FlashSales = lazyRetry(() => import("@/components/FlashSales").then(m => ({ default: m.FlashSales })));
+const TopTrends = lazyRetry(() => import("@/components/TopTrends").then(m => ({ default: m.TopTrends })));
+const ProductGrid = lazyRetry(() => import("@/components/ProductGrid").then(m => ({ default: m.ProductGrid })));
+const FeaturedSidebar = lazyRetry(() => import("@/components/FeaturedSidebar").then(m => ({ default: m.FeaturedSidebar })));
+const RecommendationsSection = lazyRetry(() => import("@/components/RecommendationsSection").then(m => ({ default: m.RecommendationsSection })));
+const Footer = lazyRetry(() => import("@/components/Footer").then(m => ({ default: m.Footer })));
+const FloatingActions = lazyRetry(() => import("@/components/FloatingActions").then(m => ({ default: m.FloatingActions })));
 
 const SITE_URL = import.meta.env.VITE_SITE_URL || "https://zandofy.com";
 

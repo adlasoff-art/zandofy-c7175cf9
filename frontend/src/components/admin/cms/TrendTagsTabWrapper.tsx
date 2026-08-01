@@ -1,7 +1,8 @@
 import { TrendTagsTab } from "./TrendTagsTab";
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
+import { lazyRetry } from "@/lib/lazy-retry";
 
-const TrendingProductsManager = lazy(() => import("./TrendingProductsManager"));
+const TrendingProductsManager = lazyRetry(() => import("./TrendingProductsManager"));
 
 function TrendTagsTabWrapper() {
   return (
