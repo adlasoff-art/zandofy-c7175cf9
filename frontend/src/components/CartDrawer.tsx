@@ -7,17 +7,19 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Minus, Plus, Trash2, ShoppingBag, CheckSquare, Square, ArrowLeft } from "lucide-react";
 import { imgUrl } from "@/lib/image-url";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { CartItemVariantEditor } from "@/components/CartItemVariantEditor";
 import { CartFreightPreview } from "@/components/cart/CartFreightPreview";
 import { useEffect, useState } from "react";
 
 function useIsMobileCart() {
-  const [isMobile, setIsMobile] = useState(false);
+  // Sync initial value to avoid side="right" → side="bottom" flip (Radix crash risk).
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 1023px)").matches : false,
+  );
   useEffect(() => {
     const mql = window.matchMedia("(max-width: 1023px)");
     const onChange = () => setIsMobile(mql.matches);
-    onChange();
     mql.addEventListener("change", onChange);
     return () => mql.removeEventListener("change", onChange);
   }, []);
@@ -27,15 +29,22 @@ function useIsMobileCart() {
 export function CartDrawer() {
   const {
     items, drawerOpen, setDrawerOpen, updateQuantity, removeItem,
-    itemCount, selectedCount, selectedSubtotal,
+    itemCount, selectedCount, selectedSubtotal, loading,
     toggleSelected, selectAll, deselectAll,
   } = useCart();
   const { user } = useAuth();
   const { t, formatPrice } = useI18n();
   const isMobile = useIsMobileCart();
+  const navigate = useNavigate();
 
   const allSelected = items.length > 0 && items.every(i => i.selected);
   const noneSelected = items.every(i => !i.selected);
+
+  const goCheckout = () => {
+    setDrawerOpen(false);
+    // Let the sheet unmount before route change (avoids overlay/focus race → Oops).
+    window.setTimeout(() => navigate("/checkout"), 50);
+  };
 
   return (
     <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -67,9 +76,20 @@ export function CartDrawer() {
           <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6 min-h-[50vh]">
             <ShoppingBag size={48} className="text-muted-foreground" />
             <p className="text-muted-foreground">{t("cart.loginRequired")}</p>
-            <Link to="/auth" onClick={() => setDrawerOpen(false)}>
-              <Button className="min-h-[44px] px-6">{t("cart.login")}</Button>
-            </Link>
+            <Button
+              className="min-h-[44px] px-6"
+              onClick={() => {
+                setDrawerOpen(false);
+                navigate("/auth");
+              }}
+            >
+              {t("cart.login")}
+            </Button>
+          </div>
+        ) : loading && items.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6 min-h-[50vh]">
+            <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            <p className="text-sm text-muted-foreground">{t("cart.loading") || "Chargement du panier…"}</p>
           </div>
         ) : items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6 min-h-[50vh]">
@@ -85,7 +105,6 @@ export function CartDrawer() {
           </div>
         ) : (
           <>
-            {/* Select all / deselect all */}
             <div className={`flex items-center justify-between py-2 border-b border-border ${isMobile ? "px-4" : "px-1"}`}>
               <button
                 onClick={() => allSelected ? deselectAll() : selectAll()}
@@ -102,7 +121,6 @@ export function CartDrawer() {
             <div className={`flex-1 overflow-y-auto space-y-3 py-4 ${isMobile ? "px-4" : ""}`}>
               {items.map(item => (
                 <div key={item.id} className={`flex gap-3 p-3 rounded-sm transition-colors ${item.selected ? "bg-muted/50" : "bg-muted/20 opacity-60"}`}>
-                  {/* Checkbox */}
                   <div className="flex items-start pt-1">
                     <Checkbox
                       checked={item.selected}
@@ -153,7 +171,6 @@ export function CartDrawer() {
               ))}
             </div>
 
-            {/* Footer */}
             <div className={`border-t border-border pt-4 space-y-3 shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] ${isMobile ? "px-4" : ""}`}>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t("cart.subtotal")} ({selectedCount} {t("cart.selected")})</span>
@@ -173,11 +190,12 @@ export function CartDrawer() {
                   {t("cart.selectItems")}
                 </Button>
               ) : (
-                <Link to="/checkout" onClick={() => setDrawerOpen(false)} className="block">
-                  <Button className="w-full h-12 min-h-[44px] font-bold active:scale-[0.98] transition-transform">
-                    {t("cart.order")} ({selectedCount}) — {formatPrice(selectedSubtotal)}
-                  </Button>
-                </Link>
+                <Button
+                  className="w-full h-12 min-h-[44px] font-bold active:scale-[0.98] transition-transform"
+                  onClick={goCheckout}
+                >
+                  {t("cart.order")} ({selectedCount}) — {formatPrice(selectedSubtotal)}
+                </Button>
               )}
             </div>
           </>

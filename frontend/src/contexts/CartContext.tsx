@@ -64,14 +64,18 @@ export const useCart = () => useContext(CartContext);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
   // Fetch cart from DB
   const fetchCart = useCallback(async () => {
-    if (!user) { setItems([]); return; }
+    if (!user) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { data, error } = await supabase
       .from("cart_items")
