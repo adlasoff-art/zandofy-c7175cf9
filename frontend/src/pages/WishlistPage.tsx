@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { MobileBackButton } from "@/components/navigation/MobileBackButton";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { Heart, Share2, Copy } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -75,7 +76,10 @@ export default function WishlistPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container py-6">
+      <div className="lg:hidden sticky top-14 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-1">
+        <MobileBackButton fallbackTo="/" />
+      </div>
+      <main className="container py-6 pb-24 lg:pb-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Heart size={24} className="text-sale" />
@@ -113,11 +117,13 @@ export default function WishlistPage() {
             ))}
           </div>
         ) : products.length === 0 ? (
-          <div className="text-center py-20">
-            <Heart size={48} className="mx-auto text-muted-foreground/30 mb-4" />
+          <div className="flex flex-col items-center justify-center text-center min-h-[50vh] px-4">
+            <Heart size={48} className="text-muted-foreground/30 mb-4" />
             <h2 className="text-lg font-semibold text-foreground mb-2">{t("wishlist.empty")}</h2>
             <p className="text-muted-foreground mb-6">{t("wishlist.emptySub")}</p>
-            <Button asChild><Link to="/">{t("wishlist.discover")}</Link></Button>
+            <Button asChild className="min-h-[44px] px-6">
+              <Link to="/">{t("wishlist.discover")}</Link>
+            </Button>
           </div>
         ) : (
           <div className={PRODUCT_GRID_CLASS}>

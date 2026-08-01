@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SEOHead, buildBreadcrumbJsonLd, buildProductItemListJsonLd, buildJsonLdGraph } from "@/components/SEOHead";
+import { MobileBackButton } from "@/components/navigation/MobileBackButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -252,9 +253,12 @@ export default function CategoryPage() {
         )}
       />
       <Header />
-      <main className="max-w-7xl mx-auto px-4 py-4">
+      <div className="lg:hidden sticky top-14 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-1">
+        <MobileBackButton fallbackTo="/" />
+      </div>
+      <main className="max-w-7xl mx-auto px-4 py-4 pb-20 lg:pb-4">
         {/* Breadcrumb */}
-        <Breadcrumb className="mb-4">
+        <Breadcrumb className="mb-4 hidden lg:flex">
           <BreadcrumbList>
             <BreadcrumbItem><BreadcrumbLink asChild><Link to="/">{t("general.home")}</Link></BreadcrumbLink></BreadcrumbItem>
             <BreadcrumbSeparator />

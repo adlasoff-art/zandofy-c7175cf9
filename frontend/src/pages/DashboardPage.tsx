@@ -378,7 +378,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <PushPermissionPrompt />
-      <main className="container py-6">
+      <main className="container py-6 pb-24 lg:pb-6">
         {/* ═══ DESKTOP LAYOUT: Sidebar + Content ═══ */}
         <div className="hidden lg:flex gap-6">
           {/* Sidebar */}

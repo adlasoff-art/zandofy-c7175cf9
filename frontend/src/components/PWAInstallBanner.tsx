@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { X, Download, MoreVertical, AlertCircle } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { trackPWAInstall } from "@/hooks/use-analytics";
+import { shouldHideMobileBottomNav } from "@/lib/mobile-chrome";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -21,6 +23,10 @@ function isInStandaloneMode() {
   return window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true;
 }
 
+const BANNER_POSITION =
+  "fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] inset-x-0 z-[60] px-3 pb-2 lg:hidden animate-fade-in";
+
+
 export function PWAInstallBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
@@ -30,6 +36,7 @@ export function PWAInstallBanner() {
   const [showFallbackMessage, setShowFallbackMessage] = useState(false);
   const { locale } = useI18n();
   const { user } = useAuth();
+  const location = useLocation();
 
   const isIOSDevice = isIOS();
 
@@ -122,13 +129,15 @@ export function PWAInstallBanner() {
   };
 
   if (isInstalled || dismissed) return null;
+  // Don't cover checkout / auth / immersive CTAs
+  if (shouldHideMobileBottomNav(location.pathname)) return null;
 
   const isFr = locale === "fr";
 
   // iOS banner
   if (showIOSBanner) {
     return (
-      <div className="fixed bottom-16 inset-x-0 z-[60] px-3 pb-2 lg:hidden animate-fade-in">
+      <div className={BANNER_POSITION}>
         <div className="relative bg-primary text-primary-foreground rounded-xl px-4 py-3 shadow-lg">
           <button
             onClick={handleDismiss}
@@ -183,7 +192,7 @@ export function PWAInstallBanner() {
     const cta = isFr ? "Installer" : "Install";
 
     return (
-      <div className="fixed bottom-16 inset-x-0 z-[60] px-3 pb-2 lg:hidden animate-fade-in">
+      <div className={BANNER_POSITION}>
         <div className="flex items-center gap-3 bg-primary text-primary-foreground rounded-xl px-4 py-3 shadow-lg">
           <Download size={20} className="shrink-0" />
           <span className="text-sm font-medium flex-1">{label}</span>
@@ -208,7 +217,7 @@ export function PWAInstallBanner() {
   // Android fallback: manual instructions + Install button + fallback message
   if (showAndroidFallback) {
     return (
-      <div className="fixed bottom-16 inset-x-0 z-[60] px-3 pb-2 lg:hidden animate-fade-in">
+      <div className={BANNER_POSITION}>
         <div className="relative bg-primary text-primary-foreground rounded-xl px-4 py-3 shadow-lg">
           <button
             onClick={handleDismiss}

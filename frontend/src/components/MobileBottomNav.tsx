@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useI18n } from "@/contexts/I18nContext";
+import { shouldHideMobileBottomNav } from "@/lib/mobile-chrome";
 
 const NAV_ITEMS = [
   { icon: Home, labelKey: "bottomNav.home", path: "/" },
@@ -24,6 +25,10 @@ export function MobileBottomNav() {
   const { setDrawerOpen, itemCount } = useCart();
   const { count: wishlistCount } = useWishlist();
   const { t } = useI18n();
+
+  if (shouldHideMobileBottomNav(location.pathname)) {
+    return null;
+  }
 
   const getBadge = (path: string) => {
     if (path === "#cart") return itemCount;
@@ -49,8 +54,12 @@ export function MobileBottomNav() {
           const href = item.path;
           const isCart = item.path === "#cart";
           const isSearch = item.path === "/search";
-          const isAccount = item.path === "/dashboard";
-          const isActive = !isCart && (isSearch ? isOnSearchPage : location.pathname === href);
+          const isAccount = item.path === "/account";
+          const isActive = !isCart && (isSearch
+            ? isOnSearchPage
+            : isAccount
+              ? location.pathname === "/account" || location.pathname.startsWith("/dashboard")
+              : location.pathname === href);
           const badge = getBadge(item.path);
           const label = t(item.labelKey);
 

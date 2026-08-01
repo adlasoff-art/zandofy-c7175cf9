@@ -8,6 +8,7 @@ import { computeStoreYears, formatStoreYears } from "@/lib/store-years";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
+import { MobileBackButton } from "@/components/navigation/MobileBackButton";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 import { VerificationBadge } from "@/components/VerificationBadge";
@@ -278,8 +279,11 @@ export default function StorePage() {
         ogImage={store?.logo_url || undefined}
       />
       <Header />
+      <div className="lg:hidden sticky top-14 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-1">
+        <MobileBackButton fallbackTo="/stores" />
+      </div>
 
-      <main>
+      <main className="pb-20 lg:pb-0">
         {storeLoading ? (
           <div className="space-y-4 container py-6">
             <Skeleton className="h-48 w-full rounded-sm" />

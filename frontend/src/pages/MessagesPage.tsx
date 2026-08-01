@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ConversationList, type ConversationItem } from "@/components/messages/ConversationList";
 import { ChatPanel } from "@/components/messages/ChatPanel";
-import { MessageCircle, ChevronLeft } from "lucide-react";
+import { MobileBackButton } from "@/components/navigation/MobileBackButton";
+import { MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function MessagesPage() {
@@ -30,10 +30,11 @@ export default function MessagesPage() {
       <main className="flex-1 flex flex-col min-h-0 container py-2 sm:py-4">
         <div className="flex-1 flex flex-col min-h-0 border border-border rounded-lg overflow-hidden bg-background">
           {/* Title bar */}
-          <div className="border-b border-border px-4 py-3 flex items-center gap-3 shrink-0">
-            <button onClick={() => navigate("/dashboard")} className="text-muted-foreground hover:text-foreground">
-              <ChevronLeft size={20} />
-            </button>
+          <div className="border-b border-border px-4 py-2 flex items-center gap-2 shrink-0">
+            <MobileBackButton
+              fallbackTo="/account"
+              className={cn(isMobile && selectedConv ? "hidden" : "")}
+            />
             <h1 className="text-lg font-bold text-foreground">Messages</h1>
           </div>
 

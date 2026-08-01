@@ -29,7 +29,8 @@ import { CascadingAddressFields } from "@/components/address/CascadingAddressFie
 import { useI18n } from "@/contexts/I18nContext";
 import {
   CreditCard, Smartphone, Truck, ChevronRight, Check, ShieldCheck,
-  ArrowLeft, Package, MapPin, Banknote, Tag, Plus, Trash2, Home, Briefcase, X, Loader2, Coins, Upload
+  ArrowLeft, Package, MapPin, Banknote, Tag, Plus, Trash2, Home, Briefcase, X, Loader2, Coins, Upload,
+  ChevronDown, ChevronUp,
 } from "lucide-react";
 import { usePaymentMethods } from "@/hooks/use-payment-methods";
 import { useKycStatus } from "@/hooks/use-kyc";
@@ -38,6 +39,7 @@ import { getColorDisplay } from "@/utils/colorName";
 import { useStorePaymentNumbers } from "@/hooks/use-store-payment-numbers";
 import { PaymentWaitingPanel } from "@/components/payments/PaymentWaitingPanel";
 import { useHomeDeliveryEnabled } from "@/hooks/use-home-delivery-enabled";
+import { MobileBackButton } from "@/components/navigation/MobileBackButton";
 
 type Step = "shipping" | "payment" | "confirmation";
 type PaymentMethod = "stripe" | "card" | "paypal" | "mobile_money" | "cod" | "off_platform";
@@ -264,6 +266,7 @@ export default function CheckoutPage() {
   const [maxTotalDiscountPct, setMaxTotalDiscountPct] = useState(20);
   const [maxPointsDiscountPct, setMaxPointsDiscountPct] = useState(10);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showPaymentAlternatives, setShowPaymentAlternatives] = useState(false);
 
   // Country/city eligibility state
   const [countryBlocked, setCountryBlocked] = useState(false);
@@ -668,6 +671,40 @@ export default function CheckoutPage() {
   ];
 
   const currentStepIndex = steps.findIndex(s => s.key === step);
+
+  const availablePaymentMethods = useMemo(() => {
+    const all = [
+      { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, M-Pesa, Airtel Money, AfriMoney", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
+      { id: "card" as const, label: "Carte bancaire (Visa/Mastercard)", sub: "Paiement sécurisé via Keccel", icon: <CreditCard size={20} />, configKey: "stripe" as const },
+      { id: "paypal" as const, label: "PayPal", sub: "Paiement via votre compte PayPal", icon: <CreditCard size={20} />, configKey: "paypal" as const },
+      { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
+      { id: "off_platform" as const, label: "Paiement hors plateforme", sub: "Transfert direct, puis envoyez la preuve", icon: <Banknote size={20} />, configKey: "off_platform" as const },
+    ];
+    return all
+      .filter((m) => (m.id === "card" ? paymentConfig?.stripe !== false : m.id === "paypal" ? (paymentConfig as any)?.paypal !== false : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false))
+      .filter((m) => m.id !== "cod" || (isKycVerified && vendorCodAllowed))
+      .filter((m) => m.id !== "off_platform" || vendorOffPlatformAllowed)
+      .filter((m) => m.id !== "mobile_money" || vendorMobileMoneyAllowed)
+      .filter((m) => m.id !== "card" || vendorCardAllowed);
+  }, [t, paymentConfig, isKycVerified, vendorCodAllowed, vendorOffPlatformAllowed, vendorMobileMoneyAllowed, vendorCardAllowed]);
+
+  const primaryPaymentMethod = useMemo(
+    () => availablePaymentMethods.find((m) => m.id === "mobile_money") ?? availablePaymentMethods[0] ?? null,
+    [availablePaymentMethods],
+  );
+  const alternativePaymentMethods = useMemo(
+    () => availablePaymentMethods.filter((m) => m.id !== primaryPaymentMethod?.id),
+    [availablePaymentMethods, primaryPaymentMethod],
+  );
+
+  const checkoutStepIndex = step === "shipping" ? 0 : step === "payment" ? 1 : 2;
+
+  useEffect(() => {
+    if (!primaryPaymentMethod) return;
+    if (paymentMethod !== primaryPaymentMethod.id) {
+      setShowPaymentAlternatives(true);
+    }
+  }, [paymentMethod, primaryPaymentMethod]);
 
   if (!user) {
     return (
@@ -1618,10 +1655,70 @@ export default function CheckoutPage() {
     </>
   );
 
+  const renderPaymentMethodButton = (method: (typeof availablePaymentMethods)[number]) => (
+    <button
+      key={method.id}
+      type="button"
+      disabled={method.id === "card" && paymentConfig?.stripe === false}
+      onClick={() => setPaymentMethod(method.id)}
+      className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-all text-left min-h-[44px] ${
+        method.id === "card" && paymentConfig?.stripe === false
+          ? "border-border bg-muted/40 opacity-60 cursor-not-allowed"
+          : paymentMethod === method.id
+            ? "border-primary bg-secondary"
+            : "border-border hover:border-primary/50"
+      }`}
+    >
+      <div className={`p-2 rounded-lg ${paymentMethod === method.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+        {method.icon}
+      </div>
+      <div className="flex-1">
+        <p className="font-medium text-foreground">{method.label}</p>
+        <p className="text-xs text-muted-foreground">
+          {method.id === "card" && paymentConfig?.stripe === false
+            ? (paymentConfig?.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif.")
+            : method.sub}
+        </p>
+      </div>
+      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+        paymentMethod === method.id ? "border-primary" : "border-border"
+      }`}>
+        {paymentMethod === method.id && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+      </div>
+    </button>
+  );
+
   return (
-    <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
       <Header />
-      <main className="container py-6 md:py-10">
+      <main className="container py-4 md:py-10">
+        {/* Mobile checkout progress + back */}
+        {!isDesktop && step !== "confirmation" && (
+          <div className="mb-4 space-y-3">
+            {step === "payment" ? (
+              <button
+                type="button"
+                onClick={() => goToStep("shipping")}
+                className="inline-flex items-center gap-1.5 min-h-[44px] px-1 -ml-1 text-sm font-medium text-foreground hover:text-primary touch-manipulation"
+              >
+                <ArrowLeft size={20} />
+                {t("vendor.back") || "Retour"}
+              </button>
+            ) : (
+              <MobileBackButton fallbackTo="/" className="lg:hidden" />
+            )}
+            <div className="flex items-center gap-2">
+              {["Adresse & expédition", "Paiement", "Confirmation"].map((label, i) => (
+                <div key={label} className="flex-1 flex flex-col items-center gap-1">
+                  <div className={`h-1.5 w-full rounded-full ${i <= checkoutStepIndex ? "bg-primary" : "bg-muted"}`} />
+                  <span className={`text-[10px] ${i === checkoutStepIndex ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                    {label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
           <Link to="/" className="hover:text-foreground">{t("checkout.home")}</Link>
@@ -1975,18 +2072,24 @@ export default function CheckoutPage() {
                   </div>
                   )}
 
-                  {/* Mobile/Tablet (< lg) — Totaux récap juste avant le bouton
-                      Continuer, après toutes les sélections (transitaire,
-                      paiement frais, option livraison). */}
+                  {/* Mobile/Tablet — totaux juste au-dessus du CTA sticky */}
                   {!isDesktop && (
-                    <div className="pt-3 border-t border-border space-y-3">
+                    <div className="pt-3 border-t border-border space-y-3 mb-20 lg:mb-0">
                       {renderSummaryTotals()}
                     </div>
                   )}
 
-                  <Button type="submit" className="w-full h-12 font-bold mt-2">
-                    {t("checkout.continueToPayment")} <ChevronRight size={16} />
-                  </Button>
+                  {isDesktop ? (
+                    <Button type="submit" className="w-full h-12 font-bold mt-2 min-h-[44px]">
+                      {t("checkout.continueToPayment")} <ChevronRight size={16} />
+                    </Button>
+                  ) : (
+                    <div className="fixed inset-x-0 bottom-0 z-40 bg-card/95 backdrop-blur-sm border-t border-border p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] lg:hidden">
+                      <Button type="submit" className="w-full h-12 font-bold min-h-[44px] active:scale-[0.99]">
+                        {t("checkout.continueToPayment")} <ChevronRight size={16} />
+                      </Button>
+                    </div>
+                  )}
                 </form>
               </>
             )}
@@ -2020,40 +2123,27 @@ export default function CheckoutPage() {
                 )}
 
                 <div className="space-y-3">
-                  {([
-                    { id: "mobile_money" as const, label: t("checkout.mobileMoney"), sub: "Orange Money, M-Pesa, Airtel Money, AfriMoney", icon: <Smartphone size={20} />, configKey: "mobile_money" as const },
-                    { id: "card" as const, label: "Carte bancaire (Visa/Mastercard)", sub: "Paiement sécurisé via Keccel", icon: <CreditCard size={20} />, configKey: "stripe" as const },
-                    { id: "paypal" as const, label: "PayPal", sub: "Paiement via votre compte PayPal", icon: <CreditCard size={20} />, configKey: "paypal" as const },
-                    { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
-                    { id: "off_platform" as const, label: "Paiement hors plateforme", sub: "Transfert direct, puis envoyez la preuve", icon: <Banknote size={20} />, configKey: "off_platform" as const },
-                  ]).filter(m => (m.id === "card" ? paymentConfig?.stripe !== false : m.id === "paypal" ? (paymentConfig as any)?.paypal !== false : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false)).filter(m => m.id !== "cod" || (isKycVerified && vendorCodAllowed)).filter(m => m.id !== "off_platform" || vendorOffPlatformAllowed).filter(m => m.id !== "mobile_money" || vendorMobileMoneyAllowed).filter(m => m.id !== "card" || vendorCardAllowed).map(method => (
-                    <button
-                      key={method.id}
-                      disabled={method.id === "card" && paymentConfig?.stripe === false}
-                      onClick={() => setPaymentMethod(method.id)}
-                      className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-all text-left ${
-                        method.id === "card" && paymentConfig?.stripe === false
-                          ? "border-border bg-muted/40 opacity-60 cursor-not-allowed"
-                          :
-                        paymentMethod === method.id
-                          ? "border-primary bg-secondary"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                    >
-                      <div className={`p-2 rounded-lg ${paymentMethod === method.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                        {method.icon}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground">{method.label}</p>
-                          <p className="text-xs text-muted-foreground">{method.id === "card" && paymentConfig?.stripe === false ? (paymentConfig?.stripe_notice_text || "Pour l'instant, ce moyen de paiement n'est pas actif.") : method.sub}</p>
-                      </div>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        paymentMethod === method.id ? "border-primary" : "border-border"
-                      }`}>
-                        {paymentMethod === method.id && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
-                      </div>
-                    </button>
-                  ))}
+                  {primaryPaymentMethod && renderPaymentMethodButton(primaryPaymentMethod)}
+
+                  {alternativePaymentMethods.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowPaymentAlternatives((v) => !v)}
+                        className="flex items-center gap-1 text-[11px] text-primary hover:underline min-h-[44px]"
+                      >
+                        {showPaymentAlternatives ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                        {showPaymentAlternatives
+                          ? "Masquer les alternatives"
+                          : `Voir ${alternativePaymentMethods.length} alternative${alternativePaymentMethods.length > 1 ? "s" : ""}`}
+                      </button>
+                      {showPaymentAlternatives && (
+                        <div className="space-y-3">
+                          {alternativePaymentMethods.map((method) => renderPaymentMethodButton(method))}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 {(paymentMethod === "card" || paymentMethod === "stripe") && (
@@ -2262,9 +2352,14 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                {/* Mobile: un seul récap totaux (déjà en haut) — pas de double en bas */}
+                {!isDesktop && (
+                  <div className="hidden" aria-hidden />
+                )}
+
                 {!paymentPending && (
-                  <div className="space-y-3">
-                    <label className="flex items-start gap-2 cursor-pointer">
+                  <div className={`space-y-3 ${!isDesktop ? "mb-24" : ""}`}>
+                    <label className="flex items-start gap-2 cursor-pointer min-h-[44px]">
                       <input
                         type="checkbox"
                         checked={termsAccepted}
@@ -2282,27 +2377,36 @@ export default function CheckoutPage() {
                         </Link>.
                       </span>
                     </label>
-                    <Button onClick={handlePayment} disabled={processing || !termsAccepted} className="w-full h-12 font-bold">
-                      {processing ? (
-                        <><Loader2 size={16} className="animate-spin mr-2" /> {t("checkout.processing")}</>
-                      ) : (
-                        `${t("checkout.placeOrder")} — ${formatPrice(total)}`
-                      )}
-                    </Button>
-                    {!termsAccepted && (
-                      <p className="text-[10px] text-muted-foreground text-center">
-                        Veuillez accepter les conditions pour continuer.
-                      </p>
+                    {isDesktop ? (
+                      <>
+                        <Button onClick={handlePayment} disabled={processing || !termsAccepted} className="w-full h-12 font-bold min-h-[44px]">
+                          {processing ? (
+                            <><Loader2 size={16} className="animate-spin mr-2" /> {t("checkout.processing")}</>
+                          ) : (
+                            `${t("checkout.placeOrder")} — ${formatPrice(total)}`
+                          )}
+                        </Button>
+                        {!termsAccepted && (
+                          <p className="text-[10px] text-muted-foreground text-center">
+                            Veuillez accepter les conditions pour continuer.
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <div className="fixed inset-x-0 bottom-0 z-40 bg-card/95 backdrop-blur-sm border-t border-border p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] space-y-2">
+                        <div className="flex justify-between text-sm px-1">
+                          <span className="text-muted-foreground">Total</span>
+                          <span className="font-bold text-foreground">{formatPrice(total)}</span>
+                        </div>
+                        <Button onClick={handlePayment} disabled={processing || !termsAccepted} className="w-full h-12 font-bold min-h-[44px] active:scale-[0.99]">
+                          {processing ? (
+                            <><Loader2 size={16} className="animate-spin mr-2" /> {t("checkout.processing")}</>
+                          ) : (
+                            `${t("checkout.placeOrder")} — ${formatPrice(total)}`
+                          )}
+                        </Button>
+                      </div>
                     )}
-                  </div>
-                )}
-
-                {/* Mobile/Tablet (< lg) — Récap commande complet déplacé en bas
-                    de l'étape paiement (items, promo, calculateur, points, totaux). */}
-                {!isDesktop && (
-                  <div className="space-y-4 pt-4 border-t border-border">
-                    {renderSummaryTop()}
-                    {renderSummaryTotals()}
                   </div>
                 )}
               </div>
@@ -2359,7 +2463,7 @@ export default function CheckoutPage() {
           )}
         </div>
       </main>
-      <Footer />
+      {isDesktop && <Footer />}
     </div>
   );
 }

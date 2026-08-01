@@ -23,6 +23,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useHeaderTheme } from "@/hooks/use-header-theme";
 import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 import { slugify } from "@/utils/slugify";
+import { isPWAStandalone } from "@/lib/device";
 
 // Mini error boundary to prevent Radix crashes from taking down the whole page
 class SafeRadix extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
@@ -68,6 +69,7 @@ export function Header() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [expandedMobileCat, setExpandedMobileCat] = useState<string | null>(null);
   const [slideIdx, setSlideIdx] = useState(0);
+  const [standalonePwa] = useState(() => isPWAStandalone());
   const megaTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const userMenuRef = useRef<HTMLDivElement>(null);
   const { user, signOut } = useAuth();
@@ -266,11 +268,21 @@ export function Header() {
               </Link>
             )}
 
-            <Link to="/tracking" className="p-2 text-foreground hover:text-primary transition-colors" aria-label={t("header.tracking") || "Suivi colis"} title={t("header.tracking") || "Suivi colis"}>
+            <Link
+              to="/tracking"
+              className={`p-2 text-foreground hover:text-primary transition-colors ${standalonePwa ? "hidden md:flex" : ""}`}
+              aria-label={t("header.tracking") || "Suivi colis"}
+              title={t("header.tracking") || "Suivi colis"}
+            >
               <PackageSearch size={20} />
             </Link>
 
-            <Link to="/help-center" className="flex p-2 text-foreground hover:text-primary transition-colors relative" aria-label={t("header.support")} title={t("header.support")}>
+            <Link
+              to="/help-center"
+              className={`flex p-2 text-foreground hover:text-primary transition-colors relative ${standalonePwa ? "hidden md:flex" : ""}`}
+              aria-label={t("header.support")}
+              title={t("header.support")}
+            >
               <Headphones size={20} />
               {unreadSupportCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
