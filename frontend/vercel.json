@@ -34,12 +34,8 @@
   ],
   "rewrites": [
     {
-      "source": "/sitemap.xml",
-      "destination": "/api/sitemap"
-    },
-    {
       "source": "/sitemap-dynamic.xml",
-      "destination": "/api/sitemap"
+      "destination": "/sitemap.xml"
     },
     {
       "source": "/product/:slug",
