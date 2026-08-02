@@ -21,7 +21,7 @@ const RecommendationsSection = lazyRetry(() => import("@/components/Recommendati
 const Footer = lazyRetry(() => import("@/components/Footer").then(m => ({ default: m.Footer })));
 const FloatingActions = lazyRetry(() => import("@/components/FloatingActions").then(m => ({ default: m.FloatingActions })));
 
-const SITE_URL = import.meta.env.VITE_SITE_URL || "https://www.zandofy.com";
+const SITE_URL = import.meta.env.VITE_SITE_URL || "https://zandofy.com";
 
 const Index = () => {
   const queryClient = useQueryClient();

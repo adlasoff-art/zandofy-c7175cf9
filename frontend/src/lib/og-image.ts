@@ -1,4 +1,4 @@
-const SITE_URL = (import.meta.env.VITE_SITE_URL || "https://www.zandofy.com").replace(/\/$/, "");
+const SITE_URL = (import.meta.env.VITE_SITE_URL || "https://zandofy.com").replace(/\/$/, "");
 
 /** Absolute HTTPS URL for Open Graph (crawlers and client meta tags). */
 export function toAbsoluteOgImage(url: string | null | undefined): string {

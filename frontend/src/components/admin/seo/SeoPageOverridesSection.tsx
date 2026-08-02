@@ -303,7 +303,7 @@ export function SeoPageOverridesSection() {
         <SeoSerpPreview
           title={current.title || ""}
           description={current.description || ""}
-          url={`https://www.zandofy.com${current.path}`}
+          url={`https://zandofy.com${current.path}`}
         />
 
         <button

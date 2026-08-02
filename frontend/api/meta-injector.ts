@@ -11,7 +11,7 @@ import { isDynamicSeoPath, resolveRequestPathname } from "./meta-injector-path";
 
 export const config = { runtime: "edge" };
 
-const DEV_SITE_URL = "https://www.zandofy.com";
+const DEV_SITE_URL = "https://zandofy.com";
 const DEV_SUPABASE_URL = "https://vpttoqojmiqxgudknyxf.supabase.co";
 const DEV_SUPABASE_ANON =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwdHRvcW9qbWlxeGd1ZGtueXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxNjE0MzcsImV4cCI6MjA2NTczNzQzN30.ZqJUUN6DqXrXJ7CcjmmMRrcVtDkQ4zYM4nhP8mC4_zE";
