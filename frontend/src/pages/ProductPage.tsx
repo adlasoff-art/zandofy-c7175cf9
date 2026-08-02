@@ -297,7 +297,11 @@ export default function ProductPage() {
 
   // integerPart/decimalPart now computed inline from currentUnitPrice
 
-  const seoDescription = product.shortDescription || product.description?.slice(0, 155) || `${product.nameFr} — ${product.categoryFr} sur Zandofy`;
+  const seoDescription =
+    product.metaDescription ||
+    product.shortDescription ||
+    product.description?.slice(0, 155) ||
+    `${product.nameFr} — ${product.categoryFr} sur Zandofy`;
   const productOgImage = resolveProductOgImage(gallery[0]?.url, product.image);
   const productJsonLd = buildProductJsonLd({
     name: product.nameFr,
@@ -320,7 +324,7 @@ export default function ProductPage() {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title={`${product.nameFr} — ${product.categoryFr}`}
+        title={product.metaTitle || `${product.nameFr} — ${product.categoryFr}`}
         description={seoDescription}
         canonical={`/product/${product.slug || product.id}`}
         ogImage={productOgImage}

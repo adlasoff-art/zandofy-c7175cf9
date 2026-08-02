@@ -2,31 +2,22 @@
  * Vercel Edge Function — SEO meta injector for crawlers.
  *
  * Triggered ONLY for known bots (User-Agent allowlist) hitting:
- *   /product/:slug, /store/:slug, /category/:slug, /blog/:slug
- *
- * Strategy:
- *   1. Detect bot via User-Agent.
- *   2. Fetch the static index.html from the same deployment.
- *   3. Fetch metadata from Supabase REST (anon key, public data only).
- *   4. Inject <title>, meta description, canonical, OG/Twitter, JSON-LD into <head>.
- *   5. Stream the rewritten HTML to the bot.
+ *   /, /product|store|category|blog/:slug, and hub/global pages
  *
  * Humans are never routed here (Vercel rewrite uses `has` UA condition).
- * On any error we fall back to the original index.html so users always get a page.
  */
 
 import { isDynamicSeoPath, resolveRequestPathname } from "./meta-injector-path";
 
 export const config = { runtime: "edge" };
 
-/** Dev-only fallbacks when Vercel env vars are unset locally. */
-const DEV_SITE_URL = "https://zandofy.com";
+const DEV_SITE_URL = "https://www.zandofy.com";
 const DEV_SUPABASE_URL = "https://vpttoqojmiqxgudknyxf.supabase.co";
 const DEV_SUPABASE_ANON =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwdHRvcW9qbWlxeGd1ZGtueXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxNjE0MzcsImV4cCI6MjA2NTczNzQzN30.ZqJUUN6DqXrXJ7CcjmmMRrcVtDkQ4zYM4nhP8mC4_zE";
 
 function getSiteUrl(): string {
-  return (process.env.SITE_URL || DEV_SITE_URL).replace(/\/$/, "");
+  return (process.env.SITE_URL || process.env.VITE_SITE_URL || DEV_SITE_URL).replace(/\/$/, "");
 }
 
 function getSupabaseUrl(): string {
@@ -46,7 +37,6 @@ function getFacebookAppId(): string | undefined {
   return id || undefined;
 }
 
-/** Crawlers require absolute HTTPS URLs for og:image (relative paths show site logo). */
 function toAbsoluteOgImage(url: string | null | undefined): string {
   const site = getSiteUrl();
   const raw = (url || "").trim();
@@ -75,7 +65,6 @@ function escapeHtml(s: string): string {
 }
 
 function escapeJsonLd(s: string): string {
-  // JSON-LD strings still need backslashes/quotes escaped via JSON.stringify when building objects.
   return s.replace(/</g, "\\u003c");
 }
 
@@ -85,6 +74,20 @@ function truncate(s: string, max = 160): string {
   return clean.length <= max ? clean : clean.slice(0, max - 1).trimEnd() + "…";
 }
 
+function slugify(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function applyTemplate(tpl: string, vars: Record<string, string>): string {
+  return (tpl || "").replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? "");
+}
+
 async function sbFetch(path: string): Promise<any[]> {
   const res = await fetch(`${getSupabaseUrl()}/rest/v1/${path}`, {
     headers: {
@@ -92,7 +95,6 @@ async function sbFetch(path: string): Promise<any[]> {
       Authorization: `Bearer ${getSupabaseAnon()}`,
       Accept: "application/json",
     },
-    // Cache aggressively at the edge — content rarely changes per request.
     cf: { cacheTtl: 300 } as any,
   });
   if (!res.ok) return [];
@@ -106,13 +108,14 @@ type MetaPayload = {
   image?: string;
   imageAlt?: string;
   ogType?: "website" | "article" | "product";
-  jsonLd?: Record<string, unknown>;
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
   keywords?: string;
   robots?: string;
   ogTitle?: string;
 };
 
-// ─── Global SEO config (admin-controlled via platform_settings.seo_config) ───
+type SitelinkNavItem = { name: string; url: string };
+
 type SeoConfig = {
   site_title?: string;
   site_description?: string;
@@ -120,7 +123,26 @@ type SeoConfig = {
   default_og_image?: string;
   brand_name?: string;
   tagline?: string;
+  social_urls?: { facebook?: string; instagram?: string; twitter?: string };
+  category_title_template?: string;
+  category_description_template?: string;
+  product_title_template?: string;
+  product_description_template?: string;
+  store_title_template?: string;
+  store_description_template?: string;
+  sitelinks_nav?: SitelinkNavItem[];
 };
+
+const DEFAULT_SITELINKS: SitelinkNavItem[] = [
+  { name: "Boutiques", url: "/stores" },
+  { name: "Populaires", url: "/popular" },
+  { name: "Tendances", url: "/trends" },
+  { name: "Blog", url: "/blog" },
+  { name: "Centre d'aide", url: "/help-center" },
+  { name: "Devenir vendeur", url: "/become-vendor" },
+  { name: "Programme d'affiliation", url: "/affiliate-program" },
+  { name: "À propos", url: "/about" },
+];
 
 let _seoCache: { value: SeoConfig | null; expiresAt: number } = { value: null, expiresAt: 0 };
 
@@ -130,27 +152,39 @@ async function getSeoConfig(forcePurge = false): Promise<SeoConfig> {
     return _seoCache.value;
   }
   try {
-    const rows = await sbFetch(
-      `platform_settings?key=eq.seo_config&select=value&limit=1`,
-    );
+    const rows = await sbFetch(`platform_settings?key=eq.seo_config&select=value&limit=1`);
     const value = (rows[0]?.value as SeoConfig) || {};
-    _seoCache = { value, expiresAt: now + 60_000 }; // 60s in-memory edge cache
+    _seoCache = { value, expiresAt: now + 60_000 };
     return value;
   } catch {
     return _seoCache.value || {};
   }
 }
 
-// Routes treated as "global" pages — title/description/og come from seo_config.
 const GLOBAL_ROUTES = new Set([
-  "/", "/faq", "/stores", "/blog", "/about", "/contact",
-  "/careers", "/help", "/pricing", "/privacy", "/terms",
-  "/popular", "/trends", "/search",
-  // Private pages — included so the override (noindex,nofollow) is honored
-  "/auth", "/reset-password", "/onboarding", "/impersonate",
+  "/",
+  "/faq",
+  "/stores",
+  "/blog",
+  "/about",
+  "/careers",
+  "/help-center",
+  "/pricing",
+  "/privacy",
+  "/terms",
+  "/popular",
+  "/trends",
+  "/search",
+  "/become-vendor",
+  "/affiliate-program",
+  "/loyalty-program",
+  "/social-responsibility",
+  "/auth",
+  "/reset-password",
+  "/onboarding",
+  "/impersonate",
 ]);
 
-// ─── Per-page SEO overrides (admin-managed via `seo_page_overrides`) ───
 type SeoOverride = {
   path: string;
   title: string | null;
@@ -184,38 +218,113 @@ async function getOverride(pathname: string, forcePurge = false): Promise<SeoOve
   return _overridesCache.value?.[pathname] || null;
 }
 
+function mergeJsonLd(
+  base: Record<string, unknown> | Record<string, unknown>[] | undefined,
+  extra: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | Record<string, unknown>[] | undefined {
+  if (!extra || Object.keys(extra).length === 0) return base;
+  if (!base) return extra;
+  if (Array.isArray(base)) return [...base, extra];
+  if (base["@graph"] && Array.isArray(base["@graph"])) {
+    return { ...base, "@graph": [...(base["@graph"] as unknown[]), extra] };
+  }
+  return {
+    "@context": "https://schema.org",
+    "@graph": [base, extra],
+  };
+}
+
+function buildHomeJsonLd(cfg: SeoConfig): Record<string, unknown> {
+  const site = getSiteUrl();
+  const brand = cfg.brand_name || "Zandofy";
+  const sameAs = [
+    cfg.social_urls?.facebook,
+    cfg.social_urls?.instagram,
+    cfg.social_urls?.twitter,
+  ].filter(Boolean) as string[];
+  const nav = (cfg.sitelinks_nav?.length ? cfg.sitelinks_nav : DEFAULT_SITELINKS).map((item, i) => ({
+    "@type": "SiteNavigationElement",
+    position: i + 1,
+    name: item.name,
+    url: item.url.startsWith("http") ? item.url : `${site}${item.url.startsWith("/") ? item.url : `/${item.url}`}`,
+  }));
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${site}/#organization`,
+        name: brand,
+        url: `${site}/`,
+        logo: `${site}/icons/icon-512.png`,
+        image: toAbsoluteOgImage(cfg.default_og_image),
+        description:
+          cfg.tagline ||
+          cfg.site_description ||
+          "Marketplace sino-africaine d'achat et logistique — prix usine, livraison en Afrique.",
+        ...(sameAs.length ? { sameAs } : {}),
+        contactPoint: {
+          "@type": "ContactPoint",
+          contactType: "customer service",
+          availableLanguage: ["French", "English"],
+        },
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${site}/#website`,
+        url: `${site}/`,
+        name: brand,
+        publisher: { "@id": `${site}/#organization` },
+        potentialAction: {
+          "@type": "SearchAction",
+          target: `${site}/search?q={search_term_string}`,
+          "query-input": "required name=search_term_string",
+        },
+      },
+      {
+        "@type": "ItemList",
+        "@id": `${site}/#mainnav`,
+        name: `Navigation principale ${brand}`,
+        itemListElement: nav,
+      },
+    ],
+  };
+}
+
 async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
   const cfg = await getSeoConfig();
   const brand = cfg.brand_name || "Zandofy";
-  const baseTitle = cfg.site_title || `${brand} — Marketplace`;
+  const baseTitle = cfg.site_title || `${brand} — Achetez en Chine, livré en Afrique | Prix usine`;
   const description = truncate(
     cfg.site_description ||
       cfg.tagline ||
-      `${brand} : marketplace mode et import. Livraison rapide en Afrique.`,
+      `${brand} : achetez aux usines chinoises et internationales. Logistique et livraison en Afrique.`,
   );
   const image = toAbsoluteOgImage(cfg.default_og_image);
   const canonical = `${getSiteUrl()}${pathname === "/" ? "/" : pathname}`;
 
-  // For sub-pages add a humanised suffix; homepage keeps the bare site title.
   const pageLabel: Record<string, string> = {
     "/faq": "FAQ",
     "/stores": "Boutiques",
     "/blog": "Blog",
     "/about": "À propos",
-    "/contact": "Contact",
     "/careers": "Carrières",
-    "/help": "Centre d'aide",
+    "/help-center": "Centre d'aide",
     "/pricing": "Tarifs",
     "/privacy": "Confidentialité",
     "/terms": "Conditions",
     "/popular": "Populaires",
     "/trends": "Tendances",
     "/search": "Recherche",
+    "/become-vendor": "Devenir vendeur",
+    "/affiliate-program": "Affiliation",
+    "/loyalty-program": "Fidélité",
+    "/social-responsibility": "Responsabilité sociale",
   };
-  const title =
-    pathname === "/" ? baseTitle : `${pageLabel[pathname] || ""} | ${brand}`.trim();
+  const title = pathname === "/" ? baseTitle : `${pageLabel[pathname] || ""} | ${brand}`.replace(/^\s*\|\s*/, "").trim();
 
-  return {
+  const payload: MetaPayload = {
     title,
     description,
     canonical,
@@ -223,87 +332,147 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
     ogType: "website",
     keywords: Array.isArray(cfg.default_keywords) ? cfg.default_keywords.join(", ") : undefined,
   };
+
+  if (pathname === "/") {
+    payload.jsonLd = buildHomeJsonLd(cfg);
+  } else if (pathname === "/faq") {
+    payload.jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      name: title,
+      url: canonical,
+      description,
+    };
+  }
+
+  return payload;
 }
 
 async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
-  // products.slug column may be null → we accept slug OR id
+  const cfg = await getSeoConfig();
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
   const filter = isUuid ? `id=eq.${slug}` : `slug=eq.${encodeURIComponent(slug)}`;
   const rows = await sbFetch(
-    `products?${filter}&publish_status=eq.published&select=id,name,slug,description,price,rating,review_count,store_id,product_images(image_url,position)&limit=1`,
+    `products?${filter}&publish_status=eq.published&select=id,name,name_fr,slug,description,short_description,price,currency,rating,review_count,stock_quantity,meta_title,meta_description,seo_keywords,store_id,categories(name,name_fr),stores!products_store_id_fkey(name),product_images(image_url,position)&limit=1`,
   );
   const p = rows[0];
   if (!p) return null;
 
+  const displayName = p.name_fr || p.name;
+  const storeName = p.stores?.name || cfg.brand_name || "Zandofy";
+  const categoryName = p.categories?.name_fr || p.categories?.name || "";
   const canonical = `${getSiteUrl()}/product/${p.slug || p.id}`;
-  // Images live in `product_images` (relational), sorted by `position`.
   const sortedImages = Array.isArray(p.product_images)
-    ? [...p.product_images].sort(
-        (a: any, b: any) => (a?.position ?? 0) - (b?.position ?? 0),
-      )
+    ? [...p.product_images].sort((a: any, b: any) => (a?.position ?? 0) - (b?.position ?? 0))
     : [];
-  const featuredUrl = sortedImages.find((img: { image_url?: string }) =>
-    Boolean(img?.image_url?.trim()),
-  )?.image_url;
+  const featuredUrl = sortedImages.find((img: { image_url?: string }) => Boolean(img?.image_url?.trim()))
+    ?.image_url;
   const image = toAbsoluteOgImage(featuredUrl);
-  const title = `${p.name} | Zandofy`;
+
+  const titleTpl = cfg.product_title_template || "{name} | Zandofy";
+  const descTpl =
+    cfg.product_description_template ||
+    "Achetez {name} sur Zandofy — import Chine & livraison Afrique.";
+  const title = truncate(
+    p.meta_title || applyTemplate(titleTpl, { name: displayName, brand: storeName, category: categoryName }),
+    70,
+  );
   const description = truncate(
-    p.description ||
-      `Achetez ${p.name} sur Zandofy — marketplace mode sino-africaine. Livraison rapide en Afrique.`,
+    p.meta_description ||
+      p.short_description ||
+      p.description ||
+      applyTemplate(descTpl, { name: displayName, brand: storeName, category: categoryName }),
   );
 
-  const jsonLd: Record<string, unknown> = {
+  const inStock =
+    p.stock_quantity == null || Number(p.stock_quantity) > 0
+      ? "https://schema.org/InStock"
+      : "https://schema.org/OutOfStock";
+
+  const productLd: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Product",
-    name: p.name,
+    name: displayName,
     description,
     image,
     url: canonical,
     sku: p.id,
-    brand: { "@type": "Brand", name: "Zandofy" },
+    brand: { "@type": "Brand", name: storeName },
     offers: {
       "@type": "Offer",
       url: canonical,
-      priceCurrency: "USD",
+      priceCurrency: p.currency || "USD",
       price: p.price,
-      availability: "https://schema.org/InStock",
+      availability: inStock,
     },
   };
   if (p.rating && p.review_count) {
-    jsonLd.aggregateRating = {
+    productLd.aggregateRating = {
       "@type": "AggregateRating",
       ratingValue: p.rating,
       reviewCount: p.review_count,
     };
   }
 
+  const breadcrumb = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Accueil", item: `${getSiteUrl()}/` },
+      ...(categoryName
+        ? [
+            {
+              "@type": "ListItem",
+              position: 2,
+              name: categoryName,
+              item: `${getSiteUrl()}/category/${slugify(categoryName)}`,
+            },
+          ]
+        : []),
+      {
+        "@type": "ListItem",
+        position: categoryName ? 3 : 2,
+        name: displayName,
+        item: canonical,
+      },
+    ],
+  };
+
   return {
     title,
     description,
     canonical,
     image,
-    imageAlt: p.name,
+    imageAlt: displayName,
     ogType: "product",
-    jsonLd,
+    keywords: Array.isArray(p.seo_keywords) ? p.seo_keywords.join(", ") : undefined,
+    jsonLd: [productLd, breadcrumb],
   };
 }
 
 async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
+  const cfg = await getSeoConfig();
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
   const filter = isUuid ? `id=eq.${slug}` : `slug=eq.${encodeURIComponent(slug)}`;
   const rows = await sbFetch(
-    `stores?${filter}&select=id,name,slug,description,logo_url,banner_url,city,country,rating,followers_count&limit=1`,
+    `stores?${filter}&select=id,name,slug,description,logo_url,banner_url,city,country,rating,review_count_override,meta_title,meta_description,seo_keywords&limit=1`,
   );
   const s = rows[0];
   if (!s) return null;
 
   const canonical = `${getSiteUrl()}/store/${s.slug || s.id}`;
   const image = toAbsoluteOgImage(s.banner_url || s.logo_url);
-  const title = `${s.name} — Boutique sur Zandofy`;
+  const titleTpl = cfg.store_title_template || "{name} — Boutique | Zandofy";
+  const descTpl =
+    cfg.store_description_template ||
+    "Découvrez la boutique {name} sur Zandofy. Produits prix usine, livraison en Afrique.";
   const location = [s.city, s.country].filter(Boolean).join(", ");
+  const title = truncate(s.meta_title || applyTemplate(titleTpl, { name: s.name, brand: "Zandofy" }), 70);
   const description = truncate(
-    s.description ||
-      `Découvrez la boutique ${s.name}${location ? ` (${location})` : ""} sur Zandofy. Mode et accessoires de qualité, livraison rapide.`,
+    s.meta_description ||
+      s.description ||
+      applyTemplate(descTpl, { name: s.name, brand: "Zandofy" }) +
+        (location ? ` (${location})` : ""),
   );
 
   const jsonLd: Record<string, unknown> = {
@@ -323,32 +492,14 @@ async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
         }
       : {}),
   };
-  if (s.rating) {
+  const reviewCount = Number(s.review_count_override) || 0;
+  if (s.rating && reviewCount > 0) {
     jsonLd.aggregateRating = {
       "@type": "AggregateRating",
       ratingValue: s.rating,
-      reviewCount: s.followers_count || 1,
+      reviewCount,
     };
   }
-
-  return { title, description, canonical, image, ogType: "website", jsonLd };
-}
-
-async function buildCategoryMeta(slug: string): Promise<MetaPayload | null> {
-  // Categories have no slug column → match by slugified name (PostgREST ilike).
-  // Replace dashes with spaces and try ilike on name and name_fr.
-  const guess = slug.replace(/-/g, " ");
-  const rows = await sbFetch(
-    `categories?or=(name.ilike.${encodeURIComponent(guess)},name_fr.ilike.${encodeURIComponent(guess)})&select=id,name,name_fr,image_url&limit=1`,
-  );
-  const c = rows[0];
-  const displayName = c?.name_fr || c?.name || guess;
-  const canonical = `${getSiteUrl()}/category/${slug}`;
-  const image = toAbsoluteOgImage(c?.image_url);
-  const title = `${displayName} — Catalogue Zandofy`;
-  const description = truncate(
-    `Tous les produits ${displayName} sur Zandofy. Mode élégante & accessible, livraison rapide en Afrique.`,
-  );
 
   return {
     title,
@@ -356,14 +507,92 @@ async function buildCategoryMeta(slug: string): Promise<MetaPayload | null> {
     canonical,
     image,
     ogType: "website",
-    jsonLd: {
-      "@context": "https://schema.org",
-      "@type": "CollectionPage",
-      name: displayName,
-      url: canonical,
-      image,
-      description,
-    },
+    keywords: Array.isArray(s.seo_keywords) ? s.seo_keywords.join(", ") : undefined,
+    jsonLd,
+  };
+}
+
+async function buildCategoryMeta(slug: string): Promise<MetaPayload | null> {
+  const cfg = await getSeoConfig();
+  const rows = await sbFetch(
+    `categories?select=id,name,name_fr,image_url,meta_title,meta_description,seo_keywords,og_image_url,parent_id&limit=500`,
+  );
+  const c =
+    rows.find(
+      (r) => slugify(r.name_fr || "") === slug || slugify(r.name || "") === slug,
+    ) || null;
+
+  const displayName = c?.name_fr || c?.name || slug.replace(/-/g, " ");
+  const canonical = `${getSiteUrl()}/category/${slug}`;
+  const image = toAbsoluteOgImage(c?.og_image_url || c?.image_url);
+  const titleTpl = cfg.category_title_template || "{name} | Zandofy";
+  const descTpl =
+    cfg.category_description_template ||
+    "Achetez {name} sur Zandofy — import Chine & livraison Afrique. Prix usine, logistique inclusive.";
+
+  const title = truncate(
+    c?.meta_title || applyTemplate(titleTpl, { name: displayName, brand: cfg.brand_name || "Zandofy" }),
+    70,
+  );
+  const description = truncate(
+    c?.meta_description ||
+      applyTemplate(descTpl, { name: displayName, brand: cfg.brand_name || "Zandofy" }),
+  );
+
+  const products = c?.id
+    ? await sbFetch(
+        `products?category_id=eq.${c.id}&publish_status=eq.published&select=id,slug,name,name_fr,price,currency,product_images(image_url,position)&order=updated_at.desc&limit=12`,
+      )
+    : [];
+
+  const itemListElement = products.map((p: any, i: number) => {
+    const imgs = Array.isArray(p.product_images)
+      ? [...p.product_images].sort((a: any, b: any) => (a?.position ?? 0) - (b?.position ?? 0))
+      : [];
+    return {
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${getSiteUrl()}/product/${p.slug || p.id}`,
+      name: p.name_fr || p.name,
+      image: toAbsoluteOgImage(imgs[0]?.image_url),
+    };
+  });
+
+  const collectionLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: displayName,
+    url: canonical,
+    image,
+    description,
+  };
+  const breadcrumb = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Accueil", item: `${getSiteUrl()}/` },
+      { "@type": "ListItem", position: 2, name: displayName, item: canonical },
+    ],
+  };
+  const itemList =
+    itemListElement.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          name: displayName,
+          numberOfItems: itemListElement.length,
+          itemListElement,
+        }
+      : null;
+
+  return {
+    title,
+    description,
+    canonical,
+    image,
+    ogType: "website",
+    keywords: Array.isArray(c?.seo_keywords) ? c.seo_keywords.join(", ") : undefined,
+    jsonLd: itemList ? [collectionLd, breadcrumb, itemList] : [collectionLd, breadcrumb],
   };
 }
 
@@ -404,23 +633,50 @@ async function buildBlogMeta(slug: string): Promise<MetaPayload | null> {
   };
 }
 
+function applyOverride(merged: MetaPayload, override: SeoOverride | null): MetaPayload {
+  if (!override) return merged;
+  if (override.title) merged.title = override.title;
+  if (override.description) merged.description = truncate(override.description);
+  if (override.og_image) merged.image = toAbsoluteOgImage(override.og_image);
+  if (override.keywords && override.keywords.length) merged.keywords = override.keywords.join(", ");
+  if (override.robots) merged.robots = override.robots;
+  if (override.og_title) merged.ogTitle = override.og_title;
+  if (override.jsonld_extra) {
+    merged.jsonLd = mergeJsonLd(
+      Array.isArray(merged.jsonLd) ? merged.jsonLd : merged.jsonLd ? [merged.jsonLd] : undefined,
+      override.jsonld_extra,
+    ) as MetaPayload["jsonLd"];
+  }
+  return merged;
+}
+
 async function buildMetaForPath(pathname: string): Promise<MetaPayload | null> {
-  // Per-page override takes priority for global/static routes.
   const override = await getOverride(pathname);
 
   const productMatch = pathname.match(/^\/product\/([^/?#]+)/i);
-  if (productMatch) return buildProductMeta(decodeURIComponent(productMatch[1]));
+  if (productMatch) {
+    const meta = await buildProductMeta(decodeURIComponent(productMatch[1]));
+    return meta ? applyOverride(meta, override) : null;
+  }
 
   const storeMatch = pathname.match(/^\/store\/([^/?#]+)/i);
-  if (storeMatch) return buildStoreMeta(decodeURIComponent(storeMatch[1]));
+  if (storeMatch) {
+    const meta = await buildStoreMeta(decodeURIComponent(storeMatch[1]));
+    return meta ? applyOverride(meta, override) : null;
+  }
 
   const categoryMatch = pathname.match(/^\/category\/([^/?#]+)/i);
-  if (categoryMatch) return buildCategoryMeta(decodeURIComponent(categoryMatch[1]));
+  if (categoryMatch) {
+    const meta = await buildCategoryMeta(decodeURIComponent(categoryMatch[1]));
+    return meta ? applyOverride(meta, override) : null;
+  }
 
   const blogMatch = pathname.match(/^\/blog\/([^/?#]+)/i);
-  if (blogMatch) return buildBlogMeta(decodeURIComponent(blogMatch[1]));
+  if (blogMatch) {
+    const meta = await buildBlogMeta(decodeURIComponent(blogMatch[1]));
+    return meta ? applyOverride(meta, override) : null;
+  }
 
-  // Global / static pages — admin-controlled SEO config
   if (GLOBAL_ROUTES.has(pathname)) {
     const base = await buildGlobalMeta(pathname);
     if (!base && !override) return null;
@@ -430,17 +686,7 @@ async function buildMetaForPath(pathname: string): Promise<MetaPayload | null> {
       canonical: `${getSiteUrl()}${pathname}`,
       ogType: "website",
     };
-    if (override) {
-      if (override.title) merged.title = override.title;
-      if (override.description) merged.description = truncate(override.description);
-      if (override.og_image) merged.image = toAbsoluteOgImage(override.og_image);
-      if (override.keywords && override.keywords.length)
-        merged.keywords = override.keywords.join(", ");
-      if (override.robots) merged.robots = override.robots;
-      // og_title injected via separate meta tag below
-      if (override.og_title) merged.ogTitle = override.og_title;
-    }
-    return merged;
+    return applyOverride(merged, override);
   }
 
   return null;
@@ -476,6 +722,8 @@ function buildHeadInjection(meta: MetaPayload): string {
 <meta name="description" content="${d}" />
 <link rel="canonical" href="${c}" />
 <meta property="og:type" content="${ogType}" />
+<meta property="og:site_name" content="Zandofy" />
+<meta property="og:locale" content="fr_FR" />
 <meta property="og:url" content="${c}" />
 <meta property="og:title" content="${ogT}" />
 <meta property="og:description" content="${d}" />
@@ -485,6 +733,7 @@ ${img.startsWith("https://") ? `<meta property="og:image:secure_url" content="${
 <meta property="og:image:height" content="630" />
 <meta property="og:image:alt" content="${imgAlt}" />
 <meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:site" content="@Zandofy" />
 <meta name="twitter:title" content="${ogT}" />
 <meta name="twitter:description" content="${d}" />
 <meta name="twitter:image" content="${img}" />`;
@@ -496,7 +745,10 @@ ${img.startsWith("https://") ? `<meta property="og:image:secure_url" content="${
   }
 
   if (meta.jsonLd) {
-    html += `\n<script type="application/ld+json">${escapeJsonLd(JSON.stringify(meta.jsonLd))}</script>`;
+    const nodes = Array.isArray(meta.jsonLd) ? meta.jsonLd : [meta.jsonLd];
+    for (const node of nodes) {
+      html += `\n<script type="application/ld+json">${escapeJsonLd(JSON.stringify(node))}</script>`;
+    }
   }
   html += `\n<!-- END injected SEO -->\n`;
   return html;
@@ -513,25 +765,22 @@ function injectMetaIntoHtml(html: string, meta: MetaPayload): string {
   return before + cleanedHead + buildHeadInjection(meta) + after;
 }
 
-/**
- * Strip the static defaults (<title>, og:*, twitter:*, canonical, description)
- * already in index.html so search engines don't see duplicate/conflicting tags.
- */
 function stripStaticSeo(head: string): string {
   return head
     .replace(/<title>[\s\S]*?<\/title>/i, "")
     .replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, "")
     .replace(/<meta[^>]+name=["']description["'][^>]*>/gi, "")
     .replace(/<meta[^>]+name=["']robots["'][^>]*>/gi, "")
+    .replace(/<meta[^>]+name=["']keywords["'][^>]*>/gi, "")
     .replace(/<meta[^>]+property=["']og:[^"']+["'][^>]*>/gi, "")
-    .replace(/<meta[^>]+name=["']twitter:[^"']+["'][^>]*>/gi, "");
+    .replace(/<meta[^>]+name=["']twitter:[^"']+["'][^>]*>/gi, "")
+    .replace(/<script[^>]+type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi, "");
 }
 
 export default async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const ua = req.headers.get("user-agent");
 
-  // Cache purge endpoint (called by admin after saving SEO config).
   if (req.headers.get("x-purge-cache") === "1") {
     _seoCache = { value: null, expiresAt: 0 };
     _overridesCache = { value: null, expiresAt: 0 };
@@ -541,12 +790,10 @@ export default async function handler(req: Request): Promise<Response> {
     });
   }
 
-  // Humans should never reach this fn (rewrite is bot-only), but be defensive.
   if (!isBot(ua)) {
     return Response.redirect(`${url.origin}${url.pathname}${url.search}`, 302);
   }
 
-  // Fetch the original index.html from the same deployment.
   const indexUrl = `${url.origin}/index.html`;
   const indexRes = await fetch(indexUrl, {
     headers: { "User-Agent": "meta-injector/1.0" },

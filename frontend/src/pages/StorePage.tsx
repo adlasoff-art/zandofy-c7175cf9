@@ -265,9 +265,12 @@ export default function StorePage() {
     </div>
   );
 
-  const seoTitle = store ? `${store.name} — Boutique` : "Boutique";
+  const seoTitle = store
+    ? (store.meta_title || `${store.name} — Boutique | Zandofy`)
+    : "Boutique";
   const seoDesc = store
-    ? `Découvrez la boutique ${store.name} sur Zandofy. ${store.description?.slice(0, 120) || "Produits de qualité, vendeur vérifié."}`
+    ? (store.meta_description ||
+      `Découvrez la boutique ${store.name} sur Zandofy. ${store.description?.slice(0, 120) || "Produits prix usine, livraison en Afrique."}`)
     : "Découvrez cette boutique sur Zandofy.";
 
   return (
@@ -276,7 +279,7 @@ export default function StorePage() {
         title={seoTitle}
         description={seoDesc}
         canonical={store ? `/store/${store.slug || store.id}` : undefined}
-        ogImage={store?.logo_url || undefined}
+        ogImage={store?.banner_url || store?.logo_url || undefined}
       />
       <Header />
       <div className="lg:hidden sticky top-14 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-1">

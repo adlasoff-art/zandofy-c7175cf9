@@ -16,7 +16,7 @@ interface TextEntry {
 const DEFAULT_TEXTS: TextEntry[] = [
   { key: "site.name", label: "Site — Nom du site", fr: "Zandofy", en: "Zandofy" },
   { key: "site.title", label: "Site — Titre (partage & SEO)", fr: "Zandofy — Mode Élégante & Accessible", en: "Zandofy — Elegant & Affordable Fashion" },
-  { key: "site.description", label: "Site — Description (partage & SEO)", fr: "Découvrez Zandofy : mode premium à prix accessibles. Robes, hauts, accessoires et plus. Expédition et Livraison rapide en Afrique.", en: "Discover Zandofy: premium fashion at accessible prices. Dresses, tops, accessories and more. Fast shipping across Africa." },
+  { key: "site.description", label: "Site — Description (partage & SEO)", fr: "Achetez directement aux usines chinoises, turques et internationales. Zandofy gère fournisseurs, logistique et livraison en Afrique.", en: "Buy directly from Chinese, Turkish and international factories. Zandofy handles suppliers, logistics and delivery across Africa." },
   { key: "footer.copyright", label: "Footer — Copyright", fr: "© {year} Zandofy. Tous droits réservés.", en: "© {year} Zandofy. All rights reserved." },
   { key: "topbar.freeShipping", label: "Top bar — Livraison", fr: "🚚 Livraison Gratuite *Conditions applicables", en: "🚚 Free Shipping *Conditions apply" },
   { key: "topbar.freeReturns", label: "Top bar — Retours", fr: "↩️ Retours Gratuits Sur toutes les commandes", en: "↩️ Free Returns On all orders" },

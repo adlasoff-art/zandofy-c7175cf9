@@ -28,7 +28,9 @@
     { "source": "/produits", "destination": "/", "statusCode": 301 },
     { "source": "/a-propos", "destination": "/about", "statusCode": 301 },
     { "source": "/conditions", "destination": "/terms", "statusCode": 301 },
-    { "source": "/confidentialite", "destination": "/privacy", "statusCode": 301 }
+    { "source": "/confidentialite", "destination": "/privacy", "statusCode": 301 },
+    { "source": "/help", "destination": "/help-center", "statusCode": 301 },
+    { "source": "/help/:path*", "destination": "/help-center", "statusCode": 301 }
   ],
   "rewrites": [
     {
@@ -84,7 +86,18 @@
       "destination": "/api/meta-injector?__pathname=/blog/:slug"
     },
     {
-      "source": "/:globalPath(|faq|stores|blog|about|contact|careers|help|pricing|privacy|terms|popular|trends|search|auth|reset-password|onboarding|impersonate)",
+      "source": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
+        }
+      ],
+      "destination": "/api/meta-injector?__pathname=/"
+    },
+    {
+      "source": "/:globalPath(faq|stores|blog|about|careers|help-center|pricing|privacy|terms|popular|trends|search|become-vendor|affiliate-program|loyalty-program|social-responsibility|auth|reset-password|onboarding|impersonate)",
       "has": [
         {
           "type": "header",

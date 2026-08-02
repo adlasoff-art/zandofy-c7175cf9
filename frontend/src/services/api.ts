@@ -53,6 +53,9 @@ export interface Product {
   store?: any;
   sellerRank?: number;
   shopType?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  seoKeywords?: string[];
 }
 
 export interface TrendTag {
@@ -148,6 +151,9 @@ export function mapProduct(row: any): Product {
         imageUrl: c.image_url || null,
       })),
     shopType: storeData?.shop_type || "international",
+    metaTitle: row.meta_title || undefined,
+    metaDescription: row.meta_description || undefined,
+    seoKeywords: Array.isArray(row.seo_keywords) ? row.seo_keywords : undefined,
   };
 }
 

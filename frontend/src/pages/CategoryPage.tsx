@@ -20,7 +20,12 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { SlidersHorizontal, X } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { useSeoConfig } from "@/hooks/use-seo-config";
 import { slugify } from "@/utils/slugify";
+
+function applySeoTemplate(tpl: string, vars: Record<string, string>): string {
+  return (tpl || "").replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? "");
+}
 
 function mapProduct(row: any) {
   const sortedImages = (row.product_images || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
@@ -58,6 +63,7 @@ const SPECIAL_SLUGS = ["nouveautes", "soldes"];
 export default function CategoryPage() {
   const { slug } = useParams<{ slug: string }>();
   const { t, locale, formatPrice } = useI18n();
+  const seoConfig = useSeoConfig();
   const labelOf = (c: { name?: string | null; name_fr?: string | null }) =>
     locale === "fr" ? (c.name_fr ?? c.name ?? "") : (c.name ?? c.name_fr ?? "");
   const isSpecial = SPECIAL_SLUGS.includes(slug?.toLowerCase() || "");
@@ -90,7 +96,7 @@ export default function CategoryPage() {
       const normalizedSlug = slugify(decodedSlug);
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name, name_fr, icon, parent_id, image_url")
+        .select("id, name, name_fr, icon, parent_id, image_url, meta_title, meta_description, seo_keywords, og_image_url")
         .order("name");
       if (error) throw error;
       const all = data || [];
@@ -222,10 +228,21 @@ export default function CategoryPage() {
   }
 
   const catLabel = labelOf(category);
-  const seoTitle = `${catLabel} — ${t("category.online") || "Acheter en ligne"}`;
-  const seoDesc = locale === "fr"
-    ? `Découvrez ${filteredProducts?.length || 0} produits ${catLabel} sur Zandofy. Livraison rapide, prix compétitifs.`
-    : `Discover ${filteredProducts?.length || 0} ${catLabel} products on Zandofy. Fast delivery, competitive prices.`;
+  const seoTitle =
+    (category as any).meta_title ||
+    applySeoTemplate(seoConfig.category_title_template, {
+      name: catLabel,
+      brand: seoConfig.brand_name || "Zandofy",
+    });
+  const seoDesc =
+    (category as any).meta_description ||
+    applySeoTemplate(seoConfig.category_description_template, {
+      name: catLabel,
+      brand: seoConfig.brand_name || "Zandofy",
+    }) ||
+    (locale === "fr"
+      ? `Découvrez ${filteredProducts?.length || 0} produits ${catLabel} sur Zandofy. Import Chine, livraison Afrique.`
+      : `Discover ${filteredProducts?.length || 0} ${catLabel} products on Zandofy. China import, Africa delivery.`);
 
   return (
     <div className="min-h-screen bg-background">
@@ -233,6 +250,7 @@ export default function CategoryPage() {
         title={seoTitle}
         description={seoDesc}
         canonical={`/category/${slug}`}
+        ogImage={(category as any).og_image_url || category.image_url || undefined}
         jsonLd={buildJsonLdGraph(
           buildBreadcrumbJsonLd([
             { name: "Accueil", url: "/" },
