@@ -149,6 +149,8 @@ function OverviewTab({
   pwaPeriodCount,
   topCountries,
   topCities,
+  trafficSources,
+  topReferrers,
 }: {
   kpis: any;
   dailyTraffic: { day: string; visitors: number; signups: number; orders: number }[];
@@ -160,10 +162,20 @@ function OverviewTab({
   pwaPeriodCount: number;
   topCountries: { country: string; session_count: number }[];
   topCities: { city: string; country: string; session_count: number }[];
+  trafficSources: { source_class: string; session_count: number }[];
+  topReferrers: { referrer_host: string; session_count: number }[];
 }) {
   const deviceCounts = devices?.devices || {};
   const osBreakdown = devices?.os || {};
   const totalSessions = kpis?.unique_sessions || 0;
+  const sourceTotal = trafficSources.reduce((s, r) => s + r.session_count, 0) || 0;
+  const SOURCE_LABELS: Record<string, string> = {
+    direct: "Direct",
+    pwa: "PWA",
+    social: "Social",
+    search: "Search",
+    referral: "Referral",
+  };
 
   return (
     <div className="space-y-4">
@@ -173,13 +185,52 @@ function OverviewTab({
         <StatCard icon={Users} label="Authentifiés" value={kpis?.authenticated_sessions || 0} sub="sessions connectées" />
         <StatCard icon={Globe} label="Anonymes" value={kpis?.anonymous_sessions || 0} sub="sans compte" />
         <StatCard icon={Wifi} label="En ligne" value={kpis?.online_now || 0} sub="temps réel" />
-        <StatCard icon={Clock} label="Durée moy." value={formatDuration(kpis?.avg_duration || 0)} />
+        <StatCard icon={Clock} label="Durée moy." value={formatDuration(kpis?.avg_duration || 0)} sub="sessions plafonnées 30 min" />
         <StatCard icon={Download} label="PWA installées" value={pwaCount} sub={`+${pwaPeriodCount} période`} />
         <StatCard icon={MousePointer} label="Clics produits" value={kpis?.product_clicks || 0} />
         <StatCard icon={UserPlus} label="Comptes créés" value={kpis?.accounts_created || 0} sub="inscriptions" />
       </div>
 
       <DailyTrafficChart data={dailyTraffic} />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="bg-card border border-border rounded-lg p-3">
+          <h3 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
+            <Globe size={14} /> Provenance
+          </h3>
+          {trafficSources.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">Aucune donnée pour cette période.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {trafficSources.map((row) => {
+                const pct = sourceTotal > 0 ? Math.round((row.session_count / sourceTotal) * 100) : 0;
+                return (
+                  <div key={row.source_class} className="flex items-center gap-2">
+                    <span className="text-xs text-foreground flex-1 capitalize">
+                      {SOURCE_LABELS[row.source_class] || row.source_class}
+                    </span>
+                    <span className="text-xs font-medium text-foreground">{row.session_count}</span>
+                    <span className="text-[10px] text-muted-foreground w-8 text-right">{pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <PaginatedWidget
+          title="Top domaines référents"
+          icon={TrendingUp}
+          items={topReferrers}
+          renderItem={(r, i) => (
+            <div key={r.referrer_host} className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
+              <span className="text-[11px] text-foreground flex-1 truncate">{r.referrer_host}</span>
+              <span className="text-[11px] font-medium text-foreground">{r.session_count}</span>
+            </div>
+          )}
+        />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="bg-card border border-border rounded-lg p-3">
@@ -674,6 +725,30 @@ export default function AdminAnalyticsPage() {
     },
   });
 
+  const { data: trafficSources } = useQuery({
+    queryKey: ["admin-analytics-traffic-sources", period],
+    queryFn: async () => {
+      const { data, error } = await rpc("get_analytics_traffic_sources", { p_since: since });
+      if (error) console.error("[Analytics] get_analytics_traffic_sources failed:", error);
+      return ((data || []) as any[]).map((d: any) => ({
+        source_class: d.source_class,
+        session_count: Number(d.session_count || 0),
+      }));
+    },
+  });
+
+  const { data: topReferrers } = useQuery({
+    queryKey: ["admin-analytics-top-referrers", period],
+    queryFn: async () => {
+      const { data, error } = await rpc("get_analytics_top_referrers", { p_since: since, p_limit: 50 });
+      if (error) console.error("[Analytics] get_analytics_top_referrers failed:", error);
+      return ((data || []) as any[]).map((d: any) => ({
+        referrer_host: d.referrer_host,
+        session_count: Number(d.session_count || 0),
+      }));
+    },
+  });
+
   return (
     <AdminLayout title="Analytics & Tracking">
       <div className="space-y-4">
@@ -722,6 +797,8 @@ export default function AdminAnalyticsPage() {
                 pwaPeriodCount={pwaPeriodCount || 0}
                 topCountries={topCountries || []}
                 topCities={topCities || []}
+                trafficSources={trafficSources || []}
+                topReferrers={topReferrers || []}
               />
             </TabsContent>
             <TabsContent value="products">

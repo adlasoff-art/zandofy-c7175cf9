@@ -292,6 +292,9 @@ export function HeroBannerEditor() {
               {/* Image Upload */}
               <div className="space-y-1">
                 <Label className="text-xs">Image</Label>
+                <p className="text-[10px] text-muted-foreground">
+                  Mobile : ~1080×1350 (portrait). Desktop : ~1920×600–800. Sujet centré, peu de texte dans l’image.
+                </p>
                 <div className="flex items-center gap-3">
                   {(formImagePreview || (editingBanner?.image_url && !formImageFile)) && (
                     <div className="w-20 h-12 rounded border border-border overflow-hidden shrink-0">

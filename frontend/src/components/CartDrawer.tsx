@@ -5,7 +5,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Minus, Plus, Trash2, ShoppingBag, CheckSquare, Square, ArrowLeft } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingBag, CheckSquare, Square, ArrowLeft, X } from "lucide-react";
 import { imgUrl } from "@/lib/image-url";
 import { CartItemVariantEditor } from "@/components/CartItemVariantEditor";
 import { CartFreightPreview } from "@/components/cart/CartFreightPreview";
@@ -37,14 +37,26 @@ export function CartDrawer() {
     <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
       <SheetContent
         side={isMobile ? "bottom" : "right"}
+        hideClose={isMobile}
         className={
           isMobile
-            ? "h-[100dvh] max-h-[100dvh] w-full rounded-none border-0 p-0 flex flex-col gap-0"
+            ? "h-[100dvh] max-h-[100dvh] w-full rounded-none border-0 p-0 pt-0 flex flex-col gap-0"
             : "w-full sm:max-w-md flex flex-col"
         }
       >
-        <SheetHeader className={isMobile ? "px-4 py-3 border-b border-border space-y-0 text-left" : undefined}>
-          <SheetTitle className="flex items-center gap-2">
+        <SheetHeader
+          className={
+            isMobile
+              ? "px-4 pb-3 border-b border-border space-y-0 text-left shrink-0"
+              : undefined
+          }
+          style={
+            isMobile
+              ? { paddingTop: "max(0.75rem, env(safe-area-inset-top, 0.75rem))" }
+              : undefined
+          }
+        >
+          <SheetTitle className="flex items-center gap-2 pr-2">
             {isMobile && (
               <button
                 type="button"
@@ -55,7 +67,20 @@ export function CartDrawer() {
                 <ArrowLeft size={20} />
               </button>
             )}
-            <ShoppingBag size={20} /> {t("cart.title")} ({itemCount})
+            <ShoppingBag size={20} />
+            <span className="flex-1 truncate">
+              {t("cart.title")} ({itemCount})
+            </span>
+            {isMobile && (
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] text-foreground"
+                aria-label={t("general.close") || "Fermer"}
+              >
+                <X size={22} />
+              </button>
+            )}
           </SheetTitle>
         </SheetHeader>
 
@@ -116,7 +141,15 @@ export function CartDrawer() {
                       onCheckedChange={() => toggleSelected(item.id)}
                     />
                   </div>
-                  <img src={imgUrl(item.image, { width: 160 })} alt={item.nameFr} className="w-20 h-24 object-cover rounded-sm shrink-0" loading="lazy" decoding="async" />
+                  <div className="w-24 h-24 shrink-0 rounded-sm overflow-hidden bg-muted border border-border">
+                    <img
+                      src={imgUrl(item.image, { width: 192 })}
+                      alt={item.nameFr}
+                      className="w-full h-full object-contain object-center"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
                   <div className="flex-1 min-w-0 space-y-1">
                     <p className="text-sm font-medium text-foreground line-clamp-2">{item.nameFr}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
