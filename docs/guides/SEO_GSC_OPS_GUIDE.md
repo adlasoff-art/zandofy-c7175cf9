@@ -9,7 +9,7 @@ Mis à jour : 2026-08-02.
 
 | Observation | Cause | Action |
 |-------------|--------|--------|
-| `/sitemap.xml` → SPA 404 / index.html | Rewrite externe Supabase ignoré ; catch-all SPA | Proxy Vercel [`frontend/api/sitemap.ts`](../../frontend/api/sitemap.ts) ← `/sitemap.xml` |
+| `/sitemap.xml` → HTML (GSC erreur) | SPA catch-all + pas de fichier statique ; `/api` non servi en mode `dist/` | Build : `scripts/fetch-sitemap.mjs` écrit `public/sitemap.xml` avant `vite build` |
 | GSC ne récupère pas `www.../sitemap.xml` | **www → 307 → apex** | Soumettre sitemap en **apex** |
 | Edge `generate-sitemap` | Source XML | Redeploy après change |
 
