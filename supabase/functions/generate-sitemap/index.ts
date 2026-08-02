@@ -19,18 +19,27 @@ Deno.serve(async () => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Static pages
+    // Hub pages — sitelinks candidates + trust pages
     const staticPages = [
       { loc: "/", changefreq: "daily", priority: "1.0" },
+      { loc: "/stores", changefreq: "daily", priority: "0.9" },
+      { loc: "/popular", changefreq: "daily", priority: "0.9" },
+      { loc: "/trends", changefreq: "daily", priority: "0.9" },
       { loc: "/search", changefreq: "daily", priority: "0.8" },
-      { loc: "/about", changefreq: "monthly", priority: "0.6" },
-      { loc: "/faq", changefreq: "monthly", priority: "0.6" },
+      { loc: "/blog", changefreq: "weekly", priority: "0.8" },
+      { loc: "/help-center", changefreq: "weekly", priority: "0.8" },
+      { loc: "/become-vendor", changefreq: "monthly", priority: "0.8" },
+      { loc: "/affiliate-program", changefreq: "monthly", priority: "0.7" },
+      { loc: "/loyalty-program", changefreq: "monthly", priority: "0.6" },
+      { loc: "/about", changefreq: "monthly", priority: "0.7" },
+      { loc: "/faq", changefreq: "monthly", priority: "0.7" },
+      { loc: "/pricing", changefreq: "monthly", priority: "0.6" },
+      { loc: "/careers", changefreq: "monthly", priority: "0.5" },
+      { loc: "/social-responsibility", changefreq: "monthly", priority: "0.5" },
       { loc: "/terms", changefreq: "yearly", priority: "0.3" },
       { loc: "/privacy", changefreq: "yearly", priority: "0.3" },
-      { loc: "/become-vendor", changefreq: "monthly", priority: "0.5" },
     ];
 
-    // Fetch published products
     const { data: products } = await supabase
       .from("products")
       .select("id, slug, updated_at")
@@ -38,45 +47,57 @@ Deno.serve(async () => {
       .order("updated_at", { ascending: false })
       .limit(5000);
 
-    // Fetch categories
     const { data: categories } = await supabase
       .from("categories")
-      .select("name, created_at")
+      .select("name, name_fr, created_at")
       .order("name");
 
-    // Fetch stores
     const { data: stores } = await supabase
       .from("stores")
       .select("id, slug, name, created_at")
+      .eq("is_banned", false)
+      .eq("is_suspended", false)
       .limit(1000);
 
-    // Build XML
+    const { data: blogPosts } = await supabase
+      .from("blog_posts")
+      .select("slug, updated_at, published_at")
+      .eq("status", "published")
+      .order("published_at", { ascending: false })
+      .limit(500);
+
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
     xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
 
-    // Static
     for (const page of staticPages) {
       xml += `  <url><loc>${SITE_URL}${page.loc}</loc><changefreq>${page.changefreq}</changefreq><priority>${page.priority}</priority></url>\n`;
     }
 
-    // Products
     for (const p of products || []) {
       const lastmod = p.updated_at ? p.updated_at.split("T")[0] : "";
       const productPath = p.slug || p.id;
       xml += `  <url><loc>${SITE_URL}/product/${productPath}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}<changefreq>weekly</changefreq><priority>0.8</priority></url>\n`;
     }
 
-    // Categories — slug must match CategoryPage / CategoryBanner (slugify name)
+    const seenCat = new Set<string>();
     for (const c of categories || []) {
-      const catSlug = slugify(c.name || "");
-      if (!catSlug) continue;
-      xml += `  <url><loc>${SITE_URL}/category/${catSlug}</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>\n`;
+      for (const raw of [c.name_fr, c.name]) {
+        const catSlug = slugify(raw || "");
+        if (!catSlug || seenCat.has(catSlug)) continue;
+        seenCat.add(catSlug);
+        xml += `  <url><loc>${SITE_URL}/category/${catSlug}</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>\n`;
+      }
     }
 
-    // Stores (use slug when available, fallback to id)
     for (const s of stores || []) {
       const storePath = s.slug || s.id;
       xml += `  <url><loc>${SITE_URL}/store/${storePath}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>\n`;
+    }
+
+    for (const b of blogPosts || []) {
+      if (!b.slug) continue;
+      const lastmod = (b.updated_at || b.published_at || "").split("T")[0];
+      xml += `  <url><loc>${SITE_URL}/blog/${b.slug}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}<changefreq>weekly</changefreq><priority>0.6</priority></url>\n`;
     }
 
     xml += `</urlset>`;

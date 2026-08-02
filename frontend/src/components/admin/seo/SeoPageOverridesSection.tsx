@@ -15,12 +15,16 @@ const KNOWN_PATHS: { path: string; label: string }[] = [
   { path: "/pricing", label: "Tarifs" },
   { path: "/about", label: "À propos" },
   { path: "/faq", label: "FAQ" },
-  { path: "/help", label: "Centre d'aide" },
+  { path: "/help-center", label: "Centre d'aide" },
   { path: "/careers", label: "Carrières" },
   { path: "/blog", label: "Blog" },
   { path: "/popular", label: "Populaires" },
   { path: "/trends", label: "Tendances" },
   { path: "/search", label: "Recherche" },
+  { path: "/become-vendor", label: "Devenir vendeur" },
+  { path: "/affiliate-program", label: "Affiliation" },
+  { path: "/loyalty-program", label: "Fidélité" },
+  { path: "/social-responsibility", label: "Responsabilité sociale" },
   { path: "/privacy", label: "Confidentialité" },
   { path: "/terms", label: "Conditions" },
 ];
@@ -105,6 +109,7 @@ export function SeoPageOverridesSection() {
               .filter(Boolean)
           : current.keywords,
       robots: current.robots || "index,follow",
+      jsonld_extra: current.jsonld_extra || null,
     };
     const { data, error } = await supabase
       .from("seo_page_overrides")
@@ -253,6 +258,34 @@ export function SeoPageOverridesSection() {
           />
         </div>
 
+        <div>
+          <label className="text-xs font-medium text-foreground">
+            JSON-LD extra (objet JSON optionnel)
+          </label>
+          <textarea
+            value={
+              current.jsonld_extra
+                ? JSON.stringify(current.jsonld_extra, null, 2)
+                : ""
+            }
+            onChange={(e) => {
+              const raw = e.target.value.trim();
+              if (!raw) {
+                update({ jsonld_extra: null });
+                return;
+              }
+              try {
+                update({ jsonld_extra: JSON.parse(raw) });
+              } catch {
+                /* keep typing until valid */
+              }
+            }}
+            rows={4}
+            placeholder='{"@type":"WebPage","name":"..."}'
+            className={inputClass + " font-mono text-[11px]"}
+          />
+        </div>
+
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-xs font-medium text-foreground cursor-pointer">
             <input
@@ -270,7 +303,7 @@ export function SeoPageOverridesSection() {
         <SeoSerpPreview
           title={current.title || ""}
           description={current.description || ""}
-          url={`https://zandofy.com${current.path}`}
+          url={`https://www.zandofy.com${current.path}`}
         />
 
         <button

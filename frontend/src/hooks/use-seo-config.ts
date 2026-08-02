@@ -18,7 +18,25 @@ export interface SeoConfig {
   social_urls: SocialUrls;
   google_site_verification: string;
   google_analytics_id: string;
+  category_title_template: string;
+  category_description_template: string;
+  product_title_template: string;
+  product_description_template: string;
+  store_title_template: string;
+  store_description_template: string;
+  sitelinks_nav: { name: string; url: string }[];
 }
+
+export const DEFAULT_SITELINKS_NAV = [
+  { name: "Boutiques", url: "/stores" },
+  { name: "Populaires", url: "/popular" },
+  { name: "Tendances", url: "/trends" },
+  { name: "Blog", url: "/blog" },
+  { name: "Centre d'aide", url: "/help-center" },
+  { name: "Devenir vendeur", url: "/become-vendor" },
+  { name: "Programme d'affiliation", url: "/affiliate-program" },
+  { name: "À propos", url: "/about" },
+];
 
 const DEFAULT_CONFIG: SeoConfig = {
   site_title: "Zandofy — Achetez en Chine, livré en Afrique | Prix usine",
@@ -42,6 +60,15 @@ const DEFAULT_CONFIG: SeoConfig = {
   social_urls: {},
   google_site_verification: "",
   google_analytics_id: "",
+  category_title_template: "{name} | Zandofy",
+  category_description_template:
+    "Achetez {name} sur Zandofy — import Chine & livraison Afrique. Prix usine, logistique inclusive.",
+  product_title_template: "{name} | Zandofy",
+  product_description_template: "Achetez {name} sur Zandofy — import Chine & livraison Afrique.",
+  store_title_template: "{name} — Boutique | Zandofy",
+  store_description_template:
+    "Découvrez la boutique {name} sur Zandofy. Produits prix usine, livraison en Afrique.",
+  sitelinks_nav: DEFAULT_SITELINKS_NAV,
 };
 
 /**
@@ -66,6 +93,19 @@ export function useSeoConfig() {
       social_urls: v.social_urls || {},
       google_site_verification: v.google_site_verification || "",
       google_analytics_id: v.google_analytics_id || "",
+      category_title_template: v.category_title_template || DEFAULT_CONFIG.category_title_template,
+      category_description_template:
+        v.category_description_template || DEFAULT_CONFIG.category_description_template,
+      product_title_template: v.product_title_template || DEFAULT_CONFIG.product_title_template,
+      product_description_template:
+        v.product_description_template || DEFAULT_CONFIG.product_description_template,
+      store_title_template: v.store_title_template || DEFAULT_CONFIG.store_title_template,
+      store_description_template:
+        v.store_description_template || DEFAULT_CONFIG.store_description_template,
+      sitelinks_nav:
+        Array.isArray(v.sitelinks_nav) && v.sitelinks_nav.length
+          ? v.sitelinks_nav
+          : DEFAULT_CONFIG.sitelinks_nav,
     });
   }, [value]);
 

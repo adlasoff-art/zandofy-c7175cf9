@@ -1,41 +1,52 @@
-# SEO bots — stratégie actuelle (lot G3)
+# SEO bots — stratégie actuelle (marketplace)
 
-## Décision retenue
-
-**Pas de migration SSR complète pour l’instant.** On conserve la SPA Vite + **injection HTML pour les crawlers** déjà en place.
+## Architecture
 
 | Couche | Rôle |
 |--------|------|
-| **Humains** | SPA React (`index.html` → bundle JS) |
-| **Bots** (Google, Bing, réseaux sociaux, etc.) | Rewrite Vercel → [`frontend/api/meta-injector.ts`](../frontend/api/meta-injector.ts) (Edge) |
+| **Humains** | SPA React (`index.html` → bundle JS) + `SEOHead` |
+| **Bots** | Rewrite Vercel UA → [`frontend/api/meta-injector.ts`](../frontend/api/meta-injector.ts) |
 | **Sitemap** | Edge Function [`supabase/functions/generate-sitemap`](../supabase/functions/generate-sitemap/index.ts) via `/sitemap.xml` |
+| **CMS** | Admin → `/admin/seo` (global, pages, catégories, templates, sitelinks, couverture) |
 
-Routes bot avec meta + JSON-LD injectés (voir [`frontend/vercel.json`](../frontend/vercel.json)) :
+Canonical host : **`https://www.zandofy.com`** (`VITE_SITE_URL` / `SITE_URL`).
 
-- `/product/:slug`
-- `/store/:slug`
-- `/category/:slug`
-- `/blog/:slug`
-- Pages statiques listées (`faq`, `stores`, `blog`, …)
+## Routes bot (meta-injector)
 
-## Pourquoi ne pas SSR tout de suite
+- `/` (accueil — `seo_config` + override + JSON-LD Organization / WebSite / SiteNavigation)
+- `/product/:slug`, `/store/:slug`, `/category/:slug`, `/blog/:slug`
+- Hubs : `faq`, `stores`, `blog`, `about`, `careers`, `help-center`, `pricing`, `privacy`, `terms`, `popular`, `trends`, `search`, `become-vendor`, `affiliate-program`, `loyalty-program`, `social-responsibility`
+- Privés (souvent noindex via override) : `auth`, `reset-password`, `onboarding`, `impersonate`
 
-- ~4 000 utilisateurs en prod — risque de régression deploy / routing Vercel.
-- `meta-injector` couvre déjà l’indexation des URLs catalogue pour les bots.
-- Prochaine étape si besoin : **prerender service** (ex. Prerender.io) ou **Vercel ISR** sur un sous-ensemble de routes, après mesure Search Console.
+`/help` → **301** `/help-center`. `/contact` → **301** `/faq`.
 
-## Actions lot G3 réalisées dans le code
+## Métas entités
 
-- Sitemap catégories aligné sur `slugify()` (comme `CategoryPage`).
-- JSON-LD `ItemList` sur pages catégorie.
-- Meta `keywords` branchées depuis la config admin SEO.
-- FAQ schema (`FAQPage`) sur fiche produit (AEO).
+| Entité | Source priorité |
+|--------|-----------------|
+| Accueil / pages | `seo_page_overrides` → `seo_config` |
+| Catégorie | `categories.meta_*` → templates `category_*_template` |
+| Produit | `products.meta_*` → templates `product_*_template` |
+| Boutique | `stores.meta_*` → templates `store_*_template` |
+| Blog | `blog_posts.meta_*` |
+
+`jsonld_extra` sur overrides est **fusionné** dans le JSON-LD injecté.
 
 ## Vérification
 
-1. Tester avec [Google Rich Results Test](https://search.google.com/test/rich-results) sur une URL produit publique.
-2. `curl -A "Googlebot" https://www.zandofy.com/product/<slug>` → HTML avec `<title>` et `application/ld+json` dans le `<head>`.
+```bash
+curl -A "Googlebot" -sL "https://www.zandofy.com/" | head -n 80
+curl -A "Googlebot" -sL "https://www.zandofy.com/category/fashion" | grep -E "<title>|description"
+```
 
-## Canonical / www
+1. [Rich Results Test](https://search.google.com/test/rich-results)
+2. Search Console : soumettre `https://www.zandofy.com/sitemap.xml`
+3. Après change SEO admin : purge cache via header `x-purge-cache: 1` sur `/api/meta-injector` (déjà déclenchée à la sauvegarde)
 
-Utiliser **`VITE_SITE_URL`** sur Vercel (prod) comme source unique. `SEOHead` et le sitemap utilisent la même base. Éviter de mélanger `zandofy.com` et `www.zandofy.com` sans redirection 301 côté DNS/Vercel.
+## Hors scope (volontaire)
+
+- SSR React complet
+- Score focus keyword type Rank Math
+- Redirect manager / 404 monitor (phase ultérieure)
+
+Voir [`SEO_MARKETPLACE_PLAYBOOK.md`](./SEO_MARKETPLACE_PLAYBOOK.md) pour ops GSC / GBP.

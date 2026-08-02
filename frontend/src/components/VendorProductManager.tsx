@@ -56,6 +56,9 @@ interface Product {
   flash_timer_enabled: boolean | null;
   images: { id: string; image_url: string; position: number | null }[];
   publish_status: string;
+  meta_title?: string | null;
+  meta_description?: string | null;
+  seo_keywords?: string[] | null;
 }
 
 interface Category {
@@ -108,6 +111,9 @@ const EMPTY_FORM = {
   prep_days_max: 5,
   can_ship_air: true,
   can_ship_sea: false,
+  meta_title: "",
+  meta_description: "",
+  seo_keywords: "",
 };
 
 type ProductFormState = typeof EMPTY_FORM;
@@ -165,7 +171,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     setLoading(prev => products.length === 0 ? true : prev);
     const { data } = await (supabase
       .from("products")
-      .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea") as any)
+      .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea, meta_title, meta_description, seo_keywords") as any)
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
 
@@ -377,6 +383,11 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       model_size: (product as any).model_size || "",
       can_ship_air: (product as any).can_ship_air !== false,
       can_ship_sea: (product as any).can_ship_sea === true,
+      meta_title: (product as any).meta_title || "",
+      meta_description: (product as any).meta_description || "",
+      seo_keywords: Array.isArray((product as any).seo_keywords)
+        ? (product as any).seo_keywords.join(", ")
+        : "",
     });
     // Split images: position 0 = main, rest = variations
     const sorted = [...product.images].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
@@ -477,6 +488,15 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       model_size: form.model_size && form.model_size.trim() !== '' ? form.model_size.trim() : null,
       can_ship_air: form.can_ship_air,
       can_ship_sea: form.can_ship_sea,
+      meta_title: form.meta_title.trim() || null,
+      meta_description: form.meta_description.trim() || null,
+      seo_keywords: (() => {
+        const keywords = form.seo_keywords
+          .split(",")
+          .map((k) => k.trim())
+          .filter(Boolean);
+        return keywords.length > 0 ? keywords : null;
+      })(),
     };
 
     let productId = editing?.id;
@@ -673,6 +693,33 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             <Field label="SKU" value={form.sku} onChange={(v) => setForm({ ...form, sku: v })} />
           </div>
           <Field label="Description courte" value={form.short_description} onChange={(v) => setForm({ ...form, short_description: v })} />
+          <div className="rounded-lg border border-border p-3 space-y-3 bg-muted/20">
+            <p className="text-xs font-semibold text-foreground">Référencement (SEO)</p>
+            <Field
+              label={`Titre SEO (${form.meta_title.length}/60)`}
+              value={form.meta_title}
+              onChange={(v) => setForm({ ...form, meta_title: v.slice(0, 70) })}
+              placeholder="Laissez vide pour le titre automatique"
+            />
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">
+                Meta description ({form.meta_description.length}/160)
+              </label>
+              <textarea
+                value={form.meta_description}
+                onChange={(e) => setForm({ ...form, meta_description: e.target.value.slice(0, 180) })}
+                rows={3}
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                placeholder="Description pour Google (recommandé ≤160 car.)"
+              />
+            </div>
+            <Field
+              label="Mots-clés SEO (virgules)"
+              value={form.seo_keywords}
+              onChange={(v) => setForm({ ...form, seo_keywords: v })}
+              placeholder="import chine, prix usine, …"
+            />
+          </div>
           <div>
             <label className="text-xs text-muted-foreground">Description</label>
             <textarea

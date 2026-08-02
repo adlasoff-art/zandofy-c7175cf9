@@ -46,5 +46,24 @@ describe("isDynamicSeoPath", () => {
     expect(isDynamicSeoPath("/category/x")).toBe(true);
     expect(isDynamicSeoPath("/blog/x")).toBe(true);
     expect(isDynamicSeoPath("/faq")).toBe(false);
+    expect(isDynamicSeoPath("/")).toBe(false);
+  });
+});
+
+describe("resolveRequestPathname home", () => {
+  it("resolves __pathname=/ for homepage bot rewrite", () => {
+    const url = new URL("https://www.zandofy.com/api/meta-injector?__pathname=/");
+    const req = new Request(url.toString(), {
+      headers: { "user-agent": "Googlebot" },
+    });
+    expect(resolveRequestPathname(req, url)).toBe("/");
+  });
+
+  it("resolves help-center hub path", () => {
+    const url = new URL(
+      "https://www.zandofy.com/api/meta-injector?__pathname=/help-center",
+    );
+    const req = new Request(url.toString());
+    expect(resolveRequestPathname(req, url)).toBe("/help-center");
   });
 });

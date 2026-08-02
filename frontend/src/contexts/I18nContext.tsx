@@ -902,7 +902,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "product.shareAria": "Partager",
     "product.colorFallback": "Couleur {{index}}",
     "category.productsCount": "{{count}} produit{{plural}}",
-    "category.online": "Acheter en ligne",
+    "category.online": "sur Zandofy",
     // Help center
     "help.title": "Centre d'aide",
     "help.subtitle": "Trouvez les procédures clés pour clients et vendeurs, puis créez ou suivez vos tickets support en un seul endroit.",
@@ -2416,7 +2416,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "product.shareAria": "Share",
     "product.colorFallback": "Color {{index}}",
     "category.productsCount": "{{count}} product{{plural}}",
-    "category.online": "Buy online",
+    "category.online": "on Zandofy",
     // Help center
     "help.title": "Help Center",
     "help.subtitle": "Find key procedures for customers and vendors, then create or track your support tickets in one place.",

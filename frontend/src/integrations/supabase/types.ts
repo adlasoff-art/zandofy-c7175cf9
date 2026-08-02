@@ -205,27 +205,39 @@ export type Database = {
           icon: string | null
           id: string
           image_url: string | null
+          meta_description: string | null
+          meta_title: string | null
           name: string
           name_fr: string
+          og_image_url: string | null
           parent_id: string | null
+          seo_keywords: string[] | null
         }
         Insert: {
           created_at?: string
           icon?: string | null
           id?: string
           image_url?: string | null
+          meta_description?: string | null
+          meta_title?: string | null
           name: string
           name_fr: string
+          og_image_url?: string | null
           parent_id?: string | null
+          seo_keywords?: string[] | null
         }
         Update: {
           created_at?: string
           icon?: string | null
           id?: string
           image_url?: string | null
+          meta_description?: string | null
+          meta_title?: string | null
           name?: string
           name_fr?: string
+          og_image_url?: string | null
           parent_id?: string | null
+          seo_keywords?: string[] | null
         }
         Relationships: [
           {

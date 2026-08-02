@@ -21,7 +21,7 @@ const RecommendationsSection = lazyRetry(() => import("@/components/Recommendati
 const Footer = lazyRetry(() => import("@/components/Footer").then(m => ({ default: m.Footer })));
 const FloatingActions = lazyRetry(() => import("@/components/FloatingActions").then(m => ({ default: m.FloatingActions })));
 
-const SITE_URL = import.meta.env.VITE_SITE_URL || "https://zandofy.com";
+const SITE_URL = import.meta.env.VITE_SITE_URL || "https://www.zandofy.com";
 
 const Index = () => {
   const queryClient = useQueryClient();
@@ -46,6 +46,15 @@ const Index = () => {
 
   const pageH1 = seoConfig.site_title || seoConfig.brand_name || "Zandofy";
 
+  const navItems = (seoConfig.sitelinks_nav || []).map((item, i) => ({
+    "@type": "SiteNavigationElement",
+    position: i + 1,
+    name: item.name,
+    url: item.url.startsWith("http")
+      ? item.url
+      : `${SITE_URL}${item.url.startsWith("/") ? item.url : `/${item.url}`}`,
+  }));
+
   const jsonLd = [
     {
       "@type": "WebSite",
@@ -69,6 +78,11 @@ const Index = () => {
         contactType: "customer service",
         availableLanguage: ["French", "English"],
       },
+    },
+    {
+      "@type": "ItemList",
+      name: `Navigation principale ${seoConfig.brand_name || "Zandofy"}`,
+      itemListElement: navItems,
     },
   ];
 

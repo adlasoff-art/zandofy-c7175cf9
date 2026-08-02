@@ -31,7 +31,7 @@ function normalizeJsonLd(jsonLd: Record<string, any> | Record<string, any>[]): R
 }
 
 const SITE_NAME = "Zandofy";
-const SITE_URL = import.meta.env.VITE_SITE_URL || "https://zandofy.com";
+const SITE_URL = import.meta.env.VITE_SITE_URL || "https://www.zandofy.com";
 
 export function SEOHead({ title, description, canonical, ogImage, ogType = "website", jsonLd, noindex }: SEOHeadProps) {
   const { seoEnabled } = useSeoEnabled();
