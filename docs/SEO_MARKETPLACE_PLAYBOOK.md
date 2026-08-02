@@ -4,12 +4,13 @@ Checklist ops après déploiement des lots techniques SEO (crawl, meta-injector,
 
 ## 1. Environnement
 
-- [ ] Vercel prod : `VITE_SITE_URL=https://www.zandofy.com`
-- [ ] Optionnel Vercel : `SITE_URL=https://www.zandofy.com` (meta-injector)
-- [ ] Redirection apex → www (Cloudflare / Vercel) ou l’inverse — **un seul** host canonique
+- [ ] Vercel prod : `VITE_SITE_URL=https://zandofy.com` (apex — www redirige déjà vers apex)
+- [ ] Optionnel Vercel : `SITE_URL=https://zandofy.com` (meta-injector)
+- [ ] Redirection **www → apex** (déjà en place) — ne pas inverser sans plan
 - [ ] Migration SQL `20260802104611_categories_seo.sql` exécutée **staging puis prod**
 - [ ] Migration SQL `20260802105000_seo_page_overrides_hubs.sql` exécutée staging puis prod
 - [ ] Redeploy Edge Function `generate-sitemap` (staging puis prod)
+- [ ] Guide détaillé : [`docs/guides/SEO_GSC_OPS_GUIDE.md`](guides/SEO_GSC_OPS_GUIDE.md)
 
 ## 2. Admin CMS (`/admin/seo`)
 

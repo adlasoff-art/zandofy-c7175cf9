@@ -1,6 +1,10 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const SITE_URL = "https://www.zandofy.com";
+/**
+ * Canonical host MUST match live redirect (www → apex).
+ * Redeploy trigger: 2026-08-02 — align apex + hubs + catalogue.
+ */
+const SITE_URL = "https://zandofy.com";
 
 /** Match frontend `slugify()` for category URLs. */
 function slugify(text: string): string {

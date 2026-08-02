@@ -16,7 +16,6 @@ Disallow: /wp-admin
 Disallow: /wp-content
 Disallow: /wp-includes
 
-# Allow major crawlers explicitly
 User-agent: Googlebot
 Allow: /
 Disallow: /dashboard
@@ -32,6 +31,7 @@ Disallow: /reset-password
 Disallow: /onboarding
 Disallow: /impersonate
 
-Host: https://www.zandofy.com
-Sitemap: https://www.zandofy.com/sitemap.xml
-Sitemap: https://www.zandofy.com/sitemap-dynamic.xml
+# Canonique live = apex (www redirige déjà vers zandofy.com)
+Host: https://zandofy.com
+Sitemap: https://zandofy.com/sitemap.xml
+Sitemap: https://zandofy.com/sitemap-dynamic.xml
