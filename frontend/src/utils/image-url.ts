@@ -1,5 +1,7 @@
 /** Responsive image URLs for Supabase Storage, Unsplash, and other CDNs. */
 
+import { imageTransformsEnabled } from "@/lib/image-url";
+
 export const PRODUCT_CARD_WIDTHS = [200, 400, 600, 800] as const;
 export const PRODUCT_DETAIL_WIDTHS = [400, 800, 1200] as const;
 export const HERO_LCP_WIDTH = 900;
@@ -22,6 +24,9 @@ export function optimizeImageUrl(
     const objectPrefix = "/storage/v1/object/public/";
     const renderPrefix = "/storage/v1/render/image/public/";
     if (parsed.pathname.includes(objectPrefix)) {
+      if (!imageTransformsEnabled()) {
+        return url;
+      }
       const renderPath = parsed.pathname.replace(objectPrefix, renderPrefix);
       return `${parsed.origin}${renderPath}?width=${width}&quality=${quality}&resize=contain`;
     }
@@ -51,6 +56,9 @@ export function buildImageSrcSet(
   quality = 80
 ): string | undefined {
   if (!url || url.startsWith("/")) return undefined;
+  if (!imageTransformsEnabled()) {
+    return undefined;
+  }
   const parts = widths.map((w) => `${optimizeImageUrl(url, w, quality)} ${w}w`);
   return parts.length > 1 ? parts.join(", ") : undefined;
 }
