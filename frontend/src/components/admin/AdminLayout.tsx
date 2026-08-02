@@ -1,13 +1,14 @@
-import { ReactNode } from "react";
+import { Component, Suspense, type ErrorInfo, type ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "./AdminSidebar";
 import { HealthAlertBanner } from "./HealthAlertBanner";
 import { useRoles } from "@/hooks/use-roles";
 import { useAuth } from "@/contexts/AuthContext";
-import { ShieldCheck, Home, User, Store, Truck, LogOut, ChevronDown, LayoutDashboard } from "lucide-react";
+import { ShieldCheck, Home, User, Store, Truck, LogOut, ChevronDown, LayoutDashboard, Bell } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { lazyRetry } from "@/lib/lazy-retry";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+const NotificationCenter = lazyRetry(() =>
+  import("@/components/NotificationCenter").then((mod) => ({ default: mod.NotificationCenter }))
+);
+
+/** Isolates Radix Popover failures so the admin shell stays usable. */
+class SafeRadix extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error, _info: ErrorInfo) {
+    console.warn("[AdminLayout SafeRadix]", error.message);
+  }
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -64,6 +83,19 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
               <h1 className="text-base font-semibold text-foreground truncate">{title}</h1>
             </div>
             <div className="ml-auto flex items-center gap-2">
+              {user && (
+                <SafeRadix
+                  fallback={
+                    <Link to="/dashboard" className="p-2 text-foreground hover:text-primary" aria-label="Notifications">
+                      <Bell size={20} />
+                    </Link>
+                  }
+                >
+                  <Suspense fallback={<span className="p-2 text-foreground"><Bell size={20} /></span>}>
+                    <NotificationCenter />
+                  </Suspense>
+                </SafeRadix>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors outline-none">
                   {profile?.avatar_url ? (
