@@ -1,7 +1,9 @@
 /**
- * image-url — helpers pour servir les images Supabase via le endpoint
- * Storage Image Transformation (`/render/image/public/...`) avec resize +
- * conversion WebP à la volée. Bypass automatique pour les URLs externes.
+ * image-url — helpers pour servir les images Supabase.
+ *
+ * Par défaut (VITE_USE_IMAGE_TRANSFORM !== "true") : URL Storage originale
+ * `/object/public/...` — pas de Image Transformations (quota Pro 100).
+ * Si VITE_USE_IMAGE_TRANSFORM=true : `/render/image/...` avec resize + WebP.
  *
  * Utilisation :
  *   <img src={imgUrl(product.main_image_url, { width: 400 })} />
@@ -18,9 +20,15 @@ export interface ImgOptions {
   resize?: "cover" | "contain" | "fill";
 }
 
+/** Strict opt-in — absent or any value other than "true" disables transforms. */
+export function imageTransformsEnabled(): boolean {
+  return import.meta.env.VITE_USE_IMAGE_TRANSFORM === "true";
+}
+
 export function imgUrl(url: string | null | undefined, opts: ImgOptions = {}): string {
   if (!url) return "";
   if (!SUPABASE_OBJECT_RE.test(url)) return url; // Non-Supabase → tel quel
+  if (!imageTransformsEnabled()) return url;
 
   const transformed = url.replace(SUPABASE_OBJECT_RE, "/storage/v1/render/image/public/");
   const params = new URLSearchParams();
@@ -38,6 +46,7 @@ export function imgUrl(url: string | null | undefined, opts: ImgOptions = {}): s
 /**
  * Generate a srcSet for responsive images.
  * widths: [400, 800] → "<url@400> 400w, <url@800> 800w"
+ * When transforms are off, returns a single entry with the raw URL (or "").
  */
 export function imgSrcSet(
   url: string | null | undefined,
@@ -45,6 +54,9 @@ export function imgSrcSet(
   opts: Omit<ImgOptions, "width"> = {}
 ): string {
   if (!url) return "";
+  if (!imageTransformsEnabled()) {
+    return `${url} ${widths[0] ?? 800}w`;
+  }
   return widths
     .map((w) => `${imgUrl(url, { ...opts, width: w })} ${w}w`)
     .join(", ");

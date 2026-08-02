@@ -1,7 +1,8 @@
 /**
  * OptimizedImage — wrapper léger autour de <img> qui ajoute :
  *  - srcset/sizes automatiques pour les images servies par Supabase Storage
- *    (transformations `?width=…&quality=…`),
+ *    (transformations `?width=…&quality=…`) si VITE_USE_IMAGE_TRANSFORM=true,
+ *  - sinon URL Storage originale (évite le quota Image Transformations),
  *  - loading/lazy + decoding=async par défaut,
  *  - support `priority` pour les LCP (eager + fetchpriority=high),
  *  - fallback transparent si l'URL n'est pas reconnue (rendu <img> simple).
@@ -9,6 +10,7 @@
  * Aucune dépendance externe — drop-in pour <img>.
  */
 import React, { useMemo } from "react";
+import { imageTransformsEnabled } from "@/lib/image-url";
 
 const SUPABASE_OBJECT_RE = /\/storage\/v1\/object\/(public|sign)\/([^?]+)/;
 const DEFAULT_WIDTHS = [200, 400, 600, 900, 1200];
@@ -80,7 +82,7 @@ export const OptimizedImage = React.forwardRef<HTMLImageElement, OptimizedImageP
     ref,
   ) {
     const { srcSet, finalSrc } = useMemo(() => {
-      if (!src || !isSupabaseStorageUrl(src)) {
+      if (!src || !isSupabaseStorageUrl(src) || !imageTransformsEnabled()) {
         return { srcSet: undefined, finalSrc: src };
       }
       const mid = widths[Math.floor(widths.length / 2)] ?? 600;
