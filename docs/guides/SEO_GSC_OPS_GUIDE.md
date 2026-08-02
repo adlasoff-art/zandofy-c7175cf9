@@ -5,17 +5,15 @@ Mis à jour : 2026-08-02.
 
 ---
 
-## 0. Diagnostic live (important)
+# Diagnostic live (important)
 
 | Observation | Cause | Action |
 |-------------|--------|--------|
-| GSC ne récupère pas `https://www.zandofy.com/sitemap.xml` | **www → 307 → apex** (`zandofy.com`) | Soumettre le sitemap en **apex**, ou inverser la redirection |
-| `https://zandofy.com/sitemap.xml` = ancien XML court | Fichier statique `frontend/public/sitemap.xml` **prioritaire** sur le rewrite Vercel | Fichier **supprimé** ; rewrite → Edge `generate-sitemap` |
-| `sitemap-dynamic.xml` = catalogue + hubs | Rewrite OK vers Edge Function | Garder en GSC |
-| Edge `generate-sitemap` déjà à jour | Déployée récemment | Redeploy après chaque change code |
+| `/sitemap.xml` → SPA 404 / index.html | Rewrite externe Supabase ignoré ; catch-all SPA | Proxy Vercel [`frontend/api/sitemap.ts`](../../frontend/api/sitemap.ts) ← `/sitemap.xml` |
+| GSC ne récupère pas `www.../sitemap.xml` | **www → 307 → apex** | Soumettre sitemap en **apex** |
+| Edge `generate-sitemap` | Source XML | Redeploy après change |
 
-**Canonique retenue (alignée infra actuelle) :** `https://zandofy.com`  
-(www redirige déjà vers apex — Cloudflare/Vercel.)
+**Canonique live :** `https://zandofy.com`
 
 ---
 

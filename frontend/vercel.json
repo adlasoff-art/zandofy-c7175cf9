@@ -34,12 +34,12 @@
   ],
   "rewrites": [
     {
-      "source": "/sitemap-dynamic.xml",
-      "destination": "https://vpttoqojmiqxgudknyxf.supabase.co/functions/v1/generate-sitemap"
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
     },
     {
-      "source": "/sitemap.xml",
-      "destination": "https://vpttoqojmiqxgudknyxf.supabase.co/functions/v1/generate-sitemap"
+      "source": "/sitemap-dynamic.xml",
+      "destination": "/api/sitemap"
     },
     {
       "source": "/product/:slug",
