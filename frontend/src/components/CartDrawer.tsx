@@ -141,11 +141,11 @@ export function CartDrawer() {
                       onCheckedChange={() => toggleSelected(item.id)}
                     />
                   </div>
-                  <div className="w-24 h-24 shrink-0 rounded-sm overflow-hidden bg-muted border border-border">
+                  <div className="relative w-24 h-24 shrink-0 rounded-sm overflow-hidden bg-muted border border-border">
                     <img
-                      src={imgUrl(item.image, { width: 192 })}
+                      src={imgUrl(item.image, { width: 192, height: 192, resize: "cover" })}
                       alt={item.nameFr}
-                      className="w-full h-full object-contain object-center"
+                      className="absolute inset-0 w-full h-full object-cover object-center"
                       loading="lazy"
                       decoding="async"
                     />
