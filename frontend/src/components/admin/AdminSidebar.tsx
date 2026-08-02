@@ -35,7 +35,8 @@ const sidebarSections: SidebarSection[] = [
     label: "Opérations",
     icon: Package,
     items: [
-      { title: "Tableau de bord", url: "/admin", icon: LayoutDashboard },
+      { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
+      { title: "Tableau de bord", url: "/admin/dashboard", icon: LayoutDashboard },
       { title: "Commandes", url: "/admin/orders", icon: Package },
       { title: "Modération produits", url: "/admin/product-moderation", icon: ShieldCheck },
       { title: "Catégorisation produits", url: "/admin/product-categories", icon: FolderTree },
@@ -129,7 +130,6 @@ const sidebarSections: SidebarSection[] = [
       { title: "Santé système", url: "/admin/health", icon: Activity },
       { title: "Journal d'audit", url: "/admin/audit", icon: ScrollText },
       { title: "Notifications", url: "/admin/notifications", icon: Bell },
-      { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
       { title: "Paramètres", url: "/admin/settings", icon: Settings },
     ],
   },
@@ -137,8 +137,8 @@ const sidebarSections: SidebarSection[] = [
 
 function isActiveInSection(section: SidebarSection, pathname: string): boolean {
   return section.items.some((item) =>
-    item.url === "/admin"
-      ? pathname === "/admin"
+    item.url === "/admin/dashboard"
+      ? pathname === "/admin/dashboard"
       : pathname.startsWith(item.url)
   );
 }
@@ -244,8 +244,8 @@ export function AdminSidebar() {
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {section.items.map((item) => {
-                      const isActive = item.url === "/admin"
-                        ? location.pathname === "/admin"
+                      const isActive = item.url === "/admin/dashboard"
+                        ? location.pathname === "/admin/dashboard"
                         : location.pathname.startsWith(item.url);
                       const badge = badgeFor(item.badgeKey);
                       return (
@@ -289,8 +289,8 @@ export function AdminSidebar() {
               <CollapsibleContent>
                 <SidebarMenu className="pl-2">
                   {section.items.map((item) => {
-                    const isActive = item.url === "/admin"
-                      ? location.pathname === "/admin"
+                    const isActive = item.url === "/admin/dashboard"
+                      ? location.pathname === "/admin/dashboard"
                       : location.pathname.startsWith(item.url);
                     const badge = badgeFor(item.badgeKey);
                     return (

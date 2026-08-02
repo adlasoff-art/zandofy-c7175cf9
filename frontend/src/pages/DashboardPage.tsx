@@ -1823,7 +1823,16 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
       return;
     }
     const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
-    setProfile(prev => ({ ...prev, avatar_url: urlData.publicUrl }));
+    const publicUrl = urlData.publicUrl;
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ avatar_url: publicUrl })
+      .eq("id", user.id);
+    if (updateError) {
+      toast({ title: t("profile.avatar.error"), description: updateError.message, variant: "destructive" });
+      return;
+    }
+    setProfile(prev => ({ ...prev, avatar_url: publicUrl }));
     toast({ title: t("profile.avatar.updated") });
   };
 

@@ -55,6 +55,92 @@ function isPWA(): boolean {
     || (navigator as any).standalone === true;
 }
 
+const UTM_STORAGE_KEY = "z_utm";
+const SOCIAL_HINTS = ["facebook", "instagram", "twitter", "t.co", "linkedin", "tiktok", "whatsapp", "t.me", "youtube", "snapchat", "pinterest"];
+const SEARCH_HINTS = ["google.", "bing.", "yahoo.", "duckduckgo.", "baidu.", "yandex."];
+
+function isSelfHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return h.includes("zandofy.com") || h === "localhost" || h.startsWith("127.0.0.1");
+}
+
+function captureUtmAndSource(): {
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  utm_term: string | null;
+  landing_referrer: string | null;
+  source_class: string;
+} {
+  const params = new URLSearchParams(window.location.search);
+  let utm_source = params.get("utm_source");
+  let utm_medium = params.get("utm_medium");
+  let utm_campaign = params.get("utm_campaign");
+  let utm_content = params.get("utm_content");
+  let utm_term = params.get("utm_term");
+
+  if (utm_source || utm_medium || utm_campaign) {
+    try {
+      sessionStorage.setItem(
+        UTM_STORAGE_KEY,
+        JSON.stringify({ utm_source, utm_medium, utm_campaign, utm_content, utm_term })
+      );
+    } catch { /* ignore */ }
+  } else {
+    try {
+      const cached = sessionStorage.getItem(UTM_STORAGE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        utm_source = parsed.utm_source ?? null;
+        utm_medium = parsed.utm_medium ?? null;
+        utm_campaign = parsed.utm_campaign ?? null;
+        utm_content = parsed.utm_content ?? null;
+        utm_term = parsed.utm_term ?? null;
+      }
+    } catch { /* ignore */ }
+  }
+
+  const landing_referrer = document.referrer || null;
+  const refLower = (landing_referrer || "").toLowerCase();
+  const utmBlob = `${utm_source || ""} ${utm_medium || ""}`.toLowerCase();
+
+  let source_class = "direct";
+  if (isPWA()) {
+    source_class = "pwa";
+  } else if (
+    SOCIAL_HINTS.some((h) => utmBlob.includes(h) || refLower.includes(h)) ||
+    utm_medium === "social" ||
+    utm_medium === "social-media"
+  ) {
+    source_class = "social";
+  } else if (
+    SEARCH_HINTS.some((h) => refLower.includes(h)) ||
+    utm_medium === "organic" ||
+    utm_medium === "cpc" ||
+    utm_medium === "seo"
+  ) {
+    source_class = "search";
+  } else if (landing_referrer) {
+    try {
+      const host = new URL(landing_referrer).hostname;
+      source_class = isSelfHost(host) ? "direct" : "referral";
+    } catch {
+      source_class = "referral";
+    }
+  }
+
+  return {
+    utm_source,
+    utm_medium,
+    utm_campaign,
+    utm_content,
+    utm_term,
+    landing_referrer,
+    source_class,
+  };
+}
+
 /**
  * Read geo data from the shared session cache. We deliberately DO NOT call
  * ipapi.co here anymore: it adds ~2s of blocking I/O on the LCP critical path
@@ -125,6 +211,13 @@ function deferToIdle(fn: () => void, timeout = 2000) {
   }
 }
 
+/** Public helper for search submits / trending clicks */
+export function trackSearchQuery(query: string, userId?: string) {
+  const q = query.trim();
+  if (q.length < 2) return;
+  deferToIdle(() => trackEvent("search", { metadata: { query: q } }, userId));
+}
+
 export function useAnalyticsTracker() {
   const location = useLocation();
   const { user } = useAuth();
@@ -135,7 +228,17 @@ export function useAnalyticsTracker() {
   useEffect(() => {
     sessionStartRef.current = Date.now();
     // Defer session_start to idle so it never blocks LCP/FCP
-    deferToIdle(() => trackEvent("session_start", {}, user?.id));
+    deferToIdle(() => {
+      const acquisition = captureUtmAndSource();
+      trackEvent(
+        "session_start",
+        {
+          metadata: acquisition,
+          referrer: acquisition.landing_referrer || document.referrer || null,
+        },
+        user?.id
+      );
+    });
 
     const handleBeforeUnload = () => {
       const duration = Math.round((Date.now() - sessionStartRef.current) / 1000);

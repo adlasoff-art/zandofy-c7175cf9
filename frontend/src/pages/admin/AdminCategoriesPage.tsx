@@ -274,6 +274,9 @@ export default function AdminCategoriesPage() {
             ) : (
               <div>
                 <label className="text-xs text-muted-foreground block mb-1">Image de catégorie</label>
+                <p className="text-[10px] text-muted-foreground mb-2">
+                  Icône cercle : PNG/WebP carré 168×168, sujet centré, peu de marge.
+                </p>
                 {form.image_url && (
                   <div className="w-full h-20 rounded-lg overflow-hidden mb-2 bg-muted">
                     <img src={form.image_url} alt="" className="w-full h-full object-cover" />

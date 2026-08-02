@@ -7,13 +7,15 @@ import { useI18n } from "@/contexts/I18nContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useVisualSearchEnabled } from "@/hooks/useVisualSearchEnabled";
+import { useAuth } from "@/contexts/AuthContext";
+import { trackSearchQuery } from "@/hooks/use-analytics";
 
 interface PredictiveSearchProps {
   mobile?: boolean;
   onClose?: () => void;
 }
 
-const TRENDING_SEARCHES = [
+const FALLBACK_TRENDING = [
   "Robe été",
   "Sac à main",
   "Sneakers",
@@ -36,9 +38,11 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
   const [hoveredSuggestion, setHoveredSuggestion] = useState<string | null>(null);
   const [previewProducts, setPreviewProducts] = useState<Product[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [trendingSearches, setTrendingSearches] = useState<string[]>(FALLBACK_TRENDING);
   const navigate = useNavigate();
   const { t } = useI18n();
   const { toast } = useToast();
+  const { user } = useAuth();
   const { enabled: visualSearchEnabled } = useVisualSearchEnabled();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -46,18 +50,40 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  // Load real trending searches (fallback to curated list if empty / cold start)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const since = new Date(Date.now() - 7 * 24 * 3600000).toISOString();
+        const { data, error } = await (supabase as any).rpc("get_trending_searches", {
+          p_since: since,
+          p_limit: 8,
+        });
+        if (error || cancelled) return;
+        const terms = ((data || []) as { query: string }[])
+          .map((r) => r.query)
+          .filter(Boolean);
+        if (terms.length > 0) setTrendingSearches(terms);
+      } catch {
+        // keep fallback
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // Animated placeholder rotation
   useEffect(() => {
-    if (query.length > 0) return;
+    if (query.length > 0 || trendingSearches.length === 0) return;
     const interval = setInterval(() => {
       setPlaceholderVisible(false);
       setTimeout(() => {
-        setPlaceholderIndex((prev) => (prev + 1) % TRENDING_SEARCHES.length);
+        setPlaceholderIndex((prev) => (prev + 1) % trendingSearches.length);
         setPlaceholderVisible(true);
       }, 300);
     }, 3000);
     return () => clearInterval(interval);
-  }, [query]);
+  }, [query, trendingSearches]);
 
   // Debounced autocomplete
   useEffect(() => {
@@ -112,6 +138,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
       const updated = [query.trim(), ...history.filter((h) => h !== query.trim())].slice(0, 5);
       localStorage.setItem("search_history", JSON.stringify(updated));
     } catch { /* ignore */ }
+    trackSearchQuery(query.trim(), user?.id);
     navigate(`/search?q=${encodeURIComponent(query.trim())}`);
     setOpen(false);
     onClose?.();
@@ -119,6 +146,12 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
 
   const handleTrendClick = (term: string) => {
     setQuery(term);
+    try {
+      const history = JSON.parse(localStorage.getItem("search_history") || "[]") as string[];
+      const updated = [term, ...history.filter((h) => h !== term)].slice(0, 5);
+      localStorage.setItem("search_history", JSON.stringify(updated));
+    } catch { /* ignore */ }
+    trackSearchQuery(term, user?.id);
     navigate(`/search?q=${encodeURIComponent(term)}`);
     setOpen(false);
     onClose?.();
@@ -219,7 +252,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
   })();
 
   const showDropdown = open && (query.length >= 2 || query.length === 0);
-  const animatedPlaceholder = query.length === 0 ? TRENDING_SEARCHES[placeholderIndex] : "";
+  const animatedPlaceholder = query.length === 0 ? trendingSearches[placeholderIndex % trendingSearches.length] : "";
 
   return (
     <>
@@ -388,7 +421,7 @@ export function PredictiveSearch({ mobile, onClose }: PredictiveSearchProps) {
                   <TrendingUp size={10} />
                   {t("search.trending")}
                 </p>
-                {TRENDING_SEARCHES.slice(0, 6).map((term, i) => (
+                {trendingSearches.slice(0, 6).map((term, i) => (
                   <button
                     key={term}
                     onClick={() => handleTrendClick(term)}

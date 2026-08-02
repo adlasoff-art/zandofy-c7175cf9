@@ -35,7 +35,7 @@ export function MobileBottomNav() {
     if (isOnSearchPage) {
       window.dispatchEvent(new CustomEvent(TOGGLE_SEARCH_EVENT));
     } else {
-      navigate("/search");
+      navigate("/search", { state: { openSearch: true } });
     }
   }, [isOnSearchPage, navigate]);
 
