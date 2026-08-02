@@ -14,6 +14,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useBranding } from "@/hooks/use-branding";
 
 interface SidebarItem {
   title: string;
@@ -148,6 +149,8 @@ export function AdminSidebar() {
   const { isAdmin } = useRoles();
   const { user } = useAuth();
   const location = useLocation();
+  const { data: branding } = useBranding();
+  const logoUrl = branding?.header_logo_url || branding?.footer_logo_url || null;
 
   const { data: profile } = useQuery({
     queryKey: ["admin-sidebar-profile", user?.id],
@@ -208,10 +211,19 @@ export function AdminSidebar() {
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
       <SidebarContent>
-        {/* Logo + version */}
+        {/* Logo + version — slot carré = logo branding (fallback Z) */}
         <div className={cn("flex items-center gap-2.5 px-3 py-3 border-b border-border", collapsed && "justify-center")}>
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-            <span className="text-primary-foreground font-bold text-sm">Z</span>
+          <div
+            className={cn(
+              "w-8 h-8 rounded-lg shrink-0 flex items-center justify-center overflow-hidden",
+              logoUrl ? "bg-card border border-border" : "bg-primary"
+            )}
+          >
+            {logoUrl ? (
+              <img src={logoUrl} alt="Zandofy" className="w-full h-full object-contain p-0.5" />
+            ) : (
+              <span className="text-primary-foreground font-bold text-sm">Z</span>
+            )}
           </div>
           {!collapsed && (
             <div className="min-w-0">
