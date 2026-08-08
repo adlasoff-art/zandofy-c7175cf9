@@ -96,7 +96,7 @@ export default function CategoryPage() {
       const normalizedSlug = slugify(decodedSlug);
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name, name_fr, icon, parent_id, image_url, meta_title, meta_description, seo_keywords, og_image_url")
+        .select("id, name, name_fr, icon, parent_id, image_url, meta_title, meta_description, seo_keywords, og_image_url, seo_body, seo_faq")
         .order("name");
       if (error) throw error;
       const all = data || [];
@@ -244,6 +244,24 @@ export default function CategoryPage() {
       ? `Découvrez ${filteredProducts?.length || 0} produits ${catLabel} sur Zandofy. Import Chine, livraison Afrique.`
       : `Discover ${filteredProducts?.length || 0} ${catLabel} products on Zandofy. China import, Africa delivery.`);
 
+  const catFaq = Array.isArray((category as any).seo_faq)
+    ? ((category as any).seo_faq as { question?: string; answer?: string }[]).filter(
+        (f) => f?.question && f?.answer,
+      )
+    : [];
+  const catFaqLd =
+    catFaq.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: catFaq.map((f) => ({
+            "@type": "Question",
+            name: f.question,
+            acceptedAnswer: { "@type": "Answer", text: f.answer },
+          })),
+        }
+      : null;
+
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
@@ -268,6 +286,7 @@ export default function CategoryPage() {
             })),
             catLabel,
           ),
+          ...(catFaqLd ? [catFaqLd] : []),
         )}
       />
       <Header />
@@ -306,6 +325,12 @@ export default function CategoryPage() {
             </div>
           </div>
         </div>
+
+        {(category as any).seo_body && (
+          <div className="prose prose-sm max-w-none mb-6 text-muted-foreground whitespace-pre-line">
+            {(category as any).seo_body}
+          </div>
+        )}
 
         {/* Subcategories */}
         {!isSpecial && category.subcategories && category.subcategories.length > 0 && (

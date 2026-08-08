@@ -728,6 +728,13 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
+            {(form.description || "").trim().length > 0 &&
+              (form.description || "").trim().length < 150 && (
+                <p className="text-[11px] text-amber-600 mt-1">
+                  Conseil SEO : visez au moins 150 caractères de description réelle (actuellement{" "}
+                  {(form.description || "").trim().length}).
+                </p>
+              )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Matière" value={form.material} onChange={(v) => setForm({ ...form, material: v })} />

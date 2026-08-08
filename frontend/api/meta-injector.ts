@@ -73,6 +73,7 @@ function buildSeoMainHtml(opts: {
   h1: string;
   price?: string;
   description?: string;
+  articleBody?: string;
   breadcrumb?: { name: string; href: string }[];
   ctaHref: string;
   ctaLabel: string;
@@ -94,7 +95,14 @@ function buildSeoMainHtml(opts: {
   const desc = opts.description
     ? `<p class="desc">${escapeHtml(stripHtml(opts.description).slice(0, 500))}</p>`
     : "";
-  return `<main id="zandofy-seo-main"><style>#zandofy-seo-main{font-family:system-ui,sans-serif;max-width:42rem;margin:1rem auto;padding:0 1rem;line-height:1.5;color:#111}#zandofy-seo-main h1{font-size:1.5rem;margin:0 0 .5rem}#zandofy-seo-main .price{font-weight:700;font-size:1.125rem;margin:.5rem 0}#zandofy-seo-main .desc{margin:.75rem 0;color:#333}#zandofy-seo-main nav ol{display:flex;flex-wrap:wrap;gap:.35rem;list-style:none;padding:0;margin:0 0 1rem;font-size:.875rem;color:#555}#zandofy-seo-main nav li:not(:last-child)::after{content:"›";margin-left:.35rem;color:#999}#zandofy-seo-main a{color:#0a5}</style>${crumbs}<h1>${escapeHtml(opts.h1)}</h1>${price}${desc}<p><a href="${escapeHtml(opts.ctaHref)}">${escapeHtml(opts.ctaLabel)}</a></p></main>`;
+  const article = opts.articleBody
+    ? `<div class="article">${escapeHtml(stripHtml(opts.articleBody).slice(0, 8000))
+        .split(/\n+/)
+        .filter(Boolean)
+        .map((p) => `<p>${p}</p>`)
+        .join("")}</div>`
+    : "";
+  return `<main id="zandofy-seo-main"><style>#zandofy-seo-main{font-family:system-ui,sans-serif;max-width:42rem;margin:1rem auto;padding:0 1rem;line-height:1.5;color:#111}#zandofy-seo-main h1{font-size:1.5rem;margin:0 0 .5rem}#zandofy-seo-main .price{font-weight:700;font-size:1.125rem;margin:.5rem 0}#zandofy-seo-main .desc,#zandofy-seo-main .article{margin:.75rem 0;color:#333}#zandofy-seo-main .article p{margin:.5rem 0}#zandofy-seo-main nav ol{display:flex;flex-wrap:wrap;gap:.35rem;list-style:none;padding:0;margin:0 0 1rem;font-size:.875rem;color:#555}#zandofy-seo-main nav li:not(:last-child)::after{content:"›";margin-left:.35rem;color:#999}#zandofy-seo-main a{color:#0a5}</style>${crumbs}<h1>${escapeHtml(opts.h1)}</h1>${price}${desc}${article}<p><a href="${escapeHtml(opts.ctaHref)}">${escapeHtml(opts.ctaLabel)}</a></p></main>`;
 }
 
 function escapeJsonLd(s: string): string {
@@ -606,7 +614,7 @@ async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
 async function buildCategoryMeta(slug: string): Promise<MetaPayload | null> {
   const cfg = await getSeoConfig();
   const rows = await sbFetch(
-    `categories?select=id,name,name_fr,image_url,meta_title,meta_description,seo_keywords,og_image_url,parent_id&limit=500`,
+    `categories?select=id,name,name_fr,image_url,meta_title,meta_description,seo_keywords,og_image_url,parent_id,seo_body,seo_faq&limit=500`,
   );
   const c =
     rows.find(
@@ -627,6 +635,7 @@ async function buildCategoryMeta(slug: string): Promise<MetaPayload | null> {
   );
   const description = truncate(
     c?.meta_description ||
+      (c?.seo_body ? stripHtml(String(c.seo_body)).slice(0, 160) : "") ||
       applyTemplate(descTpl, { name: displayName, brand: cfg.brand_name || "Zandofy" }),
   );
 
@@ -676,6 +685,28 @@ async function buildCategoryMeta(slug: string): Promise<MetaPayload | null> {
         }
       : null;
 
+  const faqItems = Array.isArray(c?.seo_faq)
+    ? (c.seo_faq as { question?: string; answer?: string }[]).filter(
+        (f) => f?.question && f?.answer,
+      )
+    : [];
+  const faqLd =
+    faqItems.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: faqItems.map((f) => ({
+            "@type": "Question",
+            name: f.question,
+            acceptedAnswer: { "@type": "Answer", text: f.answer },
+          })),
+        }
+      : null;
+
+  const jsonNodes: Record<string, unknown>[] = [collectionLd, breadcrumb];
+  if (itemList) jsonNodes.push(itemList);
+  if (faqLd) jsonNodes.push(faqLd);
+
   return {
     title,
     description,
@@ -683,10 +714,11 @@ async function buildCategoryMeta(slug: string): Promise<MetaPayload | null> {
     image,
     ogType: "website",
     keywords: Array.isArray(c?.seo_keywords) ? c.seo_keywords.join(", ") : undefined,
-    jsonLd: itemList ? [collectionLd, breadcrumb, itemList] : [collectionLd, breadcrumb],
+    jsonLd: jsonNodes,
     bodyHtml: buildSeoMainHtml({
       h1: displayName,
       description,
+      articleBody: c?.seo_body ? String(c.seo_body) : undefined,
       breadcrumb: [
         { name: "Accueil", href: `${getSiteUrl()}/` },
         { name: displayName, href: canonical },
@@ -699,7 +731,7 @@ async function buildCategoryMeta(slug: string): Promise<MetaPayload | null> {
 
 async function buildBlogMeta(slug: string): Promise<MetaPayload | null> {
   const rows = await sbFetch(
-    `blog_posts?slug=eq.${encodeURIComponent(slug)}&status=eq.published&select=title,excerpt,meta_title,meta_description,cover_image_url,og_image_url,published_at,updated_at,seo_keywords&limit=1`,
+    `blog_posts?slug=eq.${encodeURIComponent(slug)}&status=eq.published&select=title,excerpt,content,meta_title,meta_description,cover_image_url,og_image_url,published_at,updated_at,seo_keywords,author_id&limit=1`,
   );
   const b = rows[0];
   if (!b) return null;
@@ -708,6 +740,7 @@ async function buildBlogMeta(slug: string): Promise<MetaPayload | null> {
   const image = toAbsoluteOgImage(b.og_image_url || b.cover_image_url);
   const title = b.meta_title || `${b.title} | Zandofy`;
   const description = truncate(b.meta_description || b.excerpt || b.title);
+  const articleBody = b.content || b.excerpt || "";
 
   return {
     title,
@@ -723,7 +756,8 @@ async function buildBlogMeta(slug: string): Promise<MetaPayload | null> {
       image,
       url: canonical,
       datePublished: b.published_at,
-      dateModified: b.updated_at,
+      dateModified: b.updated_at || b.published_at,
+      articleBody: articleBody ? stripHtml(String(articleBody)).slice(0, 5000) : undefined,
       keywords: Array.isArray(b.seo_keywords) ? b.seo_keywords.join(", ") : undefined,
       publisher: {
         "@type": "Organization",
@@ -734,6 +768,7 @@ async function buildBlogMeta(slug: string): Promise<MetaPayload | null> {
     bodyHtml: buildSeoMainHtml({
       h1: b.title,
       description,
+      articleBody: articleBody || undefined,
       breadcrumb: [
         { name: "Accueil", href: `${getSiteUrl()}/` },
         { name: "Blog", href: `${getSiteUrl()}/blog` },

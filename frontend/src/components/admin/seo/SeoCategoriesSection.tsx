@@ -12,6 +12,8 @@ type CatRow = {
   meta_description: string | null;
   seo_keywords: string[] | null;
   og_image_url: string | null;
+  seo_body: string | null;
+  seo_faq: { question: string; answer: string }[] | null;
 };
 
 const inputClass =
@@ -29,15 +31,15 @@ export function SeoCategoriesSection() {
       setLoading(true);
       const { data, error } = await supabase
         .from("categories")
-        .select("id, name, name_fr, meta_title, meta_description, seo_keywords, og_image_url")
+        .select("id, name, name_fr, meta_title, meta_description, seo_keywords, og_image_url, seo_body, seo_faq")
         .is("parent_id", null)
         .order("name_fr");
       if (error) {
         // Columns may not exist yet on staging — soft fail
         toast({
           title: "Catégories SEO",
-          description: error.message.includes("meta_title")
-            ? "Exécutez d'abord la migration categories_seo sur Supabase."
+          description: error.message.includes("meta_title") || error.message.includes("seo_body")
+            ? "Exécutez d'abord les migrations categories_seo / seo_body sur Supabase."
             : error.message,
           variant: "destructive",
         });
@@ -66,6 +68,8 @@ export function SeoCategoriesSection() {
         meta_description: current.meta_description?.trim() || null,
         seo_keywords: current.seo_keywords?.length ? current.seo_keywords : null,
         og_image_url: current.og_image_url?.trim() || null,
+        seo_body: current.seo_body?.trim() || null,
+        seo_faq: current.seo_faq?.length ? current.seo_faq : null,
       } as any)
       .eq("id", current.id);
     setSaving(false);
@@ -139,6 +143,37 @@ export function SeoCategoriesSection() {
               maxLength={180}
               rows={3}
               className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">
+              Texte SEO long ({(current.seo_body || "").length} car. — cible 300–500 mots)
+            </label>
+            <textarea
+              value={current.seo_body || ""}
+              onChange={(e) => patch({ seo_body: e.target.value })}
+              rows={8}
+              className={inputClass}
+              placeholder="Contenu éditorial réel pour la catégorie (pas de texte inventé). Visible bots + page."
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">
+              FAQ JSON (réelles uniquement) — [{`{"question","answer"}`}, …]
+            </label>
+            <textarea
+              value={JSON.stringify(current.seo_faq || [], null, 2)}
+              onChange={(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value || "[]");
+                  if (Array.isArray(parsed)) patch({ seo_faq: parsed });
+                } catch {
+                  /* keep typing invalid JSON until blur/save */
+                }
+              }}
+              rows={5}
+              className={`${inputClass} font-mono text-xs`}
+              placeholder='[{"question":"…","answer":"…"}]'
             />
           </div>
           <div>
