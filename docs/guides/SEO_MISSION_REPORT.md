@@ -7,6 +7,15 @@
 
 ---
 
+## 0. Incident 8 août 2026 — meta-injector servi comme SPA
+
+**Symptôme :** `curl -A Googlebot` → ~9 ko `index.html` identique (pas de H1 / Product).
+**Cause :** `vercel.json` rewrite catch-all `/(.*) → /index.html` capturait aussi `/api/meta-injector`
+(`content-disposition: inline; filename="index.html"`).
+**Fix :** exclure `/api/*` du catch-all (`/((?!api/).*)`). Déployer puis retester.
+
+---
+
 ## 1. Witness URLs (post-deploy verification)
 
 Run after Vercel production deploy + edge `generate-sitemap` redeploy:
