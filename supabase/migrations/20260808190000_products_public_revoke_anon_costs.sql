@@ -80,7 +80,39 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.products TO authenticated;
 GRANT ALL ON TABLE public.products TO service_role;
 
 -- Coupons: ensure anon cannot enumerate codes (audit v7 F3). Validation via RPC only.
-REVOKE ALL ON TABLE public.coupons FROM anon;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.coupons TO authenticated;
-GRANT ALL ON TABLE public.coupons TO service_role;
+DO $$
+BEGIN
+  IF to_regclass('public.coupons') IS NOT NULL THEN
+    REVOKE ALL ON TABLE public.coupons FROM anon;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.coupons TO authenticated;
+    GRANT ALL ON TABLE public.coupons TO service_role;
+  END IF;
+END $$;
+
+-- Create RPC if missing (may not have been applied on all environments).
+CREATE OR REPLACE FUNCTION public.validate_coupon(p_code text)
+RETURNS TABLE (
+  code text,
+  discount_type text,
+  discount_value numeric,
+  min_order_amount numeric,
+  max_uses integer,
+  current_uses integer,
+  expires_at timestamptz,
+  target_city text,
+  target_country text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT c.code, c.discount_type, c.discount_value, c.min_order_amount,
+         c.max_uses, c.current_uses, c.expires_at, c.target_city, c.target_country
+  FROM public.coupons c
+  WHERE c.code = upper(trim(p_code))
+    AND c.is_active = true
+  LIMIT 1;
+$$;
+
 GRANT EXECUTE ON FUNCTION public.validate_coupon(text) TO anon, authenticated;
