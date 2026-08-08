@@ -55,9 +55,9 @@ export function ProductBuyColumn({
 
   return (
     <div className="space-y-3">
-      <h1 className="hidden lg:block text-lg md:text-xl font-semibold text-foreground leading-tight line-clamp-3">
+      <p className="hidden lg:block text-lg md:text-xl font-semibold text-foreground leading-tight line-clamp-3">
         {product.nameFr}
-      </h1>
+      </p>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
         <span className="inline-flex items-center gap-1 text-foreground">

@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fromTable } from "@/lib/supabase-helpers";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { SEOHead } from "@/components/SEOHead";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1711,6 +1712,7 @@ export default function CheckoutPage() {
 
   return (
       <div className="min-h-screen bg-background pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
+      <SEOHead title="Checkout" description="Finaliser votre commande Zandofy." canonical="/checkout" noindex />
       <Header />
       <main className="container py-4 md:py-10">
         {/* Mobile checkout progress + back */}

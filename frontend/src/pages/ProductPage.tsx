@@ -283,11 +283,19 @@ export default function ProductPage() {
   }
 
   if (!product) {
+    const gonePath = id ? `/product/${id}` : "/product/unavailable";
     return (
       <div className="min-h-screen bg-background">
+        <SEOHead
+          title="Produit retiré | Zandofy"
+          description="Ce produit n'est plus disponible sur Zandofy."
+          noindex
+          canonical={gonePath}
+        />
         <Header />
         <main className="max-w-7xl mx-auto px-4 py-20 text-center">
           <h1 className="text-2xl font-bold text-foreground">{t("product.notFound")}</h1>
+          <p className="text-muted-foreground mt-2">Ce produit n&apos;est plus disponible.</p>
           <Link to="/" className="text-primary underline mt-4 inline-block">{t("product.backToHome")}</Link>
         </main>
         <Footer />
@@ -311,8 +319,9 @@ export default function ProductPage() {
     currency: product.currency,
     rating: product.rating,
     reviewCount: product.reviewCount,
-    sku: product.sku,
+    sku: product.sku || product.id,
     storeName: (product as any).store?.name,
+    url: `/product/${product.slug || product.id}`,
   });
   const categorySlug = slugify(product.category || product.categoryFr || "produit");
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
@@ -324,7 +333,10 @@ export default function ProductPage() {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title={product.metaTitle || `${product.nameFr} — ${product.categoryFr}`}
+        title={
+          product.metaTitle ||
+          `${product.nameFr} — ${product.categoryFr || "Marketplace"} à prix Kinshasa`
+        }
         description={seoDescription}
         canonical={`/product/${product.slug || product.id}`}
         ogImage={productOgImage}
@@ -364,7 +376,8 @@ export default function ProductPage() {
                 onPrev={goGalleryPrev}
                 onNext={goGalleryNext}
               />
-              <h1 className="lg:hidden text-lg font-semibold text-primary leading-tight line-clamp-3">
+              {/* Single page H1: visible on mobile, screen-reader only on desktop (desktop title is visual duplicate in buy column). */}
+              <h1 className="text-lg font-semibold text-primary leading-tight line-clamp-3 lg:sr-only">
                 {product.nameFr}
               </h1>
             </div>

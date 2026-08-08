@@ -31,7 +31,32 @@ function normalizeJsonLd(jsonLd: Record<string, any> | Record<string, any>[]): R
 }
 
 const SITE_NAME = "Zandofy";
-const SITE_URL = import.meta.env.VITE_SITE_URL || "https://zandofy.com";
+const SITE_URL = (import.meta.env.VITE_SITE_URL || "https://zandofy.com").replace(/\/$/, "");
+
+/** Strip tracking/filter params; keep self-referencing pagination (?page=N). */
+export function buildCleanCanonical(pathOrUrl?: string): string {
+  const site = SITE_URL;
+  let path = pathOrUrl || (typeof window !== "undefined" ? window.location.pathname : "/");
+  let pageParam: string | null = null;
+
+  try {
+    if (path.startsWith("http")) {
+      const u = new URL(path);
+      pageParam = u.searchParams.get("page");
+      path = u.pathname || "/";
+    } else if (path.includes("?")) {
+      const u = new URL(path, site);
+      pageParam = u.searchParams.get("page");
+      path = u.pathname || "/";
+    }
+  } catch {
+    path = path.split("?")[0] || "/";
+  }
+
+  if (!path.startsWith("/")) path = `/${path}`;
+  const page = pageParam && /^\d+$/.test(pageParam) && Number(pageParam) > 1 ? `?page=${pageParam}` : "";
+  return `${site}${path}${page}`;
+}
 
 export function SEOHead({ title, description, canonical, ogImage, ogType = "website", jsonLd, noindex }: SEOHeadProps) {
   const { seoEnabled } = useSeoEnabled();
@@ -53,7 +78,15 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
 
     // When SEO is disabled OR page explicitly requests noindex
     if (!seoEnabled || noindex) {
-      setMeta("robots", "noindex, nofollow");
+      setMeta("robots", "noindex, follow");
+      const clean = buildCleanCanonical(canonical);
+      let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "canonical";
+        document.head.appendChild(link);
+      }
+      link.href = clean;
       return () => {
         document.querySelector('script[data-seo-jsonld]')?.remove();
       };
@@ -91,10 +124,7 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
     setMeta("og:type", ogType, "property");
     setMeta("og:site_name", SITE_NAME, "property");
 
-    const canonicalPath = canonical || window.location.pathname;
-    const canonicalUrl = canonicalPath.startsWith("http")
-      ? canonicalPath
-      : `${SITE_URL}${canonicalPath}`;
+    const canonicalUrl = buildCleanCanonical(canonical);
     setMeta("og:url", canonicalUrl, "property");
 
     if (resolvedOgImage) setMeta("og:image", resolvedOgImage, "property");
@@ -106,7 +136,7 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
     setMeta("twitter:site", "@Zandofy");
     if (resolvedOgImage) setMeta("twitter:image", resolvedOgImage);
 
-    // Canonical — always set, fallback to current pathname
+    // Canonical — absolute apex, no tracking/filter params
     let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     if (!link) {
       link = document.createElement("link");
@@ -115,24 +145,19 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
     }
     link.href = canonicalUrl;
 
-    // hreflang tags
-    const lang = seoConfig.site_language || "fr";
-    const currentUrl = canonical
-      ? (canonical.startsWith("http") ? canonical : `${SITE_URL}${canonical}`)
-      : `${SITE_URL}${window.location.pathname}`;
-
+    // hreflang: fr-CD (market default) + x-default
     const setHreflang = (hrefLang: string, href: string) => {
-      let link = document.querySelector(`link[rel="alternate"][hreflang="${hrefLang}"]`) as HTMLLinkElement | null;
-      if (!link) {
-        link = document.createElement("link");
-        link.rel = "alternate";
-        link.setAttribute("hreflang", hrefLang);
-        document.head.appendChild(link);
+      let hl = document.querySelector(`link[rel="alternate"][hreflang="${hrefLang}"]`) as HTMLLinkElement | null;
+      if (!hl) {
+        hl = document.createElement("link");
+        hl.rel = "alternate";
+        hl.setAttribute("hreflang", hrefLang);
+        document.head.appendChild(hl);
       }
-      link.href = href;
+      hl.href = href;
     };
-    setHreflang(lang, currentUrl);
-    setHreflang("x-default", currentUrl);
+    setHreflang("fr-CD", canonicalUrl);
+    setHreflang("x-default", canonicalUrl);
 
     // JSON-LD
     if (jsonLd) {
@@ -146,12 +171,12 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
       script.textContent = JSON.stringify(normalizeJsonLd(jsonLd));
     }
 
-    // Google Analytics / GTM
+    // Google Analytics / GTM — idle deferral (never on LCP critical path)
     if (seoConfig.google_analytics_id) {
       const gaId = seoConfig.google_analytics_id;
-      const existingScript = document.querySelector(`script[src*="googletagmanager.com"][data-seo-ga]`);
-      if (!existingScript) {
-        // gtag.js loader
+      const loadGa = () => {
+        const existingScript = document.querySelector(`script[src*="googletagmanager.com"][data-seo-ga]`);
+        if (existingScript) return;
         const gtagScript = document.createElement("script");
         gtagScript.async = true;
         gtagScript.src = gaId.startsWith("GTM-")
@@ -171,6 +196,12 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
           `;
           document.head.appendChild(inlineScript);
         }
+      };
+      const w = window as any;
+      if (typeof w.requestIdleCallback === "function") {
+        w.requestIdleCallback(loadGa, { timeout: 4000 });
+      } else {
+        setTimeout(loadGa, 2000);
       }
     }
 
@@ -193,7 +224,21 @@ export function buildProductJsonLd(product: {
   reviewCount?: number;
   sku?: string;
   storeName?: string;
+  url?: string;
+  availability?: string;
+  inStock?: boolean;
 }) {
+  const offerUrl = product.url
+    ? buildCleanCanonical(product.url)
+    : typeof window !== "undefined"
+      ? buildCleanCanonical(window.location.pathname)
+      : SITE_URL;
+  const availability =
+    product.availability ||
+    (product.inStock === false
+      ? "https://schema.org/OutOfStock"
+      : "https://schema.org/InStock");
+
   const ld: Record<string, any> = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -206,15 +251,16 @@ export function buildProductJsonLd(product: {
       "@type": "Offer",
       priceCurrency: product.currency || "USD",
       price: Number(product.price ?? 0).toFixed(2),
-      availability: "https://schema.org/InStock",
-      url: typeof window !== "undefined" ? window.location.href : "",
+      availability,
+      url: offerUrl,
     },
   };
-  if (product.rating && product.reviewCount) {
+  // aggregateRating only with real reviews in DB — never invent
+  if (product.rating != null && Number(product.reviewCount) > 0) {
     ld.aggregateRating = {
       "@type": "AggregateRating",
-      ratingValue: product.rating.toFixed(1),
-      reviewCount: product.reviewCount,
+      ratingValue: Number(product.rating).toFixed(1),
+      reviewCount: Number(product.reviewCount),
     };
   }
   return ld;

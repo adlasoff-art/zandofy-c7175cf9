@@ -56,7 +56,16 @@ function isPWA(): boolean {
 }
 
 const UTM_STORAGE_KEY = "z_utm";
-const SOCIAL_HINTS = ["facebook", "instagram", "twitter", "t.co", "linkedin", "tiktok", "whatsapp", "t.me", "youtube", "snapchat", "pinterest"];
+const HUMAN_FLAG_KEY = "z_human_session";
+const BOT_UA =
+  /(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|embedly|redditbot|semrushbot|ahrefsbot|mj12bot|dotbot|petalbot|seznambot|bytespider|gptbot|claudebot|ccbot|amazonbot|headlesschrome|phantomjs|lighthouse|chrome-lighthouse|pingdom|uptimerobot|statuscake)/i;
+
+function isBotUserAgent(): boolean {
+  if (typeof navigator === "undefined") return true;
+  return BOT_UA.test(navigator.userAgent || "");
+}
+
+const SOCIAL_HINTS = ["facebook", "instagram", "twitter", "t.co", "linkedin", "tiktok", "whatsapp", "t.me", "youtube", "snapchat", "pinterest", "fb.", "meta.com"];
 const SEARCH_HINTS = ["google.", "bing.", "yahoo.", "duckduckgo.", "baidu.", "yandex."];
 
 function isSelfHost(hostname: string): boolean {
@@ -142,25 +151,59 @@ function captureUtmAndSource(): {
 }
 
 /**
- * Read geo data from the shared session cache. We deliberately DO NOT call
- * ipapi.co here anymore: it adds ~2s of blocking I/O on the LCP critical path
- * for every cold visit, and is not required to record analytics. When geo is
- * actually needed (checkout, geo-blocking), `use-geo-detection` issues the
- * fetch behind `requestIdleCallback`. Subsequent analytics events naturally
- * pick the populated cache.
+ * Read geo from session cache, or hydrate once from /api/geo (CF-IPCountry).
+ * Never invent "RD Congo" as a default for analytics.
  */
 async function getGeoData(): Promise<{ country: string; city: string }> {
   const cached = sessionStorage.getItem("zandofy_geo") || sessionStorage.getItem("z_geo");
-  if (!cached) return { country: "", city: "" };
-  try {
-    const parsed = JSON.parse(cached);
-    return {
-      country: parsed.country_name || parsed.country || "",
-      city: parsed.city || "",
-    };
-  } catch {
-    return { country: "", city: "" };
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      const country = parsed.country_name || parsed.country || "";
+      // Ignore placeholder default CD with empty city from idle geo hook
+      if (country && !(parsed.source === "default-cd")) {
+        return { country, city: parsed.city || "" };
+      }
+      if (parsed.source === "cf" || parsed.source === "vercel") {
+        return { country, city: parsed.city || "" };
+      }
+    } catch {
+      /* fall through */
+    }
   }
+
+  try {
+    if (sessionStorage.getItem("z_geo_fetching") === "1") {
+      return { country: "", city: "" };
+    }
+    sessionStorage.setItem("z_geo_fetching", "1");
+    const res = await fetch("/api/geo", { credentials: "same-origin" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.country_code || data.country_name) {
+        const geo = {
+          country_code: data.country_code || "",
+          country_name: data.country_name || data.country || "",
+          country: data.country_name || data.country || "",
+          city: data.city || "",
+          source: data.source || "cf",
+        };
+        sessionStorage.setItem("zandofy_geo", JSON.stringify(geo));
+        sessionStorage.setItem("z_geo", JSON.stringify(geo));
+        return { country: geo.country_name, city: geo.city };
+      }
+    }
+  } catch {
+    /* ignore */
+  } finally {
+    try {
+      sessionStorage.removeItem("z_geo_fetching");
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return { country: "", city: "" };
 }
 
 /** Always re-read from sessionStorage (cheap) so events emitted after
@@ -224,25 +267,77 @@ export function useAnalyticsTracker() {
   const sessionStartRef = useRef<number>(Date.now());
   const lastPathRef = useRef<string>("");
   const pageStartRef = useRef<number>(Date.now());
+  const humanReadyRef = useRef(false);
+  const sessionStartedRef = useRef(false);
 
   useEffect(() => {
+    if (isBotUserAgent()) return;
+
     sessionStartRef.current = Date.now();
-    // Defer session_start to idle so it never blocks LCP/FCP
-    deferToIdle(() => {
-      const acquisition = captureUtmAndSource();
-      trackEvent(
-        "session_start",
-        {
-          metadata: acquisition,
-          referrer: acquisition.landing_referrer || document.referrer || null,
-        },
-        user?.id
-      );
-    });
+
+    const markHumanAndStart = () => {
+      if (humanReadyRef.current) return;
+      humanReadyRef.current = true;
+      try {
+        sessionStorage.setItem(HUMAN_FLAG_KEY, "1");
+      } catch {
+        /* ignore */
+      }
+
+      deferToIdle(() => {
+        const acquisition = captureUtmAndSource();
+        if (!sessionStartedRef.current) {
+          sessionStartedRef.current = true;
+          trackEvent(
+            "session_start",
+            {
+              metadata: { ...acquisition, is_human: true },
+              referrer: acquisition.landing_referrer || document.referrer || null,
+            },
+            user?.id,
+          );
+        }
+        trackEvent(
+          "human_session",
+          {
+            metadata: { ...acquisition, gate: "interaction" },
+            referrer: acquisition.landing_referrer || document.referrer || null,
+          },
+          user?.id,
+        );
+        // First human page_view for the landing path
+        const path = window.location.pathname;
+        const extra: Record<string, any> = {};
+        const productMatch = path.match(/^\/product\/(.+)$/);
+        const storeMatch = path.match(/^\/store\/(.+)$/);
+        if (productMatch) extra.product_id = productMatch[1];
+        if (storeMatch) extra.store_id = storeMatch[1];
+        trackEvent("page_view", extra, user?.id);
+        if (storeMatch) {
+          trackEvent("store_view", { store_id: storeMatch[1] }, user?.id);
+        }
+      });
+    };
+
+    // Resume human flag within the same tab session
+    try {
+      if (sessionStorage.getItem(HUMAN_FLAG_KEY) === "1") {
+        markHumanAndStart();
+      }
+    } catch {
+      /* ignore */
+    }
+
+    const onInteract = () => markHumanAndStart();
+    const opts: AddEventListenerOptions = { once: true, passive: true };
+    window.addEventListener("pointerdown", onInteract, opts);
+    window.addEventListener("keydown", onInteract, opts);
+    window.addEventListener("scroll", onInteract, opts);
+    window.addEventListener("touchstart", onInteract, opts);
 
     const handleBeforeUnload = () => {
+      if (!humanReadyRef.current) return;
       const duration = Math.round((Date.now() - sessionStartRef.current) / 1000);
-      // Read geo from shared cache (synchronous — no async in beforeunload)
       let country: string | null = null;
       let city: string | null = null;
       try {
@@ -252,7 +347,9 @@ export function useAnalyticsTracker() {
           country = geo.country_name || geo.country || null;
           city = geo.city || null;
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       const row: any = {
         session_id: getSessionId(),
         event_type: "session_end",
@@ -272,45 +369,63 @@ export function useAnalyticsTracker() {
       const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/analytics_events`;
 
-      // Use fetch with keepalive instead of sendBeacon to include required headers
       try {
         fetch(url, {
           method: "POST",
           keepalive: true,
           headers: {
             "Content-Type": "application/json",
-            "apikey": anonKey,
-            "Authorization": `Bearer ${anonKey}`,
-            "Prefer": "return=minimal",
+            apikey: anonKey,
+            Authorization: `Bearer ${anonKey}`,
+            Prefer: "return=minimal",
           },
           body: JSON.stringify(row),
         });
       } catch {
-        // Last-resort silent fail
+        /* silent */
       }
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("pointerdown", onInteract);
+      window.removeEventListener("keydown", onInteract);
+      window.removeEventListener("scroll", onInteract);
+      window.removeEventListener("touchstart", onInteract);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
   }, [user?.id]);
 
   useEffect(() => {
+    if (isBotUserAgent()) return;
+
     const path = location.pathname;
     if (path === lastPathRef.current) return;
 
-    if (lastPathRef.current) {
+    if (lastPathRef.current && humanReadyRef.current) {
       const duration = Math.round((Date.now() - pageStartRef.current) / 1000);
       if (duration > 0) {
         const prevPath = lastPathRef.current;
-        deferToIdle(() => trackEvent("page_view_end", {
-          page_path: prevPath,
-          duration_seconds: duration,
-        }, user?.id));
+        deferToIdle(() =>
+          trackEvent(
+            "page_view_end",
+            {
+              page_path: prevPath,
+              duration_seconds: duration,
+            },
+            user?.id,
+          ),
+        );
       }
     }
 
     lastPathRef.current = path;
     pageStartRef.current = Date.now();
+
+    // Page views only after human interaction (bots never pass the gate)
+    if (!humanReadyRef.current && sessionStorage.getItem(HUMAN_FLAG_KEY) !== "1") {
+      return;
+    }
 
     const extra: Record<string, any> = {};
     const productMatch = path.match(/^\/product\/(.+)$/);
@@ -318,7 +433,6 @@ export function useAnalyticsTracker() {
     if (productMatch) extra.product_id = productMatch[1];
     if (storeMatch) extra.store_id = storeMatch[1];
 
-    // Defer page_view to idle — frees the main thread for rendering
     deferToIdle(() => trackEvent("page_view", extra, user?.id));
 
     if (storeMatch) {

@@ -9,6 +9,10 @@ interface ImageZoomLensProps {
   /** Tailwind object-fit classes for the base image (default: contain everywhere). */
   objectClassName?: string;
   zoomFactor?: number;
+  /** LCP candidate — eager load + fetchpriority high + explicit dimensions. */
+  priority?: boolean;
+  width?: number;
+  height?: number;
 }
 
 /**
@@ -24,6 +28,9 @@ export const ImageZoomLens = memo(function ImageZoomLens({
   className = "",
   objectClassName = "object-contain",
   zoomFactor = 2.5,
+  priority = false,
+  width = 800,
+  height = 1067,
 }: ImageZoomLensProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [lens, setLens] = useState<{ x: number; y: number; active: boolean }>({
@@ -40,7 +47,7 @@ export const ImageZoomLens = memo(function ImageZoomLens({
       const y = ((e.clientY - rect.top) / rect.height) * 100;
       setLens({ x, y, active: true });
     },
-    []
+    [],
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -54,18 +61,20 @@ export const ImageZoomLens = memo(function ImageZoomLens({
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Base image — object-contain to avoid blur/crop */}
       <img
         src={src}
         srcSet={srcSet}
         sizes={sizes}
         alt={alt}
+        width={width}
+        height={height}
         className={`w-full h-full ${objectClassName}`}
         draggable={false}
-        decoding="async"
+        decoding={priority ? "sync" : "async"}
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "auto"}
       />
 
-      {/* Zoomed overlay on hover */}
       {lens.active && (
         <div
           className="absolute inset-0 pointer-events-none z-10"

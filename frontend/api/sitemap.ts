@@ -1,29 +1,40 @@
 /**
  * Vercel Edge — proxy sitemap XML from Supabase generate-sitemap.
  * External rewrites to Supabase were falling through to the SPA (404 / index.html).
+ * Prefer static public/sitemap*.xml from build (fetch-sitemap.mjs); this is a fallback.
+ *
+ * Query: ?part=index|products|categories|vendors|pages|blog
  */
 export const config = { runtime: "edge" };
 
-function resolveSitemapUrl(): string {
+function resolveSitemapUrl(part: string): string {
+  let base: string;
   if (process.env.SITEMAP_FUNCTION_URL?.trim()) {
-    return process.env.SITEMAP_FUNCTION_URL.trim().replace(/\/$/, "");
+    base = process.env.SITEMAP_FUNCTION_URL.trim().replace(/\/$/, "");
+  } else {
+    const sb = (
+      process.env.VITE_SUPABASE_URL ||
+      process.env.SUPABASE_URL ||
+      "https://vpttoqojmiqxgudknyxf.supabase.co"
+    ).replace(/\/$/, "");
+    base = `${sb}/functions/v1/generate-sitemap`;
   }
-  const base = (
-    process.env.VITE_SUPABASE_URL ||
-    process.env.SUPABASE_URL ||
-    "https://vpttoqojmiqxgudknyxf.supabase.co"
-  ).replace(/\/$/, "");
-  return `${base}/functions/v1/generate-sitemap`;
+  const u = new URL(base);
+  u.searchParams.set("part", part);
+  return u.toString();
 }
 
-export default async function handler(): Promise<Response> {
-  const url = resolveSitemapUrl();
+export default async function handler(req: Request): Promise<Response> {
+  const part = new URL(req.url).searchParams.get("part") || "index";
+  const url = resolveSitemapUrl(part);
   try {
     const upstream = await fetch(url, {
       headers: { Accept: "application/xml,text/xml,*/*" },
     });
     const body = await upstream.text();
-    if (!upstream.ok || !body.includes("<urlset")) {
+    const ok =
+      upstream.ok && (body.includes("<urlset") || body.includes("<sitemapindex"));
+    if (!ok) {
       console.error("[api/sitemap] upstream failed", upstream.status, body.slice(0, 200));
       return new Response("Sitemap temporarily unavailable", {
         status: 502,

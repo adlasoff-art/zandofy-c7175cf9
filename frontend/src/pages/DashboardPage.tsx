@@ -4,6 +4,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { SEOHead } from "@/components/SEOHead";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -376,6 +377,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead title="Mon espace" description="Tableau de bord client Zandofy." canonical="/dashboard" noindex />
       <Header />
       <PushPermissionPrompt />
       <main className="container py-6 pb-24 lg:pb-6">
