@@ -119,7 +119,7 @@
           "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
         }
       ],
-      "destination": "/api/meta-injector?__pathname=/$txPath"
+      "destination": "/api/meta-injector?__pathname=/:txPath"
     },
     {
       "source": "/:globalPath(faq|stores|blog|about|careers|help-center|pricing|privacy|terms|popular|trends|become-vendor|affiliate-program|loyalty-program|social-responsibility|reset-password|onboarding|impersonate)",
@@ -130,7 +130,7 @@
           "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
         }
       ],
-      "destination": "/api/meta-injector?__pathname=/$globalPath"
+      "destination": "/api/meta-injector?__pathname=/:globalPath"
     },
     {
       "source": "/:path((?!api/).*)",

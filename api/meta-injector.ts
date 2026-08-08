@@ -998,7 +998,12 @@ async function buildMetaForPath(pathname: string): Promise<MetaPayload | null> {
       canonical: `${getSiteUrl()}${pathname}`,
       ogType: "website",
     };
-    return applyOverride(merged, override);
+    const out = applyOverride(merged, override);
+    // Hard noindex for transactional / private routes (overrides cannot re-open indexing)
+    if (NOINDEX_ROUTES.has(pathname)) {
+      out.robots = pathname === "/search" ? "noindex,follow" : "noindex,nofollow";
+    }
+    return out;
   }
 
   return null;
