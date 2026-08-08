@@ -89,7 +89,29 @@
       "destination": "/api/meta-injector?__pathname=/"
     },
     {
-      "source": "/:globalPath(faq|stores|blog|about|careers|help-center|pricing|privacy|terms|popular|trends|search|become-vendor|affiliate-program|loyalty-program|social-responsibility|auth|reset-password|onboarding|impersonate)",
+      "source": "/auth",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
+        }
+      ],
+      "destination": "/api/meta-injector?__pathname=/auth"
+    },
+    {
+      "source": "/search",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
+        }
+      ],
+      "destination": "/api/meta-injector?__pathname=/search"
+    },
+    {
+      "source": "/:globalPath(faq|stores|blog|about|careers|help-center|pricing|privacy|terms|popular|trends|become-vendor|affiliate-program|loyalty-program|social-responsibility|reset-password|onboarding|impersonate)",
       "has": [
         {
           "type": "header",
