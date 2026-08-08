@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { MobileBackButton } from "@/components/navigation/MobileBackButton";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
+import { SEOHead } from "@/components/SEOHead";
 import { Heart, Share2, Copy } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -75,6 +76,12 @@ export default function WishlistPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead
+        title={t("wishlist.title") || "Mes Favoris"}
+        description="Liste de favoris personnelle — page privée non indexée."
+        canonical="/wishlist"
+        noindex
+      />
       <Header />
       <div className="lg:hidden sticky top-14 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-1">
         <MobileBackButton fallbackTo="/" />

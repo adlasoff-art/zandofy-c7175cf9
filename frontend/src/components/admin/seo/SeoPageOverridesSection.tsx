@@ -11,7 +11,7 @@ import { SeoSerpPreview } from "./SeoSerpPreview";
 
 const KNOWN_PATHS: { path: string; label: string }[] = [
   { path: "/", label: "Accueil" },
-  { path: "/stores", label: "Boutiques" },
+  { path: "/stores", label: "Fournisseurs fiables" },
   { path: "/pricing", label: "Tarifs" },
   { path: "/about", label: "À propos" },
   { path: "/faq", label: "FAQ" },
