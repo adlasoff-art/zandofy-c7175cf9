@@ -4,14 +4,15 @@
  * /api/* and external rewrites fall through to the SPA HTML — GSC then sees "sitemap is HTML".
  *
  * Writes:
- *   sitemap.xml              (sitemapindex)
- *   sitemap-products.xml
+ *   sitemap.xml                 (sitemapindex)
+ *   sitemap-products.xml        (page 1 alias)
+ *   sitemap-products-N.xml      (paginated, 1000 URLs each)
  *   sitemap-categories.xml
  *   sitemap-vendors.xml
  *   sitemap-pages.xml
  *   sitemap-blog.xml
  *
- * Cron (ops): hit generate-sitemap daily, then trigger Vercel rebuild — see SEO playbook.
+ * Cron (ops): redeploy generate-sitemap edge fn, then Vercel rebuild — see SEO playbook.
  */
 import { writeFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -24,9 +25,7 @@ const BASE =
   process.env.SITEMAP_FUNCTION_URL?.trim() ||
   `${(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "https://vpttoqojmiqxgudknyxf.supabase.co").replace(/\/$/, "")}/functions/v1/generate-sitemap`;
 
-const PARTS = [
-  { part: "index", file: "sitemap.xml", mustInclude: "<sitemapindex" },
-  { part: "products", file: "sitemap-products.xml", mustInclude: "<urlset" },
+const STATIC_PARTS = [
   { part: "categories", file: "sitemap-categories.xml", mustInclude: "<urlset" },
   { part: "vendors", file: "sitemap-vendors.xml", mustInclude: "<urlset" },
   { part: "pages", file: "sitemap-pages.xml", mustInclude: "<urlset" },
@@ -48,21 +47,27 @@ const FALLBACK_PAGES = `<?xml version="1.0" encoding="UTF-8"?>
 </urlset>
 `;
 
-function partUrl(part) {
+const EMPTY_URLSET = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+</urlset>
+`;
+
+function partUrl(part, page) {
   const u = new URL(BASE);
   u.searchParams.set("part", part);
+  if (page != null) u.searchParams.set("page", String(page));
   return u.toString();
 }
 
-async function fetchPart(part, mustInclude) {
-  const url = partUrl(part);
+async function fetchPart(part, mustInclude, page) {
+  const url = partUrl(part, page);
   console.log("[fetch-sitemap] GET", url);
   const res = await fetch(url, {
     headers: { Accept: "application/xml,text/xml,*/*" },
   });
   const text = await res.text();
   if (!res.ok || !text.includes(mustInclude)) {
-    throw new Error(`upstream ${part} failed ${res.status}: ${text.slice(0, 200)}`);
+    throw new Error(`upstream ${part}${page != null ? ` page=${page}` : ""} failed ${res.status}: ${text.slice(0, 200)}`);
   }
   if (text.includes("/search")) {
     console.warn(`[fetch-sitemap] WARNING: ${part} contains /search — should be excluded`);
@@ -70,27 +75,64 @@ async function fetchPart(part, mustInclude) {
   return text;
 }
 
+async function writeBody(file, body) {
+  const outPath = join(publicDir, file);
+  await writeFile(outPath, body, "utf8");
+  const locs = (body.match(/<loc>/g) || []).length;
+  console.log("[fetch-sitemap] wrote", outPath, "—", locs, "loc entries");
+}
+
+function productPagesFromIndex(indexXml) {
+  const pages = new Set();
+  const re = /sitemap-products-(\d+)\.xml/g;
+  let m;
+  while ((m = re.exec(indexXml)) !== null) {
+    pages.add(Number(m[1]));
+  }
+  if (pages.size === 0) pages.add(1);
+  return [...pages].sort((a, b) => a - b);
+}
+
 async function main() {
   await mkdir(publicDir, { recursive: true });
   let usedFallback = false;
 
-  for (const { part, file, mustInclude } of PARTS) {
-    const outPath = join(publicDir, file);
-    let body;
+  let indexBody;
+  try {
+    indexBody = await fetchPart("index", "<sitemapindex");
+  } catch (err) {
+    console.error("[fetch-sitemap]", err.message || err);
+    usedFallback = true;
+    indexBody = FALLBACK_INDEX;
+  }
+  await writeBody("sitemap.xml", indexBody);
+
+  const productPages = productPagesFromIndex(indexBody);
+  for (const page of productPages) {
     try {
-      body = await fetchPart(part, mustInclude);
+      const body = await fetchPart("products", "<urlset", page);
+      await writeBody(`sitemap-products-${page}.xml`, body);
+      if (page === 1) {
+        await writeBody("sitemap-products.xml", body);
+      }
     } catch (err) {
       console.error("[fetch-sitemap]", err.message || err);
       usedFallback = true;
-      if (part === "index") body = FALLBACK_INDEX;
-      else if (part === "pages") body = FALLBACK_PAGES;
-      else {
-        body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n</urlset>\n`;
-      }
+      await writeBody(`sitemap-products-${page}.xml`, EMPTY_URLSET);
+      if (page === 1) await writeBody("sitemap-products.xml", EMPTY_URLSET);
     }
-    await writeFile(outPath, body, "utf8");
-    const locs = (body.match(/<loc>/g) || []).length;
-    console.log("[fetch-sitemap] wrote", outPath, "—", locs, "loc entries");
+  }
+
+  for (const { part, file, mustInclude } of STATIC_PARTS) {
+    try {
+      const body = await fetchPart(part, mustInclude);
+      await writeBody(file, body);
+    } catch (err) {
+      console.error("[fetch-sitemap]", err.message || err);
+      usedFallback = true;
+      const body = part === "pages" ? FALLBACK_PAGES : EMPTY_URLSET;
+      await writeBody(file, body);
+    }
   }
 
   if (usedFallback) {
