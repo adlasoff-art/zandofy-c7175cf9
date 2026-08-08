@@ -218,7 +218,21 @@ export function buildProductJsonLd(product: {
   reviewCount?: number;
   sku?: string;
   storeName?: string;
+  url?: string;
+  availability?: string;
+  inStock?: boolean;
 }) {
+  const offerUrl = product.url
+    ? buildCleanCanonical(product.url)
+    : typeof window !== "undefined"
+      ? buildCleanCanonical(window.location.pathname)
+      : SITE_URL;
+  const availability =
+    product.availability ||
+    (product.inStock === false
+      ? "https://schema.org/OutOfStock"
+      : "https://schema.org/InStock");
+
   const ld: Record<string, any> = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -231,15 +245,16 @@ export function buildProductJsonLd(product: {
       "@type": "Offer",
       priceCurrency: product.currency || "USD",
       price: Number(product.price ?? 0).toFixed(2),
-      availability: "https://schema.org/InStock",
-      url: typeof window !== "undefined" ? window.location.href : "",
+      availability,
+      url: offerUrl,
     },
   };
-  if (product.rating && product.reviewCount) {
+  // aggregateRating only with real reviews in DB — never invent
+  if (product.rating != null && Number(product.reviewCount) > 0) {
     ld.aggregateRating = {
       "@type": "AggregateRating",
-      ratingValue: product.rating.toFixed(1),
-      reviewCount: product.reviewCount,
+      ratingValue: Number(product.rating).toFixed(1),
+      reviewCount: Number(product.reviewCount),
     };
   }
   return ld;

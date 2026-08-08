@@ -319,8 +319,9 @@ export default function ProductPage() {
     currency: product.currency,
     rating: product.rating,
     reviewCount: product.reviewCount,
-    sku: product.sku,
+    sku: product.sku || product.id,
     storeName: (product as any).store?.name,
+    url: `/product/${product.slug || product.id}`,
   });
   const categorySlug = slugify(product.category || product.categoryFr || "produit");
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
@@ -332,7 +333,10 @@ export default function ProductPage() {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title={product.metaTitle || `${product.nameFr} — ${product.categoryFr}`}
+        title={
+          product.metaTitle ||
+          `${product.nameFr} — ${product.categoryFr || "Marketplace"} à prix Kinshasa`
+        }
         description={seoDescription}
         canonical={`/product/${product.slug || product.id}`}
         ogImage={productOgImage}

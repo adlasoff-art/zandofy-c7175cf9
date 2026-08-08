@@ -486,7 +486,7 @@ async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
       availability: inStock,
     },
   };
-  if (p.rating && p.review_count) {
+  if (p.rating != null && Number(p.review_count) > 0) {
     productLd.aggregateRating = {
       "@type": "AggregateRating",
       ratingValue: p.rating,
@@ -616,10 +616,10 @@ async function buildCategoryMeta(slug: string): Promise<MetaPayload | null> {
   const displayName = c?.name_fr || c?.name || slug.replace(/-/g, " ");
   const canonical = `${getSiteUrl()}/category/${slug}`;
   const image = toAbsoluteOgImage(c?.og_image_url || c?.image_url);
-  const titleTpl = cfg.category_title_template || "{name} | Zandofy";
+  const titleTpl = cfg.category_title_template || "{name} à prix Kinshasa | Zandofy";
   const descTpl =
     cfg.category_description_template ||
-    "Achetez {name} sur Zandofy — import Chine & livraison Afrique. Prix usine, logistique inclusive.";
+    "Achetez {name} sur Zandofy à Kinshasa — import Chine & livraison Afrique. Prix usine, logistique inclusive.";
 
   const title = truncate(
     c?.meta_title || applyTemplate(titleTpl, { name: displayName, brand: cfg.brand_name || "Zandofy" }),
@@ -833,9 +833,11 @@ function buildHeadInjection(meta: MetaPayload): string {
 <meta name="robots" content="${escapeHtml(robots)}" />
 <meta name="description" content="${d}" />
 <link rel="canonical" href="${c}" />
+<link rel="alternate" hreflang="fr-CD" href="${c}" />
+<link rel="alternate" hreflang="x-default" href="${c}" />
 <meta property="og:type" content="${ogType}" />
 <meta property="og:site_name" content="Zandofy" />
-<meta property="og:locale" content="fr_FR" />
+<meta property="og:locale" content="fr_CD" />
 <meta property="og:url" content="${c}" />
 <meta property="og:title" content="${ogT}" />
 <meta property="og:description" content="${d}" />

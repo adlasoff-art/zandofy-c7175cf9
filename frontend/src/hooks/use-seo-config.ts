@@ -60,10 +60,10 @@ const DEFAULT_CONFIG: SeoConfig = {
   social_urls: {},
   google_site_verification: "",
   google_analytics_id: "",
-  category_title_template: "{name} | Zandofy",
+  category_title_template: "{name} à prix Kinshasa | Zandofy",
   category_description_template:
-    "Achetez {name} sur Zandofy — import Chine & livraison Afrique. Prix usine, logistique inclusive.",
-  product_title_template: "{name} | Zandofy",
+    "Achetez {name} sur Zandofy à Kinshasa — import Chine & livraison Afrique. Prix usine, logistique inclusive.",
+  product_title_template: "{name} — {category} à prix Kinshasa | Zandofy",
   product_description_template: "Achetez {name} sur Zandofy — import Chine & livraison Afrique.",
   store_title_template: "{name} — Boutique | Zandofy",
   store_description_template:
