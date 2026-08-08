@@ -53,5 +53,4 @@ Disallow: /reset-password
 Disallow: /onboarding
 Disallow: /impersonate
 
-Host: https://zandofy.com
 Sitemap: https://zandofy.com/sitemap.xml

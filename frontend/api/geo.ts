@@ -48,7 +48,7 @@ export default async function handler(req: Request): Promise<Response> {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "private, max-age=300",
+        "Cache-Control": "private, max-age=1800",
       },
     },
   );
