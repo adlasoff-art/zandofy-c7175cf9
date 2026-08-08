@@ -54,6 +54,9 @@ Après changement d'image : Admin SEO → re-scrape, puis [Facebook Sharing Debu
 
 ## Limites
 
+- **Critique :** ne jamais ajouter un rewrite SPA `/(.*) → /index.html` sans exclure `/api/*`.
+  Sinon Vercel sert `index.html` pour `/api/meta-injector` (header `content-disposition: filename="index.html"`)
+  et Googlebot reçoit le shell vide. Pattern correct : `/((?!api/).*)` → `/index.html`.
 - L'aperçu lien utilise l'**image principale** (`product_images`, `position` min), pas la vignette galerie sélectionnée à l'écran.
 - Le texte `wa.me/?text=...` ne transporte pas l'image ; la vignette vient du scraping `og:image`.
 - Catégories : pas de colonne `slug` — match `ilike` sur le nom.
