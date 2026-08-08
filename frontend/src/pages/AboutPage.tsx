@@ -15,7 +15,7 @@ export default function AboutPage() {
     queryKey: ["about-dynamic-stats"],
     queryFn: async () => {
       const [productsRes, storesRes, reviewsRes, countriesRes] = await Promise.all([
-        supabase.from("products").select("id", { count: "exact", head: true }).eq("publish_status", "published"),
+        supabase.from("products_public").select("id", { count: "exact", head: true }).eq("publish_status", "published"),
         supabase.from("stores").select("id", { count: "exact", head: true }).eq("is_verified", true),
         supabase.from("reviews").select("user_id", { count: "exact", head: true }),
         supabase.from("cities").select("country_code"),

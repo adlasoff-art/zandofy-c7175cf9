@@ -492,7 +492,7 @@ export async function groupCartByOriginAndStore(
   if (productIds.length === 0) return [];
 
   const { data: products } = await (supabase as any)
-    .from("products")
+    .from("products_public")
     .select(
       "id, store_id, origin_country, weight_grams, length_cm, width_cm, height_cm, can_ship_air, can_ship_sea, store:stores(id, name, country, country_code)",
     )

@@ -468,13 +468,19 @@ async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
   const filter = isUuid ? `id=eq.${slug}` : `slug=eq.${encodeURIComponent(slug)}`;
   const rows = await sbFetch(
-    `products?${filter}&publish_status=eq.published&select=id,name,name_fr,slug,description,short_description,price,currency,rating,review_count,stock_quantity,meta_title,meta_description,seo_keywords,store_id,categories(name,name_fr),stores!products_store_id_fkey(name),product_images(image_url,position)&limit=1`,
+    `products_public?${filter}&select=id,name,name_fr,slug,description,short_description,price,currency,rating,review_count,stock_quantity,meta_title,meta_description,seo_keywords,store_id,categories(name,name_fr),product_images(image_url,position)&limit=1`,
   );
   const p = rows[0];
   if (!p) return null;
 
   const displayName = p.name_fr || p.name;
-  const storeName = p.stores?.name || cfg.brand_name || "Zandofy";
+  let storeName = cfg.brand_name || "Zandofy";
+  if (p.store_id) {
+    const storeRows = await sbFetch(
+      `stores_public?id=eq.${p.store_id}&select=name&limit=1`,
+    );
+    if (storeRows[0]?.name) storeName = storeRows[0].name;
+  }
   const categoryName = p.categories?.name_fr || p.categories?.name || "";
   const canonical = `${getSiteUrl()}/product/${p.slug || p.id}`;
   const sortedImages = Array.isArray(p.product_images)
@@ -663,7 +669,7 @@ async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
   );
 
   const products = await sbFetch(
-    `products?store_id=eq.${s.id}&publish_status=eq.published&select=id,slug,name,name_fr,price,currency,product_images(image_url,position)&order=updated_at.desc&limit=24`,
+    `products_public?store_id=eq.${s.id}&select=id,slug,name,name_fr,price,currency,product_images(image_url,position)&order=updated_at.desc&limit=24`,
   );
   const productLinks = products.map((p: any) => ({
     name: p.name_fr || p.name,
@@ -780,7 +786,7 @@ async function buildCategoryMeta(slug: string): Promise<MetaPayload | null> {
 
   const products = c.id
     ? await sbFetch(
-        `products?category_id=eq.${c.id}&publish_status=eq.published&select=id,slug,name,name_fr,price,currency,product_images(image_url,position)&order=updated_at.desc&limit=12`,
+        `products_public?category_id=eq.${c.id}&select=id,slug,name,name_fr,price,currency,product_images(image_url,position)&order=updated_at.desc&limit=12`,
       )
     : [];
 

@@ -399,7 +399,7 @@ export default function CheckoutPage() {
         return;
       }
 
-      const { data: products } = await supabase.from("products").select("id, store_id").in("id", productIds);
+      const { data: products } = await supabase.from("products_public").select("id, store_id").in("id", productIds);
       const storeIds = [...new Set((products || []).map((product: any) => product.store_id).filter(Boolean))];
       setCartStoreIds(storeIds);
       if (storeIds.length === 0) {
@@ -636,7 +636,7 @@ export default function CheckoutPage() {
       const productIds = items.map((i) => i.productId).filter(Boolean);
       if (productIds.length > 0) {
         const { data: prods } = await supabase
-          .from("products")
+          .from("products_public")
           .select("id, store_id")
           .in("id", productIds)
           .eq("store_id", storeData.store_id);
@@ -862,7 +862,7 @@ export default function CheckoutPage() {
 
     const productIds = [...new Set(items.map((i) => i.productId).filter(Boolean))];
     const { data: prods } = productIds.length > 0
-      ? await supabase.from("products").select("id, store_id, origin_country, store:stores(country)").in("id", productIds)
+      ? await supabase.from("products_public").select("id, store_id, origin_country, store:stores(country)").in("id", productIds)
       : { data: [] };
     const storeMap = new Map((prods || []).map((p) => [p.id, p.store_id]));
     // Lot 11C — Map productId → pays d'origine (ISO2). Sert à persister

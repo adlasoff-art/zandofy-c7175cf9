@@ -19,7 +19,7 @@ export default function PopularPage() {
 
   const fetchPage = useCallback(async (offset: number) => {
     const { data } = await supabase
-      .from("products")
+      .from("products_public")
       .select(PRODUCT_LIST_SELECT)
       .eq("publish_status", "published")
       .order("sales_count", { ascending: false })

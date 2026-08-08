@@ -42,7 +42,7 @@ export function RecommendationsSection() {
         }
 
         const { data: allProducts } = await supabase
-          .from("products")
+          .from("products_public")
           .select("id, slug, name, name_fr, price, rating, product_images(image_url, position), gender_target")
           .eq("publish_status", "published")
           .order("rating", { ascending: false })
@@ -79,7 +79,7 @@ export function RecommendationsSection() {
         // Ligne 2 : pool aléatoire (mix anciens + nouveaux)
         const topIds = new Set(topRow.map(p => p.id));
         const { data: poolData } = await supabase
-          .from("products")
+          .from("products_public")
           .select("id, slug, name, name_fr, price, rating, product_images(image_url, position)")
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
@@ -117,7 +117,7 @@ export function RecommendationsSection() {
         );
       } catch {
         const { data: popular } = await supabase
-          .from("products")
+          .from("products_public")
           .select("id, slug, name, name_fr, price, rating, product_images(image_url, position)")
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })

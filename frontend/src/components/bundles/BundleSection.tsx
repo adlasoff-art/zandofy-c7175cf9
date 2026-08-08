@@ -58,7 +58,7 @@ export function BundleSection({ productId }: { productId: string }) {
         if (!items?.length) continue;
 
         const { data: products } = await supabase
-          .from("products")
+          .from("products_public")
           .select("id, name, price, product_images(image_url, position)")
           .in("id", items.map((i: any) => i.product_id));
 

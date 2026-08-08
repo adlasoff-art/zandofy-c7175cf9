@@ -162,8 +162,7 @@ const PRODUCT_SELECT = `
   categories(name, name_fr, parent_id),
   product_images(image_url, position),
   product_colors(color_hex, color_name, image_url),
-  product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
-  stores!products_store_id_fkey(id, name, is_verified, is_certified, verified_years, verified_years_override, created_at, is_online, sales_count, sales_override, followers_count, followers_override, shop_type)
+  product_sizes(size_label, region, bust_cm, waist_cm, hips_cm)
 `;
 
 // Fallback SELECT without recently added columns that may be missing in production
@@ -172,8 +171,7 @@ const PRODUCT_SELECT_FALLBACK = `
   categories(name, name_fr, parent_id),
   product_images(image_url, position),
   product_colors(color_hex, color_name, image_url),
-  product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
-  stores!products_store_id_fkey(id, name, is_verified, verified_years, created_at, is_online, sales_count, followers_count)
+  product_sizes(size_label, region, bust_cm, waist_cm, hips_cm)
 `;
 
 // Lightweight SELECT for product LISTINGS (grids, carousels, search results).
@@ -186,9 +184,11 @@ export const PRODUCT_LIST_SELECT = `
   categories(name, name_fr),
   product_images(image_url, position),
   product_colors(color_hex, color_name),
-  product_sizes(size_label),
-  stores!products_store_id_fkey(id, name, is_verified, is_certified, is_online, shop_type)
+  product_sizes(size_label)
 `;
+
+/** Public catalog reads — never select from base `products` (cost columns). */
+const PRODUCTS_PUBLIC = "products_public" as const;
 
 export async function fetchProducts(params?: {
   category?: string;
@@ -202,9 +202,8 @@ export async function fetchProducts(params?: {
 }): Promise<Product[]> {
   const tryFetch = async (selectQuery: string): Promise<{ data: any[] | null; error: any }> => {
     let query = supabase
-      .from("products")
-      .select(selectQuery)
-      .eq("publish_status", "published");
+      .from(PRODUCTS_PUBLIC)
+      .select(selectQuery);
 
     if (params?.orderBy === "popular") {
       query = query.order("sales_count", { ascending: false });
@@ -312,9 +311,8 @@ export async function fetchFlashSaleProducts(): Promise<
   if (flashData && flashData.length > 0) {
     const productIds = flashData.map((f: any) => f.product_id);
     const { data, error } = await supabase
-      .from("products")
+      .from(PRODUCTS_PUBLIC)
       .select(PRODUCT_SELECT)
-      .eq("publish_status", "published")
       .in("id", productIds);
 
     if (error || !data) return [];
@@ -335,9 +333,8 @@ export async function fetchFlashSaleProducts(): Promise<
 
   // Fallback: products with is_sale
   const { data, error } = await supabase
-    .from("products")
+    .from(PRODUCTS_PUBLIC)
     .select(PRODUCT_SELECT)
-    .eq("publish_status", "published")
     .eq("is_sale", true)
     .order("discount", { ascending: false });
 
@@ -389,33 +386,29 @@ export async function fetchProductBySlug(
     categories(name, name_fr),
     product_images(image_url, position),
     product_colors(color_hex, color_name, image_url),
-    product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
-    stores!products_store_id_fkey(id, name, logo_url, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, rating, response_rate, response_time)
+    product_sizes(size_label, region, bust_cm, waist_cm, hips_cm)
   `;
   const productSelectFallback = `
     *,
     categories(name, name_fr),
     product_images(image_url, position),
     product_colors(color_hex, color_name),
-    product_sizes(size_label, region, bust_cm, waist_cm, hips_cm),
-    stores!products_store_id_fkey(id, name, logo_url, is_verified, is_certified, verified_years, verified_years_override, created_at, followers_count, followers_override, products_count, repurchase_rate, sales_count, sales_override, sales_trend, is_online, rating, response_rate, response_time)
+    product_sizes(size_label, region, bust_cm, waist_cm, hips_cm)
   `;
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
 
   let { data, error } = await (supabase
-    .from("products")
-    .select(productSelect)
-    .eq("publish_status", "published") as any)
+    .from(PRODUCTS_PUBLIC)
+    .select(productSelect) as any)
     .eq(isUuid ? "id" : "slug", slug)
     .maybeSingle();
 
   if (error) {
     console.warn("[fetchProductBySlug] Retrying without color image_url:", error.message);
     const retry = await (supabase
-      .from("products")
-      .select(productSelectFallback)
-      .eq("publish_status", "published") as any)
+      .from(PRODUCTS_PUBLIC)
+      .select(productSelectFallback) as any)
       .eq(isUuid ? "id" : "slug", slug)
       .maybeSingle();
     data = retry.data;
