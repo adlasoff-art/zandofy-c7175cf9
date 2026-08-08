@@ -8,6 +8,16 @@ Cette fonction n'est invoquée **que pour les bots** (Googlebot, Bingbot, Facebo
 - `/blog/:slug`
 - pages globales (`/faq`, `/stores`, …)
 
+## Architecture déploiement Vercel
+
+Le projet Vercel utilise la **racine du repo** (pas `frontend/` comme Root Directory) :
+`vite.config.ts` build `frontend/` → `dist/` à la racine.
+
+Les Edge Functions doivent donc vivre dans **`/api` à la racine**.
+Éditer `frontend/api/*` puis `npm run build` (sync automatique).
+
+---
+
 ## Pourquoi
 
 Zandofy est une SPA React → le HTML statique servi par Vercel est identique pour toutes les pages. Sans injection, Meta/WhatsApp lisent `index.html` (og:url = home, og:image = `og-default.jpg`).

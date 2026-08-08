@@ -4,8 +4,105 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": null,
+  "redirects": [
+    { "source": "/boutique", "destination": "/stores", "statusCode": 301 },
+    { "source": "/boutique/:path*", "destination": "/stores", "statusCode": 301 },
+    { "source": "/shop", "destination": "/stores", "statusCode": 301 },
+    { "source": "/shop/:path*", "destination": "/stores", "statusCode": 301 },
+    { "source": "/support-client", "destination": "/faq", "statusCode": 301 },
+    { "source": "/support-client/:path*", "destination": "/faq", "statusCode": 301 },
+    { "source": "/contact", "destination": "/faq", "statusCode": 301 },
+    { "source": "/mon-compte", "destination": "/dashboard", "statusCode": 301 },
+    { "source": "/mon-compte/:path*", "destination": "/dashboard", "statusCode": 301 },
+    { "source": "/panier", "destination": "/cart", "statusCode": 301 },
+    { "source": "/commande", "destination": "/checkout", "statusCode": 301 },
+    { "source": "/wp-admin", "destination": "/", "statusCode": 301 },
+    { "source": "/wp-admin/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/wp-login.php", "destination": "/", "statusCode": 301 },
+    { "source": "/wp-content/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/wp-includes/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/feed", "destination": "/", "statusCode": 301 },
+    { "source": "/feed/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/produit/:slug", "destination": "/product/:slug", "statusCode": 301 },
+    { "source": "/produits", "destination": "/", "statusCode": 301 },
+    { "source": "/a-propos", "destination": "/about", "statusCode": 301 },
+    { "source": "/conditions", "destination": "/terms", "statusCode": 301 },
+    { "source": "/confidentialite", "destination": "/privacy", "statusCode": 301 },
+    { "source": "/help", "destination": "/help-center", "statusCode": 301 },
+    { "source": "/help/:path*", "destination": "/help-center", "statusCode": 301 },
+    { "source": "/sitemap-dynamic.xml", "destination": "/sitemap.xml", "statusCode": 301 }
+  ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/product/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
+        }
+      ],
+      "destination": "/api/meta-injector?__pathname=/product/:slug"
+    },
+    {
+      "source": "/store/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
+        }
+      ],
+      "destination": "/api/meta-injector?__pathname=/store/:slug"
+    },
+    {
+      "source": "/category/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
+        }
+      ],
+      "destination": "/api/meta-injector?__pathname=/category/:slug"
+    },
+    {
+      "source": "/blog/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
+        }
+      ],
+      "destination": "/api/meta-injector?__pathname=/blog/:slug"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
+        }
+      ],
+      "destination": "/api/meta-injector?__pathname=/"
+    },
+    {
+      "source": "/:globalPath(faq|stores|blog|about|careers|help-center|pricing|privacy|terms|popular|trends|search|become-vendor|affiliate-program|loyalty-program|social-responsibility|auth|reset-password|onboarding|impersonate)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|redditbot|tumblr|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot).*"
+        }
+      ],
+      "destination": "/api/meta-injector?__pathname=/$globalPath"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
@@ -18,6 +115,26 @@
       "source": "/icons/(.*)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=86400" }
+      ]
+    },
+    {
+      "source": "/og-default.jpg",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400" }
+      ]
+    },
+    {
+      "source": "/sitemap.xml",
+      "headers": [
+        { "key": "Content-Type", "value": "application/xml; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
+    },
+    {
+      "source": "/sitemap-:name.xml",
+      "headers": [
+        { "key": "Content-Type", "value": "application/xml; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
       ]
     },
     {
