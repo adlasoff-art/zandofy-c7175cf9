@@ -152,6 +152,8 @@ Deno.serve(async (req) => {
     }
 
     if (part === "vendors") {
+      // Same active filters as meta-injector (stores_public for anon; service role here).
+      // Keep is_banned/is_suspended false so sitemap never lists 410/404 store URLs.
       const { data: stores } = await supabase
         .from("stores")
         .select("id, slug, name, created_at")
