@@ -17,6 +17,21 @@ interface RecommendedProduct {
   rating?: number;
 }
 
+/** Fisher-Yates — mutates and returns the same array. */
+function shuffleInPlace<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/** Rotate within the top `poolSize` of a rating-sorted list, then take `n`. */
+function pickFromTopN<T>(list: T[], n: number, poolSize = 10): T[] {
+  const pool = shuffleInPlace(list.slice(0, poolSize));
+  return pool.slice(0, n);
+}
+
 export function RecommendationsSection() {
   const { user } = useAuth();
   const { t, locale, formatPrice } = useI18n();
@@ -54,19 +69,28 @@ export function RecommendationsSection() {
         if (userGender === "female" || userGender === "femme") {
           const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
           const unisex = products_list.filter(p => p.gender_target === "unisex" && !female.includes(p));
-          topRow = [...female, ...unisex].slice(0, 4);
+          // Prefer gender pool (rotated top 10), then unisex top 10 if short
+          topRow = pickFromTopN(female, 4);
+          if (topRow.length < 4) {
+            const taken = new Set(topRow.map((p) => p.id));
+            topRow = [...topRow, ...pickFromTopN(unisex.filter((p) => !taken.has(p.id)), 4 - topRow.length)];
+          }
         } else if (userGender === "male" || userGender === "homme") {
           const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
           const unisex = products_list.filter(p => p.gender_target === "unisex" && !male.includes(p));
-          topRow = [...male, ...unisex].slice(0, 4);
+          topRow = pickFromTopN(male, 4);
+          if (topRow.length < 4) {
+            const taken = new Set(topRow.map((p) => p.id));
+            topRow = [...topRow, ...pickFromTopN(unisex.filter((p) => !taken.has(p.id)), 4 - topRow.length)];
+          }
         } else {
           const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
           const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
           const unisex = products_list.filter(p => !["female", "femme", "male", "homme"].includes(p.gender_target || ""));
           topRow = [
-            ...female.slice(0, 2),
-            ...male.slice(0, 1),
-            ...unisex.slice(0, 1),
+            ...pickFromTopN(female, 2),
+            ...pickFromTopN(male, 1),
+            ...pickFromTopN(unisex, 1),
           ].slice(0, 4);
         }
 
@@ -85,11 +109,7 @@ export function RecommendationsSection() {
           .order("created_at", { ascending: false })
           .limit(80);
         const pool = ((poolData || []) as any[]).filter(p => !topIds.has(p.id));
-        // Fisher-Yates shuffle
-        for (let i = pool.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [pool[i], pool[j]] = [pool[j], pool[i]];
-        }
+        shuffleInPlace(pool);
         const bottomRow = pool.slice(0, 4);
 
         let combined = [...topRow, ...bottomRow];
