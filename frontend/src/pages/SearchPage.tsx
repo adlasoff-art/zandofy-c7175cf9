@@ -282,7 +282,7 @@ export default function SearchPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <SEOHead title={seoTitle} description={seoDesc} canonical={`/search${queryParam ? `?q=${encodeURIComponent(queryParam)}` : ""}`} />
+      <SEOHead title={seoTitle} description={seoDesc} canonical="/search" noindex />
       <Header />
       {queryParam && (
         <div className="lg:hidden sticky top-14 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-1">

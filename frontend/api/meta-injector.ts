@@ -333,6 +333,10 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
     keywords: Array.isArray(cfg.default_keywords) ? cfg.default_keywords.join(", ") : undefined,
   };
 
+  if (pathname === "/auth" || pathname === "/search") {
+    payload.robots = "noindex,follow";
+  }
+
   if (pathname === "/") {
     payload.jsonLd = buildHomeJsonLd(cfg);
   } else if (pathname === "/faq") {
