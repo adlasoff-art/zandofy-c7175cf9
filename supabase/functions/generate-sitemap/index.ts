@@ -105,16 +105,27 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     if (part === "index") {
-      const lastmod = today();
       const productTotal = await countPublishedProducts(supabase);
       const productPages = productSitemapPageCount(productTotal);
+      // Prefer freshest product updated_at for product sitemap lastmod (not build date).
+      let productIndexLastmod = today();
+      const { data: newest } = await supabase
+        .from("products")
+        .select("updated_at")
+        .eq("publish_status", "published")
+        .order("updated_at", { ascending: false })
+        .limit(1);
+      if (newest?.[0]?.updated_at) {
+        productIndexLastmod = String(newest[0].updated_at).split("T")[0];
+      }
+      const staticLastmod = today();
       let xml = xmlHeader();
       xml += `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
       for (let page = 1; page <= productPages; page++) {
-        xml += `  <sitemap><loc>${SITE_URL}/sitemap-products-${page}.xml</loc><lastmod>${lastmod}</lastmod></sitemap>\n`;
+        xml += `  <sitemap><loc>${SITE_URL}/sitemap-products-${page}.xml</loc><lastmod>${productIndexLastmod}</lastmod></sitemap>\n`;
       }
       for (const file of STATIC_CHILD_SITEMAPS) {
-        xml += `  <sitemap><loc>${SITE_URL}/${file}</loc><lastmod>${lastmod}</lastmod></sitemap>\n`;
+        xml += `  <sitemap><loc>${SITE_URL}/${file}</loc><lastmod>${staticLastmod}</lastmod></sitemap>\n`;
       }
       xml += `</sitemapindex>`;
       return xmlResponse(xml);

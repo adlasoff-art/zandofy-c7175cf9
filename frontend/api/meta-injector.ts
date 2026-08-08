@@ -258,6 +258,22 @@ const GLOBAL_ROUTES = new Set([
   "/reset-password",
   "/onboarding",
   "/impersonate",
+  "/cart",
+  "/checkout",
+  "/account",
+  "/dashboard",
+]);
+
+const NOINDEX_ROUTES = new Set([
+  "/auth",
+  "/search",
+  "/reset-password",
+  "/onboarding",
+  "/impersonate",
+  "/cart",
+  "/checkout",
+  "/account",
+  "/dashboard",
 ]);
 
 type SeoOverride = {
@@ -396,6 +412,10 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
     "/affiliate-program": "Affiliation",
     "/loyalty-program": "Fidélité",
     "/social-responsibility": "Responsabilité sociale",
+    "/cart": "Panier",
+    "/checkout": "Commande",
+    "/account": "Mon compte",
+    "/dashboard": "Tableau de bord",
   };
   const title = pathname === "/" ? baseTitle : `${pageLabel[pathname] || ""} | ${brand}`.replace(/^\s*\|\s*/, "").trim();
 
@@ -408,8 +428,8 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
     keywords: Array.isArray(cfg.default_keywords) ? cfg.default_keywords.join(", ") : undefined,
   };
 
-  if (pathname === "/auth" || pathname === "/search") {
-    payload.robots = "noindex,follow";
+  if (pathname === "/auth" || pathname === "/search" || NOINDEX_ROUTES.has(pathname)) {
+    payload.robots = pathname === "/search" ? "noindex,follow" : "noindex,nofollow";
   }
 
   if (pathname === "/") {
@@ -1092,7 +1112,7 @@ function stripStaticSeo(head: string): string {
 }
 
 function notFoundPayload(
-  kind: "category" | "store" | "product",
+  kind: "category" | "store" | "product" | "blog" | "page",
   pathname: string,
   status: 404 | 410,
 ): MetaPayload {
@@ -1100,6 +1120,8 @@ function notFoundPayload(
     product: { title: "Produit retiré | Zandofy", h1: "Produit retiré", desc: "Ce produit n'est plus disponible sur Zandofy." },
     category: { title: "Catégorie introuvable | Zandofy", h1: "Catégorie introuvable", desc: "Cette catégorie n'existe pas sur Zandofy." },
     store: { title: "Boutique introuvable | Zandofy", h1: "Boutique introuvable", desc: "Cette boutique n'existe pas sur Zandofy." },
+    blog: { title: "Article introuvable | Zandofy", h1: "Article introuvable", desc: "Cet article n'existe pas sur Zandofy." },
+    page: { title: "Page introuvable | Zandofy", h1: "Page introuvable", desc: "Cette page n'existe pas sur Zandofy." },
   }[kind];
   const path = pathname.split("?")[0];
   return {
@@ -1162,6 +1184,7 @@ export default async function handler(req: Request): Promise<Response> {
   const isProductPath = /^\/product\/[^/?#]+/i.test(pathname);
   const isStorePath = /^\/store\/[^/?#]+/i.test(pathname);
   const isCategoryPath = /^\/category\/[^/?#]+/i.test(pathname);
+  const isBlogPath = /^\/blog\/[^/?#]+/i.test(pathname);
 
   let meta: MetaPayload | null = null;
   try {
@@ -1201,6 +1224,35 @@ export default async function handler(req: Request): Promise<Response> {
 
   if (!meta && isCategoryPath) {
     const miss = notFoundPayload("category", pathname, 404);
+    html = injectMetaIntoHtml(html, miss);
+    return new Response(html, {
+      status: 404,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "public, max-age=60, s-maxage=60",
+        "X-Robots-Tag": "noindex, nofollow",
+        Vary: "User-Agent",
+      },
+    });
+  }
+
+  if (!meta && isBlogPath) {
+    const miss = notFoundPayload("blog", pathname, 404);
+    html = injectMetaIntoHtml(html, miss);
+    return new Response(html, {
+      status: 404,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "public, max-age=60, s-maxage=60",
+        "X-Robots-Tag": "noindex, nofollow",
+        Vary: "User-Agent",
+      },
+    });
+  }
+
+  // Unknown path (not a known hub, not a dynamic entity) → hard 404 for bots
+  if (!meta && !isDynamic && !GLOBAL_ROUTES.has(pathname.split("?")[0])) {
+    const miss = notFoundPayload("page", pathname, 404);
     html = injectMetaIntoHtml(html, miss);
     return new Response(html, {
       status: 404,
