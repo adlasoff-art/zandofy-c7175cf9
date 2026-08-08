@@ -179,8 +179,9 @@ function OverviewTab({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 md:grid-cols-9 gap-2">
-        <StatCard icon={Users} label="Visiteurs" value={kpis?.unique_sessions || 0} sub="sessions uniques" />
+      <div className="grid grid-cols-3 md:grid-cols-10 gap-2">
+        <StatCard icon={Users} label="Sessions humaines" value={kpis?.human_sessions ?? kpis?.unique_sessions ?? 0} sub="après interaction" />
+        <StatCard icon={Users} label="Sessions brutes" value={kpis?.unique_sessions || 0} sub="incl. bots / sans gate" />
         <StatCard icon={Eye} label="Pages vues" value={kpis?.page_views || 0} />
         <StatCard icon={Users} label="Authentifiés" value={kpis?.authenticated_sessions || 0} sub="sessions connectées" />
         <StatCard icon={Globe} label="Anonymes" value={kpis?.anonymous_sessions || 0} sub="sans compte" />
