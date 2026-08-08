@@ -5,11 +5,13 @@ import { createClient } from "npm:@supabase/supabase-js@2";
  * Canonical host MUST match live redirect (www → apex).
  *
  * Query: ?part=index|products|categories|vendors|pages|blog
- * Default: index (sitemapindex listing child files on the site origin).
+ * Products pagination: ?part=products&page=1 (1000 URLs/page via range())
+ * Files: sitemap-products-1.xml, sitemap-products-2.xml, …
  *
- * Redeploy trigger: 2026-08-08 — segmented sitemaps, exclude /search.
+ * Redeploy trigger: 2026-08-08 — product sitemap pagination past Supabase 1000-row cap.
  */
 const SITE_URL = (Deno.env.get("SITE_URL") || "https://zandofy.com").replace(/\/$/, "");
+const PRODUCT_PAGE_SIZE = 1000;
 
 /** Match frontend `slugify()` for category URLs. */
 function slugify(text: string): string {
@@ -69,13 +71,29 @@ const HUB_PAGES: { loc: string; changefreq: string; priority: string }[] = [
   { loc: "/privacy", changefreq: "yearly", priority: "0.3" },
 ];
 
-const CHILD_SITEMAPS = [
-  "sitemap-products.xml",
+const STATIC_CHILD_SITEMAPS = [
   "sitemap-categories.xml",
   "sitemap-vendors.xml",
   "sitemap-pages.xml",
   "sitemap-blog.xml",
 ] as const;
+
+async function countPublishedProducts(supabase: ReturnType<typeof createClient>): Promise<number> {
+  const { count, error } = await supabase
+    .from("products")
+    .select("id", { count: "exact", head: true })
+    .eq("publish_status", "published");
+  if (error) {
+    console.error("[generate-sitemap] count products", error.message);
+    return 0;
+  }
+  return count ?? 0;
+}
+
+function productSitemapPageCount(total: number): number {
+  if (total <= 0) return 1;
+  return Math.ceil(total / PRODUCT_PAGE_SIZE);
+}
 
 Deno.serve(async (req) => {
   try {
@@ -88,9 +106,14 @@ Deno.serve(async (req) => {
 
     if (part === "index") {
       const lastmod = today();
+      const productTotal = await countPublishedProducts(supabase);
+      const productPages = productSitemapPageCount(productTotal);
       let xml = xmlHeader();
       xml += `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
-      for (const file of CHILD_SITEMAPS) {
+      for (let page = 1; page <= productPages; page++) {
+        xml += `  <sitemap><loc>${SITE_URL}/sitemap-products-${page}.xml</loc><lastmod>${lastmod}</lastmod></sitemap>\n`;
+      }
+      for (const file of STATIC_CHILD_SITEMAPS) {
         xml += `  <sitemap><loc>${SITE_URL}/${file}</loc><lastmod>${lastmod}</lastmod></sitemap>\n`;
       }
       xml += `</sitemapindex>`;
@@ -109,12 +132,20 @@ Deno.serve(async (req) => {
     }
 
     if (part === "products") {
-      const { data: products } = await supabase
+      const pageRaw = parseInt(url.searchParams.get("page") || "1", 10);
+      const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+      const from = (page - 1) * PRODUCT_PAGE_SIZE;
+      const to = from + PRODUCT_PAGE_SIZE - 1;
+      const { data: products, error } = await supabase
         .from("products")
         .select("id, slug, updated_at")
         .eq("publish_status", "published")
         .order("updated_at", { ascending: false })
-        .limit(5000);
+        .range(from, to);
+      if (error) {
+        console.error("[generate-sitemap] products page", page, error.message);
+        return new Response(`Error fetching products: ${error.message}`, { status: 500 });
+      }
       let body = "";
       for (const p of products || []) {
         const lastmod = p.updated_at ? String(p.updated_at).split("T")[0] : "";
@@ -193,9 +224,10 @@ Deno.serve(async (req) => {
       return xmlResponse(wrapUrlset(body));
     }
 
-    return new Response(`Unknown part=${part}. Use index|products|categories|vendors|pages|blog`, {
-      status: 400,
-    });
+    return new Response(
+      `Unknown part=${part}. Use index|products|categories|vendors|pages|blog (&page=N for products)`,
+      { status: 400 },
+    );
   } catch (error) {
     return new Response(`Error generating sitemap: ${error}`, { status: 500 });
   }

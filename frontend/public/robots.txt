@@ -1,6 +1,7 @@
 # Zandofy robots.txt — apex canonical https://zandofy.com
 # Query params (sort, filters, utm) are not expressible in robots.txt;
 # they are handled via noindex + parameter-free canonicals in the app.
+# Single User-agent: * group (Cloudflare Managed robots.txt must stay OFF).
 
 User-agent: *
 Allow: /
@@ -52,5 +53,34 @@ Disallow: /messages
 Disallow: /reset-password
 Disallow: /onboarding
 Disallow: /impersonate
+
+# AI search / answers — allow (marketplace discovery)
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+# Bulk scrapers — no useful referral traffic
+User-agent: Bytespider
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
 
 Sitemap: https://zandofy.com/sitemap.xml

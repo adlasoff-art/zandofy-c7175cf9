@@ -4,10 +4,11 @@
  * Prefer static public/sitemap*.xml from build (fetch-sitemap.mjs); this is a fallback.
  *
  * Query: ?part=index|products|categories|vendors|pages|blog
+ * Products: optional &page=N (1000 URLs per page)
  */
 export const config = { runtime: "edge" };
 
-function resolveSitemapUrl(part: string): string {
+function resolveSitemapUrl(part: string, page: string | null): string {
   let base: string;
   if (process.env.SITEMAP_FUNCTION_URL?.trim()) {
     base = process.env.SITEMAP_FUNCTION_URL.trim().replace(/\/$/, "");
@@ -21,12 +22,15 @@ function resolveSitemapUrl(part: string): string {
   }
   const u = new URL(base);
   u.searchParams.set("part", part);
+  if (page) u.searchParams.set("page", page);
   return u.toString();
 }
 
 export default async function handler(req: Request): Promise<Response> {
-  const part = new URL(req.url).searchParams.get("part") || "index";
-  const url = resolveSitemapUrl(part);
+  const reqUrl = new URL(req.url);
+  const part = reqUrl.searchParams.get("part") || "index";
+  const page = reqUrl.searchParams.get("page");
+  const url = resolveSitemapUrl(part, page);
   try {
     const upstream = await fetch(url, {
       headers: { Accept: "application/xml,text/xml,*/*" },
