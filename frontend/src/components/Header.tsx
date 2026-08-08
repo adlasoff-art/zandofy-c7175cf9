@@ -41,7 +41,7 @@ const NAV_LINK_KEYS = [
   { label: "Catégories", href: "#", hasMega: true, highlight: false },
   { label: "Nouveautés", href: "/category/nouveautes", hasMega: false, highlight: false },
   { label: "Soldes", href: "/category/soldes", hasMega: false, highlight: true },
-  { label: "Fournisseurs", href: "/stores", hasMega: false, highlight: false },
+  { label: "Fournisseurs fiables", href: "/stores", hasMega: false, highlight: false },
   { label: "Électronique", href: "/category/electronics", hasMega: false, highlight: false },
   { label: "Maison & Déco", href: "/category/home", hasMega: false, highlight: false },
   { label: "Vêtements Femme", href: "/category/women", hasMega: false, highlight: false },

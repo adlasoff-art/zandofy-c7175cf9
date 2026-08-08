@@ -262,6 +262,7 @@ const GLOBAL_ROUTES = new Set([
   "/checkout",
   "/account",
   "/dashboard",
+  "/wishlist",
 ]);
 
 const NOINDEX_ROUTES = new Set([
@@ -274,7 +275,12 @@ const NOINDEX_ROUTES = new Set([
   "/checkout",
   "/account",
   "/dashboard",
+  "/wishlist",
 ]);
+
+function isWishlistPath(pathname: string): boolean {
+  return pathname === "/wishlist" || pathname.startsWith("/wishlist/");
+}
 
 type SeoOverride = {
   path: string;
@@ -397,7 +403,7 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
 
   const pageLabel: Record<string, string> = {
     "/faq": "FAQ",
-    "/stores": "Boutiques",
+    "/stores": "Fournisseurs fiables",
     "/blog": "Blog",
     "/about": "À propos",
     "/careers": "Carrières",
@@ -416,6 +422,7 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
     "/checkout": "Commande",
     "/account": "Mon compte",
     "/dashboard": "Tableau de bord",
+    "/wishlist": "Favoris",
   };
   const title = pathname === "/" ? baseTitle : `${pageLabel[pathname] || ""} | ${brand}`.replace(/^\s*\|\s*/, "").trim();
 
@@ -428,7 +435,7 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
     keywords: Array.isArray(cfg.default_keywords) ? cfg.default_keywords.join(", ") : undefined,
   };
 
-  if (pathname === "/auth" || pathname === "/search" || NOINDEX_ROUTES.has(pathname)) {
+  if (pathname === "/auth" || pathname === "/search" || NOINDEX_ROUTES.has(pathname) || isWishlistPath(pathname)) {
     payload.robots = pathname === "/search" ? "noindex,follow" : "noindex,nofollow";
   }
 
@@ -447,7 +454,7 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
       { name: "Sacs & accessoires", href: `${getSiteUrl()}/category/sacs-accessoires` },
       { name: "Literie", href: `${getSiteUrl()}/category/literie` },
       { name: "Auto & engin", href: `${getSiteUrl()}/category/auto-engin` },
-      { name: "Boutiques", href: `${getSiteUrl()}/stores` },
+      { name: "Fournisseurs fiables", href: `${getSiteUrl()}/stores` },
     ];
     payload.jsonLd = buildHomeJsonLd(cfg);
     payload.bodyHtml = buildSeoMainHtml({
@@ -457,7 +464,7 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
       productLinks: homeCats,
       breadcrumb: [{ name: "Accueil", href: `${getSiteUrl()}/` }],
       ctaHref: `${getSiteUrl()}/stores`,
-      ctaLabel: "Explorer les boutiques Zandofy",
+      ctaLabel: "Fournisseurs fiables sur Zandofy",
     });
   } else if (pathname === "/faq") {
     payload.jsonLd = {
@@ -989,8 +996,17 @@ async function buildMetaForPath(pathname: string): Promise<MetaPayload | null> {
     return meta ? applyOverride(meta, override) : null;
   }
 
-  if (GLOBAL_ROUTES.has(pathname)) {
-    const base = await buildGlobalMeta(pathname);
+  if (GLOBAL_ROUTES.has(pathname) || isWishlistPath(pathname)) {
+    const basePath = isWishlistPath(pathname) && pathname !== "/wishlist" ? "/wishlist" : pathname;
+    const base = GLOBAL_ROUTES.has(pathname)
+      ? await buildGlobalMeta(pathname)
+      : {
+          title: `Favoris | Zandofy`,
+          description: "Liste de favoris personnelle — page privée non indexée.",
+          canonical: `${getSiteUrl()}${pathname}`,
+          ogType: "website" as const,
+          robots: "noindex,nofollow",
+        };
     if (!base && !override) return null;
     const merged: MetaPayload = base || {
       title: "Zandofy",
@@ -998,9 +1014,15 @@ async function buildMetaForPath(pathname: string): Promise<MetaPayload | null> {
       canonical: `${getSiteUrl()}${pathname}`,
       ogType: "website",
     };
+    // Shared wishlist keeps its own canonical path but inherits Favoris noindex labelling
+    if (basePath === "/wishlist" && pathname !== "/wishlist") {
+      merged.title = "Favoris partagés | Zandofy";
+      merged.canonical = `${getSiteUrl()}${pathname}`;
+      merged.robots = "noindex,nofollow";
+    }
     const out = applyOverride(merged, override);
     // Hard noindex for transactional / private routes (overrides cannot re-open indexing)
-    if (NOINDEX_ROUTES.has(pathname)) {
+    if (NOINDEX_ROUTES.has(pathname) || isWishlistPath(pathname)) {
       out.robots = pathname === "/search" ? "noindex,follow" : "noindex,nofollow";
     }
     return out;

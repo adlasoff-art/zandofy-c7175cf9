@@ -21,6 +21,7 @@ Disallow: /account
 Disallow: /auth
 Disallow: /checkout
 Disallow: /cart
+Disallow: /wishlist
 Disallow: /search
 Disallow: /messages
 Disallow: /reset-password
@@ -48,6 +49,7 @@ Disallow: /account
 Disallow: /auth
 Disallow: /checkout
 Disallow: /cart
+Disallow: /wishlist
 Disallow: /search
 Disallow: /messages
 Disallow: /reset-password

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
+import { SEOHead } from "@/components/SEOHead";
 import { Heart, Gift, Share2, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -91,6 +92,12 @@ export default function SharedWishlistPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead
+        title={t("wishlist.shared.title", { owner: ownerName }) || `Liste de souhaits de ${ownerName}`}
+        description="Liste de favoris partagée — page privée non indexée."
+        canonical={userId ? `/wishlist/shared/${userId}` : "/wishlist"}
+        noindex
+      />
       <Header />
       <main className="container py-6">
         <div className="flex items-center justify-between mb-6">

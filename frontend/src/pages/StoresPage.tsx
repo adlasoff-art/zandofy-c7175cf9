@@ -335,8 +335,8 @@ export default function StoresPage() {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title={t("stores.seo.title") || "Nos Fournisseurs — Marketplace"}
-        description={t("stores.seo.description") || "Explorez les fournisseurs vérifiés de Zandofy. Comparez les boutiques, découvrez leurs produits et trouvez ceux qui correspondent à vos besoins."}
+        title={t("stores.seo.title") || "Fournisseurs fiables — Boutiques vérifiées Zandofy"}
+        description={t("stores.seo.description") || "Découvrez les fournisseurs fiables et boutiques vérifiées sur Zandofy. Comparez notes, produits et livrez depuis la Chine vers l'Afrique."}
         canonical="/stores"
       />
       <Header />

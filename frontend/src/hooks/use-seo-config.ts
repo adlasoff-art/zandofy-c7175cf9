@@ -28,7 +28,7 @@ export interface SeoConfig {
 }
 
 export const DEFAULT_SITELINKS_NAV = [
-  { name: "Boutiques", url: "/stores" },
+  { name: "Fournisseurs fiables", url: "/stores" },
   { name: "Populaires", url: "/popular" },
   { name: "Tendances", url: "/trends" },
   { name: "Blog", url: "/blog" },
