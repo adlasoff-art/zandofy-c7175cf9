@@ -64,6 +64,39 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function stripHtml(value: string): string {
+  return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** Crawler-visible main: same catalogue facts as the SPA (no cloaking). */
+function buildSeoMainHtml(opts: {
+  h1: string;
+  price?: string;
+  description?: string;
+  breadcrumb?: { name: string; href: string }[];
+  ctaHref: string;
+  ctaLabel: string;
+}): string {
+  const crumbs =
+    opts.breadcrumb && opts.breadcrumb.length > 0
+      ? `<nav aria-label="Fil d'Ariane"><ol>${opts.breadcrumb
+          .map(
+            (c, i) =>
+              `<li>${
+                i < opts.breadcrumb!.length - 1
+                  ? `<a href="${escapeHtml(c.href)}">${escapeHtml(c.name)}</a>`
+                  : escapeHtml(c.name)
+              }</li>`,
+          )
+          .join("")}</ol></nav>`
+      : "";
+  const price = opts.price ? `<p class="price">${escapeHtml(opts.price)}</p>` : "";
+  const desc = opts.description
+    ? `<p class="desc">${escapeHtml(stripHtml(opts.description).slice(0, 500))}</p>`
+    : "";
+  return `<main id="zandofy-seo-main"><style>#zandofy-seo-main{font-family:system-ui,sans-serif;max-width:42rem;margin:1rem auto;padding:0 1rem;line-height:1.5;color:#111}#zandofy-seo-main h1{font-size:1.5rem;margin:0 0 .5rem}#zandofy-seo-main .price{font-weight:700;font-size:1.125rem;margin:.5rem 0}#zandofy-seo-main .desc{margin:.75rem 0;color:#333}#zandofy-seo-main nav ol{display:flex;flex-wrap:wrap;gap:.35rem;list-style:none;padding:0;margin:0 0 1rem;font-size:.875rem;color:#555}#zandofy-seo-main nav li:not(:last-child)::after{content:"›";margin-left:.35rem;color:#999}#zandofy-seo-main a{color:#0a5}</style>${crumbs}<h1>${escapeHtml(opts.h1)}</h1>${price}${desc}<p><a href="${escapeHtml(opts.ctaHref)}">${escapeHtml(opts.ctaLabel)}</a></p></main>`;
+}
+
 function escapeJsonLd(s: string): string {
   return s.replace(/</g, "\\u003c");
 }
@@ -112,6 +145,10 @@ type MetaPayload = {
   keywords?: string;
   robots?: string;
   ogTitle?: string;
+  /** Visible body for crawlers (H1, price, description) — same facts as SPA. */
+  bodyHtml?: string;
+  /** HTTP status override (e.g. 410 for permanently removed products). */
+  httpStatus?: number;
 };
 
 type SitelinkNavItem = { name: string; url: string };
@@ -339,6 +376,13 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
 
   if (pathname === "/") {
     payload.jsonLd = buildHomeJsonLd(cfg);
+    payload.bodyHtml = buildSeoMainHtml({
+      h1: brand,
+      description,
+      breadcrumb: [{ name: "Accueil", href: `${getSiteUrl()}/` }],
+      ctaHref: `${getSiteUrl()}/`,
+      ctaLabel: "Explorer Zandofy",
+    });
   } else if (pathname === "/faq") {
     payload.jsonLd = {
       "@context": "https://schema.org",
@@ -347,6 +391,17 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
       url: canonical,
       description,
     };
+  } else if (pageLabel[pathname]) {
+    payload.bodyHtml = buildSeoMainHtml({
+      h1: pageLabel[pathname],
+      description,
+      breadcrumb: [
+        { name: "Accueil", href: `${getSiteUrl()}/` },
+        { name: pageLabel[pathname], href: canonical },
+      ],
+      ctaHref: canonical,
+      ctaLabel: `Voir ${pageLabel[pathname]} sur Zandofy`,
+    });
   }
 
   return payload;
@@ -373,13 +428,14 @@ async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
     ?.image_url;
   const image = toAbsoluteOgImage(featuredUrl);
 
-  const titleTpl = cfg.product_title_template || "{name} | Zandofy";
+  const titleTpl =
+    cfg.product_title_template || "{name} — {category} à prix Kinshasa | Zandofy";
   const descTpl =
     cfg.product_description_template ||
     "Achetez {name} sur Zandofy — import Chine & livraison Afrique.";
   const title = truncate(
-    p.meta_title || applyTemplate(titleTpl, { name: displayName, brand: storeName, category: categoryName }),
-    70,
+    p.meta_title || applyTemplate(titleTpl, { name: displayName, brand: storeName, category: categoryName || "Marketplace" }),
+    60,
   );
   const description = truncate(
     p.meta_description ||
@@ -387,6 +443,26 @@ async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
       p.description ||
       applyTemplate(descTpl, { name: displayName, brand: storeName, category: categoryName }),
   );
+
+  const priceLabel =
+    p.price != null
+      ? `${Number(p.price).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${p.currency || "USD"}`
+      : "";
+
+  const bodyHtml = buildSeoMainHtml({
+    h1: displayName,
+    price: priceLabel || undefined,
+    description,
+    breadcrumb: [
+      { name: "Accueil", href: `${getSiteUrl()}/` },
+      ...(categoryName
+        ? [{ name: categoryName, href: `${getSiteUrl()}/category/${slugify(categoryName)}` }]
+        : []),
+      { name: displayName, href: canonical },
+    ],
+    ctaHref: canonical,
+    ctaLabel: "Voir le produit sur Zandofy",
+  });
 
   const inStock =
     p.stock_quantity == null || Number(p.stock_quantity) > 0
@@ -451,6 +527,7 @@ async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
     ogType: "product",
     keywords: Array.isArray(p.seo_keywords) ? p.seo_keywords.join(", ") : undefined,
     jsonLd: [productLd, breadcrumb],
+    bodyHtml,
   };
 }
 
@@ -513,6 +590,16 @@ async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
     ogType: "website",
     keywords: Array.isArray(s.seo_keywords) ? s.seo_keywords.join(", ") : undefined,
     jsonLd,
+    bodyHtml: buildSeoMainHtml({
+      h1: s.name,
+      description,
+      breadcrumb: [
+        { name: "Accueil", href: `${getSiteUrl()}/` },
+        { name: s.name, href: canonical },
+      ],
+      ctaHref: canonical,
+      ctaLabel: "Voir la boutique sur Zandofy",
+    }),
   };
 }
 
@@ -597,6 +684,16 @@ async function buildCategoryMeta(slug: string): Promise<MetaPayload | null> {
     ogType: "website",
     keywords: Array.isArray(c?.seo_keywords) ? c.seo_keywords.join(", ") : undefined,
     jsonLd: itemList ? [collectionLd, breadcrumb, itemList] : [collectionLd, breadcrumb],
+    bodyHtml: buildSeoMainHtml({
+      h1: displayName,
+      description,
+      breadcrumb: [
+        { name: "Accueil", href: `${getSiteUrl()}/` },
+        { name: displayName, href: canonical },
+      ],
+      ctaHref: canonical,
+      ctaLabel: "Voir la catégorie sur Zandofy",
+    }),
   };
 }
 
@@ -634,6 +731,17 @@ async function buildBlogMeta(slug: string): Promise<MetaPayload | null> {
         logo: { "@type": "ImageObject", url: `${getSiteUrl()}/icons/icon-512.png` },
       },
     },
+    bodyHtml: buildSeoMainHtml({
+      h1: b.title,
+      description,
+      breadcrumb: [
+        { name: "Accueil", href: `${getSiteUrl()}/` },
+        { name: "Blog", href: `${getSiteUrl()}/blog` },
+        { name: b.title, href: canonical },
+      ],
+      ctaHref: canonical,
+      ctaLabel: "Lire l'article sur Zandofy",
+    }),
   };
 }
 
@@ -764,9 +872,22 @@ function injectMetaIntoHtml(html: string, meta: MetaPayload): string {
   if (headOpenIdx === -1 || headCloseIdx === -1) return html;
   const before = html.slice(0, html.indexOf(">", headOpenIdx) + 1);
   const headInner = html.slice(html.indexOf(">", headOpenIdx) + 1, headCloseIdx);
-  const after = html.slice(headCloseIdx);
+  const afterHead = html.slice(headCloseIdx);
   const cleanedHead = stripStaticSeo(headInner);
-  return before + cleanedHead + buildHeadInjection(meta) + after;
+  let out = before + cleanedHead + buildHeadInjection(meta) + afterHead;
+
+  if (meta.bodyHtml) {
+    // Prefer insert before </body>; else after #root so SPA still mounts.
+    if (/<\/body>/i.test(out)) {
+      out = out.replace(/<\/body>/i, `${meta.bodyHtml}</body>`);
+    } else if (/<div[^>]+id=["']root["'][^>]*>\s*<\/div>/i.test(out)) {
+      out = out.replace(
+        /(<div[^>]+id=["']root["'][^>]*>\s*<\/div>)/i,
+        `$1${meta.bodyHtml}`,
+      );
+    }
+  }
+  return out;
 }
 
 function stripStaticSeo(head: string): string {
@@ -809,6 +930,7 @@ export default async function handler(req: Request): Promise<Response> {
 
   const pathname = resolveRequestPathname(req, url);
   const isDynamic = isDynamicSeoPath(pathname);
+  const isProductPath = /^\/product\/[^/?#]+/i.test(pathname);
 
   let meta: MetaPayload | null = null;
   try {
@@ -816,6 +938,39 @@ export default async function handler(req: Request): Promise<Response> {
   } catch (err) {
     console.warn("[meta-injector] buildMetaForPath failed", pathname, err);
     meta = null;
+  }
+
+  // Permanently unavailable / unpublished products → HTTP 410 (no soft-200 fallback).
+  if (!meta && isProductPath) {
+    const gone: MetaPayload = {
+      title: "Produit retiré | Zandofy",
+      description: "Ce produit n'est plus disponible sur Zandofy.",
+      canonical: `${getSiteUrl()}${pathname.split("?")[0]}`,
+      image: `${getSiteUrl()}/og-default.jpg`,
+      ogType: "website",
+      robots: "noindex,nofollow",
+      httpStatus: 410,
+      bodyHtml: buildSeoMainHtml({
+        h1: "Produit retiré",
+        description: "Ce produit n'est plus disponible sur Zandofy.",
+        breadcrumb: [
+          { name: "Accueil", href: `${getSiteUrl()}/` },
+          { name: "Produit retiré", href: `${getSiteUrl()}${pathname.split("?")[0]}` },
+        ],
+        ctaHref: `${getSiteUrl()}/`,
+        ctaLabel: "Retour à l'accueil Zandofy",
+      }),
+    };
+    html = injectMetaIntoHtml(html, gone);
+    return new Response(html, {
+      status: 410,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "public, max-age=60, s-maxage=60",
+        "X-Robots-Tag": "noindex, nofollow",
+        Vary: "User-Agent",
+      },
+    });
   }
 
   if (!meta && isDynamic) {
@@ -845,7 +1000,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   return new Response(html, {
-    status: 200,
+    status: meta?.httpStatus || 200,
     headers: responseHeaders,
   });
 }
