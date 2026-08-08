@@ -171,12 +171,12 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
       script.textContent = JSON.stringify(normalizeJsonLd(jsonLd));
     }
 
-    // Google Analytics / GTM
+    // Google Analytics / GTM — idle deferral (never on LCP critical path)
     if (seoConfig.google_analytics_id) {
       const gaId = seoConfig.google_analytics_id;
-      const existingScript = document.querySelector(`script[src*="googletagmanager.com"][data-seo-ga]`);
-      if (!existingScript) {
-        // gtag.js loader
+      const loadGa = () => {
+        const existingScript = document.querySelector(`script[src*="googletagmanager.com"][data-seo-ga]`);
+        if (existingScript) return;
         const gtagScript = document.createElement("script");
         gtagScript.async = true;
         gtagScript.src = gaId.startsWith("GTM-")
@@ -196,6 +196,12 @@ export function SEOHead({ title, description, canonical, ogImage, ogType = "webs
           `;
           document.head.appendChild(inlineScript);
         }
+      };
+      const w = window as any;
+      if (typeof w.requestIdleCallback === "function") {
+        w.requestIdleCallback(loadGa, { timeout: 4000 });
+      } else {
+        setTimeout(loadGa, 2000);
       }
     }
 

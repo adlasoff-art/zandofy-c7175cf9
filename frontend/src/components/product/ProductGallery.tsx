@@ -130,6 +130,9 @@ export function ProductGallery({
               className="w-full h-full"
               objectClassName="object-cover md:object-contain"
               zoomFactor={2.5}
+              priority={selectedIndex === 0}
+              width={800}
+              height={1067}
             />
           )}
 
