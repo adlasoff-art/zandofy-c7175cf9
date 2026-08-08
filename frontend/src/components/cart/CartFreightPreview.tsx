@@ -67,7 +67,7 @@ export function CartFreightPreview({
       const ids = [...new Set(items.map((i) => i.productId).filter(Boolean))];
       const { data: prods } = ids.length
         ? await supabase
-            .from("products")
+            .from("products_public")
             .select("id, weight_grams, length_cm, width_cm, height_cm")
             .in("id", ids)
         : { data: [] as ProductDims[] };

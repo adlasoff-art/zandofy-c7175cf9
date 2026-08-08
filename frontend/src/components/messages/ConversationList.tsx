@@ -108,7 +108,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
     const [storesRes, productsRes, profilesRes] = await Promise.all([
       supabase.from("stores").select("id, name, logo_url, is_online").in("id", storeIds),
       productIds.length > 0
-        ? supabase.from("products").select("id, name_fr, image, price, slug").in("id", productIds)
+        ? supabase.from("products_public").select("id, name_fr, image, price, slug").in("id", productIds)
         : Promise.resolve({ data: [] }),
       otherUserIds.length > 0
         ? supabase.from("profiles").select("id, first_name, last_name, avatar_url").in("id", otherUserIds)

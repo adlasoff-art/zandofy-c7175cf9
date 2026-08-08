@@ -125,7 +125,7 @@ export default function CategoryPage() {
       if (!category) return [];
 
       let query = supabase
-        .from("products")
+        .from("products_public")
         .select(PRODUCT_LIST_SELECT)
         .eq("publish_status", "published");
 

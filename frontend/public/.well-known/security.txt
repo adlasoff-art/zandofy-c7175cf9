@@ -1,0 +1,3 @@
+Contact: mailto:security@zandofy.com
+Preferred-Languages: fr, en
+Canonical: https://zandofy.com/.well-known/security.txt

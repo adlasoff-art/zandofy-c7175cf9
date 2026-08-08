@@ -28,7 +28,7 @@ export interface SearchFilters {
 
 export async function searchProducts(filters: SearchFilters): Promise<Product[]> {
   let query = supabase
-    .from("products")
+    .from("products_public")
     .select(SEARCH_SELECT)
     .eq("publish_status", "published");
 
@@ -102,7 +102,7 @@ export async function autocompleteProducts(query: string): Promise<Product[]> {
   if (!query || query.length < 2) return [];
 
   const { data, error } = await supabase
-    .from("products")
+    .from("products_public")
     .select("id, name, name_fr, price, currency, product_images(image_url, position)")
     .eq("publish_status", "published")
     .or(`name.ilike.%${sanitizeLike(query)}%,name_fr.ilike.%${sanitizeLike(query)}%`)
