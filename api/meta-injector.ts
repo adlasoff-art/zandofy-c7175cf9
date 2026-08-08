@@ -413,13 +413,31 @@ async function buildGlobalMeta(pathname: string): Promise<MetaPayload | null> {
   }
 
   if (pathname === "/") {
+    const homeH1 = "Achetez en Chine, livré en Afrique — prix usine, livraison suivie";
+    const homeArticle = [
+      "Zandofy est la marketplace sino-africaine qui relie les acheteurs en RDC et en Afrique aux usines et marques internationales.",
+      "Comparez des prix usine, commandez en ligne et suivez la logistique jusqu'à Kinshasa et au-delà : fournisseurs vérifiés, catalogue multi-catégories, paiement et livraison pensés pour le marché local.",
+      "Que vous cherchiez mode, électronique, maison, beauté ou équipements, explorez les boutiques officielles et les catégories principales ci-dessous pour trouver le bon produit au bon prix.",
+    ].join(" ");
+    const homeCats = [
+      { name: "Mode africaine", href: `${getSiteUrl()}/category/mode-africaine` },
+      { name: "Accessoires tech", href: `${getSiteUrl()}/category/accessoires-tech` },
+      { name: "Beauté & soins", href: `${getSiteUrl()}/category/beaute-soins` },
+      { name: "Soins bébé", href: `${getSiteUrl()}/category/soins-bebe` },
+      { name: "Sacs & accessoires", href: `${getSiteUrl()}/category/sacs-accessoires` },
+      { name: "Literie", href: `${getSiteUrl()}/category/literie` },
+      { name: "Auto & engin", href: `${getSiteUrl()}/category/auto-engin` },
+      { name: "Boutiques", href: `${getSiteUrl()}/stores` },
+    ];
     payload.jsonLd = buildHomeJsonLd(cfg);
     payload.bodyHtml = buildSeoMainHtml({
-      h1: "Achetez en Chine, livré en RDC et en Afrique — prix usine",
+      h1: homeH1,
       description,
+      articleBody: homeArticle,
+      productLinks: homeCats,
       breadcrumb: [{ name: "Accueil", href: `${getSiteUrl()}/` }],
-      ctaHref: `${getSiteUrl()}/`,
-      ctaLabel: "Explorer Zandofy",
+      ctaHref: `${getSiteUrl()}/stores`,
+      ctaLabel: "Explorer les boutiques Zandofy",
     });
   } else if (pathname === "/faq") {
     payload.jsonLd = {
@@ -576,31 +594,57 @@ async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
   };
 }
 
+/**
+ * Same source of truth as SPA StorePage + sitemap vendors:
+ * - Public read: `stores_public` (anon; `stores` is RLS-blocked)
+ * - Sitemap uses service role on `stores` with identical active filters
+ */
 async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
   const cfg = await getSeoConfig();
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
+  const storeSelect =
+    "id,name,slug,description,logo_url,banner_url,city,country,rating,review_count_override,meta_title,meta_description,seo_keywords,is_banned,is_suspended";
   const filter = isUuid ? `id=eq.${slug}` : `slug=eq.${encodeURIComponent(slug)}`;
-  let rows = await sbFetch(
-    `stores?${filter}&is_banned=eq.false&is_suspended=eq.false&select=id,name,slug,description,logo_url,banner_url,city,country,rating,review_count_override,meta_title,meta_description,seo_keywords&limit=1`,
-  );
-  // Fallback: match slugified name when slug column empty/mismatched
+
+  // Include banned/suspended so we can return 410 (not soft-empty / false 404)
+  let rows = await sbFetch(`stores_public?${filter}&select=${storeSelect}&limit=1`);
   if (!rows[0] && !isUuid) {
-    const all = await sbFetch(
-      `stores?is_banned=eq.false&is_suspended=eq.false&select=id,name,slug,description,logo_url,banner_url,city,country,rating,review_count_override,meta_title,meta_description,seo_keywords&limit=2000`,
-    );
+    const all = await sbFetch(`stores_public?select=${storeSelect}&limit=2000`);
     rows = all.filter(
-      (r) =>
-        slugify(r.slug || "") === slug ||
-        slugify(r.name || "") === slug,
+      (r) => slugify(r.slug || "") === slug || slugify(r.name || "") === slug,
     );
   }
   const s = rows[0];
   if (!s) return null;
 
-  const canonical = `${getSiteUrl()}/store/${s.slug || s.id}`;
+  const pathSlug = s.slug || s.id;
+  const canonical = `${getSiteUrl()}/store/${pathSlug}`;
+
+  if (s.is_banned || s.is_suspended) {
+    return {
+      title: "Boutique indisponible | Zandofy",
+      description: "Cette boutique n'est plus disponible sur Zandofy.",
+      canonical,
+      image: `${getSiteUrl()}/og-default.jpg`,
+      ogType: "website",
+      robots: "noindex,nofollow",
+      httpStatus: 410,
+      bodyHtml: buildSeoMainHtml({
+        h1: "Boutique indisponible",
+        description: "Cette boutique n'est plus disponible sur Zandofy.",
+        breadcrumb: [
+          { name: "Accueil", href: `${getSiteUrl()}/` },
+          { name: "Boutiques", href: `${getSiteUrl()}/stores` },
+          { name: "Indisponible", href: canonical },
+        ],
+        ctaHref: `${getSiteUrl()}/stores`,
+        ctaLabel: "Voir les boutiques Zandofy",
+      }),
+    };
+  }
+
   const image = toAbsoluteOgImage(s.banner_url || s.logo_url);
-  const titleTpl =
-    cfg.store_title_template || "{name} — Boutique officielle sur Zandofy | Livraison RDC";
+  const titleTpl = cfg.store_title_template || "{name} Boutique | Zandofy";
   const descTpl =
     cfg.store_description_template ||
     "Découvrez la boutique {name} sur Zandofy. Produits prix usine, livraison en Afrique.";
@@ -609,7 +653,7 @@ async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
   const title =
     rawTitle.length <= 60
       ? rawTitle
-      : buildPageTitle({ primary: s.name, suffix: "— Boutique | Zandofy", max: 60 });
+      : buildPageTitle({ primary: s.name, suffix: "Boutique | Zandofy", max: 60 });
   const description = truncate(
     s.meta_description ||
       s.description ||
@@ -619,7 +663,7 @@ async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
   );
 
   const products = await sbFetch(
-    `products?store_id=eq.${s.id}&publish_status=eq.published&select=id,slug,name,name_fr,price,currency,product_images(image_url,position)&order=updated_at.desc&limit=12`,
+    `products?store_id=eq.${s.id}&publish_status=eq.published&select=id,slug,name,name_fr,price,currency,product_images(image_url,position)&order=updated_at.desc&limit=24`,
   );
   const productLinks = products.map((p: any) => ({
     name: p.name_fr || p.name,
@@ -662,7 +706,8 @@ async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Accueil", item: `${getSiteUrl()}/` },
-      { "@type": "ListItem", position: 2, name: s.name, item: canonical },
+      { "@type": "ListItem", position: 2, name: "Boutiques", item: `${getSiteUrl()}/stores` },
+      { "@type": "ListItem", position: 3, name: s.name, item: canonical },
     ],
   };
   const itemList =
@@ -690,6 +735,7 @@ async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
       productLinks,
       breadcrumb: [
         { name: "Accueil", href: `${getSiteUrl()}/` },
+        { name: "Boutiques", href: `${getSiteUrl()}/stores` },
         { name: s.name, href: canonical },
       ],
       ctaHref: canonical,
@@ -1005,6 +1051,9 @@ function injectMetaIntoHtml(html: string, meta: MetaPayload): string {
   const afterHead = html.slice(headCloseIdx);
   const cleanedHead = stripStaticSeo(headInner);
   let out = before + cleanedHead + buildHeadInjection(meta) + afterHead;
+
+  // Avoid duplicate crawler mains (static index.html home + injector)
+  out = out.replace(/<main\b[^>]*\bid=["']zandofy-seo-main["'][^>]*>[\s\S]*?<\/main>/gi, "");
 
   if (meta.bodyHtml) {
     // Prefer insert before </body>; else after #root so SPA still mounts.

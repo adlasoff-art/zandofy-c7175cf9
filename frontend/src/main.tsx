@@ -4,6 +4,9 @@ import "./index.css";
 import { APP_VERSION, SHOW_UPDATE_PROMPT } from "./version";
 import { clearChunkRecoveryLocks } from "./lib/lazy-retry";
 
+// Remove static crawler home block once the SPA mounts (avoids duplicate H1 for humans).
+document.getElementById("zandofy-seo-main")?.remove();
+
 // Chunk load error detection & auto-reload
 function isChunkLoadError(error: unknown): boolean {
   if (!error) return false;
