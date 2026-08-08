@@ -9,7 +9,9 @@ Checklist ops après déploiement des lots techniques SEO (crawl, meta-injector,
 - [ ] Redirection **www → apex** (déjà en place) — ne pas inverser sans plan
 - [ ] Migration SQL `20260802104611_categories_seo.sql` exécutée **staging puis prod**
 - [ ] Migration SQL `20260802105000_seo_page_overrides_hubs.sql` exécutée staging puis prod
-- [ ] Redeploy Edge Function `generate-sitemap` (staging puis prod)
+- [ ] Redeploy Edge Function `generate-sitemap` (staging puis prod) — sortie **sitemapindex** (`?part=index|products|categories|vendors|pages|blog`)
+- [ ] Build Vercel : `fetch-sitemap.mjs` écrit `sitemap.xml` + enfants dans `public/`
+- [ ] Cron quotidien (optionnel) : appeler l’edge + déclencher rebuild Vercel (Deploy Hooks) pour rafraîchir les XML statiques
 - [ ] Guide détaillé : [`docs/guides/SEO_GSC_OPS_GUIDE.md`](guides/SEO_GSC_OPS_GUIDE.md)
 
 ## 2. Admin CMS (`/admin/seo`)
@@ -25,12 +27,12 @@ Checklist ops après déploiement des lots techniques SEO (crawl, meta-injector,
 ## 3. Google Search Console
 
 - [ ] Propriété domaine `zandofy.com` (couvre www + apex)
-- [ ] Soumettre sitemap : `https://www.zandofy.com/sitemap.xml`
+- [ ] Soumettre sitemap index : `https://zandofy.com/sitemap.xml` (retirer anciens `sitemap-dynamic.xml` si listés)
 - [ ] Inspection URL → demander indexation :
-  - `https://www.zandofy.com/`
-  - `https://www.zandofy.com/stores`
-  - `https://www.zandofy.com/about`
-  - `https://www.zandofy.com/category/fashion` (après fix templates)
+  - `https://zandofy.com/`
+  - `https://zandofy.com/stores`
+  - `https://zandofy.com/about`
+  - `https://zandofy.com/category/fashion` (après fix templates)
   - Top hubs (become-vendor, help-center, affiliate)
 - [ ] Suivre couverture : pages indexées vs exclues
 - [ ] Corriger pages soft-404 / canonicals signalés

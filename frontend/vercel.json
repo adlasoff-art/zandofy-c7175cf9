@@ -30,13 +30,10 @@
     { "source": "/conditions", "destination": "/terms", "statusCode": 301 },
     { "source": "/confidentialite", "destination": "/privacy", "statusCode": 301 },
     { "source": "/help", "destination": "/help-center", "statusCode": 301 },
-    { "source": "/help/:path*", "destination": "/help-center", "statusCode": 301 }
+    { "source": "/help/:path*", "destination": "/help-center", "statusCode": 301 },
+    { "source": "/sitemap-dynamic.xml", "destination": "/sitemap.xml", "statusCode": 301 }
   ],
   "rewrites": [
-    {
-      "source": "/sitemap-dynamic.xml",
-      "destination": "/sitemap.xml"
-    },
     {
       "source": "/product/:slug",
       "has": [
@@ -132,7 +129,7 @@
       ]
     },
     {
-      "source": "/sitemap-dynamic.xml",
+      "source": "/sitemap-:name.xml",
       "headers": [
         { "key": "Content-Type", "value": "application/xml; charset=utf-8" },
         { "key": "Cache-Control", "value": "public, max-age=3600" }
