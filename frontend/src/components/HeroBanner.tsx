@@ -197,13 +197,13 @@ export function HeroBanner() {
                   {...(i === 0 ? ({ fetchpriority: "high" } as any) : {})}
                 />
                 <div
-                  className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent flex flex-col justify-center pl-6 md:pl-12"
+                  className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent flex flex-col justify-end pb-10 md:justify-center md:pb-0 pl-6 pr-14 md:pl-12 md:pr-12"
                   aria-hidden={i !== current}
                 >
-                  <p className="text-white text-xl md:text-4xl font-bold tracking-wide max-w-md">{slide.title}</p>
-                  {slide.subtitle && <p className="text-white/80 text-sm md:text-base mt-1 max-w-sm">{slide.subtitle}</p>}
+                  <p className="text-white text-base sm:text-lg md:text-4xl font-bold tracking-wide max-w-md leading-snug line-clamp-2">{slide.title}</p>
+                  {slide.subtitle && <p className="text-white/80 text-xs sm:text-sm md:text-base mt-1 max-w-sm line-clamp-2">{slide.subtitle}</p>}
                   {slide.cta && (
-                    <Link to={slide.link || "/"} className="mt-4 inline-block w-fit px-6 py-2.5 text-xs font-bold bg-white text-gray-900 rounded-sm hover:bg-white/90 transition-colors uppercase tracking-wider">
+                    <Link to={slide.link || "/"} className="mt-2.5 md:mt-4 inline-block w-fit px-6 py-2.5 text-xs font-bold bg-white text-gray-900 rounded-sm hover:bg-white/90 transition-colors uppercase tracking-wider">
                       {slide.cta}
                     </Link>
                   )}
