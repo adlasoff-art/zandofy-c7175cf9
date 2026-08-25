@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Crown, Store, Search, Loader2, Check, X, MessageCircle, Truck, Eye, EyeOff, Ticket, Users } from "lucide-react";
 import { VENDOR_TIERS, PUBLISH_STATUS_CONFIG, type VendorTier } from "@/lib/vendor-tiers";
 import { Switch } from "@/components/ui/switch";
+import { PublishSocialDialog } from "@/components/admin/PublishSocialDialog";
 
 interface StoreWithSub {
   id: string;
@@ -110,11 +111,15 @@ export default function AdminVendorSubscriptionsPage() {
         .eq("id", productId);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ["pending-products"] });
-      toast.success("Statut du produit mis à jour");
+      if (!vars.approve) toast.success("Produit rejeté");
+      // approve toast handled by PublishSocialDialog
     },
   });
+
+  const [socialProductId, setSocialProductId] = useState<string | null>(null);
+  const [socialOpen, setSocialOpen] = useState(false);
 
   const { data: pendingProducts = [] } = useQuery({
     queryKey: ["pending-products"],
@@ -154,7 +159,10 @@ export default function AdminVendorSubscriptionsPage() {
                   </div>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => approveProduct.mutate({ productId: p.id, approve: true })}
+                      onClick={() => {
+                        setSocialProductId(p.id);
+                        setSocialOpen(true);
+                      }}
                       className="p-1.5 rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
                     >
                       <Check size={14} />
@@ -342,6 +350,20 @@ export default function AdminVendorSubscriptionsPage() {
           </div>
         )}
       </div>
+
+      <PublishSocialDialog
+        open={socialOpen}
+        onOpenChange={setSocialOpen}
+        productId={socialProductId}
+        mode="after_approve"
+        onConfirmApprove={async () => {
+          if (!socialProductId) return;
+          await approveProduct.mutateAsync({ productId: socialProductId, approve: true });
+        }}
+        onDone={() => {
+          queryClient.invalidateQueries({ queryKey: ["pending-products"] });
+        }}
+      />
     </AdminLayout>
   );
 }
