@@ -4,15 +4,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
-import { Loader2, Package, Store, Tag, Ruler, Weight, MapPin, Star, Image as ImageIcon, Palette, LayoutGrid, DollarSign, AlertTriangle, Link as LinkIcon, Layers } from "lucide-react";
+import { Loader2, Package, Store, Tag, Ruler, Weight, MapPin, Star, Image as ImageIcon, Palette, LayoutGrid, DollarSign, AlertTriangle, Link as LinkIcon, Layers, Check, Share2 } from "lucide-react";
 
 interface Props {
   productId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onRequestApprove?: (productId: string) => void;
+  onRequestSocial?: (productId: string) => void;
 }
 
-export function ProductModerationDetail({ productId, open, onOpenChange }: Props) {
+export function ProductModerationDetail({ productId, open, onOpenChange, onRequestApprove, onRequestSocial }: Props) {
   const { data: product, isLoading } = useQuery({
     queryKey: ["admin-product-detail", productId],
     enabled: !!productId && open,
@@ -121,11 +123,31 @@ export function ProductModerationDetail({ productId, open, onOpenChange }: Props
                   <p className="text-sm text-muted-foreground">{product.name}</p>
                 )}
               </div>
-              {statusCfg && (
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusCfg.badgeClass}`}>
-                  {statusCfg.label}
-                </span>
-              )}
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                {statusCfg && (
+                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusCfg.badgeClass}`}>
+                    {statusCfg.label}
+                  </span>
+                )}
+                {product.publish_status !== "published" && onRequestApprove && productId && (
+                  <button
+                    type="button"
+                    onClick={() => onRequestApprove(productId)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+                  >
+                    <Check size={14} /> Approuver
+                  </button>
+                )}
+                {product.publish_status === "published" && onRequestSocial && productId && (
+                  <button
+                    type="button"
+                    onClick={() => onRequestSocial(productId)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-sky-100 text-sky-800 hover:bg-sky-200 transition-colors"
+                  >
+                    <Share2 size={14} /> Publier sur les réseaux
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Previous moderation reason */}

@@ -3,10 +3,11 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShieldCheck, Search, Loader2, Check, X, Eye, Store, Filter, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
+import { ShieldCheck, Search, Loader2, Check, X, Eye, Store, Filter, ChevronLeft, ChevronRight, RotateCcw, Share2 } from "lucide-react";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 import { ProductModerationDetail } from "@/components/admin/ProductModerationDetail";
 import { ModerationActionDialog } from "@/components/admin/ModerationActionDialog";
+import { PublishSocialDialog } from "@/components/admin/PublishSocialDialog";
 
 type StatusFilter = "pending_approval" | "published" | "rejected" | "revision_requested" | "draft" | "all";
 
@@ -35,6 +36,11 @@ export default function AdminProductModerationPage() {
   const [actionProduct, setActionProduct] = useState<{ id: string; name: string } | null>(null);
   const [actionType, setActionType] = useState<"rejected" | "revision_requested">("rejected");
   const [actionOpen, setActionOpen] = useState(false);
+
+  // Social publish / approve dialog
+  const [socialProductId, setSocialProductId] = useState<string | null>(null);
+  const [socialMode, setSocialMode] = useState<"after_approve" | "manual">("after_approve");
+  const [socialOpen, setSocialOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-product-moderation", statusFilter, page],
@@ -104,10 +110,26 @@ export default function AdminProductModerationPage() {
       if (error) throw error;
       if (!updated || updated.length === 0) throw new Error("Mise à jour bloquée — vérifiez vos permissions.");
       if (updated[0].publish_status !== status) throw new Error("Le statut n'a pas été modifié.");
+
+      // Cancel pending social posts when leaving published catalog
+      if (status !== "published") {
+        await (supabase as any)
+          .from("social_post_jobs")
+          .update({
+            status: "skipped",
+            last_error: `Skipped: product status → ${status}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("product_id", productId)
+          .in("status", ["pending", "processing"]);
+      }
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ["admin-product-moderation"] });
-      toast.success("Produit approuvé et publié !");
+      if (vars.status === "pending_approval") {
+        toast.success("Produit dépublié (retour en attente)");
+      }
+      // published: toast handled by PublishSocialDialog
     },
     onError: (err: Error) => toast.error(err.message || "Erreur lors de la mise à jour"),
   });
@@ -129,6 +151,17 @@ export default function AdminProductModerationPage() {
 
       if (error) throw error;
       if (!updated || updated.length === 0) throw new Error("Mise à jour bloquée — vérifiez vos permissions.");
+
+      // Cancel social queue on reject / revision
+      await (supabase as any)
+        .from("social_post_jobs")
+        .update({
+          status: "skipped",
+          last_error: `Skipped: product status → ${status}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("product_id", productId)
+        .in("status", ["pending", "processing"]);
 
       const product = updated[0];
       const productName = product.name_fr || product.name || "Produit";
@@ -332,16 +365,36 @@ export default function AdminProductModerationPage() {
                           Détails
                         </button>
 
-                        {/* Approve */}
+                        {/* Approve → social dialog */}
                         {product.publish_status !== "published" && (
                           <button
-                            onClick={() => updateStatus.mutate({ productId: product.id, status: "published" })}
+                            onClick={() => {
+                              setSocialProductId(product.id);
+                              setSocialMode("after_approve");
+                              setSocialOpen(true);
+                            }}
                             disabled={updateStatus.isPending}
                             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition-colors disabled:opacity-50"
                             title="Approuver et publier"
                           >
                             <Check size={14} />
                             Approuver
+                          </button>
+                        )}
+
+                        {/* Social share for already published */}
+                        {product.publish_status === "published" && (
+                          <button
+                            onClick={() => {
+                              setSocialProductId(product.id);
+                              setSocialMode("manual");
+                              setSocialOpen(true);
+                            }}
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-sky-100 text-sky-800 hover:bg-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50 transition-colors"
+                            title="Publier sur Facebook et Instagram"
+                          >
+                            <Share2 size={14} />
+                            Réseaux
                           </button>
                         )}
 
@@ -424,6 +477,32 @@ export default function AdminProductModerationPage() {
         productId={detailProductId}
         open={detailOpen}
         onOpenChange={setDetailOpen}
+        onRequestApprove={(id) => {
+          setDetailOpen(false);
+          setSocialProductId(id);
+          setSocialMode("after_approve");
+          setSocialOpen(true);
+        }}
+        onRequestSocial={(id) => {
+          setDetailOpen(false);
+          setSocialProductId(id);
+          setSocialMode("manual");
+          setSocialOpen(true);
+        }}
+      />
+
+      <PublishSocialDialog
+        open={socialOpen}
+        onOpenChange={setSocialOpen}
+        productId={socialProductId}
+        mode={socialMode}
+        onConfirmApprove={async () => {
+          if (!socialProductId) return;
+          await updateStatus.mutateAsync({ productId: socialProductId, status: "published" });
+        }}
+        onDone={() => {
+          queryClient.invalidateQueries({ queryKey: ["admin-product-moderation"] });
+        }}
       />
 
       {/* Moderation action dialog (reject / revision) */}

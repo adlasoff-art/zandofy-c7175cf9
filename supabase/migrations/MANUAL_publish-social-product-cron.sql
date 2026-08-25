@@ -1,0 +1,32 @@
+-- MANUAL (staging then production) — optional safety net for pending social jobs
+-- Requires: pg_cron + pg_net (or invoke via Dashboard cron / GitHub Actions)
+-- Edge Function: publish-social-product
+-- Secrets to set in Supabase Edge Functions (staging + production):
+--   META_PAGE_ID
+--   META_PAGE_ACCESS_TOKEN   (long-lived Page token)
+--   META_IG_BUSINESS_ID
+--   SOCIAL_PUBLISH_ENABLED=true
+--
+-- Example cron every 5 minutes (adjust project URL + service role):
+--
+-- SELECT cron.schedule(
+--   'publish-social-product-every-5m',
+--   '*/5 * * * *',
+--   $$
+--   SELECT net.http_post(
+--     url := 'https://<PROJECT_REF>.supabase.co/functions/v1/publish-social-product',
+--     headers := jsonb_build_object(
+--       'Authorization', 'Bearer <SOCIAL_PUBLISH_CRON_SECRET>',
+--       'Content-Type', 'application/json'
+--     ),
+--     body := '{}'::jsonb
+--   );
+--   $$
+-- );
+
+-- Smoke test after migration + secrets:
+-- 1. Approve or open a published product → PublishSocialDialog → primary image
+-- 2. SELECT * FROM social_post_jobs ORDER BY created_at DESC LIMIT 10;
+-- 3. Invoke Edge Function; expect facebook then instagram status=posted
+-- 4. Verify FB caption has link in 2nd block; IG caption has link last
+-- 5. Confirm no Mobile Money / long digit strings in caption_snapshot
