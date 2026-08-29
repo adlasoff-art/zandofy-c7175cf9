@@ -132,14 +132,42 @@ export function PublishSocialDialog({
     if (error) throw error;
 
     const jobIds = [data?.facebook_job_id, data?.instagram_job_id].filter(Boolean);
+    if (jobIds.length === 0) {
+      throw new Error("Aucun job social créé (Facebook/Instagram désactivés ou produit sans image)");
+    }
+
     const { data: proc, error: invErr } = await supabase.functions.invoke("publish-social-product", {
       body: { job_ids: jobIds },
     });
-    if (invErr) {
-      throw new Error(invErr.message || "Edge function invoke failed — jobs remain pending");
+
+    // Prefer body.error even when invoke sets a generic non-2xx error
+    const bodyErr =
+      proc && typeof proc === "object" && (proc as { error?: unknown }).error != null
+        ? String((proc as { error: unknown }).error)
+        : null;
+
+    if (invErr && !bodyErr) {
+      let detail = invErr.message || "Edge function invoke failed — jobs remain pending";
+      try {
+        const res = (invErr as { context?: Response }).context;
+        if (res) {
+          const raw = await res.clone().text();
+          try {
+            const body = JSON.parse(raw);
+            if (body?.error) detail = String(body.error);
+            else if (body?.message) detail = String(body.message);
+            else if (raw) detail = raw.slice(0, 400);
+          } catch {
+            if (raw) detail = raw.slice(0, 400);
+          }
+        }
+      } catch {
+        /* keep detail */
+      }
+      throw new Error(detail);
     }
-    if (proc?.error) {
-      throw new Error(String(proc.error));
+    if (bodyErr) {
+      throw new Error(bodyErr);
     }
     const failed = Array.isArray(proc?.results)
       ? proc.results.filter((r: any) => r && r.ok === false && r.error !== "claim_skipped")

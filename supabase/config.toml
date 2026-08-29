@@ -221,3 +221,6 @@ verify_jwt = true
 
 [functions.watermark-image]
 verify_jwt = false
+
+[functions.publish-social-product]
+verify_jwt = false
