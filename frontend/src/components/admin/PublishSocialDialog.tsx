@@ -136,7 +136,22 @@ export function PublishSocialDialog({
       body: { job_ids: jobIds },
     });
     if (invErr) {
-      throw new Error(invErr.message || "Edge function invoke failed — jobs remain pending");
+      let detail = invErr.message || "Edge function invoke failed — jobs remain pending";
+      try {
+        const res = (invErr as { context?: Response }).context;
+        if (res) {
+          const body = await res.clone().json();
+          if (body?.error) detail = String(body.error);
+          else if (body?.message) detail = String(body.message);
+        }
+      } catch {
+        /* keep detail */
+      }
+      // When non-2xx, invoke may still put a parsed body on data
+      if (proc && typeof proc === "object" && (proc as { error?: string }).error) {
+        detail = String((proc as { error: string }).error);
+      }
+      throw new Error(detail);
     }
     if (proc?.error) {
       throw new Error(String(proc.error));

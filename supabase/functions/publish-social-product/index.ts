@@ -286,19 +286,24 @@ Deno.serve(async (req) => {
         const meId = String((me as { id?: string }).id || "");
         if (meId && meId !== pageId) {
           return json({
+            processed: 0,
             error:
               `META_PAGE_ACCESS_TOKEN is not a Page token (token /me id=${meId}, expected Page ${pageId}). ` +
               "Use access_token from GET /me/accounts for that Page.",
-            processed: 0,
-          }, 400);
+          });
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         return json({
-          error: `META_PAGE_ACCESS_TOKEN rejected by Meta: ${msg}`,
           processed: 0,
-        }, 400);
+          error: `META_PAGE_ACCESS_TOKEN rejected by Meta: ${msg}`,
+        });
       }
+    } else if (!pageId || !token) {
+      return json({
+        processed: 0,
+        error: "Missing META_PAGE_ID or META_PAGE_ACCESS_TOKEN in Edge Function secrets",
+      });
     }
 
     // Reclaim stale processing jobs
