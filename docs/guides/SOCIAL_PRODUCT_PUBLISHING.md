@@ -51,3 +51,12 @@ npx supabase functions deploy publish-social-product --project-ref <STAGING_OR_P
 
 - Env: `SOCIAL_PUBLISH_ENABLED=false`
 - Or SQL: `UPDATE social_post_settings SET is_enabled = false WHERE platform = 'instagram';`
+
+## Facebook-first (current)
+
+Migration `20260829190000_disable_instagram_social_until_facebook_ok.sql` sets Instagram `is_enabled = false`.
+Only Facebook jobs are enqueued. After FB posts succeed in staging/prod, re-enable:
+
+```sql
+UPDATE social_post_settings SET is_enabled = true, updated_at = now() WHERE platform = 'instagram';
+```
