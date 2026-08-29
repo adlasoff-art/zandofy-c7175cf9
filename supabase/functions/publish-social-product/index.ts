@@ -216,7 +216,7 @@ async function publishInstagram(
   return { id: String(pub.id || "") };
 }
 
-async function authorize(req: Request, admin: ReturnType<typeof createClient>): Promise<Response | null> {
+async function authorize(req: Request, admin: ReturnType<typeof createClient>): Promise<string | null> {
   const authHeader = req.headers.get("Authorization") || "";
   const cronHeader = req.headers.get("x-cron-secret") || "";
   const cronSecret = Deno.env.get("SOCIAL_PUBLISH_CRON_SECRET") || "";
@@ -229,15 +229,14 @@ async function authorize(req: Request, admin: ReturnType<typeof createClient>): 
   }
 
   if (!bearer) {
-    return json({ error: "Unauthorized" }, 401);
+    return "Unauthorized — missing admin session";
   }
 
-  // Reject accidental use of service role as "user" from browser (still allow if equals cron — handled above)
+  // Reject accidental use of service role as "user" from browser
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
   if (serviceKey && bearer === serviceKey) {
-    // Service role only allowed when used as cron substitute if no dedicated secret
     if (!cronSecret) return null;
-    return json({ error: "Unauthorized" }, 401);
+    return "Unauthorized — service role not allowed for browser invoke";
   }
 
   const userClient = createClient(
@@ -247,13 +246,13 @@ async function authorize(req: Request, admin: ReturnType<typeof createClient>): 
   );
   const { data: { user }, error: userErr } = await userClient.auth.getUser();
   if (userErr || !user) {
-    return json({ error: "Unauthorized" }, 401);
+    return "Unauthorized — invalid or expired session";
   }
 
   const { data: isAdmin } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" });
   const { data: isManager } = await admin.rpc("has_role", { _user_id: user.id, _role: "manager" });
   if (!isAdmin && !isManager) {
-    return json({ error: "Admin or manager role required" }, 403);
+    return "Admin or manager role required";
   }
   return null;
 }
@@ -277,7 +276,9 @@ Deno.serve(async (req) => {
     );
 
     const denied = await authorize(req, supabase);
-    if (denied) return denied;
+    if (denied) {
+      return json({ processed: 0, error: denied });
+    }
 
     // Fail fast if META_PAGE_ACCESS_TOKEN is a User token (Meta then returns misleading publish_actions)
     if (pageId && token) {
@@ -477,6 +478,10 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("publish-social-product fatal:", err instanceof Error ? err.message : err);
-    return json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    // 200 so supabase.functions.invoke surfaces body.error (non-2xx hides it as generic message)
+    return json({
+      processed: 0,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 });
