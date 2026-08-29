@@ -53,6 +53,20 @@ export function PublishSocialDialog({
     setPostSocial(true);
   }, [open, productId]);
 
+  const { data: platformSettings } = useQuery({
+    queryKey: ["social-post-settings"],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("social_post_settings")
+        .select("platform, is_enabled");
+      if (error) throw error;
+      return (data || []) as { platform: string; is_enabled: boolean }[];
+    },
+  });
+
+  const igEnabled = platformSettings?.find((s) => s.platform === "instagram")?.is_enabled === true;
+
   const { data: product, isLoading } = useQuery({
     queryKey: ["publish-social-preview", productId],
     enabled: !!productId && open,
@@ -150,7 +164,11 @@ export function PublishSocialDialog({
       if (shouldPost) {
         try {
           await enqueueAndProcess(alreadyPosted);
-          toast.success("Publié sur les réseaux (Facebook → Instagram)");
+          toast.success(
+            igEnabled
+              ? "Publié sur les réseaux (Facebook → Instagram)"
+              : "Publié sur Facebook (Instagram en pause)",
+          );
         } catch (err: any) {
           toast.warning("Produit OK, publication sociale partielle ou en attente", {
             description: err?.message || String(err),
@@ -180,7 +198,9 @@ export function PublishSocialDialog({
             {mode === "after_approve" ? "Approuver et partager" : "Publier sur les réseaux"}
           </DialogTitle>
           <DialogDescription>
-            Facebook d’abord, puis Instagram. Lien produit en 2ᵉ ligne (FB) / dernière ligne (IG).
+            {igEnabled
+              ? "Facebook d’abord, puis Instagram. Lien produit en 2ᵉ ligne (FB) / dernière ligne (IG)."
+              : "Publication Facebook uniquement — Instagram est en pause jusqu’à ce que la Page fonctionne."}
           </DialogDescription>
         </DialogHeader>
 
@@ -200,12 +220,19 @@ export function PublishSocialDialog({
                   checked={postSocial}
                   onCheckedChange={(v) => setPostSocial(v === true)}
                 />
-                Poster aussi sur Facebook et Instagram
+                {igEnabled
+                  ? "Poster aussi sur Facebook et Instagram"
+                  : "Poster aussi sur Facebook"}
               </label>
             )}
 
             {(mode === "manual" || postSocial) && (
               <>
+                {!igEnabled && (
+                  <p className="text-xs rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200 px-3 py-2">
+                    Instagram désactivé dans les réglages. On réactivera après un post Facebook réussi.
+                  </p>
+                )}
                 <div className="space-y-2">
                   <Label>Images</Label>
                   <div className="flex flex-col gap-2 text-sm">
@@ -226,30 +253,34 @@ export function PublishSocialDialog({
                         onChange={() => setImageMode("all")}
                         disabled={imageCount < 2}
                       />
-                      Toutes les images ({Math.min(imageCount, 10)} max IG)
+                      Toutes les images ({Math.min(imageCount, 10)} max)
                     </label>
                   </div>
                 </div>
 
                 <Tabs defaultValue="facebook">
-                  <TabsList className="grid w-full grid-cols-2">
+                  <TabsList className={`grid w-full ${igEnabled ? "grid-cols-2" : "grid-cols-1"}`}>
                     <TabsTrigger value="facebook" className="gap-1">
                       <Facebook size={12} /> Facebook
                     </TabsTrigger>
-                    <TabsTrigger value="instagram" className="gap-1">
-                      <Instagram size={12} /> Instagram
-                    </TabsTrigger>
+                    {igEnabled && (
+                      <TabsTrigger value="instagram" className="gap-1">
+                        <Instagram size={12} /> Instagram
+                      </TabsTrigger>
+                    )}
                   </TabsList>
                   <TabsContent value="facebook">
                     <pre className="text-[11px] whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-3 max-h-48 overflow-y-auto">
                       {fbCaption}
                     </pre>
                   </TabsContent>
-                  <TabsContent value="instagram">
-                    <pre className="text-[11px] whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-3 max-h-48 overflow-y-auto">
-                      {igCaption}
-                    </pre>
-                  </TabsContent>
+                  {igEnabled && (
+                    <TabsContent value="instagram">
+                      <pre className="text-[11px] whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-3 max-h-48 overflow-y-auto">
+                        {igCaption}
+                      </pre>
+                    </TabsContent>
+                  )}
                 </Tabs>
 
                 {existingJobs.length > 0 && (

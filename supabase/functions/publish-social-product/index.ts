@@ -279,6 +279,28 @@ Deno.serve(async (req) => {
     const denied = await authorize(req, supabase);
     if (denied) return denied;
 
+    // Fail fast if META_PAGE_ACCESS_TOKEN is a User token (Meta then returns misleading publish_actions)
+    if (pageId && token) {
+      try {
+        const me = await graphGet("/me?fields=id,name", token);
+        const meId = String((me as { id?: string }).id || "");
+        if (meId && meId !== pageId) {
+          return json({
+            error:
+              `META_PAGE_ACCESS_TOKEN is not a Page token (token /me id=${meId}, expected Page ${pageId}). ` +
+              "Use access_token from GET /me/accounts for that Page.",
+            processed: 0,
+          }, 400);
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return json({
+          error: `META_PAGE_ACCESS_TOKEN rejected by Meta: ${msg}`,
+          processed: 0,
+        }, 400);
+      }
+    }
+
     // Reclaim stale processing jobs
     const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
     await supabase
