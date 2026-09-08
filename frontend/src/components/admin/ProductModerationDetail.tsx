@@ -133,7 +133,13 @@ export function ProductModerationDetail({ productId, open, onOpenChange, onReque
                   <button
                     type="button"
                     onClick={() => onRequestApprove(productId)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+                    disabled={images.length === 0}
+                    title={
+                      images.length === 0
+                        ? "Impossible d'approuver sans photo"
+                        : "Approuver ce produit"
+                    }
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors disabled:opacity-40 disabled:pointer-events-none disabled:hover:bg-emerald-100"
                   >
                     <Check size={14} /> Approuver
                   </button>
@@ -169,7 +175,12 @@ export function ProductModerationDetail({ productId, open, onOpenChange, onReque
             {/* Images */}
             <Section title="Photos" icon={<ImageIcon size={14} />}>
               {images.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">Aucune photo</p>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground italic">Aucune photo</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    Impossible d&apos;approuver sans photo. Demandez au vendeur de re-téléverser des images.
+                  </p>
+                </div>
               ) : (
                 <div className="grid grid-cols-4 gap-2">
                   {images.map((img: any) => (

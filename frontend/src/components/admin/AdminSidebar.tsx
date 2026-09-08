@@ -151,6 +151,13 @@ export function AdminSidebar() {
   const location = useLocation();
   const { data: branding } = useBranding();
   const logoUrl = branding?.header_logo_url || branding?.footer_logo_url || null;
+  const [logoFailed, setLogoFailed] = useState(false);
+
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [logoUrl]);
+
+  const showLogo = Boolean(logoUrl) && !logoFailed;
 
   const { data: profile } = useQuery({
     queryKey: ["admin-sidebar-profile", user?.id],
@@ -216,11 +223,16 @@ export function AdminSidebar() {
           <div
             className={cn(
               "w-8 h-8 rounded-lg shrink-0 flex items-center justify-center overflow-hidden",
-              logoUrl ? "bg-card border border-border" : "bg-primary"
+              showLogo ? "bg-card border border-border" : "bg-primary"
             )}
           >
-            {logoUrl ? (
-              <img src={logoUrl} alt="Zandofy" className="w-full h-full object-contain p-0.5" />
+            {showLogo ? (
+              <img
+                src={logoUrl!}
+                alt="Zandofy"
+                className="w-full h-full object-contain p-0.5"
+                onError={() => setLogoFailed(true)}
+              />
             ) : (
               <span className="text-primary-foreground font-bold text-sm">Z</span>
             )}
