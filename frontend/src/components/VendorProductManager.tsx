@@ -437,6 +437,15 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       toast.error("Nom et prix sont obligatoires");
       return;
     }
+    // Re-soumission d'un produit publié : exiger au moins une photo
+    if (
+      editing?.publish_status === "published" &&
+      mainImage.length === 0 &&
+      variationMedia.length === 0
+    ) {
+      toast.error("Ajoutez au moins une photo avant de modifier un produit publié");
+      return;
+    }
     setSaving(true);
 
     // Generate or refresh the URL slug from the (French) name so product
@@ -515,13 +524,16 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       productId = data.id;
     }
 
-    // Sync images
+    // Sync related rows: insert-first then delete old (never wipe before insert succeeds).
     if (productId) {
-      // Delete old images
-      await supabase.from("product_images").delete().eq("product_id", productId);
+      const abortSave = (message: string) => {
+        toast.error(message);
+        setSaving(false);
+      };
 
+      // --- product_images ---
       const allMedia = [
-        ...mainImage.map((m, i) => ({ ...m, position: 0 })),
+        ...mainImage.map((m) => ({ ...m, position: 0 })),
         ...variationMedia.map((m, i) => ({ ...m, position: i + 1 })),
       ];
 
@@ -531,59 +543,247 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
           image_url: m.url,
           position: m.position,
         }));
-        await supabase.from("product_images").insert(imgRows);
+        const { data: insertedImgs, error: imgInsertErr } = await supabase
+          .from("product_images")
+          .insert(imgRows)
+          .select("id");
+        if (imgInsertErr || !insertedImgs?.length) {
+          console.error("product_images insert error:", imgInsertErr);
+          abortSave(
+            "Erreur lors de l'enregistrement des photos : " +
+              (imgInsertErr?.message || "inconnue") +
+              ". Les photos précédentes ont été conservées."
+          );
+          return;
+        }
+        const newImgIds = insertedImgs.map((r) => r.id);
+        const { error: imgDelErr } = await supabase
+          .from("product_images")
+          .delete()
+          .eq("product_id", productId)
+          .not("id", "in", `(${newImgIds.join(",")})`);
+        if (imgDelErr) {
+          console.warn("product_images cleanup error:", imgDelErr);
+          toast.warning("Photos enregistrées, mais d'anciennes vignettes n'ont pas pu être nettoyées.");
+        }
+      } else if (editing) {
+        // User cleared all media in the form — remove previous rows only now.
+        const { error: imgClearErr } = await supabase
+          .from("product_images")
+          .delete()
+          .eq("product_id", productId);
+        if (imgClearErr) {
+          console.error("product_images clear error:", imgClearErr);
+          abortSave("Impossible de supprimer les photos : " + (imgClearErr.message || "inconnue"));
+          return;
+        }
       }
 
-      // Sync sizes
-      await supabase.from("product_sizes").delete().eq("product_id", productId);
+      // --- product_sizes ---
       if (sizes.length > 0) {
-        await supabase.from("product_sizes").insert(
-          sizes.map((s) => ({
-            product_id: productId!,
-            size_label: s.size_label,
-            region: s.region || null,
-            bust_cm: s.bust_cm || null,
-            waist_cm: s.waist_cm || null,
-            hips_cm: s.hips_cm || null,
-          }))
-        );
+        const sizeRows = sizes.map((s) => ({
+          product_id: productId!,
+          size_label: s.size_label,
+          region: s.region || null,
+          bust_cm: s.bust_cm || null,
+          waist_cm: s.waist_cm || null,
+          hips_cm: s.hips_cm || null,
+        }));
+        const { data: insertedSizes, error: sizeInsertErr } = await supabase
+          .from("product_sizes")
+          .insert(sizeRows)
+          .select("id");
+        if (sizeInsertErr || !insertedSizes?.length) {
+          console.error("product_sizes insert error:", sizeInsertErr);
+          abortSave(
+            "Erreur lors de l'enregistrement des tailles : " +
+              (sizeInsertErr?.message || "inconnue") +
+              ". Les tailles précédentes ont été conservées."
+          );
+          return;
+        }
+        const newSizeIds = insertedSizes.map((r) => r.id);
+        const { error: sizeDelErr } = await supabase
+          .from("product_sizes")
+          .delete()
+          .eq("product_id", productId)
+          .not("id", "in", `(${newSizeIds.join(",")})`);
+        if (sizeDelErr) {
+          console.warn("product_sizes cleanup error:", sizeDelErr);
+          toast.warning("Tailles enregistrées, nettoyage des anciennes incomplet.");
+        }
+      } else if (editing) {
+        const { error: sizeClearErr } = await supabase
+          .from("product_sizes")
+          .delete()
+          .eq("product_id", productId);
+        if (sizeClearErr) {
+          console.error("product_sizes clear error:", sizeClearErr);
+          abortSave("Impossible de supprimer les tailles : " + (sizeClearErr.message || "inconnue"));
+          return;
+        }
       }
 
-      // Sync colors
-      await supabase.from("product_colors").delete().eq("product_id", productId);
+      // --- product_colors ---
       if (colors.length > 0) {
-        await supabase.from("product_colors").insert(
-          colors.map((c) => ({
-            product_id: productId!,
-            color_name: c.color_name,
-            color_hex: c.color_hex,
-            image_url: c.image_url || null,
-          }))
-        );
+        const colorRows = colors.map((c) => ({
+          product_id: productId!,
+          color_name: c.color_name,
+          color_hex: c.color_hex,
+          image_url: c.image_url || null,
+        }));
+        const { data: insertedColors, error: colorInsertErr } = await supabase
+          .from("product_colors")
+          .insert(colorRows)
+          .select("id");
+        if (colorInsertErr || !insertedColors?.length) {
+          console.error("product_colors insert error:", colorInsertErr);
+          abortSave(
+            "Erreur lors de l'enregistrement des couleurs : " +
+              (colorInsertErr?.message || "inconnue") +
+              ". Les couleurs précédentes ont été conservées."
+          );
+          return;
+        }
+        const newColorIds = insertedColors.map((r) => r.id);
+        const { error: colorDelErr } = await supabase
+          .from("product_colors")
+          .delete()
+          .eq("product_id", productId)
+          .not("id", "in", `(${newColorIds.join(",")})`);
+        if (colorDelErr) {
+          console.warn("product_colors cleanup error:", colorDelErr);
+          toast.warning("Couleurs enregistrées, nettoyage des anciennes incomplet.");
+        }
+      } else if (editing) {
+        const { error: colorClearErr } = await supabase
+          .from("product_colors")
+          .delete()
+          .eq("product_id", productId);
+        if (colorClearErr) {
+          console.error("product_colors clear error:", colorClearErr);
+          abortSave("Impossible de supprimer les couleurs : " + (colorClearErr.message || "inconnue"));
+          return;
+        }
       }
 
-      // Sync dynamic variant selections
-      await (supabase as any).from("product_variant_selections").delete().eq("product_id", productId);
+      // --- product_variant_selections (UNIQUE product_id+variant_option_id) ---
       if (dynamicSelections.length > 0) {
-        await (supabase as any).from("product_variant_selections").insert(
-          dynamicSelections.map((s) => ({
+        const optionIds = dynamicSelections.map((s) => s.variant_option_id);
+        const { error: selDelErr } = await (supabase as any)
+          .from("product_variant_selections")
+          .delete()
+          .eq("product_id", productId)
+          .not("variant_option_id", "in", `(${optionIds.join(",")})`);
+        if (selDelErr) {
+          console.error("product_variant_selections prune error:", selDelErr);
+          abortSave(
+            "Erreur lors de la mise à jour des variantes : " + (selDelErr.message || "inconnue")
+          );
+          return;
+        }
+        const { data: existingSels } = await (supabase as any)
+          .from("product_variant_selections")
+          .select("variant_option_id")
+          .eq("product_id", productId);
+        const existingOpt = new Set(
+          ((existingSels as { variant_option_id: string }[]) || []).map((r) => r.variant_option_id)
+        );
+        const toInsert = dynamicSelections
+          .filter((s) => !existingOpt.has(s.variant_option_id))
+          .map((s) => ({
             product_id: productId!,
             variant_type_id: s.variant_type_id,
             variant_option_id: s.variant_option_id,
-          }))
-        );
+          }));
+        if (toInsert.length > 0) {
+          const { error: selInsertErr } = await (supabase as any)
+            .from("product_variant_selections")
+            .insert(toInsert);
+          if (selInsertErr) {
+            console.error("product_variant_selections insert error:", selInsertErr);
+            abortSave(
+              "Erreur lors de l'enregistrement des variantes : " +
+                (selInsertErr.message || "inconnue")
+            );
+            return;
+          }
+        }
+      } else if (editing) {
+        const { error: selClearErr } = await (supabase as any)
+          .from("product_variant_selections")
+          .delete()
+          .eq("product_id", productId);
+        if (selClearErr) {
+          console.error("product_variant_selections clear error:", selClearErr);
+          abortSave("Impossible de supprimer les variantes : " + (selClearErr.message || "inconnue"));
+          return;
+        }
       }
 
-      // Sync custom variant values
-      await (supabase as any).from("product_custom_variant_values").delete().eq("product_id", productId);
+      // --- product_custom_variant_values (UNIQUE product_id+type+label) ---
       if (customVariantValues.length > 0) {
-        await (supabase as any).from("product_custom_variant_values").insert(
-          customVariantValues.map((c) => ({
+        const { data: existingCustom } = await (supabase as any)
+          .from("product_custom_variant_values")
+          .select("id, variant_type_id, custom_label")
+          .eq("product_id", productId);
+        const wanted = new Set(
+          customVariantValues.map((c) => `${c.variant_type_id}::${c.custom_label}`)
+        );
+        const existingList =
+          (existingCustom as { id: string; variant_type_id: string; custom_label: string }[]) || [];
+        const toDeleteIds = existingList
+          .filter((r) => !wanted.has(`${r.variant_type_id}::${r.custom_label}`))
+          .map((r) => r.id);
+        if (toDeleteIds.length > 0) {
+          const { error: customDelErr } = await (supabase as any)
+            .from("product_custom_variant_values")
+            .delete()
+            .in("id", toDeleteIds);
+          if (customDelErr) {
+            console.error("product_custom_variant_values prune error:", customDelErr);
+            abortSave(
+              "Erreur lors de la mise à jour des valeurs custom : " +
+                (customDelErr.message || "inconnue")
+            );
+            return;
+          }
+        }
+        const existingKeys = new Set(
+          existingList.map((r) => `${r.variant_type_id}::${r.custom_label}`)
+        );
+        const toInsertCustom = customVariantValues
+          .filter((c) => !existingKeys.has(`${c.variant_type_id}::${c.custom_label}`))
+          .map((c) => ({
             product_id: productId!,
             variant_type_id: c.variant_type_id,
             custom_label: c.custom_label,
-          }))
-        );
+          }));
+        if (toInsertCustom.length > 0) {
+          const { error: customInsertErr } = await (supabase as any)
+            .from("product_custom_variant_values")
+            .insert(toInsertCustom);
+          if (customInsertErr) {
+            console.error("product_custom_variant_values insert error:", customInsertErr);
+            abortSave(
+              "Erreur lors de l'enregistrement des valeurs custom : " +
+                (customInsertErr.message || "inconnue")
+            );
+            return;
+          }
+        }
+      } else if (editing) {
+        const { error: customClearErr } = await (supabase as any)
+          .from("product_custom_variant_values")
+          .delete()
+          .eq("product_id", productId);
+        if (customClearErr) {
+          console.error("product_custom_variant_values clear error:", customClearErr);
+          abortSave(
+            "Impossible de supprimer les valeurs custom : " + (customClearErr.message || "inconnue")
+          );
+          return;
+        }
       }
     }
 
@@ -599,6 +799,24 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   };
 
   const handlePublish = async (productId: string) => {
+    const inMemory = products.find((p) => p.id === productId);
+    let photoCount = inMemory?.images?.length ?? 0;
+    if (!inMemory || photoCount === 0) {
+      const { count, error: countErr } = await supabase
+        .from("product_images")
+        .select("id", { count: "exact", head: true })
+        .eq("product_id", productId);
+      if (countErr) {
+        toast.error("Impossible de vérifier les photos avant soumission");
+        return;
+      }
+      photoCount = count ?? 0;
+    }
+    if (photoCount === 0) {
+      toast.error("Ajoutez au moins une photo avant de soumettre pour approbation");
+      return;
+    }
+
     const { error } = await supabase
       .from("products")
       .update({ publish_status: "pending_approval" } as any)
@@ -1109,8 +1327,13 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
                 {(product.publish_status === "draft" || product.publish_status === "revision_requested") && (
                   <button
                     onClick={() => handlePublish(product.id)}
-                    className="p-2 text-muted-foreground hover:text-emerald-500 transition-colors"
-                    title="Soumettre pour approbation"
+                    disabled={!product.images?.length}
+                    className="p-2 text-muted-foreground hover:text-emerald-500 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                    title={
+                      product.images?.length
+                        ? "Soumettre pour approbation"
+                        : "Ajoutez au moins une photo avant de soumettre"
+                    }
                   >
                     <Send size={14} />
                   </button>

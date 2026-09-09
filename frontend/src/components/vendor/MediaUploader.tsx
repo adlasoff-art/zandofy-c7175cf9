@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { compressImage } from "@/utils/image-compress";
 import { sanitizeExtension } from "@/utils/sanitize-filename";
-import { ImageIcon, Plus, X, Loader2, Video, Play } from "lucide-react";
+import { Plus, X, Loader2, Video } from "lucide-react";
 import { toast } from "sonner";
 
 interface MediaItem {
@@ -32,6 +32,7 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
     setUploading(true);
 
     const newItems: MediaItem[] = [];
+    let failureCount = 0;
     for (let i = 0; i < files.length; i++) {
       const raw = files[i];
       const isVideo = raw.type.startsWith("video/");
@@ -41,7 +42,8 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
 
       const { error } = await supabase.storage.from("product-media").upload(path, file, { cacheControl: "31536000" });
       if (error) {
-        toast.error(`Erreur upload: ${file.name}`);
+        failureCount += 1;
+        toast.error(`Erreur upload « ${file.name} » : ${error.message}`);
         continue;
       }
 
@@ -62,6 +64,16 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
         type: isVideo ? "video" : "image",
         position: items.length + i,
       });
+    }
+
+    if (newItems.length === 0) {
+      toast.error(
+        failureCount > 0
+          ? "Aucune image n'a pu être téléversée. Vérifiez le format, la taille et votre connexion."
+          : "Aucune image n'a pu être téléversée."
+      );
+      setUploading(false);
+      return;
     }
 
     if (multiple) {
