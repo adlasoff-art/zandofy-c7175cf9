@@ -41,7 +41,7 @@ export function BrandLogo({ variant = "header", className = "" }: BrandLogoProps
   const showLogo = Boolean(logoUrl) && !logoFailed;
 
   const textOnlyFooter = (
-    <span className={textStyle} style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 400 }}>
+    <span className={`${textStyle} ${className}`} style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 400 }}>
       Zandofy
     </span>
   );

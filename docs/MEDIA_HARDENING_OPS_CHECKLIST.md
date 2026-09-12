@@ -37,8 +37,21 @@ Pour chaque ligne : dashboard vendeur (ou admin) → re-upload photos → sauveg
 
 ## 4. Smoke vendeur (après deploy)
 
-1. Éditer produit avec photos → save sans changer médias → photos intactes.
-2. Remplacer photo principale → save → nouvelle vignette.
-3. Brouillon sans photo → OK.
-4. Soumettre sans photo → toast bloquant / bouton Send désactivé.
-5. Upload fichier invalide → toast avec message Storage.
+1. Éditer produit avec photos → save sans changer médias → **mêmes ids** `product_images` (pas de re-insert) → photos intactes.
+2. Remplacer photo principale → save → nouvelle vignette ; anciennes lignes orphelines purgées.
+3. Ajouter 3–5 photos galerie → save → `position` 0 = cover, 1..N = galerie ; toutes visibles catalogue + PDP.
+4. Brouillon sans photo → OK.
+5. Soumettre sans photo → toast bloquant / bouton Send désactivé.
+6. Upload fichier invalide → toast avec message Storage.
+7. Produit `pending_approval` **ou** `revision_requested` : impossible d'enregistrer en vidant toutes les photos.
+8. Après approbation admin : partage Facebook / social dialog inchangé (image cover disponible).
+
+**Sécurité (ne pas casser)** : aucune migration Storage dans ce fix — bucket `product-media` public pour URLs connues ; upload toujours limité au dossier `{store_id}/` du owner. Ne pas rouvrir le listing anon. Les `id` d'images envoyés par le client ne sont acceptés que s'ils appartiennent déjà au `product_id` sauvegardé.
+
+## 5. Smoke admin
+
+1. Liste modération : bouton Approuver désactivé si 0 photo.
+2. Détail produit : Approuver désactivé + message.
+3. Tentative d'approuver sans photo (toute entrée y compris dialog social) → erreur explicite / bouton désactivé.
+4. Approuver avec photos → PublishSocialDialog / Facebook comme avant.
+

@@ -57,7 +57,7 @@ export default function AdminProductModerationPage() {
 
       let query = supabase
         .from("products")
-        .select("id, name_fr, name, price, currency, publish_status, store_id, created_at, stock_quantity")
+        .select("id, name_fr, name, price, currency, publish_status, store_id, created_at, stock_quantity, product_images(id)")
         .order("created_at", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
@@ -83,6 +83,7 @@ export default function AdminProductModerationPage() {
         products: products.map(p => ({
           ...p,
           store_name: p.store_id ? storeMap.get(p.store_id) || "—" : "—",
+          image_count: Array.isArray((p as any).product_images) ? (p as any).product_images.length : 0,
         })),
         totalCount: count || 0,
       };
@@ -96,6 +97,17 @@ export default function AdminProductModerationPage() {
   // Simple approve (no reason needed)
   const updateStatus = useMutation({
     mutationFn: async ({ productId, status }: { productId: string; status: string }) => {
+      if (status === "published") {
+        const { count, error: countErr } = await supabase
+          .from("product_images")
+          .select("id", { count: "exact", head: true })
+          .eq("product_id", productId);
+        if (countErr) throw new Error("Impossible de vérifier les photos avant publication");
+        if (!count || count < 1) {
+          throw new Error("Impossible d'approuver un produit sans photo");
+        }
+      }
+
       const { data: updated, error } = await (supabase as any)
         .from("products")
         .update({
@@ -369,13 +381,21 @@ export default function AdminProductModerationPage() {
                         {product.publish_status !== "published" && (
                           <button
                             onClick={() => {
+                              if ((product as any).image_count < 1) {
+                                toast.error("Impossible d'approuver un produit sans photo");
+                                return;
+                              }
                               setSocialProductId(product.id);
                               setSocialMode("after_approve");
                               setSocialOpen(true);
                             }}
-                            disabled={updateStatus.isPending}
+                            disabled={updateStatus.isPending || (product as any).image_count < 1}
                             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition-colors disabled:opacity-50"
-                            title="Approuver et publier"
+                            title={
+                              (product as any).image_count < 1
+                                ? "Impossible d'approuver sans photo"
+                                : "Approuver et publier"
+                            }
                           >
                             <Check size={14} />
                             Approuver
