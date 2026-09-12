@@ -19,11 +19,25 @@ interface MediaUploaderProps {
   multiple?: boolean;
   acceptVideo?: boolean;
   storeId: string;
+  onUploadingChange?: (uploading: boolean) => void;
 }
 
-export function MediaUploader({ label, items, onChange, multiple = false, acceptVideo = false, storeId }: MediaUploaderProps) {
+export function MediaUploader({
+  label,
+  items,
+  onChange,
+  multiple = false,
+  acceptVideo = false,
+  storeId,
+  onUploadingChange,
+}: MediaUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const setUploadingState = (value: boolean) => {
+    setUploading(value);
+    onUploadingChange?.(value);
+  };
 
   const accept = acceptVideo ? "image/*,video/mp4,video/webm,video/quicktime" : "image/*";
 
@@ -33,7 +47,7 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
       toast.error("Boutique introuvable — impossible d'uploader les médias.");
       return;
     }
-    setUploading(true);
+    setUploadingState(true);
 
     const newItems: MediaItem[] = [];
     let failureCount = 0;
@@ -84,7 +98,7 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
           ? "Aucune image n'a pu être téléversée. Vérifiez le format, la taille et votre connexion."
           : "Aucune image n'a pu être téléversée."
       );
-      setUploading(false);
+      setUploadingState(false);
       return;
     }
 
@@ -93,7 +107,7 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
     } else {
       onChange(newItems.slice(0, 1));
     }
-    setUploading(false);
+    setUploadingState(false);
   };
 
   const removeItem = (index: number) => {
