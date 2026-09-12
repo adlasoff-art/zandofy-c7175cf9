@@ -18,6 +18,23 @@ import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 import { generateProductSlug } from "@/utils/productSlug";
 
+const MAX_GALLERY_IMAGES = 30;
+
+/** Accept product-media Storage URLs, or keep an URL already on this product (legacy). */
+function isAllowedProductMediaUrl(url: string, existingUrls?: Set<string>): boolean {
+  if (existingUrls?.has(url)) return true;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+    return (
+      parsed.pathname.includes("/storage/v1/object/public/product-media/") ||
+      parsed.pathname.includes("/storage/v1/object/sign/product-media/")
+    );
+  } catch {
+    return false;
+  }
+}
+
 interface Supplier {
   id: string;
   agent_name: string;
@@ -146,6 +163,15 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<ProductFormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const mediaUploadingCountRef = useRef(0);
+  const handleMediaUploadingChange = useCallback((uploading: boolean) => {
+    mediaUploadingCountRef.current = Math.max(
+      0,
+      mediaUploadingCountRef.current + (uploading ? 1 : -1)
+    );
+    setMediaUploading(mediaUploadingCountRef.current > 0);
+  }, []);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [mainImage, setMainImage] = useState<MediaItem[]>([]);
   const [variationMedia, setVariationMedia] = useState<MediaItem[]>([]);
@@ -168,35 +194,37 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
 
   const loadProducts = useCallback(async () => {
     // Only show loading spinner on first load to avoid flash on tab refocus
-    setLoading(prev => products.length === 0 ? true : prev);
-    const { data } = await (supabase
+    setLoading((prev) => (products.length === 0 ? true : prev));
+    const { data, error } = await (supabase
       .from("products")
-      .select("id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea, meta_title, meta_description, seo_keywords") as any)
+      .select(
+        "id, name, name_fr, slug, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea, meta_title, meta_description, seo_keywords, product_images(id, image_url, position)"
+      ) as any)
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
 
+    if (error) {
+      console.error("loadProducts error:", error);
+      toast.error("Impossible de charger le catalogue : " + (error.message || "erreur réseau"));
+      setLoading(false);
+      return;
+    }
+
     if (data) {
-      const productIds = data.map((p) => p.id);
-      const { data: imgs } = productIds.length > 0
-        ? await supabase
-            .from("product_images")
-            .select("id, image_url, position, product_id")
-            .in("product_id", productIds)
-        : { data: [] };
-
-      const imgMap = new Map<string, typeof imgs>();
-      (imgs || []).forEach((img) => {
-        const arr = imgMap.get(img.product_id) || [];
-        arr.push(img);
-        imgMap.set(img.product_id, arr);
-      });
-
       setProducts(
-        data.map((p) => ({
-          ...p,
-          publish_status: (p as any).publish_status || "draft",
-          images: (imgMap.get(p.id) || []).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
-        }))
+        data.map((p: any) => {
+          const { product_images, ...rest } = p;
+          return {
+            ...rest,
+            publish_status: p.publish_status || "draft",
+            images: Array.isArray(product_images)
+              ? [...product_images].sort(
+                  (a: { position?: number | null }, b: { position?: number | null }) =>
+                    (a.position ?? 0) - (b.position ?? 0)
+                )
+              : [],
+          };
+        })
       );
     }
     setLoading(false);
@@ -552,119 +580,59 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
         return error;
       };
 
-      // --- product_images: cover (pos 0) + gallery (1..N), idempotent ---
-      // Never wipe-then-insert. Never trust client ids that do not belong to this product.
-      // Unchanged rows keep their id (embeddings / social cover stay stable).
+      // --- product_images: atomic smart-sync RPC (cover pos 0 + gallery 1..N) ---
       const cover = mainImage
         .filter((m) => typeof m.url === "string" && m.url.trim().length > 0)
         .slice(0, 1)
-        .map((m) => ({ id: m.id, url: m.url.trim(), position: 0 }));
+        .map((m) => ({ image_url: m.url.trim(), position: 0 }));
       const gallery = variationMedia
         .filter((m) => typeof m.url === "string" && m.url.trim().length > 0)
-        .map((m, i) => ({ id: m.id, url: m.url.trim(), position: i + 1 }));
+        .map((m, i) => ({ image_url: m.url.trim(), position: i + 1 }));
       const allMedia = [...cover, ...gallery];
 
-      if (allMedia.length > 0) {
-        const { data: existingImgs, error: imgSelErr } = await supabase
-          .from("product_images")
-          .select("id, image_url, position")
-          .eq("product_id", productId!);
-        if (imgSelErr) {
-          console.error("product_images select error:", imgSelErr);
-          abortSave("Impossible de lire les photos existantes : " + (imgSelErr.message || "inconnue"));
+      if (allMedia.length > MAX_GALLERY_IMAGES) {
+        abortSave(`Maximum ${MAX_GALLERY_IMAGES} photos par produit.`);
+        return;
+      }
+
+      const existingUrls = new Set(
+        (editing?.images || []).map((img) => img.image_url).filter(Boolean)
+      );
+      const invalid = allMedia.find((m) => !isAllowedProductMediaUrl(m.image_url, existingUrls));
+      if (invalid) {
+        abortSave(
+          "Une URL photo est invalide (seules les images Storage product-media sont acceptées). Re-téléversez la photo."
+        );
+        return;
+      }
+
+      // Always sync on edit (including clear for drafts). On create, sync only if photos present.
+      if (allMedia.length > 0 || editing) {
+        const { data: writtenCount, error: syncErr } = await (supabase as any).rpc(
+          "sync_product_gallery",
+          {
+            p_product_id: productId,
+            p_images: allMedia,
+          }
+        );
+        if (syncErr) {
+          console.error("sync_product_gallery error:", syncErr);
+          const msg = String(syncErr.message || syncErr.code || "inconnue");
+          abortSave(
+            "Erreur lors de l'enregistrement des photos : " +
+              msg +
+              (msg.includes("Could not find") || msg.includes("PGRST202")
+                ? " Appliquez la migration SQL sync_product_gallery (staging puis prod)."
+                : "")
+          );
           return;
         }
-
-        const existingById = new Map((existingImgs || []).map((r) => [r.id, r]));
-        const keepIds = new Set<string>();
-        const toInsert: { product_id: string; image_url: string; position: number }[] = [];
-        const toUpdateUrl: { id: string; image_url: string; position: number }[] = [];
-        const toUpdatePos: { id: string; position: number }[] = [];
-
-        for (const m of allMedia) {
-          const trustedId = m.id && existingById.has(m.id) ? m.id : undefined;
-          if (trustedId) {
-            const ex = existingById.get(trustedId)!;
-            if (ex.image_url !== m.url) {
-              toUpdateUrl.push({ id: trustedId, image_url: m.url, position: m.position });
-            } else if ((ex.position ?? 0) !== m.position) {
-              toUpdatePos.push({ id: trustedId, position: m.position });
-            }
-            keepIds.add(trustedId);
-          } else {
-            toInsert.push({
-              product_id: productId!,
-              image_url: m.url,
-              position: m.position,
-            });
-          }
-        }
-
-        // Insert new rows BEFORE deleting old ones (never leave 0 photos mid-flight).
-        if (toInsert.length > 0) {
-          const { data: insertedImgs, error: imgInsertErr } = await supabase
-            .from("product_images")
-            .insert(toInsert)
-            .select("id");
-          if (imgInsertErr || !insertedImgs?.length || insertedImgs.length !== toInsert.length) {
-            console.error("product_images insert error:", imgInsertErr);
-            abortSave(
-              "Erreur lors de l'enregistrement des photos : " +
-                (imgInsertErr?.message || "inconnue") +
-                ". Les photos déjà en base ont été conservées."
-            );
-            return;
-          }
-          insertedImgs.forEach((r) => keepIds.add(r.id));
-        }
-
-        for (const u of toUpdateUrl) {
-          const { error: updErr } = await supabase
-            .from("product_images")
-            .update({ image_url: u.image_url, position: u.position })
-            .eq("id", u.id)
-            .eq("product_id", productId!);
-          if (updErr) {
-            console.error("product_images update error:", updErr);
-            abortSave("Erreur lors de la mise à jour d'une photo : " + (updErr.message || "inconnue"));
-            return;
-          }
-        }
-
-        for (const u of toUpdatePos) {
-          // Position-only — avoids resetting embeddings (trigger is ON image_url).
-          const { error: posErr } = await supabase
-            .from("product_images")
-            .update({ position: u.position })
-            .eq("id", u.id)
-            .eq("product_id", productId!);
-          if (posErr) {
-            console.error("product_images position error:", posErr);
-            abortSave("Erreur lors du réordonnancement des photos : " + (posErr.message || "inconnue"));
-            return;
-          }
-        }
-
-        const orphanIds = (existingImgs || []).map((r) => r.id).filter((id) => !keepIds.has(id));
-        if (orphanIds.length > 0) {
-          const { error: imgDelErr } = await supabase
-            .from("product_images")
-            .delete()
-            .in("id", orphanIds);
-          if (imgDelErr) {
-            console.warn("product_images cleanup error:", imgDelErr);
-            toast.warning("Photos enregistrées, mais d'anciennes vignettes n'ont pas pu être nettoyées.");
-          }
-        }
-      } else if (editing) {
-        // Cleared in form — only for draft (published/pending/revision blocked by requiresPhoto).
-        const { error: imgClearErr } = await supabase
-          .from("product_images")
-          .delete()
-          .eq("product_id", productId);
-        if (imgClearErr) {
-          console.error("product_images clear error:", imgClearErr);
-          abortSave("Impossible de supprimer les photos : " + (imgClearErr.message || "inconnue"));
+        const n = typeof writtenCount === "number" ? writtenCount : Number(writtenCount ?? 0);
+        if (n !== allMedia.length) {
+          console.error("sync_product_gallery count mismatch:", { n, expected: allMedia.length });
+          abortSave(
+            `Les photos n'ont pas toutes été enregistrées (${n}/${allMedia.length}). Réessayez ou contactez le support.`
+          );
           return;
         }
       }
@@ -976,6 +944,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             onChange={setMainImage}
             multiple={false}
             storeId={storeId}
+            onUploadingChange={handleMediaUploadingChange}
           />
 
           {/* Gallery media (additional photos / video — not color-variant SKUs) */}
@@ -986,6 +955,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             multiple={true}
             acceptVideo={true}
             storeId={storeId}
+            onUploadingChange={handleMediaUploadingChange}
           />
 
           <Field label="Nom (FR) *" value={form.name_fr} onChange={(v) => setForm({ ...form, name_fr: v })} />
@@ -1324,11 +1294,15 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
 
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || mediaUploading}
             className="w-full py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {editing ? "Mettre à jour" : "Créer le produit"}
+            {saving || mediaUploading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {mediaUploading
+              ? "Upload des photos…"
+              : editing
+                ? "Mettre à jour"
+                : "Créer le produit"}
           </button>
         </div>
       </div>
@@ -1443,6 +1417,14 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
                   >
                     <Send size={14} />
                   </button>
+                )}
+                {product.publish_status === "pending_approval" && (
+                  <span
+                    className="px-2 py-1 text-[10px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 rounded-md"
+                    title="Déjà en file d'attente admin — pas besoin de resoumettre"
+                  >
+                    En validation
+                  </span>
                 )}
                 {product.publish_status === "published" && (
                   <button
