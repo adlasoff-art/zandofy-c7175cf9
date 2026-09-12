@@ -180,8 +180,14 @@ export function PublishSocialDialog({
     return data;
   };
 
+  const imageCount = (product?.product_images || []).length;
+
   const handleConfirm = async () => {
     if (!productId) return;
+    if (imageCount < 1) {
+      toast.error("Impossible de continuer : ce produit n'a aucune photo");
+      return;
+    }
     setSubmitting(true);
     try {
       if (mode === "after_approve" && onConfirmApprove) {
@@ -215,8 +221,6 @@ export function PublishSocialDialog({
     }
   };
 
-  const imageCount = (product?.product_images || []).length;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -241,6 +245,12 @@ export function PublishSocialDialog({
             <p className="text-sm font-medium text-foreground truncate">
               {product.name_fr || product.name}
             </p>
+
+            {imageCount < 1 && (
+              <p className="text-xs rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-3 py-2">
+                Aucune photo en base — demandez au vendeur de re-téléverser la galerie avant d&apos;approuver.
+              </p>
+            )}
 
             {mode === "after_approve" && (
               <label className="flex items-center gap-2 text-sm">
@@ -349,7 +359,10 @@ export function PublishSocialDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
             Annuler
           </Button>
-          <Button onClick={handleConfirm} disabled={submitting || isLoading || !product}>
+          <Button
+            onClick={handleConfirm}
+            disabled={submitting || isLoading || !product || imageCount < 1}
+          >
             {submitting && <Loader2 className="animate-spin mr-1" size={14} />}
             {mode === "after_approve"
               ? postSocial

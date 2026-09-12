@@ -29,6 +29,10 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
 
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    if (!storeId?.trim()) {
+      toast.error("Boutique introuvable — impossible d'uploader les médias.");
+      return;
+    }
     setUploading(true);
 
     const newItems: MediaItem[] = [];
@@ -38,6 +42,7 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
       const isVideo = raw.type.startsWith("video/");
       const file = isVideo ? raw : await compressImage(raw);
       const ext = sanitizeExtension(file.name, isVideo ? "mp4" : "jpg");
+      // Path must start with store UUID folder for storage RLS (owner upload policy).
       const path = `${storeId}/${Date.now()}-${i}.${ext}`;
 
       const { error } = await supabase.storage.from("product-media").upload(path, file, { cacheControl: "31536000" });
@@ -59,12 +64,19 @@ export function MediaUploader({ label, items, onChange, multiple = false, accept
       }
 
       const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
+      if (!urlData?.publicUrl) {
+        failureCount += 1;
+        toast.error(`URL publique manquante pour « ${file.name} »`);
+        continue;
+      }
       newItems.push({
         url: urlData.publicUrl,
         type: isVideo ? "video" : "image",
         position: items.length + i,
       });
     }
+
+    if (inputRef.current) inputRef.current.value = "";
 
     if (newItems.length === 0) {
       toast.error(

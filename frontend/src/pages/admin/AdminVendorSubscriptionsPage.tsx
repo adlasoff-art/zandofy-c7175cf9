@@ -105,6 +105,14 @@ export default function AdminVendorSubscriptionsPage() {
 
   const approveProduct = useMutation({
     mutationFn: async ({ productId, approve }: { productId: string; approve: boolean }) => {
+      if (approve) {
+        const { count, error: countErr } = await supabase
+          .from("product_images")
+          .select("id", { count: "exact", head: true })
+          .eq("product_id", productId);
+        if (countErr) throw new Error("Impossible de vérifier les photos avant publication");
+        if (!count || count < 1) throw new Error("Impossible d'approuver un produit sans photo");
+      }
       const { error } = await supabase
         .from("products")
         .update({ publish_status: approve ? "published" : "rejected" } as any)
@@ -116,6 +124,7 @@ export default function AdminVendorSubscriptionsPage() {
       if (!vars.approve) toast.success("Produit rejeté");
       // approve toast handled by PublishSocialDialog
     },
+    onError: (err: Error) => toast.error(err.message || "Erreur lors de la mise à jour"),
   });
 
   const [socialProductId, setSocialProductId] = useState<string | null>(null);

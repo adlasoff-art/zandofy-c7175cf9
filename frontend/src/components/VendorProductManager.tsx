@@ -437,17 +437,17 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       toast.error("Nom et prix sont obligatoires");
       return;
     }
-    // Re-soumission d'un produit publié : exiger au moins une photo
-    if (
-      editing?.publish_status === "published" &&
-      mainImage.length === 0 &&
-      variationMedia.length === 0
-    ) {
-      toast.error("Ajoutez au moins une photo avant de modifier un produit publié");
+    // Produits déjà en catalogue / file / révision : ne jamais enregistrer sans photo
+    const requiresPhoto =
+      editing?.publish_status === "published" ||
+      editing?.publish_status === "pending_approval" ||
+      editing?.publish_status === "revision_requested";
+    if (requiresPhoto && mainImage.length === 0 && variationMedia.length === 0) {
+      toast.error("Ajoutez au moins une photo avant d'enregistrer ce produit");
       return;
     }
     setSaving(true);
-
+    try {
     // Generate or refresh the URL slug from the (French) name so product
     // pages render as /product/<slug> instead of /product/<uuid>.
     const displayName = form.name_fr || form.name;
@@ -517,57 +517,147 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
         ? { ...payload, publish_status: "pending_approval" }
         : payload;
       const { error } = await (supabase.from("products").update(updatePayload as any) as any).eq("id", editing.id);
-      if (error) { console.error("Product update error:", error); toast.error("Erreur lors de la mise à jour : " + (error.message || "inconnue")); setSaving(false); return; }
+      if (error) { console.error("Product update error:", error); toast.error("Erreur lors de la mise à jour : " + (error.message || "inconnue")); return; }
     } else {
       const { data, error } = await (supabase.from("products").insert(payload as any) as any).select("id").single();
-      if (error || !data) { console.error("Product insert error:", error); toast.error("Erreur lors de la création : " + (error?.message || "inconnue")); setSaving(false); return; }
+      if (error || !data) { console.error("Product insert error:", error); toast.error("Erreur lors de la création : " + (error?.message || "inconnue")); return; }
       productId = data.id;
     }
 
-    // Sync related rows: insert-first then delete old (never wipe before insert succeeds).
+    // Sync related rows (images idempotent; sizes/colors insert-then-prune).
     if (productId) {
       const abortSave = (message: string) => {
-        toast.error(message);
-        setSaving(false);
+        toast.error(
+          message +
+            (editing
+              ? " Les infos produit déjà enregistrées peuvent être à jour — rouvrez la fiche si besoin."
+              : " Le brouillon produit a pu être créé sans ces éléments — rouvrez-le et réessayez.")
+        );
       };
 
-      // --- product_images ---
-      const allMedia = [
-        ...mainImage.map((m) => ({ ...m, position: 0 })),
-        ...variationMedia.map((m, i) => ({ ...m, position: i + 1 })),
-      ];
+      // Delete rows for this product whose id is not in keepIds (safe .in() API).
+      const pruneByIds = async (
+        table: "product_sizes" | "product_colors",
+        keepIds: string[]
+      ) => {
+        const { data: existing, error: selErr } = await supabase
+          .from(table)
+          .select("id")
+          .eq("product_id", productId!);
+        if (selErr) return selErr;
+        const keep = new Set(keepIds);
+        const toDelete = (existing || []).map((r) => r.id).filter((id) => !keep.has(id));
+        if (toDelete.length === 0) return null;
+        const { error } = await supabase.from(table).delete().in("id", toDelete);
+        return error;
+      };
+
+      // --- product_images: cover (pos 0) + gallery (1..N), idempotent ---
+      // Never wipe-then-insert. Never trust client ids that do not belong to this product.
+      // Unchanged rows keep their id (embeddings / social cover stay stable).
+      const cover = mainImage
+        .filter((m) => typeof m.url === "string" && m.url.trim().length > 0)
+        .slice(0, 1)
+        .map((m) => ({ id: m.id, url: m.url.trim(), position: 0 }));
+      const gallery = variationMedia
+        .filter((m) => typeof m.url === "string" && m.url.trim().length > 0)
+        .map((m, i) => ({ id: m.id, url: m.url.trim(), position: i + 1 }));
+      const allMedia = [...cover, ...gallery];
 
       if (allMedia.length > 0) {
-        const imgRows = allMedia.map((m) => ({
-          product_id: productId!,
-          image_url: m.url,
-          position: m.position,
-        }));
-        const { data: insertedImgs, error: imgInsertErr } = await supabase
+        const { data: existingImgs, error: imgSelErr } = await supabase
           .from("product_images")
-          .insert(imgRows)
-          .select("id");
-        if (imgInsertErr || !insertedImgs?.length) {
-          console.error("product_images insert error:", imgInsertErr);
-          abortSave(
-            "Erreur lors de l'enregistrement des photos : " +
-              (imgInsertErr?.message || "inconnue") +
-              ". Les photos précédentes ont été conservées."
-          );
+          .select("id, image_url, position")
+          .eq("product_id", productId!);
+        if (imgSelErr) {
+          console.error("product_images select error:", imgSelErr);
+          abortSave("Impossible de lire les photos existantes : " + (imgSelErr.message || "inconnue"));
           return;
         }
-        const newImgIds = insertedImgs.map((r) => r.id);
-        const { error: imgDelErr } = await supabase
-          .from("product_images")
-          .delete()
-          .eq("product_id", productId)
-          .not("id", "in", `(${newImgIds.join(",")})`);
-        if (imgDelErr) {
-          console.warn("product_images cleanup error:", imgDelErr);
-          toast.warning("Photos enregistrées, mais d'anciennes vignettes n'ont pas pu être nettoyées.");
+
+        const existingById = new Map((existingImgs || []).map((r) => [r.id, r]));
+        const keepIds = new Set<string>();
+        const toInsert: { product_id: string; image_url: string; position: number }[] = [];
+        const toUpdateUrl: { id: string; image_url: string; position: number }[] = [];
+        const toUpdatePos: { id: string; position: number }[] = [];
+
+        for (const m of allMedia) {
+          const trustedId = m.id && existingById.has(m.id) ? m.id : undefined;
+          if (trustedId) {
+            const ex = existingById.get(trustedId)!;
+            if (ex.image_url !== m.url) {
+              toUpdateUrl.push({ id: trustedId, image_url: m.url, position: m.position });
+            } else if ((ex.position ?? 0) !== m.position) {
+              toUpdatePos.push({ id: trustedId, position: m.position });
+            }
+            keepIds.add(trustedId);
+          } else {
+            toInsert.push({
+              product_id: productId!,
+              image_url: m.url,
+              position: m.position,
+            });
+          }
+        }
+
+        // Insert new rows BEFORE deleting old ones (never leave 0 photos mid-flight).
+        if (toInsert.length > 0) {
+          const { data: insertedImgs, error: imgInsertErr } = await supabase
+            .from("product_images")
+            .insert(toInsert)
+            .select("id");
+          if (imgInsertErr || !insertedImgs?.length || insertedImgs.length !== toInsert.length) {
+            console.error("product_images insert error:", imgInsertErr);
+            abortSave(
+              "Erreur lors de l'enregistrement des photos : " +
+                (imgInsertErr?.message || "inconnue") +
+                ". Les photos déjà en base ont été conservées."
+            );
+            return;
+          }
+          insertedImgs.forEach((r) => keepIds.add(r.id));
+        }
+
+        for (const u of toUpdateUrl) {
+          const { error: updErr } = await supabase
+            .from("product_images")
+            .update({ image_url: u.image_url, position: u.position })
+            .eq("id", u.id)
+            .eq("product_id", productId!);
+          if (updErr) {
+            console.error("product_images update error:", updErr);
+            abortSave("Erreur lors de la mise à jour d'une photo : " + (updErr.message || "inconnue"));
+            return;
+          }
+        }
+
+        for (const u of toUpdatePos) {
+          // Position-only — avoids resetting embeddings (trigger is ON image_url).
+          const { error: posErr } = await supabase
+            .from("product_images")
+            .update({ position: u.position })
+            .eq("id", u.id)
+            .eq("product_id", productId!);
+          if (posErr) {
+            console.error("product_images position error:", posErr);
+            abortSave("Erreur lors du réordonnancement des photos : " + (posErr.message || "inconnue"));
+            return;
+          }
+        }
+
+        const orphanIds = (existingImgs || []).map((r) => r.id).filter((id) => !keepIds.has(id));
+        if (orphanIds.length > 0) {
+          const { error: imgDelErr } = await supabase
+            .from("product_images")
+            .delete()
+            .in("id", orphanIds);
+          if (imgDelErr) {
+            console.warn("product_images cleanup error:", imgDelErr);
+            toast.warning("Photos enregistrées, mais d'anciennes vignettes n'ont pas pu être nettoyées.");
+          }
         }
       } else if (editing) {
-        // User cleared all media in the form — remove previous rows only now.
+        // Cleared in form — only for draft (published/pending/revision blocked by requiresPhoto).
         const { error: imgClearErr } = await supabase
           .from("product_images")
           .delete()
@@ -593,7 +683,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
           .from("product_sizes")
           .insert(sizeRows)
           .select("id");
-        if (sizeInsertErr || !insertedSizes?.length) {
+        if (sizeInsertErr || !insertedSizes?.length || insertedSizes.length !== sizeRows.length) {
           console.error("product_sizes insert error:", sizeInsertErr);
           abortSave(
             "Erreur lors de l'enregistrement des tailles : " +
@@ -602,12 +692,10 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
           );
           return;
         }
-        const newSizeIds = insertedSizes.map((r) => r.id);
-        const { error: sizeDelErr } = await supabase
-          .from("product_sizes")
-          .delete()
-          .eq("product_id", productId)
-          .not("id", "in", `(${newSizeIds.join(",")})`);
+        const sizeDelErr = await pruneByIds(
+          "product_sizes",
+          insertedSizes.map((r) => r.id)
+        );
         if (sizeDelErr) {
           console.warn("product_sizes cleanup error:", sizeDelErr);
           toast.warning("Tailles enregistrées, nettoyage des anciennes incomplet.");
@@ -636,7 +724,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
           .from("product_colors")
           .insert(colorRows)
           .select("id");
-        if (colorInsertErr || !insertedColors?.length) {
+        if (colorInsertErr || !insertedColors?.length || insertedColors.length !== colorRows.length) {
           console.error("product_colors insert error:", colorInsertErr);
           abortSave(
             "Erreur lors de l'enregistrement des couleurs : " +
@@ -645,12 +733,10 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
           );
           return;
         }
-        const newColorIds = insertedColors.map((r) => r.id);
-        const { error: colorDelErr } = await supabase
-          .from("product_colors")
-          .delete()
-          .eq("product_id", productId)
-          .not("id", "in", `(${newColorIds.join(",")})`);
+        const colorDelErr = await pruneByIds(
+          "product_colors",
+          insertedColors.map((r) => r.id)
+        );
         if (colorDelErr) {
           console.warn("product_colors cleanup error:", colorDelErr);
           toast.warning("Couleurs enregistrées, nettoyage des anciennes incomplet.");
@@ -669,26 +755,37 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
 
       // --- product_variant_selections (UNIQUE product_id+variant_option_id) ---
       if (dynamicSelections.length > 0) {
-        const optionIds = dynamicSelections.map((s) => s.variant_option_id);
-        const { error: selDelErr } = await (supabase as any)
+        const wantedOpts = new Set(dynamicSelections.map((s) => s.variant_option_id));
+        const { data: existingSels, error: selListErr } = await (supabase as any)
           .from("product_variant_selections")
-          .delete()
-          .eq("product_id", productId)
-          .not("variant_option_id", "in", `(${optionIds.join(",")})`);
-        if (selDelErr) {
-          console.error("product_variant_selections prune error:", selDelErr);
+          .select("id, variant_option_id")
+          .eq("product_id", productId);
+        if (selListErr) {
+          console.error("product_variant_selections list error:", selListErr);
           abortSave(
-            "Erreur lors de la mise à jour des variantes : " + (selDelErr.message || "inconnue")
+            "Erreur lors de la mise à jour des variantes : " + (selListErr.message || "inconnue")
           );
           return;
         }
-        const { data: existingSels } = await (supabase as any)
-          .from("product_variant_selections")
-          .select("variant_option_id")
-          .eq("product_id", productId);
-        const existingOpt = new Set(
-          ((existingSels as { variant_option_id: string }[]) || []).map((r) => r.variant_option_id)
-        );
+        const existingList =
+          (existingSels as { id: string; variant_option_id: string }[]) || [];
+        const selToDelete = existingList
+          .filter((r) => !wantedOpts.has(r.variant_option_id))
+          .map((r) => r.id);
+        if (selToDelete.length > 0) {
+          const { error: selDelErr } = await (supabase as any)
+            .from("product_variant_selections")
+            .delete()
+            .in("id", selToDelete);
+          if (selDelErr) {
+            console.error("product_variant_selections prune error:", selDelErr);
+            abortSave(
+              "Erreur lors de la mise à jour des variantes : " + (selDelErr.message || "inconnue")
+            );
+            return;
+          }
+        }
+        const existingOpt = new Set(existingList.map((r) => r.variant_option_id));
         const toInsert = dynamicSelections
           .filter((s) => !existingOpt.has(s.variant_option_id))
           .map((s) => ({
@@ -723,10 +820,18 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
 
       // --- product_custom_variant_values (UNIQUE product_id+type+label) ---
       if (customVariantValues.length > 0) {
-        const { data: existingCustom } = await (supabase as any)
+        const { data: existingCustom, error: customListErr } = await (supabase as any)
           .from("product_custom_variant_values")
           .select("id, variant_type_id, custom_label")
           .eq("product_id", productId);
+        if (customListErr) {
+          console.error("product_custom_variant_values list error:", customListErr);
+          abortSave(
+            "Erreur lors de la lecture des valeurs custom : " +
+              (customListErr.message || "inconnue")
+          );
+          return;
+        }
         const wanted = new Set(
           customVariantValues.map((c) => `${c.variant_type_id}::${c.custom_label}`)
         );
@@ -795,24 +900,25 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       : "Produit sauvegardé en brouillon");
     cancelForm();
     loadProducts();
-    setSaving(false);
+    } catch (err) {
+      console.error("handleSave unexpected error:", err);
+      toast.error("Erreur inattendue lors de la sauvegarde");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handlePublish = async (productId: string) => {
-    const inMemory = products.find((p) => p.id === productId);
-    let photoCount = inMemory?.images?.length ?? 0;
-    if (!inMemory || photoCount === 0) {
-      const { count, error: countErr } = await supabase
-        .from("product_images")
-        .select("id", { count: "exact", head: true })
-        .eq("product_id", productId);
-      if (countErr) {
-        toast.error("Impossible de vérifier les photos avant soumission");
-        return;
-      }
-      photoCount = count ?? 0;
+    // Toujours vérifier en base (évite un cache liste périmé)
+    const { count, error: countErr } = await supabase
+      .from("product_images")
+      .select("id", { count: "exact", head: true })
+      .eq("product_id", productId);
+    if (countErr) {
+      toast.error("Impossible de vérifier les photos avant soumission");
+      return;
     }
-    if (photoCount === 0) {
+    if (!count || count < 1) {
       toast.error("Ajoutez au moins une photo avant de soumettre pour approbation");
       return;
     }
@@ -872,9 +978,9 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             storeId={storeId}
           />
 
-          {/* Variation media (images + video) */}
+          {/* Gallery media (additional photos / video — not color-variant SKUs) */}
           <MediaUploader
-            label="Images / Vidéo de variations"
+            label="Galerie — autres photos / vidéo"
             items={variationMedia}
             onChange={setVariationMedia}
             multiple={true}
