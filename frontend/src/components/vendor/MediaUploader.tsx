@@ -20,6 +20,8 @@ interface MediaUploaderProps {
   acceptVideo?: boolean;
   storeId: string;
   onUploadingChange?: (uploading: boolean) => void;
+  /** Soft cap for gallery (cover is separate). Default 29 so cover+gallery ≤ 30. */
+  maxItems?: number;
 }
 
 export function MediaUploader({
@@ -30,6 +32,7 @@ export function MediaUploader({
   acceptVideo = false,
   storeId,
   onUploadingChange,
+  maxItems,
 }: MediaUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,6 +43,7 @@ export function MediaUploader({
   };
 
   const accept = acceptVideo ? "image/*,video/mp4,video/webm,video/quicktime" : "image/*";
+  const limit = maxItems ?? (multiple ? 29 : 1);
 
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -47,72 +51,88 @@ export function MediaUploader({
       toast.error("Boutique introuvable — impossible d'uploader les médias.");
       return;
     }
-    setUploadingState(true);
 
-    const newItems: MediaItem[] = [];
-    let failureCount = 0;
-    for (let i = 0; i < files.length; i++) {
-      const raw = files[i];
-      const isVideo = raw.type.startsWith("video/");
-      const file = isVideo ? raw : await compressImage(raw);
-      const ext = sanitizeExtension(file.name, isVideo ? "mp4" : "jpg");
-      // Path must start with store UUID folder for storage RLS (owner upload policy).
-      const path = `${storeId}/${Date.now()}-${i}.${ext}`;
-
-      const { error } = await supabase.storage.from("product-media").upload(path, file, { cacheControl: "31536000" });
-      if (error) {
-        failureCount += 1;
-        toast.error(`Erreur upload « ${file.name} » : ${error.message}`);
-        continue;
-      }
-
-      // Apply watermark (best-effort, non-blocking error)
-      if (!isVideo) {
-        try {
-          await supabase.functions.invoke("watermark-image", {
-            body: { bucket: "product-media", path },
-          });
-        } catch {
-          // silent: keep original if watermark fails
-        }
-      }
-
-      const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
-      if (!urlData?.publicUrl) {
-        failureCount += 1;
-        toast.error(`URL publique manquante pour « ${file.name} »`);
-        continue;
-      }
-      newItems.push({
-        url: urlData.publicUrl,
-        type: isVideo ? "video" : "image",
-        position: items.length + i,
-      });
-    }
-
-    if (inputRef.current) inputRef.current.value = "";
-
-    if (newItems.length === 0) {
-      toast.error(
-        failureCount > 0
-          ? "Aucune image n'a pu être téléversée. Vérifiez le format, la taille et votre connexion."
-          : "Aucune image n'a pu être téléversée."
-      );
-      setUploadingState(false);
+    const remaining = multiple ? Math.max(0, limit - items.length) : 1;
+    if (remaining <= 0) {
+      toast.error(`Maximum ${limit} fichier(s) pour cette zone.`);
       return;
     }
 
-    if (multiple) {
-      onChange([...items, ...newItems]);
-    } else {
-      onChange(newItems.slice(0, 1));
+    setUploadingState(true);
+    const newItems: MediaItem[] = [];
+    let failureCount = 0;
+
+    try {
+      const fileList = Array.from(files).slice(0, remaining);
+      for (let i = 0; i < fileList.length; i++) {
+        const raw = fileList[i];
+        const isVideo = raw.type.startsWith("video/");
+        const file = isVideo ? raw : await compressImage(raw);
+        const ext = sanitizeExtension(file.name, isVideo ? "mp4" : "jpg");
+        // Path must start with store UUID folder for storage RLS (owner upload policy).
+        const path = `${storeId}/${Date.now()}-${i}.${ext}`;
+
+        const { error } = await supabase.storage
+          .from("product-media")
+          .upload(path, file, { cacheControl: "31536000" });
+        if (error) {
+          failureCount += 1;
+          toast.error(`Erreur upload « ${file.name} » : ${error.message}`);
+          continue;
+        }
+
+        if (!isVideo) {
+          try {
+            await supabase.functions.invoke("watermark-image", {
+              body: { bucket: "product-media", path },
+            });
+          } catch {
+            // keep original if watermark fails
+          }
+        }
+
+        const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(path);
+        if (!urlData?.publicUrl) {
+          failureCount += 1;
+          toast.error(`URL publique manquante pour « ${file.name} »`);
+          continue;
+        }
+        newItems.push({
+          url: urlData.publicUrl,
+          type: isVideo ? "video" : "image",
+          position: items.length + i,
+        });
+      }
+
+      if (inputRef.current) inputRef.current.value = "";
+
+      if (newItems.length === 0) {
+        toast.error(
+          failureCount > 0
+            ? "Aucune image n'a pu être téléversée. Vérifiez le format, la taille et votre connexion."
+            : "Aucune image n'a pu être téléversée."
+        );
+        return;
+      }
+
+      if (multiple) {
+        onChange([...items, ...newItems].slice(0, limit));
+      } else {
+        onChange(newItems.slice(0, 1));
+      }
+    } catch (err) {
+      console.error("MediaUploader unexpected error:", err);
+      toast.error("Erreur inattendue pendant l'upload des médias.");
+    } finally {
+      setUploadingState(false);
     }
-    setUploadingState(false);
   };
 
   const removeItem = (index: number) => {
     onChange(items.filter((_, i) => i !== index));
   };
+
+  const canAdd = multiple ? items.length < limit : items.length === 0;
 
   return (
     <div>
@@ -136,7 +156,7 @@ export function MediaUploader({
             </button>
           </div>
         ))}
-        {(multiple || items.length === 0) && (
+        {canAdd && (
           <button
             type="button"
             onClick={() => inputRef.current?.click()}

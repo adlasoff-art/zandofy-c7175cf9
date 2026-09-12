@@ -18,6 +18,23 @@ import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 import { generateProductSlug } from "@/utils/productSlug";
 
+const MAX_GALLERY_IMAGES = 30;
+
+/** Accept product-media Storage URLs, or keep an URL already on this product (legacy). */
+function isAllowedProductMediaUrl(url: string, existingUrls?: Set<string>): boolean {
+  if (existingUrls?.has(url)) return true;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+    return (
+      parsed.pathname.includes("/storage/v1/object/public/product-media/") ||
+      parsed.pathname.includes("/storage/v1/object/sign/product-media/")
+    );
+  } catch {
+    return false;
+  }
+}
+
 interface Supplier {
   id: string;
   agent_name: string;
@@ -181,7 +198,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     const { data, error } = await (supabase
       .from("products")
       .select(
-        "id, name, name_fr, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea, meta_title, meta_description, seo_keywords, product_images(id, image_url, position)"
+        "id, name, name_fr, slug, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea, meta_title, meta_description, seo_keywords, product_images(id, image_url, position)"
       ) as any)
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
@@ -195,16 +212,19 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
 
     if (data) {
       setProducts(
-        data.map((p: any) => ({
-          ...p,
-          publish_status: p.publish_status || "draft",
-          images: Array.isArray(p.product_images)
-            ? [...p.product_images].sort(
-                (a: { position?: number | null }, b: { position?: number | null }) =>
-                  (a.position ?? 0) - (b.position ?? 0)
-              )
-            : [],
-        }))
+        data.map((p: any) => {
+          const { product_images, ...rest } = p;
+          return {
+            ...rest,
+            publish_status: p.publish_status || "draft",
+            images: Array.isArray(product_images)
+              ? [...product_images].sort(
+                  (a: { position?: number | null }, b: { position?: number | null }) =>
+                    (a.position ?? 0) - (b.position ?? 0)
+                )
+              : [],
+          };
+        })
       );
     }
     setLoading(false);
@@ -560,8 +580,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
         return error;
       };
 
-      // --- product_images: atomic RPC (cover pos 0 + gallery 1..N) ---
-      // Never claim success unless DB row count matches what the vendor uploaded.
+      // --- product_images: atomic smart-sync RPC (cover pos 0 + gallery 1..N) ---
       const cover = mainImage
         .filter((m) => typeof m.url === "string" && m.url.trim().length > 0)
         .slice(0, 1)
@@ -571,6 +590,23 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
         .map((m, i) => ({ image_url: m.url.trim(), position: i + 1 }));
       const allMedia = [...cover, ...gallery];
 
+      if (allMedia.length > MAX_GALLERY_IMAGES) {
+        abortSave(`Maximum ${MAX_GALLERY_IMAGES} photos par produit.`);
+        return;
+      }
+
+      const existingUrls = new Set(
+        (editing?.images || []).map((img) => img.image_url).filter(Boolean)
+      );
+      const invalid = allMedia.find((m) => !isAllowedProductMediaUrl(m.image_url, existingUrls));
+      if (invalid) {
+        abortSave(
+          "Une URL photo est invalide (seules les images Storage product-media sont acceptées). Re-téléversez la photo."
+        );
+        return;
+      }
+
+      // Always sync on edit (including clear for drafts). On create, sync only if photos present.
       if (allMedia.length > 0 || editing) {
         const { data: writtenCount, error: syncErr } = await (supabase as any).rpc(
           "sync_product_gallery",
@@ -581,10 +617,13 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
         );
         if (syncErr) {
           console.error("sync_product_gallery error:", syncErr);
+          const msg = String(syncErr.message || syncErr.code || "inconnue");
           abortSave(
             "Erreur lors de l'enregistrement des photos : " +
-              (syncErr.message || "inconnue") +
-              ". Vérifiez que la migration galerie a bien été appliquée en base."
+              msg +
+              (msg.includes("Could not find") || msg.includes("PGRST202")
+                ? " Appliquez la migration SQL sync_product_gallery (staging puis prod)."
+                : "")
           );
           return;
         }

@@ -2,60 +2,48 @@
 
 ## 0. MIGRATION OBLIGATOIRE (staging → prod)
 
-Sans cette étape, le frontend affichera une erreur explicite à la sauvegarde des photos.
+Fichier unique à coller (version auditée) :
 
-Fichier : `supabase/migrations/20260912140000_product_gallery_sync_rpc_and_rls.sql`
+`supabase/migrations/20260912140000_product_gallery_sync_rpc_and_rls.sql`
 
-1. SQL Editor **staging** → coller le fichier entier → Run.
-2. Smoke vendeur staging (section 4).
+1. SQL Editor **staging** → Run le fichier entier.
+2. Smoke vendeur (section 4).
 3. SQL Editor **production** → **même fichier** → Run.
-4. Puis déployer / hard-refresh le frontend (Vercel `main`).
+4. Merge/deploy frontend `develop` → `main` + hard refresh.
 
-Vérif rapide après SQL :
+Si une **ancienne** version du fichier a déjà été exécutée : re-coller ce fichier (il est idempotent : `CREATE OR REPLACE` + `DROP POLICY IF EXISTS`).
+
+Vérif :
 
 ```sql
 SELECT proname FROM pg_proc WHERE proname = 'sync_product_gallery';
 SELECT polname, cmd FROM pg_policies WHERE tablename = 'product_images' ORDER BY cmd, polname;
+-- Doit échouer (forbidden) si appelé sans auth — test owner via app
 ```
 
-## 1. RLS `product_images`
+## 1. Smoke vendeur
+
+1. Upload cover + 3 galerie → attendre fin upload → sauver → vignettes visibles.
+2. Re-sauver sans changer photos → toujours OK (embeddings non reset).
+3. Draft → bouton Send ; publié modifié → « En validation » (pas de Send).
+4. Collaborateur avec permission `products` peut sauver la galerie.
+5. URL hors `product-media` refusée à la sauvegarde.
+
+## 2. Sécurité attendue
+
+| Contrôle | Attendu |
+|----------|---------|
+| SELECT public images | Conservé (`USING true`) — catalogue public |
+| INSERT/UPDATE/DELETE | Owner **ou** collab `products` **ou** admin/manager |
+| RPC | SECURITY DEFINER + authz stricte + max 30 + URL product-media |
+| Storage upload | Toujours `{store_id}/…` |
+
+## 3. Produits orphelins
 
 ```sql
-SELECT polname, cmd, roles, qual, with_check
-FROM pg_policies
-WHERE tablename = 'product_images'
-ORDER BY cmd, polname;
-```
-
-Attendu : `Public read product_images` (SELECT) + policies owner INSERT/UPDATE/DELETE (+ admin/manager).
-
-## 2. Logos plateforme
-
-1. Admin → CMS → Branding.
-2. Re-upload **Logo Header** + **Logo Footer** (+ favicon si cassé) vers bucket `cms-assets`.
-3. Hard refresh `https://www.zandofy.com` et `/admin`.
-
-## 3. Produits orphelins (sans `product_images`)
-
-```sql
-SELECT p.id, p.name_fr, p.publish_status, p.store_id, p.created_at
+SELECT p.id, p.name_fr, p.publish_status
 FROM products p
-WHERE NOT EXISTS (
-  SELECT 1 FROM product_images pi WHERE pi.product_id = p.id
-)
-AND p.publish_status IN ('pending_approval', 'published', 'draft')
+WHERE NOT EXISTS (SELECT 1 FROM product_images pi WHERE pi.product_id = p.id)
+  AND p.publish_status IN ('pending_approval', 'published', 'draft')
 ORDER BY p.created_at DESC;
 ```
-
-Pour chaque ligne : dashboard vendeur → re-upload photos → sauvegarder → vérifier vignette.
-
-## 4. Smoke vendeur (après SQL + deploy)
-
-1. Upload principale + 3 galerie → **attendre fin upload** → Mettre à jour → toast succès.
-2. Catalogue : vignette visible ; si `draft` → bouton **Send** actif.
-3. Si produit était `published` → statut **En attente** + pastille « En validation » (pas de Send : déjà en file admin).
-4. Save pendant upload → bouton désactivé (« Upload des photos… »).
-5. Soumettre draft sans photo → bloqué.
-6. Approuver admin + Facebook comme avant.
-
-**Sécurité** : RPC `sync_product_gallery` = SECURITY DEFINER mais **owner/admin/manager only**. SELECT public des images catalogue conservé. Upload Storage toujours `{store_id}/`.
