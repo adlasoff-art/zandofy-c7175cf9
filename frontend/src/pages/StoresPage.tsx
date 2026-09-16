@@ -263,7 +263,9 @@ export default function StoresPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("stores_public" as any)
-        .select("id, name, slug, description, logo_url, banner_url, is_verified, verified_years, followers_count, products_count, sales_count, rating, is_online, last_seen_at, created_at, followers_override, sales_override, verified_years_override, review_count_override")
+        .select("id, name, slug, description, logo_url, banner_url, is_verified, verified_years, followers_count, products_count, sales_count, rating, is_online, last_seen_at, created_at, followers_override, sales_override, verified_years_override, review_count_override, is_banned, is_suspended")
+        .eq("is_banned", false)
+        .eq("is_suspended", false)
         .order("sales_count", { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as StoreRow[];

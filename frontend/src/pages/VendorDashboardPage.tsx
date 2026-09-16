@@ -35,13 +35,14 @@ import { GeoFieldsRow, type GeoFieldsValue } from "@/components/address/GeoField
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
-  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign, Calculator, ShieldCheck, LineChart,
+  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign, Calculator, ShieldCheck, LineChart, Archive,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { ACTIVE_ORDER_STATUSES, NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
 import { VENDOR_TIERS } from "@/lib/vendor-tiers";
 import { useStorePresence } from "@/hooks/useStorePresence";
 import { useStoreCertification } from "@/hooks/use-certification";
+import { useStoreSuspension, isActivityBlocked } from "@/hooks/use-store-suspension";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { Switch } from "@/components/ui/switch";
 
@@ -69,8 +70,10 @@ interface VendorStore {
   collaborators_enabled: boolean;
   is_suspended?: boolean;
   is_banned?: boolean;
+  deleted_at?: string | null;
   suspension_reason?: string | null;
   ban_reason?: string | null;
+  delete_reason?: string | null;
   suspended_activities?: string[];
   is_platform_owned?: boolean;
 }
@@ -149,7 +152,7 @@ export default function VendorDashboardPage() {
       // Find all stores owned by user
       const { data: storesData } = await (supabase as any)
         .from("stores")
-        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, suspension_reason, ban_reason, suspended_activities, is_platform_owned")
+        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned")
         .eq("owner_id", user!.id)
         .order("created_at", { ascending: true });
 
@@ -476,8 +479,21 @@ export default function VendorDashboardPage() {
                 {/* Platform claim banner */}
                 <VendorPlatformClaimBanner storeId={store!.id} userId={user!.id} storeName={store!.name} />
 
-                {/* Store suspension/ban banner */}
-                {store?.is_banned && (
+                {/* Store archive / ban / suspend banners */}
+                {store?.deleted_at && (
+                  <div className="p-4 rounded-lg border border-slate-300 bg-slate-50 dark:bg-slate-900/40 dark:border-slate-600">
+                    <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-semibold text-sm mb-1">
+                      <Archive size={16} /> Boutique archivée
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {store.delete_reason || "Votre boutique a été retirée du catalogue public. Les commandes et données sont conservées."}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Les écritures catalogue sont bloquées. Contactez le support pour une restauration.
+                    </p>
+                  </div>
+                )}
+                {store?.is_banned && !store?.deleted_at && (
                   <div className="p-4 rounded-lg border border-destructive bg-destructive/5">
                     <div className="flex items-center gap-2 text-destructive font-semibold text-sm mb-1">
                       <Ban size={16} /> Boutique bannie
@@ -486,7 +502,7 @@ export default function VendorDashboardPage() {
                     <p className="text-xs text-muted-foreground mt-1">Contactez le support pour plus d'informations.</p>
                   </div>
                 )}
-                {store?.is_suspended && !store?.is_banned && (
+                {store?.is_suspended && !store?.is_banned && !store?.deleted_at && (
                   <div className="p-4 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/10">
                     <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-semibold text-sm mb-1">
                       <AlertTriangle size={16} /> Boutique suspendue
@@ -534,8 +550,18 @@ export default function VendorDashboardPage() {
               {/* Platform claim banner */}
               <VendorPlatformClaimBanner storeId={store!.id} userId={user!.id} storeName={store!.name} />
 
-              {/* Store suspension/ban banner (mobile) */}
-              {store?.is_banned && (
+              {/* Store archive / ban / suspend banner (mobile) */}
+              {store?.deleted_at && (
+                <div className="p-4 rounded-lg border border-slate-300 bg-slate-50 dark:bg-slate-900/40 dark:border-slate-600">
+                  <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-semibold text-sm mb-1">
+                    <Archive size={16} /> Boutique archivée
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {store.delete_reason || "Boutique retirée du catalogue public. Commandes et données conservées."}
+                  </p>
+                </div>
+              )}
+              {store?.is_banned && !store?.deleted_at && (
                 <div className="p-4 rounded-lg border border-destructive bg-destructive/5">
                   <div className="flex items-center gap-2 text-destructive font-semibold text-sm mb-1">
                     <Ban size={16} /> Boutique bannie
@@ -543,7 +569,7 @@ export default function VendorDashboardPage() {
                   <p className="text-xs text-muted-foreground">{store.ban_reason || "Votre boutique a été bannie pour violation des conditions d'utilisation."}</p>
                 </div>
               )}
-              {store?.is_suspended && !store?.is_banned && (
+              {store?.is_suspended && !store?.is_banned && !store?.deleted_at && (
                 <div className="p-4 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/10">
                   <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-semibold text-sm mb-1">
                     <AlertTriangle size={16} /> Boutique suspendue
@@ -754,6 +780,11 @@ function VendorSummaryWidgets({
 
 
 function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s: VendorStore) => void }) {
+  const { data: suspensionStatus } = useStoreSuspension(store.id);
+  const settingsBlocked =
+    isActivityBlocked(suspensionStatus, "product_listing") ||
+    !!store.deleted_at ||
+    !!store.is_banned;
   const [whatsapp, setWhatsapp] = useState(store.whatsapp_number || "");
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -826,6 +857,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   }, [store.id]);
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (settingsBlocked) {
+      toast.error("Paramètres bloqués : boutique suspendue, bannie ou archivée");
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
@@ -855,6 +890,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   };
 
   const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (settingsBlocked) {
+      toast.error("Paramètres bloqués : boutique suspendue, bannie ou archivée");
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
@@ -883,6 +922,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   };
 
   const handleSave = async () => {
+    if (settingsBlocked) {
+      toast.error("Paramètres bloqués : boutique suspendue, bannie ou archivée");
+      return;
+    }
     setSaving(true);
     const keywords = seoKeywords.split(",").map((k) => k.trim()).filter(Boolean);
 
@@ -947,6 +990,10 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
   };
 
   const handleNameChangeRequest = async () => {
+    if (settingsBlocked) {
+      toast.error("Paramètres bloqués : boutique suspendue, bannie ou archivée");
+      return;
+    }
     if (!newName.trim() || newName.trim() === store.name) return;
     setSubmittingName(true);
     const { error } = await supabase
@@ -970,6 +1017,12 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
         <Settings size={16} /> Paramètres de la boutique
       </h3>
 
+      {settingsBlocked && (
+        <div className="p-3 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/10 text-xs text-muted-foreground">
+          Paramètres en lecture seule : boutique suspendue, bannie ou archivée.
+        </div>
+      )}
+
       {/* ═══ PRÉSENCE EN LIGNE ═══ */}
       <div className="bg-card border border-border rounded-lg p-4">
         <div className="flex items-center justify-between">
@@ -980,7 +1033,9 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
             </p>
           </div>
           <button
+            disabled={settingsBlocked}
             onClick={async () => {
+              if (settingsBlocked) return;
               const next = !presenceVisible;
               setPresenceVisible(next);
               await (supabase as any).from("stores").update({ presence_visible: next }).eq("id", store.id);
@@ -990,7 +1045,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
               }
               toast.success(next ? "Présence activée" : "Présence masquée");
             }}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${presenceVisible ? "bg-emerald-500" : "bg-muted-foreground/30"}`}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${presenceVisible ? "bg-emerald-500" : "bg-muted-foreground/30"}`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-card transition-transform ${presenceVisible ? "translate-x-6" : "translate-x-1"}`} />
           </button>

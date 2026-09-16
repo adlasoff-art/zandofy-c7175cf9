@@ -15,6 +15,7 @@ import { PromotionTimer } from "@/components/vendor/PromotionTimer";
 import { ProductVariantsEditor, type SizeVariant, type ColorVariant, type DynamicVariantSelection, type CustomVariantValue } from "@/components/vendor/ProductVariantsEditor";
 import { PricingCalculator } from "@/components/vendor/PricingCalculator";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
+import { useStoreSuspension, isActivityBlocked } from "@/hooks/use-store-suspension";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 import { generateProductSlug } from "@/utils/productSlug";
 
@@ -152,6 +153,8 @@ const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 export function VendorProductManager({ storeId, suppliersEnabled = false }: { storeId: string; suppliersEnabled?: boolean }) {
   const { user } = useAuth();
   const { subscription, tierConfig, canAddProduct } = useVendorSubscription(storeId);
+  const { data: suspensionStatus } = useStoreSuspension(storeId);
+  const listingBlocked = isActivityBlocked(suspensionStatus, "product_listing");
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -355,6 +358,10 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   };
 
   const startCreate = () => {
+    if (listingBlocked) {
+      toast.error("Catalogue bloqué : boutique suspendue, bannie ou archivée");
+      return;
+    }
     if (!canAddProduct(products.length)) {
       toast.error(`Limite atteinte (${tierConfig.maxProducts} produits max pour le plan ${tierConfig.label})`);
       return;
@@ -371,6 +378,10 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   };
 
   const startEdit = async (product: Product) => {
+    if (listingBlocked) {
+      toast.error("Catalogue bloqué : boutique suspendue, bannie ou archivée");
+      return;
+    }
     setCreating(false);
     setEditing(product);
     setForm({
@@ -461,6 +472,10 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   };
 
   const handleSave = async () => {
+    if (listingBlocked) {
+      toast.error("Catalogue bloqué : boutique suspendue, bannie ou archivée");
+      return;
+    }
     if (!form.name_fr.trim() || form.price <= 0) {
       toast.error("Nom et prix sont obligatoires");
       return;
@@ -877,6 +892,10 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   };
 
   const handlePublish = async (productId: string) => {
+    if (listingBlocked) {
+      toast.error("Catalogue bloqué : boutique suspendue, bannie ou archivée");
+      return;
+    }
     // Toujours vérifier en base (évite un cache liste périmé)
     const { count, error: countErr } = await supabase
       .from("product_images")
@@ -904,6 +923,10 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   };
 
   const handleDelete = async (id: string) => {
+    if (listingBlocked) {
+      toast.error("Catalogue bloqué : boutique suspendue, bannie ou archivée");
+      return;
+    }
     setDeleting(id);
     await supabase.from("product_images").delete().eq("product_id", id);
     const { error } = await supabase.from("products").delete().eq("id", id);
@@ -913,6 +936,10 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   };
 
   const handleUnpublish = async (productId: string) => {
+    if (listingBlocked) {
+      toast.error("Catalogue bloqué : boutique suspendue, bannie ou archivée");
+      return;
+    }
     const { error } = await supabase
       .from("products")
       .update({ publish_status: "draft" } as any)
@@ -1311,6 +1338,11 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
 
   return (
     <div className="space-y-4">
+      {listingBlocked && (
+        <div className="p-3 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/10 text-xs text-muted-foreground">
+          Catalogue en lecture seule : votre boutique est suspendue, bannie ou archivée. Les commandes restent consultables.
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h3 className="text-base font-bold text-foreground flex items-center gap-2">
           <Package size={16} /> Catalogue ({filteredProducts.length}
@@ -1318,7 +1350,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
         </h3>
         <button
           onClick={startCreate}
-          disabled={!canAddProduct(products.length)}
+          disabled={listingBlocked || !canAddProduct(products.length)}
           className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex items-center gap-1 disabled:opacity-50"
         >
           <Plus size={12} /> Ajouter

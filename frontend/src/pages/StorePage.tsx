@@ -93,30 +93,41 @@ export default function StorePage() {
   const { data: store, isLoading: storeLoading } = useQuery({
     queryKey: ["store", id],
     queryFn: async () => {
-      let data: any = null;
-      let error: any = null;
-      if (isUUID) {
-        const res = await (supabase as any).from("stores_public").select("*").eq("id", id!).maybeSingle();
-        data = res.data; error = res.error;
-      } else {
-        const res = await (supabase as any).from("stores_public").select("*").eq("slug", id!).maybeSingle();
-        data = res.data; error = res.error;
-      }
-      if (error || !data) return null;
-      return data as StoreData;
+      const filterCol = isUUID ? "id" : "slug";
+      // 1) Live catalog first — full public profile (badges, counts, presence).
+      const publicRes = await (supabase as any)
+        .from("stores_public")
+        .select("*")
+        .eq(filterCol, id!)
+        .maybeSingle();
+      if (publicRes.data) return publicRes.data as StoreData;
+
+      // 2) Non-public lookup (ban / suspend / soft-archive) → "indisponible", not a false 404.
+      // stores_seo may be missing before migration; ignore that error and fall through.
+      const seoRes = await (supabase as any)
+        .from("stores_seo")
+        .select("*")
+        .eq(filterCol, id!)
+        .maybeSingle();
+      if (seoRes.data) return seoRes.data as StoreData;
+
+      return null;
     },
     enabled: !!id,
   });
 
-  // Check if store is banned — show unavailable message
-  const isBannedStore = !!(store as any)?.is_banned;
+  // Hidden from public catalog: ban, suspend, or soft-archive
+  const isUnavailableStore =
+    !!(store as any)?.is_banned ||
+    !!(store as any)?.is_suspended ||
+    !!(store as any)?.deleted_at;
 
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ["store-products", store?.id],
     queryFn: async () => {
       return await fetchProducts({ storeId: store!.id });
     },
-    enabled: !!store?.id,
+    enabled: !!store?.id && !isUnavailableStore,
     staleTime: 0,
     refetchOnMount: 'always',
   });
@@ -306,13 +317,13 @@ export default function StorePage() {
               Retour à l'accueil
             </Link>
           </div>
-        ) : isBannedStore ? (
+        ) : isUnavailableStore ? (
           <div className="text-center py-20 container">
             <Store size={48} className="mx-auto text-destructive/30 mb-4" />
             <h1 className="text-2xl font-bold text-foreground">Boutique indisponible</h1>
-            <p className="text-muted-foreground mt-2">Cette boutique a été suspendue pour non-respect des règles de la plateforme.</p>
+            <p className="text-muted-foreground mt-2">Cette boutique n&apos;est plus disponible sur la plateforme.</p>
             <Link to="/stores" className="text-primary underline mt-4 inline-block">
-              Voir d'autres boutiques
+              Voir d&apos;autres boutiques
             </Link>
           </div>
         ) : (

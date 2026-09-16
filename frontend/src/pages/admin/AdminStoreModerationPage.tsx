@@ -14,7 +14,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   Store, Search, Ban, ShieldAlert, ShieldCheck, AlertTriangle, Loader2, X,
-  Eye, Package, MessageCircle, Wallet, Flame, Ticket, ChevronRight,
+  Eye, Package, MessageCircle, Wallet, Flame, Ticket, ChevronRight, Archive, ArchiveRestore,
 } from "lucide-react";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 
@@ -26,7 +26,7 @@ const ACTIVITY_OPTIONS = [
   { key: "promotions", label: "Promotions", icon: Flame, description: "Bloquer les ventes flash et coupons" },
 ];
 
-type StoreStatus = "all" | "active" | "suspended" | "banned";
+type StoreStatus = "all" | "active" | "suspended" | "banned" | "archived";
 
 interface StoreRow {
   id: string;
@@ -43,6 +43,8 @@ interface StoreRow {
   created_at: string;
   products_count: number | null;
   sales_count: number | null;
+  deleted_at: string | null;
+  delete_reason: string | null;
   owner_email?: string | null;
   owner_name?: string | null;
 }
@@ -69,8 +71,10 @@ export default function AdminStoreModerationPage() {
   const [selectedStore, setSelectedStore] = useState<StoreRow | null>(null);
   const [showSuspendDialog, setShowSuspendDialog] = useState(false);
   const [showBanDialog, setShowBanDialog] = useState(false);
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
   const [banReason, setBanReason] = useState("");
+  const [archiveReason, setArchiveReason] = useState("");
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const [banOwnerToo, setBanOwnerToo] = useState(false);
 
@@ -79,7 +83,7 @@ export default function AdminStoreModerationPage() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("stores")
-        .select("id, name, logo_url, owner_id, is_suspended, is_banned, suspension_reason, ban_reason, suspended_at, banned_at, suspended_activities, created_at, products_count, sales_count")
+        .select("id, name, logo_url, owner_id, is_suspended, is_banned, suspension_reason, ban_reason, suspended_at, banned_at, suspended_activities, created_at, products_count, sales_count, deleted_at, delete_reason")
         .order("created_at", { ascending: false });
       if (error) throw error;
 
@@ -93,6 +97,8 @@ export default function AdminStoreModerationPage() {
       return (data || []).map((s: any) => ({
         ...s,
         suspended_activities: s.suspended_activities || [],
+        deleted_at: s.deleted_at || null,
+        delete_reason: s.delete_reason || null,
         owner_email: s.owner_id ? ownerMap[s.owner_id]?.email : null,
         owner_name: s.owner_id ? `${ownerMap[s.owner_id]?.first_name || ""} ${ownerMap[s.owner_id]?.last_name || ""}`.trim() : null,
       })) as StoreRow[];
@@ -101,9 +107,15 @@ export default function AdminStoreModerationPage() {
 
   const filtered = useMemo(() => {
     let list = stores;
-    if (statusFilter === "active") list = list.filter((s) => !s.is_suspended && !s.is_banned);
-    else if (statusFilter === "suspended") list = list.filter((s) => s.is_suspended && !s.is_banned);
-    else if (statusFilter === "banned") list = list.filter((s) => s.is_banned);
+    if (statusFilter === "active") {
+      list = list.filter((s) => !s.is_suspended && !s.is_banned && !s.deleted_at);
+    } else if (statusFilter === "suspended") {
+      list = list.filter((s) => s.is_suspended && !s.is_banned && !s.deleted_at);
+    } else if (statusFilter === "banned") {
+      list = list.filter((s) => s.is_banned && !s.deleted_at);
+    } else if (statusFilter === "archived") {
+      list = list.filter((s) => !!s.deleted_at);
+    }
 
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -120,10 +132,10 @@ export default function AdminStoreModerationPage() {
   const safePage = Math.min(currentPage, totalPages);
   const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  // Counts
-  const activeCount = stores.filter((s) => !s.is_suspended && !s.is_banned).length;
-  const suspendedCount = stores.filter((s) => s.is_suspended && !s.is_banned).length;
-  const bannedCount = stores.filter((s) => s.is_banned).length;
+  const activeCount = stores.filter((s) => !s.is_suspended && !s.is_banned && !s.deleted_at).length;
+  const suspendedCount = stores.filter((s) => s.is_suspended && !s.is_banned && !s.deleted_at).length;
+  const bannedCount = stores.filter((s) => s.is_banned && !s.deleted_at).length;
+  const archivedCount = stores.filter((s) => !!s.deleted_at).length;
 
   // Suspend store
   const suspendMutation = useMutation({
@@ -304,6 +316,79 @@ export default function AdminStoreModerationPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const archiveMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedStore) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await (supabase as any)
+        .from("stores")
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: user?.id ?? null,
+          delete_reason: archiveReason || "Archivage admin — masquée du catalogue public",
+        })
+        .eq("id", selectedStore.id);
+      if (error) throw error;
+
+      await logAudit("store_archive", selectedStore.owner_id || selectedStore.id, {
+        store_id: selectedStore.id,
+        store_name: selectedStore.name,
+        reason: archiveReason,
+      });
+
+      if (selectedStore.owner_id) {
+        await supabase.from("notifications").insert({
+          user_id: selectedStore.owner_id,
+          type: "system",
+          title: "Boutique archivée",
+          message: `Votre boutique "${selectedStore.name}" a été retirée du catalogue public. Les commandes et données sont conservées. Raison : ${archiveReason || "Non spécifiée"}.`,
+          link: "/vendor",
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-store-moderation"] });
+      setShowArchiveDialog(false);
+      setArchiveReason("");
+      toast.success("Boutique archivée (masquée du public)");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: async (store: StoreRow) => {
+      const { error } = await (supabase as any)
+        .from("stores")
+        .update({
+          deleted_at: null,
+          deleted_by: null,
+          delete_reason: null,
+        })
+        .eq("id", store.id);
+      if (error) throw error;
+
+      await logAudit("store_restore", store.owner_id || store.id, {
+        store_id: store.id,
+        store_name: store.name,
+      });
+
+      if (store.owner_id) {
+        await supabase.from("notifications").insert({
+          user_id: store.owner_id,
+          type: "system",
+          title: "Boutique restaurée",
+          message: `L'archivage de votre boutique "${store.name}" a été annulé.`,
+          link: "/vendor",
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-store-moderation"] });
+      toast.success("Boutique restaurée");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const toggleActivity = (key: string) => {
     setSelectedActivities((prev) =>
       prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key]
@@ -311,6 +396,9 @@ export default function AdminStoreModerationPage() {
   };
 
   function getStoreStatus(s: StoreRow) {
+    if (s.deleted_at) {
+      return { label: "Archivée", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300", icon: Archive };
+    }
     if (s.is_banned) return { label: "Bannie", color: "bg-destructive/10 text-destructive", icon: Ban };
     if (s.is_suspended) return { label: "Suspendue", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300", icon: ShieldAlert };
     return { label: "Active", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300", icon: ShieldCheck };
@@ -319,12 +407,13 @@ export default function AdminStoreModerationPage() {
   return (
     <AdminLayout title="Modération boutiques">
       {/* Stats cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         {[
           { label: "Total", value: stores.length, color: "text-foreground" },
           { label: "Actives", value: activeCount, color: "text-emerald-600" },
           { label: "Suspendues", value: suspendedCount, color: "text-amber-600" },
           { label: "Bannies", value: bannedCount, color: "text-destructive" },
+          { label: "Archivées", value: archivedCount, color: "text-slate-600" },
         ].map((s) => (
           <Card key={s.label}>
             <CardContent className="p-4 text-center">
@@ -347,15 +436,23 @@ export default function AdminStoreModerationPage() {
               className="pl-10"
             />
           </div>
-          <div className="flex gap-2">
-            {(["all", "active", "suspended", "banned"] as StoreStatus[]).map((s) => (
+          <div className="flex gap-2 flex-wrap">
+            {(["all", "active", "suspended", "banned", "archived"] as StoreStatus[]).map((s) => (
               <Button
                 key={s}
                 variant={statusFilter === s ? "default" : "outline"}
                 size="sm"
                 onClick={() => { setStatusFilter(s); setCurrentPage(1); }}
               >
-                {s === "all" ? "Toutes" : s === "active" ? "Actives" : s === "suspended" ? "Suspendues" : "Bannies"}
+                {s === "all"
+                  ? "Toutes"
+                  : s === "active"
+                    ? "Actives"
+                    : s === "suspended"
+                      ? "Suspendues"
+                      : s === "banned"
+                        ? "Bannies"
+                        : "Archivées"}
               </Button>
             ))}
           </div>
@@ -422,48 +519,70 @@ export default function AdminStoreModerationPage() {
                         <td className="p-3 text-muted-foreground hidden sm:table-cell">{s.products_count ?? 0}</td>
                         <td className="p-3 text-muted-foreground hidden sm:table-cell">{s.sales_count ?? 0}</td>
                         <td className="p-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {!s.is_banned && !s.is_suspended && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-amber-600 border-amber-300 hover:bg-amber-50 text-xs"
-                                onClick={() => { setSelectedStore(s); setShowSuspendDialog(true); }}
-                              >
-                                <ShieldAlert size={12} className="mr-1" /> Suspendre
-                              </Button>
-                            )}
-                            {s.is_suspended && !s.is_banned && (
+                          <div className="flex items-center justify-end gap-1 flex-wrap">
+                            {s.deleted_at ? (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 className="text-emerald-600 border-emerald-300 hover:bg-emerald-50 text-xs"
-                                onClick={() => unsuspendMutation.mutate(s)}
-                                disabled={unsuspendMutation.isPending}
+                                onClick={() => restoreMutation.mutate(s)}
+                                disabled={restoreMutation.isPending}
                               >
-                                <ShieldCheck size={12} className="mr-1" /> Lever
+                                <ArchiveRestore size={12} className="mr-1" /> Restaurer
                               </Button>
-                            )}
-                            {!s.is_banned && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="text-xs"
-                                onClick={() => { setSelectedStore(s); setShowBanDialog(true); }}
-                              >
-                                <Ban size={12} className="mr-1" /> Bannir
-                              </Button>
-                            )}
-                            {s.is_banned && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-emerald-600 border-emerald-300 hover:bg-emerald-50 text-xs"
-                                onClick={() => unbanMutation.mutate(s)}
-                                disabled={unbanMutation.isPending}
-                              >
-                                <ShieldCheck size={12} className="mr-1" /> Débannir
-                              </Button>
+                            ) : (
+                              <>
+                                {!s.is_banned && !s.is_suspended && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-amber-600 border-amber-300 hover:bg-amber-50 text-xs"
+                                    onClick={() => { setSelectedStore(s); setShowSuspendDialog(true); }}
+                                  >
+                                    <ShieldAlert size={12} className="mr-1" /> Suspendre
+                                  </Button>
+                                )}
+                                {s.is_suspended && !s.is_banned && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-emerald-600 border-emerald-300 hover:bg-emerald-50 text-xs"
+                                    onClick={() => unsuspendMutation.mutate(s)}
+                                    disabled={unsuspendMutation.isPending}
+                                  >
+                                    <ShieldCheck size={12} className="mr-1" /> Lever
+                                  </Button>
+                                )}
+                                {!s.is_banned && (
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    className="text-xs"
+                                    onClick={() => { setSelectedStore(s); setShowBanDialog(true); }}
+                                  >
+                                    <Ban size={12} className="mr-1" /> Bannir
+                                  </Button>
+                                )}
+                                {s.is_banned && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-emerald-600 border-emerald-300 hover:bg-emerald-50 text-xs"
+                                    onClick={() => unbanMutation.mutate(s)}
+                                    disabled={unbanMutation.isPending}
+                                  >
+                                    <ShieldCheck size={12} className="mr-1" /> Débannir
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-slate-600 border-slate-300 hover:bg-slate-50 text-xs"
+                                  onClick={() => { setSelectedStore(s); setShowArchiveDialog(true); }}
+                                >
+                                  <Archive size={12} className="mr-1" /> Archiver
+                                </Button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -493,7 +612,7 @@ export default function AdminStoreModerationPage() {
               Suspendre « {selectedStore?.name} »
             </DialogTitle>
             <DialogDescription>
-              Choisissez les activités à suspendre ou laissez vide pour tout bloquer.
+              La boutique sera masquée du catalogue public. Les données et commandes sont conservées. Choisissez les activités vendeur à bloquer, ou laissez vide pour tout bloquer.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -560,7 +679,7 @@ export default function AdminStoreModerationPage() {
               Bannir « {selectedStore?.name} »
             </DialogTitle>
             <DialogDescription>
-              Le bannissement est définitif. La boutique et tous ses produits seront masqués.
+              La boutique sera masquée du catalogue public (listes, recherche, produits). Les données et commandes sont conservées — action réversible via « Débannir ».
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -585,7 +704,7 @@ export default function AdminStoreModerationPage() {
             <div className="p-3 bg-destructive/5 rounded-lg border border-destructive/20">
               <p className="text-xs text-destructive flex items-center gap-1">
                 <AlertTriangle size={12} />
-                Cette action est irréversible pour la boutique. Les commandes en cours ne seront pas annulées automatiquement.
+                Masquage public immédiat. Les commandes en cours ne sont pas annulées. Soft-archive disponible séparément (Archiver).
               </p>
             </div>
           </div>
@@ -598,6 +717,42 @@ export default function AdminStoreModerationPage() {
             >
               {banMutation.isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : <Ban size={14} className="mr-1" />}
               Confirmer le bannissement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Archive dialog */}
+      <Dialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Archive size={18} className="text-slate-600" />
+              Archiver « {selectedStore?.name} »
+            </DialogTitle>
+            <DialogDescription>
+              Soft-archive : masquée du catalogue public. Données, photos et commandes conservées. Restaurable. Pas de suppression définitive.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-foreground">Raison de l&apos;archivage</label>
+              <Textarea
+                value={archiveReason}
+                onChange={(e) => setArchiveReason(e.target.value)}
+                placeholder="Ex: Boutique fermée à la demande du vendeur..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowArchiveDialog(false)}>Annuler</Button>
+            <Button
+              onClick={() => archiveMutation.mutate()}
+              disabled={archiveMutation.isPending}
+            >
+              {archiveMutation.isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : <Archive size={14} className="mr-1" />}
+              Confirmer l&apos;archivage
             </Button>
           </DialogFooter>
         </DialogContent>
