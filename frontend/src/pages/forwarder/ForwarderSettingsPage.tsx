@@ -1,13 +1,8 @@
 /**
- * ForwarderSettingsPage — Affinage UX /forwarder/* (Phase B2.2)
- *
- * Permet au transitaire d'éditer son identité opérationnelle
- * (contact, logo, description, adresse). Les champs légaux
- * (raison sociale, RCCM/NIF, statut KYB) restent en lecture seule
- * et sont protégés par le trigger trg_protect_forwarder_sensitive.
+ * ForwarderSettingsPage — identité publique (upload logo + géo siège) + templates WhatsApp.
  */
 import { useEffect, useState } from "react";
-import { Loader2, Save, ShieldCheck, Lock, Globe2, Phone, Mail, MapPin, Image as ImageIcon } from "lucide-react";
+import { Loader2, Save, ShieldCheck, Lock, Globe2, Phone, Mail, MapPin, Image as ImageIcon, MessageCircle, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,10 +11,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { fromTable } from "@/lib/supabase-helpers";
 import { useForwarderContext } from "@/hooks/use-forwarder-context";
+import { GeoFieldsRow, type GeoFieldsValue } from "@/components/address/GeoFieldsRow";
+import { supabase } from "@/integrations/supabase/client";
+import { DEFAULT_WA_TEMPLATES, resolveWaTemplates, type WaTemplateKey } from "@/lib/forwarder-wa";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 
 export default function ForwarderSettingsPage() {
   const { forwarder, loading, refetch } = useForwarderContext();
+  const push = usePushNotifications();
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [hqGeo, setHqGeo] = useState<GeoFieldsValue>({ country: "", city: "" });
   const [form, setForm] = useState({
     contact_email: "",
     contact_phone: "",
@@ -28,6 +30,7 @@ export default function ForwarderSettingsPage() {
     headquarters_address: "",
     logo_url: "",
   });
+  const [wa, setWa] = useState<Record<WaTemplateKey, string>>({ ...DEFAULT_WA_TEMPLATES });
 
   useEffect(() => {
     if (!forwarder) return;
@@ -39,6 +42,11 @@ export default function ForwarderSettingsPage() {
       headquarters_address: forwarder.headquarters_address ?? "",
       logo_url: forwarder.logo_url ?? "",
     });
+    setHqGeo({
+      country: forwarder.headquarters_country ?? "",
+      city: forwarder.headquarters_city ?? "",
+    });
+    setWa(resolveWaTemplates(forwarder.wa_templates as Record<string, string> | undefined));
   }, [forwarder]);
 
   if (loading || !forwarder) {
@@ -52,6 +60,26 @@ export default function ForwarderSettingsPage() {
   const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  const uploadLogo = async (file: File) => {
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${forwarder.id}/logo-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("forwarder-logos").upload(path, file, {
+        contentType: file.type,
+        upsert: true,
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from("forwarder-logos").getPublicUrl(path);
+      setForm((f) => ({ ...f, logo_url: data.publicUrl }));
+      toast.success("Logo téléversé");
+    } catch (e: any) {
+      toast.error(e.message || "Échec upload logo");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     const { error } = await fromTable("forwarders")
@@ -61,7 +89,10 @@ export default function ForwarderSettingsPage() {
         website_url: form.website_url || null,
         description: form.description || null,
         headquarters_address: form.headquarters_address || null,
+        headquarters_country: hqGeo.country?.toUpperCase() || null,
+        headquarters_city: hqGeo.city?.trim() || null,
         logo_url: form.logo_url || null,
+        wa_templates: wa,
       })
       .eq("id", forwarder.id);
     setSaving(false);
@@ -83,7 +114,7 @@ export default function ForwarderSettingsPage() {
       <header className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-foreground">Paramètres</h1>
-          <p className="text-xs text-muted-foreground">Identité publique et coordonnées du transitaire.</p>
+          <p className="text-xs text-muted-foreground">Identité publique, siège et messages WhatsApp.</p>
         </div>
         <Button onClick={handleSave} disabled={saving}>
           {saving ? <Loader2 className="animate-spin mr-2" size={14} /> : <Save size={14} className="mr-2" />}
@@ -91,7 +122,6 @@ export default function ForwarderSettingsPage() {
         </Button>
       </header>
 
-      {/* Identité publique éditable */}
       <section className="rounded-lg border border-border bg-card p-4 space-y-4">
         <h2 className="text-sm font-semibold text-foreground">Identité publique</h2>
 
@@ -109,12 +139,32 @@ export default function ForwarderSettingsPage() {
             <Input value={form.website_url} onChange={update("website_url")} placeholder="https://..." />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs flex items-center gap-1.5"><ImageIcon size={12} /> URL du logo</Label>
-            <Input value={form.logo_url} onChange={update("logo_url")} placeholder="https://...png" />
+            <Label className="text-xs flex items-center gap-1.5"><ImageIcon size={12} /> Logo</Label>
+            <Input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={uploading}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void uploadLogo(f);
+              }}
+            />
+            {form.logo_url && (
+              <img src={form.logo_url} alt="Logo" className="h-12 w-12 object-contain rounded border border-border mt-1" />
+            )}
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label className="text-xs flex items-center gap-1.5"><MapPin size={12} /> Adresse du siège</Label>
-            <Input value={form.headquarters_address} onChange={update("headquarters_address")} placeholder="N° rue, ville" />
+            <Label className="text-xs flex items-center gap-1.5"><MapPin size={12} /> Siège (pays / ville)</Label>
+            <GeoFieldsRow
+              value={hqGeo}
+              onChange={(patch) => setHqGeo((g) => ({ ...g, ...patch }))}
+              levels={["country", "city"]}
+              labels={{ country: "Pays du siège", city: "Ville du siège" }}
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="text-xs">Adresse (ligne)</Label>
+            <Input value={form.headquarters_address} onChange={update("headquarters_address")} placeholder="N° rue, quartier…" />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label className="text-xs">Description</Label>
@@ -128,7 +178,69 @@ export default function ForwarderSettingsPage() {
         </div>
       </section>
 
-      {/* Identité légale verrouillée */}
+      <section className="rounded-lg border border-border bg-card p-4 space-y-4">
+        <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <MessageCircle size={14} /> Templates WhatsApp
+        </h2>
+        <p className="text-[11px] text-muted-foreground">
+          Variables : {"{{company}}"}, {"{{awb}}"}, {"{{status}}"}, {"{{tracking_url}}"}, {"{{weight}}"}, {"{{amount}}"}
+        </p>
+        {(["arrived", "reminder", "urgent"] as WaTemplateKey[]).map((key) => (
+          <div key={key} className="space-y-1">
+            <Label className="text-xs capitalize">{key === "arrived" ? "Arrivée" : key === "reminder" ? "Rappel" : "Urgent"}</Label>
+            <Textarea
+              rows={2}
+              value={wa[key]}
+              onChange={(e) => setWa((w) => ({ ...w, [key]: e.target.value }))}
+            />
+          </div>
+        ))}
+      </section>
+
+      <section className="rounded-lg border border-border bg-card p-4 space-y-4">
+        <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <Bell size={14} /> Notifications web push
+        </h2>
+        <p className="text-[11px] text-muted-foreground">
+          Recevez des alertes navigateur (handoffs, mises à jour). Utilise le service worker PWA existant.
+        </p>
+        {!push.supported ? (
+          <p className="text-xs text-muted-foreground">Non supporté sur ce navigateur.</p>
+        ) : (
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="outline">
+              {push.isSubscribed ? "Activé" : push.permission === "denied" ? "Bloqué" : "Désactivé"}
+            </Badge>
+            {!push.isSubscribed && push.permission !== "denied" && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={push.loading}
+                onClick={async () => {
+                  const ok = await push.subscribe();
+                  if (ok) toast.success("Notifications activées");
+                  else toast.error("Impossible d'activer les notifications");
+                }}
+              >
+                {push.loading ? <Loader2 className="animate-spin" size={14} /> : "Activer"}
+              </Button>
+            )}
+            {push.isSubscribed && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  await push.unsubscribe();
+                  toast.success("Notifications désactivées");
+                }}
+              >
+                Désactiver
+              </Button>
+            )}
+          </div>
+        )}
+      </section>
+
       <section className="rounded-lg border border-border bg-card p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -147,8 +259,6 @@ export default function ForwarderSettingsPage() {
           <ReadOnly label="N° d'enregistrement (RCCM)" value={forwarder.registration_number} />
           <ReadOnly label="N° fiscal (NIF)" value={forwarder.tax_id} />
           <ReadOnly label="Slug public" value={forwarder.slug} />
-          <ReadOnly label="Pays du siège" value={forwarder.headquarters_country} />
-          <ReadOnly label="Ville du siège" value={forwarder.headquarters_city} />
         </div>
       </section>
     </div>

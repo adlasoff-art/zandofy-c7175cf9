@@ -1,13 +1,10 @@
 /**
- * useForwarderContext — Affinage UX /forwarder/* (Phase B2.2)
- *
- * Charge le forwarder (transitaire) dont le user connecté est owner ou
- * transporteur lié. Cache 5min. Utilisé par tout le dashboard /forwarder/*
- * et le RoleGuard.
+ * useForwarderContext — loads forwarder for owner, linked transporter, or active member.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { fromTable } from "@/lib/supabase-helpers";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface ForwarderRow {
   id: string;
@@ -38,7 +35,10 @@ export interface ForwarderRow {
   approved_at: string | null;
   created_at: string;
   updated_at: string;
+  wa_templates?: Record<string, string> | null;
 }
+
+export type ForwarderMemberRole = "owner" | "ops" | "finance" | null;
 
 export function useForwarderContext() {
   const { user, loading: authLoading } = useAuth();
@@ -47,9 +47,9 @@ export function useForwarderContext() {
     queryKey: ["forwarder-context", user?.id],
     enabled: !!user?.id && !authLoading,
     staleTime: 5 * 60 * 1000,
-    queryFn: async (): Promise<ForwarderRow | null> => {
-      // Match owner OR linked transporter
-      const { data, error } = await fromTable("forwarders")
+    queryFn: async (): Promise<{ forwarder: ForwarderRow | null; memberRole: ForwarderMemberRole }> => {
+      // 1) Owner or linked transporter
+      const { data: owned, error } = await fromTable("forwarders")
         .select("*")
         .or(`owner_user_id.eq.${user!.id},linked_transporter_user_id.eq.${user!.id}`)
         .order("submitted_at", { ascending: false, nullsFirst: false })
@@ -57,18 +57,51 @@ export function useForwarderContext() {
         .maybeSingle();
       if (error) {
         console.warn("[useForwarderContext] fetch failed:", error.message);
-        return null;
       }
-      return (data as ForwarderRow | null) ?? null;
+      if (owned) {
+        const role: ForwarderMemberRole =
+          (owned as ForwarderRow).owner_user_id === user!.id ? "owner" : "ops";
+        return { forwarder: owned as ForwarderRow, memberRole: role };
+      }
+
+      // 2) Active staff member
+      const { data: membership } = await (supabase as any)
+        .from("forwarder_members")
+        .select("role, forwarder_id")
+        .eq("user_id", user!.id)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!membership?.forwarder_id) {
+        return { forwarder: null, memberRole: null };
+      }
+
+      const { data: fw } = await fromTable("forwarders")
+        .select("*")
+        .eq("id", membership.forwarder_id)
+        .maybeSingle();
+
+      return {
+        forwarder: (fw as ForwarderRow | null) ?? null,
+        memberRole: (membership.role as ForwarderMemberRole) || "ops",
+      };
     },
   });
 
-  const forwarder = query.data ?? null;
+  const forwarder = query.data?.forwarder ?? null;
+  const memberRole = query.data?.memberRole ?? null;
+  const isOwner =
+    !!forwarder && (forwarder.owner_user_id === user?.id || memberRole === "owner");
+  const canFinance =
+    isOwner || memberRole === "finance" || memberRole === "owner";
 
   return {
     forwarder,
+    memberRole,
+    canFinance,
     loading: authLoading || query.isLoading,
-    isOwner: !!forwarder,
+    isOwner,
     isApproved: forwarder?.status === "approved" && forwarder?.is_active === true,
     isPending: forwarder?.status === "pending",
     isRejected: forwarder?.status === "rejected",

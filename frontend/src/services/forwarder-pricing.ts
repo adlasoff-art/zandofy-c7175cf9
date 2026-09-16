@@ -5,6 +5,8 @@ export interface QuoteItem {
   custom_label?: string;
   quantity: number;
   cbm: number;
+  /** Real weight per unit (kg); used by quote_forwarder kg tiers. */
+  weight_kg?: number;
 }
 
 export interface ForwarderQuote {

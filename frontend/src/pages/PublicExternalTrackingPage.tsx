@@ -42,6 +42,15 @@ type PublicShipment = {
   status: string;
   origin: string | null;
   destination: string | null;
+  origin_country_code?: string | null;
+  origin_city?: string | null;
+  destination_country_code?: string | null;
+  destination_city?: string | null;
+  weight_kg?: number | null;
+  quoted_amount?: number | null;
+  quoted_currency?: string | null;
+  photo_paths?: string[];
+  photo_count?: number;
   eta: string | null;
   events: { at?: string; status?: string; label?: string }[];
   updated_at: string;
@@ -128,6 +137,20 @@ export default function PublicExternalTrackingPage() {
                 <dd className="font-medium text-foreground">{shipment.destination || "—"}</dd>
               </div>
               <div>
+                <dt className="text-xs text-muted-foreground">Poids</dt>
+                <dd className="font-medium text-foreground">
+                  {shipment.weight_kg != null ? `${Number(shipment.weight_kg)} kg` : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Tarif</dt>
+                <dd className="font-medium text-foreground">
+                  {shipment.quoted_amount != null
+                    ? `${Number(shipment.quoted_amount).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${shipment.quoted_currency || ""}`
+                    : "—"}
+                </dd>
+              </div>
+              <div>
                 <dt className="text-xs text-muted-foreground">ETA</dt>
                 <dd className="font-medium text-foreground">{shipment.eta || "—"}</dd>
               </div>
@@ -138,6 +161,17 @@ export default function PublicExternalTrackingPage() {
                 </dd>
               </div>
             </dl>
+
+            {Array.isArray(shipment.photo_paths) && shipment.photo_paths.length > 0 && (
+              <div className="border-t border-border pt-3 space-y-2">
+                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Photos</h2>
+                <div className="grid grid-cols-2 gap-2">
+                  {shipment.photo_paths.map((path) => (
+                    <SignedPhoto key={path} path={path} />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {Array.isArray(shipment.events) && shipment.events.length > 0 && (
               <div className="border-t border-border pt-3 space-y-2">
@@ -159,5 +193,42 @@ export default function PublicExternalTrackingPage() {
       </main>
       <Footer />
     </div>
+  );
+}
+
+function SignedPhoto({ path }: { path: string }) {
+  const { data: url, isError } = useQuery({
+    queryKey: ["ext-ship-photo", path],
+    queryFn: async () => {
+      // Prefer signed URL (works with private bucket + token-folder SELECT RLS)
+      const { data, error } = await supabase.storage
+        .from("external-shipment-photos")
+        .createSignedUrl(path, 3600);
+      if (!error && data?.signedUrl) return data.signedUrl as string;
+
+      // Fallback: download blob via RLS SELECT (anon allowed if token folder matches)
+      const { data: blob, error: dlErr } = await supabase.storage
+        .from("external-shipment-photos")
+        .download(path);
+      if (dlErr || !blob) throw dlErr || new Error("photo unavailable");
+      return URL.createObjectURL(blob);
+    },
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
+  });
+  if (isError) {
+    return (
+      <div className="aspect-square rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground px-2 text-center">
+        Photo indisponible
+      </div>
+    );
+  }
+  if (!url) {
+    return <div className="aspect-square rounded bg-muted animate-pulse" />;
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="block aspect-square rounded overflow-hidden border border-border">
+      <img src={url} alt="Colis" className="w-full h-full object-cover" />
+    </a>
   );
 }

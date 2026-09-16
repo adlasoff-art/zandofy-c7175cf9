@@ -1,8 +1,9 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { ForwardersGlobalSettings } from "@/components/admin/forwarders/ForwardersGlobalSettings";
 import { ForwardersList } from "@/components/admin/forwarders/ForwardersList";
+import { AdminForwarderMemberRequests } from "@/components/admin/forwarders/AdminForwarderMemberRequests";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Settings } from "lucide-react";
+import { Truck, Settings, Users } from "lucide-react";
 
 export default function AdminForwardersPage() {
   return (
@@ -13,6 +14,9 @@ export default function AdminForwardersPage() {
             <TabsTrigger value="list" className="gap-2">
               <Truck size={14} /> Transitaires
             </TabsTrigger>
+            <TabsTrigger value="team" className="gap-2">
+              <Users size={14} /> Demandes équipe
+            </TabsTrigger>
             <TabsTrigger value="settings" className="gap-2">
               <Settings size={14} /> Paramètres globaux
             </TabsTrigger>
@@ -20,6 +24,10 @@ export default function AdminForwardersPage() {
 
           <TabsContent value="list">
             <ForwardersList />
+          </TabsContent>
+
+          <TabsContent value="team">
+            <AdminForwarderMemberRequests />
           </TabsContent>
 
           <TabsContent value="settings">
