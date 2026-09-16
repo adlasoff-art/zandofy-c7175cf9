@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Plus, Pencil, MapPin, DollarSign, Trash2, Truck, CheckCircle2 } from "lucide-react";
+import { Loader2, Plus, Pencil, MapPin, DollarSign, Trash2, Truck, CheckCircle2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { ForwarderFormDialog, type Forwarder } from "./ForwarderFormDialog";
 import { ForwarderCoverageDialog } from "./ForwarderCoverageDialog";
-import { ForwarderTiersDialog } from "./ForwarderTiersDialog";
 import { ForwarderPricingProfilesDialog } from "./ForwarderPricingProfilesDialog";
+import { resolveForwarderOwnerUserId, startImpersonation } from "@/lib/admin-impersonate";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,9 +29,9 @@ export function ForwardersList() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Forwarder | null>(null);
   const [coverageFor, setCoverageFor] = useState<Forwarder | null>(null);
-  const [tiersFor, setTiersFor] = useState<Forwarder | null>(null);
   const [profilesFor, setProfilesFor] = useState<Forwarder | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Forwarder | null>(null);
+  const [openingSpaceId, setOpeningSpaceId] = useState<string | null>(null);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["admin-forwarders"],
@@ -45,6 +45,24 @@ export function ForwardersList() {
     },
   });
 
+  const openForwarderSpace = async (f: Forwarder) => {
+    const targetUserId = resolveForwarderOwnerUserId(f);
+    if (!targetUserId) {
+      toast.error("Aucun propriétaire rattaché — liez un user dans la fiche transitaire.");
+      return;
+    }
+    if (f.status && f.status !== "approved") {
+      toast.warning("Compte non approuvé — vous verrez exactement l'état vu par l'utilisateur.");
+    }
+    setOpeningSpaceId(f.id || null);
+    try {
+      await startImpersonation(targetUserId, "/forwarder");
+    } catch (e: any) {
+      toast.error(e?.message || "Échec impersonation");
+    } finally {
+      setOpeningSpaceId(null);
+    }
+  };
   const toggle = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
       const { error } = await sb.from("forwarders").update({ is_active }).eq("id", id);
@@ -153,6 +171,19 @@ export function ForwardersList() {
                       Approuver
                     </Button>
                   )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="Ouvrir l'espace transitaire (impersonation)"
+                    disabled={openingSpaceId === f.id}
+                    onClick={() => void openForwarderSpace(f)}
+                  >
+                    {openingSpaceId === f.id ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <ExternalLink size={14} />
+                    )}
+                  </Button>
                   <Switch
                     checked={!!f.is_active}
                     onCheckedChange={(v) => toggle.mutate({ id: f.id!, is_active: v })}
@@ -162,9 +193,6 @@ export function ForwardersList() {
                   </Button>
                   <Button size="icon" variant="ghost" title="Tarifs (paliers CBM, pièces, règles)" onClick={() => setProfilesFor(f)}>
                     <DollarSign size={14} />
-                  </Button>
-                  <Button size="icon" variant="ghost" title="Multiplicateurs (legacy)" onClick={() => setTiersFor(f)}>
-                    <span className="text-[10px] font-bold">×</span>
                   </Button>
                   <Button size="icon" variant="ghost" title="Modifier" onClick={() => { setEditing(f); setFormOpen(true); }}>
                     <Pencil size={14} />
@@ -189,12 +217,6 @@ export function ForwardersList() {
           onOpenChange={(v) => !v && setCoverageFor(null)}
           forwarderId={coverageFor?.id ?? null}
           forwarderName={coverageFor?.name}
-        />
-        <ForwarderTiersDialog
-          open={!!tiersFor}
-          onOpenChange={(v) => !v && setTiersFor(null)}
-          forwarderId={tiersFor?.id ?? null}
-          forwarderName={tiersFor?.name}
         />
         <ForwarderPricingProfilesDialog
           open={!!profilesFor}

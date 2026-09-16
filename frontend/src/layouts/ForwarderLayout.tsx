@@ -9,7 +9,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import {
   LayoutDashboard, FileText, Map, ArrowLeftRight, Settings, ChevronRight,
-  AlertCircle, Loader2, ShieldAlert, ArrowLeft, Ship, Building2,
+  AlertCircle, Loader2, ShieldAlert, ArrowLeft, Ship, Building2, Users, Wallet,
 } from "lucide-react";
 import { useForwarderContext } from "@/hooks/use-forwarder-context";
 import { Button } from "@/components/ui/button";
@@ -19,19 +19,34 @@ import {
   SidebarFooter, SidebarHeader, useSidebar,
 } from "@/components/ui/sidebar";
 
-const NAV_ITEMS = [
+const NAV_ITEMS: Array<{
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  end?: boolean;
+  ownerOnly?: boolean;
+  financeOnly?: boolean;
+}> = [
   { to: "/forwarder",          label: "Tableau de bord", icon: LayoutDashboard, end: true },
   { to: "/forwarder/shipments", label: "Expéditions",     icon: Ship },
   { to: "/forwarder/profiles", label: "Tarifs",          icon: FileText },
   { to: "/forwarder/coverage", label: "Couverture",      icon: Map },
   { to: "/forwarder/handoffs", label: "Handoffs",        icon: ArrowLeftRight },
-  { to: "/forwarder/settings", label: "Paramètres",      icon: Settings },
+  { to: "/forwarder/team",     label: "Équipe",          icon: Users, ownerOnly: true },
+  { to: "/forwarder/wallet",   label: "Portefeuille",    icon: Wallet, financeOnly: true },
+  { to: "/forwarder/settings", label: "Paramètres",      icon: Settings, ownerOnly: true },
 ];
 
 function ForwarderSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const { forwarder } = useForwarderContext();
+  const { forwarder, isOwner, canFinance } = useForwarderContext();
+
+  const items = NAV_ITEMS.filter((item) => {
+    if (item.ownerOnly && !isOwner) return false;
+    if (item.financeOnly && !canFinance) return false;
+    return true;
+  });
 
   return (
     <Sidebar
@@ -74,7 +89,7 @@ function ForwarderSidebar() {
           {!collapsed && <SidebarGroupLabel>Navigation</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV_ITEMS.map((item) => (
+              {items.map((item) => (
                 <SidebarMenuItem key={item.to}>
                   <SidebarMenuButton asChild>
                     <NavLink

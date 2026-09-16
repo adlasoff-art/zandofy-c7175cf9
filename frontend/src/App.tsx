@@ -168,6 +168,8 @@ const ForwarderCoveragePage = lazyRetry(() => import("./pages/forwarder/Forwarde
 const ForwarderHandoffsPage = lazyRetry(() => import("./pages/forwarder/ForwarderHandoffsPage"));
 const ForwarderSettingsPage = lazyRetry(() => import("./pages/forwarder/ForwarderSettingsPage"));
 const ForwarderShipmentsPage = lazyRetry(() => import("./pages/forwarder/ForwarderShipmentsPage"));
+const ForwarderTeamPage = lazyRetry(() => import("./pages/forwarder/ForwarderTeamPage"));
+const ForwarderWalletPage = lazyRetry(() => import("./pages/forwarder/ForwarderWalletPage"));
 const ForwarderLayout = lazyRetry(() => import("./layouts/ForwarderLayout"));
 const PublicExternalTrackingPage = lazyRetry(() => import("./pages/PublicExternalTrackingPage"));
 
@@ -408,6 +410,8 @@ const App = () => (
                   <Route path="profiles" element={<ForwarderProfilesPage />} />
                   <Route path="coverage" element={<ForwarderCoveragePage />} />
                   <Route path="handoffs" element={<ForwarderHandoffsPage />} />
+                  <Route path="team" element={<ForwarderTeamPage />} />
+                  <Route path="wallet" element={<ForwarderWalletPage />} />
                   <Route path="settings" element={<ForwarderSettingsPage />} />
                 </Route>
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

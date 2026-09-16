@@ -39,6 +39,7 @@ export interface Forwarder {
   contact_phone?: string | null;
   is_active?: boolean;
   status?: "pending" | "approved" | "rejected" | "suspended";
+  owner_user_id?: string | null;
   linked_transporter_user_id?: string | null;
   supported_modes?: string[] | null;
   coverage_routes?: CoverageRoute[] | null;

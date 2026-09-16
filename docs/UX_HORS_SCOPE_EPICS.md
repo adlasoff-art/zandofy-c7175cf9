@@ -55,3 +55,12 @@ Après merge I0–I5, appliquer en SQL Editor staging puis prod :
 - `supabase/migrations/20260916170000_ensure_orders_shipping_mode.sql`
 - `supabase/migrations/20260916180000_external_shipments_forwarder_tms.sql`
 - `supabase/migrations/20260916181000_external_shipment_token_harden.sql` (si 180000 déjà appliqué sans kill switch)
+
+## Admin spaces & monitoring (ops)
+
+- **Multi-rôles** : un compte `admin` peut aussi avoir `vendor` / `operator` / `forwarder` (+ entité liée approuvée) pour exploiter ses propres espaces.
+- **Dropdown admin** (`AdminLayout`) : Accueil, Mon espace, vendeur, **opérateur**, **transitaire**, livreur, Administration.
+- **Menu compte site** (Header / mobile) : « Espace transitaire » si rôle `forwarder` ; sinon « Devenir transitaire ».
+- **Monitoring d’un autre compte** : pas de bypass RLS. Utiliser **Ouvrir l’espace** sur `/admin/forwarders` ou `/admin/operators` (impersonation Edge `impersonate-user`, nouvel onglet avec `redirect=/forwarder` ou `/operator`), ou Impersonner depuis la fiche Utilisateur.
+- Après exchange, landing par défaut inclut `operator` et `forwarder` (plus seulement vendor/rider/shipper).
+- Smoke : dropdown → `/operator` `/forwarder` ; Ouvrir espace → bandeau impersonation + **dashboard métier ciblé** ; quitter impersonation restaure l’admin.

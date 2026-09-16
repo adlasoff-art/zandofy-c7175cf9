@@ -4,7 +4,7 @@ import { AdminSidebar } from "./AdminSidebar";
 import { HealthAlertBanner } from "./HealthAlertBanner";
 import { useRoles } from "@/hooks/use-roles";
 import { useAuth } from "@/contexts/AuthContext";
-import { ShieldCheck, Home, User, Store, Truck, LogOut, ChevronDown, LayoutDashboard, Bell } from "lucide-react";
+import { ShieldCheck, Home, User, Store, Truck, LogOut, ChevronDown, LayoutDashboard, Bell, Building2, Ship } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -130,6 +130,16 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
                   <DropdownMenuItem asChild>
                     <Link to="/vendor" className="flex items-center gap-2 cursor-pointer">
                       <Store size={14} /> Espace vendeur
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/operator" className="flex items-center gap-2 cursor-pointer">
+                      <Building2 size={14} /> Espace opérateur
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/forwarder" className="flex items-center gap-2 cursor-pointer">
+                      <Ship size={14} /> Espace transitaire
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
