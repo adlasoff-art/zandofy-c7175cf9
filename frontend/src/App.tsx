@@ -167,7 +167,9 @@ const ForwarderProfilesPage = lazyRetry(() => import("./pages/forwarder/Forwarde
 const ForwarderCoveragePage = lazyRetry(() => import("./pages/forwarder/ForwarderCoveragePage"));
 const ForwarderHandoffsPage = lazyRetry(() => import("./pages/forwarder/ForwarderHandoffsPage"));
 const ForwarderSettingsPage = lazyRetry(() => import("./pages/forwarder/ForwarderSettingsPage"));
+const ForwarderShipmentsPage = lazyRetry(() => import("./pages/forwarder/ForwarderShipmentsPage"));
 const ForwarderLayout = lazyRetry(() => import("./layouts/ForwarderLayout"));
+const PublicExternalTrackingPage = lazyRetry(() => import("./pages/PublicExternalTrackingPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchOnWindowFocus: false } },
@@ -303,6 +305,7 @@ const App = () => (
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/tracking" element={<TrackingPage />} />
                 <Route path="/tracking/:ref" element={<TrackingPage />} />
+                <Route path="/t/:token" element={<PublicExternalTrackingPage />} />
                 <Route path="/become-vendor" element={<BecomeVendorPage />} />
                 <Route path="/driver" element={<DriverPage />} />
                 <Route path="/affiliate-program" element={<AffiliateProgramPage />} />
@@ -401,6 +404,7 @@ const App = () => (
                   }
                 >
                   <Route index element={<ForwarderDashboardPage />} />
+                  <Route path="shipments" element={<ForwarderShipmentsPage />} />
                   <Route path="profiles" element={<ForwarderProfilesPage />} />
                   <Route path="coverage" element={<ForwarderCoveragePage />} />
                   <Route path="handoffs" element={<ForwarderHandoffsPage />} />

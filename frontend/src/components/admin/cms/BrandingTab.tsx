@@ -91,7 +91,17 @@ function BrandingTab() {
     }
 
     const { data: urlData } = supabase.storage.from("cms-assets").getPublicUrl(path);
-    setConfig((prev) => ({ ...prev, [field]: urlData.publicUrl }));
+    setConfig((prev) => {
+      const next: BrandingConfig = { ...prev, [field]: urlData.publicUrl };
+      // Uploading a logo while mode is still "text" would hide the image in BrandLogo — flip to logo_and_text.
+      if (
+        (field === "header_logo_url" || field === "footer_logo_url") &&
+        prev.logo_mode === "text"
+      ) {
+        next.logo_mode = "logo_and_text";
+      }
+      return next;
+    });
     setUploading(null);
   };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { fetchProducts, fetchTrendTags, fetchCategories, type Product, type TrendTag, type Category } from "@/services/api";
@@ -53,6 +53,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(cached?.hasMore ?? true);
   const [currentOffset, setCurrentOffset] = useState(cached?.currentOffset ?? 0);
+  const loadingMoreRef = useRef(false);
 
   // Popular section
   const [popularProducts, setPopularProducts] = useState<Product[]>(cached?.popularProducts ?? []);
@@ -97,7 +98,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
   useEffect(() => {
     if (cached && cached.popularProducts.length > 0) return;
     setPopularLoading(true);
-    fetchProducts({ limit: 8, orderBy: "popular" })
+    fetchProducts({ limit: 12, orderBy: "popular" })
       .then((items) => {
         setPopularProducts(items);
         setPopularLoading(false);
@@ -144,6 +145,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
     setMoreProducts([]);
     setCurrentOffset(0);
     setHasMore(true);
+    loadingMoreRef.current = false;
 
     const params: any = { limit: PAGE_SIZE };
     if (activeTab !== "all") {
@@ -164,34 +166,62 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
       });
   }, [activeTab, retryKey]);
 
-  const handleLoadMore = async () => {
-    if (loadingMore || !hasMore) return;
+  const handleLoadMore = useCallback(async () => {
+    // Sync lock — IntersectionObserver can fire twice before React re-renders loadingMore
+    if (loadingMoreRef.current || !hasMore) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
 
-    const totalLoaded = products.length + moreProducts.length;
-    const params: any = { limit: PAGE_SIZE, offset: totalLoaded };
-    if (activeTab !== "all") {
-      params.trendTagId = activeTab;
+    try {
+      const totalLoaded = products.length + moreProducts.length;
+      const params: any = { limit: PAGE_SIZE, offset: totalLoaded };
+      if (activeTab !== "all") {
+        params.trendTagId = activeTab;
+      }
+
+      const data = await fetchProducts(params);
+
+      const existingIds = new Set([
+        ...products.map((p) => p.id),
+        ...moreProducts.map((p) => p.id),
+      ]);
+      const newProducts = data.filter((p) => !existingIds.has(p.id));
+
+      if (newProducts.length === 0 || data.length < PAGE_SIZE) {
+        setHasMore(false);
+      }
+
+      if (newProducts.length > 0) {
+        setMoreProducts((prev) => [...prev, ...newProducts]);
+      }
+    } catch (err) {
+      console.error("[ProductGrid] Load more failed:", err);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
     }
+  }, [hasMore, products, moreProducts, activeTab]);
 
-    const data = await fetchProducts(params);
+  // Infinite scroll sentinel (replaces "Voir plus" click). Fallback button if IO missing.
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const supportsIO = typeof IntersectionObserver !== "undefined";
 
-    // Filter duplicates
-    const existingIds = new Set([
-      ...products.map((p) => p.id),
-      ...moreProducts.map((p) => p.id),
-    ]);
-    const newProducts = data.filter((p) => !existingIds.has(p.id));
+  useEffect(() => {
+    if (!supportsIO || !hasMore || loading || error) return;
+    const el = loadMoreRef.current;
+    if (!el) return;
 
-    if (newProducts.length === 0 || data.length < PAGE_SIZE) {
-      setHasMore(false);
-    }
-
-    if (newProducts.length > 0) {
-      setMoreProducts((prev) => [...prev, ...newProducts]);
-    }
-    setLoadingMore(false);
-  };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          void handleLoadMore();
+        }
+      },
+      { root: null, rootMargin: "320px 0px", threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [supportsIO, hasMore, loading, error, handleLoadMore]);
 
   const tabs = [
     { key: "all", label: t("home.all") },
@@ -204,7 +234,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
         {/* ═══════════════════════════════════════════ */}
         {/* POPULAR PRODUCTS SECTION                    */}
         {/* ═══════════════════════════════════════════ */}
-        {popularProducts.length > 0 && (
+        {(popularLoading || popularProducts.length > 0) && (
           <div className="mb-10">
           <Link to="/popular" className="flex items-center gap-2 mb-4 group cursor-pointer">
               <Flame size={18} className="text-orange-500" />
@@ -314,18 +344,28 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
           </div>
         )}
 
-        {/* "Voir Plus" button — infinite pagination */}
+        {/* Infinite scroll sentinel — replaces "Voir Plus" button */}
         <div className="text-center mt-8">
           {hasMore ? (
-            <button
-              onClick={handleLoadMore}
-              disabled={loadingMore}
-              className="px-10 py-2.5 text-sm font-medium border border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:border-primary transition-colors disabled:opacity-50 shadow-sm"
-            >
-              {loadingMore ? t("general.loadingMore") : t("general.seeMore")}
-            </button>
+            <>
+              <div ref={loadMoreRef} className="h-1 w-full" aria-hidden />
+              {loadingMore && (
+                <p className="text-sm text-muted-foreground py-2">{t("general.loadingMore")}</p>
+              )}
+              {!supportsIO && (
+                <button
+                  onClick={() => void handleLoadMore()}
+                  disabled={loadingMore}
+                  className="px-10 py-2.5 text-sm font-medium border border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:border-primary transition-colors disabled:opacity-50 shadow-sm"
+                >
+                  {loadingMore ? t("general.loadingMore") : t("general.seeMore")}
+                </button>
+              )}
+            </>
           ) : (
-            <p className="text-xs text-muted-foreground">{t("general.allSeen")}</p>
+            !loading && products.length > 0 && (
+              <p className="text-xs text-muted-foreground">{t("general.allSeen")}</p>
+            )
           )}
         </div>
       </div>
