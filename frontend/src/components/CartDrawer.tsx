@@ -93,7 +93,7 @@ export function CartDrawer() {
               onClick={() => {
                 setDrawerOpen(false);
                 window.setTimeout(() => {
-                  window.location.assign("/auth");
+                  window.location.assign("/auth?redirect=" + encodeURIComponent("/checkout"));
                 }, 0);
               }}
             >

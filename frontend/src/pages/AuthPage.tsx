@@ -220,6 +220,39 @@ export default function AuthPage() {
     }
   };
 
+  const handleMagicLink = async () => {
+    if (!email.trim()) {
+      toast({ title: "Email requis", description: "Entrez votre email pour recevoir un lien de connexion.", variant: "destructive" });
+      return;
+    }
+    const rl = checkRateLimit();
+    if (!rl.allowed) {
+      const mins = Math.ceil(rl.remainingSeconds / 60);
+      setLockoutMsg(`Trop de tentatives. Réessayez dans ${mins} minute(s).`);
+      return;
+    }
+    setLoading(true);
+    try {
+      const safeRedirect = redirectTo.startsWith("/") ? redirectTo : "/";
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          emailRedirectTo: `${window.location.origin}${safeRedirect}`,
+          shouldCreateUser: mode === "signup",
+        },
+      });
+      if (error) throw error;
+      toast({
+        title: "Lien envoyé",
+        description: "Vérifiez votre boîte email pour vous connecter en un clic (OTP / magic link).",
+      });
+    } catch (err: any) {
+      toast({ title: t("auth.error"), description: err.message || t("auth.genericError"), variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <SEOHead title="Connexion" description="Connectez-vous à votre compte Zandofy." noindex />
@@ -340,6 +373,17 @@ export default function AuthPage() {
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                 </svg>
                 {t("auth.continueGoogle")}
+              </Button>
+
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full h-11 gap-2 text-sm font-medium"
+                onClick={handleMagicLink}
+                disabled={loading || !!lockoutMsg}
+              >
+                <Mail size={16} />
+                Connexion rapide par email (lien OTP)
               </Button>
 
               <div className="relative">

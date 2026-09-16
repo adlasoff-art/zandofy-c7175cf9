@@ -203,9 +203,13 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
           )}
         </div>
 
-        {(product as any).shopType === "local" && (
+        {(product as any).shopType === "local" ? (
           <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 px-1.5 py-0.5 rounded mt-0.5 w-fit">
-            🏪 En stock · Livraison rapide
+            Stock local
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-[9px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded mt-0.5 w-fit">
+            Import
           </span>
         )}
 

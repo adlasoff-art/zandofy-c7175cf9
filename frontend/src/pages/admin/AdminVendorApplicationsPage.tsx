@@ -97,112 +97,177 @@ export default function AdminVendorApplicationsPage() {
 
   const handleAction = async (action: "approved" | "rejected" | "revision_requested") => {
     if (!selected) return;
-    setActionLoading(true);
 
-    const updates: any = {
-      status: action,
-      reviewed_at: new Date().toISOString(),
-      admin_notes: adminNotes || null,
-    };
-
-    await supabase.from("vendor_applications").update(updates).eq("id", selected.id);
-
-    // If approved, create store + assign vendor role
     if (action === "approved") {
-      // Create the store with shop_type fields
-      await supabase.from("stores").insert({
-        name: selected.store_name || "Nouvelle boutique",
-        description: selected.store_description || null,
-        logo_url: selected.store_logo_url || null,
-        banner_url: selected.store_banner_url || null,
-        owner_id: selected.user_id,
-        is_verified: false,
-        shop_type: selected.shop_type || "international",
-        fulfillment_type: selected.fulfillment_type || "zandofy_warehouse",
-        fleet_management: selected.fleet_management || "platform",
-      } as any);
-
-      // Assign vendor role
-      await supabase.from("user_roles").insert({
-        user_id: selected.user_id,
-        role: "vendor",
-      });
-
-      // Notify user
-      await supabase.from("notifications").insert({
-        user_id: selected.user_id,
-        type: "vendor",
-        title: "Boutique approuvée !",
-        message: "Félicitations ! Votre demande de vendeur a été approuvée. Accédez à votre espace vendeur.",
-        link: "/vendor",
-      });
-
-      // Send approval email
-      await sendVendorEmail(
-        selected.user_id,
-        "🎉 Votre boutique Zandofy a été approuvée !",
-        `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
-          <h1 style="color:#16a34a;">Félicitations !</h1>
-          <p>Bonjour <strong>${selected.full_name || "Vendeur"}</strong>,</p>
-          <p>Votre demande de vendeur pour la boutique <strong>"${selected.store_name}"</strong> a été <span style="color:#16a34a;font-weight:bold;">approuvée</span>.</p>
-          <p>Vous pouvez maintenant accéder à votre espace vendeur et commencer à ajouter vos produits.</p>
-          <a href="${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/vendor" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Accéder à ma boutique</a>
-          <p style="color:#888;margin-top:24px;font-size:12px;">— L'équipe Zandofy</p>
-        </div>`
-      );
-    } else if (action === "rejected") {
-      await supabase.from("notifications").insert({
-        user_id: selected.user_id,
-        type: "vendor",
-        title: "Demande refusée",
-        message: adminNotes || "Votre demande de vendeur n'a pas été approuvée.",
-        link: "/become-vendor",
-      });
-
-      // Send rejection email
-      await sendVendorEmail(
-        selected.user_id,
-        "Mise à jour de votre demande vendeur Zandofy",
-        `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
-          <h1 style="color:#dc2626;">Demande non approuvée</h1>
-          <p>Bonjour <strong>${selected.full_name || "Vendeur"}</strong>,</p>
-          <p>Votre demande de vendeur pour la boutique <strong>"${selected.store_name}"</strong> n'a malheureusement pas été approuvée.</p>
-          ${adminNotes ? `<p><strong>Motif :</strong> ${adminNotes}</p>` : ""}
-          <p>Vous pouvez soumettre une nouvelle demande à tout moment.</p>
-          <a href="${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/become-vendor" style="display:inline-block;background:#dc2626;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Nouvelle demande</a>
-          <p style="color:#888;margin-top:24px;font-size:12px;">— L'équipe Zandofy</p>
-        </div>`
-      );
-    } else {
-      await supabase.from("notifications").insert({
-        user_id: selected.user_id,
-        type: "vendor",
-        title: "Révision demandée",
-        message: adminNotes || "Veuillez corriger votre demande de vendeur.",
-        link: "/become-vendor",
-      });
-
-      // Send revision email
-      await sendVendorEmail(
-        selected.user_id,
-        "Révision demandée pour votre demande vendeur Zandofy",
-        `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
-          <h1 style="color:#f59e0b;">Révision demandée</h1>
-          <p>Bonjour <strong>${selected.full_name || "Vendeur"}</strong>,</p>
-          <p>Votre demande de vendeur pour la boutique <strong>"${selected.store_name}"</strong> nécessite quelques modifications.</p>
-          ${adminNotes ? `<p><strong>Commentaire :</strong> ${adminNotes}</p>` : ""}
-          <p>Veuillez corriger les éléments mentionnés et resoumettre votre demande.</p>
-          <a href="${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/become-vendor" style="display:inline-block;background:#f59e0b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Corriger ma demande</a>
-          <p style="color:#888;margin-top:24px;font-size:12px;">— L'équipe Zandofy</p>
-        </div>`
-      );
+      const { data: kyc } = await (supabase as any)
+        .from("kyc_verifications")
+        .select("status")
+        .eq("user_id", selected.user_id)
+        .eq("status", "approved")
+        .maybeSingle();
+      if (!kyc) {
+        toast({
+          title: "KYC manquant",
+          description: "Le propriétaire doit avoir un KYC approuvé avant l'approbation de la boutique.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
-    setActionLoading(false);
-    setSelected(null);
-    setAdminNotes("");
-    queryClient.invalidateQueries({ queryKey: ["admin-vendor-applications"] });
-    toast({ title: `Demande ${action === "approved" ? "approuvée" : action === "rejected" ? "refusée" : "renvoyée"}` });
+    setActionLoading(true);
+
+    try {
+      if (action === "approved") {
+        // Create store FIRST — never mark application approved without a store
+        const { data: newStore, error: storeErr } = await supabase.from("stores").insert({
+          name: selected.store_name || "Nouvelle boutique",
+          description: selected.store_description || null,
+          logo_url: selected.store_logo_url || null,
+          banner_url: selected.store_banner_url || null,
+          owner_id: selected.user_id,
+          is_verified: false,
+          shop_type: selected.shop_type || "international",
+          fulfillment_type: selected.fulfillment_type || "zandofy_warehouse",
+          fleet_management: selected.fleet_management || "platform",
+        } as any).select("id").maybeSingle();
+
+        if (storeErr || !newStore?.id) {
+          toast({
+            title: "Erreur création boutique",
+            description: storeErr?.message || "Boutique non créée — candidature non approuvée.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        await supabase.from("vendor_subscriptions").upsert({
+          store_id: newStore.id,
+          tier: "beginner",
+          max_products: 100,
+          is_whatsapp_enabled: false,
+          can_self_deliver: false,
+        } as any, { onConflict: "store_id" });
+
+        // Prefer admin free_max_products from vendor_monetization when present
+        try {
+          const { data: mon } = await supabase
+            .from("platform_settings")
+            .select("value")
+            .eq("key", "vendor_monetization")
+            .maybeSingle();
+          const freeMax = Number((mon?.value as any)?.free_max_products);
+          if (Number.isFinite(freeMax) && freeMax > 0) {
+            await supabase.from("vendor_subscriptions").update({ max_products: freeMax } as any).eq("store_id", newStore.id);
+          }
+        } catch { /* keep 100 */ }
+
+        const { data: existingRole } = await supabase
+          .from("user_roles")
+          .select("id")
+          .eq("user_id", selected.user_id)
+          .eq("role", "vendor")
+          .maybeSingle();
+        if (!existingRole) {
+          await supabase.from("user_roles").insert({
+            user_id: selected.user_id,
+            role: "vendor",
+          });
+        }
+
+        await supabase.from("vendor_applications").update({
+          status: action,
+          reviewed_at: new Date().toISOString(),
+          admin_notes: adminNotes || null,
+        }).eq("id", selected.id);
+
+        await supabase.from("notifications").insert({
+          user_id: selected.user_id,
+          type: "vendor",
+          title: "Boutique approuvée !",
+          message: "Félicitations ! Votre demande de vendeur a été approuvée. Accédez à votre espace vendeur.",
+          link: "/vendor",
+        });
+
+        await sendVendorEmail(
+          selected.user_id,
+          "🎉 Votre boutique Zandofy a été approuvée !",
+          `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+            <h1 style="color:#16a34a;">Félicitations !</h1>
+            <p>Bonjour <strong>${selected.full_name || "Vendeur"}</strong>,</p>
+            <p>Votre demande de vendeur pour la boutique <strong>"${selected.store_name}"</strong> a été <span style="color:#16a34a;font-weight:bold;">approuvée</span>.</p>
+            <p>Vous pouvez maintenant accéder à votre espace vendeur et commencer à ajouter vos produits.</p>
+            <a href="${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/vendor" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Accéder à ma boutique</a>
+            <p style="color:#888;margin-top:24px;font-size:12px;">— L'équipe Zandofy</p>
+          </div>`
+        );
+      } else if (action === "rejected") {
+        await supabase.from("vendor_applications").update({
+          status: action,
+          reviewed_at: new Date().toISOString(),
+          admin_notes: adminNotes || null,
+        }).eq("id", selected.id);
+
+        await supabase.from("notifications").insert({
+          user_id: selected.user_id,
+          type: "vendor",
+          title: "Demande refusée",
+          message: adminNotes || "Votre demande de vendeur n'a pas été approuvée.",
+          link: "/become-vendor",
+        });
+
+        await sendVendorEmail(
+          selected.user_id,
+          "Mise à jour de votre demande vendeur Zandofy",
+          `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+            <h1 style="color:#dc2626;">Demande non approuvée</h1>
+            <p>Bonjour <strong>${selected.full_name || "Vendeur"}</strong>,</p>
+            <p>Votre demande de vendeur pour la boutique <strong>"${selected.store_name}"</strong> n'a malheureusement pas été approuvée.</p>
+            ${adminNotes ? `<p><strong>Motif :</strong> ${adminNotes}</p>` : ""}
+            <p>Vous pouvez soumettre une nouvelle demande à tout moment.</p>
+            <a href="${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/become-vendor" style="display:inline-block;background:#dc2626;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Nouvelle demande</a>
+            <p style="color:#888;margin-top:24px;font-size:12px;">— L'équipe Zandofy</p>
+          </div>`
+        );
+      } else {
+        await supabase.from("vendor_applications").update({
+          status: action,
+          reviewed_at: new Date().toISOString(),
+          admin_notes: adminNotes || null,
+        }).eq("id", selected.id);
+
+        await supabase.from("notifications").insert({
+          user_id: selected.user_id,
+          type: "vendor",
+          title: "Révision demandée",
+          message: adminNotes || "Veuillez corriger votre demande de vendeur.",
+          link: "/become-vendor",
+        });
+
+        await sendVendorEmail(
+          selected.user_id,
+          "Révision demandée pour votre demande vendeur Zandofy",
+          `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+            <h1 style="color:#f59e0b;">Révision demandée</h1>
+            <p>Bonjour <strong>${selected.full_name || "Vendeur"}</strong>,</p>
+            <p>Votre demande de vendeur pour la boutique <strong>"${selected.store_name}"</strong> nécessite quelques modifications.</p>
+            ${adminNotes ? `<p><strong>Commentaire :</strong> ${adminNotes}</p>` : ""}
+            <p>Veuillez corriger les éléments mentionnés et resoumettre votre demande.</p>
+            <a href="${import.meta.env.VITE_SITE_URL || "https://zandofy.com"}/become-vendor" style="display:inline-block;background:#f59e0b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;margin-top:16px;">Corriger ma demande</a>
+            <p style="color:#888;margin-top:24px;font-size:12px;">— L'équipe Zandofy</p>
+          </div>`
+        );
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["admin-vendor-applications"] });
+      toast({ title: `Demande ${action === "approved" ? "approuvée" : action === "rejected" ? "refusée" : "renvoyée"}` });
+      setSelected(null);
+      setAdminNotes("");
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e?.message || "Action échouée", variant: "destructive" });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const submitted = applications?.filter((a: any) => a.status === "submitted") || [];
@@ -301,7 +366,8 @@ export default function AdminVendorApplicationsPage() {
               </div>
 
               <div className="border border-border rounded-md p-3 space-y-1">
-                <h4 className="font-semibold flex items-center gap-2"><FileText size={14} /> Documents KYB</h4>
+                <h4 className="font-semibold flex items-center gap-2"><FileText size={14} /> Documents (optionnels)</h4>
+                <p className="text-xs text-muted-foreground mb-2">KYB entreprise n&apos;est plus exigé à la création — vérifiez le KYC du propriétaire.</p>
                 {selectedDocs && selectedDocs.length > 0 ? (
                   <ul className="space-y-2">
                     {selectedDocs.map((doc: any) => (

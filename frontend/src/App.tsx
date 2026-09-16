@@ -184,8 +184,14 @@ function CmsThemeInjector() { useCmsTheme(); usePlatformFont(); return null; }
 
 function GeoBlockGuard({ children }: { children: React.ReactNode }) {
   const { blocked } = useGeoBlocking();
-  // Fail-open while geo is resolving — never block the entire app on ipapi latency.
-  if (blocked) return <GeoBlockScreen />;
+  // Crawlers must never see GeoBlockScreen — Google indexes rendered SPA text into SERP snippets.
+  // Align with meta-injector UA allowlist; humans in blocked countries still see the gate.
+  const isBot =
+    typeof navigator !== "undefined" &&
+    /(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|quora link preview|outbrain|vkshare|w3c_validator|redditbot|tumblr|bitlybot|nuzzel|qwantify|pinterestbot|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot|gptbot|bytespider|claudebot|anthropic|perplexity|lighthouse|chrome-lighthouse|headlesschrome)/i.test(
+      navigator.userAgent || ""
+    );
+  if (blocked && !isBot) return <GeoBlockScreen />;
   return <>{children}</>;
 }
 

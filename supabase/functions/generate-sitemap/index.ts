@@ -79,12 +79,13 @@ const STATIC_CHILD_SITEMAPS = [
 ] as const;
 
 async function countPublishedProducts(supabase: ReturnType<typeof createClient>): Promise<number> {
+  // Align with public catalog only — never fall back to unfiltered `products`
+  // (would re-index banned/suspended/archived store SKUs).
   const { count, error } = await supabase
-    .from("products")
-    .select("id", { count: "exact", head: true })
-    .eq("publish_status", "published");
+    .from("products_public")
+    .select("id", { count: "exact", head: true });
   if (error) {
-    console.error("[generate-sitemap] count products", error.message);
+    console.error("[generate-sitemap] count products_public", error.message);
     return 0;
   }
   return count ?? 0;
@@ -110,9 +111,8 @@ Deno.serve(async (req) => {
       // Prefer freshest product updated_at for product sitemap lastmod (not build date).
       let productIndexLastmod = today();
       const { data: newest } = await supabase
-        .from("products")
+        .from("products_public")
         .select("updated_at")
-        .eq("publish_status", "published")
         .order("updated_at", { ascending: false })
         .limit(1);
       if (newest?.[0]?.updated_at) {
@@ -148,14 +148,14 @@ Deno.serve(async (req) => {
       const from = (page - 1) * PRODUCT_PAGE_SIZE;
       const to = from + PRODUCT_PAGE_SIZE - 1;
       const { data: products, error } = await supabase
-        .from("products")
+        .from("products_public")
         .select("id, slug, updated_at")
-        .eq("publish_status", "published")
         .order("updated_at", { ascending: false })
         .range(from, to);
       if (error) {
-        console.error("[generate-sitemap] products page", page, error.message);
-        return new Response(`Error fetching products: ${error.message}`, { status: 500 });
+        console.error("[generate-sitemap] products_public page", page, error.message);
+        // Fail closed: empty urlset rather than leaking non-public products via base table
+        return xmlResponse(wrapUrlset(""));
       }
       let body = "";
       for (const p of products || []) {

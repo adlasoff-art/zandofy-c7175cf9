@@ -716,7 +716,7 @@ export default function CheckoutPage() {
           <Package size={48} className="mx-auto text-muted-foreground" />
           <h1 className="text-xl font-bold text-foreground">{t("checkout.loginRequired")}</h1>
           <p className="text-muted-foreground">{t("checkout.loginRequiredDesc")}</p>
-          <Link to="/auth"><Button>{t("checkout.loginButton")}</Button></Link>
+          <Link to="/auth?redirect=%2Fcheckout"><Button>{t("checkout.loginButton")}</Button></Link>
         </main>
       </div>
     );
@@ -787,16 +787,16 @@ export default function CheckoutPage() {
         const total = Object.keys(freightGroups).length;
         const done = Object.values(freightGroups).filter((s) => s.offer).length;
         toast({
-          title: "Transitaires requis",
-          description: `Veuillez choisir un transitaire pour chacun des ${total} colis (${done}/${total} choisis).`,
+          title: "Livraison — choix incomplet",
+          description: `Choisissez un mode de transport (transitaire) pour chacun des ${total} colis de votre commande (${done}/${total}). Sans cela, nous ne pouvons pas calculer ni confirmer la livraison.`,
           variant: "destructive",
         });
         return;
       }
     } else if (freightOffersAvailable > 0 && !selectedFreightOffer) {
       toast({
-        title: "Transitaire requis",
-        description: "Veuillez sélectionner un transitaire avant de continuer.",
+        title: "Livraison — transitaire requis",
+        description: "Sélectionnez une offre de transport ci-dessus pour connaître le délai et le prix de livraison avant de payer.",
         variant: "destructive",
       });
       return;
@@ -806,7 +806,7 @@ export default function CheckoutPage() {
     if (homeDeliveryEnabled && deliveryOption === "none") {
       toast({
         title: "Mode de livraison requis",
-        description: "Veuillez choisir entre la livraison à domicile ou le retrait au Hub.",
+        description: "Choisissez « Livraison à domicile » ou « Retrait au Hub » pour finaliser votre commande.",
         variant: "destructive",
       });
       return;
@@ -821,7 +821,7 @@ export default function CheckoutPage() {
     ) {
       toast({
         title: "Livreur requis",
-        description: "Veuillez sélectionner un livreur pour finaliser votre livraison à domicile.",
+        description: "Pour la livraison à domicile, sélectionnez un livreur disponible dans votre zone.",
         variant: "destructive",
       });
       return;
@@ -2171,7 +2171,7 @@ export default function CheckoutPage() {
 
                 {(paymentMethod === "card" || paymentMethod === "stripe") && (
                   <div className="space-y-2 pt-2 border-t border-border">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1"><ShieldCheck size={14} /> Paiement sécurisé via Keccel / Mastercard</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1"><ShieldCheck size={14} /> Paiement sécurisé Zandofy (escrow plateforme)</p>
                     <p className="text-xs text-muted-foreground">Vous serez redirigé vers la page de paiement sécurisé Visa/Mastercard pour finaliser votre transaction.</p>
                   </div>
                 )}

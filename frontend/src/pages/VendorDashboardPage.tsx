@@ -94,7 +94,24 @@ export default function VendorDashboardPage() {
   const [noStore, setNoStore] = useState(false);
   const [selectedConv, setSelectedConv] = useState<VendorConversation | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "analytics_pro" | "team" | "suppliers" | "pricing" | "autonomous" | "freight_sim" | "kyb" | "settings">("catalogue");
+  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "analytics_pro" | "team" | "suppliers" | "pricing" | "autonomous" | "freight_sim" | "kyb" | "settings">(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    const allowed = new Set([
+      "messages", "catalogue", "orders", "deliveries", "promos", "coupons", "wallet",
+      "returns", "disputes", "featured", "stats", "analytics_pro", "team", "suppliers",
+      "pricing", "autonomous", "freight_sim", "kyb", "settings",
+    ]);
+    return (tab && allowed.has(tab) ? tab : "catalogue") as typeof activeTab;
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tab") !== activeTab) {
+      params.set("tab", activeTab);
+      const qs = params.toString();
+      window.history.replaceState({}, "", `${window.location.pathname}?${qs}`);
+    }
+  }, [activeTab]);
   const [orderCounters, setOrderCounters] = useState<OrderCounters>({ total: 0, in_progress: 0, delivered: 0 });
   const [suppliersEnabled, setSuppliersEnabled] = useState(false);
   const { data: vendorFeaturesConfig } = useQuery({
@@ -152,7 +169,7 @@ export default function VendorDashboardPage() {
       // Find all stores owned by user
       const { data: storesData } = await (supabase as any)
         .from("stores")
-        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned")
+        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type")
         .eq("owner_id", user!.id)
         .order("created_at", { ascending: true });
 
@@ -268,20 +285,22 @@ export default function VendorDashboardPage() {
 
   const totalUnread = conversations.reduce((s, c) => s + c.unread_count, 0);
 
+  const shopType = (store as any)?.shop_type === "local" ? "local" : "international";
+
   const VENDOR_TABS = [
     { key: "catalogue" as const, label: "Catalogue", icon: Package },
     { key: "orders" as const, label: "Commandes", icon: ShoppingBag },
-    { key: "deliveries" as const, label: "Livraisons", icon: Bike },
+    ...(shopType === "local" ? [{ key: "deliveries" as const, label: "Livraisons", icon: Bike }] : []),
     { key: "promos" as const, label: "Promos", icon: Flame },
     { key: "coupons" as const, label: "Coupons", icon: Crown },
     { key: "wallet" as const, label: "Wallet", icon: Wallet },
     { key: "returns" as const, label: "Retours", icon: RotateCcw },
     { key: "disputes" as const, label: "Litiges", icon: AlertTriangle },
     { key: "featured" as const, label: "Mise en avant", icon: Sparkles },
-    ...(suppliersEnabled ? [{ key: "suppliers" as const, label: "Fournisseurs", icon: Truck }] : []),
+    ...(suppliersEnabled && shopType !== "local" ? [{ key: "suppliers" as const, label: "Fournisseurs", icon: Truck }] : []),
     { key: "pricing" as const, label: "Tarification", icon: DollarSign },
-    { key: "autonomous" as const, label: "Autonome", icon: Globe },
-    ...(freightSimEnabled ? [{ key: "freight_sim" as const, label: "Simulateur fret", icon: Calculator }] : []),
+    ...(shopType === "local" ? [{ key: "autonomous" as const, label: "Autonome", icon: Globe }] : []),
+    ...(freightSimEnabled && shopType !== "local" ? [{ key: "freight_sim" as const, label: "Simulateur fret", icon: Calculator }] : []),
     { key: "kyb" as const, label: "Vérification KYB", icon: ShieldCheck },
     { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
     { key: "analytics_pro" as const, label: "Analytics Pro", icon: LineChart },

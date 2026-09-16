@@ -26,15 +26,15 @@ export function TopTrends() {
       const trendingIds: string[] = (trending || []).map((t: any) => t.product_id);
 
       if (trendingIds.length > 0) {
-        const allProducts = await fetchProducts({ limit: 50 });
+        const allProducts = await fetchProducts({ limit: 24 });
         const trendingSet = new Set(trendingIds);
         const ordered = trendingIds
           .map((id) => allProducts.find((p) => p.id === id))
           .filter(Boolean) as Product[];
         const rest = allProducts.filter((p) => !trendingSet.has(p.id));
-        setProducts([...ordered, ...rest].slice(0, 12));
+        setProducts([...ordered, ...rest].slice(0, 8));
       } else {
-        const data = await fetchProducts({ limit: 12 });
+        const data = await fetchProducts({ limit: 8 });
         setProducts(data);
       }
     } catch (err) {
@@ -70,7 +70,7 @@ export function TopTrends() {
         ) : (
           <div className={PRODUCT_GRID_CLASS}>
             {loading
-              ? Array.from({ length: 12 }).map((_, i) => <ProductCardSkeleton key={i} />)
+              ? Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)
               : products.map((product, i) => (
                   <Link to={`/product/${product.slug || product.id}`} key={product.id}>
                     <ProductCard product={product} index={i} />

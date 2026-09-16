@@ -8,6 +8,8 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useStoreKybGate } from "@/hooks/use-store-kyb-gate";
+import { StoreKybGateBanner } from "@/components/vendor/StoreKybGateBanner";
 
 interface Props {
   storeId: string;
@@ -32,6 +34,8 @@ export function VendorWalletTab({ storeId }: Props) {
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawMethod, setWithdrawMethod] = useState("mobile_money");
+  const { data: kybGate } = useStoreKybGate(storeId);
+  const kybBlocked = !!kybGate?.blocked;
 
   // Release pending funds on load
   const { data: wallet, isLoading: walletLoading } = useQuery({
@@ -79,6 +83,7 @@ export function VendorWalletTab({ storeId }: Props) {
 
   const withdrawMutation = useMutation({
     mutationFn: async () => {
+      if (kybBlocked) throw new Error("KYB entreprise requis avant tout retrait (seuil de ventes atteint).");
       const amount = parseFloat(withdrawAmount);
       if (!amount || amount <= 0) throw new Error("Montant invalide");
       if (!wallet) throw new Error("Portefeuille introuvable");
@@ -90,7 +95,12 @@ export function VendorWalletTab({ storeId }: Props) {
         amount,
         method: withdrawMethod,
       });
-      if (error) throw error;
+      if (error) {
+        if (String(error.message || "").includes("kyb_required")) {
+          throw new Error("KYB entreprise requis avant tout retrait (seuil de ventes atteint).");
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vendor-withdrawals", storeId] });
@@ -127,6 +137,7 @@ export function VendorWalletTab({ storeId }: Props) {
 
   return (
     <div className="space-y-6">
+      <StoreKybGateBanner storeId={storeId} />
       {/* Balance cards */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-card border border-border rounded-lg p-4">
@@ -157,11 +168,13 @@ export function VendorWalletTab({ storeId }: Props) {
       <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
         <DialogTrigger asChild>
           <Button
-            disabled={!canWithdraw || hasPendingWithdrawal}
+            disabled={!canWithdraw || hasPendingWithdrawal || kybBlocked}
             className="w-full"
           >
             <Banknote size={16} className="mr-2" />
-            {hasPendingWithdrawal
+            {kybBlocked
+              ? "Retrait bloqué — KYB requis"
+              : hasPendingWithdrawal
               ? "Retrait en cours de traitement"
               : !canWithdraw
               ? `Minimum de retrait : $${wallet.min_withdrawal}`
