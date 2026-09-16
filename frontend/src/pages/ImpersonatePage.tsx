@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { throwIfEdgeFunctionError } from "@/services/admin-email";
+import { defaultImpersonationLanding, sanitizeImpersonationRedirect } from "@/lib/admin-impersonate";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { SEOHead } from "@/components/SEOHead";
 
@@ -58,19 +59,11 @@ export default function ImpersonatePage() {
         sessionStorage.setItem("impersonation_target_email", target.email || "");
         sessionStorage.setItem("impersonation_active", "true");
 
-        // Redirect based on roles
+        // Prefer explicit redirect from admin "Ouvrir l'espace" (sanitized)
+        const forced = sanitizeImpersonationRedirect(searchParams.get("redirect"));
         const roles: string[] = target.roles || [];
-        if (roles.includes("admin") || roles.includes("manager")) {
-          navigate("/admin", { replace: true });
-        } else if (roles.includes("vendor")) {
-          navigate("/vendor", { replace: true });
-        } else if (roles.includes("rider")) {
-          navigate("/rider", { replace: true });
-        } else if (roles.includes("shipper")) {
-          navigate("/shipper", { replace: true });
-        } else {
-          navigate("/dashboard", { replace: true });
-        }
+        const landing = forced || defaultImpersonationLanding(roles);
+        navigate(landing, { replace: true });
       } catch (e: any) {
         console.error("Impersonation exchange failed:", e);
         setError(e.message || "Échec de l'impersonation");

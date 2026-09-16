@@ -13,12 +13,14 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, XCircle, PauseCircle, PlayCircle, Building2, Truck, MapPin, Users, Plus, Archive, Pencil, DollarSign, FileText } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, PauseCircle, PlayCircle, Building2, Truck, MapPin, Users, Plus, Archive, Pencil, DollarSign, FileText, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ShieldAlert, Clock } from "lucide-react";
 import { CreateOperatorDialog } from "@/components/admin/operators/CreateOperatorDialog";
 import { OperatorKybDocsPanel } from "@/components/admin/operators/OperatorKybDocsPanel";
 import { EditOperatorDialog } from "@/components/admin/operators/EditOperatorDialog";
+import { startImpersonation } from "@/lib/admin-impersonate";
+import { toast as sonnerToast } from "sonner";
 
 type OperatorRow = {
   id: string;
@@ -43,6 +45,7 @@ type OperatorRow = {
   created_at: string;
   approved_at: string | null;
   archived_at: string | null;
+  owner_user_id: string | null;
 };
 
 const STATUS_VARIANT: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -65,6 +68,25 @@ export default function AdminOperatorsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<OperatorRow | null>(null);
   const [drawerTab, setDrawerTab] = useState<"info" | "kyb">("info");
+  const [openingSpaceId, setOpeningSpaceId] = useState<string | null>(null);
+
+  const openOperatorSpace = async (op: OperatorRow) => {
+    if (!op.owner_user_id) {
+      sonnerToast.error("Aucun propriétaire rattaché — liez un user à cet opérateur.");
+      return;
+    }
+    if (op.status !== "approved") {
+      sonnerToast.warning("Compte non approuvé — vous verrez exactement l'état vu par l'utilisateur.");
+    }
+    setOpeningSpaceId(op.id);
+    try {
+      await startImpersonation(op.owner_user_id, "/operator");
+    } catch (e: any) {
+      sonnerToast.error(e?.message || "Échec impersonation");
+    } finally {
+      setOpeningSpaceId(null);
+    }
+  };
 
   const { data: operators, isLoading } = useQuery({
     queryKey: ["admin-operators", tab],
@@ -260,6 +282,19 @@ export default function AdminOperatorsPage() {
                     </div>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => setSelected(op)}>Détails</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="Ouvrir l'espace opérateur (impersonation)"
+                      disabled={openingSpaceId === op.id}
+                      onClick={() => void openOperatorSpace(op)}
+                    >
+                      {openingSpaceId === op.id ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <ExternalLink size={14} />
+                      )}
+                    </Button>
                     <Button asChild size="sm" variant="ghost">
                       <Link to={`/admin/operators/${op.id}/rates`} title="Gérer les tarifs">
                         <DollarSign size={14} />

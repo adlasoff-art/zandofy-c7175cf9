@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { ALL_APP_ROLES, ROLE_LABELS_FR } from "@/lib/role-labels";
 import { ensureFreshSession, throwIfEdgeFunctionError } from "@/services/admin-email";
+import { startImpersonation } from "@/lib/admin-impersonate";
 import {
   Dialog,
   DialogContent,
@@ -301,20 +302,9 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
 
   // Impersonation — open in new tab
   const impersonateMutation = useMutation({
-    mutationFn: async () => {
-      await ensureFreshSession();
-      const res = await supabase.functions.invoke("impersonate-user", {
-        body: { action: "start", targetUserId: user.id },
-      });
-      await throwIfEdgeFunctionError(res);
-      return res.data;
-    },
-    onSuccess: (data) => {
+    mutationFn: async () => startImpersonation(user.id),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user-audit-logs", user.id] });
-      // Open new tab with impersonation token
-      const url = `${window.location.origin}/impersonate?token=${data.token}`;
-      window.open(url, "_blank");
-      toast.success(`Onglet d'impersonation ouvert pour ${data.targetName}`);
     },
     onError: (e: any) => toast.error(e.message),
   });
