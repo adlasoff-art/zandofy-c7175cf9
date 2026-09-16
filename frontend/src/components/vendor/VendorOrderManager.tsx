@@ -30,6 +30,7 @@ import { getColorDisplay } from "@/utils/colorName";
 import { ShippingLabelPreview } from "@/components/shipping/ShippingLabelPreview";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FreightDetailsPanel } from "@/components/orders/FreightDetailsPanel";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface OrderItem {
   id: string;
@@ -285,7 +286,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
 
   const vendorOrderStatusTabs = [
     { key: "all", label: "Toutes" },
-    ...activeFlow.map((s) => ({ key: s, label: STATUS_CONFIG[s]?.label || s })),
+    ...getStatusFlow(shopType).map((s) => ({ key: s, label: STATUS_CONFIG[s]?.label || s })),
     { key: "cancelled", label: "Annulées" },
     { key: "returned", label: "Retournées" },
   ];
@@ -374,32 +375,29 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
         )}
       </div>
 
-      {/* Search bar */}
-      <div className="relative">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <input
-          placeholder="Rechercher (réf, client, produit, montant, code confirmation, livreur...)"
-          value={orderSearch}
-          onChange={(e) => setOrderSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-        />
-      </div>
-
-      {/* Status filter tabs */}
-      <div className="flex gap-1 overflow-x-auto pb-1">
-        {vendorOrderStatusTabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setOrderStatusFilter(tab.key)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${
-              orderStatusFilter === tab.key
-                ? "bg-foreground text-card border-foreground"
-                : "bg-card text-foreground border-border hover:bg-muted"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Search + status filter (same row on desktop) */}
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+        <div className="relative flex-1 max-w-sm">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            placeholder="Réf, client, produit, montant…"
+            value={orderSearch}
+            onChange={(e) => setOrderSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+        <Select value={orderStatusFilter} onValueChange={setOrderStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[220px] h-10 bg-card">
+            <SelectValue placeholder="Statut" />
+          </SelectTrigger>
+          <SelectContent>
+            {vendorOrderStatusTabs.map((tab) => (
+              <SelectItem key={tab.key} value={tab.key}>
+                {tab.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {filteredOrders.length === 0 ? (

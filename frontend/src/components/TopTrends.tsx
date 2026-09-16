@@ -32,9 +32,9 @@ export function TopTrends() {
           .map((id) => allProducts.find((p) => p.id === id))
           .filter(Boolean) as Product[];
         const rest = allProducts.filter((p) => !trendingSet.has(p.id));
-        setProducts([...ordered, ...rest].slice(0, 8));
+        setProducts([...ordered, ...rest].slice(0, 12));
       } else {
-        const data = await fetchProducts({ limit: 8 });
+        const data = await fetchProducts({ limit: 12 });
         setProducts(data);
       }
     } catch (err) {
@@ -70,7 +70,7 @@ export function TopTrends() {
         ) : (
           <div className={PRODUCT_GRID_CLASS}>
             {loading
-              ? Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)
+              ? Array.from({ length: 12 }).map((_, i) => <ProductCardSkeleton key={i} />)
               : products.map((product, i) => (
                   <Link to={`/product/${product.slug || product.id}`} key={product.id}>
                     <ProductCard product={product} index={i} />

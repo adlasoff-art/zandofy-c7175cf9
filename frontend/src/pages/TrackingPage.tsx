@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { mapInternalShipment, detectCarrier, fetchExternalTracking, type TrackingResult } from "@/lib/tracking-providers";
-import { STATUS_CONFIG, STATUS_FLOW, CUSTOMER_TRACKING_STEPS, getStepIndex } from "@/lib/order-status";
+import { STATUS_CONFIG, CUSTOMER_TRACKING_STEPS, LOCAL_CUSTOMER_TRACKING_STEPS, getStepIndex } from "@/lib/order-status";
 import { useI18n } from "@/contexts/I18nContext";
 import { DeliveryMap } from "@/components/DeliveryMap";
 import { useRiderLocationSubscription } from "@/hooks/use-rider-location";
@@ -57,6 +57,7 @@ interface OrderTrackingResult {
   confirmation_code: string | null;
   created_at: string; updated_at: string;
   store_name: string | null;
+  shop_type?: string | null;
   history: { status: string; created_at: string; notes: string | null }[];
   delivery_id?: string | null;
 }
@@ -116,21 +117,26 @@ function Timeline({ steps, currentStatus }: { steps: typeof SHIPMENT_STEPS; curr
   );
 }
 
-// ── 9-Step Order Timeline (3 rows × 3, snake flow) ──
-function OrderTimeline({ currentStatus, history }: { currentStatus: string; history: OrderTrackingResult["history"] }) {
+// ── Order Timeline (intl 3×3 snake OR local compact flow) ──
+function OrderTimeline({
+  currentStatus,
+  history,
+  shopType,
+}: {
+  currentStatus: string;
+  history: OrderTrackingResult["history"];
+  shopType?: string | null;
+}) {
   const { locale } = useI18n();
   const dateLocale = locale === "en" ? "en-US" : "fr-FR";
   const isCancelled = currentStatus === "cancelled";
   const isReturned = currentStatus === "returned";
-  const activeIdx = getStepIndex(currentStatus);
+  const isLocal = shopType === "local";
+  const steps = isLocal ? LOCAL_CUSTOMER_TRACKING_STEPS : CUSTOMER_TRACKING_STEPS;
+  const activeIdx = getStepIndex(currentStatus, shopType || undefined);
   const historyMap = new Map(history.map((h) => [h.status, h.created_at]));
 
-  // 3 rows of 3 steps
-  const ROW1 = CUSTOMER_TRACKING_STEPS.slice(0, 3);
-  const ROW2 = CUSTOMER_TRACKING_STEPS.slice(3, 6);
-  const ROW3 = CUSTOMER_TRACKING_STEPS.slice(6, 9);
-
-  const renderStep = (step: typeof CUSTOMER_TRACKING_STEPS[0], globalIdx: number) => {
+  const renderStep = (step: (typeof CUSTOMER_TRACKING_STEPS)[0], globalIdx: number) => {
     const done = globalIdx <= activeIdx && !isCancelled && !isReturned;
     const isCurrent = globalIdx === activeIdx && !isCancelled && !isReturned;
     const Icon = step.icon;
@@ -160,15 +166,48 @@ function OrderTimeline({ currentStatus, history }: { currentStatus: string; hist
     );
   };
 
-  const renderRow = (steps: typeof CUSTOMER_TRACKING_STEPS, startIndex: number) => (
+  if (isLocal) {
+    return (
+      <div className="relative">
+        {(isCancelled || isReturned) && (
+          <div className="mb-4">
+            <Badge variant="destructive" className="text-sm">
+              {isCancelled ? <XCircle size={14} className="mr-1" /> : <RotateCcw size={14} className="mr-1" />}
+              {STATUS_CONFIG[currentStatus]?.label || currentStatus}
+            </Badge>
+          </div>
+        )}
+        <div className="py-4 overflow-x-auto">
+          <div className="flex items-start gap-0 min-w-max w-full">
+            {steps.map((step, i) => (
+              <div key={step.key} className="flex items-start">
+                {renderStep(step, i)}
+                {i < steps.length - 1 && (
+                  <div className={cn(
+                    "h-0.5 mt-[22px] flex-shrink-0 w-4 sm:w-6",
+                    i < activeIdx && !isCancelled && !isReturned ? "bg-primary" : "bg-border",
+                  )} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const ROW1 = CUSTOMER_TRACKING_STEPS.slice(0, 3);
+  const ROW2 = CUSTOMER_TRACKING_STEPS.slice(3, 6);
+  const ROW3 = CUSTOMER_TRACKING_STEPS.slice(6, 9);
+
+  const renderRow = (rowSteps: typeof CUSTOMER_TRACKING_STEPS, startIndex: number) => (
     <div className="flex items-start w-full">
-      {steps.map((step, i) => {
+      {rowSteps.map((step, i) => {
         const globalIdx = startIndex + i;
-        const done = globalIdx <= activeIdx && !isCancelled && !isReturned;
         return (
           <div key={step.key} className="flex items-start flex-1 min-w-0">
             {renderStep(step, globalIdx)}
-            {i < steps.length - 1 && (
+            {i < rowSteps.length - 1 && (
               <div className={cn("h-0.5 mt-[22px] flex-shrink-0 w-4 sm:w-6",
                 globalIdx < activeIdx && !isCancelled && !isReturned ? "bg-primary" : "bg-border")} />
             )}
@@ -178,19 +217,18 @@ function OrderTimeline({ currentStatus, history }: { currentStatus: string; hist
     </div>
   );
 
-  const renderRowReversed = (steps: typeof CUSTOMER_TRACKING_STEPS, startIndex: number) => {
-    const reversed = [...steps].reverse();
+  const renderRowReversed = (rowSteps: typeof CUSTOMER_TRACKING_STEPS, startIndex: number) => {
+    const reversed = [...rowSteps].reverse();
     return (
       <div className="flex items-start w-full">
         {reversed.map((step, i) => {
-          const globalIdx = startIndex + (steps.length - 1 - i);
-          const done = globalIdx <= activeIdx && !isCancelled && !isReturned;
+          const globalIdx = startIndex + (rowSteps.length - 1 - i);
           return (
             <div key={step.key} className="flex items-start flex-1 min-w-0">
               {renderStep(step, globalIdx)}
               {i < reversed.length - 1 && (
                 <div className={cn("h-0.5 mt-[22px] flex-shrink-0 w-4 sm:w-6",
-                  Math.min(startIndex + (steps.length - 1 - i), startIndex + (steps.length - 2 - i)) < activeIdx && !isCancelled && !isReturned
+                  Math.min(startIndex + (rowSteps.length - 1 - i), startIndex + (rowSteps.length - 2 - i)) < activeIdx && !isCancelled && !isReturned
                     ? "bg-primary" : "bg-border")} />
               )}
             </div>
@@ -212,19 +250,14 @@ function OrderTimeline({ currentStatus, history }: { currentStatus: string; hist
       )}
 
       <div className="py-4 space-y-0">
-        {/* Row 1: L → R */}
         {renderRow(ROW1, 0)}
-        {/* Snake connector: right side going down */}
         <div className="flex justify-end pr-[16%]">
           <div className={cn("w-0.5 h-5", activeIdx >= 2 && !isCancelled && !isReturned ? "bg-primary" : "bg-border")} />
         </div>
-        {/* Row 2: R → L (snake) */}
         {renderRowReversed(ROW2, 3)}
-        {/* Snake connector: left side going down */}
         <div className="flex justify-start pl-[16%]">
           <div className={cn("w-0.5 h-5", activeIdx >= 5 && !isCancelled && !isReturned ? "bg-primary" : "bg-border")} />
         </div>
-        {/* Row 3: L → R */}
         {renderRow(ROW3, 6)}
       </div>
     </div>
@@ -569,9 +602,15 @@ export default function TrackingPage() {
     if (!order) return null;
 
     let storeName: string | null = null;
+    let shopType: string | null = null;
     if (order.store_id) {
-      const { data: store } = await supabase.from("stores").select("name").eq("id", order.store_id).single();
+      const { data: store } = await supabase
+        .from("stores")
+        .select("name, shop_type")
+        .eq("id", order.store_id)
+        .single();
       storeName = store?.name || null;
+      shopType = (store as any)?.shop_type || "international";
     }
 
     // Lot 11B Phase B4 — Hub UI : nom de l'opérateur (entreprise de livraison) si attribué
@@ -616,6 +655,7 @@ export default function TrackingPage() {
       created_at: order.created_at,
       updated_at: order.updated_at,
       store_name: storeName,
+      shop_type: shopType,
       history: (history || []) as OrderTrackingResult["history"],
       delivery_id: deliveryData?.id || null,
       delivery_operator_id: (order as any).delivery_operator_id || null,
@@ -870,7 +910,11 @@ export default function TrackingPage() {
               )}
 
               {/* 10-step timeline */}
-              <OrderTimeline currentStatus={orderResult.status} history={orderResult.history} />
+              <OrderTimeline
+                currentStatus={orderResult.status}
+                history={orderResult.history}
+                shopType={orderResult.shop_type}
+              />
 
               {/* Delivery choice panel */}
               {showDeliveryChoice && (

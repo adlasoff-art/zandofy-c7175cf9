@@ -15,7 +15,11 @@ export function BrandLogo({ variant = "header", className = "" }: BrandLogoProps
     variant === "header"
       ? branding?.header_logo_url
       : branding?.footer_logo_url || branding?.header_logo_url;
-  const mode = branding?.logo_mode || "text";
+  // If an image URL is configured but mode stayed at default "text", treat as logo+text
+  // so CMS uploads are visible without forcing admins to flip logo_mode manually.
+  const rawMode = branding?.logo_mode || "text";
+  const mode =
+    logoUrl && rawMode === "text" ? "logo_and_text" : rawMode;
 
   useEffect(() => {
     setLogoFailed(false);

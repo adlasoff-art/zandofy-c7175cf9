@@ -45,6 +45,7 @@ import {
 import {
   ACTIVE_ORDER_STATUSES,
   CUSTOMER_TRACKING_STEPS,
+  LOCAL_CUSTOMER_TRACKING_STEPS,
   NON_REVENUE_ORDER_STATUSES,
   STATUS_CONFIG,
   getStepIndex,
@@ -69,12 +70,12 @@ const TABS = [
   { key: "orders", labelKey: "dashboard.tab.orders", icon: Package },
   { key: "subscriptions", labelKey: "dashboard.tab.subscriptions", icon: CreditCard },
   { key: "tracking", labelKey: "dashboard.tab.tracking", icon: Truck },
+  { key: "messages", labelKey: "dashboard.tab.messages", icon: MessageCircle },
+  { key: "notifications", labelKey: "dashboard.tab.notifications", icon: Bell },
   { key: "returns", labelKey: "dashboard.tab.returns", icon: RotateCcw },
   { key: "disputes", labelKey: "dashboard.tab.disputes", icon: AlertTriangle },
   { key: "referral", labelKey: "dashboard.tab.referral", icon: Gift },
   { key: "affiliate", labelKey: "dashboard.tab.affiliate", icon: Star },
-  { key: "notifications", labelKey: "dashboard.tab.notifications", icon: Bell },
-  { key: "messages", labelKey: "dashboard.tab.messages", icon: MessageCircle },
   { key: "profile", labelKey: "dashboard.tab.profile", icon: UserIcon },
   { key: "kyc", labelKey: "dashboard.tab.kyc", icon: ShieldCheck },
   { key: "addresses", labelKey: "dashboard.tab.addresses", icon: MapPin },
@@ -121,6 +122,7 @@ interface OrderRow {
   store_id: string | null;
   delivery_date_requested: string | null;
   delivery_time_requested: string | null;
+  shop_type?: string | null;
 }
 
 interface OrderItemRow {
@@ -219,7 +221,28 @@ export default function DashboardPage() {
       "delivery_date_requested",
       "delivery_time_requested",
     ]);
-    setOrders(ordersWithOptionalFields);
+
+    // Enrich with store shop_type for local vs intl tracking steppers
+    const storeIds = Array.from(
+      new Set(ordersWithOptionalFields.map((o) => o.store_id).filter(Boolean)),
+    ) as string[];
+    const shopTypeByStore = new Map<string, string>();
+    if (storeIds.length > 0) {
+      const { data: stores } = await supabase
+        .from("stores")
+        .select("id, shop_type")
+        .in("id", storeIds);
+      (stores || []).forEach((s: any) => {
+        if (s?.id) shopTypeByStore.set(s.id, s.shop_type || "international");
+      });
+    }
+
+    setOrders(
+      ordersWithOptionalFields.map((o) => ({
+        ...o,
+        shop_type: o.store_id ? shopTypeByStore.get(o.store_id) || "international" : "international",
+      })),
+    );
     setLoading(false);
   }, [user]);
 
@@ -1038,7 +1061,13 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       )}
 
       {/* Stepper with dates */}
-      <TrackingStepper status={order.status} statusHistory={statusHistory} orderRef={order.order_ref} trackingNumber={order.tracking_number} />
+      <TrackingStepper
+        status={order.status}
+        statusHistory={statusHistory}
+        orderRef={order.order_ref}
+        trackingNumber={order.tracking_number}
+        shopType={order.shop_type}
+      />
 
       {/* Status History Timeline */}
       {statusHistory.length > 0 && (
@@ -1303,11 +1332,25 @@ function CancelOrderButton({ orderId, orderRef, onSuccess, small }: {
   );
 }
 
-function TrackingStepper({ status, statusHistory, orderRef, trackingNumber }: { status: string; statusHistory?: StatusHistoryRow[]; orderRef?: string; trackingNumber?: string | null }) {
+function TrackingStepper({
+  status,
+  statusHistory,
+  orderRef,
+  trackingNumber,
+  shopType,
+}: {
+  status: string;
+  statusHistory?: StatusHistoryRow[];
+  orderRef?: string;
+  trackingNumber?: string | null;
+  shopType?: string | null;
+}) {
   const { t, locale } = useI18n();
   const dateLocale = locale === "en" ? enUS : fr;
   const navigate = useNavigate();
-  const currentIdx = getStepIndex(status);
+  const isLocal = shopType === "local";
+  const steps = isLocal ? LOCAL_CUSTOMER_TRACKING_STEPS : CUSTOMER_TRACKING_STEPS;
+  const currentIdx = getStepIndex(status, shopType || undefined);
   const isCancelled = status === "cancelled" || status === "returned";
 
   if (isCancelled) {
@@ -1320,10 +1363,6 @@ function TrackingStepper({ status, statusHistory, orderRef, trackingNumber }: { 
     );
   }
 
-  // 3 rows of 3 steps — snake flow: Row1 L→R, Row2 R→L (reversed display), Row3 L→R
-  const ROW1 = CUSTOMER_TRACKING_STEPS.slice(0, 3);
-  const ROW2 = CUSTOMER_TRACKING_STEPS.slice(3, 6);
-  const ROW3 = CUSTOMER_TRACKING_STEPS.slice(6, 9);
   const historyMap = new Map((statusHistory || []).map((h) => [h.status, h.created_at]));
 
   const handleStepClick = (stepKey: string) => {
@@ -1340,7 +1379,7 @@ function TrackingStepper({ status, statusHistory, orderRef, trackingNumber }: { 
     return done && orderRef && (stepKey === "out_for_delivery" || stepKey === "in_shipping");
   };
 
-  const renderStep = (step: typeof CUSTOMER_TRACKING_STEPS[0], globalIdx: number, isCurrent: boolean, done: boolean) => {
+  const renderStep = (step: (typeof CUSTOMER_TRACKING_STEPS)[0], globalIdx: number, isCurrent: boolean, done: boolean) => {
     const Icon = step.icon;
     const ts = historyMap.get(step.key);
     const clickable = isClickable(step.key, done || isCurrent);
@@ -1372,16 +1411,43 @@ function TrackingStepper({ status, statusHistory, orderRef, trackingNumber }: { 
     );
   };
 
-  const renderRow = (steps: typeof CUSTOMER_TRACKING_STEPS, startIndex: number) => (
+  // Local shops: compact single-row / wrapping flow (no intl hub snake grid)
+  if (isLocal) {
+    return (
+      <div className="py-3 overflow-x-auto">
+        <div className="flex items-start gap-0 min-w-max sm:min-w-0 sm:flex-wrap sm:justify-between w-full">
+          {steps.map((step, i) => {
+            const done = i <= currentIdx;
+            const isCur = i === currentIdx;
+            return (
+              <div key={step.key} className="flex items-start">
+                {renderStep(step, i, isCur, done)}
+                {i < steps.length - 1 && (
+                  <div className={`h-0.5 mt-5 flex-shrink-0 w-4 sm:w-6 ${i < currentIdx ? "bg-primary" : "bg-border"}`} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // International: 3 rows of 3 — snake flow
+  const ROW1 = CUSTOMER_TRACKING_STEPS.slice(0, 3);
+  const ROW2 = CUSTOMER_TRACKING_STEPS.slice(3, 6);
+  const ROW3 = CUSTOMER_TRACKING_STEPS.slice(6, 9);
+
+  const renderRow = (rowSteps: typeof CUSTOMER_TRACKING_STEPS, startIndex: number) => (
     <div className="flex items-start w-full">
-      {steps.map((step, i) => {
+      {rowSteps.map((step, i) => {
         const globalIdx = startIndex + i;
         const done = globalIdx <= currentIdx;
         const isCur = globalIdx === currentIdx;
         return (
           <div key={step.key} className="flex items-start flex-1 min-w-0">
             {renderStep(step, globalIdx, isCur, done)}
-            {i < steps.length - 1 && (
+            {i < rowSteps.length - 1 && (
               <div className={`h-0.5 mt-5 flex-shrink-0 w-4 sm:w-6 ${globalIdx < currentIdx ? "bg-primary" : "bg-border"}`} />
             )}
           </div>
@@ -1390,13 +1456,12 @@ function TrackingStepper({ status, statusHistory, orderRef, trackingNumber }: { 
     </div>
   );
 
-  // Row 2 is displayed reversed visually (snake: goes right-to-left)
-  const renderRowReversed = (steps: typeof CUSTOMER_TRACKING_STEPS, startIndex: number) => {
-    const reversed = [...steps].reverse();
+  const renderRowReversed = (rowSteps: typeof CUSTOMER_TRACKING_STEPS, startIndex: number) => {
+    const reversed = [...rowSteps].reverse();
     return (
       <div className="flex items-start w-full">
         {reversed.map((step, i) => {
-          const globalIdx = startIndex + (steps.length - 1 - i);
+          const globalIdx = startIndex + (rowSteps.length - 1 - i);
           const done = globalIdx <= currentIdx;
           const isCur = globalIdx === currentIdx;
           return (
@@ -1404,8 +1469,7 @@ function TrackingStepper({ status, statusHistory, orderRef, trackingNumber }: { 
               {renderStep(step, globalIdx, isCur, done)}
               {i < reversed.length - 1 && (
                 <div className={`h-0.5 mt-5 flex-shrink-0 w-4 sm:w-6 ${
-                  // For reversed row, connector between globalIdx of current and next (which is lower index)
-                  Math.min(startIndex + (steps.length - 1 - i), startIndex + (steps.length - 2 - i)) < currentIdx ? "bg-primary" : "bg-border"
+                  Math.min(startIndex + (rowSteps.length - 1 - i), startIndex + (rowSteps.length - 2 - i)) < currentIdx ? "bg-primary" : "bg-border"
                 }`} />
               )}
             </div>
@@ -1417,19 +1481,14 @@ function TrackingStepper({ status, statusHistory, orderRef, trackingNumber }: { 
 
   return (
     <div className="py-3 space-y-0">
-      {/* Row 1: L → R */}
       {renderRow(ROW1, 0)}
-      {/* Snake connector: top-right down to row 2 right */}
       <div className="flex justify-end pr-[16%]">
         <div className={`w-0.5 h-5 ${currentIdx >= 2 ? "bg-primary" : "bg-border"}`} />
       </div>
-      {/* Row 2: R → L (reversed) */}
       {renderRowReversed(ROW2, 3)}
-      {/* Snake connector: bottom-left down to row 3 left */}
       <div className="flex justify-start pl-[16%]">
         <div className={`w-0.5 h-5 ${currentIdx >= 5 ? "bg-primary" : "bg-border"}`} />
       </div>
-      {/* Row 3: L → R */}
       {renderRow(ROW3, 6)}
     </div>
   );
@@ -1650,7 +1709,12 @@ function TrackingTab({ orders }: { orders: OrderRow[] }) {
           <div className="flex items-center justify-between">
             <span className="font-bold text-sm text-foreground">{order.order_ref}</span>
           </div>
-          <TrackingStepper status={order.status} orderRef={order.order_ref} trackingNumber={order.tracking_number} />
+          <TrackingStepper
+            status={order.status}
+            orderRef={order.order_ref}
+            trackingNumber={order.tracking_number}
+            shopType={order.shop_type}
+          />
           <CustomerOrderTracker orderId={order.id} />
         </div>
       ))}

@@ -34,7 +34,7 @@ import { StoreTransferSection } from "@/components/vendor/StoreTransferSection";
 import { GeoFieldsRow, type GeoFieldsValue } from "@/components/address/GeoFieldsRow";
 import { toast } from "sonner";
 import {
-  Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag, BarChart3,
+  Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag,
   Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign, Calculator, ShieldCheck, LineChart, Archive,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
@@ -96,18 +96,22 @@ export default function VendorDashboardPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "analytics_pro" | "team" | "suppliers" | "pricing" | "autonomous" | "freight_sim" | "kyb" | "settings">(() => {
     const tab = new URLSearchParams(window.location.search).get("tab");
+    // Deep-link alias: legacy ?tab=stats → analytics_pro
+    const normalized = tab === "stats" ? "analytics_pro" : tab;
     const allowed = new Set([
       "messages", "catalogue", "orders", "deliveries", "promos", "coupons", "wallet",
       "returns", "disputes", "featured", "stats", "analytics_pro", "team", "suppliers",
       "pricing", "autonomous", "freight_sim", "kyb", "settings",
     ]);
-    return (tab && allowed.has(tab) ? tab : "catalogue") as typeof activeTab;
+    return (normalized && allowed.has(normalized) ? normalized : "catalogue") as typeof activeTab;
   });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("tab") !== activeTab) {
-      params.set("tab", activeTab);
+    // Keep URL clean: never leave ?tab=stats after merge
+    const urlTab = activeTab === "stats" ? "analytics_pro" : activeTab;
+    if (params.get("tab") !== urlTab) {
+      params.set("tab", urlTab);
       const qs = params.toString();
       window.history.replaceState({}, "", `${window.location.pathname}?${qs}`);
     }
@@ -290,6 +294,7 @@ export default function VendorDashboardPage() {
   const VENDOR_TABS = [
     { key: "catalogue" as const, label: "Catalogue", icon: Package },
     { key: "orders" as const, label: "Commandes", icon: ShoppingBag },
+    { key: "messages" as const, label: "Messages", icon: MessageCircle },
     ...(shopType === "local" ? [{ key: "deliveries" as const, label: "Livraisons", icon: Bike }] : []),
     { key: "promos" as const, label: "Promos", icon: Flame },
     { key: "coupons" as const, label: "Coupons", icon: Crown },
@@ -302,10 +307,8 @@ export default function VendorDashboardPage() {
     ...(shopType === "local" ? [{ key: "autonomous" as const, label: "Autonome", icon: Globe }] : []),
     ...(freightSimEnabled && shopType !== "local" ? [{ key: "freight_sim" as const, label: "Simulateur fret", icon: Calculator }] : []),
     { key: "kyb" as const, label: "Vérification KYB", icon: ShieldCheck },
-    { key: "stats" as const, label: "Statistiques", icon: BarChart3 },
-    { key: "analytics_pro" as const, label: "Analytics Pro", icon: LineChart },
+    { key: "analytics_pro" as const, label: "Analytics", icon: LineChart },
     ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
-    { key: "messages" as const, label: "Messages", icon: MessageCircle },
     { key: "settings" as const, label: "Paramètres", icon: Settings },
   ];
 
@@ -343,8 +346,15 @@ export default function VendorDashboardPage() {
       {activeTab === "autonomous" && <VendorAutonomousTab storeId={store!.id} />}
       {activeTab === "freight_sim" && freightSimEnabled && <VendorFreightSimulator />}
       {activeTab === "kyb" && <VendorKybV2Tab storeId={store!.id} />}
-      {activeTab === "stats" && <VendorStatsTab storeId={store!.id} />}
-      {activeTab === "analytics_pro" && <VendorAnalyticsProTab storeId={store!.id} />}
+      {(activeTab === "analytics_pro" || activeTab === "stats") && (
+        <div className="space-y-8">
+          <VendorAnalyticsProTab storeId={store!.id} />
+          <div className="border-t border-border pt-6">
+            <h3 className="text-sm font-semibold text-muted-foreground mb-4">Vue détaillée boutique</h3>
+            <VendorStatsTab storeId={store!.id} />
+          </div>
+        </div>
+      )}
       {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
       {activeTab === "messages" && (
         <>

@@ -21,6 +21,7 @@ import {
 
 const NAV_ITEMS = [
   { to: "/forwarder",          label: "Tableau de bord", icon: LayoutDashboard, end: true },
+  { to: "/forwarder/shipments", label: "Expéditions",     icon: Ship },
   { to: "/forwarder/profiles", label: "Tarifs",          icon: FileText },
   { to: "/forwarder/coverage", label: "Couverture",      icon: Map },
   { to: "/forwarder/handoffs", label: "Handoffs",        icon: ArrowLeftRight },
