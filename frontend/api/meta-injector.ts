@@ -628,21 +628,23 @@ async function buildProductMeta(slug: string): Promise<MetaPayload | null> {
 }
 
 /**
- * Same source of truth as SPA StorePage + sitemap vendors:
- * - Public read: `stores_public` (anon; `stores` is RLS-blocked)
- * - Sitemap uses service role on `stores` with identical active filters
+ * Store page SEO: use `stores_seo` (includes banned/suspended/archived) for HTTP 410.
+ * Catalog lists use filtered `stores_public` only.
  */
 async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
   const cfg = await getSeoConfig();
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
   const storeSelect =
-    "id,name,slug,description,logo_url,banner_url,city,country,rating,review_count_override,meta_title,meta_description,seo_keywords,is_banned,is_suspended";
+    "id,name,slug,description,logo_url,banner_url,city,country,rating,review_count_override,meta_title,meta_description,seo_keywords,is_banned,is_suspended,deleted_at";
   const filter = isUuid ? `id=eq.${slug}` : `slug=eq.${encodeURIComponent(slug)}`;
 
-  // Include banned/suspended so we can return 410 (not soft-empty / false 404)
-  let rows = await sbFetch(`stores_public?${filter}&select=${storeSelect}&limit=1`);
+  let rows = await sbFetch(`stores_seo?${filter}&select=${storeSelect}&limit=1`);
+  if (!rows[0]) {
+    // Fallback before migration applied
+    rows = await sbFetch(`stores_public?${filter}&select=${storeSelect.replace(",deleted_at", "")}&limit=1`);
+  }
   if (!rows[0] && !isUuid) {
-    const all = await sbFetch(`stores_public?select=${storeSelect}&limit=2000`);
+    const all = await sbFetch(`stores_seo?select=${storeSelect}&limit=2000`);
     rows = all.filter(
       (r) => slugify(r.slug || "") === slug || slugify(r.name || "") === slug,
     );
@@ -653,7 +655,7 @@ async function buildStoreMeta(slug: string): Promise<MetaPayload | null> {
   const pathSlug = s.slug || s.id;
   const canonical = `${getSiteUrl()}/store/${pathSlug}`;
 
-  if (s.is_banned || s.is_suspended) {
+  if (s.is_banned || s.is_suspended || s.deleted_at) {
     return {
       title: "Boutique indisponible | Zandofy",
       description: "Cette boutique n'est plus disponible sur Zandofy.",

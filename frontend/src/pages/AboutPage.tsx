@@ -16,7 +16,8 @@ export default function AboutPage() {
     queryFn: async () => {
       const [productsRes, storesRes, reviewsRes, countriesRes] = await Promise.all([
         supabase.from("products_public").select("id", { count: "exact", head: true }).eq("publish_status", "published"),
-        supabase.from("stores").select("id", { count: "exact", head: true }).eq("is_verified", true),
+        // Public catalog only (excludes banned/suspended/archived); anon cannot count base `stores`.
+        supabase.from("stores_public").select("id", { count: "exact", head: true }).eq("is_verified", true),
         supabase.from("reviews").select("user_id", { count: "exact", head: true }),
         supabase.from("cities").select("country_code"),
       ]);

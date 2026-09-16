@@ -201,6 +201,7 @@ Deno.serve(async (req) => {
         .select("id, slug, name, created_at")
         .eq("is_banned", false)
         .eq("is_suspended", false)
+        .is("deleted_at", null)
         .limit(1000);
       let body = "";
       for (const s of stores || []) {
