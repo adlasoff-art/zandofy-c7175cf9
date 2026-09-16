@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,7 +16,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import { sanitizeExtension } from "@/utils/sanitize-filename";
 import {
-  User, Store, FileCheck, Send, CheckCircle2, Upload, Trash2, Loader2, AlertCircle, Clock,
+  User, Store, FileCheck, Send, CheckCircle2, Upload, Trash2, Loader2, AlertCircle, Clock, ShieldCheck,
 } from "lucide-react";
 
 interface ApplicationData {
@@ -94,6 +95,22 @@ export default function BecomeVendorPage() {
   } | null>(null);
   const localDraftKey = useMemo(() => (user ? `zandofy_vendor_application_draft:${user.id}` : null), [user?.id]);
   const hasRestoredLocalDraftRef = useRef(false);
+
+  const { data: kycApproved = false, isLoading: kycLoading } = useQuery({
+    queryKey: ["vendor-app-kyc", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return false;
+      const { data } = await (supabase as any)
+        .from("kyc_verifications")
+        .select("status")
+        .eq("user_id", user.id)
+        .eq("status", "approved")
+        .maybeSingle();
+      return !!data;
+    },
+    enabled: !!user?.id,
+    staleTime: 30_000,
+  });
 
   // Load existing application
   useEffect(() => {
@@ -264,7 +281,7 @@ export default function BecomeVendorPage() {
           <AlertCircle size={48} className="mx-auto text-muted-foreground" />
           <h1 className="text-2xl font-bold">{t("vendor.loginRequired")}</h1>
           <p className="text-muted-foreground">{t("vendor.loginRequiredDesc")}</p>
-          <Button onClick={() => navigate("/auth")}>{t("general.loginButton")}</Button>
+          <Button onClick={() => navigate("/auth?redirect=" + encodeURIComponent("/become-vendor"))}>{t("general.loginButton")}</Button>
         </div>
         <Footer />
       </div>
@@ -391,6 +408,14 @@ export default function BecomeVendorPage() {
   const handleBack = () => setStep((s) => Math.max(1, s - 1));
 
   const handleSubmit = async () => {
+    if (!kycApproved) {
+      toast({
+        title: "KYC requis",
+        description: "Complétez la vérification d'identité (KYC) avant de soumettre votre candidature vendeur.",
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(true);
     if (form.id) {
       const { error } = await supabase
@@ -453,7 +478,7 @@ export default function BecomeVendorPage() {
     switch (s) {
       case 1: return !!form.full_name && !!form.phone && !!form.business_type;
       case 2: return !!form.store_name;
-      case 3: return docs.length >= 2;
+      case 3: return kycApproved;
       default: return true;
     }
   };
@@ -461,7 +486,7 @@ export default function BecomeVendorPage() {
   const STEPS = [
     { id: 1, label: t("vendor.step1"), icon: User, description: t("vendor.step1Desc") },
     { id: 2, label: t("vendor.step2"), icon: Store, description: t("vendor.step2Desc") },
-    { id: 3, label: t("vendor.step3"), icon: FileCheck, description: t("vendor.step3Desc") },
+    { id: 3, label: "Identité (KYC)", icon: ShieldCheck, description: "Vérification d'identité obligatoire — documents entreprise (KYB) plus tard" },
     { id: 4, label: t("vendor.step4"), icon: Send, description: t("vendor.step4Desc") },
   ];
 
@@ -472,11 +497,9 @@ export default function BecomeVendorPage() {
     { value: "artisan", label: t("vendor.artisan") },
   ];
 
-  const REQUIRED_DOCS = [
-    { type: "id_card", label: t("vendor.docId"), description: t("vendor.docIdDesc") },
-    { type: "rccm", label: t("vendor.docRccm"), description: t("vendor.docRccmDesc") },
-    { type: "proof_address", label: t("vendor.docAddress"), description: t("vendor.docAddressDesc") },
-    { type: "logo", label: t("vendor.docLogo"), description: t("vendor.docLogoDesc") },
+  /** Optional branding only — KYB (RCCM…) is deferred until sales threshold. */
+  const OPTIONAL_DOCS = [
+    { type: "logo", label: t("vendor.docLogo"), description: "Optionnel — logo de votre boutique" },
   ];
 
   const progressPct = ((step - 1) / (STEPS.length - 1)) * 100;
@@ -487,7 +510,9 @@ export default function BecomeVendorPage() {
       <main className="container max-w-2xl py-8 space-y-6">
         <div className="text-center space-y-2">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">{t("vendor.title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("vendor.subtitle")}</p>
+          <p className="text-sm text-muted-foreground">
+            Vendez gratuitement — la plateforme prend une commission sur les ventes livrées. Les documents d&apos;entreprise (KYB) seront demandés après un palier de ventes.
+          </p>
         </div>
 
         <div className="space-y-3">
@@ -600,37 +625,62 @@ export default function BecomeVendorPage() {
 
             {step === 3 && (
               <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">{t("vendor.uploadDocs")}</p>
-                {REQUIRED_DOCS.map((doc) => {
-                  const uploaded = docs.find((d) => d.type === doc.type);
-                  return (
-                    <div key={doc.type} className="border border-border rounded-md p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">{doc.label}</p>
-                          <p className="text-xs text-muted-foreground">{doc.description}</p>
+                <div className={`rounded-lg border p-4 ${kycApproved ? "border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20" : "border-amber-300 bg-amber-50 dark:bg-amber-950/20"}`}>
+                  <div className="flex items-center gap-2 font-semibold text-sm mb-1">
+                    <ShieldCheck size={16} />
+                    {kycApproved ? "Identité vérifiée (KYC)" : "KYC obligatoire pour devenir vendeur"}
+                  </div>
+                  {kycLoading ? (
+                    <p className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 size={12} className="animate-spin" /> Vérification…</p>
+                  ) : kycApproved ? (
+                    <p className="text-xs text-muted-foreground">
+                      Votre identité est approuvée. Les documents d&apos;entreprise (RCCM, NIF…) ne sont pas requis maintenant — ils seront demandés après un seuil de ventes.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-xs text-muted-foreground">
+                        Complétez la vérification d&apos;identité dans votre compte, puis revenez ici pour continuer.
+                      </p>
+                      <Button asChild size="sm">
+                        <Link to="/dashboard">Compléter mon KYC</Link>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 border-t border-border pt-4">
+                  <p className="text-sm font-medium">Logo boutique (optionnel)</p>
+                  {OPTIONAL_DOCS.map((doc) => {
+                    const uploaded = docs.find((d) => d.type === doc.type);
+                    return (
+                      <div key={doc.type} className="border border-border rounded-md p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">{doc.label}</p>
+                            <p className="text-xs text-muted-foreground">{doc.description}</p>
+                          </div>
+                          {uploaded && (
+                            <Button variant="ghost" size="icon" onClick={() => removeDoc(doc.type)} className="h-7 w-7 text-destructive">
+                              <Trash2 size={14} />
+                            </Button>
+                          )}
                         </div>
-                        {uploaded && (
-                          <Button variant="ghost" size="icon" onClick={() => removeDoc(doc.type)} className="h-7 w-7 text-destructive">
-                            <Trash2 size={14} />
-                          </Button>
+                        {uploaded ? (
+                          <div className="flex items-center gap-2 text-sm text-emerald-600">
+                            <CheckCircle2 size={14} />
+                            <span className="truncate">{uploaded.file_name}</span>
+                          </div>
+                        ) : (
+                          <label className="flex items-center gap-2 cursor-pointer text-sm text-primary hover:underline">
+                            {uploading === doc.type ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                            <span>{uploading === doc.type ? t("vendor.uploading") : t("vendor.download")}</span>
+                            <input type="file" className="hidden" accept="image/*,.pdf" disabled={uploading === doc.type} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadDoc(doc.type, f); }} />
+                          </label>
                         )}
                       </div>
-                      {uploaded ? (
-                        <div className="flex items-center gap-2 text-sm text-emerald-600">
-                          <CheckCircle2 size={14} />
-                          <span className="truncate">{uploaded.file_name}</span>
-                        </div>
-                      ) : (
-                        <label className="flex items-center gap-2 cursor-pointer text-sm text-primary hover:underline">
-                          {uploading === doc.type ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                          <span>{uploading === doc.type ? t("vendor.uploading") : t("vendor.download")}</span>
-                          <input type="file" className="hidden" accept="image/*,.pdf" disabled={uploading === doc.type} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadDoc(doc.type, f); }} />
-                        </label>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -648,21 +698,14 @@ export default function BecomeVendorPage() {
                     <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2"><Store size={14} /> {t("vendor.shop")}</h4>
                     <p><strong>{t("vendor.storeName")}:</strong> {form.store_name}</p>
                     {form.store_description && <p><strong>{t("vendor.storeDesc")}:</strong> {form.store_description}</p>}
+                    <p><strong>Type :</strong> {form.shop_type === "local" ? "Locale" : "Internationale"}</p>
                   </div>
                   <div className="border border-border rounded-md p-3">
-                    <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2"><FileCheck size={14} /> {t("vendor.kybDocs")}</h4>
-                    {docs.length === 0 ? (
-                      <p className="text-muted-foreground">{t("vendor.noDocs")}</p>
-                    ) : (
-                      <ul className="space-y-1">
-                        {docs.map((d) => (
-                          <li key={d.type} className="flex items-center gap-2 text-emerald-600">
-                            <CheckCircle2 size={12} />
-                            <span>{REQUIRED_DOCS.find((r) => r.type === d.type)?.label || d.type}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2"><ShieldCheck size={14} /> KYC</h4>
+                    <p className={kycApproved ? "text-emerald-600" : "text-amber-600"}>
+                      {kycApproved ? "Identité vérifiée" : "KYC manquant — soumission bloquée"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">KYB entreprise : demandé plus tard selon le palier de ventes.</p>
                   </div>
                 </div>
               </div>
@@ -679,7 +722,7 @@ export default function BecomeVendorPage() {
                 {t("vendor.next")}
               </Button>
             ) : (
-              <Button onClick={handleSubmit} disabled={saving || docs.length < 2} className="bg-emerald-600 hover:bg-emerald-700">
+              <Button onClick={handleSubmit} disabled={saving || !kycApproved} className="bg-emerald-600 hover:bg-emerald-700">
                 {saving ? <Loader2 size={16} className="animate-spin mr-2" /> : <Send size={16} className="mr-2" />}
                 {t("vendor.submit")}
               </Button>

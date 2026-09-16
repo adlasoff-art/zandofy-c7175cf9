@@ -16,7 +16,7 @@ export interface VendorSubscription {
 
 const DEFAULT_SUB: Omit<VendorSubscription, "id" | "store_id"> = {
   tier: "beginner",
-  max_products: 10,
+  max_products: 100,
   is_whatsapp_enabled: false,
   can_self_deliver: false,
   payment_method: null,
@@ -74,7 +74,7 @@ export function useVendorSubscription(storeId: string | null) {
     ? VENDOR_TIERS[subscription.tier] || VENDOR_TIERS.beginner
     : VENDOR_TIERS.beginner;
 
-  const effectiveMaxProducts = maxProductsOverride ?? subscription?.max_products ?? 10;
+  const effectiveMaxProducts = maxProductsOverride ?? subscription?.max_products ?? 100;
   const canAddProduct = (currentCount: number) => currentCount < effectiveMaxProducts;
 
   return { subscription, loading, tierConfig, canAddProduct, effectiveMaxProducts };

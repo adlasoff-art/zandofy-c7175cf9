@@ -85,8 +85,8 @@ export interface Category {
 // Map Supabase row to Product interface
 export function mapProduct(row: any): Product {
   const storeData = row.stores;
-  const storeIsVerified = storeData?.is_verified ?? false;
-  const storeIsCertified = storeData?.is_certified ?? false;
+  const storeIsVerified = row.store_is_verified ?? storeData?.is_verified ?? false;
+  const storeIsCertified = row.store_is_certified ?? storeData?.is_certified ?? false;
 
   // Compute seniority: override > auto DB value > computed from created_at
   const storeVerifiedYears = computeStoreYears(
@@ -150,7 +150,7 @@ export function mapProduct(row: any): Product {
         name: c.color_name || "",
         imageUrl: c.image_url || null,
       })),
-    shopType: storeData?.shop_type || "international",
+    shopType: row.shop_type || storeData?.shop_type || "international",
     metaTitle: row.meta_title || undefined,
     metaDescription: row.meta_description || undefined,
     seoKeywords: Array.isArray(row.seo_keywords) ? row.seo_keywords : undefined,
@@ -180,11 +180,11 @@ const PRODUCT_SELECT_FALLBACK = `
 // product_images / product_colors / product_sizes in production.
 // Use PRODUCT_SELECT (above) only on the product detail page.
 export const PRODUCT_LIST_SELECT = `
-  *,
+  id, name, name_fr, slug, price, original_price, currency, discount, is_new, is_sale,
+  sales_count, store_id, category_id, created_at, short_description, origin_country,
+  shop_type, store_is_verified, store_is_certified,
   categories(name, name_fr),
-  product_images(image_url, position),
-  product_colors(color_hex, color_name),
-  product_sizes(size_label)
+  product_images(image_url, position)
 `;
 
 /** Public catalog reads — never select from base `products` (cost columns). */

@@ -97,7 +97,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
   useEffect(() => {
     if (cached && cached.popularProducts.length > 0) return;
     setPopularLoading(true);
-    fetchProducts({ limit: 12, orderBy: "popular" })
+    fetchProducts({ limit: 8, orderBy: "popular" })
       .then((items) => {
         setPopularProducts(items);
         setPopularLoading(false);
@@ -105,33 +105,31 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
       .catch(() => setPopularLoading(false));
   }, []);
 
-  // Load category sections on mount
+  // Load category sections on mount (capped fan-out)
   useEffect(() => {
     if (cached && cached.categorySections.length > 0) return;
-    fetchCategories().then((cats) => {
-      CATEGORY_SECTION_TARGETS.forEach((target) => {
+    let cancelled = false;
+    (async () => {
+      const cats = await fetchCategories();
+      for (const target of CATEGORY_SECTION_TARGETS) {
+        if (cancelled) return;
         const cat = cats.find((c) => categoryMatchesKeys(c, target.keys));
-        if (cat) {
-          fetchProducts({ categoryId: cat.id, limit: 12 }).then((data) => {
-            if (data.length > 0) {
-              setCategorySections((prev) => {
-                const label = t(target.labelKey) || target.labelFr;
-                const href = categoryPath(cat, locale);
-                if (prev.find((s) => s.href === href)) return prev;
-                return [
-                  ...prev,
-                  {
-                    label,
-                    products: data,
-                    href,
-                  },
-                ];
-              });
-            }
+        if (!cat) continue;
+        try {
+          const data = await fetchProducts({ categoryId: cat.id, limit: 6 });
+          if (cancelled || data.length === 0) continue;
+          setCategorySections((prev) => {
+            const label = t(target.labelKey) || target.labelFr;
+            const href = categoryPath(cat, locale);
+            if (prev.find((s) => s.href === href)) return prev;
+            return [...prev, { label, products: data, href }];
           });
+        } catch {
+          /* skip section */
         }
-      });
-    });
+      }
+    })();
+    return () => { cancelled = true; };
   }, [t, locale]);
 
   // Load main Tendances products when tab changes

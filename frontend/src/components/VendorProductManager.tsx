@@ -16,6 +16,8 @@ import { ProductVariantsEditor, type SizeVariant, type ColorVariant, type Dynami
 import { PricingCalculator } from "@/components/vendor/PricingCalculator";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { useStoreSuspension, isActivityBlocked } from "@/hooks/use-store-suspension";
+import { useStoreKybGate } from "@/hooks/use-store-kyb-gate";
+import { StoreKybGateBanner } from "@/components/vendor/StoreKybGateBanner";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 import { generateProductSlug } from "@/utils/productSlug";
 
@@ -154,7 +156,8 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   const { user } = useAuth();
   const { subscription, tierConfig, canAddProduct } = useVendorSubscription(storeId);
   const { data: suspensionStatus } = useStoreSuspension(storeId);
-  const listingBlocked = isActivityBlocked(suspensionStatus, "product_listing");
+  const { data: kybGate } = useStoreKybGate(storeId);
+  const listingBlocked = isActivityBlocked(suspensionStatus, "product_listing") || !!kybGate?.blocked;
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -359,7 +362,11 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
 
   const startCreate = () => {
     if (listingBlocked) {
-      toast.error("Catalogue bloqué : boutique suspendue, bannie ou archivée");
+      toast.error(
+        kybGate?.blocked
+          ? "Catalogue bloqué : complétez le KYB entreprise (seuil de ventes atteint)."
+          : "Catalogue bloqué : boutique suspendue, bannie ou archivée"
+      );
       return;
     }
     if (!canAddProduct(products.length)) {
@@ -1338,7 +1345,8 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
 
   return (
     <div className="space-y-4">
-      {listingBlocked && (
+      <StoreKybGateBanner storeId={storeId} />
+      {listingBlocked && !kybGate?.blocked && (
         <div className="p-3 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/10 text-xs text-muted-foreground">
           Catalogue en lecture seule : votre boutique est suspendue, bannie ou archivée. Les commandes restent consultables.
         </div>

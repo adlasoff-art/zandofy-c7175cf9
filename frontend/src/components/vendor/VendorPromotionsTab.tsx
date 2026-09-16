@@ -10,6 +10,8 @@ import { fr } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { VENDOR_TIERS, VendorTier } from "@/lib/vendor-tiers";
+import { useStoreKybGate } from "@/hooks/use-store-kyb-gate";
+import { StoreKybGateBanner } from "@/components/vendor/StoreKybGateBanner";
 
 interface PromoProduct {
   id: string;
@@ -59,6 +61,8 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
   const [editSaving, setEditSaving] = useState(false);
   // Vendor tier for promo limits
   const [vendorTier, setVendorTier] = useState<VendorTier>("beginner");
+  const { data: kybGate } = useStoreKybGate(storeId);
+  const kybBlocked = !!kybGate?.blocked;
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -129,6 +133,10 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
 
   const togglePromo = async (product: PromoProduct) => {
     const newIsSale = !product.is_sale;
+    if (newIsSale && kybBlocked) {
+      toast.error("Promos bloquées : complétez le KYB entreprise (seuil de ventes atteint).");
+      return;
+    }
     if (newIsSale && !checkPromoLimit()) return;
 
     setToggling(product.id);
@@ -248,6 +256,7 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
 
   return (
     <div className="space-y-4">
+      <StoreKybGateBanner storeId={storeId} />
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-base font-bold text-foreground flex items-center gap-2">
@@ -255,7 +264,8 @@ export function VendorPromotionsTab({ storeId }: { storeId: string }) {
         </h3>
         <button
           onClick={() => { setBulkMode(!bulkMode); setSelected(new Set()); }}
-          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
+          disabled={kybBlocked}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1 disabled:opacity-50 ${
             bulkMode
               ? "bg-sale text-sale-foreground"
               : "bg-card border border-border text-foreground hover:border-primary"

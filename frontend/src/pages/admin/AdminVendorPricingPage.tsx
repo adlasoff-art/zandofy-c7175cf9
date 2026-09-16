@@ -370,6 +370,7 @@ export default function AdminVendorPricingPage() {
       vendor_cod_enabled: edit.vendor_cod_enabled,
       vendor_off_platform_enabled: edit.vendor_off_platform_enabled,
       vendor_custom_payment_numbers_enabled: edit.vendor_custom_payment_numbers_enabled,
+      mm_granted_by_admin: !!edit.vendor_custom_payment_numbers_enabled,
       vendor_mobile_money_enabled: edit.vendor_mobile_money_enabled,
       vendor_card_enabled: edit.vendor_card_enabled,
       vendor_mode: edit.vendor_mode,

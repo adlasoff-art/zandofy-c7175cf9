@@ -4,7 +4,10 @@ import { mapProduct, type Product } from "@/services/api";
 /** Lightweight select for search results (kept inline to avoid coupling
  *  with PRODUCT_LIST_SELECT — search needs colors/sizes for filtering). */
 const SEARCH_SELECT = `
-  *,
+  id, name, name_fr, slug, price, original_price, currency, discount, is_new, is_sale,
+  sales_count, store_id, category_id, created_at, short_description, origin_country,
+  rating, review_count, moq, publish_status,
+  shop_type, store_is_verified, store_is_certified,
   categories(name, name_fr),
   product_images(image_url, position),
   product_colors(color_hex, color_name),
@@ -65,7 +68,35 @@ export async function searchProducts(filters: SearchFilters): Promise<Product[]>
   }
 
   // Hard cap to protect DB I/O — search results are paginated client-side.
-  const { data, error } = await query.limit(96);
+  let { data, error } = await query.limit(96);
+  if (error) {
+    // Before harden migration: shop_type columns may be missing on products_public
+    const fallbackSelect = `
+      id, name, name_fr, slug, price, original_price, currency, discount, is_new, is_sale,
+      sales_count, store_id, category_id, created_at, short_description, origin_country,
+      rating, review_count, moq, publish_status,
+      categories(name, name_fr),
+      product_images(image_url, position),
+      product_colors(color_hex, color_name),
+      product_sizes(size_label)
+    `;
+    let fb = supabase.from("products_public").select(fallbackSelect).eq("publish_status", "published");
+    if (filters.query) {
+      const q = sanitizeLike(filters.query);
+      fb = fb.or(`name.ilike.%${q}%,name_fr.ilike.%${q}%`);
+    }
+    if (filters.minPrice !== undefined) fb = fb.gte("price", filters.minPrice);
+    if (filters.maxPrice !== undefined) fb = fb.lte("price", filters.maxPrice);
+    switch (filters.sortBy) {
+      case "price_asc": fb = fb.order("price", { ascending: true }); break;
+      case "price_desc": fb = fb.order("price", { ascending: false }); break;
+      case "rating": fb = fb.order("rating", { ascending: false }); break;
+      default: fb = fb.order("created_at", { ascending: false });
+    }
+    const retry = await fb.limit(96);
+    data = retry.data;
+    error = retry.error;
+  }
   if (error) {
     console.error("Search error:", error);
     return [];

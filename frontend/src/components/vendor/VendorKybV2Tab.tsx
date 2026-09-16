@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useKybSubmission, KYB_REQUIRED_DOCS, getSignedKybUrl, type KybDocType } from "@/hooks/use-kyb-kyc-v2";
+import { useStoreKybGate } from "@/hooks/use-store-kyb-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ const STATUS_BADGE: Record<string, { label: string; variant: "default" | "second
 
 export function VendorKybV2Tab({ storeId }: Props) {
   const { submission, documents, loading, updateFields, uploadDocument, deleteDocument, submit } = useKybSubmission(storeId);
+  const { data: gate } = useStoreKybGate(storeId);
   const [uploading, setUploading] = useState<KybDocType | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -53,6 +55,21 @@ export function VendorKybV2Tab({ storeId }: Props) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Alert>
+            <AlertDescription className="text-sm">
+              Le KYB n&apos;est pas exigé pour démarrer. Il devient obligatoire lorsque vos ventes livrées atteignent
+              le seuil ({gate?.shop_type === "local" ? "local" : "international"} :
+              ${Number(gate?.threshold ?? (gate?.shop_type === "local" ? 200 : 500)).toFixed(0)}).
+              Sans KYB approuvé au-delà du seuil : catalogue, promos et retraits sont bloqués — commandes et litiges restent ouverts.
+            </AlertDescription>
+          </Alert>
+          {gate && !gate.exempt && (
+            <div className="text-xs text-muted-foreground bg-muted/40 rounded-md px-3 py-2">
+              Ventes livrées : <strong className="text-foreground">${Number(gate.gmv ?? 0).toFixed(0)}</strong>
+              {" / "}seuil ${Number(gate.threshold ?? 0).toFixed(0)}
+              {gate.blocked ? " — bloqué" : gate.soft_warn ? " — proche du seuil" : ""}
+            </div>
+          )}
           {submission?.status === "rejected" && submission.rejection_reason && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
@@ -62,7 +79,9 @@ export function VendorKybV2Tab({ storeId }: Props) {
           {submission?.status === "approved" && (
             <Alert>
               <CheckCircle2 className="h-4 w-4" />
-              <AlertDescription>Votre dossier KYB a été approuvé. Toutes les fonctionnalités vendeur sont débloquées.</AlertDescription>
+              <AlertDescription>
+                Votre dossier KYB a été approuvé. Catalogue, promos et retraits restent disponibles au-delà du seuil de ventes.
+              </AlertDescription>
             </Alert>
           )}
           <div>
@@ -83,8 +102,8 @@ export function VendorKybV2Tab({ storeId }: Props) {
           <div><Label>Numéro RCCM</Label><Input disabled={isLocked} defaultValue={submission?.rccm_number ?? ""} onBlur={handleField("rccm_number")} placeholder="CD/KIN/RCCM/..." /></div>
           <div><Label>NIF (n° impôt)</Label><Input disabled={isLocked} defaultValue={submission?.tax_nif ?? ""} onBlur={handleField("tax_nif")} /></div>
           <div><Label>Nom complet du dirigeant</Label><Input disabled={isLocked} defaultValue={submission?.director_full_name ?? ""} onBlur={handleField("director_full_name")} /></div>
-          <div><Label>N° pièce d'identité du dirigeant</Label><Input disabled={isLocked} defaultValue={submission?.director_id_number ?? ""} onBlur={handleField("director_id_number")} /></div>
-          <div className="md:col-span-2"><Label>Adresse de l'entreprise</Label><Input disabled={isLocked} defaultValue={submission?.business_address ?? ""} onBlur={handleField("business_address")} /></div>
+          <div><Label>N° pièce d&apos;identité du dirigeant</Label><Input disabled={isLocked} defaultValue={submission?.director_id_number ?? ""} onBlur={handleField("director_id_number")} /></div>
+          <div className="md:col-span-2"><Label>Adresse de l&apos;entreprise</Label><Input disabled={isLocked} defaultValue={submission?.business_address ?? ""} onBlur={handleField("business_address")} /></div>
           <div><Label>Pays</Label><Input disabled={isLocked} defaultValue={submission?.business_country ?? ""} onBlur={handleField("business_country")} placeholder="RDC" /></div>
           <div><Label>Ville</Label><Input disabled={isLocked} defaultValue={submission?.business_city ?? ""} onBlur={handleField("business_city")} /></div>
           <div><Label>Banque</Label><Input disabled={isLocked} defaultValue={submission?.bank_name ?? ""} onBlur={handleField("bank_name")} /></div>

@@ -1,6 +1,6 @@
 /**
  * Vendor component to manage mobile money payment numbers.
- * Displayed in VendorSettings when the admin has enabled custom payment numbers for the store.
+ * Allowed when admin-grandfathered OR active vendor_mm_numbers subscription.
  */
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +22,31 @@ interface NumberEntry {
   sort_order: number;
 }
 
+async function resolveMmAllowed(storeId: string): Promise<boolean> {
+  const { data: override } = await (supabase as any)
+    .from("vendor_pricing_overrides")
+    .select("vendor_custom_payment_numbers_enabled, mm_granted_by_admin")
+    .eq("store_id", storeId)
+    .maybeSingle();
+
+  if (override?.mm_granted_by_admin === true && override?.vendor_custom_payment_numbers_enabled === true) {
+    return true;
+  }
+
+  const { data: subs } = await (supabase as any)
+    .from("store_package_subscriptions")
+    .select("paid_until, is_active, service_packages!inner(slug)")
+    .eq("store_id", storeId)
+    .eq("is_active", true)
+    .eq("service_packages.slug", "vendor_mm_numbers")
+    .limit(1);
+
+  const sub = subs?.[0];
+  if (!sub?.is_active) return false;
+  if (sub.paid_until && new Date(sub.paid_until).getTime() <= Date.now()) return false;
+  return true;
+}
+
 export function VendorPaymentNumbers({ storeId }: { storeId: string }) {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [numbers, setNumbers] = useState<NumberEntry[]>([]);
@@ -31,14 +56,7 @@ export function VendorPaymentNumbers({ storeId }: { storeId: string }) {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      // Check if custom numbers are enabled for this store
-      const { data: override } = await (supabase as any)
-        .from("vendor_pricing_overrides")
-        .select("vendor_custom_payment_numbers_enabled")
-        .eq("store_id", storeId)
-        .maybeSingle();
-
-      const isAllowed = override?.vendor_custom_payment_numbers_enabled === true;
+      const isAllowed = await resolveMmAllowed(storeId);
       setAllowed(isAllowed);
 
       if (!isAllowed) {
@@ -46,7 +64,6 @@ export function VendorPaymentNumbers({ storeId }: { storeId: string }) {
         return;
       }
 
-      // Load existing numbers
       const { data: existing } = await (supabase as any)
         .from("store_payment_numbers")
         .select("operator, operator_label, phone_number, display_name, sort_order")
@@ -54,7 +71,6 @@ export function VendorPaymentNumbers({ storeId }: { storeId: string }) {
         .order("sort_order");
 
       if (existing && existing.length > 0) {
-        // Merge with defaults to ensure all operators are present
         const merged = DEFAULT_OPERATORS.map((def) => {
           const found = existing.find((e: NumberEntry) => e.operator === def.operator);
           return found || { ...def, phone_number: "", display_name: "" };
@@ -104,7 +120,20 @@ export function VendorPaymentNumbers({ storeId }: { storeId: string }) {
     );
   }
 
-  if (!allowed) return null;
+  if (!allowed) {
+    return (
+      <div className="bg-card border border-dashed border-border rounded-lg p-4 space-y-2">
+        <p className="text-sm font-medium text-foreground flex items-center gap-2">
+          <Phone size={14} className="text-primary" />
+          Numéros Mobile Money boutique
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Sans forfait actif, les clients paient via les canaux plateforme Zandofy.
+          Abonnez-vous (~$9,99/mois) dans l&apos;onglet Tarification pour afficher vos propres numéros.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-card border border-border rounded-lg p-4 space-y-4">
@@ -114,7 +143,7 @@ export function VendorPaymentNumbers({ storeId }: { storeId: string }) {
           Numéros de paiement Mobile Money
         </label>
         <p className="text-xs text-muted-foreground">
-          Renseignez vos numéros de paiement pour chaque opérateur. Ces numéros seront affichés au client lors du checkout en mode « paiement hors plateforme ».
+          Ces numéros s&apos;affichent au checkout quand votre forfait MM est actif (ou accord admin).
         </p>
       </div>
 
