@@ -5,6 +5,7 @@ import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { fetchFlashSaleProducts, type Product } from "@/services/api";
 import { shuffleByDailySeed } from "@/lib/daily-shuffle";
 import { SUPER_PROMO_CARD_SLOT_CLASS } from "@/lib/product-image-fit";
+import { useHomeMarket } from "@/contexts/HomeMarketContext";
 import { useI18n } from "@/contexts/I18nContext";
 
 function useCountdown(targetDate: Date) {
@@ -33,27 +34,33 @@ export function FlashSales() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const { t } = useI18n();
+  const { shopTypeFilter } = useHomeMarket();
 
   // Find the nearest promo end date from fetched products, fallback to 8h
   const [saleEnd, setSaleEnd] = useState(() => new Date(Date.now() + 8 * 60 * 60 * 1000));
   const countdown = useCountdown(saleEnd);
 
   useEffect(() => {
-    fetchFlashSaleProducts().then((data) => {
+    let cancelled = false;
+    setLoading(true);
+    fetchFlashSaleProducts({ shopType: shopTypeFilter }).then((data) => {
+      if (cancelled) return;
       setProducts(shuffleByDailySeed(data));
       setLoading(false);
 
-      // Use earliest real promo_end_date from DB if available
       const now = Date.now();
       const endDates = data
-        .map((p: any) => p.promoEndDate ? new Date(p.promoEndDate).getTime() : null)
+        .map((p: any) => (p.promoEndDate ? new Date(p.promoEndDate).getTime() : null))
         .filter((t): t is number => t !== null && t > now);
 
       if (endDates.length > 0) {
         setSaleEnd(new Date(Math.min(...endDates)));
       }
     });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [shopTypeFilter]);
 
   if (!loading && products.length === 0) return null;
 

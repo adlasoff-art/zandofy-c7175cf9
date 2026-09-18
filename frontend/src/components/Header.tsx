@@ -1,4 +1,4 @@
-import { Search, ShoppingBag, Heart, User, Menu, X, Headphones, Globe, ChevronRight, LogOut, MessageCircle, ChevronDown, PackageSearch, Sun, Moon, Monitor, Bell, Sparkles } from "lucide-react";
+import { ShoppingBag, Heart, User, Headphones, Globe, ChevronRight, LogOut, MessageCircle, ChevronDown, PackageSearch, Sun, Moon, Monitor, Bell, Sparkles, X } from "lucide-react";
 import { useState, useRef, useEffect, Component, Suspense, type ReactNode, type ErrorInfo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -8,6 +8,11 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { MegaMenu } from "@/components/MegaMenu";
 import { CurrencySwitcher } from "@/components/CurrencySwitcher";
 import { lazyRetry } from "@/lib/lazy-retry";
+import {
+  TOGGLE_CATEGORIES_EVENT,
+  CATEGORIES_PANEL_STATE_EVENT,
+} from "@/components/MobileBottomNav";
+import { safeExternalOrAppHref } from "@/lib/safe-href";
 
 // Lazy-load NotificationCenter to prevent Radix Popover import failures from crashing the entire Header
 const NotificationCenter = lazyRetry(() =>
@@ -60,16 +65,28 @@ interface TopBarConfig {
   bg_color: string;
   text_color: string;
   messages: { text_fr: string; text_en: string; visible: boolean }[];
+  /** Optional CTA — whole strip or text becomes a link */
+  link_url?: string | null;
+  /** Allow user to dismiss for the session */
+  dismissible?: boolean;
 }
+
+const TOPBAR_DISMISS_KEY = "zandofy_topbar_dismissed";
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [megaOpen, setMegaOpen] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [expandedMobileCat, setExpandedMobileCat] = useState<string | null>(null);
   const [slideIdx, setSlideIdx] = useState(0);
+  const [topBarDismissed, setTopBarDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem(TOPBAR_DISMISS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   const [standalonePwa] = useState(() => isPWAStandalone());
   const megaTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -87,17 +104,34 @@ export function Header() {
   const { value: topBarConfig } = useBootstrapSetting<TopBarConfig | null>("topbar_config", null);
 
   const topBarMessages = (() => {
-    if (!topBarConfig?.enabled) return [];
+    if (!topBarConfig?.enabled || topBarDismissed) return [];
     const msgs = (topBarConfig.messages || []).filter(m => m.visible);
     return msgs.map(m => locale === "fr" ? m.text_fr : m.text_en).filter(Boolean);
   })();
 
-  // Slide mode auto-rotate
+  const topBarLink = safeExternalOrAppHref(topBarConfig?.link_url);
+  const topBarDismissible = Boolean(topBarConfig?.dismissible);
+  /** Mobile: treat multi-message static as slide (Alibaba-style rotation). */
+  const effectiveTopBarMode =
+    topBarConfig?.mode === "static" && topBarMessages.length > 1
+      ? "slide"
+      : topBarConfig?.mode || "static";
+
+  // Slide mode auto-rotate (incl. mobile static→slide)
   useEffect(() => {
-    if (!topBarConfig || topBarConfig.mode !== "slide" || topBarMessages.length <= 1) return;
+    if (effectiveTopBarMode !== "slide" || topBarMessages.length <= 1) return;
     const interval = setInterval(() => setSlideIdx(prev => (prev + 1) % topBarMessages.length), 3500);
     return () => clearInterval(interval);
-  }, [topBarConfig?.mode, topBarMessages.length]);
+  }, [effectiveTopBarMode, topBarMessages.length]);
+
+  const dismissTopBar = () => {
+    setTopBarDismissed(true);
+    try {
+      sessionStorage.setItem(TOPBAR_DISMISS_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  };
 
   // Dynamic category nav from CMS
   const { data: cmsNavItems } = useQuery({
@@ -152,6 +186,19 @@ export function Header() {
     return () => document.removeEventListener("mousedown", handler);
   }, [userMenuOpen]);
 
+  // Bottom-nav "Catégories" opens the same panel as the former hamburger
+  useEffect(() => {
+    const onToggle = () => setMobileOpen((v) => !v);
+    window.addEventListener(TOGGLE_CATEGORIES_EVENT, onToggle);
+    return () => window.removeEventListener(TOGGLE_CATEGORIES_EVENT, onToggle);
+  }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent(CATEGORIES_PANEL_STATE_EVENT, { detail: { open: mobileOpen } }),
+    );
+  }, [mobileOpen]);
+
   const handleMegaEnter = () => {
     clearTimeout(megaTimeoutRef.current);
     setMegaOpen(true);
@@ -175,14 +222,39 @@ export function Header() {
 
   const topBarBg = topBarConfig?.bg_color || undefined;
   const topBarText = topBarConfig?.text_color || undefined;
-  const topBarMode = topBarConfig?.mode || "static";
+  const topBarMode = effectiveTopBarMode;
+
+  const topBarInner = (
+    <>
+      {topBarMode === "marquee" ? (
+        <div className="whitespace-nowrap animate-marquee inline-flex gap-12">
+          {topBarMessages.map((msg, i) => <span key={i}>{msg}</span>)}
+          {topBarMessages.map((msg, i) => <span key={`d-${i}`}>{msg}</span>)}
+        </div>
+      ) : topBarMode === "slide" ? (
+        <span className="text-center transition-opacity duration-500 flex-1 px-2">
+          {topBarMessages[slideIdx % topBarMessages.length]}
+        </span>
+      ) : (
+        <>
+          {topBarMessages.map((msg, i) => (
+            <span key={i} className="whitespace-nowrap hidden md:inline-flex items-center gap-1.5">
+              {msg}
+              {i < topBarMessages.length - 1 && <span className="mx-4 opacity-30">|</span>}
+            </span>
+          ))}
+          <span className="md:hidden text-center flex-1 px-2">{topBarMessages[0]}</span>
+        </>
+      )}
+    </>
+  );
 
   return (
     <header className="sticky top-0 z-50 bg-card" style={{ paddingTop: "env(safe-area-inset-top)", backgroundColor: headerBg }}>
-      {/* Top bar / promo zone */}
+      {/* Top bar / promo zone — paints under status bar (Alibaba-style) */}
       {topBarMessages.length > 0 && (
         <div
-          className="text-[11px] py-1.5"
+          className="text-[11px] py-1.5 relative"
           style={{
             backgroundColor: topBarBg || "hsl(var(--foreground))",
             color: topBarText || "hsl(var(--card))",
@@ -190,24 +262,30 @@ export function Header() {
             paddingTop: "env(safe-area-inset-top)",
           }}
         >
-          <div className="container flex items-center justify-center gap-8 overflow-hidden">
-            {topBarMode === "marquee" ? (
-              <div className="whitespace-nowrap animate-marquee inline-flex gap-12">
-                {topBarMessages.map((msg, i) => <span key={i}>{msg}</span>)}
-                {topBarMessages.map((msg, i) => <span key={`d-${i}`}>{msg}</span>)}
-              </div>
-            ) : topBarMode === "slide" ? (
-              <span className="text-center transition-opacity duration-500">{topBarMessages[slideIdx % topBarMessages.length]}</span>
+          <div className="container flex items-center justify-center gap-2 overflow-hidden min-h-[28px]">
+            {topBarLink ? (
+              <a
+                href={topBarLink}
+                className="flex flex-1 items-center justify-center gap-8 overflow-hidden min-w-0 hover:opacity-90"
+                target={topBarLink.startsWith("http") ? "_blank" : undefined}
+                rel={topBarLink.startsWith("http") ? "noopener noreferrer" : undefined}
+              >
+                {topBarInner}
+              </a>
             ) : (
-              <>
-                {topBarMessages.map((msg, i) => (
-                  <span key={i} className="whitespace-nowrap hidden md:inline-flex items-center gap-1.5">
-                    {msg}
-                    {i < topBarMessages.length - 1 && <span className="mx-4 opacity-30">|</span>}
-                  </span>
-                ))}
-                <span className="md:hidden text-center">{topBarMessages[0]}</span>
-              </>
+              <div className="flex flex-1 items-center justify-center gap-8 overflow-hidden min-w-0">
+                {topBarInner}
+              </div>
+            )}
+            {topBarDismissible && (
+              <button
+                type="button"
+                onClick={dismissTopBar}
+                className="shrink-0 p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center opacity-80 hover:opacity-100"
+                aria-label={t("common.close") || "Fermer"}
+              >
+                <X size={14} />
+              </button>
             )}
           </div>
         </div>
@@ -215,34 +293,22 @@ export function Header() {
 
       {/* Main header row */}
       <div className="border-b border-border">
-        <div className="container flex items-center h-14 gap-4">
-          <button
-            className="lg:hidden p-1.5 text-foreground"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label="Menu"
-          >
-            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
-
+        <div className="container flex items-center h-14 gap-2 md:gap-4">
           <BrandLogo variant="header" />
 
-          <div className="hidden md:flex flex-1 max-w-2xl mx-auto px-6">
+          {/* Sticky always-on search (phone + tablet); desktop below */}
+          <div className="flex flex-1 min-w-0 lg:hidden">
+            <PredictiveSearch />
+          </div>
+          <div className="hidden lg:flex flex-1 max-w-2xl mx-auto px-6">
             <PredictiveSearch />
           </div>
 
-          <div className="flex items-center gap-0.5 ml-auto">
-            <button
-              className="hidden md:flex lg:hidden p-2 text-foreground"
-              onClick={() => setSearchOpen(!searchOpen)}
-              aria-label={t("header.search")}
-            >
-              <Search size={20} />
-            </button>
-
+          <div className="flex items-center gap-0.5 ml-auto shrink-0">
             {user && (
               <Link
                 to="/sourcing"
-                className="p-2 text-foreground hover:text-primary transition-colors"
+                className="hidden sm:flex p-2 text-foreground hover:text-primary transition-colors"
                 aria-label={t("header.findProduct") || "Trouvez-moi ce produit"}
                 title={t("header.findProduct") || "Trouvez-moi ce produit"}
               >
@@ -259,7 +325,12 @@ export function Header() {
             )}
 
             {user && (
-              <Link to="/messages" className="p-2 text-foreground hover:text-primary transition-colors relative" aria-label={t("header.messages")} title={t("header.messages")}>
+              <Link
+                to="/messages"
+                className="hidden md:flex p-2 text-foreground hover:text-primary transition-colors relative"
+                aria-label={t("header.messages")}
+                title={t("header.messages")}
+              >
                 <MessageCircle size={20} />
                 {unreadCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
@@ -271,7 +342,7 @@ export function Header() {
 
             <Link
               to="/tracking"
-              className={`p-2 text-foreground hover:text-primary transition-colors ${standalonePwa ? "hidden md:flex" : ""}`}
+              className={`p-2 text-foreground hover:text-primary transition-colors ${standalonePwa ? "hidden md:flex" : "hidden sm:flex"}`}
               aria-label={t("header.tracking") || "Suivi colis"}
               title={t("header.tracking") || "Suivi colis"}
             >
@@ -280,7 +351,7 @@ export function Header() {
 
             <Link
               to="/help-center"
-              className={`flex p-2 text-foreground hover:text-primary transition-colors relative ${standalonePwa ? "hidden md:flex" : ""}`}
+              className={`p-2 text-foreground hover:text-primary transition-colors relative ${standalonePwa ? "hidden md:flex" : "hidden sm:flex"}`}
               aria-label={t("header.support")}
               title={t("header.support")}
             >
@@ -341,7 +412,7 @@ export function Header() {
                 <User size={20} />
               </Link>
             )}
-            <Link to="/wishlist" className="hidden md:flex p-2 text-foreground hover:text-primary transition-colors relative" aria-label={t("header.wishlist")}>
+            <Link to="/wishlist" className="flex p-2 text-foreground hover:text-primary transition-colors relative" aria-label={t("header.wishlist")}>
               <Heart size={20} />
               {wishlistCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-sale text-sale-foreground text-[10px] font-bold rounded-full flex items-center justify-center">{wishlistCount > 99 ? "99+" : wishlistCount}</span>
@@ -356,12 +427,6 @@ export function Header() {
           </div>
         </div>
       </div>
-
-      {searchOpen && (
-        <div className="md:hidden px-4 py-2 border-b border-border bg-card">
-          <PredictiveSearch mobile onClose={() => setSearchOpen(false)} />
-        </div>
-      )}
 
       <nav className="hidden lg:block border-b border-border relative"
         style={{ backgroundColor: navBg || undefined }}
@@ -404,6 +469,17 @@ export function Header() {
 
       {mobileOpen && (
         <nav className="lg:hidden border-b border-border bg-card animate-fade-in max-h-[70vh] overflow-y-auto">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-border sticky top-0 bg-card z-10">
+            <span className="text-sm font-semibold text-foreground">{t("bottomNav.categories")}</span>
+            <button
+              type="button"
+              className="p-2 text-muted-foreground hover:text-foreground rounded-full"
+              aria-label={t("common.close") || "Fermer"}
+              onClick={() => setMobileOpen(false)}
+            >
+              <X size={18} />
+            </button>
+          </div>
           <div className="py-2">
             {(() => {
               const parents = (mobileCategories || []).filter((c) => !c.parent_id);

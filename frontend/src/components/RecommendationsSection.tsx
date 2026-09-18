@@ -2,19 +2,36 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/contexts/I18nContext";
-import { Sparkles, Loader2 } from "lucide-react";
-import { Link } from "react-router-dom";
-import { imgUrl } from "@/lib/image-url";
+import { Sparkles } from "lucide-react";
 import { fetchRecentlyViewedProductIds } from "@/lib/user-product-views";
+import { ProductRail } from "@/components/ProductRail";
+import type { Product } from "@/services/api";
+import { useHomeMarket } from "@/contexts/HomeMarketContext";
 
-interface RecommendedProduct {
+function toProduct(p: {
   id: string;
   slug?: string | null;
   name: string;
+  name_fr?: string | null;
   nameFr?: string | null;
   price: number;
-  image: string;
-  rating?: number;
+  rating?: number | null;
+  product_images?: Array<{ image_url: string }>;
+  image?: string;
+}): Product {
+  return {
+    id: p.id,
+    slug: p.slug || undefined,
+    name: p.name,
+    nameFr: p.name_fr || p.nameFr || p.name,
+    price: Number(p.price),
+    currency: "USD",
+    image: p.image || p.product_images?.[0]?.image_url || "/placeholder.svg",
+    category: "",
+    categoryFr: "",
+    rating: p.rating ?? 0,
+    reviewCount: 0,
+  };
 }
 
 /** Fisher-Yates — mutates and returns the same array. */
@@ -34,11 +51,13 @@ function pickFromTopN<T>(list: T[], n: number, poolSize = 10): T[] {
 
 export function RecommendationsSection() {
   const { user } = useAuth();
-  const { t, locale, formatPrice } = useI18n();
-  const [products, setProducts] = useState<RecommendedProduct[]>([]);
+  const { t } = useI18n();
+  const { shopTypeFilter } = useHomeMarket();
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       setLoading(true);
       try {
@@ -56,12 +75,17 @@ export function RecommendationsSection() {
           }
         }
 
-        const { data: allProducts } = await supabase
+        let q = supabase
           .from("products_public")
-          .select("id, slug, name, name_fr, price, rating, product_images(image_url, position), gender_target")
+          .select(
+            "id, slug, name, name_fr, price, rating, product_images(image_url, position), gender_target, shop_type",
+          )
           .eq("publish_status", "published")
           .order("rating", { ascending: false })
           .limit(60);
+        if (shopTypeFilter) q = (q as any).eq("shop_type", shopTypeFilter);
+        const { data: allProducts } = await q;
+        if (cancelled) return;
         const products_list = (allProducts || []) as any[];
 
         let topRow: any[];
@@ -102,12 +126,15 @@ export function RecommendationsSection() {
 
         // Ligne 2 : pool aléatoire (mix anciens + nouveaux)
         const topIds = new Set(topRow.map(p => p.id));
-        const { data: poolData } = await supabase
+        let poolQ = supabase
           .from("products_public")
-          .select("id, slug, name, name_fr, price, rating, product_images(image_url, position)")
+          .select("id, slug, name, name_fr, price, rating, product_images(image_url, position), shop_type")
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
           .limit(80);
+        if (shopTypeFilter) poolQ = (poolQ as any).eq("shop_type", shopTypeFilter);
+        const { data: poolData } = await poolQ;
+        if (cancelled) return;
         const pool = ((poolData || []) as any[]).filter(p => !topIds.has(p.id));
         shuffleInPlace(pool);
         const bottomRow = pool.slice(0, 4);
@@ -116,6 +143,7 @@ export function RecommendationsSection() {
 
         if (user) {
           const recentIds = await fetchRecentlyViewedProductIds(user.id);
+          if (cancelled) return;
           if (recentIds.size > 0) {
             const filtered = combined.filter((p: any) => !recentIds.has(p.id));
             if (filtered.length >= 4) {
@@ -124,93 +152,39 @@ export function RecommendationsSection() {
           }
         }
 
-        setProducts(
-          combined.map((p: any) => ({
-            id: p.id,
-            slug: p.slug,
-            name: p.name,
-            nameFr: p.name_fr,
-            price: Number(p.price),
-            rating: p.rating,
-            image: p.product_images?.[0]?.image_url || "/placeholder.svg",
-          }))
-        );
+        if (cancelled) return;
+        setProducts(combined.map((p: any) => toProduct(p)));
       } catch {
-        const { data: popular } = await supabase
+        if (cancelled) return;
+        let fallbackQ = supabase
           .from("products_public")
-          .select("id, slug, name, name_fr, price, rating, product_images(image_url, position)")
+          .select("id, slug, name, name_fr, price, rating, product_images(image_url, position), shop_type")
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
           .limit(8);
+        if (shopTypeFilter) fallbackQ = (fallbackQ as any).eq("shop_type", shopTypeFilter);
+        const { data: popular } = await fallbackQ;
+        if (cancelled) return;
 
-        setProducts(
-          (popular || []).map((p: any) => ({
-            id: p.id,
-            slug: p.slug,
-            name: p.name,
-            nameFr: (p as any).name_fr,
-            price: Number(p.price),
-            rating: p.rating,
-            image: p.product_images?.[0]?.image_url || "/placeholder.svg",
-          }))
-        );
+        setProducts((popular || []).map((p: any) => toProduct(p)));
       }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
     load();
-  }, [user]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user, shopTypeFilter]);
 
-  if (loading) {
-    return (
-      <div className="container py-6">
-        <div className="flex items-center justify-center py-8">
-          <Loader2 size={20} className="animate-spin text-primary" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!products.length) return null;
+  if (!loading && !products.length) return null;
 
   return (
-    <section className="container py-6" aria-labelledby="home-recommendations-heading">
-      <div className="flex items-center gap-2 mb-4">
-        <Sparkles size={20} className="text-primary" aria-hidden />
-        <h2 id="home-recommendations-heading" className="text-lg font-bold text-foreground">
-          {user ? t("home.forYou") : t("home.popularProducts")}
-        </h2>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        {products.map((product) => {
-          const displayName = locale === "fr" ? product.nameFr || product.name : product.name;
-          return (
-          <Link
-            key={product.id}
-            to={`/product/${product.slug || product.id}`}
-            className="group bg-card border border-border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
-          >
-            <div className="aspect-square overflow-hidden bg-muted">
-              <img
-                src={imgUrl(product.image, { width: 400, height: 400, resize: "cover" })}
-                alt={displayName}
-                className="w-full h-full object-cover object-center"
-                loading="lazy"
-              />
-            </div>
-            <div className="p-2.5">
-              <p className="text-xs font-medium text-foreground line-clamp-2 mb-1">{displayName}</p>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-primary">{formatPrice(product.price)}</span>
-                {product.rating != null && product.rating > 0 && (
-                  <span className="text-[10px] text-primary">★ {product.rating}</span>
-                )}
-              </div>
-            </div>
-          </Link>
-          );
-        })}
-      </div>
-    </section>
+    <ProductRail
+      title={user ? t("home.forYou") : t("home.popularProducts")}
+      titleId="home-recommendations-heading"
+      products={products}
+      loading={loading}
+      icon={<Sparkles size={20} className="text-primary" aria-hidden />}
+    />
   );
 }

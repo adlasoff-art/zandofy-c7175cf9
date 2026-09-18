@@ -4,11 +4,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { HeroBanner } from "@/components/HeroBanner";
 import { CategoryBanner } from "@/components/CategoryBanner";
+import { HomeServiceCards } from "@/components/HomeServiceCards";
+import { HomeMarketSwitch } from "@/components/HomeMarketSwitch";
+import { HomeMarketProvider } from "@/contexts/HomeMarketContext";
 import { LazyMount } from "@/components/LazyMount";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { SEOHead } from "@/components/SEOHead";
 import { useSeoConfig } from "@/hooks/use-seo-config";
 import { useSeoOverride } from "@/hooks/use-seo-overrides";
+import { requestHomeReshuffle } from "@/lib/home-session-shuffle";
 import { Loader2 } from "lucide-react";
 import { lazyRetry } from "@/lib/lazy-retry";
 
@@ -18,6 +22,7 @@ const TopTrends = lazyRetry(() => import("@/components/TopTrends").then(m => ({ 
 const ProductGrid = lazyRetry(() => import("@/components/ProductGrid").then(m => ({ default: m.ProductGrid })));
 const FeaturedSidebar = lazyRetry(() => import("@/components/FeaturedSidebar").then(m => ({ default: m.FeaturedSidebar })));
 const RecommendationsSection = lazyRetry(() => import("@/components/RecommendationsSection").then(m => ({ default: m.RecommendationsSection })));
+const HomeCmsRails = lazyRetry(() => import("@/components/HomeCmsRails").then(m => ({ default: m.HomeCmsRails })));
 const Footer = lazyRetry(() => import("@/components/Footer").then(m => ({ default: m.Footer })));
 const FloatingActions = lazyRetry(() => import("@/components/FloatingActions").then(m => ({ default: m.FloatingActions })));
 
@@ -31,6 +36,7 @@ const Index = () => {
   const seoConfig = useSeoConfig();
   const override = useSeoOverride("/");
   const handleRefresh = useCallback(async () => {
+    requestHomeReshuffle();
     await queryClient.invalidateQueries();
     await new Promise((resolve) => setTimeout(resolve, 400));
   }, [queryClient]);
@@ -87,6 +93,7 @@ const Index = () => {
   ];
 
   return (
+    <HomeMarketProvider>
     <div
       className="min-h-screen bg-background"
       {...handlers}
@@ -116,7 +123,9 @@ const Index = () => {
       <main>
         <h1 className="sr-only">{pageH1}</h1>
         <HeroBanner />
+        <HomeMarketSwitch />
         <CategoryBanner />
+        <HomeServiceCards />
 
         <LazyMount minHeight={320} initialShown={restoreHomeLayout}>
           <Suspense fallback={<div style={{ minHeight: 320 }} />}>
@@ -124,27 +133,25 @@ const Index = () => {
           </Suspense>
         </LazyMount>
 
-        <LazyMount minHeight={400} initialShown={restoreHomeLayout}>
-          <Suspense fallback={<div style={{ minHeight: 400 }} />}>
+        <LazyMount minHeight={280} initialShown={restoreHomeLayout}>
+          <Suspense fallback={<div style={{ minHeight: 280 }} />}>
             <RecommendationsSection />
           </Suspense>
         </LazyMount>
 
-        {/* Featured sidebar + TopTrends only */}
+        {/* TopTrends mobile-first; FeaturedSidebar desktop only (plan order) */}
         <div className="container">
           <div className="flex flex-col lg:flex-row gap-4 py-4">
-            {/* Featured sidebar – left on desktop */}
-            <div className="order-2 lg:order-1">
+            <div className="hidden lg:block order-2 lg:order-1">
               <LazyMount minHeight={300} initialShown={restoreHomeLayout}>
                 <Suspense fallback={<div style={{ minHeight: 300 }} />}>
                   <FeaturedSidebar />
                 </Suspense>
               </LazyMount>
             </div>
-            {/* TopTrends beside sidebar */}
             <div className="flex-1 min-w-0 order-1 lg:order-2">
-              <LazyMount minHeight={500} initialShown={restoreHomeLayout}>
-                <Suspense fallback={<div style={{ minHeight: 500 }} />}>
+              <LazyMount minHeight={280} initialShown={restoreHomeLayout}>
+                <Suspense fallback={<div style={{ minHeight: 280 }} />}>
                   <TopTrends />
                 </Suspense>
               </LazyMount>
@@ -152,7 +159,12 @@ const Index = () => {
           </div>
         </div>
 
-        {/* ProductGrid returns to full width */}
+        <LazyMount minHeight={280} initialShown={restoreHomeLayout}>
+          <Suspense fallback={<div style={{ minHeight: 280 }} />}>
+            <HomeCmsRails />
+          </Suspense>
+        </LazyMount>
+
         <LazyMount minHeight={600} initialShown={restoreHomeLayout}>
           <Suspense fallback={<div style={{ minHeight: 600 }} />}>
             <ProductGrid restoreFromCache={restoreHomeLayout} />
@@ -170,6 +182,7 @@ const Index = () => {
         <FloatingActions />
       </Suspense>
     </div>
+    </HomeMarketProvider>
   );
 };
 

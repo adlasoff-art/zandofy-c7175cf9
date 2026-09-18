@@ -199,6 +199,8 @@ export async function fetchProducts(params?: {
   categoryId?: string;
   storeId?: string;
   orderBy?: "popular" | "newest" | "default";
+  /** Filter by products_public.shop_type (local | international). */
+  shopType?: "local" | "international";
 }): Promise<Product[]> {
   const tryFetch = async (selectQuery: string): Promise<{ data: any[] | null; error: any }> => {
     let query = supabase
@@ -225,6 +227,9 @@ export async function fetchProducts(params?: {
     }
     if (params?.sale) {
       query = query.eq("is_sale", true);
+    }
+    if (params?.shopType) {
+      query = (query as any).eq("shop_type", params.shopType);
     }
     if (params?.offset) {
       query = query.range(params.offset, params.offset + (params?.limit || 24) - 1);
@@ -296,10 +301,13 @@ function filterSuperPromoRows(rows: any[]): any[] {
   return rows.filter(isWithinSuperPromoZone);
 }
 
-export async function fetchFlashSaleProducts(): Promise<
+export async function fetchFlashSaleProducts(opts?: {
+  shopType?: "local" | "international";
+}): Promise<
   (Product & { flashPrice?: number; flashEndsAt?: string })[]
 > {
   const now = new Date().toISOString();
+  const shopType = opts?.shopType;
 
   // First try real flash_sales table
   const { data: flashData } = await fromTable("flash_sales")
@@ -310,10 +318,9 @@ export async function fetchFlashSaleProducts(): Promise<
 
   if (flashData && flashData.length > 0) {
     const productIds = flashData.map((f: any) => f.product_id);
-    const { data, error } = await supabase
-      .from(PRODUCTS_PUBLIC)
-      .select(PRODUCT_SELECT)
-      .in("id", productIds);
+    let q = supabase.from(PRODUCTS_PUBLIC).select(PRODUCT_SELECT).in("id", productIds);
+    if (shopType) q = (q as any).eq("shop_type", shopType);
+    const { data, error } = await q;
 
     if (error || !data) return [];
 
@@ -332,11 +339,13 @@ export async function fetchFlashSaleProducts(): Promise<
   }
 
   // Fallback: products with is_sale
-  const { data, error } = await supabase
+  let saleQ = supabase
     .from(PRODUCTS_PUBLIC)
     .select(PRODUCT_SELECT)
     .eq("is_sale", true)
     .order("discount", { ascending: false });
+  if (shopType) saleQ = (saleQ as any).eq("shop_type", shopType);
+  const { data, error } = await saleQ;
 
   if (error) {
     console.error("Error fetching flash sales:", error);

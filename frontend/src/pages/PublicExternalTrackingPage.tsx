@@ -47,6 +47,7 @@ type PublicShipment = {
   destination_country_code?: string | null;
   destination_city?: string | null;
   weight_kg?: number | null;
+  total_cbm?: number | null;
   quoted_amount?: number | null;
   quoted_currency?: string | null;
   photo_paths?: string[];
@@ -140,6 +141,12 @@ export default function PublicExternalTrackingPage() {
                 <dt className="text-xs text-muted-foreground">Poids</dt>
                 <dd className="font-medium text-foreground">
                   {shipment.weight_kg != null ? `${Number(shipment.weight_kg)} kg` : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Volume</dt>
+                <dd className="font-medium text-foreground">
+                  {shipment.total_cbm != null ? `${Number(shipment.total_cbm)} CBM` : "—"}
                 </dd>
               </div>
               <div>

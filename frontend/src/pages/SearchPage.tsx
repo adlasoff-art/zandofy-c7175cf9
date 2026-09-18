@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useSearchParams, Link, useLocation, useNavigate } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
@@ -14,23 +14,18 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SlidersHorizontal, X, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
-import { TOGGLE_SEARCH_EVENT } from "@/components/MobileBottomNav";
 
 export default function SearchPage() {
   const { t, locale, formatPrice } = useI18n();
   const labelOf = (c: { name?: string | null; nameFr?: string | null }) =>
     locale === "fr" ? (c.nameFr ?? c.name ?? "") : (c.name ?? c.nameFr ?? "");
   const [searchParams, setSearchParams] = useSearchParams();
-  const location = useLocation();
-  const navigate = useNavigate();
   const queryParam = searchParams.get("q") || "";
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(
-    () => Boolean((location.state as { openSearch?: boolean } | null)?.openSearch)
-  );
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(true);
 
   // Filter state
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -67,22 +62,6 @@ export default function SearchPage() {
       }
     );
   }, []);
-
-  // Listen for mobile bottom nav search toggle
-  useEffect(() => {
-    const handler = () => setMobileSearchOpen((prev) => !prev);
-    window.addEventListener(TOGGLE_SEARCH_EVENT, handler);
-    return () => window.removeEventListener(TOGGLE_SEARCH_EVENT, handler);
-  }, []);
-
-  // Open search bar when navigated with state.openSearch (1st bottom-nav tap)
-  useEffect(() => {
-    const state = location.state as { openSearch?: boolean } | null;
-    if (state?.openSearch) {
-      setMobileSearchOpen(true);
-      navigate(location.pathname + location.search, { replace: true, state: {} });
-    }
-  }, [location.state, location.pathname, location.search, navigate]);
 
   // Run search
   const runSearch = useCallback(async () => {
