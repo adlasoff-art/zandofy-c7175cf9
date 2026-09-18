@@ -209,9 +209,11 @@ export async function fetchEligibleFreightOffers(
       const routes = p.forwarder?.coverage_routes ?? [];
       const supports = p.forwarder?.supported_modes;
       if (supports && supports.length > 0 && !supports.includes(input.mode)) return false;
-      return routes.some((r) =>
+      return routes.some((r: any) =>
         (r?.origin_country || "").toUpperCase() === originISO &&
-        (r?.destination_country || "").toUpperCase() === destISO,
+        (
+          (r?.destination_country || r?.dest_country || "").toUpperCase() === destISO
+        ),
       );
     });
 

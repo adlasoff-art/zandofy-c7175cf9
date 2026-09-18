@@ -72,16 +72,38 @@ export default function ForwarderDashboardPage() {
       const rows = (data || []) as any[];
       const byMode: Record<string, number> = {};
       const byDest: Record<string, number> = {};
+      const byCurrency: Record<string, number> = {};
       let totalQuoted = 0;
       let totalWeight = 0;
       for (const r of rows) {
         byMode[r.mode] = (byMode[r.mode] || 0) + 1;
         const d = r.destination_country_code || "?";
         byDest[d] = (byDest[d] || 0) + 1;
-        totalQuoted += Number(r.quoted_amount) || 0;
+        const amt = Number(r.quoted_amount) || 0;
+        totalQuoted += amt;
+        const cur = r.quoted_currency || "USD";
+        byCurrency[cur] = (byCurrency[cur] || 0) + amt;
         totalWeight += Number(r.weight_kg) || 0;
       }
-      return { count: rows.length, byMode, byDest, totalQuoted, totalWeight };
+      return { count: rows.length, byMode, byDest, byCurrency, totalQuoted, totalWeight };
+    },
+  });
+
+  const { data: platformFinance } = useQuery({
+    queryKey: ["forwarder-dash-platform-finance", forwarder?.id],
+    enabled: !!forwarder?.id && tab === "analytics" && canFinance,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data: wallet } = await (supabase as any)
+        .from("forwarder_wallets")
+        .select("balance, total_earned, currency")
+        .eq("forwarder_id", forwarder!.id)
+        .maybeSingle();
+      return {
+        balance: Number(wallet?.balance) || 0,
+        totalEarned: Number(wallet?.total_earned) || 0,
+        currency: (wallet?.currency as string) || "USD",
+      };
     },
   });
 
@@ -186,41 +208,108 @@ export default function ForwarderDashboardPage() {
       )}
 
       {tab === "analytics" && canFinance && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard icon={Ship} label="Expéditions" value={String(analytics?.count ?? "…")} />
-            <KpiCard icon={TrendingUp} label="CA quoté (snapshot)" value={
-              analytics ? analytics.totalQuoted.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) : "…"
-            } />
-            <KpiCard icon={Target} label="Poids total (kg)" value={
-              analytics ? analytics.totalWeight.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) : "…"
-            } />
-            <KpiCard icon={Wallet} label="Portefeuille" value="→" hint="Ouvrir finance" />
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Par mode</CardTitle></CardHeader>
-              <CardContent className="space-y-1 text-sm">
-                {analytics && Object.keys(analytics.byMode).length > 0
-                  ? Object.entries(analytics.byMode).map(([k, v]) => (
+        <div className="space-y-6">
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold text-foreground">Fret plateforme (Zandofy)</h2>
+            <p className="text-[11px] text-muted-foreground">
+              Montants encaissés via le checkout quand le fret est payé — crédités au portefeuille.
+              Séparé du TMS externe (pas de fusion multi-devises).
+            </p>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+              <KpiCard
+                icon={Wallet}
+                label="Total gagné (wallet)"
+                value={
+                  platformFinance
+                    ? `${platformFinance.totalEarned.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} ${platformFinance.currency}`
+                    : "…"
+                }
+                hint="Crédités sur commandes payées"
+              />
+              <KpiCard
+                icon={Banknote}
+                label="Solde disponible"
+                value={
+                  platformFinance
+                    ? `${platformFinance.balance.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} ${platformFinance.currency}`
+                    : "…"
+                }
+              />
+              <KpiCard icon={ArrowLeftRight} label="Handoffs (30j)" value={String(handoffStats?.total ?? "…")} />
+            </div>
+            <QuickLink to="/forwarder/wallet" icon={Wallet} label="Ouvrir le portefeuille" />
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold text-foreground">TMS externe (hors marketplace)</h2>
+            <p className="text-[11px] text-muted-foreground">
+              Snapshots de devis à la création d&apos;expédition — indicatifs, non crédités au wallet.
+            </p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <KpiCard icon={Ship} label="Expéditions" value={String(analytics?.count ?? "…")} />
+              <KpiCard
+                icon={TrendingUp}
+                label="CA quoté (somme brute)"
+                value={
+                  analytics
+                    ? analytics.totalQuoted.toLocaleString("fr-FR", { maximumFractionDigits: 0 })
+                    : "…"
+                }
+                hint="Attention: devises mélangées si multi-currency"
+              />
+              <KpiCard
+                icon={Target}
+                label="Poids total (kg)"
+                value={
+                  analytics
+                    ? analytics.totalWeight.toLocaleString("fr-FR", { maximumFractionDigits: 0 })
+                    : "…"
+                }
+              />
+              <KpiCard
+                icon={Banknote}
+                label="Par devise (TMS)"
+                value={
+                  analytics && Object.keys(analytics.byCurrency).length
+                    ? Object.entries(analytics.byCurrency)
+                        .map(([c, v]) => `${Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 0 })} ${c}`)
+                        .join(" · ")
+                    : "—"
+                }
+              />
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Par mode</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1 text-sm">
+                  {analytics && Object.keys(analytics.byMode).length > 0 ? (
+                    Object.entries(analytics.byMode).map(([k, v]) => (
                       <Row key={k} label={k.toUpperCase()} value={String(v)} />
                     ))
-                  : <p className="text-xs text-muted-foreground">Pas encore de données.</p>}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Par destination</CardTitle></CardHeader>
-              <CardContent className="space-y-1 text-sm">
-                {analytics && Object.keys(analytics.byDest).length > 0
-                  ? Object.entries(analytics.byDest)
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Pas encore de données.</p>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Par destination</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1 text-sm">
+                  {analytics && Object.keys(analytics.byDest).length > 0 ? (
+                    Object.entries(analytics.byDest)
                       .sort((a, b) => b[1] - a[1])
                       .slice(0, 8)
                       .map(([k, v]) => <Row key={k} label={k} value={String(v)} />)
-                  : <p className="text-xs text-muted-foreground">Pas encore de données.</p>}
-              </CardContent>
-            </Card>
-          </div>
-          <QuickLink to="/forwarder/wallet" icon={Wallet} label="Ouvrir le portefeuille" />
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Pas encore de données.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </section>
         </div>
       )}
 

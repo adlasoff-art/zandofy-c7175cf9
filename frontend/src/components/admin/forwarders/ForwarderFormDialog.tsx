@@ -14,6 +14,7 @@ import { z } from "zod";
 import { TransporterUserPicker } from "./TransporterUserPicker";
 import { CountryCombobox, getCountryName } from "@/components/vendor/CountryCombobox";
 import { ForwarderShippingTemplatesPanel } from "./ForwarderShippingTemplatesPanel";
+import { CoverageRoutesEditor } from "@/components/forwarder/CoverageRoutesEditor";
 
 type TransportMode = "air" | "sea" | "road" | "rail";
 
@@ -156,7 +157,9 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
         is_active: !!payload.is_active,
       };
       if (payload.id) {
-        const { error } = await sb.from("forwarders").update(body).eq("id", payload.id);
+        // Routes are managed by CoverageRoutesEditor (immediate save) — do not overwrite with stale form chips
+        const { coverage_routes: _cr, ...updateBody } = body;
+        const { error } = await sb.from("forwarders").update(updateBody).eq("id", payload.id);
         if (error) throw error;
       } else {
         const { error } = await sb.from("forwarders").insert(body);
@@ -351,54 +354,65 @@ export function ForwarderFormDialog({ open, onOpenChange, forwarder }: Props) {
               <Route size={13} className="text-primary" /> Routes desservies (origine → destination) *
             </Label>
             <p className="text-[11px] text-muted-foreground">
-              Pays d'origine des marchandises que ce transitaire accepte d'acheminer vers une destination donnée. Sans route déclarée, le transitaire n'apparaît pour aucune commande.
+              Pays d&apos;origine des marchandises que ce transitaire accepte d&apos;acheminer vers une destination donnée. Sans route déclarée, le transitaire n&apos;apparaît pour aucune commande.
             </p>
-            <div className="grid grid-cols-[1fr_auto_1fr_auto] items-end gap-2 pt-1">
-              <div>
-                <CountryCombobox
-                  value={newOrigin}
-                  onChange={(v) => setNewOrigin(v)}
-                  label="Origine"
-                  placeholder="Pays d'origine..."
-                  showNone={false}
-                />
-              </div>
-              <span className="pb-2 text-muted-foreground">→</span>
-              <div>
-                <CountryCombobox
-                  value={newDest}
-                  onChange={(v) => setNewDest(v)}
-                  label="Destination"
-                  placeholder="Pays de destination..."
-                  showNone={false}
-                />
-              </div>
-              <Button type="button" size="sm" onClick={addRoute} disabled={!newOrigin || !newDest}>
-                <Plus size={14} />
-              </Button>
-            </div>
-            {(form.coverage_routes ?? []).length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-2">
-                {(form.coverage_routes ?? []).map((r, idx) => (
-                  <div
-                    key={`${r.origin_country}-${r.destination_country}-${idx}`}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-background text-xs"
-                  >
-                    <span className="font-mono">{r.origin_country}</span>
-                    <span className="text-muted-foreground hidden sm:inline">{getCountryName(r.origin_country)}</span>
-                    <span className="text-muted-foreground">→</span>
-                    <span className="font-mono">{r.destination_country}</span>
-                    <span className="text-muted-foreground hidden sm:inline">{getCountryName(r.destination_country)}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeRoute(idx)}
-                      className="ml-1 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 size={11} />
-                    </button>
+            {forwarder?.id ? (
+              <CoverageRoutesEditor
+                forwarderId={forwarder.id}
+                initialRoutes={(form.coverage_routes as any) || []}
+                compact
+                onSaved={() => qc.invalidateQueries({ queryKey: ["admin-forwarders"] })}
+              />
+            ) : (
+              <>
+                <div className="grid grid-cols-[1fr_auto_1fr_auto] items-end gap-2 pt-1">
+                  <div>
+                    <CountryCombobox
+                      value={newOrigin}
+                      onChange={(v) => setNewOrigin(v)}
+                      label="Origine"
+                      placeholder="Pays d'origine..."
+                      showNone={false}
+                    />
                   </div>
-                ))}
-              </div>
+                  <span className="pb-2 text-muted-foreground">→</span>
+                  <div>
+                    <CountryCombobox
+                      value={newDest}
+                      onChange={(v) => setNewDest(v)}
+                      label="Destination"
+                      placeholder="Pays de destination..."
+                      showNone={false}
+                    />
+                  </div>
+                  <Button type="button" size="sm" onClick={addRoute} disabled={!newOrigin || !newDest}>
+                    <Plus size={14} />
+                  </Button>
+                </div>
+                {(form.coverage_routes ?? []).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-2">
+                    {(form.coverage_routes ?? []).map((r, idx) => (
+                      <div
+                        key={`${r.origin_country}-${r.destination_country}-${idx}`}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-background text-xs"
+                      >
+                        <span className="font-mono">{r.origin_country}</span>
+                        <span className="text-muted-foreground hidden sm:inline">{getCountryName(r.origin_country)}</span>
+                        <span className="text-muted-foreground">→</span>
+                        <span className="font-mono">{r.destination_country}</span>
+                        <span className="text-muted-foreground hidden sm:inline">{getCountryName(r.destination_country)}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeRoute(idx)}
+                          className="ml-1 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
 

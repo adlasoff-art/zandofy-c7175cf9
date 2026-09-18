@@ -1,16 +1,22 @@
 /**
- * ForwarderShipmentsPage — Vague 1 TMS:
- * Geo O/D, weight + pricing profile quote snapshot, search/filter, compact list.
+ * ForwarderShipmentsPage — TMS create with profile-driven fields (kg / piece / CBM),
+ * photo picker, quote_forwarder snapshot. Shared pricing tables with admin.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Package, Plus, Copy, Link2, Loader2, Plane, Ship, Truck, Search, MessageCircle, Camera } from "lucide-react";
+import { Package, Plus, Copy, Link2, Loader2, Plane, Ship, Truck, Search, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useForwarderContext } from "@/hooks/use-forwarder-context";
 import { GeoFieldsRow, type GeoFieldsValue } from "@/components/address/GeoFieldsRow";
 import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { ConsigneeCombobox, type Consignee } from "@/components/forwarder/ConsigneeCombobox";
+import { ShipmentPhotoPicker } from "@/components/forwarder/ShipmentPhotoPicker";
+import {
+  billingBasisFromRpc,
+  quoteForwarder,
+  type BillingBasis,
+} from "@/services/forwarder-pricing";
 import {
   buildWaMeUrl,
   renderWaTemplate,
@@ -83,7 +89,50 @@ type PieceTier = {
   category_id: string | null;
   custom_label: string | null;
   price: number;
+  min_quantity: number;
 };
+
+type KgTier = {
+  id: string;
+  min_kg: number;
+  max_kg: number | null;
+  flat_price: number | null;
+  price_per_kg: number | null;
+};
+
+/** Build quote_forwarder line items with correct qty semantics (no weight×qty double-count). */
+function buildTmsQuoteItems(opts: {
+  hasPiece: boolean;
+  categoryId?: string;
+  quantity: number;
+  weightKg: number;
+  cbm: number;
+}): { category_id?: string; quantity: number; cbm: number; weight_kg: number }[] {
+  const { hasPiece, categoryId, quantity, weightKg, cbm } = opts;
+  if (hasPiece) {
+    // Piece price uses quantity; do not also multiply shipment-total weight/CBM by qty
+    return [
+      {
+        category_id: categoryId || undefined,
+        quantity,
+        cbm: 0,
+        weight_kg: 0,
+      },
+    ];
+  }
+  return [
+    {
+      quantity: 1,
+      cbm: cbm > 0 ? cbm : 0,
+      weight_kg: weightKg > 0 ? weightKg : 0,
+    },
+  ];
+}
+
+function sanitizeImageExt(name: string): string {
+  const raw = (name.split(".").pop() || "jpg").toLowerCase();
+  return /^[a-z0-9]{1,8}$/.test(raw) && ["jpg", "jpeg", "png", "webp"].includes(raw) ? raw : "jpg";
+}
 
 function geoLabel(country?: string, city?: string): string {
   const parts: string[] = [];
@@ -112,6 +161,7 @@ export default function ForwarderShipmentsPage() {
     notes: "",
     weight_kg: "",
     quantity: "1",
+    total_cbm: "",
     category_id: "",
     pricing_profile_id: "",
     save_to_carnet: false,
@@ -120,7 +170,7 @@ export default function ForwarderShipmentsPage() {
   const [quotePreview, setQuotePreview] = useState<{
     total: number;
     currency: string;
-    billing_basis: "per_kg" | "flat" | "per_piece";
+    billing_basis: BillingBasis;
     breakdown: unknown;
     error?: string;
   } | null>(null);
@@ -159,14 +209,40 @@ export default function ForwarderShipmentsPage() {
     },
   });
 
+  const { data: cities = [] } = useQuery({
+    queryKey: ["cities-for-shipment-profiles"],
+    enabled: showForm,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("cities")
+        .select("id, name, country_code")
+        .eq("is_active", true)
+        .limit(2000);
+      return (data || []) as { id: string; name: string; country_code: string }[];
+    },
+  });
+
   const matchedProfiles = useMemo(() => {
     const dest = (destGeo.country || "").toUpperCase();
-    return profiles.filter((p) => {
+    const cityName = (destGeo.city || "").trim().toLowerCase();
+    const countryMatches = profiles.filter((p) => {
       if (p.mode !== form.mode) return false;
       if (!dest) return true;
       return p.country_code?.toUpperCase() === dest;
     });
-  }, [profiles, form.mode, destGeo.country]);
+    if (!cityName || !dest) return countryMatches;
+    const cityIds = new Set(
+      cities
+        .filter((c) => c.country_code?.toUpperCase() === dest && c.name.trim().toLowerCase() === cityName)
+        .map((c) => c.id),
+    );
+    const exact = countryMatches.filter((p) => p.city_id && cityIds.has(p.city_id));
+    if (exact.length > 0) return exact;
+    // Prefer country-wide when no city-exact profile
+    const wide = countryMatches.filter((p) => !p.city_id);
+    return wide.length > 0 ? wide : countryMatches;
+  }, [profiles, form.mode, destGeo.country, destGeo.city, cities]);
 
   const selectedProfileId = form.pricing_profile_id || matchedProfiles[0]?.id || "";
 
@@ -176,13 +252,52 @@ export default function ForwarderShipmentsPage() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("forwarder_piece_tiers")
-        .select("id, profile_id, category_id, custom_label, price")
+        .select("id, profile_id, category_id, custom_label, price, min_quantity")
         .eq("profile_id", selectedProfileId)
         .order("sort_order");
       if (error) throw error;
       return (data || []) as PieceTier[];
     },
   });
+
+  const { data: kgTiers = [] } = useQuery({
+    queryKey: ["kg-tiers-shipment", selectedProfileId],
+    enabled: !!selectedProfileId && showForm,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("forwarder_kg_tiers")
+        .select("id, min_kg, max_kg, flat_price, price_per_kg")
+        .eq("profile_id", selectedProfileId)
+        .order("sort_order");
+      if (error) throw error;
+      return (data || []) as KgTier[];
+    },
+  });
+
+  const { data: cbmTierCount = 0 } = useQuery({
+    queryKey: ["cbm-tiers-count-shipment", selectedProfileId],
+    enabled: !!selectedProfileId && showForm,
+    queryFn: async () => {
+      const { count, error } = await (supabase as any)
+        .from("forwarder_cbm_tiers")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", selectedProfileId);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
+  const hasPieceTiers = pieceTiers.length > 0;
+  const hasKgTiers = kgTiers.length > 0;
+  const hasCbmTiers = cbmTierCount > 0;
+  const pieceOnlyProfile = hasPieceTiers && !hasKgTiers && !hasCbmTiers;
+  const selectedPieceTier = useMemo(
+    () => pieceTiers.find((t) => t.category_id && t.category_id === form.category_id) || null,
+    [pieceTiers, form.category_id],
+  );
+  const showQuantity = !!selectedPieceTier || (pieceOnlyProfile && !!form.category_id);
+  const showCbmField = hasCbmTiers;
+  const weightRequired = !selectedPieceTier && (hasKgTiers || (!hasPieceTiers && !hasCbmTiers));
 
   const { data: categories = [] } = useQuery({
     queryKey: ["categories-for-shipment-quote"],
@@ -195,16 +310,21 @@ export default function ForwarderShipmentsPage() {
     },
   });
 
-  // Live quote preview
+  // Live quote preview via shared quoteForwarder helper
   useEffect(() => {
     if (!showForm || !selectedProfileId) {
       setQuotePreview(null);
       return;
     }
     const weight = parseFloat(form.weight_kg);
-    const qty = Math.max(1, parseFloat(form.quantity) || 1);
-    const hasPiece = !!form.category_id && pieceTiers.some((t) => t.category_id === form.category_id);
-    if (!hasPiece && (!Number.isFinite(weight) || weight <= 0)) {
+    const cbm = parseFloat(form.total_cbm);
+    const minQty = Math.max(1, selectedPieceTier?.min_quantity || 1);
+    const qty = showQuantity ? Math.max(minQty, parseFloat(form.quantity) || minQty) : 1;
+    const hasPiece = !!selectedPieceTier;
+    const hasCbmInput = Number.isFinite(cbm) && cbm > 0;
+    const hasWeight = Number.isFinite(weight) && weight > 0;
+
+    if (!hasPiece && !hasWeight && !hasCbmInput) {
       setQuotePreview(null);
       return;
     }
@@ -213,25 +333,19 @@ export default function ForwarderShipmentsPage() {
     const t = setTimeout(async () => {
       setQuoteLoading(true);
       try {
-        const items = [
-          {
-            category_id: form.category_id || undefined,
-            quantity: qty,
-            cbm: 0,
-            weight_kg: Number.isFinite(weight) && weight > 0 ? weight : 0,
-          },
-        ];
-        const raw = await (supabase.rpc as any)("quote_forwarder", {
-          p_profile_id: selectedProfileId,
-          p_items: items,
-          p_total_cbm: null,
+        const items = buildTmsQuoteItems({
+          hasPiece,
+          categoryId: form.category_id,
+          quantity: qty,
+          weightKg: hasWeight ? weight : 0,
+          cbm: hasCbmInput ? cbm : 0,
+        });
+        const data = await quoteForwarder({
+          profileId: selectedProfileId,
+          items,
+          totalCbm: hasCbmInput && !hasPiece ? cbm : undefined,
         });
         if (cancelled) return;
-        if (raw.error) {
-          setQuotePreview({ total: 0, currency: "USD", billing_basis: "per_kg", breakdown: {}, error: raw.error.message });
-          return;
-        }
-        const data = raw.data as any;
         if (!data || data.error) {
           setQuotePreview({
             total: 0,
@@ -242,9 +356,23 @@ export default function ForwarderShipmentsPage() {
           });
           return;
         }
-        const tier = data?.subpackages?.[0]?.tier_used as string | undefined;
-        const billing_basis: "per_kg" | "flat" | "per_piece" =
-          tier === "piece" ? "per_piece" : "per_kg";
+        const sub = data.subpackages?.[0];
+        const tier = sub?.tier_used as string | undefined;
+        const billable = Number(sub?.billable_weight_kg) || 0;
+        const lineTotal = Number(sub?.line_total) || 0;
+        let kgTierIsFlat = false;
+        if (tier === "kg" && kgTiers.length > 0) {
+          const match =
+            kgTiers.find(
+              (k) => billable >= k.min_kg && (k.max_kg == null || billable <= k.max_kg),
+            ) || kgTiers[kgTiers.length - 1];
+          kgTierIsFlat = match?.flat_price != null;
+          // Confirm flat: line equals flat_price (within epsilon)
+          if (kgTierIsFlat && match?.flat_price != null) {
+            kgTierIsFlat = Math.abs(lineTotal - Number(match.flat_price)) < 0.01;
+          }
+        }
+        const billing_basis = billingBasisFromRpc(tier, { kgTierIsFlat });
         const total = Number(data.total) || 0;
         setQuotePreview({
           total,
@@ -279,11 +407,13 @@ export default function ForwarderShipmentsPage() {
     selectedProfileId,
     form.weight_kg,
     form.quantity,
+    form.total_cbm,
     form.category_id,
-    pieceTiers,
+    selectedPieceTier,
+    showQuantity,
+    kgTiers,
     matchedProfiles,
   ]);
-
   // Keep pricing_profile_id in sync with matched list
   useEffect(() => {
     if (!showForm) return;
@@ -294,6 +424,20 @@ export default function ForwarderShipmentsPage() {
       setForm((f) => ({ ...f, pricing_profile_id: "" }));
     }
   }, [matchedProfiles, showForm, form.pricing_profile_id]);
+
+  // Piece-only profiles: auto-pick first category so Select has a valid value
+  useEffect(() => {
+    if (!showForm || !pieceOnlyProfile) return;
+    if (form.category_id && pieceTiers.some((t) => t.category_id === form.category_id)) return;
+    const first = pieceTiers.find((t) => t.category_id);
+    if (first?.category_id) {
+      setForm((f) => ({
+        ...f,
+        category_id: first.category_id!,
+        quantity: String(Math.max(1, first.min_quantity || 1)),
+      }));
+    }
+  }, [showForm, pieceOnlyProfile, pieceTiers, form.category_id]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -327,6 +471,7 @@ export default function ForwarderShipmentsPage() {
       notes: "",
       weight_kg: "",
       quantity: "1",
+      total_cbm: "",
       category_id: "",
       pricing_profile_id: "",
       save_to_carnet: false,
@@ -346,21 +491,54 @@ export default function ForwarderShipmentsPage() {
       if (!selectedProfileId) {
         throw new Error("Aucun profil tarifaire pour ce mode / pays de destination");
       }
-      if (!quotePreview || quotePreview.error || quotePreview.total <= 0) {
-        throw new Error(quotePreview?.error || "Renseignez le poids (ou une catégorie) pour obtenir un tarif");
-      }
 
       const originLabel = geoLabel(originGeo.country, originGeo.city);
       const destLabel = geoLabel(destGeo.country, destGeo.city);
       const weight = parseFloat(form.weight_kg);
-      const qty = Math.max(1, parseFloat(form.quantity) || 1);
+      const cbmVal = parseFloat(form.total_cbm);
+      const minQty = Math.max(1, selectedPieceTier?.min_quantity || 1);
+      const qty = showQuantity ? Math.max(minQty, parseFloat(form.quantity) || minQty) : 1;
+      const hasPiece = !!selectedPieceTier;
+      const hasWeight = Number.isFinite(weight) && weight > 0;
+      const hasCbmInput = Number.isFinite(cbmVal) && cbmVal > 0;
+
+      // Re-quote at submit (never trust stale preview)
+      const items = buildTmsQuoteItems({
+        hasPiece,
+        categoryId: form.category_id,
+        quantity: qty,
+        weightKg: hasWeight ? weight : 0,
+        cbm: hasCbmInput ? cbmVal : 0,
+      });
+      const fresh = await quoteForwarder({
+        profileId: selectedProfileId,
+        items,
+        totalCbm: hasCbmInput && !hasPiece ? cbmVal : undefined,
+      });
+      if (!fresh || fresh.error) {
+        throw new Error(fresh?.error || "Devis indisponible");
+      }
+      const sub = fresh.subpackages?.[0];
+      const tier = sub?.tier_used as string | undefined;
+      const billable = Number(sub?.billable_weight_kg) || 0;
+      const lineTotal = Number(sub?.line_total) || 0;
+      let kgTierIsFlat = false;
+      if (tier === "kg" && kgTiers.length > 0) {
+        const match =
+          kgTiers.find((k) => billable >= k.min_kg && (k.max_kg == null || billable <= k.max_kg)) ||
+          kgTiers[kgTiers.length - 1];
+        if (match?.flat_price != null) {
+          kgTierIsFlat = Math.abs(lineTotal - Number(match.flat_price)) < 0.01;
+        }
+      }
+      const billing_basis = billingBasisFromRpc(tier, { kgTierIsFlat });
+      const total = Number(fresh.total) || 0;
+      if (total <= 0 || tier === "quote_only" || tier === "none" || !tier) {
+        throw new Error("Aucun palier tarifaire applicable — vérifiez poids, CBM ou catégorie");
+      }
 
       let consigneeId = form.consignee_id || null;
-      if (
-        form.save_to_carnet &&
-        !consigneeId &&
-        form.consignee_name.trim()
-      ) {
+      if (form.save_to_carnet && !consigneeId && form.consignee_name.trim()) {
         const { data: createdC, error: cErr } = await (supabase as any)
           .from("forwarder_consignees")
           .insert({
@@ -391,14 +569,15 @@ export default function ForwarderShipmentsPage() {
           consignee_phone: form.consignee_phone.trim() || null,
           eta: form.eta || null,
           notes: form.notes.trim() || null,
-          weight_kg: Number.isFinite(weight) && weight > 0 ? weight : null,
+          weight_kg: hasWeight ? weight : null,
+          total_cbm: hasCbmInput && !hasPiece ? cbmVal : null,
           quantity: qty,
           category_id: form.category_id || null,
           pricing_profile_id: selectedProfileId,
-          billing_basis: quotePreview.billing_basis,
-          quoted_amount: quotePreview.total,
-          quoted_currency: quotePreview.currency,
-          quote_breakdown: quotePreview.breakdown || {},
+          billing_basis,
+          quoted_amount: total,
+          quoted_currency: fresh.currency || "USD",
+          quote_breakdown: fresh,
           status: "created",
           events: [
             {
@@ -413,27 +592,56 @@ export default function ForwarderShipmentsPage() {
       if (error) throw error;
 
       const photoPaths: string[] = [];
+      const uploadFailures: string[] = [];
       for (const file of pendingPhotos.slice(0, 5)) {
-        const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+        const ext = sanitizeImageExt(file.name);
         const path = `${row.public_token}/${crypto.randomUUID()}.${ext}`;
+        const contentType =
+          file.type ||
+          (ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg");
         const { error: upErr } = await supabase.storage
           .from("external-shipment-photos")
-          .upload(path, file, { contentType: file.type, upsert: false });
+          .upload(path, file, { contentType, upsert: false });
         if (upErr) {
           console.warn("[shipments] photo upload failed", upErr);
+          uploadFailures.push(file.name);
           continue;
         }
         photoPaths.push(path);
       }
       if (photoPaths.length > 0) {
-        await (supabase as any)
+        const { error: photoUpdateErr } = await (supabase as any)
           .from("external_shipments")
           .update({ photo_paths: photoPaths })
           .eq("id", row.id);
+        if (photoUpdateErr) {
+          uploadFailures.push("enregistrement des chemins");
+          await supabase.storage.from("external-shipment-photos").remove(photoPaths);
+          return {
+            photoOk: 0,
+            photoWanted: pendingPhotos.length,
+            uploadFailures,
+          };
+        }
       }
+      return {
+        photoOk: photoPaths.length,
+        photoWanted: pendingPhotos.length,
+        uploadFailures,
+      };
     },
-    onSuccess: () => {
-      toast.success("Expédition créée");
+    onSuccess: (result) => {
+      if (result.photoWanted > 0 && result.photoOk < result.photoWanted) {
+        toast.warning(
+          `Expédition créée — ${result.photoOk}/${result.photoWanted} photo(s) enregistrée(s)${
+            result.uploadFailures.length ? ` (${result.uploadFailures.join(", ")})` : ""
+          }`,
+        );
+      } else if (result.photoWanted > 0 && result.photoOk === 0) {
+        toast.warning("Expédition créée, mais aucune photo n'a pu être téléversée");
+      } else {
+        toast.success("Expédition créée");
+      }
       setShowForm(false);
       resetForm();
       qc.invalidateQueries({ queryKey: ["forwarder-external-shipments", forwarder?.id] });
@@ -441,7 +649,6 @@ export default function ForwarderShipmentsPage() {
     },
     onError: (e: any) => toast.error(e.message || "Échec création"),
   });
-
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const { data: current } = await (supabase as any)
@@ -645,11 +852,17 @@ export default function ForwarderShipmentsPage() {
                   <SelectValue placeholder={matchedProfiles.length ? "Choisir" : "Aucun profil"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {matchedProfiles.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.mode.toUpperCase()} · {p.country_code} · {p.currency}
-                    </SelectItem>
-                  ))}
+                  {matchedProfiles.map((p) => {
+                    const cityLabel = p.city_id
+                      ? cities.find((c) => c.id === p.city_id)?.name
+                      : null;
+                    return (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.mode.toUpperCase()} · {p.country_code}
+                        {cityLabel ? ` · ${cityLabel}` : " · pays"} · {p.currency}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               {matchedProfiles.length === 0 && (
@@ -659,7 +872,9 @@ export default function ForwarderShipmentsPage() {
               )}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Poids (kg) *</Label>
+              <Label className="text-xs">
+                Poids (kg){weightRequired ? " *" : " (optionnel)"}
+              </Label>
               <Input
                 type="number"
                 min="0"
@@ -669,28 +884,45 @@ export default function ForwarderShipmentsPage() {
                 onChange={(e) => setForm((f) => ({ ...f, weight_kg: e.target.value }))}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Quantité</Label>
-              <Input
-                type="number"
-                min="1"
-                step="1"
-                value={form.quantity}
-                onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
-              />
-            </div>
-            {pieceTiers.length > 0 && (
+            {showCbmField && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">
+                  Volume (CBM){!hasKgTiers && !selectedPieceTier ? " *" : ""}
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={form.total_cbm}
+                  onChange={(e) => setForm((f) => ({ ...f, total_cbm: e.target.value }))}
+                />
+              </div>
+            )}
+            {hasPieceTiers && (
               <div className="space-y-1.5 sm:col-span-2">
-                <Label className="text-xs">Catégorie (tarif à la pièce)</Label>
+                <Label className="text-xs">
+                  Catégorie (tarif à la pièce){pieceOnlyProfile ? " *" : ""}
+                </Label>
                 <Select
                   value={form.category_id || "__none__"}
-                  onValueChange={(v) => setForm((f) => ({ ...f, category_id: v === "__none__" ? "" : v }))}
+                  onValueChange={(v) => {
+                    const cat = v === "__none__" ? "" : v;
+                    const tier = pieceTiers.find((t) => t.category_id === cat);
+                    setForm((f) => ({
+                      ...f,
+                      category_id: cat,
+                      quantity: String(Math.max(1, tier?.min_quantity || 1)),
+                    }));
+                  }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Aucune (poids / forfait)" />
+                    <SelectValue placeholder="Aucune (poids / CBM / forfait)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">Aucune (poids / forfait)</SelectItem>
+                    {!pieceOnlyProfile && (
+                      <SelectItem value="__none__">Aucune (poids / CBM / forfait)</SelectItem>
+                    )}
                     {pieceTiers
                       .filter((t) => t.category_id)
                       .map((t) => {
@@ -708,27 +940,23 @@ export default function ForwarderShipmentsPage() {
                 </Select>
               </div>
             )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs flex items-center gap-1.5">
-              <Camera size={12} /> Photos du colis
-            </Label>
-            <Input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              capture="environment"
-              multiple
-              onChange={(e) => {
-                const files = Array.from(e.target.files || []).slice(0, 5);
-                setPendingPhotos(files);
-              }}
-            />
-            {pendingPhotos.length > 0 && (
-              <p className="text-[11px] text-muted-foreground">{pendingPhotos.length} photo(s) sélectionnée(s)</p>
+            {showQuantity && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">
+                  Quantité *{selectedPieceTier ? ` (min ${selectedPieceTier.min_quantity || 1})` : ""}
+                </Label>
+                <Input
+                  type="number"
+                  min={selectedPieceTier?.min_quantity || 1}
+                  step="1"
+                  value={form.quantity}
+                  onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
+                />
+              </div>
             )}
           </div>
 
+          <ShipmentPhotoPicker files={pendingPhotos} onChange={setPendingPhotos} />
           <div className="space-y-1.5">
             <Label className="text-xs">Notes internes</Label>
             <Textarea
@@ -773,6 +1001,7 @@ export default function ForwarderShipmentsPage() {
               size="sm"
               disabled={
                 createMutation.isPending ||
+                quoteLoading ||
                 !originGeo.country ||
                 !destGeo.country ||
                 !selectedProfileId ||
