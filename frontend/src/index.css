@@ -340,7 +340,7 @@ img[data-fallback]::after {
 /* Add bottom padding to main content on mobile to avoid bottom nav overlap */
 @media (max-width: 1023px) {
   body {
-    padding-bottom: 3.5rem;
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
   }
   body.hide-mobile-bottom-nav {
     padding-bottom: 0;

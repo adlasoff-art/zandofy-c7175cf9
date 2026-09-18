@@ -1,12 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
+import { ProductRail } from "@/components/ProductRail";
 import { fetchProducts, fetchTrendTags, fetchCategories, type Product, type TrendTag, type Category } from "@/services/api";
 import { categoryPath } from "@/lib/category-slug";
 import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 import { readProductGridCache, writeProductGridCache } from "@/lib/product-grid-cache";
+import {
+  getHomeShuffleSeed,
+  shuffleBySessionSeed,
+  HOME_RESHUFFLE_EVENT,
+} from "@/lib/home-session-shuffle";
 import { ChevronRight, TrendingUp, Flame, Users } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { useHomeMarket } from "@/contexts/HomeMarketContext";
 
 const PAGE_SIZE = 24;
 
@@ -39,7 +46,12 @@ function categoryMatchesKeys(cat: Category, keys: string[]): boolean {
 
 export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: boolean }) {
   const { t, locale } = useI18n();
-  const cached = restoreFromCache ? readProductGridCache() : null;
+  const { market, shopTypeFilter } = useHomeMarket();
+  /** POP restore only for unfiltered Accueil — never across markets. */
+  const cached =
+    restoreFromCache && market === "all" ? readProductGridCache("all") : null;
+  const marketRef = useRef(market);
+  marketRef.current = market;
 
   const [products, setProducts] = useState<Product[]>(cached?.products ?? []);
   const [loading, setLoading] = useState(!(cached && cached.products.length > 0));
@@ -85,7 +97,10 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
 
   useEffect(() => {
     return () => {
-      writeProductGridCache(cacheSnapshotRef.current);
+      writeProductGridCache({
+        ...cacheSnapshotRef.current,
+        market: marketRef.current,
+      });
     };
   }, []);
 
@@ -94,22 +109,47 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
     fetchTrendTags().then(setTrendTags);
   }, []);
 
-  // Popular products via API (no direct wishlists/cart_items reads — RLS-safe, fewer queries)
+  // Popular products — cancel stale market requests
   useEffect(() => {
-    if (cached && cached.popularProducts.length > 0) return;
+    let cancelled = false;
+    if (
+      restoreFromCache &&
+      market === "all" &&
+      cached &&
+      cached.popularProducts.length > 0
+    ) {
+      setPopularProducts(cached.popularProducts);
+      setPopularLoading(false);
+      return;
+    }
     setPopularLoading(true);
-    fetchProducts({ limit: 12, orderBy: "popular" })
+    fetchProducts({ limit: 12, orderBy: "popular", shopType: shopTypeFilter })
       .then((items) => {
+        if (cancelled) return;
         setPopularProducts(items);
         setPopularLoading(false);
       })
-      .catch(() => setPopularLoading(false));
-  }, []);
+      .catch(() => {
+        if (!cancelled) setPopularLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [shopTypeFilter, market]);
 
-  // Load category sections on mount (capped fan-out)
+  // Load category sections (capped fan-out)
   useEffect(() => {
-    if (cached && cached.categorySections.length > 0) return;
+    if (
+      restoreFromCache &&
+      market === "all" &&
+      cached &&
+      cached.categorySections.length > 0
+    ) {
+      setCategorySections(cached.categorySections);
+      return;
+    }
     let cancelled = false;
+    setCategorySections([]);
     (async () => {
       const cats = await fetchCategories();
       for (const target of CATEGORY_SECTION_TARGETS) {
@@ -117,7 +157,11 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
         const cat = cats.find((c) => categoryMatchesKeys(c, target.keys));
         if (!cat) continue;
         try {
-          const data = await fetchProducts({ categoryId: cat.id, limit: 6 });
+          const data = await fetchProducts({
+            categoryId: cat.id,
+            limit: 6,
+            shopType: shopTypeFilter,
+          });
           if (cancelled || data.length === 0) continue;
           setCategorySections((prev) => {
             const label = t(target.labelKey) || target.labelFr;
@@ -130,16 +174,30 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
         }
       }
     })();
-    return () => { cancelled = true; };
-  }, [t, locale]);
+    return () => {
+      cancelled = true;
+    };
+  }, [t, locale, shopTypeFilter, market]);
 
-  // Load main Tendances products when tab changes
+  // Load main Tendances products when tab / market changes (session shuffle; POP uses cache)
   useEffect(() => {
-    if (cached && cached.activeTab === activeTab && cached.products.length > 0 && retryKey === 0) {
+    if (
+      restoreFromCache &&
+      market === "all" &&
+      cached &&
+      cached.activeTab === activeTab &&
+      cached.products.length > 0 &&
+      retryKey === 0
+    ) {
+      setProducts(cached.products);
+      setMoreProducts(cached.moreProducts);
+      setHasMore(cached.hasMore);
+      setCurrentOffset(cached.currentOffset);
       setLoading(false);
       return;
     }
 
+    let cancelled = false;
     setLoading(true);
     setError(null);
     setMoreProducts([]);
@@ -147,24 +205,58 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
     setHasMore(true);
     loadingMoreRef.current = false;
 
-    const params: any = { limit: PAGE_SIZE };
+    const params: any = { limit: PAGE_SIZE, shopType: shopTypeFilter };
     if (activeTab !== "all") {
       params.trendTagId = activeTab;
     }
 
-    fetchProducts(params)
-      .then((data) => {
-        setProducts(data);
-        setCurrentOffset(data.length);
-        setHasMore(data.length >= PAGE_SIZE);
+    (async () => {
+      try {
+        // Mix recent + older catalogue before session shuffle (wave E)
+        const [recent, older] = await Promise.all([
+          fetchProducts(params),
+          activeTab === "all"
+            ? fetchProducts({
+                limit: PAGE_SIZE,
+                offset: PAGE_SIZE * 2,
+                shopType: shopTypeFilter,
+              })
+            : Promise.resolve([] as Product[]),
+        ]);
+        if (cancelled) return;
+        const seen = new Set<string>();
+        const mixed: Product[] = [];
+        for (const p of [...recent, ...older]) {
+          if (seen.has(p.id)) continue;
+          seen.add(p.id);
+          mixed.push(p);
+        }
+        const ordered =
+          activeTab === "all" ? shuffleBySessionSeed(mixed, getHomeShuffleSeed()) : mixed;
+        setProducts(ordered.slice(0, PAGE_SIZE));
+        setCurrentOffset(Math.max(recent.length, ordered.slice(0, PAGE_SIZE).length));
+        setHasMore(recent.length >= PAGE_SIZE || older.length > 0);
         setLoading(false);
-      })
-      .catch((err) => {
+      } catch (err: any) {
+        if (cancelled) return;
         console.error("[ProductGrid] Load failed:", err);
         setError(err.message || (t("common.loadProductsFailed") || "Erreur de chargement"));
         setLoading(false);
-      });
-  }, [activeTab, retryKey]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, retryKey, shopTypeFilter, market]);
+
+  // Re-tap Accueil / pull-to-refresh → reshuffle without full remount of page chrome
+  useEffect(() => {
+    if (restoreFromCache) return;
+    const onReshuffle = () => setRetryKey((k) => k + 1);
+    window.addEventListener(HOME_RESHUFFLE_EVENT, onReshuffle);
+    return () => window.removeEventListener(HOME_RESHUFFLE_EVENT, onReshuffle);
+  }, [restoreFromCache]);
 
   const handleLoadMore = useCallback(async () => {
     // Sync lock — IntersectionObserver can fire twice before React re-renders loadingMore
@@ -174,7 +266,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
 
     try {
       const totalLoaded = products.length + moreProducts.length;
-      const params: any = { limit: PAGE_SIZE, offset: totalLoaded };
+      const params: any = { limit: PAGE_SIZE, offset: totalLoaded, shopType: shopTypeFilter };
       if (activeTab !== "all") {
         params.trendTagId = activeTab;
       }
@@ -200,7 +292,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [hasMore, products, moreProducts, activeTab]);
+  }, [hasMore, products, moreProducts, activeTab, shopTypeFilter]);
 
   // Infinite scroll sentinel (replaces "Voir plus" click). Fallback button if IO missing.
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -236,22 +328,15 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
         {/* ═══════════════════════════════════════════ */}
         {(popularLoading || popularProducts.length > 0) && (
           <div className="mb-10">
-          <Link to="/popular" className="flex items-center gap-2 mb-4 group cursor-pointer">
-              <Flame size={18} className="text-orange-500" />
-              <h2 className="text-base md:text-lg font-bold text-foreground group-hover:text-primary transition-colors">
-                {t("home.mostPopular")}
-              </h2>
-              <ChevronRight size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
-            </Link>
-            <div className={PRODUCT_GRID_CLASS}>
-              {popularLoading
-                ? Array.from({ length: 12 }).map((_, i) => <ProductCardSkeleton key={i} />)
-                : popularProducts.map((product, i) => (
-                    <Link to={`/product/${product.slug || product.id}`} key={product.id} className="block">
-                      <ProductCard product={product} index={i} />
-                    </Link>
-                  ))}
-            </div>
+            <ProductRail
+              title={t("home.mostPopular")}
+              titleId="home-popular-heading"
+              seeAllHref="/popular"
+              products={popularProducts}
+              loading={popularLoading}
+              icon={<Flame size={18} className="text-orange-500" aria-hidden />}
+              embedded
+            />
           </div>
         )}
 
