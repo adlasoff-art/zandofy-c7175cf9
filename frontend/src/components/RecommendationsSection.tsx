@@ -93,38 +93,37 @@ export function RecommendationsSection() {
         if (userGender === "female" || userGender === "femme") {
           const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
           const unisex = products_list.filter(p => p.gender_target === "unisex" && !female.includes(p));
-          // Prefer gender pool (rotated top 10), then unisex top 10 if short
-          topRow = pickFromTopN(female, 4);
-          if (topRow.length < 4) {
+          topRow = pickFromTopN(female, 6, 16);
+          if (topRow.length < 6) {
             const taken = new Set(topRow.map((p) => p.id));
-            topRow = [...topRow, ...pickFromTopN(unisex.filter((p) => !taken.has(p.id)), 4 - topRow.length)];
+            topRow = [...topRow, ...pickFromTopN(unisex.filter((p) => !taken.has(p.id)), 6 - topRow.length, 16)];
           }
         } else if (userGender === "male" || userGender === "homme") {
           const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
           const unisex = products_list.filter(p => p.gender_target === "unisex" && !male.includes(p));
-          topRow = pickFromTopN(male, 4);
-          if (topRow.length < 4) {
+          topRow = pickFromTopN(male, 6, 16);
+          if (topRow.length < 6) {
             const taken = new Set(topRow.map((p) => p.id));
-            topRow = [...topRow, ...pickFromTopN(unisex.filter((p) => !taken.has(p.id)), 4 - topRow.length)];
+            topRow = [...topRow, ...pickFromTopN(unisex.filter((p) => !taken.has(p.id)), 6 - topRow.length, 16)];
           }
         } else {
           const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
           const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
           const unisex = products_list.filter(p => !["female", "femme", "male", "homme"].includes(p.gender_target || ""));
           topRow = [
-            ...pickFromTopN(female, 2),
-            ...pickFromTopN(male, 1),
-            ...pickFromTopN(unisex, 1),
-          ].slice(0, 4);
+            ...pickFromTopN(female, 3, 12),
+            ...pickFromTopN(male, 2, 12),
+            ...pickFromTopN(unisex, 1, 12),
+          ].slice(0, 6);
         }
 
-        if (topRow.length < 4) {
+        if (topRow.length < 6) {
           const existingIds = new Set(topRow.map(p => p.id));
           const remaining = products_list.filter(p => !existingIds.has(p.id));
-          topRow = [...topRow, ...remaining].slice(0, 4);
+          topRow = [...topRow, ...remaining].slice(0, 6);
         }
 
-        // Ligne 2 : pool aléatoire (mix anciens + nouveaux)
+        // Ligne 2 desktop (6) : pool aléatoire (mix anciens + nouveaux) → 12 total
         const topIds = new Set(topRow.map(p => p.id));
         let poolQ = supabase
           .from("products_public")
@@ -137,7 +136,7 @@ export function RecommendationsSection() {
         if (cancelled) return;
         const pool = ((poolData || []) as any[]).filter(p => !topIds.has(p.id));
         shuffleInPlace(pool);
-        const bottomRow = pool.slice(0, 4);
+        const bottomRow = pool.slice(0, 6);
 
         let combined = [...topRow, ...bottomRow];
 
@@ -146,14 +145,14 @@ export function RecommendationsSection() {
           if (cancelled) return;
           if (recentIds.size > 0) {
             const filtered = combined.filter((p: any) => !recentIds.has(p.id));
-            if (filtered.length >= 4) {
-              combined = filtered;
+            if (filtered.length >= 6) {
+              combined = filtered.slice(0, 12);
             }
           }
         }
 
         if (cancelled) return;
-        setProducts(combined.map((p: any) => toProduct(p)));
+        setProducts(combined.slice(0, 12).map((p: any) => toProduct(p)));
       } catch {
         if (cancelled) return;
         let fallbackQ = supabase
@@ -161,7 +160,7 @@ export function RecommendationsSection() {
           .select("id, slug, name, name_fr, price, rating, product_images(image_url, position), shop_type")
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
-          .limit(8);
+          .limit(12);
         if (shopTypeFilter) fallbackQ = (fallbackQ as any).eq("shop_type", shopTypeFilter);
         const { data: popular } = await fallbackQ;
         if (cancelled) return;
@@ -184,6 +183,8 @@ export function RecommendationsSection() {
       titleId="home-recommendations-heading"
       products={products}
       loading={loading}
+      skeletonCount={12}
+      className="bg-muted/30 dark:bg-muted/10"
       icon={<Sparkles size={20} className="text-primary" aria-hidden />}
     />
   );

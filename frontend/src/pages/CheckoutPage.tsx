@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, type ReactNode, type FormEvent } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAuthSettings } from "@/hooks/use-auth-settings";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { fromTable } from "@/lib/supabase-helpers";
@@ -104,6 +105,8 @@ const emptyShipping: ShippingInfo = {
 export default function CheckoutPage() {
   const { selectedItems: items, selectedSubtotal: subtotal, removeSelectedItems, loading: cartLoading } = useCart();
   const { user } = useAuth();
+  const { data: authSettings, isLoading: authSettingsLoading } = useAuthSettings();
+  const [resendingConfirm, setResendingConfirm] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { t, formatPrice } = useI18n();
@@ -717,6 +720,62 @@ export default function CheckoutPage() {
           <h1 className="text-xl font-bold text-foreground">{t("checkout.loginRequired")}</h1>
           <p className="text-muted-foreground">{t("checkout.loginRequiredDesc")}</p>
           <Link to="/auth?redirect=%2Fcheckout"><Button>{t("checkout.loginButton")}</Button></Link>
+        </main>
+      </div>
+    );
+  }
+
+  // Avoid flash-through before gate settings load (fail-open only after known false)
+  if (authSettingsLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container py-16 flex flex-col items-center justify-center gap-3 text-center">
+          <Loader2 size={32} className="animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">{t("checkout.loadingCart") || "Chargement…"}</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (authSettings?.gate_checkout_on_email_confirm && !user.email_confirmed_at) {
+    const handleResendConfirm = async () => {
+      if (!user.email) return;
+      setResendingConfirm(true);
+      const { error } = await supabase.auth.resend({ type: "signup", email: user.email });
+      setResendingConfirm(false);
+      if (error) {
+        toast({ title: t("auth.error"), description: error.message, variant: "destructive" });
+        return;
+      }
+      toast({
+        title: t("checkout.emailConfirmResent") || "E-mail renvoyé",
+        description: t("checkout.emailConfirmResentDesc") || "Consultez votre boîte mail pour confirmer votre compte.",
+      });
+    };
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container py-16 text-center space-y-4 max-w-md mx-auto">
+          <ShieldCheck size={48} className="mx-auto text-primary" />
+          <h1 className="text-xl font-bold text-foreground">
+            {t("checkout.emailConfirmRequired") || "Confirmez votre e-mail"}
+          </h1>
+          <p className="text-muted-foreground">
+            {t("checkout.emailConfirmRequiredDesc") ||
+              "Votre compte doit être vérifié avant de commander. Ouvrez le lien reçu par e-mail, puis revenez ici."}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <Button onClick={handleResendConfirm} disabled={resendingConfirm}>
+              {resendingConfirm ? (
+                <Loader2 size={16} className="animate-spin mr-2" />
+              ) : null}
+              {t("checkout.resendConfirmEmail") || "Renvoyer l'e-mail"}
+            </Button>
+            <Link to="/">
+              <Button variant="outline">{t("checkout.backToShop")}</Button>
+            </Link>
+          </div>
         </main>
       </div>
     );

@@ -10,40 +10,23 @@ Bottom navigation (exactly 5, Jacob / Alibaba pattern):
 
 Header (sticky):
 
-- Logo + always-visible PredictiveSearch (scroll with header)
-- Favoris (Heart) in header actions
+- **Mobile (&lt; `lg`) — 2 rows:**
+  1. Logo + icons (tracking always visible, Heart, notifs if user)
+  2. PredictiveSearch full width (sticky with header)
+- **Desktop (`lg+`):** single row logo | search | actions (messages `md+`, cart `md+`)
 - Messagerie icon only from `md+` (phone uses bottom tab)
-- No hamburger; categories panel opened from bottom tab only
-- **Top bar CMS** (`platform_settings.topbar_config`): full-bleed promo under status bar (`safe-area-inset-top`). Fields: `enabled`, `mode` (static|slide|marquee), colors, `messages[]`, optional `link_url` (sanitized `/` or `https:` only), `dismissible` (session). Mobile: multi-message static auto-rotates as slide.
+- No hamburger; categories panel from bottom tab only
+- Top bar CMS under status bar (`safe-area-inset-top`); `link_url` sanitized
 
 Homepage mobile content order:
 
 1. Hero
-2. **Market switch** Tout | Local | International (`shop_type` filter; `localStorage` key `zandofy_home_market`; discovery only — **not** checkout)
-3. CategoryBanner (1 horizontal row) + HomeServiceCards
-4. Super Promo (hidden if empty)
-5. Pour vous / Populaires rails
-6. Top tendances rail
-7. CMS category/store rails (`cms_homepage_sections` keys `category_rail` | `store_rail`)
-8. Tendance feed (session shuffle; POP from PDP preserves order + scroll)
-
-Desktop (`lg+`) may show FeaturedSidebar beside Top tendances — not in the mobile stack.
-
-### Local / International (Flutter parity)
-
-| Item | Contract |
-|------|----------|
-| Values | `all` \| `local` \| `international` |
-| Persistence | `localStorage` / `SharedPreferences` → `zandofy_home_market` |
-| API | `fetchProducts({ shopType })` → `products_public.shop_type` |
-| Scope | Accueil rails + feed only; cart/checkout unchanged |
-| Semantic | Store market type (stock local vs import), **not** buyer city |
+2. Market switch Tout | Local | International
+3. CategoryBanner + HomeServiceCards
+4. Super Promo
+5. Pour vous / Populaires rails (12 items → 6×6 desktop)
+6. Top tendances
+7. CMS rails (`display_mode`: `rail` | `grid_page`)
+8. Tendance feed
 
 Do not put Search or Settings in the bottom bar.
-
-### Pixel parity notes (Flutter)
-
-- Touch targets ≥ 44px bottom nav + top-bar dismiss.
-- Header + top bar share sticky stack; top bar paints into status bar.
-- Same section order and event names as above — native UI can diverge visually but IA must match.
-- Body padding includes `safe-area-inset-bottom` under the bottom nav.
