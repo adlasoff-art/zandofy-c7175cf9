@@ -83,7 +83,13 @@ export default function AdminSettingsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [gatewayFees, setGatewayFees] = useState({ mobile_money_fee_pct: 2.5 });
+  const [gatewayFees, setGatewayFees] = useState({ mobile_money_fee_pct: 2.5, card_fee_pct: 3.5 });
+  const [manualChannels, setManualChannels] = useState<Record<string, { enabled: boolean; label: string }>>({
+    western_union: { enabled: false, label: "Western Union" },
+    moneygram: { enabled: false, label: "MoneyGram" },
+    bank_transfer: { enabled: false, label: "Virement bancaire" },
+    visa_direct: { enabled: false, label: "Visa Direct" },
+  });
   const [reviewBonus, setReviewBonus] = useState({ bonus_pct: 0.10 });
   const [visualSearchEnabled, setVisualSearchEnabled] = useState(false);
   const [homeDeliveryEnabled, setHomeDeliveryEnabled] = useState(false);
@@ -180,7 +186,7 @@ export default function AdminSettingsPage() {
     supabase
       .from("platform_settings")
       .select("key, value")
-      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings", "gateway_fees", "review_bonus", "visual_search_enabled", "home_delivery_enabled"])
+      .in("key", ["free_shipping_threshold", "referral_settings", "maintenance_mode", "newness_duration_days", "payment_methods", "pricing_defaults", "bulk_discount_tiers", "max_discount_settings", "gateway_fees", "manual_payout_channels", "review_bonus", "visual_search_enabled", "home_delivery_enabled"])
       .then(({ data }) => {
         data?.forEach((row) => {
           const v = row.value as any;
@@ -228,7 +234,12 @@ export default function AdminSettingsPage() {
               setBulkTiers(tiers.map((tier: any) => ({ min_quantity: Number(tier.min_quantity) || 1, discount_pct: Number(tier.discount_pct) || 0 })));
             }
           } else if (row.key === "gateway_fees") {
-            setGatewayFees({ mobile_money_fee_pct: Number(v.mobile_money_fee_pct) || 2.5 });
+            setGatewayFees({
+              mobile_money_fee_pct: Number(v.mobile_money_fee_pct) || 2.5,
+              card_fee_pct: Number(v.card_fee_pct) || 3.5,
+            });
+          } else if (row.key === "manual_payout_channels" && v && typeof v === "object") {
+            setManualChannels((prev) => ({ ...prev, ...v }));
           } else if (row.key === "review_bonus") {
             setReviewBonus({ bonus_pct: Number(v.bonus_pct) || 0.10 });
           } else if (row.key === "visual_search_enabled") {
@@ -352,6 +363,10 @@ export default function AdminSettingsPage() {
       .from("platform_settings")
       .upsert({ key: "gateway_fees", value: gatewayFees as any, updated_at: now }, { onConflict: "key" });
 
+    const { error: e9b } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "manual_payout_channels", value: manualChannels as any, updated_at: now }, { onConflict: "key" });
+
     const { error: e10 } = await supabase
       .from("platform_settings")
       .upsert({ key: "review_bonus", value: reviewBonus as any, updated_at: now }, { onConflict: "key" });
@@ -364,7 +379,7 @@ export default function AdminSettingsPage() {
       .from("platform_settings")
       .upsert({ key: "home_delivery_enabled", value: { enabled: homeDeliveryEnabled } as any, updated_at: now }, { onConflict: "key" });
 
-    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8 || e9 || e10 || e11 || e12;
+    const error = e1 || e2 || e3 || e4 || e5 || e6 || e7 || e8 || e9 || e9b || e10 || e11 || e12;
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
@@ -455,10 +470,33 @@ export default function AdminSettingsPage() {
                 max={20}
                 step={0.1}
                 value={gatewayFees.mobile_money_fee_pct}
-                onChange={(e) => setGatewayFees({ mobile_money_fee_pct: Number(e.target.value) || 2.5 })}
+                onChange={(e) =>
+                  setGatewayFees((p) => ({
+                    ...p,
+                    mobile_money_fee_pct: Number(e.target.value) || 2.5,
+                  }))
+                }
                 className={inputClass}
               />
-              <p className="text-[10px] text-muted-foreground mt-1">Déduit du brut pour estimer le revenu net (KPI indicatif)</p>
+              <p className="text-[10px] text-muted-foreground mt-1">Déduit du brut pour estimer le revenu net (KelPay)</p>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Frais passerelle Carte Keccel (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={20}
+                step={0.1}
+                value={gatewayFees.card_fee_pct}
+                onChange={(e) =>
+                  setGatewayFees((p) => ({
+                    ...p,
+                    card_fee_pct: Number(e.target.value) || 3.5,
+                  }))
+                }
+                className={inputClass}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Frais agrégateur carte (pas Stripe)</p>
             </div>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">Bonus avis avec photos (%)</label>
@@ -473,6 +511,31 @@ export default function AdminSettingsPage() {
               />
               <p className="text-[10px] text-muted-foreground mt-1">% du sous-total commande crédité en ZandoPoints à l'approbation</p>
             </div>
+          </div>
+        </section>
+        <section className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign size={18} className="text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">Canaux manuels hors plateforme (stubs)</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Préparés pour une demande future — tous désactivés : invisibles côté vendeur.
+          </p>
+          <div className="space-y-2">
+            {Object.entries(manualChannels).map(([key, ch]) => (
+              <div key={key} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <span className="text-sm text-foreground">{ch.label}</span>
+                <Switch
+                  checked={ch.enabled === true}
+                  onCheckedChange={(v) =>
+                    setManualChannels((prev) => ({
+                      ...prev,
+                      [key]: { ...prev[key], enabled: v },
+                    }))
+                  }
+                />
+              </div>
+            ))}
           </div>
         </section>
         <section className="bg-card border border-border rounded-xl p-5">

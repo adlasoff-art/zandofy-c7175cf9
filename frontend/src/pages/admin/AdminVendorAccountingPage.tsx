@@ -42,20 +42,12 @@ function fmt(n: number) {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/** Gateway fee rates by payment method */
-const GATEWAY_RATES: Record<string, number> = {
-  mobile_money: 2.5,
-  stripe: 3.5,
-  card: 3.5,
-  paypal: 3.9,
-  cod: 0,
-  off_platform: 0,
-  unknown: 0,
-};
-
-function getGatewayRate(method: string): number {
-  return GATEWAY_RATES[method] ?? 0;
-}
+import {
+  DEFAULT_GATEWAY_FEES,
+  getGatewayRateForMethod,
+  parseGatewayFees,
+  type GatewayFees,
+} from "@/lib/gateway-fees";
 
 interface OrderDetail {
   orderId: string;
@@ -154,7 +146,15 @@ export default function AdminVendorAccountingPage() {
     },
   });
 
-  // Fetch delivered orders WITH items joined
+  const { data: gatewayFees = DEFAULT_GATEWAY_FEES } = useQuery({
+    queryKey: ["gateway-fees-accounting"],
+    queryFn: async (): Promise<GatewayFees> => {
+      const { data } = await supabase.from("platform_settings").select("value").eq("key", "gateway_fees").maybeSingle();
+      return parseGatewayFees(data?.value);
+    },
+  });
+
+  const getGatewayRate = (method: string) => getGatewayRateForMethod(method, gatewayFees);
   const { data: rawOrders, isLoading } = useQuery({
     queryKey: ["accounting-orders", period],
     queryFn: async () => {
@@ -392,7 +392,7 @@ export default function AdminVendorAccountingPage() {
         };
       })
       .sort((a, b) => b.totalRevenue - a.totalRevenue);
-  }, [stores, rawOrders, orderItems, products, overrides, wallets, globalDefaults, referralTxns, search]);
+  }, [stores, rawOrders, orderItems, products, overrides, wallets, globalDefaults, referralTxns, search, gatewayFees]);
 
   // Totals
   const totals = useMemo(() => {
@@ -459,7 +459,7 @@ export default function AdminVendorAccountingPage() {
 
   const methodLabel = (m: string) => {
     const labels: Record<string, string> = {
-      mobile_money: "Mobile Money (2.5%)", stripe: "Carte (3.5%)", card: "Carte (3.5%)",
+      mobile_money: "Mobile Money (KelPay)", stripe: "Carte (Keccel)", card: "Carte (Keccel)",
       cod: "Contre remboursement", off_platform: "Hors plateforme",
       paypal: "PayPal (3.9%)", unknown: "Non spécifié",
     };
@@ -737,7 +737,7 @@ export default function AdminVendorAccountingPage() {
                                               <td className="py-1 pr-3 font-medium text-primary">{o.orderRef}</td>
                                               <td className="py-1 px-2">
                                                 <Badge variant="outline" className="text-[8px]">
-                                                  {o.paymentMethod === "stripe" ? "Carte" : o.paymentMethod === "mobile_money" ? "MoMo" : o.paymentMethod === "cod" ? "COD" : o.paymentMethod === "off_platform" ? "Hors pl." : o.paymentMethod}
+                                                  {o.paymentMethod === "stripe" || o.paymentMethod === "card" ? "Carte (Keccel)" : o.paymentMethod === "mobile_money" ? "MoMo" : o.paymentMethod === "cod" ? "COD" : o.paymentMethod === "off_platform" ? "Hors pl." : o.paymentMethod}
                                                 </Badge>
                                               </td>
                                               <td className="text-right py-1 px-2 font-medium">${fmt(o.totalRevenue)}</td>

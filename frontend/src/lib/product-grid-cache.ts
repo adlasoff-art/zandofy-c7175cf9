@@ -1,6 +1,6 @@
 import type { Product } from "@/services/api";
 
-const CACHE_KEY = "zandofy_home_product_grid_v2";
+const CACHE_KEY = "zandofy_home_product_grid_v4";
 const TTL_MS = 30 * 60 * 1000;
 
 export type ProductGridCache = {

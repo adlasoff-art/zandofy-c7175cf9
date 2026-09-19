@@ -26,6 +26,7 @@ import { VendorPaymentNumbers } from "@/components/vendor/VendorPaymentNumbers";
 import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
 import { VendorPricingTab } from "@/components/vendor/VendorPricingTab";
 import { VendorAutonomousTab } from "@/components/vendor/VendorAutonomousTab";
+import { VendorPaymentModesTab } from "@/components/vendor/VendorPaymentModesTab";
 import { VendorKybV2Tab } from "@/components/vendor/VendorKybV2Tab";
 import { VendorAnalyticsProTab } from "@/components/vendor/VendorAnalyticsProTab";
 import { VendorFreightSimulator } from "@/components/vendor/VendorFreightSimulator";
@@ -35,7 +36,7 @@ import { GeoFieldsRow, type GeoFieldsValue } from "@/components/address/GeoField
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag,
-  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign, Calculator, ShieldCheck, LineChart, Archive,
+  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign, Calculator, ShieldCheck, LineChart, Archive, CreditCard,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { ACTIVE_ORDER_STATUSES, NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
@@ -304,6 +305,7 @@ export default function VendorDashboardPage() {
     { key: "featured" as const, label: "Mise en avant", icon: Sparkles },
     ...(suppliersEnabled && shopType !== "local" ? [{ key: "suppliers" as const, label: "Fournisseurs", icon: Truck }] : []),
     { key: "pricing" as const, label: "Tarification", icon: DollarSign },
+    { key: "payments" as const, label: "Paiements", icon: CreditCard },
     ...(shopType === "local" ? [{ key: "autonomous" as const, label: "Autonome", icon: Globe }] : []),
     ...(freightSimEnabled && shopType !== "local" ? [{ key: "freight_sim" as const, label: "Simulateur fret", icon: Calculator }] : []),
     { key: "kyb" as const, label: "Vérification KYB", icon: ShieldCheck },
@@ -343,6 +345,7 @@ export default function VendorDashboardPage() {
       {activeTab === "featured" && <VendorFeaturedRequestTab storeId={store!.id} />}
       {activeTab === "suppliers" && <VendorSuppliersTab storeId={store!.id} />}
       {activeTab === "pricing" && <VendorPricingTab storeId={store!.id} />}
+      {activeTab === "payments" && <VendorPaymentModesTab storeId={store!.id} />}
       {activeTab === "autonomous" && <VendorAutonomousTab storeId={store!.id} />}
       {activeTab === "freight_sim" && freightSimEnabled && <VendorFreightSimulator />}
       {activeTab === "kyb" && <VendorKybV2Tab storeId={store!.id} />}

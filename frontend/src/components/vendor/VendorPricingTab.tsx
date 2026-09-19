@@ -8,6 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { VENDOR_TIERS } from "@/lib/vendor-tiers";
 import { SubscriptionCheckoutDialog } from "@/components/payments/SubscriptionCheckoutDialog";
 import { Link } from "react-router-dom";
+import {
+  DEFAULT_GATEWAY_FEES,
+  estimateVendorNet,
+  parseGatewayFees,
+  type GatewayFees,
+} from "@/lib/gateway-fees";
+import { useVendorOffPlatformAccess } from "@/hooks/use-vendor-off-platform-access";
 
 interface Props {
   storeId: string;
@@ -111,6 +118,20 @@ export function VendorPricingTab({ storeId }: Props) {
     },
   });
 
+  const { data: gatewayFees = DEFAULT_GATEWAY_FEES } = useQuery({
+    queryKey: ["gateway-fees-vendor-pricing"],
+    queryFn: async (): Promise<GatewayFees> => {
+      const { data } = await supabase
+        .from("platform_settings")
+        .select("value")
+        .eq("key", "gateway_fees")
+        .maybeSingle();
+      return parseGatewayFees(data?.value);
+    },
+  });
+
+  const { data: offAccess } = useVendorOffPlatformAccess(storeId);
+
   const currentTier = (vendorSub as any)?.tier || "beginner";
   const tierConfig = VENDOR_TIERS[currentTier as keyof typeof VENDOR_TIERS] || VENDOR_TIERS.beginner;
   const freeMax = monetization?.free_max_products ?? productOverride?.max_products_override ?? (vendorSub as any)?.max_products ?? tierConfig.maxProducts;
@@ -120,6 +141,11 @@ export function VendorPricingTab({ storeId }: Props) {
       (!(currentSub as any)?.paid_until || new Date((currentSub as any).paid_until).getTime() > Date.now())) ||
     (productOverride?.vendor_custom_payment_numbers_enabled === true &&
       (productOverride as any)?.mm_granted_by_admin === true);
+
+  const commissionPct = Number(commissionRate ?? monetization?.default_commission_pct ?? 10);
+  const sampleGross = 100;
+  const netMoMo = estimateVendorNet(sampleGross, commissionPct, "mobile_money", gatewayFees);
+  const netCard = estimateVendorNet(sampleGross, commissionPct, "card", gatewayFees);
 
   const handleSubscriptionSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ["store-package-sub", storeId] });
@@ -144,8 +170,13 @@ export function VendorPricingTab({ storeId }: Props) {
         </div>
         <p className="text-sm text-muted-foreground">
           Taux actuel :{" "}
-          <span className="font-bold text-foreground text-lg">{commissionRate ?? monetization?.default_commission_pct ?? 10}%</span>
+          <span className="font-bold text-foreground text-lg">{commissionPct}%</span>
           {" "}sur chaque vente livrée.
+        </p>
+        <p className="text-[11px] text-muted-foreground leading-relaxed" title="Estimation indicative — hors coûts produit">
+          Ex. sur $100 brut : net ≈ ${netMoMo.net.toFixed(2)} (MoMo, −${netMoMo.commission.toFixed(2)} commission −${netMoMo.gatewayFee.toFixed(2)} frais)
+          {" · "}
+          ≈ ${netCard.net.toFixed(2)} (Carte Keccel, −${netCard.commission.toFixed(2)} −${netCard.gatewayFee.toFixed(2)})
         </p>
         <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
           <Badge className={tierConfig.badgeClass}>Gratuit</Badge>
@@ -155,6 +186,22 @@ export function VendorPricingTab({ storeId }: Props) {
           </span>
         </div>
       </div>
+
+      {offAccess?.reason === "trial" && offAccess.trialEndsAt && (
+        <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+          Essai hors plateforme jusqu&apos;au {new Date(offAccess.trialEndsAt).toLocaleDateString("fr-FR")}
+          {offAccess.daysLeft != null ? ` (${offAccess.daysLeft} j)` : ""}.{" "}
+          {!hasMm && (
+            <button
+              type="button"
+              className="underline text-primary"
+              onClick={() => mmPackage && setCheckoutPkg(mmPackage)}
+            >
+              Souscrire le forfait numéros
+            </button>
+          )}
+        </div>
+      )}
 
       {/* MM upsell — single clear card */}
       <div className="bg-card border-2 border-primary/30 rounded-lg p-5 space-y-3">

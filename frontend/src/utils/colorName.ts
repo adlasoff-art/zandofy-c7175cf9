@@ -139,14 +139,31 @@ export function hexToColorName(hex: string | null | undefined): string {
 }
 
 /**
+ * Returns a CSS-safe color for inline styles (blocks injection / invalid values).
+ * Accepts #RGB, #RRGGBB, #RRGGBBAA, or the same without leading #.
+ */
+export function toSafeCssColor(color: string | null | undefined): string | null {
+  if (!color) return null;
+  const raw = color.trim();
+  if (/^#[0-9A-Fa-f]{3}$/.test(raw) || /^#[0-9A-Fa-f]{6}$/.test(raw) || /^#[0-9A-Fa-f]{8}$/.test(raw)) {
+    return raw;
+  }
+  if (/^[0-9A-Fa-f]{3}$/.test(raw) || /^[0-9A-Fa-f]{6}$/.test(raw) || /^[0-9A-Fa-f]{8}$/.test(raw)) {
+    return `#${raw}`;
+  }
+  return null;
+}
+
+/**
  * Renders a color as: [swatch] Name
  * Use in JSX: <ColorLabel color="#3B82F6" />
  */
 export function getColorDisplay(color: string | null | undefined): { name: string; hex: string } | null {
   if (!color) return null;
-  const isHex = color.trim().startsWith("#");
-  return {
-    name: isHex ? hexToColorName(color) : color,
-    hex: isHex ? color : "",
-  };
+  const safe = toSafeCssColor(color);
+  if (safe) {
+    return { name: hexToColorName(safe), hex: safe };
+  }
+  // Named color label without a paintableswatch
+  return { name: color.trim(), hex: "" };
 }

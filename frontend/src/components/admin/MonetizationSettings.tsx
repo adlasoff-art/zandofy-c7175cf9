@@ -18,6 +18,7 @@ interface VendorMonetizationConfig {
   free_max_promos: number;
   mm_numbers_monthly_price_usd: number;
   default_commission_pct: number;
+  off_platform_trial_days: number;
 }
 
 export function MonetizationSettings() {
@@ -35,6 +36,7 @@ export function MonetizationSettings() {
     free_max_promos: 10,
     mm_numbers_monthly_price_usd: 9.99,
     default_commission_pct: 10,
+    off_platform_trial_days: 30,
   });
   const [saving, setSaving] = useState(false);
 
@@ -67,6 +69,7 @@ export function MonetizationSettings() {
               free_max_promos: Number(v?.free_max_promos) || 10,
               mm_numbers_monthly_price_usd: Number(v?.mm_numbers_monthly_price_usd) || 9.99,
               default_commission_pct: Number(v?.default_commission_pct) || 10,
+              off_platform_trial_days: Number(v?.off_platform_trial_days) || 30,
             });
           }
         });
@@ -151,6 +154,13 @@ export function MonetizationSettings() {
             <input type="number" min={0.99} step={0.01} value={vendorMonetization.mm_numbers_monthly_price_usd}
               onChange={e => setVendorMonetization(p => ({ ...p, mm_numbers_monthly_price_usd: Number(e.target.value) }))}
               className={inputClass} />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Essai hors plateforme (jours)</label>
+            <input type="number" min={1} max={365} value={vendorMonetization.off_platform_trial_days}
+              onChange={e => setVendorMonetization(p => ({ ...p, off_platform_trial_days: Number(e.target.value) || 30 }))}
+              className={inputClass} />
+            <p className="text-[10px] text-muted-foreground mt-1">Depuis stores.created_at — après, forfait ou grant admin requis</p>
           </div>
         </div>
       </section>

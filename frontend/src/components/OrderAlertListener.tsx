@@ -47,7 +47,7 @@ export function OrderAlertListener() {
       .from("orders")
       .select("order_ref, store_id, total, created_at, status")
       .gt("created_at", lastSeenRef.current)
-      // Ne JAMAIS alerter pour une commande encore en attente de paiement (carte/MM/PayPal/Stripe/off-platform)
+      // Ne JAMAIS alerter pour une commande encore en attente de paiement (carte Keccel/MM/PayPal/off-platform)
       // ni pour les commandes échouées/annulées/retournées. Seules les commandes payées et actives doivent
       // déclencher l'alerte "Nouvelle commande !".
       .not("status", "in", '("awaiting_payment","payment_failed","cancelled","returned")')
