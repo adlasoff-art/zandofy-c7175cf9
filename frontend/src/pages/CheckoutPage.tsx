@@ -41,6 +41,7 @@ import { getColorDisplay } from "@/utils/colorName";
 import { useStorePaymentNumbers } from "@/hooks/use-store-payment-numbers";
 import { resolveOffPlatformAccess } from "@/hooks/use-vendor-off-platform-access";
 import { PaymentWaitingPanel } from "@/components/payments/PaymentWaitingPanel";
+import { startMoMoPaymentWatch, type MoMoPaymentWatchHandle } from "@/lib/momo-payment-watch";
 import { useHomeDeliveryEnabled } from "@/hooks/use-home-delivery-enabled";
 import { MobileBackButton } from "@/components/navigation/MobileBackButton";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -162,6 +163,7 @@ export default function CheckoutPage() {
    const [vendorCardAllowed, setVendorCardAllowed] = useState(true);
    const [cartStoreIds, setCartStoreIds] = useState<string[]>([]);
   const paymentChannelRef = useRef<any>(null);
+  const paymentWatchRef = useRef<MoMoPaymentWatchHandle | null>(null);
   const { data: paymentNumbers = [] } = useStorePaymentNumbers(cartStoreIds);
 
   const [shipping, setShipping] = useState<ShippingInfo>({ ...emptyShipping, email: user?.email || "" });
@@ -466,11 +468,18 @@ export default function CheckoutPage() {
     void loadVendorCodEligibility();
   }, [items]);
 
-  // Cleanup realtime subscription on unmount
+  // Cleanup Realtime + MoMo watch on unmount
   useEffect(() => {
     return () => {
+      paymentWatchRef.current?.stop();
+      paymentWatchRef.current = null;
+      if ((paymentChannelRef as any)._timeoutId) {
+        clearTimeout((paymentChannelRef as any)._timeoutId);
+        (paymentChannelRef as any)._timeoutId = null;
+      }
       if (paymentChannelRef.current) {
         supabase.removeChannel(paymentChannelRef.current);
+        paymentChannelRef.current = null;
       }
     };
   }, []);
@@ -1259,6 +1268,121 @@ export default function CheckoutPage() {
     return { orderRef: baseRef, orderIds: createdOrderIds };
   };
 
+  const stopMoMoListeners = useCallback(() => {
+    paymentWatchRef.current?.stop();
+    paymentWatchRef.current = null;
+    if ((paymentChannelRef as any)._timeoutId) {
+      clearTimeout((paymentChannelRef as any)._timeoutId);
+      (paymentChannelRef as any)._timeoutId = null;
+    }
+    if (paymentChannelRef.current) {
+      supabase.removeChannel(paymentChannelRef.current);
+      paymentChannelRef.current = null;
+    }
+  }, []);
+
+  /** Shared success/fail after MoMo (Realtime, poll, or manual check). Guarded by watch.claimResult. */
+  const applyMoMoSuccess = useCallback(
+    async (orderIds: string[], orderRefLabel: string) => {
+      if (orderIds.length > 0) {
+        await supabase
+          .from("orders")
+          .update({ status: "pending" } as any)
+          .in("id", orderIds)
+          .eq("status", "awaiting_payment");
+        await (supabase as any)
+          .from("orders")
+          .update({ shipping_payment_status: "paid" })
+          .in("id", orderIds)
+          .eq("shipping_payment_status", "unpaid");
+        await (supabase as any)
+          .from("orders")
+          .update({ last_mile_payment_status: "paid" })
+          .in("id", orderIds)
+          .eq("last_mile_payment_status", "unpaid");
+      }
+      stopMoMoListeners();
+      setPaymentPending(false);
+      await removeSelectedItems();
+      goToStep("confirmation");
+      toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRefLabel}` });
+    },
+    // removeSelectedItems / goToStep / toast / t are stable enough for payment session
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stopMoMoListeners, t],
+  );
+
+  const applyMoMoFailed = useCallback(
+    async (orderIds: string[], message?: string) => {
+      if (orderIds.length > 0) {
+        await supabase
+          .from("orders")
+          .update({ status: "payment_failed" } as any)
+          .in("id", orderIds)
+          .eq("status", "awaiting_payment");
+      }
+      stopMoMoListeners();
+      setPaymentPending(false);
+      toast({
+        title: "Paiement échoué",
+        description: message || "Le paiement n'a pas pu être complété. Veuillez réessayer.",
+        variant: "destructive",
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stopMoMoListeners],
+  );
+
+  /**
+   * Start Realtime + hybrid DB/kelpay-check watch for a MoMo reference.
+   * Replaces the old single check at t=180s.
+   */
+  const beginMoMoWait = useCallback(
+    (opts: {
+      reference: string;
+      transactionId: string | null;
+      orderIds: string[];
+      orderRefLabel: string;
+    }) => {
+      const { reference, transactionId, orderIds, orderRefLabel } = opts;
+      stopMoMoListeners();
+
+      const watch = startMoMoPaymentWatch({
+        reference,
+        transactionId,
+        onSuccess: () => applyMoMoSuccess(orderIds, orderRefLabel),
+        onFailed: () => applyMoMoFailed(orderIds),
+      });
+      paymentWatchRef.current = watch;
+
+      const channel = supabase
+        .channel(`payment-${reference}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "payment_transactions",
+            filter: `reference=eq.${reference}`,
+          },
+          async (payload: any) => {
+            const newStatus = payload.new?.status;
+            if (newStatus === "success") {
+              if (!watch.claimResult("success")) return;
+              await applyMoMoSuccess(orderIds, orderRefLabel);
+            } else if (newStatus === "failed") {
+              if (!watch.claimResult("failed")) return;
+              await applyMoMoFailed(orderIds);
+            }
+          },
+        )
+        .subscribe();
+
+      paymentChannelRef.current = channel;
+    },
+    [stopMoMoListeners, applyMoMoSuccess, applyMoMoFailed],
+  );
+
   const handlePayment = async () => {
     setProcessing(true);
 
@@ -1303,7 +1427,7 @@ export default function CheckoutPage() {
           return;
         }
 
-        // Payment request accepted - wait for PIN validation
+        // Payment request accepted - wait for PIN validation (Realtime + hybrid poll)
         setPaymentTransactionId(data.transaction_id);
         setPaymentReference(data.reference);
         setPaymentPending(true);
@@ -1311,82 +1435,12 @@ export default function CheckoutPage() {
         setPaymentOrderIds(orderIds);
         setProcessing(false);
 
-        // Subscribe to realtime updates on payment_transactions
-        const channel = supabase
-          .channel(`payment-${data.reference}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "UPDATE",
-              schema: "public",
-              table: "payment_transactions",
-              filter: `reference=eq.${data.reference}`,
-            },
-            async (payload: any) => {
-              const newStatus = payload.new?.status;
-              if (newStatus === "success") {
-                await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
-                // Logistique payée avec la commande : marquer "paid" maintenant
-                await (supabase as any).from("orders")
-                  .update({ shipping_payment_status: "paid" } as any)
-                  .in("id", orderIds)
-                  .eq("shipping_payment_status", "unpaid");
-                await (supabase as any).from("orders")
-                  .update({ last_mile_payment_status: "paid" } as any)
-                  .in("id", orderIds)
-                  .eq("last_mile_payment_status", "unpaid");
-                setPaymentPending(false);
-                removeSelectedItems();
-                goToStep("confirmation");
-                toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
-                supabase.removeChannel(channel);
-              } else if (newStatus === "failed") {
-                await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", orderIds);
-                setPaymentPending(false);
-                toast({
-                  title: "Paiement échoué",
-                  description: "Le paiement n'a pas pu être complété. Veuillez réessayer.",
-                  variant: "destructive",
-                });
-                supabase.removeChannel(channel);
-              }
-            }
-          )
-          .subscribe();
-
-        paymentChannelRef.current = channel;
-
-        // Auto-timeout after 3 minutes
-        const paymentTimeoutId = setTimeout(async () => {
-          if (!paymentChannelRef.current) return;
-          try {
-            const { data: checkData } = await supabase.functions.invoke("kelpay-check", {
-              body: { transaction_id: data.transaction_id, reference: data.reference },
-            });
-            if (checkData?.status === "success") {
-              await supabase.from("orders").update({ status: "pending" } as any).in("id", orderIds).eq("status", "awaiting_payment");
-              await (supabase as any).from("orders").update({ shipping_payment_status: "paid" }).in("id", orderIds).eq("shipping_payment_status", "unpaid");
-              await (supabase as any).from("orders").update({ last_mile_payment_status: "paid" }).in("id", orderIds).eq("last_mile_payment_status", "unpaid");
-              setPaymentPending(false);
-              await removeSelectedItems();
-              goToStep("confirmation");
-              toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
-            } else {
-              // Timeout reached — mark as failed
-              await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", orderIds).eq("status", "awaiting_payment");
-              setPaymentPending(false);
-              toast({ title: "Délai expiré", description: "Le paiement n'a pas été confirmé dans les 3 minutes. Veuillez réessayer.", variant: "destructive" });
-            }
-          } catch {
-            setPaymentPending(false);
-            toast({ title: "Délai expiré", description: "Impossible de vérifier le paiement. Veuillez réessayer.", variant: "destructive" });
-          }
-          if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
-        }, 180000); // 3 minutes
-
-        // Store timeout for cleanup
-        (paymentChannelRef as any)._timeoutId = paymentTimeoutId;
-
+        beginMoMoWait({
+          reference: data.reference,
+          transactionId: data.transaction_id ?? null,
+          orderIds,
+          orderRefLabel: orderRef,
+        });
       } catch (err: any) {
         toast({ title: "Erreur", description: err.message || "Erreur inattendue.", variant: "destructive" });
         if (createdOrderIds.length > 0) {
@@ -1477,38 +1531,35 @@ export default function CheckoutPage() {
 
   const handleCheckPaymentStatus = async () => {
     if (!paymentTransactionId && !paymentReference) return;
+    setProcessing(true);
     try {
       const { data } = await supabase.functions.invoke("kelpay-check", {
         body: { transaction_id: paymentTransactionId, reference: paymentReference },
       });
       if (data?.status === "success") {
-        if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
-        if (paymentOrderIds.length > 0) {
-          await supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
-          await (supabase as any).from("orders").update({ shipping_payment_status: "paid" }).in("id", paymentOrderIds).eq("shipping_payment_status", "unpaid");
-          await (supabase as any).from("orders").update({ last_mile_payment_status: "paid" }).in("id", paymentOrderIds).eq("last_mile_payment_status", "unpaid");
-        }
-        setPaymentPending(false);
-        await removeSelectedItems();
-        goToStep("confirmation");
-        toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderId}` });
+        const watch = paymentWatchRef.current;
+        if (watch && !watch.claimResult("success")) return;
+        if (!watch) stopMoMoListeners();
+        await applyMoMoSuccess(paymentOrderIds, orderId || "");
       } else if (data?.status === "failed") {
-        if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
-        if (paymentOrderIds.length > 0) {
-          await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds);
-        }
-        setPaymentPending(false);
-        toast({ title: "Paiement échoué", description: "Le paiement n'a pas abouti.", variant: "destructive" });
+        const watch = paymentWatchRef.current;
+        if (watch && !watch.claimResult("failed")) return;
+        if (!watch) stopMoMoListeners();
+        await applyMoMoFailed(paymentOrderIds, "Le paiement n'a pas abouti.");
       } else {
         toast({ title: "En attente", description: "Le paiement est toujours en cours de traitement." });
       }
     } catch {
       toast({ title: "Erreur", description: "Impossible de vérifier le statut.", variant: "destructive" });
+    } finally {
+      setProcessing(false);
     }
   };
 
   const handleCancelPaymentWait = async () => {
-    if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
+    // If success/fail already claimed, do not overwrite order status
+    if (paymentWatchRef.current?.isSettled()) return;
+    stopMoMoListeners();
     if (paymentOrderIds.length > 0) {
       await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
     }
@@ -1520,10 +1571,31 @@ export default function CheckoutPage() {
 
   /**
    * Auto-abandon : compte à rebours expiré + 60s sans action OU fermeture de page.
-   * Vérifie une dernière fois auprès de KelPay puis bascule en payment_failed.
    */
   const handleAutoAbandonPayment = async () => {
     if (paymentOrderIds.length === 0) return;
+    if (paymentWatchRef.current?.isSettled()) return;
+
+    try {
+      // Last chance before abandon (late PIN during grace) — claim mutex first
+      if (paymentReference || paymentTransactionId) {
+        const { data: checkData } = await supabase.functions.invoke("kelpay-check", {
+          body: { transaction_id: paymentTransactionId, reference: paymentReference },
+        });
+        if (checkData?.status === "success") {
+          const watch = paymentWatchRef.current;
+          if (watch && !watch.claimResult("success")) return;
+          if (!watch) stopMoMoListeners();
+          await applyMoMoSuccess(paymentOrderIds, orderId || "");
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("auto-abandon last-check failed:", e);
+    }
+
+    if (paymentWatchRef.current?.isSettled()) return;
+    stopMoMoListeners();
     try {
       await supabase.functions.invoke("mark-payment-abandoned", {
         body: { order_ids: paymentOrderIds, reference: paymentReference },
@@ -1531,7 +1603,6 @@ export default function CheckoutPage() {
     } catch (e) {
       console.warn("auto-abandon failed:", e);
     }
-    if (paymentChannelRef.current) { supabase.removeChannel(paymentChannelRef.current); paymentChannelRef.current = null; }
     setPaymentPending(false);
     setPaymentTransactionId(null);
     setPaymentReference(null);
@@ -2315,6 +2386,7 @@ export default function CheckoutPage() {
                 {paymentMethod === "mobile_money" && paymentPending && (
                   <div className="space-y-4 pt-2 border-t border-border">
                     <PaymentWaitingPanel
+                      key={paymentReference || "momo-wait"}
                       durationSeconds={180}
                       providerLabel={
                         mobileMoneyProvider === "orange_money" ? "Orange Money" :
@@ -2372,16 +2444,11 @@ export default function CheckoutPage() {
                             disabled={!retryPhone.replace(/[\s\-\+]/g, "") || retryPhone.replace(/[\s\-\+]/g, "").length < 9 || processing}
                             onClick={async () => {
                               setProcessing(true);
-                              // Remove old channel
-                              if (paymentChannelRef.current) {
-                                supabase.removeChannel(paymentChannelRef.current);
-                                paymentChannelRef.current = null;
-                              }
                               try {
                                 const cleanPhone = retryPhone.replace(/[\s\-\+]/g, "");
-                                 const { data, error } = await supabase.functions.invoke("kelpay-payment", {
+                                const { data, error } = await supabase.functions.invoke("kelpay-payment", {
                                   body: {
-                                     order_id: paymentOrderIds[0],
+                                    order_id: paymentOrderIds[0],
                                     phone_number: cleanPhone,
                                     amount: total,
                                     currency: "USD",
@@ -2397,22 +2464,12 @@ export default function CheckoutPage() {
                                   setMobileMoneyProvider(retryProvider);
                                   setShowRetryForm(false);
                                   toast({ title: "Nouvelle demande envoyée", description: "Validez sur votre téléphone." });
-                                  // Re-subscribe
-                                  const channel = supabase
-                                    .channel(`payment-retry-${data.reference}`)
-                                    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "payment_transactions", filter: `reference=eq.${data.reference}` },
-                                      (payload: any) => {
-                                        const ns = payload.new?.status;
-                                        if (ns === "success") {
-                                          supabase.from("orders").update({ status: "pending" } as any).in("id", paymentOrderIds).eq("status", "awaiting_payment");
-                                          (supabase as any).from("orders").update({ shipping_payment_status: "paid" }).in("id", paymentOrderIds).eq("shipping_payment_status", "unpaid");
-                                          (supabase as any).from("orders").update({ last_mile_payment_status: "paid" }).in("id", paymentOrderIds).eq("last_mile_payment_status", "unpaid");
-                                          setPaymentPending(false); removeSelectedItems(); goToStep("confirmation"); toast({ title: t("checkout.orderConfirmed") }); supabase.removeChannel(channel);
-                                        }
-                                        else if (ns === "failed") { supabase.from("orders").update({ status: "payment_failed" } as any).in("id", paymentOrderIds); setPaymentPending(false); toast({ title: "Paiement échoué", variant: "destructive" }); supabase.removeChannel(channel); }
-                                      }
-                                    ).subscribe();
-                                  paymentChannelRef.current = channel;
+                                  beginMoMoWait({
+                                    reference: data.reference,
+                                    transactionId: data.transaction_id ?? null,
+                                    orderIds: paymentOrderIds,
+                                    orderRefLabel: orderId || "",
+                                  });
                                 }
                               } catch (err: any) {
                                 toast({ title: "Erreur", description: err.message, variant: "destructive" });
