@@ -20,7 +20,12 @@ type SectionRow = {
   section_key: string;
   is_active: boolean;
   sort_order: number;
-  config: { entity_id?: string; limit?: number; href?: string } | null;
+  config: {
+    entity_id?: string;
+    limit?: number;
+    href?: string;
+    display_mode?: "rail" | "grid_page";
+  } | null;
 };
 
 type CatOpt = { id: string; name: string; name_fr: string | null };
@@ -36,6 +41,7 @@ export default function SectionsTab() {
   const [draftType, setDraftType] = useState<"category_rail" | "store_rail">("category_rail");
   const [draftEntity, setDraftEntity] = useState("");
   const [draftLimit, setDraftLimit] = useState("12");
+  const [draftDisplayMode, setDraftDisplayMode] = useState<"rail" | "grid_page">("rail");
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -113,6 +119,7 @@ export default function SectionsTab() {
       config: {
         entity_id: draftEntity,
         limit: Math.min(Math.max(Number(draftLimit) || 12, 4), 24),
+        display_mode: draftDisplayMode,
       },
     });
     setSaving(false);
@@ -123,6 +130,7 @@ export default function SectionsTab() {
     toast({ title: "Rail ajouté" });
     setDraftLabel("");
     setDraftEntity("");
+    setDraftDisplayMode("rail");
     load();
   };
 
@@ -199,6 +207,21 @@ export default function SectionsTab() {
               onChange={(e) => setDraftLimit(e.target.value)}
             />
           </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Affichage accueil</Label>
+            <Select
+              value={draftDisplayMode}
+              onValueChange={(v) => setDraftDisplayMode(v as "rail" | "grid_page")}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="rail">Rail horizontal (scroll)</SelectItem>
+                <SelectItem value="grid_page">Grille + lien page dédiée</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <Button type="button" size="sm" onClick={handleAddRail} disabled={saving}>
           {saving ? <Loader2 size={14} className="animate-spin mr-1" /> : <Plus size={14} className="mr-1" />}
@@ -250,7 +273,7 @@ export default function SectionsTab() {
               </div>
 
               {isRail && (
-                <div className="grid sm:grid-cols-3 gap-3 pl-10">
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 pl-10">
                   <div className="space-y-1">
                     <Label className="text-xs">Titre</Label>
                     <Input
@@ -291,6 +314,32 @@ export default function SectionsTab() {
                                 {st.name}
                               </SelectItem>
                             ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Affichage</Label>
+                    <Select
+                      value={s.config?.display_mode || "rail"}
+                      onValueChange={(v) => {
+                        const nextMode = v as "rail" | "grid_page";
+                        const next = {
+                          ...s,
+                          config: {
+                            ...(s.config || {}),
+                            display_mode: nextMode,
+                          },
+                        };
+                        setSections((prev) => prev.map((x) => (x.id === s.id ? next : x)));
+                        void handleSaveConfig(next);
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="rail">Rail horizontal</SelectItem>
+                        <SelectItem value="grid_page">Grille + page</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

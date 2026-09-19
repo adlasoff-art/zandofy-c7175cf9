@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { requestAddressOnboarding } from "@/lib/address-onboarding-bus";
 
 interface WishlistContextType {
   wishlistIds: Set<string>;
@@ -89,6 +90,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
         removeMutation.mutate(productId);
       } else {
         addMutation.mutate(productId);
+        requestAddressOnboarding();
       }
     },
     [user, wishlistIds, addMutation, removeMutation, toast]

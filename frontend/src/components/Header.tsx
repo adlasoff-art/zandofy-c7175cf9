@@ -291,15 +291,12 @@ export function Header() {
         </div>
       )}
 
-      {/* Main header row */}
+      {/* Main header — mobile: 2 rows (logo+icons / search); lg+: single row */}
       <div className="border-b border-border">
+        {/* Row 1: logo + actions (and desktop search) */}
         <div className="container flex items-center h-14 gap-2 md:gap-4">
           <BrandLogo variant="header" />
 
-          {/* Sticky always-on search (phone + tablet); desktop below */}
-          <div className="flex flex-1 min-w-0 lg:hidden">
-            <PredictiveSearch />
-          </div>
           <div className="hidden lg:flex flex-1 max-w-2xl mx-auto px-6">
             <PredictiveSearch />
           </div>
@@ -342,7 +339,7 @@ export function Header() {
 
             <Link
               to="/tracking"
-              className={`p-2 text-foreground hover:text-primary transition-colors ${standalonePwa ? "hidden md:flex" : "hidden sm:flex"}`}
+              className="flex p-2 text-foreground hover:text-primary transition-colors"
               aria-label={t("header.tracking") || "Suivi colis"}
               title={t("header.tracking") || "Suivi colis"}
             >
@@ -425,6 +422,11 @@ export function Header() {
               )}
             </button>
           </div>
+        </div>
+
+        {/* Row 2 mobile/tablet: full-width sticky search */}
+        <div className="container pb-2.5 lg:hidden">
+          <PredictiveSearch />
         </div>
       </div>
 

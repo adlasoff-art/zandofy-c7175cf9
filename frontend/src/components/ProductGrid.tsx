@@ -334,6 +334,8 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
               seeAllHref="/popular"
               products={popularProducts}
               loading={popularLoading}
+              skeletonCount={12}
+              className="bg-transparent"
               icon={<Flame size={18} className="text-orange-500" aria-hidden />}
               embedded
             />

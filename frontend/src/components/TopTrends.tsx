@@ -73,7 +73,7 @@ export function TopTrends() {
 
   if (error) {
     return (
-      <section className="py-6 bg-card" aria-labelledby="home-trends-heading">
+      <section className="py-6 bg-muted/30 dark:bg-muted/10" aria-labelledby="home-trends-heading">
         <div className="container">
           <Link to="/trends" className="flex items-center gap-2 mb-4 group cursor-pointer">
             <h2
@@ -110,7 +110,8 @@ export function TopTrends() {
       seeAllHref="/trends"
       products={products}
       loading={loading}
-      className="bg-card py-0"
+      skeletonCount={12}
+      className="bg-muted/30 dark:bg-muted/10 py-0"
       embedded
     />
   );

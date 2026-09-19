@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { requestAddressOnboarding } from "@/lib/address-onboarding-bus";
 
 export interface CartItem {
   id: string;
@@ -173,6 +174,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     await fetchCart();
     setDrawerOpen(true);
+    requestAddressOnboarding();
     toast({
       title: wasExisting
         ? `Panier mis à jour — ${finalQty} pièces au total`

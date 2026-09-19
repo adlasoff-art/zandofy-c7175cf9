@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ShieldCheck, Globe, AlertTriangle, Bell } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ShieldCheck, Globe, AlertTriangle, Bell, Phone } from "lucide-react";
 import { useEffect } from "react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useGeoDetection } from "@/hooks/use-geo-detection";
 import { useActiveGeo } from "@/hooks/useActiveGeo";
+import { useAuthSettings } from "@/hooks/use-auth-settings";
+import { sanitizeAuthRedirect } from "@/lib/auth-redirect";
 import { LegalModal } from "@/components/auth/LegalModal";
 import { HoneypotField, isHoneypotTriggered } from "@/components/security/FormProtection";
 import { SEOHead } from "@/components/SEOHead";
@@ -31,6 +33,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [lockoutMsg, setLockoutMsg] = useState<string | null>(null);
@@ -42,6 +45,9 @@ export default function AuthPage() {
   const { t } = useI18n();
   const geo = useGeoDetection();
   const { isCountryActive, loading: geoLoading } = useActiveGeo();
+  const { data: authSettings } = useAuthSettings();
+  const isFluid = (authSettings?.mode ?? "fluid") === "fluid";
+  const collectPhone = authSettings?.collect_phone_on_signup !== false;
   const [notifyMeSent, setNotifyMeSent] = useState(false);
   const [notifyMeLoading, setNotifyMeLoading] = useState(false);
 
@@ -53,8 +59,7 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (user) {
-      const safeRedirect = redirectTo.startsWith("/") ? redirectTo : "/";
-      navigate(safeRedirect, { replace: true });
+      navigate(sanitizeAuthRedirect(redirectTo), { replace: true });
     }
   }, [user, navigate, redirectTo]);
 
@@ -151,9 +156,55 @@ export default function AuthPage() {
             await supabase.from("zando_points").insert({ user_id: signUpData.user.id });
           }
         }
+
+        if (signUpData.user && collectPhone && phone.trim() && signUpData.session) {
+          await supabase
+            .from("profiles")
+            .update({ phone: phone.trim() })
+            .eq("id", signUpData.user.id);
+        }
+
         resetLoginAttempts();
         setAttemptsLeft(null);
+
+        const safeRedirect = sanitizeAuthRedirect(redirectTo);
+        if (signUpData.session) {
+          toast({
+            title: t("auth.signupSuccess") || "Compte créé",
+            description: isFluid
+              ? (t("auth.signupFluidDesc") || "Bienvenue ! Vous pouvez commencer à naviguer.")
+              : t("auth.signupSuccessDesc"),
+          });
+          navigate(safeRedirect);
+          setLoading(false);
+          return;
+        }
+
+        // Fluid but Confirm email still ON: try immediate password sign-in
+        if (isFluid) {
+          const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (!signInErr && signInData.session) {
+            if (signUpData.user && collectPhone && phone.trim()) {
+              await supabase
+                .from("profiles")
+                .update({ phone: phone.trim() })
+                .eq("id", signUpData.user.id);
+            }
+            toast({
+              title: t("auth.signupSuccess") || "Compte créé",
+              description: t("auth.signupFluidDesc") || "Bienvenue ! Vous pouvez commencer à naviguer.",
+            });
+            navigate(safeRedirect);
+            setLoading(false);
+            return;
+          }
+        }
+
         toast({ title: t("auth.signupSuccess"), description: t("auth.signupSuccessDesc") });
+        setMode("login");
       } else if (mode === "forgot") {
         // Check password reset rate limit
         const resetCheck = checkResetAllowed();
@@ -233,7 +284,7 @@ export default function AuthPage() {
     }
     setLoading(true);
     try {
-      const safeRedirect = redirectTo.startsWith("/") ? redirectTo : "/";
+      const safeRedirect = sanitizeAuthRedirect(redirectTo);
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
@@ -418,6 +469,26 @@ export default function AuthPage() {
                 <Input id="email" type="email" placeholder="example@mail.com" value={email} onChange={e => setEmail(e.target.value)} className="pl-9 h-11" required />
               </div>
             </div>
+
+            {mode === "signup" && collectPhone && (
+              <div className="space-y-1.5">
+                <Label htmlFor="phone" className="text-xs">
+                  {t("auth.phone") || "Téléphone"}{" "}
+                  <span className="text-muted-foreground font-normal">({t("common.optional") || "optionnel"})</span>
+                </Label>
+                <div className="relative">
+                  <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+243 …"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="pl-9 h-11"
+                  />
+                </div>
+              </div>
+            )}
 
             {mode !== "forgot" && (
               <div className="space-y-1.5">

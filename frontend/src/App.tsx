@@ -18,6 +18,7 @@ import { I18nProvider } from "@/contexts/I18nContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationListener } from "@/components/NotificationToast";
 import { OrderAlertListener } from "@/components/OrderAlertListener";
+import { AddressOnboardingProvider } from "@/contexts/AddressOnboardingContext";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { ScrollRestoration } from "@/components/ScrollRestoration";
 import { MobileChromeSync } from "@/components/MobileChromeSync";
@@ -248,6 +249,7 @@ const App = () => (
             <Sonner />
             <NotificationListener />
             <OrderAlertListener />
+            <AddressOnboardingProvider>
             <SupportDrawerProvider>
             <ScrollRestoration />
             <MobileChromeSync />
@@ -422,6 +424,7 @@ const App = () => (
             </BanGuard>
             </MaintenanceGuard>
             </SupportDrawerProvider>
+            </AddressOnboardingProvider>
           </UIConfigProvider>
           </ThemeProvider>
           </I18nProvider>
