@@ -3,7 +3,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
-import { PRODUCT_LIST_SELECT } from "@/services/api";
+import { PRODUCT_LIST_SELECT, mapProduct } from "@/services/api";
 import { Footer } from "@/components/Footer";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
@@ -25,37 +25,6 @@ import { slugify } from "@/utils/slugify";
 
 function applySeoTemplate(tpl: string, vars: Record<string, string>): string {
   return (tpl || "").replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? "");
-}
-
-function mapProduct(row: any) {
-  const sortedImages = (row.product_images || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
-  return {
-    id: row.id,
-    slug: row.slug || "",
-    name: row.name,
-    nameFr: row.name_fr,
-    price: Number(row.price),
-    originalPrice: row.original_price ? Number(row.original_price) : undefined,
-    currency: row.currency,
-    image: sortedImages[0]?.image_url || "/placeholder.svg",
-    galleryImages: sortedImages,
-    category: row.categories?.name || "",
-    categoryFr: row.categories?.name_fr || "",
-    rating: Number(row.rating) || 0,
-    reviewCount: row.review_count || 0,
-    isNew: row.is_new || false,
-    isSale: row.is_sale || false,
-    discount: row.discount || 0,
-    colors: row.product_colors?.map((c: any) => c.color_hex) || [],
-    sizes: row.product_sizes?.map((s: any) => s.size_label) || [],
-    moq: row.moq || 1,
-    verifiedYears: row.verified_years || 0,
-    originCountry: row.origin_country || "",
-    sku: row.sku || "",
-    storeId: row.store_id || "",
-    storeIsCertified: row.stores?.is_certified || false,
-    storeIsVerified: row.stores?.is_verified || false,
-  };
 }
 
 const SPECIAL_SLUGS = ["nouveautes", "soldes"];

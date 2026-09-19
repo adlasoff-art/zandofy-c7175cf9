@@ -9,36 +9,8 @@ import { Heart, Gift, Share2, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useI18n } from "@/contexts/I18nContext";
-import type { Product } from "@/services/api";
+import { mapProduct } from "@/services/api";
 import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
-
-function mapProduct(row: any): Product {
-  const sortedImages = (row.product_images || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
-  return {
-    id: row.id,
-    slug: row.slug || "",
-    name: row.name,
-    nameFr: row.name_fr,
-    price: Number(row.price),
-    originalPrice: row.original_price ? Number(row.original_price) : undefined,
-    currency: row.currency,
-    image: sortedImages[0]?.image_url || "/placeholder.svg",
-    galleryImages: sortedImages,
-    category: row.categories?.name || "",
-    categoryFr: row.categories?.name_fr || "",
-    rating: Number(row.rating) || 0,
-    reviewCount: row.review_count || 0,
-    isNew: row.is_new || false,
-    isSale: row.is_sale || false,
-    discount: row.discount || 0,
-    colors: row.product_colors?.map((c: any) => c.color_hex) || [],
-    sizes: row.product_sizes?.map((s: any) => s.size_label) || [],
-    moq: row.moq || 1,
-    verifiedYears: row.verified_years || 0,
-    originCountry: row.origin_country || "",
-    storeId: row.store_id || "",
-  };
-}
 
 export default function SharedWishlistPage() {
   const { userId } = useParams<{ userId: string }>();

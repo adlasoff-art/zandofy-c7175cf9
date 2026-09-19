@@ -10,6 +10,7 @@ import { CertificationBadge } from "@/components/CertificationBadge";
 import { formatStoreYears } from "@/lib/store-years";
 import type { Product } from "@/services/api";
 import { PRODUCT_CARD_IMAGE_CLASS, PRODUCT_CARD_IMAGE_HOVER_CLASS } from "@/lib/product-image-fit";
+import { toSafeCssColor } from "@/utils/colorName";
 
 interface ProductCardProps {
   product: Product;
@@ -203,15 +204,15 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
           )}
         </div>
 
-        {(product as any).shopType === "local" ? (
+        {product.shopType === "local" ? (
           <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 px-1.5 py-0.5 rounded mt-0.5 w-fit">
-            Stock local
+            {t("product.shopType.local")}
           </span>
-        ) : (
+        ) : product.shopType === "international" ? (
           <span className="inline-flex items-center gap-1 text-[9px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded mt-0.5 w-fit">
-            Import
+            {t("product.shopType.international")}
           </span>
-        )}
+        ) : null}
 
         <div className="flex items-center gap-1 mt-0.5 min-h-[1rem]">
           <Star size={10} className="fill-accent text-accent shrink-0" />
@@ -232,23 +233,23 @@ export const ProductCard = memo(function ProductCard({ product, index = 0, prior
           <div className="flex items-center gap-1 min-w-0 flex-1">
             {showColors ? (
               <>
-                {product.colors!.slice(0, 6).map((color, idx) =>
-                  color ? (
+                {product.colors!.slice(0, 6).map((color, idx) => {
+                  const safe = toSafeCssColor(color);
+                  if (!safe) return null;
+                  return (
                     <span
                       key={idx}
                       className="w-3 h-3 rounded-full border border-border/60 shrink-0"
-                      style={{ backgroundColor: String(color).toLowerCase() }}
+                      style={{ backgroundColor: safe }}
                       title={color}
                     />
-                  ) : null,
-                )}
+                  );
+                })}
                 {product.colors!.length > 6 && (
                   <span className="text-[8px] text-muted-foreground">+{product.colors!.length - 6}</span>
                 )}
               </>
-            ) : (
-              <span className="w-3 h-3 rounded-full border border-border/40 bg-muted shrink-0" aria-hidden />
-            )}
+            ) : null}
           </div>
 
           <button

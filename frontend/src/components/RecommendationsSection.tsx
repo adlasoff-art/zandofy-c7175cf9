@@ -5,34 +5,11 @@ import { useI18n } from "@/contexts/I18nContext";
 import { Sparkles } from "lucide-react";
 import { fetchRecentlyViewedProductIds } from "@/lib/user-product-views";
 import { ProductRail } from "@/components/ProductRail";
-import type { Product } from "@/services/api";
+import { mapProduct, PRODUCT_LIST_SELECT, type Product } from "@/services/api";
 import { useHomeMarket } from "@/contexts/HomeMarketContext";
 
-function toProduct(p: {
-  id: string;
-  slug?: string | null;
-  name: string;
-  name_fr?: string | null;
-  nameFr?: string | null;
-  price: number;
-  rating?: number | null;
-  product_images?: Array<{ image_url: string }>;
-  image?: string;
-}): Product {
-  return {
-    id: p.id,
-    slug: p.slug || undefined,
-    name: p.name,
-    nameFr: p.name_fr || p.nameFr || p.name,
-    price: Number(p.price),
-    currency: "USD",
-    image: p.image || p.product_images?.[0]?.image_url || "/placeholder.svg",
-    category: "",
-    categoryFr: "",
-    rating: p.rating ?? 0,
-    reviewCount: 0,
-  };
-}
+/** List select + gender_target for ranking (rating already in PRODUCT_LIST_SELECT). */
+const RECO_SELECT = `${PRODUCT_LIST_SELECT.trim()}, gender_target`;
 
 /** Fisher-Yates — mutates and returns the same array. */
 function shuffleInPlace<T>(arr: T[]): T[] {
@@ -77,9 +54,7 @@ export function RecommendationsSection() {
 
         let q = supabase
           .from("products_public")
-          .select(
-            "id, slug, name, name_fr, price, rating, product_images(image_url, position), gender_target, shop_type",
-          )
+          .select(RECO_SELECT)
           .eq("publish_status", "published")
           .order("rating", { ascending: false })
           .limit(60);
@@ -127,7 +102,7 @@ export function RecommendationsSection() {
         const topIds = new Set(topRow.map(p => p.id));
         let poolQ = supabase
           .from("products_public")
-          .select("id, slug, name, name_fr, price, rating, product_images(image_url, position), shop_type")
+          .select(RECO_SELECT)
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
           .limit(80);
@@ -152,12 +127,12 @@ export function RecommendationsSection() {
         }
 
         if (cancelled) return;
-        setProducts(combined.slice(0, 12).map((p: any) => toProduct(p)));
+        setProducts(combined.slice(0, 12).map((p: any) => mapProduct(p)));
       } catch {
         if (cancelled) return;
         let fallbackQ = supabase
           .from("products_public")
-          .select("id, slug, name, name_fr, price, rating, product_images(image_url, position), shop_type")
+          .select(RECO_SELECT)
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
           .limit(12);
@@ -165,7 +140,7 @@ export function RecommendationsSection() {
         const { data: popular } = await fallbackQ;
         if (cancelled) return;
 
-        setProducts((popular || []).map((p: any) => toProduct(p)));
+        setProducts((popular || []).map((p: any) => mapProduct(p)));
       }
       if (!cancelled) setLoading(false);
     }

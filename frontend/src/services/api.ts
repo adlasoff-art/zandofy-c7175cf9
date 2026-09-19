@@ -150,7 +150,10 @@ export function mapProduct(row: any): Product {
         name: c.color_name || "",
         imageUrl: c.image_url || null,
       })),
-    shopType: row.shop_type || storeData?.shop_type || "international",
+    shopType: (() => {
+      const raw = row.shop_type || storeData?.shop_type;
+      return raw === "local" || raw === "international" ? raw : undefined;
+    })(),
     metaTitle: row.meta_title || undefined,
     metaDescription: row.meta_description || undefined,
     seoKeywords: Array.isArray(row.seo_keywords) ? row.seo_keywords : undefined,
@@ -181,10 +184,11 @@ const PRODUCT_SELECT_FALLBACK = `
 // Use PRODUCT_SELECT (above) only on the product detail page.
 export const PRODUCT_LIST_SELECT = `
   id, name, name_fr, slug, price, original_price, currency, discount, is_new, is_sale,
-  sales_count, store_id, category_id, created_at, short_description, origin_country,
+  sales_count, rating, review_count, store_id, category_id, created_at, short_description, origin_country,
   shop_type, store_is_verified, store_is_certified,
   categories(name, name_fr),
-  product_images(image_url, position)
+  product_images(image_url, position),
+  product_colors(color_hex, color_name)
 `;
 
 /** Public catalog reads — never select from base `products` (cost columns). */
