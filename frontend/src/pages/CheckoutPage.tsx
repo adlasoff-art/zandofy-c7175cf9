@@ -1522,7 +1522,7 @@ export default function CheckoutPage() {
       goToStep("confirmation");
       setProcessing(false);
       if (paymentMethod === "off_platform") {
-        toast({ title: "Commande enregistrée", description: `N° ${orderRef} — Uploadez votre preuve de paiement depuis votre espace client.` });
+        toast({ title: "Commande enregistrée", description: `N° ${orderRef} — Uploadez obligatoirement votre preuve de paiement depuis votre espace client (validation vendeur).` });
       } else {
         toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
       }
@@ -2540,8 +2540,8 @@ export default function CheckoutPage() {
                       <p className="font-semibold">📋 Comment ça marche :</p>
                       <ol className="list-decimal list-inside space-y-1">
                         <li>Effectuez le paiement directement au vendeur (Mobile Money, virement ou paiement en espèces, etc.)</li>
-                        <li>Après la commande, uploadez la preuve de paiement depuis votre espace client. Pour un paiement Mobile Money, assurez-vous que le <strong>numéro de transaction</strong>, le <strong>nom du destinataire</strong>, le <strong>numéro de téléphone utilisé</strong> et la <strong>date</strong> soient clairement visibles sur la capture.</li>
-                        <li>Le vendeur valide la preuve et votre commande est confirmée pour la suite du processus.</li>
+                        <li>Après la commande, uploadez <strong>obligatoirement</strong> la preuve de paiement depuis votre espace client. Pour un paiement Mobile Money, assurez-vous que le <strong>numéro de transaction</strong>, le <strong>nom du destinataire</strong>, le <strong>numéro de téléphone utilisé</strong> et la <strong>date</strong> soient clairement visibles sur la capture.</li>
+                        <li>Le vendeur valide votre preuve : votre commande est alors confirmée pour la suite du processus.</li>
                       </ol>
                     </div>
                   </div>
@@ -2622,8 +2622,7 @@ export default function CheckoutPage() {
                   <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4 text-left space-y-2">
                     <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">⏳ Paiement en attente</p>
                     <p className="text-xs text-amber-700 dark:text-amber-400">
-                      Votre commande est enregistrée mais en attente de preuve de paiement. 
-                      Rendez-vous dans votre espace client pour uploader la preuve de paiement du produit.
+                      Votre commande est enregistrée. Uploadez <strong>obligatoirement</strong> la preuve de paiement depuis votre espace client — le vendeur la validera pour confirmer la commande.
                     </p>
                     <p className="text-xs text-amber-700 dark:text-amber-400">
                       <strong>Note :</strong> Les frais d'expédition et de livraison seront à régler séparément depuis votre espace commande.

@@ -464,6 +464,8 @@ describe("Off-platform dual validation", () => {
       isOffPlatformAwaitingAdminRelease,
       blocksAdminStatusPillsForOffPlatform,
       canAdminReleaseOffPlatform,
+      hasOffPlatformPaymentProof,
+      vendorOffPlatformConfirmUpdates,
     } = await import("@/lib/off-platform-payment");
 
     const waiting = {
@@ -474,8 +476,17 @@ describe("Off-platform dual validation", () => {
       off_platform_admin_released_at: null,
     };
     expect(isOffPlatformAwaitingAdminRelease(waiting)).toBe(true);
+    expect(isOffPlatformAwaitingAdminRelease(waiting, true)).toBe(true);
+    expect(isOffPlatformAwaitingAdminRelease(waiting, false)).toBe(false);
     expect(blocksAdminStatusPillsForOffPlatform(waiting)).toBe(true);
     expect(canAdminReleaseOffPlatform(waiting, false)).toBe(true);
+    expect(canAdminReleaseOffPlatform(waiting, false, true)).toBe(true);
+    expect(canAdminReleaseOffPlatform(waiting, false, false)).toBe(false);
+    expect(hasOffPlatformPaymentProof(waiting)).toBe(true);
+
+    const confirm = vendorOffPlatformConfirmUpdates("2026-05-24T13:00:00Z", "user-1");
+    expect(confirm.status).toBe("pending");
+    expect(confirm.shipping_payment_status).toBe("paid");
 
     const cardAwaiting = {
       payment_method: "stripe",
