@@ -10,6 +10,12 @@ import { imgUrl } from "@/lib/image-url";
 import { CartItemVariantEditor } from "@/components/CartItemVariantEditor";
 import { CartFreightPreview } from "@/components/cart/CartFreightPreview";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useNavigate } from "react-router-dom";
+import { useEffect, useRef } from "react";
+
+function prefetchCheckoutChunk() {
+  void import("@/pages/CheckoutPage");
+}
 
 export function CartDrawer() {
   const {
@@ -20,17 +26,33 @@ export function CartDrawer() {
   const { user } = useAuth();
   const { t, formatPrice } = useI18n();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+  const navTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (navTimerRef.current != null) window.clearTimeout(navTimerRef.current);
+    };
+  }, []);
 
   const allSelected = items.length > 0 && items.every(i => i.selected);
   const noneSelected = items.every(i => !i.selected);
 
   const goCheckout = () => {
     setDrawerOpen(false);
-    // Hard navigation: avoids Sheet/Radix + lazy Checkout race that surfaces as
-    // ErrorBoundary "Oups" then works after manual reload.
-    window.setTimeout(() => {
-      window.location.assign("/checkout");
-    }, 0);
+    // Soft nav after Sheet close — keeps cart/React Query cache warm (no full reload).
+    if (navTimerRef.current != null) window.clearTimeout(navTimerRef.current);
+    navTimerRef.current = window.setTimeout(() => {
+      navigate("/checkout");
+    }, 120);
+  };
+
+  const goAuthForCheckout = () => {
+    setDrawerOpen(false);
+    if (navTimerRef.current != null) window.clearTimeout(navTimerRef.current);
+    navTimerRef.current = window.setTimeout(() => {
+      navigate("/auth?redirect=" + encodeURIComponent("/checkout"));
+    }, 120);
   };
 
   return (
@@ -89,13 +111,11 @@ export function CartDrawer() {
             <ShoppingBag size={48} className="text-muted-foreground" />
             <p className="text-muted-foreground">{t("cart.loginRequired")}</p>
             <Button
+              type="button"
               className="min-h-[44px] px-6"
-              onClick={() => {
-                setDrawerOpen(false);
-                window.setTimeout(() => {
-                  window.location.assign("/auth?redirect=" + encodeURIComponent("/checkout"));
-                }, 0);
-              }}
+              onClick={goAuthForCheckout}
+              onPointerEnter={prefetchCheckoutChunk}
+              onFocus={prefetchCheckoutChunk}
             >
               {t("cart.login")}
             </Button>
@@ -110,6 +130,7 @@ export function CartDrawer() {
             <ShoppingBag size={48} className="text-muted-foreground" />
             <p className="text-base font-semibold text-foreground">{t("cart.empty")}</p>
             <Button
+              type="button"
               variant="outline"
               className="min-h-[44px] px-6"
               onClick={() => setDrawerOpen(false)}
@@ -121,6 +142,7 @@ export function CartDrawer() {
           <>
             <div className={`flex items-center justify-between py-2 border-b border-border ${isMobile ? "px-4" : "px-1"}`}>
               <button
+                type="button"
                 onClick={() => allSelected ? deselectAll() : selectAll()}
                 className="text-xs font-medium text-primary hover:underline flex items-center gap-1.5 min-h-[44px]"
               >
@@ -167,14 +189,14 @@ export function CartDrawer() {
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-foreground">{formatPrice(item.price * item.quantity)}</span>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-11 h-11 flex items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground">
+                        <button type="button" onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-11 h-11 flex items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground">
                           <Minus size={14} />
                         </button>
                         <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-11 h-11 flex items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground">
+                        <button type="button" onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-11 h-11 flex items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground">
                           <Plus size={14} />
                         </button>
-                        <button onClick={() => removeItem(item.id)} className="w-11 h-11 flex items-center justify-center text-destructive hover:bg-destructive/10 rounded ml-1">
+                        <button type="button" onClick={() => removeItem(item.id)} className="w-11 h-11 flex items-center justify-center text-destructive hover:bg-destructive/10 rounded ml-1">
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -208,13 +230,16 @@ export function CartDrawer() {
               )}
               <p className="text-xs text-muted-foreground">{t("cart.shippingAtCheckout")}</p>
               {noneSelected ? (
-                <Button className="w-full h-12 min-h-[44px] font-bold" disabled>
+                <Button type="button" className="w-full h-12 min-h-[44px] font-bold" disabled>
                   {t("cart.selectItems")}
                 </Button>
               ) : (
                 <Button
+                  type="button"
                   className="w-full h-12 min-h-[44px] font-bold active:scale-[0.98] transition-transform"
                   onClick={goCheckout}
+                  onPointerEnter={prefetchCheckoutChunk}
+                  onFocus={prefetchCheckoutChunk}
                 >
                   {t("cart.order")} ({selectedCount}) — {formatPrice(selectedSubtotal)}
                 </Button>
