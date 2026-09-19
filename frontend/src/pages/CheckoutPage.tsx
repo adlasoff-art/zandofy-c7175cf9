@@ -105,13 +105,13 @@ const emptyShipping: ShippingInfo = {
 export default function CheckoutPage() {
   const { selectedItems: items, selectedSubtotal: subtotal, removeSelectedItems, loading: cartLoading } = useCart();
   const { user } = useAuth();
-  const { data: authSettings, isLoading: authSettingsLoading } = useAuthSettings();
+  const { data: authSettings, isFetched: authSettingsFetched } = useAuthSettings();
   const [resendingConfirm, setResendingConfirm] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { t, formatPrice } = useI18n();
   const { data: paymentConfig } = usePaymentMethods();
-  const { isVerified: isKycVerified, isOrderBlocked, needsKyc, kycStatus } = useKycStatus();
+  const { isVerified: isKycVerified, isOrderBlocked, needsKyc, kycStatus, isKycReady } = useKycStatus();
   const { data: homeDeliveryEnabled = false } = useHomeDeliveryEnabled();
 
   // Enable real geo-IP detection only on checkout (perf: avoid blocking home rendering).
@@ -725,20 +725,43 @@ export default function CheckoutPage() {
     );
   }
 
-  // Avoid flash-through before gate settings load (fail-open only after known false)
-  if (authSettingsLoading) {
+  // Unique boot: cart hydrating OR KYC/order-count still settling — no flash screens
+  if (
+    step !== "confirmation" &&
+    ((cartLoading && items.length === 0) || !isKycReady)
+  ) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
         <main className="container py-16 flex flex-col items-center justify-center gap-3 text-center">
           <Loader2 size={32} className="animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">{t("checkout.loadingCart") || "Chargement…"}</p>
+          <p className="text-sm text-muted-foreground">
+            {t("checkout.preparing") || "Préparation de la commande…"}
+          </p>
         </main>
       </div>
     );
   }
 
-  if (authSettings?.gate_checkout_on_email_confirm && !user.email_confirmed_at) {
+  if (isOrderBlocked) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container py-16 text-center space-y-4">
+          <Package size={48} className="mx-auto text-muted-foreground" />
+          <h1 className="text-xl font-bold text-foreground">Vérification requise</h1>
+          <p className="text-muted-foreground">Vous avez atteint la limite de commandes sans vérification d'identité. Complétez votre KYC pour continuer.</p>
+          <Link to="/dashboard"><Button>Compléter la vérification</Button></Link>
+        </main>
+      </div>
+    );
+  }
+
+  if (
+    authSettingsFetched &&
+    authSettings?.gate_checkout_on_email_confirm &&
+    !user.email_confirmed_at
+  ) {
     const handleResendConfirm = async () => {
       if (!user.email) return;
       setResendingConfirm(true);
@@ -766,44 +789,16 @@ export default function CheckoutPage() {
               "Votre compte doit être vérifié avant de commander. Ouvrez le lien reçu par e-mail, puis revenez ici."}
           </p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
-            <Button onClick={handleResendConfirm} disabled={resendingConfirm}>
+            <Button type="button" onClick={handleResendConfirm} disabled={resendingConfirm}>
               {resendingConfirm ? (
                 <Loader2 size={16} className="animate-spin mr-2" />
               ) : null}
               {t("checkout.resendConfirmEmail") || "Renvoyer l'e-mail"}
             </Button>
             <Link to="/">
-              <Button variant="outline">{t("checkout.backToShop")}</Button>
+              <Button type="button" variant="outline">{t("checkout.backToShop")}</Button>
             </Link>
           </div>
-        </main>
-      </div>
-    );
-  }
-
-  if (isOrderBlocked) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="container py-16 text-center space-y-4">
-          <Package size={48} className="mx-auto text-muted-foreground" />
-          <h1 className="text-xl font-bold text-foreground">Vérification requise</h1>
-          <p className="text-muted-foreground">Vous avez atteint la limite de commandes sans vérification d'identité. Complétez votre KYC pour continuer.</p>
-          <Link to="/dashboard"><Button>Compléter la vérification</Button></Link>
-        </main>
-      </div>
-    );
-  }
-
-  // Wait for cart hydration — otherwise we flash "empty" then remount full checkout
-  // (and after a hard reload / SW update this looked like a broken flow).
-  if (cartLoading && items.length === 0 && step !== "confirmation") {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="container py-16 flex flex-col items-center justify-center gap-3 text-center">
-          <Loader2 size={32} className="animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">{t("checkout.loadingCart") || "Chargement du panier…"}</p>
         </main>
       </div>
     );
@@ -1571,7 +1566,7 @@ export default function CheckoutPage() {
                 (-{appliedCoupon.discount_type === "percentage" ? `${appliedCoupon.discount_value}%` : `$${appliedCoupon.discount_value}`})
               </span>
             </div>
-            <button onClick={() => { setAppliedCoupon(null); setCouponCode(""); }} className="text-muted-foreground hover:text-destructive">
+            <button type="button" onClick={() => { setAppliedCoupon(null); setCouponCode(""); }} className="text-muted-foreground hover:text-destructive">
               <X size={14} />
             </button>
           </div>
@@ -1585,6 +1580,7 @@ export default function CheckoutPage() {
               onKeyDown={e => e.key === "Enter" && handleApplyCoupon()}
             />
             <Button
+              type="button"
               variant="outline"
               size="sm"
               onClick={handleApplyCoupon}
@@ -1627,6 +1623,7 @@ export default function CheckoutPage() {
               <span className="text-xs text-muted-foreground">({pointsBalance} pts)</span>
             </div>
             <button
+              type="button"
               onClick={() => { setUsePoints(!usePoints); if (!usePoints) setPointsToUse(Math.min(pointsBalance, Math.floor(subtotal - discountAmount))); }}
               className={`text-xs font-medium px-2 py-1 rounded-full transition-colors ${
                 usePoints ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
@@ -1838,6 +1835,7 @@ export default function CheckoutPage() {
                       {savedAddresses.map(addr => (
                         <button
                           key={addr.id}
+                          type="button"
                           onClick={() => handleSelectAddress(addr)}
                           className={`relative text-left p-3 rounded-lg border-2 transition-all ${
                             selectedAddressId === addr.id
@@ -1857,6 +1855,7 @@ export default function CheckoutPage() {
                           <p className="text-xs text-muted-foreground">{addr.phone}</p>
                           {!(addr as any).is_first_address && (
                             <button
+                              type="button"
                               onClick={(e) => { e.stopPropagation(); handleDeleteAddress(addr.id); }}
                               className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
                             >
@@ -2084,7 +2083,12 @@ export default function CheckoutPage() {
                           Vous pouvez choisir le retrait à l'agence (hub) ou nous demander d'étendre la couverture.
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          <Button size="sm" variant="default" onClick={() => setDeliveryOption("hub_pickup")}>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="default"
+                            onClick={() => setDeliveryOption("hub_pickup")}
+                          >
                             🏪 Choisir le retrait à l'agence (hub)
                           </Button>
                           <RequestCoverageButton
@@ -2182,7 +2186,7 @@ export default function CheckoutPage() {
                   <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                     <CreditCard size={18} /> {t("checkout.paymentMethod")}
                   </h2>
-                  <button onClick={() => goToStep("shipping")} className="text-sm text-primary hover:underline flex items-center gap-1">
+                  <button type="button" onClick={() => goToStep("shipping")} className="text-sm text-primary hover:underline flex items-center gap-1">
                     <ArrowLeft size={14} /> {t("vendor.back")}
                   </button>
                 </div>
@@ -2292,6 +2296,7 @@ export default function CheckoutPage() {
                     {/* Retry with different number */}
                     {!showRetryForm ? (
                       <button
+                        type="button"
                         onClick={() => { setShowRetryForm(true); setRetryPhone(""); }}
                         className="w-full text-xs text-primary hover:underline py-1"
                       >

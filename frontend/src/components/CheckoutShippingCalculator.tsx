@@ -1,12 +1,12 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plane, Ship, TruckIcon, Train, Loader2, Info, Lightbulb, Package, CalendarDays } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { Plane, Ship, TruckIcon, Train, Loader2, Info, Lightbulb, CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { isLandTransportFeasible } from "@/utils/neighboring-countries";
 import {
   searchCities, calculateDynamicQuote,
   type City, type DynamicQuoteResult,
 } from "@/services/dynamic-shipping";
-import { ForwarderSelector, type ForwarderChoice } from "@/components/checkout/ForwarderSelector";
+import type { ForwarderChoice } from "@/components/checkout/ForwarderSelector";
 import { FreightSelector, type ConsolidationChoice } from "@/components/checkout/FreightSelector";
 import type { EligibleFreightOffer } from "@/services/freightQuoteCheckout";
 import {
@@ -18,6 +18,13 @@ import {
   type FreightGroupSelection,
 } from "@/components/checkout/MultiOriginFreightSelector";
 import { useI18n } from "@/contexts/I18nContext";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 
 const MODE_META = {
   air:  { icon: Plane,     label: "Aérien",     labelKey: "shipping.mode.air",  localLabel: "Aérien local", unit: "kg" },
@@ -74,7 +81,7 @@ export function CheckoutShippingCalculator({
   onFreightAvailabilityChange,
   onFreightGroupsChange,
 }: Props) {
-  const { t, formatPrice } = useI18n();
+  const { t, formatPrice, locale } = useI18n();
   const [products, setProducts] = useState<CartProductInfo[]>([]);
   const [destCity, setDestCity] = useState<City | null>(null);
   const [originCities, setOriginCities] = useState<Map<string, City>>(new Map());
@@ -100,6 +107,15 @@ export function CheckoutShippingCalculator({
   // Lot 11C Phase 2 — Groupes (store_id × origin_country) du panier.
   const [originGroups, setOriginGroups] = useState<CartOriginGroup[]>([]);
   const [groupSelections, setGroupSelections] = useState<Record<string, FreightGroupSelection>>({});
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [seaHintOpen, setSeaHintOpen] = useState(false);
+  const seaHintTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (seaHintTimerRef.current != null) window.clearTimeout(seaHintTimerRef.current);
+    };
+  }, []);
 
   // Recalcule les groupes à chaque changement de panier.
   useEffect(() => {
@@ -517,9 +533,6 @@ export function CheckoutShippingCalculator({
       <div className="flex gap-1.5 flex-wrap">
         {(["air", "sea", "road", "rail"] as TransportMode[]).map(mode => {
           const data = modeTotals.get(mode);
-          // Maritime : on garde l'onglet visible MÊME sans quote, en mode grisé,
-          // pour informer le client que ce mode existe mais nécessite d'atteindre
-          // le seuil de fret minimum. Pour les autres modes, on cache si pas de quote.
           if (mode !== "sea" && (!data || data.total <= 0)) return null;
           if (mode === "sea" && (!data || data.total <= 0) && !seaThreshold?.enabled) {
             return null;
@@ -529,25 +542,31 @@ export function CheckoutShippingCalculator({
           const Meta = MODE_META[mode];
           const Icon = Meta.icon;
           const isActive = activeMode === mode && !isSeaDisabled;
-          
+
           return (
             <button
               key={mode}
-              disabled={isSeaDisabled}
+              type="button"
+              aria-disabled={isSeaDisabled || undefined}
               title={
-                seaNoQuote
+                isSeaDisabled
                   ? (t("shipping.seaTooltip", { min: formatPrice(seaThreshold?.min_subtotal ?? 49) }) ||
                       `Maritime : disponible une fois le seuil de fret de ${formatPrice(seaThreshold?.min_subtotal ?? 49)} atteint`)
                   : undefined
               }
               onClick={() => {
-                if (isSeaDisabled) return;
+                if (isSeaDisabled) {
+                  setSeaHintOpen(true);
+                  if (seaHintTimerRef.current != null) window.clearTimeout(seaHintTimerRef.current);
+                  seaHintTimerRef.current = window.setTimeout(() => setSeaHintOpen(false), 6000);
+                  return;
+                }
                 setUserHasSelected(true);
                 setActiveMode(mode);
               }}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all border ${
                 isSeaDisabled
-                  ? "border-border bg-muted/50 text-muted-foreground/50 cursor-not-allowed opacity-60"
+                  ? "border-border bg-muted/50 text-muted-foreground/50 cursor-pointer opacity-60"
                   : isActive
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border text-muted-foreground hover:border-primary/50"
@@ -582,134 +601,237 @@ export function CheckoutShippingCalculator({
         })}
       </div>
 
-      {/* Notice tarifs indicatifs (basés sur le poids/CBM réel) */}
-      <div className="flex items-start gap-2 text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-md px-2.5 py-2 mt-3">
-        <Info size={12} className="shrink-0 mt-0.5 text-primary" />
-        <p>
-          Les tarifs <strong className="text-foreground">Aérien</strong> et{" "}
-          <strong className="text-foreground">Maritime</strong> affichés ici sont{" "}
-          <strong className="text-foreground">indicatifs</strong>, calculés sur le poids
-          (ou le CBM) réel des produits sélectionnés. Le{" "}
-          <strong className="text-foreground">tarif réel facturé</strong> est celui défini
-          par le transitaire que vous choisirez plus bas dans la section
-          « Choisissez un transitaire ».
-        </p>
-      </div>
-
-      {/* Sea mode threshold hint */}
-      {isSeaBlocked && seaHasQuotes && seaThreshold && (() => {
-        const freightGap = preciseRound(seaThreshold.min_subtotal - seaQuoteTotal, 2);
-        return (
-          <div className="flex items-start gap-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-2 mt-3">
-            <Ship size={12} className="shrink-0 mt-0.5" />
-            <div>
-              <p className="font-medium">{t("shipping.seaUnavailableTitle") || "🚢 Maritime indisponible — seuil de fret non atteint"}</p>
-              <p className="text-[10px] mt-0.5 text-amber-600 dark:text-amber-500">
-                {t("shipping.seaThresholdHint", {
-                  current: formatPrice(seaQuoteTotal),
-                  gap: formatPrice(freightGap),
-                  min: formatPrice(seaThreshold.min_subtotal),
-                }) ||
-                  `Le fret maritime actuel est de ${formatPrice(seaQuoteTotal)} — ajoutez ${formatPrice(freightGap)} de fret pour atteindre ${formatPrice(seaThreshold.min_subtotal)}.`}
-              </p>
-            </div>
+      {seaHintOpen && (isSeaBlocked || !modeTotals.has("sea") || (modeTotals.get("sea")?.total ?? 0) <= 0) && (
+        <div className="flex items-start gap-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-2">
+          <Ship size={12} className="shrink-0 mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">
+              {t("shipping.seaUnavailableTitle") || "Maritime indisponible — seuil de fret non atteint"}
+            </p>
+            <p className="text-[10px] mt-0.5 text-amber-600 dark:text-amber-500">
+              {seaThreshold
+                ? (t("shipping.seaThresholdHint", {
+                    current: formatPrice(seaQuoteTotal),
+                    gap: formatPrice(preciseRound(Math.max(0, seaThreshold.min_subtotal - seaQuoteTotal), 2)),
+                    min: formatPrice(seaThreshold.min_subtotal),
+                  }) ||
+                    `Le fret maritime actuel est de ${formatPrice(seaQuoteTotal)} — ajoutez ${formatPrice(preciseRound(Math.max(0, seaThreshold.min_subtotal - seaQuoteTotal), 2))} de fret pour atteindre ${formatPrice(seaThreshold.min_subtotal)}.`)
+                : (t("shipping.seaTooltip", { min: formatPrice(49) }) ||
+                    "Maritime : disponible une fois le seuil de fret minimum atteint")}
+            </p>
           </div>
-        );
-      })()}
+          <button
+            type="button"
+            className="text-[10px] underline shrink-0"
+            onClick={() => setSeaHintOpen(false)}
+          >
+            {t("common.close") || "OK"}
+          </button>
+        </div>
+      )}
 
-      {/* Selected mode details */}
+      {/* Compact surface: route → ETA → price + detail link */}
       {(() => {
         const data = modeTotals.get(activeMode);
         if (!data) return null;
         const details = quotes.get(activeMode);
-        
-        return (
-          <div className="bg-muted/30 rounded-md px-3 py-2 space-y-1">
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">
-                {t("shipping.modeFreightLabel", { mode: t(MODE_META[activeMode].labelKey) || MODE_META[activeMode].label }) ||
-                  `Fret ${MODE_META[activeMode].label}`}
-              </span>
-              <span className="font-bold text-foreground">{formatPrice(data.total)}</span>
-            </div>
-            {data.surchargeAmount > 0 && (
-              <div className="flex justify-between text-[10px] text-amber-600">
-                <span>{t("shipping.categorySurcharge") || "Surtaxe catégorie"}</span>
-                <span>+{formatPrice(data.surchargeAmount)}</span>
-              </div>
-            )}
-            {data.transitMin && data.transitMax && (
-              <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>{t("shipping.estimatedDelay") || "Délai estimé"}</span>
-                <span>{t("freight.transitDays", { min: data.transitMin, max: data.transitMax }) || `${data.transitMin}–${data.transitMax} jours`}</span>
-              </div>
-            )}
-            {totalWeight > 0 && (
-              <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>{t("shipping.totalWeight") || "Poids total"}</span>
-                <span>{preciseRound(totalWeight / 1000, 3)} kg</span>
-              </div>
-            )}
-            {totalVolume > 0 && (
-              <div className="flex justify-between text-[10px] text-muted-foreground">
-                <span>{t("shipping.totalVolumeLabel") || "Volume total"}</span>
-                <span>{preciseRound(totalVolume, 4)} CBM</span>
-              </div>
-            )}
-            {details?.[0] && (
-              <div className="text-[10px] text-muted-foreground/60">
-                {(() => {
-                  // Affichage origine = PAYS uniquement (jamais une ville arbitraire)
-                  // La ville la plus peuplée n'est qu'un proxy interne pour le calcul Haversine.
-                  const originCC = details[0].origin_city.match(/\(([A-Z]{2})\)/)?.[1] ?? "";
-                  let originLabel = details[0].origin_city;
-                  if (originCC) {
-                    try {
-                      const dn = new Intl.DisplayNames(["fr"], { type: "region" });
-                      originLabel = dn.of(originCC) || originCC;
-                    } catch {
-                      originLabel = originCC;
-                    }
-                  }
-                  return `${originLabel} → ${details[0].destination_city}`;
-                })()} · {details[0].distance_km.toLocaleString()} km
-                {details[0].route_type === "default" && ` · ${t("shipping.indicativeRate") || "Tarif indicatif"}`}
-              </div>
-            )}
-            {/* Estimated arrival date */}
-            {(() => {
-              if (isLocalStore && deliveryDefaults) {
-                const minH = deliveryDefaults.local_hours_min;
-                const maxH = deliveryDefaults.local_hours_max;
-                const fmtH = (h: number) => h < 1 ? `${Math.round(h * 60)}min` : `${h}h`;
-                return (
-                  <div className="flex items-center gap-1.5 text-sm text-destructive font-semibold pt-1.5 border-t border-border/50 mt-1.5">
-                    <CalendarDays size={14} className="shrink-0" />
-                    <span>{t("shipping.localDeliveryEstimate", { min: fmtH(minH), max: fmtH(maxH) }) || `🏪 Livraison estimée : ${fmtH(minH)} – ${fmtH(maxH)}`}</span>
-                  </div>
-                );
+        const routeLine = details?.[0]
+          ? (() => {
+              const originCC = details[0].origin_city.match(/\(([A-Z]{2})\)/)?.[1] ?? "";
+              let originLabel = details[0].origin_city;
+              if (originCC) {
+                try {
+                  const dn = new Intl.DisplayNames([locale || "fr"], { type: "region" });
+                  originLabel = dn.of(originCC) || originCC;
+                } catch {
+                  originLabel = originCC;
+                }
               }
-              // International: prep + transit
-              const transitMin = data.transitMin ?? deliveryDefaults?.intl_transit_min ?? 4;
-              const transitMax = data.transitMax ?? deliveryDefaults?.intl_transit_max ?? 6;
-              const totalMin = prepDays.min + transitMin;
-              const totalMax = prepDays.max + transitMax;
-              const now = new Date();
-              const dateMin = new Date(now);
-              dateMin.setDate(dateMin.getDate() + totalMin);
-              const dateMax = new Date(now);
-              dateMax.setDate(dateMax.getDate() + totalMax);
-              const fmt = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
-              return (
-                <div className="flex items-center gap-1.5 text-sm text-destructive font-semibold pt-1.5 border-t border-border/50 mt-1.5">
-                  <CalendarDays size={14} className="shrink-0" />
-                  <span>{t("shipping.intlArrivalEstimate", { min: fmt(dateMin), max: fmt(dateMax), year: dateMax.getFullYear() }) || `📦 Arrivée estimée : ${fmt(dateMin)} – ${fmt(dateMax)} ${dateMax.getFullYear()}`}</span>
-                </div>
-              );
-            })()}
+              return {
+                text: `${originLabel} → ${details[0].destination_city} · ${details[0].distance_km.toLocaleString(locale || "fr")} km`,
+                indicative: details[0].route_type === "default",
+              };
+            })()
+          : null;
+
+        const etaNode = (() => {
+          if (isLocalStore && deliveryDefaults) {
+            const minH = deliveryDefaults.local_hours_min;
+            const maxH = deliveryDefaults.local_hours_max;
+            const fmtH = (h: number) => (h < 1 ? `${Math.round(h * 60)}min` : `${h}h`);
+            return (
+              <div className="flex items-center gap-1.5 text-sm text-destructive font-semibold">
+                <CalendarDays size={14} className="shrink-0" />
+                <span>
+                  {t("shipping.localDeliveryEstimate", { min: fmtH(minH), max: fmtH(maxH) }) ||
+                    `Livraison estimée : ${fmtH(minH)} – ${fmtH(maxH)}`}
+                </span>
+              </div>
+            );
+          }
+          const transitMin = data.transitMin ?? deliveryDefaults?.intl_transit_min ?? 4;
+          const transitMax = data.transitMax ?? deliveryDefaults?.intl_transit_max ?? 6;
+          const totalMin = prepDays.min + transitMin;
+          const totalMax = prepDays.max + transitMax;
+          const now = new Date();
+          const dateMin = new Date(now);
+          dateMin.setDate(dateMin.getDate() + totalMin);
+          const dateMax = new Date(now);
+          dateMax.setDate(dateMax.getDate() + totalMax);
+          const fmt = (d: Date) =>
+            d.toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR", { day: "numeric", month: "short" });
+          return (
+            <div className="flex items-center gap-1.5 text-sm text-destructive font-semibold">
+              <CalendarDays size={14} className="shrink-0" />
+              <span>
+                {t("shipping.intlArrivalEstimate", {
+                  min: fmt(dateMin),
+                  max: fmt(dateMax),
+                  year: dateMax.getFullYear(),
+                }) || `Arrivée estimée : ${fmt(dateMin)} – ${fmt(dateMax)} ${dateMax.getFullYear()}`}
+              </span>
+            </div>
+          );
+        })();
+
+        return (
+          <div className="space-y-1.5 pt-1">
+            {routeLine && (
+              <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                <span className="min-w-0 flex-1">
+                  {routeLine.text}
+                  {routeLine.indicative && (
+                    <>
+                      {" · "}
+                      <button
+                        type="button"
+                        onClick={() => setDetailOpen(true)}
+                        className="inline-flex items-center gap-0.5 text-primary hover:underline font-medium"
+                      >
+                        <Info size={10} />
+                        {t("shipping.indicativeRate") || "Tarif indicatif"}
+                      </button>
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
+            {etaNode}
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="text-muted-foreground">
+                {t("shipping.modeFreightLabel", {
+                  mode: t(MODE_META[activeMode].labelKey) || MODE_META[activeMode].label,
+                }) || `Fret ${MODE_META[activeMode].label}`}
+              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="font-bold text-foreground">{formatPrice(data.total)}</span>
+                <button
+                  type="button"
+                  onClick={() => setDetailOpen(true)}
+                  className="text-[10px] text-primary hover:underline"
+                >
+                  {t("shipping.calcDetail") || "Détail du calcul"}
+                </button>
+              </div>
+            </div>
           </div>
         );
       })()}
+
+      <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
+        <SheetContent
+          side="bottom"
+          className="max-h-[85dvh] overflow-y-auto rounded-t-xl pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+        >
+          <SheetHeader>
+            <SheetTitle>{t("shipping.calcDetail") || "Détail du calcul"}</SheetTitle>
+            <SheetDescription className="text-left text-xs">
+              {t("shipping.indicativeSheetDesc") ||
+                "Les tarifs Aérien et Maritime affichés sont indicatifs, calculés sur le poids (ou le CBM) réel. Le tarif facturé est celui du transitaire choisi ci-dessous."}
+            </SheetDescription>
+          </SheetHeader>
+          {(() => {
+            const data = modeTotals.get(activeMode);
+            if (!data) return null;
+            const details = quotes.get(activeMode);
+            return (
+              <div className="mt-4 space-y-2 text-sm pb-6">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    {t("shipping.modeFreightLabel", {
+                      mode: t(MODE_META[activeMode].labelKey) || MODE_META[activeMode].label,
+                    }) || `Fret ${MODE_META[activeMode].label}`}
+                  </span>
+                  <span className="font-bold">{formatPrice(data.total)}</span>
+                </div>
+                {data.surchargeAmount > 0 && (
+                  <div className="flex justify-between text-xs text-amber-600">
+                    <span>{t("shipping.categorySurcharge") || "Surtaxe catégorie"}</span>
+                    <span>+{formatPrice(data.surchargeAmount)}</span>
+                  </div>
+                )}
+                {data.transitMin && data.transitMax && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{t("shipping.estimatedDelay") || "Délai estimé"}</span>
+                    <span>
+                      {t("freight.transitDays", { min: data.transitMin, max: data.transitMax }) ||
+                        `${data.transitMin}–${data.transitMax} jours`}
+                    </span>
+                  </div>
+                )}
+                {totalWeight > 0 && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{t("shipping.totalWeight") || "Poids total"}</span>
+                    <span>{preciseRound(totalWeight / 1000, 3)} kg</span>
+                  </div>
+                )}
+                {totalVolume > 0 && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{t("shipping.totalVolumeLabel") || "Volume total"}</span>
+                    <span>{preciseRound(totalVolume, 4)} CBM</span>
+                  </div>
+                )}
+                {details?.[0] && (
+                  <p className="text-[11px] text-muted-foreground pt-1 border-t border-border">
+                    {(() => {
+                      const originCC = details[0].origin_city.match(/\(([A-Z]{2})\)/)?.[1] ?? "";
+                      let originLabel = details[0].origin_city;
+                      if (originCC) {
+                        try {
+                          const dn = new Intl.DisplayNames([locale || "fr"], { type: "region" });
+                          originLabel = dn.of(originCC) || originCC;
+                        } catch {
+                          originLabel = originCC;
+                        }
+                      }
+                      return `${originLabel} → ${details[0].destination_city} · ${details[0].distance_km.toLocaleString(locale || "fr")} km`;
+                    })()}
+                    {details[0].route_type === "default" &&
+                      ` · ${t("shipping.indicativeRate") || "Tarif indicatif"}`}
+                  </p>
+                )}
+                {isSeaBlocked && seaThreshold && (
+                  <div className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-2 mt-2">
+                    <p className="font-medium">
+                      {t("shipping.seaUnavailableTitle") || "Maritime indisponible — seuil de fret non atteint"}
+                    </p>
+                    <p className="mt-0.5">
+                      {t("shipping.seaThresholdHint", {
+                        current: formatPrice(seaQuoteTotal),
+                        gap: formatPrice(
+                          preciseRound(Math.max(0, seaThreshold.min_subtotal - seaQuoteTotal), 2),
+                        ),
+                        min: formatPrice(seaThreshold.min_subtotal),
+                      }) ||
+                        `Ajoutez ${formatPrice(preciseRound(Math.max(0, seaThreshold.min_subtotal - seaQuoteTotal), 2))} de fret pour atteindre ${formatPrice(seaThreshold.min_subtotal)}.`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
 
       {/* Optimization advice */}
       {optimizationTip && (
@@ -719,11 +841,6 @@ export function CheckoutShippingCalculator({
         </div>
       )}
 
-      {/* Lot 4D — Coexistence conditionnelle :
-          1) FreightSelector (nouveau moteur Lot 3A : CBM/pièce/poids volumétrique + acompte)
-             affiché uniquement si des profils éligibles existent pour la destination + mode.
-          2) ForwarderSelector legacy en fallback silencieux dans le cas contraire,
-             pour ne rien casser tant que tous les transitaires n'ont pas migré. */}
       {destCity && modeTotals.get(activeMode) && (
         <>
           {isMultiGroup ? (
@@ -750,7 +867,6 @@ export function CheckoutShippingCalculator({
             mode={activeMode}
             originCountry={(() => {
               const origins = [...new Set(products.map((p) => (p.originCountry || "").toUpperCase()).filter(Boolean))];
-              // Mono-origine → filtre actif. Multi-origines → pas de filtre (Phase 2 splittera).
               return origins.length === 1 ? origins[0] : null;
             })()}
             items={cartItems.map((ci) => {
@@ -771,11 +887,6 @@ export function CheckoutShippingCalculator({
             totalWeightKgForMarketing={totalWeight / 1000}
           />
           )}
-          {/* Fallback legacy ForwarderSelector retiré : il ré-affichait des
-              transitaires non couvrants (ville/origine ignorées) et causait
-              l'effet "transitaire apparaît puis disparaît" au refresh. Le
-              FreightSelector / MultiOriginFreightSelector est désormais la
-              seule source de vérité pour le choix transitaire au checkout. */}
         </>
       )}
     </div>
