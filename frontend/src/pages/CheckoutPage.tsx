@@ -755,6 +755,121 @@ export default function CheckoutPage() {
     }
   }, [paymentMethod, primaryPaymentMethod]);
 
+  const stopMoMoListeners = useCallback(() => {
+    paymentWatchRef.current?.stop();
+    paymentWatchRef.current = null;
+    if ((paymentChannelRef as any)._timeoutId) {
+      clearTimeout((paymentChannelRef as any)._timeoutId);
+      (paymentChannelRef as any)._timeoutId = null;
+    }
+    if (paymentChannelRef.current) {
+      supabase.removeChannel(paymentChannelRef.current);
+      paymentChannelRef.current = null;
+    }
+  }, []);
+
+  /** Shared success/fail after MoMo (Realtime, poll, or manual check). Guarded by watch.claimResult. */
+  const applyMoMoSuccess = useCallback(
+    async (orderIds: string[], orderRefLabel: string) => {
+      if (orderIds.length > 0) {
+        await supabase
+          .from("orders")
+          .update({ status: "pending" } as any)
+          .in("id", orderIds)
+          .eq("status", "awaiting_payment");
+        await (supabase as any)
+          .from("orders")
+          .update({ shipping_payment_status: "paid" })
+          .in("id", orderIds)
+          .eq("shipping_payment_status", "unpaid");
+        await (supabase as any)
+          .from("orders")
+          .update({ last_mile_payment_status: "paid" })
+          .in("id", orderIds)
+          .eq("last_mile_payment_status", "unpaid");
+      }
+      stopMoMoListeners();
+      setPaymentPending(false);
+      await removeSelectedItems();
+      goToStep("confirmation");
+      toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRefLabel}` });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stopMoMoListeners, t, removeSelectedItems],
+  );
+
+  const applyMoMoFailed = useCallback(
+    async (orderIds: string[], message?: string) => {
+      if (orderIds.length > 0) {
+        await supabase
+          .from("orders")
+          .update({ status: "payment_failed" } as any)
+          .in("id", orderIds)
+          .eq("status", "awaiting_payment");
+      }
+      stopMoMoListeners();
+      setPaymentPending(false);
+      toast({
+        title: "Paiement échoué",
+        description: message || "Le paiement n'a pas pu être complété. Veuillez réessayer.",
+        variant: "destructive",
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stopMoMoListeners],
+  );
+
+  /**
+   * Start Realtime + hybrid DB/kelpay-check watch for a MoMo reference.
+   * Replaces the old single check at t=180s.
+   * MUST stay above early returns (Rules of Hooks — React #310).
+   */
+  const beginMoMoWait = useCallback(
+    (opts: {
+      reference: string;
+      transactionId: string | null;
+      orderIds: string[];
+      orderRefLabel: string;
+    }) => {
+      const { reference, transactionId, orderIds, orderRefLabel } = opts;
+      stopMoMoListeners();
+
+      const watch = startMoMoPaymentWatch({
+        reference,
+        transactionId,
+        onSuccess: () => applyMoMoSuccess(orderIds, orderRefLabel),
+        onFailed: () => applyMoMoFailed(orderIds),
+      });
+      paymentWatchRef.current = watch;
+
+      const channel = supabase
+        .channel(`payment-${reference}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "payment_transactions",
+            filter: `reference=eq.${reference}`,
+          },
+          async (payload: any) => {
+            const newStatus = payload.new?.status;
+            if (newStatus === "success") {
+              if (!watch.claimResult("success")) return;
+              await applyMoMoSuccess(orderIds, orderRefLabel);
+            } else if (newStatus === "failed") {
+              if (!watch.claimResult("failed")) return;
+              await applyMoMoFailed(orderIds);
+            }
+          },
+        )
+        .subscribe();
+
+      paymentChannelRef.current = channel;
+    },
+    [stopMoMoListeners, applyMoMoSuccess, applyMoMoFailed],
+  );
+
   if (!user) {
     return (
       <div className="min-h-screen bg-background">
@@ -1267,121 +1382,6 @@ export default function CheckoutPage() {
 
     return { orderRef: baseRef, orderIds: createdOrderIds };
   };
-
-  const stopMoMoListeners = useCallback(() => {
-    paymentWatchRef.current?.stop();
-    paymentWatchRef.current = null;
-    if ((paymentChannelRef as any)._timeoutId) {
-      clearTimeout((paymentChannelRef as any)._timeoutId);
-      (paymentChannelRef as any)._timeoutId = null;
-    }
-    if (paymentChannelRef.current) {
-      supabase.removeChannel(paymentChannelRef.current);
-      paymentChannelRef.current = null;
-    }
-  }, []);
-
-  /** Shared success/fail after MoMo (Realtime, poll, or manual check). Guarded by watch.claimResult. */
-  const applyMoMoSuccess = useCallback(
-    async (orderIds: string[], orderRefLabel: string) => {
-      if (orderIds.length > 0) {
-        await supabase
-          .from("orders")
-          .update({ status: "pending" } as any)
-          .in("id", orderIds)
-          .eq("status", "awaiting_payment");
-        await (supabase as any)
-          .from("orders")
-          .update({ shipping_payment_status: "paid" })
-          .in("id", orderIds)
-          .eq("shipping_payment_status", "unpaid");
-        await (supabase as any)
-          .from("orders")
-          .update({ last_mile_payment_status: "paid" })
-          .in("id", orderIds)
-          .eq("last_mile_payment_status", "unpaid");
-      }
-      stopMoMoListeners();
-      setPaymentPending(false);
-      await removeSelectedItems();
-      goToStep("confirmation");
-      toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRefLabel}` });
-    },
-    // removeSelectedItems / goToStep / toast / t are stable enough for payment session
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [stopMoMoListeners, t],
-  );
-
-  const applyMoMoFailed = useCallback(
-    async (orderIds: string[], message?: string) => {
-      if (orderIds.length > 0) {
-        await supabase
-          .from("orders")
-          .update({ status: "payment_failed" } as any)
-          .in("id", orderIds)
-          .eq("status", "awaiting_payment");
-      }
-      stopMoMoListeners();
-      setPaymentPending(false);
-      toast({
-        title: "Paiement échoué",
-        description: message || "Le paiement n'a pas pu être complété. Veuillez réessayer.",
-        variant: "destructive",
-      });
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [stopMoMoListeners],
-  );
-
-  /**
-   * Start Realtime + hybrid DB/kelpay-check watch for a MoMo reference.
-   * Replaces the old single check at t=180s.
-   */
-  const beginMoMoWait = useCallback(
-    (opts: {
-      reference: string;
-      transactionId: string | null;
-      orderIds: string[];
-      orderRefLabel: string;
-    }) => {
-      const { reference, transactionId, orderIds, orderRefLabel } = opts;
-      stopMoMoListeners();
-
-      const watch = startMoMoPaymentWatch({
-        reference,
-        transactionId,
-        onSuccess: () => applyMoMoSuccess(orderIds, orderRefLabel),
-        onFailed: () => applyMoMoFailed(orderIds),
-      });
-      paymentWatchRef.current = watch;
-
-      const channel = supabase
-        .channel(`payment-${reference}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "payment_transactions",
-            filter: `reference=eq.${reference}`,
-          },
-          async (payload: any) => {
-            const newStatus = payload.new?.status;
-            if (newStatus === "success") {
-              if (!watch.claimResult("success")) return;
-              await applyMoMoSuccess(orderIds, orderRefLabel);
-            } else if (newStatus === "failed") {
-              if (!watch.claimResult("failed")) return;
-              await applyMoMoFailed(orderIds);
-            }
-          },
-        )
-        .subscribe();
-
-      paymentChannelRef.current = channel;
-    },
-    [stopMoMoListeners, applyMoMoSuccess, applyMoMoFailed],
-  );
 
   const handlePayment = async () => {
     setProcessing(true);
