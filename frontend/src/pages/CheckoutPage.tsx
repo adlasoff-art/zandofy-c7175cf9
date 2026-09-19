@@ -39,6 +39,7 @@ import { useKycStatus } from "@/hooks/use-kyc";
 import { KycBanner } from "@/components/kyc/KycBanner";
 import { getColorDisplay } from "@/utils/colorName";
 import { useStorePaymentNumbers } from "@/hooks/use-store-payment-numbers";
+import { resolveOffPlatformAccess } from "@/hooks/use-vendor-off-platform-access";
 import { PaymentWaitingPanel } from "@/components/payments/PaymentWaitingPanel";
 import { useHomeDeliveryEnabled } from "@/hooks/use-home-delivery-enabled";
 import { MobileBackButton } from "@/components/navigation/MobileBackButton";
@@ -399,6 +400,10 @@ export default function CheckoutPage() {
       const productIds = [...new Set(items.map((item) => item.productId).filter(Boolean))];
       if (productIds.length === 0) {
         setVendorCodAllowed(false);
+        setVendorOffPlatformAllowed(false);
+        setVendorMobileMoneyAllowed(true);
+        setVendorCardAllowed(true);
+        setCartStoreIds([]);
         return;
       }
 
@@ -407,25 +412,55 @@ export default function CheckoutPage() {
       setCartStoreIds(storeIds);
       if (storeIds.length === 0) {
         setVendorCodAllowed(false);
+        setVendorOffPlatformAllowed(false);
+        setVendorMobileMoneyAllowed(true);
+        setVendorCardAllowed(true);
         return;
       }
 
-      const { data: overrides } = await (supabase as any)
-        .from("vendor_pricing_overrides")
-        .select("store_id, vendor_cod_enabled, vendor_off_platform_enabled, vendor_mobile_money_enabled, vendor_card_enabled")
-        .in("store_id", storeIds);
+      // SECURITY DEFINER RPC — buyers cannot SELECT vendor_pricing_overrides via RLS
+      const { data: flagRows, error: flagsErr } = await (supabase as any).rpc(
+        "get_checkout_vendor_payment_flags",
+        { p_store_ids: storeIds },
+      );
+      if (flagsErr) {
+        console.warn("[checkout] get_checkout_vendor_payment_flags:", flagsErr.message);
+        // Fail closed on COD / off-platform; fail open on platform MoMo/card (historical defaults)
+        setVendorCodAllowed(false);
+        setVendorOffPlatformAllowed(false);
+        setVendorMobileMoneyAllowed(true);
+        setVendorCardAllowed(true);
+        return;
+      }
 
-      const codMap = new Map((overrides || []).map((override: any) => [override.store_id, !!override.vendor_cod_enabled]));
-      setVendorCodAllowed(storeIds.every((storeId) => codMap.get(storeId) === true));
+      const flags = (flagRows || []) as Array<{
+        store_id: string;
+        vendor_cod_enabled: boolean;
+        vendor_off_platform_enabled: boolean;
+        vendor_mobile_money_enabled: boolean;
+        vendor_card_enabled: boolean;
+      }>;
+      const byStore = new Map(flags.map((f) => [f.store_id, f]));
 
-      const offPlatformMap = new Map((overrides || []).map((override: any) => [override.store_id, !!override.vendor_off_platform_enabled]));
-      setVendorOffPlatformAllowed(storeIds.every((storeId) => offPlatformMap.get(storeId) === true));
+      setVendorCodAllowed(
+        storeIds.every((id) => byStore.get(id)?.vendor_cod_enabled === true),
+      );
+      setVendorMobileMoneyAllowed(
+        storeIds.every((id) => byStore.get(id)?.vendor_mobile_money_enabled !== false),
+      );
+      setVendorCardAllowed(
+        storeIds.every((id) => byStore.get(id)?.vendor_card_enabled !== false),
+      );
 
-      const mobileMoneyMap = new Map((overrides || []).map((override: any) => [override.store_id, override.vendor_mobile_money_enabled !== false]));
-      setVendorMobileMoneyAllowed(storeIds.every((storeId) => mobileMoneyMap.get(storeId) !== false));
-
-      const cardMap = new Map((overrides || []).map((override: any) => [override.store_id, override.vendor_card_enabled !== false]));
-      setVendorCardAllowed(storeIds.every((storeId) => cardMap.get(storeId) !== false));
+      const offFlagsOk = storeIds.every(
+        (id) => byStore.get(id)?.vendor_off_platform_enabled === true,
+      );
+      if (!offFlagsOk) {
+        setVendorOffPlatformAllowed(false);
+      } else {
+        const accessResults = await Promise.all(storeIds.map((id) => resolveOffPlatformAccess(id)));
+        setVendorOffPlatformAllowed(accessResults.every((a) => a.allowed));
+      }
     };
 
     void loadVendorCodEligibility();
@@ -2409,23 +2444,39 @@ export default function CheckoutPage() {
                     </p>
 
                     {/* Payment numbers */}
-                    {paymentNumbers.length > 0 && (
+                    {paymentNumbers.length > 0 ? (
                       <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
-                        <p className="text-xs font-semibold text-foreground">📱 Numéros de paiement du vendeur :</p>
+                        <p className="text-xs font-semibold text-foreground">Numéros de paiement du vendeur :</p>
                         <div className="grid gap-2">
                           {paymentNumbers.map((pn) => (
-                            <div key={pn.operator} className="flex items-center gap-3 bg-card border border-border rounded-md px-3 py-2">
+                            <div key={`${pn.store_id || ""}-${pn.operator}`} className="flex items-center gap-3 bg-card border border-border rounded-md px-3 py-2">
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-foreground">{pn.operator_label}</p>
+                                <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                                  {pn.operator_label}
+                                  {pn.is_preferred && (
+                                    <span className="text-[9px] text-primary font-semibold">Préféré</span>
+                                  )}
+                                </p>
                                 <p className="text-sm font-semibold text-primary tracking-wide">{pn.phone_number}</p>
                                 {pn.display_name && (
                                   <p className="text-[11px] text-muted-foreground">Nom affiché : <span className="font-medium text-foreground">{pn.display_name}</span></p>
                                 )}
                               </div>
+                              {pn.qr_image_url && (
+                                <img
+                                  src={pn.qr_image_url}
+                                  alt={`QR ${pn.operator_label}`}
+                                  className="h-14 w-14 object-contain rounded border border-border shrink-0"
+                                />
+                              )}
                             </div>
                           ))}
                         </div>
                       </div>
+                    ) : (
+                      <p className="text-xs text-amber-700 dark:text-amber-400 border border-amber-200/60 rounded-md p-2">
+                        Le vendeur n&apos;a pas encore publié de numéro. Contactez-le via le chat commande après validation, ou choisissez un autre mode de paiement.
+                      </p>
                     )}
 
                     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1">

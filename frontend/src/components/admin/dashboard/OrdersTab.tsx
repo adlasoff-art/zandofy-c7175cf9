@@ -4,16 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from "recharts";
 import { Package, DollarSign, TrendingUp, CreditCard, Users, Gift, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { PIE_COLORS, TOOLTIP_STYLE } from "./shared";
+import { DEFAULT_GATEWAY_FEES, getGatewayRateForMethod, parseGatewayFees, type GatewayFees } from "@/lib/gateway-fees";
 import { Badge } from "@/components/ui/badge";
 import type { PeriodKey } from "./DashboardPeriodSelector";
 import { getPeriodDate } from "./DashboardPeriodSelector";
 import type { GlobalFilters } from "./DashboardGlobalFilters";
 
 interface Props { period: PeriodKey; geoFilters?: GlobalFilters; }
-
-const GATEWAY_RATES: Record<string, number> = {
-  mobile_money: 2.5, stripe: 3.5, card: 3.5, paypal: 3.9, cod: 0, off_platform: 0,
-};
 
 function fmt(n: number) {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -26,6 +23,14 @@ export function OrdersTab({ period, geoFilters }: Props) {
   const city = geoFilters?.city !== "all" ? geoFilters?.city : undefined;
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const { data: gatewayFees = DEFAULT_GATEWAY_FEES } = useQuery({
+    queryKey: ["gateway-fees-orders-tab"],
+    queryFn: async (): Promise<GatewayFees> => {
+      const { data } = await supabase.from("platform_settings").select("value").eq("key", "gateway_fees").maybeSingle();
+      return parseGatewayFees(data?.value);
+    },
+  });
 
   // Fetch orders
   const { data: orders = [] } = useQuery({
@@ -105,7 +110,7 @@ export function OrdersTab({ period, geoFilters }: Props) {
       .map((o: any) => {
         const items = itemsByOrder.get(o.id) || [];
         const method = o.payment_method || "unknown";
-        const gatewayPct = GATEWAY_RATES[method] ?? 0;
+        const gatewayPct = getGatewayRateForMethod(method, gatewayFees);
         const discount = Number(o.discount_amount || 0);
         const referral = refByOrder.get(o.id) || 0;
 
@@ -144,7 +149,7 @@ export function OrdersTab({ period, geoFilters }: Props) {
           netMarginPct: revenue > 0 ? (netMargin / revenue) * 100 : 0,
         };
       });
-  }, [orders, allItems, products, stores, referralTxns, search]);
+  }, [orders, allItems, products, stores, referralTxns, search, gatewayFees]);
 
   // Summary KPIs
   const totals = useMemo(() => {
@@ -182,7 +187,7 @@ export function OrdersTab({ period, geoFilters }: Props) {
   };
 
   const methodLabels: Record<string, string> = {
-    stripe: "Carte", mobile_money: "MoMo", cod: "COD", off_platform: "Hors pl.", paypal: "PayPal",
+    stripe: "Carte (Keccel)", mobile_money: "MoMo", cod: "COD", off_platform: "Hors pl.", paypal: "PayPal", card: "Carte (Keccel)",
   };
 
   return (

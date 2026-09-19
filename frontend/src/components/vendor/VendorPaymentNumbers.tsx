@@ -1,11 +1,13 @@
 /**
- * Vendor component to manage mobile money payment numbers.
- * Allowed when admin-grandfathered OR active vendor_mm_numbers subscription.
+ * Vendor component to manage mobile money payment numbers + preferred + QR.
+ * Allowed via resolveOffPlatformAccess (grant / subscription / 30d trial).
  */
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Phone, Loader2, Save } from "lucide-react";
+import { Phone, Loader2, Save, Star, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { resolveOffPlatformAccess } from "@/hooks/use-vendor-off-platform-access";
+import { sanitizeExtension } from "@/utils/sanitize-filename";
 
 const DEFAULT_OPERATORS = [
   { operator: "orange_money", operator_label: "Orange Money", sort_order: 0 },
@@ -20,93 +22,178 @@ interface NumberEntry {
   phone_number: string;
   display_name: string;
   sort_order: number;
-}
-
-async function resolveMmAllowed(storeId: string): Promise<boolean> {
-  const { data: override } = await (supabase as any)
-    .from("vendor_pricing_overrides")
-    .select("vendor_custom_payment_numbers_enabled, mm_granted_by_admin")
-    .eq("store_id", storeId)
-    .maybeSingle();
-
-  if (override?.mm_granted_by_admin === true && override?.vendor_custom_payment_numbers_enabled === true) {
-    return true;
-  }
-
-  const { data: subs } = await (supabase as any)
-    .from("store_package_subscriptions")
-    .select("paid_until, is_active, service_packages!inner(slug)")
-    .eq("store_id", storeId)
-    .eq("is_active", true)
-    .eq("service_packages.slug", "vendor_mm_numbers")
-    .limit(1);
-
-  const sub = subs?.[0];
-  if (!sub?.is_active) return false;
-  if (sub.paid_until && new Date(sub.paid_until).getTime() <= Date.now()) return false;
-  return true;
+  is_preferred: boolean;
+  qr_image_url: string;
 }
 
 export function VendorPaymentNumbers({ storeId }: { storeId: string }) {
   const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [accessReason, setAccessReason] = useState<string>("denied");
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
   const [numbers, setNumbers] = useState<NumberEntry[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [uploadingOp, setUploadingOp] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const isAllowed = await resolveMmAllowed(storeId);
-      setAllowed(isAllowed);
+      const access = await resolveOffPlatformAccess(storeId);
+      setAllowed(access.allowed);
+      setAccessReason(access.reason);
+      setTrialEndsAt(access.trialEndsAt);
 
-      if (!isAllowed) {
+      if (!access.allowed) {
         setLoading(false);
         return;
       }
 
       const { data: existing } = await (supabase as any)
         .from("store_payment_numbers")
-        .select("operator, operator_label, phone_number, display_name, sort_order")
+        .select(
+          "operator, operator_label, phone_number, display_name, sort_order, is_preferred, qr_image_url",
+        )
         .eq("store_id", storeId)
         .order("sort_order");
 
       if (existing && existing.length > 0) {
         const merged = DEFAULT_OPERATORS.map((def) => {
           const found = existing.find((e: NumberEntry) => e.operator === def.operator);
-          return found || { ...def, phone_number: "", display_name: "" };
+          return found
+            ? {
+                ...def,
+                phone_number: found.phone_number || "",
+                display_name: found.display_name || "",
+                is_preferred: !!found.is_preferred,
+                qr_image_url: found.qr_image_url || "",
+              }
+            : { ...def, phone_number: "", display_name: "", is_preferred: false, qr_image_url: "" };
         });
         setNumbers(merged);
       } else {
-        setNumbers(DEFAULT_OPERATORS.map((d) => ({ ...d, phone_number: "", display_name: "" })));
+        setNumbers(
+          DEFAULT_OPERATORS.map((d) => ({
+            ...d,
+            phone_number: "",
+            display_name: "",
+            is_preferred: false,
+            qr_image_url: "",
+          })),
+        );
       }
       setLoading(false);
     }
     load();
   }, [storeId]);
 
+  const setPreferred = (operator: string) => {
+    setNumbers((prev) =>
+      prev.map((n) => ({ ...n, is_preferred: n.operator === operator })),
+    );
+  };
+
+  const uploadQr = async (operator: string, file: File) => {
+    const allowedMime = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowedMime.includes(file.type)) {
+      toast.error("QR : image JPEG, PNG ou WebP uniquement");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("QR : max 2 Mo");
+      return;
+    }
+    setUploadingOp(operator);
+    try {
+      // product-media is public + store-owner folder policy (vendor-documents is private + uid folder)
+      const ext = sanitizeExtension(file.name, "jpg");
+      const path = `${storeId}/payment-qr/${operator}_${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("product-media")
+        .upload(path, file, {
+          cacheControl: "31536000",
+          upsert: true,
+          contentType: file.type,
+        });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("product-media").getPublicUrl(path);
+      const url = pub?.publicUrl;
+      if (!url) throw new Error("URL publique introuvable");
+      setNumbers((prev) =>
+        prev.map((n) => (n.operator === operator ? { ...n, qr_image_url: url } : n)),
+      );
+      toast.success("QR téléversé — enregistrez pour confirmer");
+    } catch (e: any) {
+      toast.error(e?.message || "Upload QR impossible");
+    } finally {
+      setUploadingOp(null);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      for (const n of numbers) {
-        await (supabase as any)
-          .from("store_payment_numbers")
-          .upsert(
-            {
-              store_id: storeId,
-              operator: n.operator,
-              operator_label: n.operator_label,
-              phone_number: n.phone_number.trim(),
-              display_name: n.display_name.trim(),
-              sort_order: n.sort_order,
-              is_active: n.phone_number.trim() !== "",
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "store_id,operator" }
-          );
+      const withPhone = numbers.filter((n) => n.phone_number.trim());
+      if (withPhone.length === 0) {
+        toast.error("Ajoutez au moins un numéro");
+        setSaving(false);
+        return;
       }
-      toast.success("Numéros de paiement mis à jour");
+      // Ensure at most one preferred among saved rows
+      let preferredSet = false;
+      const toSave = numbers.map((n) => {
+        const hasPhone = !!n.phone_number.trim();
+        let isPreferred = hasPhone && n.is_preferred;
+        if (isPreferred && preferredSet) isPreferred = false;
+        if (isPreferred) preferredSet = true;
+        return {
+          operator: n.operator,
+          operator_label: n.operator_label,
+          phone_number: n.phone_number,
+          display_name: n.display_name,
+          sort_order: n.sort_order,
+          is_preferred: isPreferred,
+          qr_image_url: n.qr_image_url,
+          is_active: hasPhone,
+        };
+      });
+      if (!preferredSet && withPhone[0]) {
+        for (const n of toSave) {
+          if (n.operator === withPhone[0].operator) n.is_preferred = true;
+        }
+      }
+
+      const { error: clearErr } = await (supabase as any)
+        .from("store_payment_numbers")
+        .update({ is_preferred: false })
+        .eq("store_id", storeId);
+      if (clearErr) throw clearErr;
+
+      for (const n of toSave) {
+        const { error } = await (supabase as any).from("store_payment_numbers").upsert(
+          {
+            store_id: storeId,
+            operator: n.operator,
+            operator_label: n.operator_label,
+            phone_number: n.phone_number.trim(),
+            display_name: n.display_name.trim(),
+            sort_order: n.sort_order,
+            is_preferred: n.is_preferred,
+            qr_image_url: n.qr_image_url || null,
+            is_active: n.is_active,
+          },
+          { onConflict: "store_id,operator" },
+        );
+        if (error) throw error;
+      }
+      setNumbers(
+        toSave.map(({ is_active: _a, ...rest }) => ({
+          ...rest,
+          phone_number: rest.phone_number,
+        })),
+      );
+      toast.success("Numéros enregistrés");
     } catch (e: any) {
-      toast.error(e.message || "Erreur lors de la sauvegarde");
+      toast.error(e?.message || "Erreur d'enregistrement");
     } finally {
       setSaving(false);
     }
@@ -114,83 +201,109 @@ export function VendorPaymentNumbers({ storeId }: { storeId: string }) {
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-lg p-4 flex justify-center">
-        <Loader2 size={16} className="animate-spin text-primary" />
+      <div className="flex justify-center py-6">
+        <Loader2 className="animate-spin text-primary" size={20} />
       </div>
     );
   }
 
   if (!allowed) {
     return (
-      <div className="bg-card border border-dashed border-border rounded-lg p-4 space-y-2">
-        <p className="text-sm font-medium text-foreground flex items-center gap-2">
-          <Phone size={14} className="text-primary" />
-          Numéros Mobile Money boutique
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Sans forfait actif, les clients paient via les canaux plateforme Zandofy.
-          Abonnez-vous (~$9,99/mois) dans l&apos;onglet Tarification pour afficher vos propres numéros.
-        </p>
+      <div className="text-xs text-muted-foreground border border-border rounded-md p-3">
+        Accès numéros / QR indisponible ({accessReason === "denied" ? "essai terminé ou non activé" : accessReason}).
+        Souscrivez le forfait ou contactez l’admin.
       </div>
     );
   }
 
   return (
-    <div className="bg-card border border-border rounded-lg p-4 space-y-4">
-      <div>
-        <label className="text-sm font-medium text-foreground flex items-center gap-2 mb-1">
-          <Phone size={14} className="text-primary" />
-          Numéros de paiement Mobile Money
-        </label>
-        <p className="text-xs text-muted-foreground">
-          Ces numéros s&apos;affichent au checkout quand votre forfait MM est actif (ou accord admin).
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <Phone size={14} />
+        Numéros & QR hors plateforme
+      </div>
+      {accessReason === "trial" && trialEndsAt && (
+        <p className="text-[11px] text-amber-700 dark:text-amber-400">
+          Essai jusqu’au {new Date(trialEndsAt).toLocaleDateString("fr-FR")}
         </p>
-      </div>
-
-      <div className="space-y-3">
-        {numbers.map((entry, idx) => (
-          <div key={entry.operator} className="border border-border rounded-lg p-3 space-y-2">
-            <p className="text-xs font-semibold text-foreground">{entry.operator_label}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div>
-                <label className="text-[11px] text-muted-foreground block mb-0.5">Numéro de téléphone</label>
-                <input
-                  type="tel"
-                  value={entry.phone_number}
-                  onChange={(e) => {
-                    const updated = [...numbers];
-                    updated[idx] = { ...updated[idx], phone_number: e.target.value };
-                    setNumbers(updated);
-                  }}
-                  placeholder="Ex: 0991234567"
-                  className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-muted-foreground block mb-0.5">Nom affiché (USSD/App)</label>
-                <input
-                  type="text"
-                  value={entry.display_name}
-                  onChange={(e) => {
-                    const updated = [...numbers];
-                    updated[idx] = { ...updated[idx], display_name: e.target.value };
-                    setNumbers(updated);
-                  }}
-                  placeholder="Nom visible par le client"
-                  className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-            </div>
+      )}
+      {numbers.map((n) => (
+        <div key={n.operator} className="border border-border rounded-md p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium">{n.operator_label}</span>
+            <button
+              type="button"
+              onClick={() => setPreferred(n.operator)}
+              className={`inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded border ${
+                n.is_preferred
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground"
+              }`}
+            >
+              <Star size={10} className={n.is_preferred ? "fill-primary" : ""} />
+              Préféré
+            </button>
           </div>
-        ))}
-      </div>
-
+          <input
+            className="w-full h-9 px-2 text-sm border border-border rounded-md bg-background"
+            placeholder="Numéro"
+            value={n.phone_number}
+            onChange={(e) =>
+              setNumbers((prev) =>
+                prev.map((x) =>
+                  x.operator === n.operator ? { ...x, phone_number: e.target.value } : x,
+                ),
+              )
+            }
+          />
+          <input
+            className="w-full h-9 px-2 text-sm border border-border rounded-md bg-background"
+            placeholder="Nom affiché (optionnel)"
+            value={n.display_name}
+            onChange={(e) =>
+              setNumbers((prev) =>
+                prev.map((x) =>
+                  x.operator === n.operator ? { ...x, display_name: e.target.value } : x,
+                ),
+              )
+            }
+          />
+          <div className="flex items-center gap-2">
+            <label className="inline-flex items-center gap-1 text-[11px] text-primary cursor-pointer">
+              {uploadingOp === n.operator ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <Upload size={12} />
+              )}
+              QR code
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploadingOp === n.operator}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadQr(n.operator, f);
+                }}
+              />
+            </label>
+            {n.qr_image_url && (
+              <img
+                src={n.qr_image_url}
+                alt="QR"
+                className="h-10 w-10 object-contain rounded border border-border"
+              />
+            )}
+          </div>
+        </div>
+      ))}
       <button
+        type="button"
         onClick={handleSave}
         disabled={saving}
-        className="w-full py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-xs font-medium disabled:opacity-50"
       >
-        {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+        {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
         Enregistrer les numéros
       </button>
     </div>

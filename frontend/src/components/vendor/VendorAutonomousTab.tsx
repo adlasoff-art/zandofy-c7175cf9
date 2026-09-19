@@ -122,8 +122,8 @@ export function VendorAutonomousTab({ storeId }: Props) {
   const webhookApproved = override?.webhook_approved === true;
   const activeWebhook = webhookApproved ? override?.vendor_webhook_url : null;
   const paymentConfig = {
-    mobile_money: override?.vendor_mobile_money_enabled === true,
-    card: override?.vendor_card_enabled === true,
+    mobile_money: override?.vendor_mobile_money_enabled !== false,
+    card: override?.vendor_card_enabled !== false,
     cod: override?.vendor_cod_enabled === true,
     off_platform: override?.vendor_off_platform_enabled === true,
     custom_numbers: override?.vendor_custom_payment_numbers_enabled === true,
@@ -179,7 +179,7 @@ export function VendorAutonomousTab({ storeId }: Props) {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {[
             { label: "Mobile Money", active: paymentConfig.mobile_money },
-            { label: "Carte bancaire", active: paymentConfig.card },
+            { label: "Carte bancaire (Keccel)", active: paymentConfig.card },
             { label: "Paiement livraison", active: paymentConfig.cod },
             { label: "Hors plateforme", active: paymentConfig.off_platform },
             { label: "N° personnalisés", active: paymentConfig.custom_numbers },

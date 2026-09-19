@@ -37,6 +37,9 @@ interface ApplicationData {
   shop_type: string;
   fulfillment_type: string;
   fleet_management: string;
+  pay_mobile_money: boolean;
+  pay_card: boolean;
+  pay_off_platform: boolean;
 }
 
 interface DocFile {
@@ -63,6 +66,9 @@ const initialData: ApplicationData = {
   shop_type: "international",
   fulfillment_type: "zandofy_warehouse",
   fleet_management: "platform",
+  pay_mobile_money: true,
+  pay_card: true,
+  pay_off_platform: false,
 };
 
 interface VendorApplicationLocalDraft {
@@ -175,6 +181,9 @@ export default function BecomeVendorPage() {
           shop_type: (data as any).shop_type || "international",
           fulfillment_type: (data as any).fulfillment_type || "zandofy_warehouse",
           fleet_management: (data as any).fleet_management || "platform",
+          pay_mobile_money: (data as any).payment_preferences?.mobile_money !== false,
+          pay_card: (data as any).payment_preferences?.card !== false,
+          pay_off_platform: (data as any).payment_preferences?.off_platform === true,
         });
         setStep(data.current_step || 1);
         setExistingApp(true);
@@ -382,6 +391,11 @@ export default function BecomeVendorPage() {
       shop_type: form.shop_type,
       fulfillment_type: form.fulfillment_type,
       fleet_management: form.fleet_management,
+      payment_preferences: {
+        mobile_money: form.pay_mobile_money,
+        card: form.pay_card,
+        off_platform: form.pay_off_platform,
+      },
     };
 
     let appId = form.id;
@@ -416,11 +430,29 @@ export default function BecomeVendorPage() {
       });
       return;
     }
+    if (!form.pay_mobile_money && !form.pay_card && !form.pay_off_platform) {
+      toast({
+        title: "Modes de paiement",
+        description: "Sélectionnez au moins un mode de perception (Mobile Money, carte ou hors plateforme).",
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(true);
+    await saveProgress(4);
     if (form.id) {
       const { error } = await supabase
         .from("vendor_applications")
-        .update({ status: "submitted", submitted_at: new Date().toISOString(), current_step: 4 })
+        .update({
+          status: "submitted",
+          submitted_at: new Date().toISOString(),
+          current_step: 4,
+          payment_preferences: {
+            mobile_money: form.pay_mobile_money,
+            card: form.pay_card,
+            off_platform: form.pay_off_platform,
+          },
+        } as any)
         .eq("id", form.id);
       if (error) {
         console.error("Submit error:", error);
@@ -477,7 +509,11 @@ export default function BecomeVendorPage() {
   const canProceed = (s: number) => {
     switch (s) {
       case 1: return !!form.full_name && !!form.phone && !!form.business_type;
-      case 2: return !!form.store_name;
+      case 2:
+        return (
+          !!form.store_name &&
+          (form.pay_mobile_money || form.pay_card || form.pay_off_platform)
+        );
       case 3: return kycApproved;
       default: return true;
     }
@@ -620,6 +656,47 @@ export default function BecomeVendorPage() {
                     </div>
                   </>
                 )}
+
+                <div className="space-y-3 border-t border-border pt-4 mt-4">
+                  <Label className="text-base font-semibold">Perception des paiements *</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Au moins un mode. Mobile Money et carte = encaissement via Zandofy (KelPay / Keccel).
+                    Hors plateforme = vos numéros / QR + preuve client (essai 30 jours puis abonnement).
+                  </p>
+                  {(
+                    [
+                      {
+                        key: "pay_mobile_money" as const,
+                        label: "Mobile Money (KelPay)",
+                        checked: form.pay_mobile_money,
+                      },
+                      {
+                        key: "pay_card" as const,
+                        label: "Carte bancaire (Keccel)",
+                        checked: form.pay_card,
+                      },
+                      {
+                        key: "pay_off_platform" as const,
+                        label: "Hors plateforme (numéros / QR)",
+                        checked: form.pay_off_platform,
+                      },
+                    ] as const
+                  ).map((opt) => (
+                    <label
+                      key={opt.key}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/40"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={opt.checked}
+                        onChange={(e) =>
+                          setForm((prev) => ({ ...prev, [opt.key]: e.target.checked }))
+                        }
+                      />
+                      <span className="text-sm font-medium text-foreground">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
               </>
             )}
 
@@ -699,6 +776,15 @@ export default function BecomeVendorPage() {
                     <p><strong>{t("vendor.storeName")}:</strong> {form.store_name}</p>
                     {form.store_description && <p><strong>{t("vendor.storeDesc")}:</strong> {form.store_description}</p>}
                     <p><strong>Type :</strong> {form.shop_type === "local" ? "Locale" : "Internationale"}</p>
+                    <p className="mt-2"><strong>Paiements :</strong>{" "}
+                      {[
+                        form.pay_mobile_money ? "Mobile Money (KelPay)" : null,
+                        form.pay_card ? "Carte (Keccel)" : null,
+                        form.pay_off_platform ? "Hors plateforme" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "—"}
+                    </p>
                   </div>
                   <div className="border border-border rounded-md p-3">
                     <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2"><ShieldCheck size={14} /> KYC</h4>

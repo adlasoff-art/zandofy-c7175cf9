@@ -141,6 +141,26 @@ export default function AdminVendorApplicationsPage() {
           return;
         }
 
+        const prefs = (selected as any).payment_preferences as
+          | { mobile_money?: boolean; card?: boolean; off_platform?: boolean }
+          | null
+          | undefined;
+        // Safe defaults when prefs missing/partial: MoMo+carte on, hors plateforme off
+        const momo = prefs == null ? true : prefs.mobile_money !== false;
+        const card = prefs == null ? true : prefs.card !== false;
+        const off = prefs == null ? false : prefs.off_platform === true;
+        const hasAtLeastOne = momo || card || off;
+        await (supabase as any).from("vendor_pricing_overrides").upsert(
+          {
+            store_id: newStore.id,
+            vendor_mobile_money_enabled: hasAtLeastOne ? momo : true,
+            vendor_card_enabled: hasAtLeastOne ? card : true,
+            vendor_off_platform_enabled: hasAtLeastOne ? off : false,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "store_id" },
+        );
+
         await supabase.from("vendor_subscriptions").upsert({
           store_id: newStore.id,
           tier: "beginner",
