@@ -21,7 +21,13 @@ import {
   canAdminAdvance,
 } from "@/lib/order-status";
 import { withOptionalOrderFields } from "@/lib/order-query";
-import { VENDOR_ORDERS_OR_FILTER } from "@/lib/off-platform-payment";
+import {
+  VENDOR_ORDERS_OR_FILTER,
+  hasOffPlatformPaymentProof,
+  isPlatformOwnedStore,
+  vendorOffPlatformConfirmUpdates,
+  vendorOffPlatformVerifyOnlyUpdates,
+} from "@/lib/off-platform-payment";
 import { useRoles } from "@/hooks/use-roles";
 import { SupplierInfoModal, ShippedTransitionModal, RiderAssignmentModal, DeliveryFeeModal, EditTrackingModal, HubPickupModal, HubProofPhotoUpload, generateConfirmationCode } from "./OrderTransitionModals";
 import { format } from "date-fns";
@@ -143,6 +149,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
   const [hubPickupModal, setHubPickupModal] = useState<string | null>(null);
   const [hasSelfDelivery, setHasSelfDelivery] = useState(false);
   const [labelsEnabled, setLabelsEnabled] = useState(false);
+  const [isPlatformOwned, setIsPlatformOwned] = useState<boolean | null>(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [showLabelPreview, setShowLabelPreview] = useState(false);
 
@@ -167,6 +174,28 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
       setLabelsEnabled(data?.shipping_labels_enabled || false);
     }
     checkLabels();
+  }, [storeId]);
+
+  // Boutique plateforme vs vendeur autonome (hors-plateforme)
+  useEffect(() => {
+    async function loadStoreFlags() {
+      const { data, error } = await supabase
+        .from("stores")
+        .select("is_platform_owned")
+        .eq("id", storeId)
+        .maybeSingle();
+      // Fail-closed : sans flag fiable, on bloque Valider/Finaliser (évite confirm auto sur boutique plateforme).
+      if (error || !data) {
+        console.error("[VendorOrderManager] is_platform_owned unavailable:", error);
+        setIsPlatformOwned(null);
+        return;
+      }
+      setIsPlatformOwned(isPlatformOwnedStore((data as any).is_platform_owned));
+    }
+    if (storeId) {
+      setIsPlatformOwned(null);
+      loadStoreFlags();
+    }
   }, [storeId]);
 
   const loadOrders = useCallback(async () => {
@@ -599,15 +628,77 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   />
                 )}
 
-                {/* Off-platform payment validation by vendor (étape 1 — admin libère ensuite) */}
+                {/* Off-platform: vendeur autonome (non-plateforme) ou verify-only (plateforme → admin) */}
                 {order.payment_method === "off_platform" && order.status === "awaiting_payment" && (
                   <div className="space-y-2 border border-amber-200 dark:border-amber-700 rounded-lg p-3 bg-amber-50 dark:bg-amber-900/20">
                     <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                       💳 Paiement hors plateforme — Validation vendeur
                     </p>
-                    {order.off_platform_vendor_verified_at ? (
+                    {order.off_platform_vendor_verified_at && isPlatformOwned === true ? (
                       <p className="text-xs text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-900/30 rounded-md p-2">
                         Preuve validée par vous — en attente de validation administrateur avant traitement logistique.
+                      </p>
+                    ) : order.off_platform_vendor_verified_at && isPlatformOwned === false ? (
+                      <div className="space-y-2">
+                        <p className="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-md p-2">
+                          Preuve déjà validée — finalisez pour confirmer la commande.
+                        </p>
+                        <Button
+                          size="sm"
+                          className="w-full text-xs gap-1"
+                          disabled={
+                            !user?.id ||
+                            updatingId === order.id ||
+                            !hasOffPlatformPaymentProof(order)
+                          }
+                          onClick={async () => {
+                            if (!user?.id) return;
+                            if (!hasOffPlatformPaymentProof(order)) {
+                              toast.error("Preuve de paiement client requise.");
+                              return;
+                            }
+                            setUpdatingId(order.id);
+                            const now = new Date().toISOString();
+                            const payload = vendorOffPlatformConfirmUpdates(now, user.id, {
+                              preserveVerifiedAt: order.off_platform_vendor_verified_at,
+                            });
+                            const { error } = await supabase
+                              .from("orders")
+                              .update(payload as any)
+                              .eq("id", order.id);
+                            if (error) {
+                              toast.error("Impossible de finaliser la commande.");
+                              setUpdatingId(null);
+                              return;
+                            }
+                            await supabase.from("order_status_history").insert({
+                              order_id: order.id,
+                              status: "pending",
+                              notes: "Vendeur : confirmation hors plateforme (finalisation)",
+                              changed_by: user.id,
+                            });
+                            setOrders((prev) =>
+                              prev.map((o) =>
+                                o.id === order.id
+                                  ? {
+                                      ...o,
+                                      ...payload,
+                                      off_platform_vendor_verified_by: user.id,
+                                    }
+                                  : o,
+                              ),
+                            );
+                            triggerOrderStatusNotification(order.id, "pending");
+                            toast.success("Commande confirmée — vous pouvez traiter la logistique.");
+                            setUpdatingId(null);
+                          }}
+                        >
+                          <Check size={12} /> Finaliser la commande
+                        </Button>
+                      </div>
+                    ) : order.off_platform_vendor_verified_at && isPlatformOwned === null ? (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <Loader2 size={12} className="animate-spin" /> Chargement…
                       </p>
                     ) : order.shipping_payment_proof_url ? (
                       <div className="space-y-2">
@@ -619,40 +710,60 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                           onClick={async () => {
                             const { getDeliveryProofUrl } = await import("@/lib/delivery-proof-urls");
                             const u = await getDeliveryProofUrl(order.shipping_payment_proof_url);
-                            if (u) window.open(u, '_blank');
+                            if (u) window.open(u, "_blank");
                           }}
                         />
                         <div className="flex gap-2">
                           <Button
                             size="sm"
                             className="flex-1 text-xs gap-1"
-                            disabled={!user?.id}
+                            disabled={!user?.id || updatingId === order.id || isPlatformOwned === null}
                             onClick={async () => {
-                              if (!user?.id) return;
+                              if (!user?.id || isPlatformOwned === null) return;
+                              if (!hasOffPlatformPaymentProof(order)) {
+                                toast.error("Preuve de paiement client requise.");
+                                return;
+                              }
+                              setUpdatingId(order.id);
                               const now = new Date().toISOString();
+                              const payload = isPlatformOwned
+                                ? vendorOffPlatformVerifyOnlyUpdates(now, user.id)
+                                : vendorOffPlatformConfirmUpdates(now, user.id);
                               const { error } = await supabase
                                 .from("orders")
-                                .update({
-                                  off_platform_vendor_verified_at: now,
-                                  off_platform_vendor_verified_by: user.id,
-                                } as any)
+                                .update(payload as any)
                                 .eq("id", order.id);
-                              if (!error) {
-                                setOrders(prev =>
-                                  prev.map(o =>
-                                    o.id === order.id
-                                      ? {
-                                          ...o,
-                                          off_platform_vendor_verified_at: now,
-                                          off_platform_vendor_verified_by: user.id,
-                                        }
-                                      : o,
-                                  ),
-                                );
-                                toast.success("Preuve validée — l'administration va finaliser la commande.");
-                              } else {
+                              if (error) {
                                 toast.error("Impossible d'enregistrer la validation.");
+                                setUpdatingId(null);
+                                return;
                               }
+                              if (!isPlatformOwned) {
+                                await supabase.from("order_status_history").insert({
+                                  order_id: order.id,
+                                  status: "pending",
+                                  notes: "Vendeur : preuve hors plateforme validée — commande confirmée",
+                                  changed_by: user.id,
+                                });
+                                triggerOrderStatusNotification(order.id, "pending");
+                              }
+                              setOrders((prev) =>
+                                prev.map((o) =>
+                                  o.id === order.id
+                                    ? {
+                                        ...o,
+                                        ...payload,
+                                        off_platform_vendor_verified_by: user.id,
+                                      }
+                                    : o,
+                                ),
+                              );
+                              toast.success(
+                                isPlatformOwned
+                                  ? "Preuve validée — l'administration va finaliser la commande."
+                                  : "Preuve validée — commande confirmée.",
+                              );
+                              setUpdatingId(null);
                             }}
                           >
                             <Check size={12} /> Valider la preuve client
@@ -661,13 +772,18 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                             size="sm"
                             variant="destructive"
                             className="flex-1 text-xs gap-1"
+                            disabled={updatingId === order.id}
                             onClick={async () => {
                               const { error } = await supabase
                                 .from("orders")
                                 .update({ status: "payment_failed" } as any)
                                 .eq("id", order.id);
                               if (!error) {
-                                setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "payment_failed" } : o));
+                                setOrders((prev) =>
+                                  prev.map((o) =>
+                                    o.id === order.id ? { ...o, status: "payment_failed" } : o,
+                                  ),
+                                );
                                 toast.error("Paiement refusé — commande marquée comme échouée.");
                               }
                             }}
@@ -677,7 +793,9 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                         </div>
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground">⏳ En attente de la preuve de paiement du client...</p>
+                      <p className="text-xs text-muted-foreground">
+                        ⏳ En attente de la preuve de paiement du client...
+                      </p>
                     )}
                   </div>
                 )}

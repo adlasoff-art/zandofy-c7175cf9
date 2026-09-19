@@ -227,6 +227,22 @@ export default function AdminOrdersPage() {
           o._itemNames = (itemMap.get(o.id) || []).join(" ").toLowerCase();
         });
       }
+
+      // Flag boutique plateforme pour le panneau hors-plateforme
+      const storeIds = [...new Set(ordersData.map((o: any) => o.store_id).filter(Boolean))];
+      if (storeIds.length > 0) {
+        const { data: stores } = await (supabase as any)
+          .from("stores")
+          .select("id, is_platform_owned")
+          .in("id", storeIds);
+        const platformMap = new Map<string, boolean>(
+          (stores || []).map((s: any) => [s.id, !!s.is_platform_owned]),
+        );
+        ordersData.forEach((o: any) => {
+          o._isPlatformOwned = platformMap.get(o.store_id) === true;
+        });
+      }
+
       return ordersData;
     },
     enabled: !authLoading && !!user,
@@ -270,13 +286,17 @@ export default function AdminOrdersPage() {
   }, [dateFilter, customStart, customEnd]);
 
   const offPlatformReleaseCount = useMemo(
-    () => orders.filter((o: any) => isOffPlatformAwaitingAdminRelease(o)).length,
+    () =>
+      orders.filter(
+        (o: any) => isOffPlatformAwaitingAdminRelease(o, o._isPlatformOwned === true),
+      ).length,
+
     [orders],
   );
 
   const filtered = orders.filter((o: any) => {
     if (statusFilter === "off_platform_release") {
-      if (!isOffPlatformAwaitingAdminRelease(o)) return false;
+      if (!isOffPlatformAwaitingAdminRelease(o, o._isPlatformOwned === true)) return false;
     } else {
       const matchStatus = statusFilter === "all" || o.status === statusFilter;
       if (!matchStatus) return false;
@@ -839,6 +859,7 @@ export default function AdminOrdersPage() {
                         <OffPlatformReleasePanel
                           order={o}
                           userId={user.id}
+                          isPlatformOwned={o._isPlatformOwned === true}
                           disabled={updatingId === o.id}
                           onUpdated={() => queryClient.invalidateQueries({ queryKey: ["admin-orders"] })}
                         />

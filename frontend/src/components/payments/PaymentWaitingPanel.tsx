@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, ShieldCheck, X, Clock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/contexts/I18nContext";
 
 interface PaymentWaitingPanelProps {
   /** Durée totale d'attente en secondes (par défaut 180 = 3 min). */
   durationSeconds?: number;
-  /** Texte décrivant l'opérateur (ex. "Orange Money"). */
+  /** Texte décrivant l'opérateur (ex. "Orange Money") — conservé pour compatibilité. */
   providerLabel?: string;
   /** Référence à afficher (optionnel). */
   reference?: string | null;
@@ -27,7 +28,7 @@ interface PaymentWaitingPanelProps {
  */
 export function PaymentWaitingPanel({
   durationSeconds = 180,
-  providerLabel,
+  providerLabel: _providerLabel,
   reference,
   checking = false,
   onCheck,
@@ -36,6 +37,7 @@ export function PaymentWaitingPanel({
   onAutoAbandon,
   autoAbandonAfterExpireSeconds = 60,
 }: PaymentWaitingPanelProps) {
+  const { t } = useI18n();
   const [remaining, setRemaining] = useState(durationSeconds);
   const [graceRemaining, setGraceRemaining] = useState<number | null>(null);
   const expireFiredRef = useRef(false);
@@ -92,11 +94,11 @@ export function PaymentWaitingPanel({
         <p className="text-sm font-semibold text-foreground">
           {isExpired
             ? "Délai écoulé — vérifiez l'état de votre paiement"
-            : "En attente de validation sur votre téléphone"}
+            : t("checkout.momoWaiting.title")}
         </p>
         {!isExpired && (
-          <p className="text-xs text-muted-foreground max-w-xs">
-            Ouvrez l'application{providerLabel ? ` ${providerLabel}` : " Mobile Money"} et validez le paiement avec votre code PIN.
+          <p className="text-xs text-muted-foreground max-w-sm leading-relaxed">
+            {t("checkout.momoWaiting.body")}
           </p>
         )}
         {isExpired && graceRemaining !== null && graceRemaining > 0 && (

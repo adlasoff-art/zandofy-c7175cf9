@@ -12,6 +12,7 @@ import {
   canAdminReleaseOffPlatform,
   isOffPlatformAwaitingAdminRelease,
   isOffPlatformAwaitingPayment,
+  isPlatformOwnedStore,
   type OffPlatformOrderFields,
 } from "@/lib/off-platform-payment";
 
@@ -22,11 +23,19 @@ type Props = {
     total?: number;
   };
   userId: string;
+  /** Boutique plateforme : admin libère. Sinon lecture seule (vendeur autonome). */
+  isPlatformOwned?: boolean | null;
   disabled?: boolean;
   onUpdated: () => void;
 };
 
-export function OffPlatformReleasePanel({ order, userId, disabled, onUpdated }: Props) {
+export function OffPlatformReleasePanel({
+  order,
+  userId,
+  isPlatformOwned,
+  disabled,
+  onUpdated,
+}: Props) {
   const [busy, setBusy] = useState(false);
   const [overrideWithoutVendor, setOverrideWithoutVendor] = useState(false);
 
@@ -34,8 +43,9 @@ export function OffPlatformReleasePanel({ order, userId, disabled, onUpdated }: 
     return null;
   }
 
-  const awaitingAdmin = isOffPlatformAwaitingAdminRelease(order);
-  const canRelease = canAdminReleaseOffPlatform(order, overrideWithoutVendor);
+  const platformStore = isPlatformOwnedStore(isPlatformOwned);
+  const awaitingAdmin = isOffPlatformAwaitingAdminRelease(order, isPlatformOwned);
+  const canRelease = canAdminReleaseOffPlatform(order, overrideWithoutVendor, isPlatformOwned);
   const alreadyReleased = !!order.off_platform_admin_released_at;
 
   const openProof = async () => {
@@ -46,7 +56,7 @@ export function OffPlatformReleasePanel({ order, userId, disabled, onUpdated }: 
   };
 
   const releaseOrder = async () => {
-    if (!canRelease || alreadyReleased) return;
+    if (!platformStore || !canRelease || alreadyReleased) return;
     if (
       !order.off_platform_vendor_verified_at &&
       overrideWithoutVendor &&
@@ -90,6 +100,7 @@ export function OffPlatformReleasePanel({ order, userId, disabled, onUpdated }: 
   };
 
   const rejectOrder = async () => {
+    if (!platformStore) return;
     if (!confirm("Refuser le paiement hors plateforme pour cette commande ?")) return;
     setBusy(true);
     const { error } = await supabase
@@ -105,25 +116,54 @@ export function OffPlatformReleasePanel({ order, userId, disabled, onUpdated }: 
     setBusy(false);
   };
 
+  const proofBlock = order.shipping_payment_proof_url ? (
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">Preuve de paiement client :</p>
+      <DeliveryProofImage
+        pathOrUrl={order.shipping_payment_proof_url}
+        alt="Preuve de paiement"
+        className="w-full max-w-xs rounded-lg border border-border object-cover cursor-pointer"
+        onClick={openProof}
+      />
+    </div>
+  ) : (
+    <p className="text-xs text-amber-700">Aucune preuve uploadée par le client.</p>
+  );
+
+  const vendorVerifiedBlock = order.off_platform_vendor_verified_at ? (
+    <p className="text-xs text-emerald-700 dark:text-emerald-400">
+      Preuve validée par le vendeur le{" "}
+      {format(new Date(order.off_platform_vendor_verified_at), "d MMM yyyy à HH:mm", {
+        locale: fr,
+      })}
+    </p>
+  ) : (
+    <p className="text-xs text-muted-foreground">En attente de la validation vendeur.</p>
+  );
+
+  // Boutique vendeur autonome : œil admin uniquement
+  if (!platformStore) {
+    return (
+      <div className="space-y-2 border border-border rounded-lg p-3 bg-muted/30">
+        <p className="text-xs font-semibold text-foreground">
+          Hors plateforme — suivi (vendeur autonome)
+        </p>
+        <p className="text-xs text-muted-foreground">
+          La confirmation de cette commande est gérée par le vendeur. Lecture seule pour l&apos;administration.
+        </p>
+        {proofBlock}
+        {vendorVerifiedBlock}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2 border border-violet-200 dark:border-violet-800 rounded-lg p-3 bg-violet-50 dark:bg-violet-900/20">
       <p className="text-xs font-semibold text-violet-800 dark:text-violet-300">
         Hors plateforme — validation administrateur
       </p>
 
-      {order.shipping_payment_proof_url ? (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">Preuve de paiement client :</p>
-          <DeliveryProofImage
-            pathOrUrl={order.shipping_payment_proof_url}
-            alt="Preuve de paiement"
-            className="w-full max-w-xs rounded-lg border border-border object-cover cursor-pointer"
-            onClick={openProof}
-          />
-        </div>
-      ) : (
-        <p className="text-xs text-amber-700">Aucune preuve uploadée par le client.</p>
-      )}
+      {proofBlock}
 
       {order.off_platform_vendor_verified_at && (
         <p className="text-xs text-emerald-700 dark:text-emerald-400">

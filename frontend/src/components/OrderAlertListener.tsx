@@ -104,24 +104,35 @@ export function OrderAlertListener() {
 
     const { data } = await supabase
       .from("orders")
-      .select("order_ref, off_platform_vendor_verified_at")
+      .select("order_ref, store_id, off_platform_vendor_verified_at")
       .eq("payment_method", "off_platform")
       .eq("status", "awaiting_payment")
       .not("off_platform_vendor_verified_at", "is", null)
       .is("off_platform_admin_released_at", null)
       .gt("off_platform_vendor_verified_at", lastSeenVendorVerifyRef.current)
       .order("off_platform_vendor_verified_at", { ascending: true })
-      .limit(10);
+      .limit(20);
 
-    if (data && data.length > 0) {
-      const latest = data[data.length - 1] as any;
-      toast("Hors plateforme prête à libérer", {
-        description: `Commande ${latest.order_ref} — validation vendeur reçue`,
-        icon: <ShieldCheck size={16} />,
-        duration: 8000,
-      });
-      lastSeenVendorVerifyRef.current = new Date().toISOString();
-    }
+    if (!data || data.length === 0) return;
+
+    // Uniquement boutiques plateforme : les vendeurs autonomes confirment sans libération admin.
+    const storeIds = [...new Set(data.map((o: any) => o.store_id).filter(Boolean))];
+    const { data: platformStores } = await (supabase as any)
+      .from("stores")
+      .select("id")
+      .eq("is_platform_owned", true)
+      .in("id", storeIds);
+    const platformSet = new Set((platformStores || []).map((s: any) => s.id));
+    const ready = data.filter((o: any) => platformSet.has(o.store_id));
+    if (ready.length === 0) return;
+
+    const latest = ready[ready.length - 1] as any;
+    toast("Hors plateforme prête à libérer", {
+      description: `Commande ${latest.order_ref} — validation vendeur reçue`,
+      icon: <ShieldCheck size={16} />,
+      duration: 8000,
+    });
+    lastSeenVendorVerifyRef.current = new Date().toISOString();
   };
 
   const runAllChecks = async () => {
