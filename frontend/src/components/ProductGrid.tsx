@@ -14,6 +14,8 @@ import {
 import { ChevronRight, TrendingUp, Flame, Users } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useHomeMarket } from "@/contexts/HomeMarketContext";
+import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
+import { rankProductsByDiscoveryPrefs } from "@/lib/discovery-prefs";
 
 const PAGE_SIZE = 24;
 
@@ -47,6 +49,7 @@ function categoryMatchesKeys(cat: Category, keys: string[]): boolean {
 export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: boolean }) {
   const { t, locale } = useI18n();
   const { market, shopTypeFilter } = useHomeMarket();
+  const { prefs, hasCompleted } = useDiscoveryPrefs();
   /** POP restore only for unfiltered Accueil — never across markets. */
   const cached =
     restoreFromCache && market === "all" ? readProductGridCache("all") : null;
@@ -233,8 +236,12 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
         }
         const ordered =
           activeTab === "all" ? shuffleBySessionSeed(mixed, getHomeShuffleSeed()) : mixed;
-        setProducts(ordered.slice(0, PAGE_SIZE));
-        setCurrentOffset(Math.max(recent.length, ordered.slice(0, PAGE_SIZE).length));
+        const ranked =
+          hasCompleted && activeTab === "all"
+            ? rankProductsByDiscoveryPrefs(ordered, prefs, PAGE_SIZE)
+            : ordered.slice(0, PAGE_SIZE);
+        setProducts(ranked);
+        setCurrentOffset(Math.max(recent.length, ranked.length));
         setHasMore(recent.length >= PAGE_SIZE || older.length > 0);
         setLoading(false);
       } catch (err: any) {
@@ -248,7 +255,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
     return () => {
       cancelled = true;
     };
-  }, [activeTab, retryKey, shopTypeFilter, market]);
+  }, [activeTab, retryKey, shopTypeFilter, market, hasCompleted, prefs]);
 
   // Re-tap Accueil / pull-to-refresh → reshuffle without full remount of page chrome
   useEffect(() => {

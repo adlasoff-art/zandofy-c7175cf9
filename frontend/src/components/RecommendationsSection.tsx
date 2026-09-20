@@ -7,6 +7,8 @@ import { fetchRecentlyViewedProductIds } from "@/lib/user-product-views";
 import { ProductRail } from "@/components/ProductRail";
 import { mapProduct, PRODUCT_LIST_SELECT, type Product } from "@/services/api";
 import { useHomeMarket } from "@/contexts/HomeMarketContext";
+import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
+import { rankProductsByDiscoveryPrefs } from "@/lib/discovery-prefs";
 
 /** List select + gender_target for ranking (rating already in PRODUCT_LIST_SELECT). */
 const RECO_SELECT = `${PRODUCT_LIST_SELECT.trim()}, gender_target`;
@@ -30,6 +32,7 @@ export function RecommendationsSection() {
   const { user } = useAuth();
   const { t } = useI18n();
   const { shopTypeFilter } = useHomeMarket();
+  const { prefs, hasCompleted } = useDiscoveryPrefs();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -52,68 +55,71 @@ export function RecommendationsSection() {
           }
         }
 
+        // Prefer discovery audience over profile gender only after completed onboarding
+        if (hasCompleted) {
+          if (prefs.audience === "male") userGender = "male";
+          else if (prefs.audience === "female") userGender = "female";
+          else if (prefs.audience === "both" || prefs.audience === "any") {
+            userGender = null;
+          }
+        }
+
         let q = supabase
           .from("products_public")
           .select(RECO_SELECT)
           .eq("publish_status", "published")
           .order("rating", { ascending: false })
-          .limit(60);
+          .limit(80);
         if (shopTypeFilter) q = (q as any).eq("shop_type", shopTypeFilter);
         const { data: allProducts } = await q;
         if (cancelled) return;
         const products_list = (allProducts || []) as any[];
 
-        let topRow: any[];
+        let combined: any[];
 
-        if (userGender === "female" || userGender === "femme") {
-          const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
-          const unisex = products_list.filter(p => p.gender_target === "unisex" && !female.includes(p));
-          topRow = pickFromTopN(female, 6, 16);
-          if (topRow.length < 6) {
-            const taken = new Set(topRow.map((p) => p.id));
-            topRow = [...topRow, ...pickFromTopN(unisex.filter((p) => !taken.has(p.id)), 6 - topRow.length, 16)];
-          }
-        } else if (userGender === "male" || userGender === "homme") {
-          const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
-          const unisex = products_list.filter(p => p.gender_target === "unisex" && !male.includes(p));
-          topRow = pickFromTopN(male, 6, 16);
-          if (topRow.length < 6) {
-            const taken = new Set(topRow.map((p) => p.id));
-            topRow = [...topRow, ...pickFromTopN(unisex.filter((p) => !taken.has(p.id)), 6 - topRow.length, 16)];
-          }
+        if (hasCompleted) {
+          combined = rankProductsByDiscoveryPrefs(products_list, prefs, 12);
         } else {
-          const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
-          const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
-          const unisex = products_list.filter(p => !["female", "femme", "male", "homme"].includes(p.gender_target || ""));
-          topRow = [
-            ...pickFromTopN(female, 3, 12),
-            ...pickFromTopN(male, 2, 12),
-            ...pickFromTopN(unisex, 1, 12),
-          ].slice(0, 6);
+          let topRow: any[];
+
+          if (userGender === "female" || userGender === "femme") {
+            const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
+            const unisex = products_list.filter(p => p.gender_target === "unisex" && !female.includes(p));
+            topRow = pickFromTopN(female, 6, 16);
+            if (topRow.length < 6) {
+              const taken = new Set(topRow.map((p) => p.id));
+              topRow = [...topRow, ...pickFromTopN(unisex.filter((p) => !taken.has(p.id)), 6 - topRow.length, 16)];
+            }
+          } else if (userGender === "male" || userGender === "homme") {
+            const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
+            const unisex = products_list.filter(p => p.gender_target === "unisex" && !male.includes(p));
+            topRow = pickFromTopN(male, 6, 16);
+            if (topRow.length < 6) {
+              const taken = new Set(topRow.map((p) => p.id));
+              topRow = [...topRow, ...pickFromTopN(unisex.filter((p) => !taken.has(p.id)), 6 - topRow.length, 16)];
+            }
+          } else {
+            const female = products_list.filter(p => p.gender_target === "female" || p.gender_target === "femme");
+            const male = products_list.filter(p => p.gender_target === "male" || p.gender_target === "homme");
+            const unisex = products_list.filter(p => !["female", "femme", "male", "homme"].includes(p.gender_target || ""));
+            topRow = [
+              ...pickFromTopN(female, 3, 12),
+              ...pickFromTopN(male, 2, 12),
+              ...pickFromTopN(unisex, 1, 12),
+            ].slice(0, 6);
+          }
+
+          if (topRow.length < 6) {
+            const existingIds = new Set(topRow.map(p => p.id));
+            const remaining = products_list.filter(p => !existingIds.has(p.id));
+            topRow = [...topRow, ...remaining].slice(0, 6);
+          }
+
+          const topIds = new Set(topRow.map(p => p.id));
+          const pool = products_list.filter(p => !topIds.has(p.id));
+          shuffleInPlace(pool);
+          combined = [...topRow, ...pool.slice(0, 6)];
         }
-
-        if (topRow.length < 6) {
-          const existingIds = new Set(topRow.map(p => p.id));
-          const remaining = products_list.filter(p => !existingIds.has(p.id));
-          topRow = [...topRow, ...remaining].slice(0, 6);
-        }
-
-        // Ligne 2 desktop (6) : pool aléatoire (mix anciens + nouveaux) → 12 total
-        const topIds = new Set(topRow.map(p => p.id));
-        let poolQ = supabase
-          .from("products_public")
-          .select(RECO_SELECT)
-          .eq("publish_status", "published")
-          .order("created_at", { ascending: false })
-          .limit(80);
-        if (shopTypeFilter) poolQ = (poolQ as any).eq("shop_type", shopTypeFilter);
-        const { data: poolData } = await poolQ;
-        if (cancelled) return;
-        const pool = ((poolData || []) as any[]).filter(p => !topIds.has(p.id));
-        shuffleInPlace(pool);
-        const bottomRow = pool.slice(0, 6);
-
-        let combined = [...topRow, ...bottomRow];
 
         if (user) {
           const recentIds = await fetchRecentlyViewedProductIds(user.id);
@@ -148,13 +154,13 @@ export function RecommendationsSection() {
     return () => {
       cancelled = true;
     };
-  }, [user, shopTypeFilter]);
+  }, [user, shopTypeFilter, prefs, hasCompleted]);
 
   if (!loading && !products.length) return null;
 
   return (
     <ProductRail
-      title={user ? t("home.forYou") : t("home.popularProducts")}
+      title={user || hasCompleted ? t("home.forYou") : t("home.popularProducts")}
       titleId="home-recommendations-heading"
       products={products}
       loading={loading}

@@ -31,6 +31,7 @@ export interface Product {
   season?: string;
   salesCount?: number;
   categoryId?: string;
+  genderTarget?: string;
   storeId?: string;
   shortDescription?: string;
   description?: string;
@@ -129,6 +130,7 @@ export function mapProduct(row: any): Product {
     season: row.season || "",
     storeId: row.store_id || "",
     categoryId: row.category_id || undefined,
+    genderTarget: row.gender_target || undefined,
     shortDescription: row.short_description || undefined,
     description: row.description || undefined,
     weightGrams: row.weight_grams || undefined,
@@ -185,7 +187,7 @@ const PRODUCT_SELECT_FALLBACK = `
 export const PRODUCT_LIST_SELECT = `
   id, name, name_fr, slug, price, original_price, currency, discount, is_new, is_sale,
   sales_count, rating, review_count, store_id, category_id, created_at, short_description, origin_country,
-  shop_type, store_is_verified, store_is_certified,
+  shop_type, store_is_verified, store_is_certified, gender_target,
   categories(name, name_fr),
   product_images(image_url, position),
   product_colors(color_hex, color_name)

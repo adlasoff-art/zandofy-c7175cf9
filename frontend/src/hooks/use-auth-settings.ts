@@ -6,6 +6,11 @@ export type AuthSettings = {
   collect_phone_on_signup: boolean;
   address_onboarding_enabled: boolean;
   gate_checkout_on_email_confirm: boolean;
+  discovery_onboarding_enabled: boolean;
+  discovery_onboarding_steps: {
+    payment: boolean;
+    receipt: boolean;
+  };
 };
 
 export const AUTH_SETTINGS_DEFAULTS: AuthSettings = {
@@ -13,18 +18,30 @@ export const AUTH_SETTINGS_DEFAULTS: AuthSettings = {
   collect_phone_on_signup: true,
   address_onboarding_enabled: true,
   gate_checkout_on_email_confirm: false,
+  discovery_onboarding_enabled: true,
+  discovery_onboarding_steps: {
+    payment: true,
+    receipt: true,
+  },
 };
 
 export const AUTH_SETTINGS_QUERY_KEY = ["platform-auth-settings"] as const;
 
 function normalizeAuthSettings(raw: unknown): AuthSettings {
   if (!raw || typeof raw !== "object") return { ...AUTH_SETTINGS_DEFAULTS };
-  const v = raw as Partial<AuthSettings>;
+  const v = raw as Partial<AuthSettings> & {
+    discovery_onboarding_steps?: Partial<AuthSettings["discovery_onboarding_steps"]>;
+  };
   return {
     mode: v.mode === "strict" ? "strict" : "fluid",
     collect_phone_on_signup: v.collect_phone_on_signup !== false,
     address_onboarding_enabled: v.address_onboarding_enabled !== false,
     gate_checkout_on_email_confirm: v.gate_checkout_on_email_confirm === true,
+    discovery_onboarding_enabled: v.discovery_onboarding_enabled !== false,
+    discovery_onboarding_steps: {
+      payment: v.discovery_onboarding_steps?.payment !== false,
+      receipt: v.discovery_onboarding_steps?.receipt !== false,
+    },
   };
 }
 

@@ -6,7 +6,6 @@ import { HeroBanner } from "@/components/HeroBanner";
 import { CategoryBanner } from "@/components/CategoryBanner";
 import { HomeServiceCards } from "@/components/HomeServiceCards";
 import { HomeMarketSwitch } from "@/components/HomeMarketSwitch";
-import { HomeMarketProvider } from "@/contexts/HomeMarketContext";
 import { LazyMount } from "@/components/LazyMount";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { SEOHead } from "@/components/SEOHead";
@@ -93,7 +92,6 @@ const Index = () => {
   ];
 
   return (
-    <HomeMarketProvider>
     <div
       className="min-h-screen bg-background"
       {...handlers}
@@ -182,7 +180,6 @@ const Index = () => {
         <FloatingActions />
       </Suspense>
     </div>
-    </HomeMarketProvider>
   );
 };
 
