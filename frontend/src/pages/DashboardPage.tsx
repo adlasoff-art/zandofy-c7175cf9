@@ -117,6 +117,7 @@ interface OrderRow {
   last_mile_payment_status: string | null;
   rider_cash_collected: boolean | null;
   shipping_payment_proof_url: string | null;
+  product_payment_proof_url: string | null;
   last_mile_payment_proof_url: string | null;
   hub_pickup_proof_url: string | null;
   store_id: string | null;
@@ -216,6 +217,7 @@ export default function DashboardPage() {
     }
     const ordersWithOptionalFields = await withOptionalOrderFields<OrderRow>((data || []) as OrderRow[], [
       "shipping_payment_proof_url",
+      "product_payment_proof_url",
       "last_mile_payment_proof_url",
       "hub_pickup_proof_url",
       "delivery_date_requested",
@@ -912,11 +914,11 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           </div>
           <PaymentProofUpload
             orderId={order.id}
-            field="shipping_payment_proof_url"
+            field="product_payment_proof_url"
             label={t("dashboard.detail.proof.order")}
-            existingUrl={order.shipping_payment_proof_url}
+            existingUrl={order.product_payment_proof_url || order.shipping_payment_proof_url}
           />
-          {order.shipping_payment_proof_url && (
+          {(order.product_payment_proof_url || order.shipping_payment_proof_url) && (
             <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-2.5">
               <span className="text-blue-700 dark:text-blue-400 font-medium">
                 {t("dashboard.detail.offPlatform.waiting")}

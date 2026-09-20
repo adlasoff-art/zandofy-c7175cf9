@@ -5,6 +5,9 @@ export const VENDOR_ORDERS_OR_FILTER =
 export type OffPlatformOrderFields = {
   payment_method?: string | null;
   status?: string;
+  /** Preuve paiement produit (hors plateforme). */
+  product_payment_proof_url?: string | null;
+  /** Preuve expédition différée (ne pas confondre avec produit). */
   shipping_payment_proof_url?: string | null;
   shipping_payment_status?: string | null;
   off_platform_vendor_verified_at?: string | null;
@@ -15,8 +18,15 @@ export function isPlatformOwnedStore(flag: boolean | null | undefined): boolean 
   return flag === true;
 }
 
+/** URL preuve produit hors plateforme (fallback legacy sur shipping_* avant backfill). */
+export function offPlatformProductProofUrl(order: OffPlatformOrderFields): string | null {
+  const product = order.product_payment_proof_url?.trim();
+  if (product) return product;
+  return order.shipping_payment_proof_url?.trim() || null;
+}
+
 export function hasOffPlatformPaymentProof(order: OffPlatformOrderFields): boolean {
-  return !!order.shipping_payment_proof_url?.trim();
+  return !!offPlatformProductProofUrl(order);
 }
 
 export function isOffPlatformAwaitingPayment(order: OffPlatformOrderFields): boolean {

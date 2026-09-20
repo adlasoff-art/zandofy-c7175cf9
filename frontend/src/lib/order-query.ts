@@ -2,6 +2,7 @@ import { fromTable } from "@/lib/supabase-helpers";
 
 type OptionalOrderField =
   | "shipping_payment_proof_url"
+  | "product_payment_proof_url"
   | "last_mile_payment_proof_url"
   | "hub_pickup_proof_url"
   | "deferred_payment_provider"
@@ -17,6 +18,7 @@ type OptionalOrderValues = Record<OptionalOrderField, string | null>;
 
 const EMPTY_OPTIONAL_ORDER_VALUES: OptionalOrderValues = {
   shipping_payment_proof_url: null,
+  product_payment_proof_url: null,
   last_mile_payment_proof_url: null,
   hub_pickup_proof_url: null,
   deferred_payment_provider: null,

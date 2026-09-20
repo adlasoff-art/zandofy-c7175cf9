@@ -14,6 +14,7 @@ import {
   isOffPlatformAwaitingPayment,
   isPlatformOwnedStore,
   adminOffPlatformReleaseFields,
+  offPlatformProductProofUrl,
   type OffPlatformOrderFields,
 } from "@/lib/off-platform-payment";
 
@@ -50,9 +51,10 @@ export function OffPlatformReleasePanel({
   const alreadyReleased = !!order.off_platform_admin_released_at;
 
   const openProof = async () => {
-    if (!order.shipping_payment_proof_url) return;
+    const proof = offPlatformProductProofUrl(order);
+    if (!proof) return;
     const { getDeliveryProofUrl } = await import("@/lib/delivery-proof-urls");
-    const u = await getDeliveryProofUrl(order.shipping_payment_proof_url);
+    const u = await getDeliveryProofUrl(proof);
     if (u) window.open(u, "_blank");
   };
 
@@ -118,11 +120,12 @@ export function OffPlatformReleasePanel({
     setBusy(false);
   };
 
-  const proofBlock = order.shipping_payment_proof_url ? (
+  const productProof = offPlatformProductProofUrl(order);
+  const proofBlock = productProof ? (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground">Preuve de paiement client :</p>
       <DeliveryProofImage
-        pathOrUrl={order.shipping_payment_proof_url}
+        pathOrUrl={productProof}
         alt="Preuve de paiement"
         className="w-full max-w-xs rounded-lg border border-border object-cover cursor-pointer"
         onClick={openProof}
