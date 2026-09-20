@@ -45,6 +45,10 @@ import { startMoMoPaymentWatch, type MoMoPaymentWatchHandle } from "@/lib/momo-p
 import { useHomeDeliveryEnabled } from "@/hooks/use-home-delivery-enabled";
 import { MobileBackButton } from "@/components/navigation/MobileBackButton";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
+import { trackDiscoveryOnboarding } from "@/hooks/use-analytics";
+import { resolveMomoGateway, discoveryPrefToCheckoutMethod } from "@/lib/payment-gateways";
+import { usePaymentGateways } from "@/hooks/use-payment-gateways";
 
 type Step = "shipping" | "payment" | "confirmation";
 type PaymentMethod = "stripe" | "card" | "paypal" | "mobile_money" | "cod" | "off_platform";
@@ -115,6 +119,9 @@ export default function CheckoutPage() {
   const { data: paymentConfig } = usePaymentMethods();
   const { isVerified: isKycVerified, isOrderBlocked, needsKyc, kycStatus, isKycReady } = useKycStatus();
   const { data: homeDeliveryEnabled = false } = useHomeDeliveryEnabled();
+  const { prefs: discoveryPrefs, hasCompleted: discoveryCompleted } = useDiscoveryPrefs();
+  const { data: paymentGateways } = usePaymentGateways();
+  const discoveryPrefApplied = useRef(false);
 
   // Enable real geo-IP detection only on checkout (perf: avoid blocking home rendering).
   useEffect(() => {
@@ -170,6 +177,7 @@ export default function CheckoutPage() {
   const { data: paymentNumbers = [] } = useStorePaymentNumbers(cartStoreIds);
 
   const [shipping, setShipping] = useState<ShippingInfo>({ ...emptyShipping, email: user?.email || "" });
+  const momoGateway = resolveMomoGateway(shipping.country || discoveryPrefs.country_code, paymentGateways);
 
   // Saved addresses
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
@@ -781,6 +789,39 @@ export default function CheckoutPage() {
     () => availablePaymentMethods.filter((m) => m.id !== primaryPaymentMethod?.id),
     [availablePaymentMethods, primaryPaymentMethod],
   );
+
+  // Soft-wire discovery prefs → shipping country + preferred payment (once methods known)
+  useEffect(() => {
+    if (discoveryPrefApplied.current) return;
+    if (!discoveryCompleted) return;
+    if (!availablePaymentMethods.length) return;
+    discoveryPrefApplied.current = true;
+    const meta: Record<string, unknown> = {};
+    if (
+      discoveryPrefs.country_code &&
+      (shipping.country === "CD" || !shipping.country) &&
+      discoveryPrefs.country_code !== shipping.country
+    ) {
+      setShipping((s) => ({ ...s, country: discoveryPrefs.country_code! }));
+      meta.country = discoveryPrefs.country_code;
+    }
+    const prefMethod = discoveryPrefs.payment_prefs
+      .map(discoveryPrefToCheckoutMethod)
+      .find((m) => m && availablePaymentMethods.some((am) => am.id === m));
+    if (prefMethod) {
+      setPaymentMethod(prefMethod as PaymentMethod);
+      meta.payment_method = prefMethod;
+    }
+    if (Object.keys(meta).length) {
+      trackDiscoveryOnboarding("checkout_pref_applied", meta, user?.id);
+    }
+  }, [
+    discoveryCompleted,
+    discoveryPrefs,
+    shipping.country,
+    availablePaymentMethods,
+    user?.id,
+  ]);
 
   const checkoutStepIndex = step === "shipping" ? 0 : step === "payment" ? 1 : 2;
 
@@ -1522,15 +1563,16 @@ export default function CheckoutPage() {
           return;
         }
 
-        // Call KelPay for first order remainder only (server validates against that order)
+        const momoFn = momoGateway === "pawapay" ? "pawapay-payment" : "kelpay-payment";
         const kelpayAmount = firstRemaining;
-        const { data, error } = await supabase.functions.invoke("kelpay-payment", {
+        const { data, error } = await supabase.functions.invoke(momoFn, {
           body: {
             order_id: orderIds[0],
             phone_number: cleanPhone,
             amount: kelpayAmount,
             currency: "USD",
             provider: mobileMoneyProvider,
+            country_code: shipping.country || discoveryPrefs.country_code || "CD",
           },
         });
 
@@ -1678,7 +1720,8 @@ export default function CheckoutPage() {
     if (!paymentTransactionId && !paymentReference) return;
     setProcessing(true);
     try {
-      const { data } = await supabase.functions.invoke("kelpay-check", {
+      const checkFn = momoGateway === "pawapay" ? "pawapay-check" : "kelpay-check";
+      const { data } = await supabase.functions.invoke(checkFn, {
         body: { transaction_id: paymentTransactionId, reference: paymentReference },
       });
       if (data?.status === "success") {
@@ -1724,7 +1767,8 @@ export default function CheckoutPage() {
     try {
       // Last chance before abandon (late PIN during grace) — claim mutex first
       if (paymentReference || paymentTransactionId) {
-        const { data: checkData } = await supabase.functions.invoke("kelpay-check", {
+        const checkFn = momoGateway === "pawapay" ? "pawapay-check" : "kelpay-check";
+        const { data: checkData } = await supabase.functions.invoke(checkFn, {
           body: { transaction_id: paymentTransactionId, reference: paymentReference },
         });
         if (checkData?.status === "success") {
@@ -2597,7 +2641,8 @@ export default function CheckoutPage() {
                               setProcessing(true);
                               try {
                                 const cleanPhone = retryPhone.replace(/[\s\-\+]/g, "");
-                                const { data, error } = await supabase.functions.invoke("kelpay-payment", {
+                                const momoFn = momoGateway === "pawapay" ? "pawapay-payment" : "kelpay-payment";
+                                const { data, error } = await supabase.functions.invoke(momoFn, {
                                   body: {
                                     order_id: paymentOrderIds[0],
                                     phone_number: cleanPhone,

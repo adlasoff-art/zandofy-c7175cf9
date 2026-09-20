@@ -7,6 +7,8 @@ import { useAuthSettings } from "@/hooks/use-auth-settings";
 import { useGeoDetection } from "@/hooks/use-geo-detection";
 import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
+import { GeoCombobox } from "@/components/address/GeoCombobox";
+import { useGeoData } from "@/hooks/useGeoData";
 import { useActiveGeo } from "@/hooks/useActiveGeo";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -249,7 +251,9 @@ export function DiscoveryOnboardingProvider({ children }: { children: ReactNode 
       case "payment":
         return draft.payment_prefs.length >= 1;
       case "country":
-        return !!draft.country_code;
+        if (!draft.country_code) return false;
+        if (draft.purchase_scope === "city") return !!draft.city_id;
+        return true;
       default:
         return true;
     }
@@ -383,6 +387,7 @@ export function DiscoveryOnboardingProvider({ children }: { children: ReactNode 
                         purchase_scope: o.value,
                         receipt_mode:
                           o.value === "any_country" ? null : d.receipt_mode,
+                        city_id: o.value === "city" ? d.city_id : null,
                       }))
                     }
                     fullWidth
@@ -432,15 +437,35 @@ export function DiscoveryOnboardingProvider({ children }: { children: ReactNode 
           )}
 
           {currentStep === "country" && (
-            <StepBlock title="Dans quel pays êtes-vous ?">
+            <StepBlock
+              title="Dans quel pays êtes-vous ?"
+              hint={
+                draft.purchase_scope === "city"
+                  ? "Indiquez aussi votre ville pour affiner le catalogue local"
+                  : undefined
+              }
+            >
               <CountryCombobox
                 value={draft.country_code || ""}
-                onChange={(code) => setDraft((d) => ({ ...d, country_code: code || null }))}
+                onChange={(code) =>
+                  setDraft((d) => ({
+                    ...d,
+                    country_code: code || null,
+                    city_id: null,
+                  }))
+                }
                 label=""
                 showNone={false}
                 allowedCodes={activeCountryCodes.length ? activeCountryCodes : undefined}
                 placeholder="Sélectionner un pays…"
               />
+              {draft.purchase_scope === "city" && draft.country_code && (
+                <DiscoveryCityPicker
+                  countryCode={draft.country_code}
+                  cityId={draft.city_id}
+                  onChange={(cityId) => setDraft((d) => ({ ...d, city_id: cityId }))}
+                />
+              )}
             </StepBlock>
           )}
 
@@ -487,6 +512,41 @@ function StepBlock({
         {hint && <p className="text-sm text-primary-foreground/75 mt-1">{hint}</p>}
       </div>
       {children}
+    </div>
+  );
+}
+
+function DiscoveryCityPicker({
+  countryCode,
+  cityId,
+  onChange,
+}: {
+  countryCode: string;
+  cityId: string | null;
+  onChange: (cityId: string | null) => void;
+}) {
+  const { cities } = useGeoData(countryCode, "", "", "");
+  const selectedName =
+    cities.find((c) => c.id === cityId)?.label ||
+    cities.find((c) => c.id === cityId)?.value ||
+    "";
+
+  return (
+    <div className="mt-3">
+      <GeoCombobox
+        options={cities.map((c) => ({
+          value: c.id || c.value,
+          label: c.label,
+          id: c.id,
+        }))}
+        value={cityId || selectedName}
+        onChange={(v) => {
+          const match = cities.find((c) => c.id === v || c.value === v);
+          onChange(match?.id || null);
+        }}
+        label="Ville"
+        placeholder="Sélectionner votre ville…"
+      />
     </div>
   );
 }

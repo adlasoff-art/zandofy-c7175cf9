@@ -54,6 +54,7 @@ import { PrecisionShippingEstimate } from "@/components/PrecisionShippingEstimat
 import { SEOHead, buildProductJsonLd, buildBreadcrumbJsonLd, buildJsonLdGraph, buildMarketplaceFaqJsonLd } from "@/components/SEOHead";
 import { VariantOrderDrawer } from "@/components/VariantOrderDrawer";
 import { MobileBackButton } from "@/components/navigation/MobileBackButton";
+import { ProductRfqButton } from "@/components/ProductRfqButton";
 import { slugify } from "@/utils/slugify";
 import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 
@@ -683,6 +684,7 @@ export default function ProductPage() {
               <p className="text-xs text-muted-foreground">
                 {t("product.minQty")} <span className="font-medium text-foreground">{moq} {t("product.pieces", { plural: moq > 1 ? "s" : "" })}</span>
               </p>
+              {product?.id && <ProductRfqButton productId={product.id} />}
             </div>
 
             {/* ═══ TRUST & LOGISTICS MODULES ═══ */}

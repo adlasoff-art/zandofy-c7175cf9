@@ -34,7 +34,7 @@ Prefs déjà collectées :
 - `country_code` (ISO-2)  
 - `payment_prefs[]` : `mobile_money` | `card` | `off_platform` | `later`  
 
-Future PowerPay / gateways par pays : mapper `country_code` + prefs → provider actif sans re-onboarding. **Pas d’intégration code dans cet epic.**
+Future **PawaPay** / gateways par pays : mapper `country_code` + prefs → provider actif sans re-onboarding. Router CMS `payment_gateways` + Edge stubs `pawapay-*` (KelPay défaut CD). Live API après secrets staging.
 
 ## Design tokens
 
@@ -51,4 +51,5 @@ Future PowerPay / gateways par pays : mapper `country_code` + prefs → provider
 
 ## Hors scope immédiat
 
-WIP messages/KYC, PowerPay live, Flutter app build — reprendre après smoke web Accueil Hommes/local RDC.
+App Flutter complète (checkout PawaPay mobile, messages natifs, apps vendeur) — hors miroir.  
+Package Dart : `mobile/zandofy_discovery/` (prefs + assembler). Enrichir `_flutter_specs/` après smoke web Hommes/local + I7.

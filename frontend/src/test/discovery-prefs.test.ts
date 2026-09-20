@@ -136,6 +136,33 @@ describe("assembleDiscoveryFeed", () => {
     expect(femaleCore.length).toBeLessThanOrEqual(2);
   });
 
+  it("prefers true store_city_id match when prefs.city_id set", () => {
+    const cityPrefs = normalizeDiscoveryPrefs({
+      ...prefs,
+      city_id: "11111111-1111-4111-8111-111111111111",
+    });
+    const pool = makePool().map((p, i) => ({
+      ...p,
+      store_city_id:
+        i <= 5
+          ? "11111111-1111-4111-8111-111111111111"
+          : "22222222-2222-4222-8222-222222222222",
+    }));
+    const ranked = assembleDiscoveryFeed(pool, {
+      prefs: cityPrefs,
+      take: 20,
+      mix: DISCOVERY_MIX_DEFAULTS,
+      surface: "test_city",
+      seedKey: "u1",
+      nowMs: 1_700_000_000_000,
+    });
+    const top = ranked.slice(0, 8);
+    const matched = top.filter(
+      (p) => p.store_city_id === "11111111-1111-4111-8111-111111111111",
+    );
+    expect(matched.length).toBeGreaterThanOrEqual(2);
+  });
+
   it("legacy rankProductsByDiscoveryPrefs still works", () => {
     const ranked = rankProductsByDiscoveryPrefs(makePool(), prefs, 10);
     expect(ranked.length).toBe(10);

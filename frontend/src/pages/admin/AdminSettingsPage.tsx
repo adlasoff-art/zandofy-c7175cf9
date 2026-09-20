@@ -4,6 +4,7 @@ import { CarrierLogoUpload } from "@/components/admin/CarrierLogoUpload";
 import { GeoBlockingSettings } from "@/components/admin/GeoBlockingSettings";
 import { AuthSettingsPanel } from "@/components/admin/AuthSettingsPanel";
 import { KelpayWebhookPanel } from "@/components/admin/KelpayWebhookPanel";
+import { PaymentGatewaysPanel } from "@/components/admin/PaymentGatewaysPanel";
 import { MonetizationSettings } from "@/components/admin/MonetizationSettings";
 import { AdminDefaultPaymentNumbers } from "@/components/admin/AdminDefaultPaymentNumbers";
 import { useState, useEffect, useCallback } from "react";
@@ -451,6 +452,8 @@ export default function AdminSettingsPage() {
 
         {/* KelPay Webhook Panel */}
         <KelpayWebhookPanel />
+
+        <PaymentGatewaysPanel />
 
         {/* Gateway Fees & Review Bonus */}
         <section className="bg-card border border-border rounded-xl p-5">

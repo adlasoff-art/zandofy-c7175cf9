@@ -38,6 +38,10 @@ export type DiscoveryProductLike = {
   shopType?: string | null;
   origin_country?: string | null;
   originCountry?: string | null;
+  store_city_id?: string | null;
+  storeCityId?: string | null;
+  store_city?: string | null;
+  storeCity?: string | null;
   rating?: number | null;
 };
 
@@ -63,6 +67,14 @@ function shopTypeOf(p: DiscoveryProductLike) {
 }
 function originOf(p: DiscoveryProductLike) {
   return (p.origin_country || p.originCountry || "").toUpperCase();
+}
+function storeCityIdOf(p: DiscoveryProductLike) {
+  return p.store_city_id || p.storeCityId || null;
+}
+function sameCity(p: DiscoveryProductLike, cityId: string | null) {
+  if (!cityId) return false;
+  const id = storeCityIdOf(p);
+  return !!id && id === cityId;
 }
 
 /** Simple string hash → uint32 for seeded shuffle. */
@@ -190,6 +202,7 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
     : prefs.interest_category_ids || [];
   const interestSet = new Set(interestIds);
   const country = prefs.country_code;
+  const cityId = prefs.city_id;
   const scope = prefs.purchase_scope;
   const audience = prefs.audience;
 
@@ -207,10 +220,18 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
   const isNeutral = (p: T) => isNeutralGender(genderOf(p));
 
   const localSame = shuffled.filter((p) => isLocalShop(p) && sameCountry(p, country));
+  // I7: true city match when prefs.city_id + store_city_id available; else V1 seed partition
+  const trueCity = cityId
+    ? localSame.filter((p) => sameCity(p, cityId))
+    : [];
+  const trueCityA = seededShuffle(trueCity, seed ^ 0xa5a5);
   const localSameA = seededShuffle(localSame, seed ^ 0xa5a5);
   const mid = Math.ceil(localSameA.length / 2);
-  const cityProxy = localSameA.slice(0, mid);
-  const countryProxy = localSameA.slice(mid);
+  const cityProxy = trueCityA.length > 0 ? trueCityA : localSameA.slice(0, mid);
+  const countryProxy =
+    trueCityA.length > 0
+      ? localSameA.filter((p) => !sameCity(p, cityId))
+      : localSameA.slice(mid);
 
   const corePoolBase = shuffled.filter((p) => coreAudience(p) && inInterest(p));
   const coreLocalInterest = corePoolBase.filter((p) => isLocalShop(p) && sameCountry(p, country));

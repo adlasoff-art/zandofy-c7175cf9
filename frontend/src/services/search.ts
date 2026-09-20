@@ -8,6 +8,7 @@ const SEARCH_SELECT = `
   sales_count, store_id, category_id, created_at, short_description, origin_country,
   rating, review_count, moq, publish_status,
   shop_type, store_is_verified, store_is_certified, gender_target,
+  store_city_id, store_city,
   categories(name, name_fr),
   product_images(image_url, position),
   product_colors(color_hex, color_name),

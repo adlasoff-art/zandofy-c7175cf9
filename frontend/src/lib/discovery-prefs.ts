@@ -21,6 +21,8 @@ export type DiscoveryPrefs = {
   receipt_mode: ReceiptMode | null;
   payment_prefs: PaymentPref[];
   country_code: string | null;
+  /** Admin geo `cities.id` when purchase_scope is city (I7). */
+  city_id: string | null;
   completed_at: string | null;
   skipped_at: string | null;
   updated_at: string;
@@ -42,6 +44,7 @@ export function emptyDiscoveryPrefs(): DiscoveryPrefs {
     receipt_mode: null,
     payment_prefs: [],
     country_code: null,
+    city_id: null,
     completed_at: null,
     skipped_at: null,
     updated_at: new Date().toISOString(),
@@ -72,6 +75,11 @@ export function normalizeDiscoveryPrefs(raw: unknown): DiscoveryPrefs {
         )
       : [],
     country_code: typeof v.country_code === "string" && v.country_code.length === 2 ? v.country_code.toUpperCase() : null,
+    city_id:
+      typeof v.city_id === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v.city_id)
+        ? v.city_id
+        : null,
     completed_at: typeof v.completed_at === "string" ? v.completed_at : null,
     skipped_at: typeof v.skipped_at === "string" ? v.skipped_at : null,
     updated_at: typeof v.updated_at === "string" ? v.updated_at : new Date().toISOString(),

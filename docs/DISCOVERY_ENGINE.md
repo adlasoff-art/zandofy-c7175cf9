@@ -20,7 +20,8 @@ Platform-wide product ranking driven by guest/user onboarding prefs (`profiles.d
 - Scope **country**: 65% local + same country  
 - Scope **any_country**: 65% profile across markets (soft-boost declared country)
 
-True city-level store matching is **I7** (needs `stores.city`); V1 uses shop_type + origin_country.
+True city-level store matching is **I7**: `prefs.city_id` ↔ `products_public.store_city_id`.  
+Fallback V1 (seed partition of local+same-country) when city_id or store city is missing.
 
 ## Rotation
 
@@ -30,7 +31,7 @@ Seed = hash(userOrGuest + timeBucket(rotation_hours) + surfaceId). Default `rota
 
 Home: FlashSales, TopTrends, Recommendations, ProductGrid, HomeCmsRails.  
 Platform: Search, Category, Product related.  
-Not FeaturedSidebar (CMS placements only).
+FeaturedSidebar: soft-reorder **product** placements only (ads/stores keep CMS `sort_order`; skip if fewer than 4 product slots).
 
 ## Keys
 
@@ -45,7 +46,7 @@ Events: `discovery_onboarding_*`, `discovery_feed_assembled`. Admin: Analytics p
 
 ## Mobile / payments
 
-See `docs/DISCOVERY_MOBILE_HANDOFF.md`. Prefs `country_code` + `payment_prefs` prepare future multi-gateway (e.g. PowerPay) — no gateway code in this epic.
+See `docs/DISCOVERY_MOBILE_HANDOFF.md`. Prefs `country_code` + `payment_prefs` soft-wire checkout; CMS `payment_gateways` routes MoMo (KelPay / PawaPay stub).
 
 ## Staging → prod
 

@@ -1,9 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/contexts/I18nContext";
+import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAuthSettings } from "@/hooks/use-auth-settings";
+import { assembleDiscoveryFeed, expandInterestCategoryIds } from "@/lib/discovery-engine";
+import { useQuery } from "@tanstack/react-query";
 
 interface FeaturedPlacement {
   id: string;
@@ -21,6 +26,42 @@ interface FeaturedPlacement {
   end_date: string;
   show_timer: boolean;
   timer_color: string | null;
+}
+
+const MIN_PRODUCT_SLOTS_TO_RANK = 4;
+
+/** Soft-reorder only product placements; keep ad/store CMS indices fixed. */
+function softRankProductPlacements(
+  list: FeaturedPlacement[],
+  rankedProductIds: string[],
+): FeaturedPlacement[] {
+  if (!rankedProductIds.length) return list;
+  const productSlots = list
+    .map((p, i) => ({ p, i }))
+    .filter(({ p }) => p.placement_type === "product" && p.product_id);
+  if (productSlots.length < MIN_PRODUCT_SLOTS_TO_RANK) return list;
+
+  const byId = new Map(
+    productSlots
+      .filter(({ p }) => p.product_id)
+      .map(({ p }) => [p.product_id!, p]),
+  );
+  const orderedProducts: FeaturedPlacement[] = [];
+  for (const id of rankedProductIds) {
+    const item = byId.get(id);
+    if (item) {
+      orderedProducts.push(item);
+      byId.delete(id);
+    }
+  }
+  for (const leftover of byId.values()) orderedProducts.push(leftover);
+
+  const out = [...list];
+  let pi = 0;
+  for (const { i } of productSlots) {
+    out[i] = orderedProducts[pi++];
+  }
+  return out;
 }
 
 function CountdownTimer({ endDate, color }: { endDate: string; color: string }) {
@@ -107,20 +148,80 @@ export function FeaturedSidebar() {
   const [slideDir, setSlideDir] = useState<"left" | "right">("left");
   const [animating, setAnimating] = useState(false);
   const { t } = useI18n();
+  const { prefs, hasCompleted } = useDiscoveryPrefs();
+  const { user } = useAuth();
+  const { data: authSettings } = useAuthSettings();
+
+  const { data: categoryTree = [] } = useQuery({
+    queryKey: ["discovery-category-tree"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("categories").select("id, parent_id").limit(2000);
+      if (error) throw error;
+      return (data || []) as { id: string; parent_id: string | null }[];
+    },
+    staleTime: 10 * 60 * 1000,
+    enabled: hasCompleted,
+  });
 
   useEffect(() => {
+    let cancelled = false;
     const now = new Date().toISOString();
-    (supabase.from("featured_placements" as any) as any)
-      .select("id, placement_type, product_id, store_id, title, image_url, image_url_2, cta_text, cta_link, bg_color, text_color, start_date, end_date, show_timer, timer_color")
-      .eq("is_active", true)
-      .lte("start_date", now)
-      .gte("end_date", now)
-      .order("sort_order")
-      .then(({ data }: any) => {
-        setPlacements(data || []);
+    (async () => {
+      const { data } = await (supabase.from("featured_placements" as any) as any)
+        .select(
+          "id, placement_type, product_id, store_id, title, image_url, image_url_2, cta_text, cta_link, bg_color, text_color, start_date, end_date, show_timer, timer_color",
+        )
+        .eq("is_active", true)
+        .lte("start_date", now)
+        .gte("end_date", now)
+        .order("sort_order");
+
+      let list = (data || []) as FeaturedPlacement[];
+      if (cancelled) return;
+
+      if (hasCompleted) {
+        const productIds = [
+          ...new Set(
+            list
+              .filter((p) => p.placement_type === "product" && p.product_id)
+              .map((p) => p.product_id!),
+          ),
+        ];
+        if (productIds.length >= MIN_PRODUCT_SLOTS_TO_RANK) {
+          const { data: products } = await (supabase as any)
+            .from("products_public")
+            .select("id, category_id, gender_target, shop_type, origin_country")
+            .in("id", productIds);
+          if (!cancelled && products?.length) {
+            const ranked = assembleDiscoveryFeed(products, {
+              prefs,
+              mix: authSettings?.discovery_mix,
+              take: products.length,
+              interestCategoryIds: expandInterestCategoryIds(
+                prefs.interest_category_ids,
+                categoryTree,
+              ),
+              surface: "home_featured",
+              seedKey: user?.id || "guest",
+            });
+            list = softRankProductPlacements(
+              list,
+              ranked.map((p: { id: string }) => p.id),
+            );
+          }
+        }
+      }
+
+      if (!cancelled) {
+        setPlacements(list);
         setLoading(false);
-      });
-  }, []);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasCompleted, prefs, authSettings?.discovery_mix, categoryTree, user?.id]);
 
   // Auto-slide every 5s between placements, paused on hover
   useEffect(() => {
