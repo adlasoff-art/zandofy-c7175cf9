@@ -13,7 +13,16 @@ void main() {
     });
     expect(p.audience, 'male');
     expect(p.countryCode, 'CD');
+    expect(p.cityId, '11111111-1111-4111-8111-111111111111');
     expect(p.hasCompleted, isTrue);
+  });
+
+  test('rejects invalid city_id', () {
+    final p = DiscoveryPrefs.fromJson({
+      'city_id': 'not-a-uuid',
+      'country_code': 'CD',
+    });
+    expect(p.cityId, isNull);
   });
 
   test('assemble returns take without completed', () {

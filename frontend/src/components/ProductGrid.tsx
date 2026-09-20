@@ -17,7 +17,7 @@ import { useHomeMarket } from "@/contexts/HomeMarketContext";
 import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
 import { useAuthSettings } from "@/hooks/use-auth-settings";
 import { useAuth } from "@/contexts/AuthContext";
-import { assembleDiscoveryFeed, expandInterestCategoryIds } from "@/lib/discovery-engine";
+import { assembleDiscoveryFeed, expandInterestCategoryIds, EMPTY_CATEGORY_TREE } from "@/lib/discovery-engine";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
@@ -56,7 +56,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
   const { prefs, hasCompleted } = useDiscoveryPrefs();
   const { data: authSettings } = useAuthSettings();
   const { user } = useAuth();
-  const { data: categoryTree = [] } = useQuery({
+  const { data: categoryTreeData } = useQuery({
     queryKey: ["discovery-category-tree"],
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("categories").select("id, parent_id").limit(2000);
@@ -66,6 +66,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
     staleTime: 10 * 60 * 1000,
     enabled: hasCompleted,
   });
+  const categoryTree = categoryTreeData ?? EMPTY_CATEGORY_TREE;
   const effectiveShopType = hasCompleted ? undefined : shopTypeFilter;
   const cached =
     restoreFromCache && market === "all" ? readProductGridCache("all") : null;

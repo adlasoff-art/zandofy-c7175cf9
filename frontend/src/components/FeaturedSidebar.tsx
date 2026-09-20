@@ -7,7 +7,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAuthSettings } from "@/hooks/use-auth-settings";
-import { assembleDiscoveryFeed, expandInterestCategoryIds } from "@/lib/discovery-engine";
+import { assembleDiscoveryFeed, expandInterestCategoryIds, EMPTY_CATEGORY_TREE } from "@/lib/discovery-engine";
 import { useQuery } from "@tanstack/react-query";
 
 interface FeaturedPlacement {
@@ -30,7 +30,8 @@ interface FeaturedPlacement {
 
 const MIN_PRODUCT_SLOTS_TO_RANK = 4;
 
-/** Soft-reorder only product placements; keep ad/store CMS indices fixed. */
+/** Soft-reorder only product placements; keep ad/store CMS indices fixed.
+ *  Handles duplicate product_ids by consuming ranked ids in order per slot. */
 function softRankProductPlacements(
   list: FeaturedPlacement[],
   rankedProductIds: string[],
@@ -41,25 +42,31 @@ function softRankProductPlacements(
     .filter(({ p }) => p.placement_type === "product" && p.product_id);
   if (productSlots.length < MIN_PRODUCT_SLOTS_TO_RANK) return list;
 
-  const byId = new Map(
-    productSlots
-      .filter(({ p }) => p.product_id)
-      .map(({ p }) => [p.product_id!, p]),
-  );
+  const byId = new Map<string, FeaturedPlacement[]>();
+  for (const { p } of productSlots) {
+    const id = p.product_id!;
+    if (!byId.has(id)) byId.set(id, []);
+    byId.get(id)!.push(p);
+  }
+
   const orderedProducts: FeaturedPlacement[] = [];
+  const used = new Set<FeaturedPlacement>();
   for (const id of rankedProductIds) {
-    const item = byId.get(id);
-    if (item) {
-      orderedProducts.push(item);
-      byId.delete(id);
+    const bucket = byId.get(id);
+    if (!bucket?.length) continue;
+    const next = bucket.find((x) => !used.has(x));
+    if (next) {
+      orderedProducts.push(next);
+      used.add(next);
     }
   }
-  for (const leftover of byId.values()) orderedProducts.push(leftover);
+  for (const { p } of productSlots) {
+    if (!used.has(p)) orderedProducts.push(p);
+  }
 
   const out = [...list];
-  let pi = 0;
-  for (const { i } of productSlots) {
-    out[i] = orderedProducts[pi++];
+  for (let s = 0; s < productSlots.length; s++) {
+    out[productSlots[s].i] = orderedProducts[s] ?? productSlots[s].p;
   }
   return out;
 }
@@ -152,7 +159,7 @@ export function FeaturedSidebar() {
   const { user } = useAuth();
   const { data: authSettings } = useAuthSettings();
 
-  const { data: categoryTree = [] } = useQuery({
+  const { data: categoryTreeData } = useQuery({
     queryKey: ["discovery-category-tree"],
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("categories").select("id, parent_id").limit(2000);
@@ -162,6 +169,7 @@ export function FeaturedSidebar() {
     staleTime: 10 * 60 * 1000,
     enabled: hasCompleted,
   });
+  const categoryTree = categoryTreeData ?? EMPTY_CATEGORY_TREE;
 
   useEffect(() => {
     let cancelled = false;
@@ -190,7 +198,7 @@ export function FeaturedSidebar() {
         if (productIds.length >= MIN_PRODUCT_SLOTS_TO_RANK) {
           const { data: products } = await (supabase as any)
             .from("products_public")
-            .select("id, category_id, gender_target, shop_type, origin_country")
+            .select("id, category_id, gender_target, shop_type, origin_country, store_city_id, store_city")
             .in("id", productIds);
           if (!cancelled && products?.length) {
             const ranked = assembleDiscoveryFeed(products, {
@@ -214,6 +222,7 @@ export function FeaturedSidebar() {
 
       if (!cancelled) {
         setPlacements(list);
+        setCurrent((c) => (list.length ? Math.min(c, list.length - 1) : 0));
         setLoading(false);
       }
     })();

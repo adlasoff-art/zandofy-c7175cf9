@@ -1,6 +1,6 @@
 /**
  * PawaPay MoMo initiate — stub until PAWAPAY_* secrets are configured.
- * Deploy after CMS payment_gateways.pawapay.enabled = true.
+ * Auth required before any config probing.
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -32,29 +32,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const apiToken = Deno.env.get("PAWAPAY_API_TOKEN");
-    if (!apiToken) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error:
-            "PawaPay n'est pas encore configuré (secret PAWAPAY_API_TOKEN manquant). Utilisez KelPay ou désactivez pawapay dans payment_gateways.",
-        }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -68,19 +53,28 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Live PawaPay API integration lands when staging keys are available.
-    // Keep service client referenced so deploy tooling does not strip unused imports.
-    void supabase;
+    const apiToken = Deno.env.get("PAWAPAY_API_TOKEN");
+    if (!apiToken) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "PawaPay is not available for this environment.",
+        }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Live PawaPay API path lands after staging secrets + provider wiring.
     return new Response(
       JSON.stringify({
         success: false,
-        error: "PawaPay API live path not enabled yet — set PAWAPAY_API_TOKEN and complete provider wiring.",
+        error: "PawaPay is not available for this environment.",
       }),
       { status: 501, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
     return new Response(
-      JSON.stringify({ success: false, error: (e as Error).message || "PawaPay error" }),
+      JSON.stringify({ success: false, error: (e as Error).message || "Payment error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }

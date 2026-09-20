@@ -50,9 +50,16 @@ class DiscoveryPrefs {
     final scope = raw['purchase_scope'] as String?;
     final ids = (raw['interest_category_ids'] as List?)
             ?.whereType<String>()
+            .where((id) => id.isNotEmpty && id.length <= 64)
             .take(5)
             .toList() ??
         <String>[];
+    final cityRaw = raw['city_id'] as String?;
+    final cityOk = cityRaw != null &&
+        RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+                caseSensitive: false)
+            .hasMatch(cityRaw);
+    const allowedPay = {'mobile_money', 'card', 'off_platform', 'later'};
     return DiscoveryPrefs(
       version: (raw['version'] as num?)?.toInt() ?? 1,
       audience: const {'male', 'female', 'both', 'any'}.contains(audience)
@@ -62,10 +69,17 @@ class DiscoveryPrefs {
       purchaseScope:
           const {'city', 'country', 'any_country'}.contains(scope) ? scope : null,
       receiptMode: raw['receipt_mode'] as String?,
-      paymentPrefs: (raw['payment_prefs'] as List?)?.whereType<String>().toList() ??
+      paymentPrefs: (raw['payment_prefs'] as List?)
+              ?.whereType<String>()
+              .where(allowedPay.contains)
+              .toList() ??
           const [],
-      countryCode: (raw['country_code'] as String?)?.toUpperCase(),
-      cityId: raw['city_id'] as String?,
+      countryCode: (() {
+        final c = (raw['country_code'] as String?)?.toUpperCase();
+        if (c != null && c.length == 2) return c;
+        return null;
+      })(),
+      cityId: cityOk ? cityRaw : null,
       completedAt: raw['completed_at'] as String?,
       skippedAt: raw['skipped_at'] as String?,
       updatedAt: DateTime.tryParse(raw['updated_at'] as String? ?? '') ??

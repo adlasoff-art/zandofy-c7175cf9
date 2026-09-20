@@ -7,6 +7,7 @@ import { useAuthSettings } from "@/hooks/use-auth-settings";
 import {
   assembleDiscoveryFeed,
   expandInterestCategoryIds,
+  EMPTY_CATEGORY_TREE,
   type DiscoveryProductLike,
 } from "@/lib/discovery-engine";
 import { trackDiscoveryOnboarding } from "@/hooks/use-analytics";
@@ -24,7 +25,7 @@ export function useDiscoveryRankedProducts<T extends DiscoveryProductLike>(
   const { user } = useAuth();
   const trackedKey = useRef<string>("");
 
-  const { data: categories = [] } = useQuery({
+  const { data: categoriesData } = useQuery({
     queryKey: ["discovery-category-tree"],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
@@ -37,6 +38,7 @@ export function useDiscoveryRankedProducts<T extends DiscoveryProductLike>(
     staleTime: 10 * 60 * 1000,
     enabled: hasCompleted && prefs.interest_category_ids.length > 0,
   });
+  const categories = categoriesData ?? EMPTY_CATEGORY_TREE;
 
   const ranked = useMemo(() => {
     if (!hasCompleted || !products.length) return take ? products.slice(0, take) : products;

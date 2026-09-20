@@ -28,6 +28,9 @@ export const DISCOVERY_MIX_FALLBACK: DiscoveryMixConfig = {
   rotation_hours: 12,
 };
 
+/** Stable empty category tree — avoid `= []` default identity storms in effect deps. */
+export const EMPTY_CATEGORY_TREE: { id: string; parent_id: string | null }[] = [];
+
 export type DiscoveryProductLike = {
   id: string;
   category_id?: string | null;
@@ -316,7 +319,10 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
     const safe = shuffled.filter((p) => !isOppositeAudience(p, audience));
     pushFrom(safe, take - result.length);
   }
-  if (result.length < take) pushFrom(shuffled, take - result.length);
+  // Never dump opposite gender for male/female; for both/any allow residual catalogue
+  if (result.length < take && (audience === "both" || audience === "any" || !audience)) {
+    pushFrom(shuffled, take - result.length);
+  }
 
   return result.slice(0, take);
 }

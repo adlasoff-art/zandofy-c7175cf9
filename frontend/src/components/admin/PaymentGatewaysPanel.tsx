@@ -57,13 +57,14 @@ export function PaymentGatewaysPanel() {
     toast({ title: "Gateways enregistrés" });
   };
 
-  const parseMap = (text: string): Record<string, "kelpay" | "pawapay"> => {
+  const parseMap = (text: string): Record<string, "kelpay" | "pawapay"> | null => {
     const out: Record<string, "kelpay" | "pawapay"> = {};
     for (const part of text.split(/[,;\n]+/)) {
       const [k, v] = part.split("=").map((s) => s.trim());
       if (!k || !v) continue;
       if (v === "kelpay" || v === "pawapay") out[k.toUpperCase()] = v;
     }
+    if (!Object.keys(out).length) return null;
     return out;
   };
 
@@ -97,12 +98,21 @@ export function PaymentGatewaysPanel() {
             size="sm"
             variant="outline"
             disabled={saving}
-            onClick={() =>
+            onClick={() => {
+              const map = parseMap(countryMapText);
+              if (!map) {
+                toast({
+                  title: "Mapping invalide",
+                  description: "Indiquez au moins un pays (ex. CD=kelpay).",
+                  variant: "destructive",
+                });
+                return;
+              }
               void save({
                 ...cfg,
-                by_country: parseMap(countryMapText),
-              })
-            }
+                by_country: map,
+              });
+            }}
           >
             Enregistrer mapping
           </Button>

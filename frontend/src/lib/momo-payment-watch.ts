@@ -21,8 +21,13 @@ export type StartMoMoPaymentWatchOptions = {
   onFailed: () => void | Promise<void>;
   /** Poll interval (default 4000). */
   intervalMs?: number;
-  /** Invoke kelpay-check every N ticks (default 3 → ~8–12s with immediate first tick). */
+  /** Invoke gateway check every N ticks (default 3 → ~8–12s with immediate first tick). */
   kelpayEveryN?: number;
+  /**
+   * Edge function for provider status poll.
+   * Default kelpay-check; pass pawapay-check when MoMo routed to PawaPay.
+   */
+  checkFunction?: string;
   /**
    * Stop polling after this many ticks without calling onFailed.
    * Default 50 (~200s) — covers the 180s USSD window + grace.
@@ -48,6 +53,7 @@ export function startMoMoPaymentWatch(
     onFailed,
     intervalMs = 4000,
     kelpayEveryN = 3,
+    checkFunction = "kelpay-check",
     maxAttempts = 50,
   } = options;
 
@@ -114,7 +120,7 @@ export function startMoMoPaymentWatch(
       }
 
       if (attempts % kelpayEveryN === 0) {
-        const { data: checkData } = await supabase.functions.invoke("kelpay-check", {
+        const { data: checkData } = await supabase.functions.invoke(checkFunction, {
           body: {
             reference,
             ...(transactionId ? { transaction_id: transactionId } : {}),

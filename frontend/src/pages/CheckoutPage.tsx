@@ -116,12 +116,13 @@ export default function CheckoutPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { t, formatPrice } = useI18n();
-  const { data: paymentConfig } = usePaymentMethods();
+  const { data: paymentConfig, isFetched: paymentConfigFetched } = usePaymentMethods();
   const { isVerified: isKycVerified, isOrderBlocked, needsKyc, kycStatus, isKycReady } = useKycStatus();
   const { data: homeDeliveryEnabled = false } = useHomeDeliveryEnabled();
   const { prefs: discoveryPrefs, hasCompleted: discoveryCompleted } = useDiscoveryPrefs();
   const { data: paymentGateways } = usePaymentGateways();
   const discoveryPrefApplied = useRef(false);
+  const [vendorFlagsReady, setVendorFlagsReady] = useState(false);
 
   // Enable real geo-IP detection only on checkout (perf: avoid blocking home rendering).
   useEffect(() => {
@@ -417,6 +418,7 @@ export default function CheckoutPage() {
         setVendorMobileMoneyAllowed(true);
         setVendorCardAllowed(true);
         setCartStoreIds([]);
+        setVendorFlagsReady(true);
         return;
       }
 
@@ -428,6 +430,7 @@ export default function CheckoutPage() {
         setVendorOffPlatformAllowed(false);
         setVendorMobileMoneyAllowed(true);
         setVendorCardAllowed(true);
+        setVendorFlagsReady(true);
         return;
       }
 
@@ -443,6 +446,7 @@ export default function CheckoutPage() {
         setVendorOffPlatformAllowed(false);
         setVendorMobileMoneyAllowed(true);
         setVendorCardAllowed(true);
+        setVendorFlagsReady(true);
         return;
       }
 
@@ -474,6 +478,7 @@ export default function CheckoutPage() {
         const accessResults = await Promise.all(storeIds.map((id) => resolveOffPlatformAccess(id)));
         setVendorOffPlatformAllowed(accessResults.every((a) => a.allowed));
       }
+      setVendorFlagsReady(true);
     };
 
     void loadVendorCodEligibility();
@@ -794,6 +799,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (discoveryPrefApplied.current) return;
     if (!discoveryCompleted) return;
+    if (!paymentConfigFetched || !vendorFlagsReady) return;
     if (!availablePaymentMethods.length) return;
     discoveryPrefApplied.current = true;
     const meta: Record<string, unknown> = {};
@@ -820,8 +826,18 @@ export default function CheckoutPage() {
     discoveryPrefs,
     shipping.country,
     availablePaymentMethods,
+    paymentConfigFetched,
+    vendorFlagsReady,
     user?.id,
   ]);
+
+  // Drop stale payment method when vendor/platform filters shrink the list
+  useEffect(() => {
+    if (!availablePaymentMethods.length) return;
+    if (availablePaymentMethods.some((m) => m.id === paymentMethod)) return;
+    const next = primaryPaymentMethod?.id;
+    if (next) setPaymentMethod(next);
+  }, [availablePaymentMethods, paymentMethod, primaryPaymentMethod]);
 
   const checkoutStepIndex = step === "shipping" ? 0 : step === "payment" ? 1 : 2;
 
@@ -914,13 +930,15 @@ export default function CheckoutPage() {
       transactionId: string | null;
       orderIds: string[];
       orderRefLabel: string;
+      checkFunction?: string;
     }) => {
-      const { reference, transactionId, orderIds, orderRefLabel } = opts;
+      const { reference, transactionId, orderIds, orderRefLabel, checkFunction } = opts;
       stopMoMoListeners();
 
       const watch = startMoMoPaymentWatch({
         reference,
         transactionId,
+        checkFunction: checkFunction || (momoGateway === "pawapay" ? "pawapay-check" : "kelpay-check"),
         onSuccess: () => applyMoMoSuccess(orderIds, orderRefLabel),
         onFailed: () => applyMoMoFailed(orderIds),
       });
@@ -951,7 +969,7 @@ export default function CheckoutPage() {
 
       paymentChannelRef.current = channel;
     },
-    [stopMoMoListeners, applyMoMoSuccess, applyMoMoFailed],
+    [stopMoMoListeners, applyMoMoSuccess, applyMoMoFailed, momoGateway],
   );
 
   if (!user) {
@@ -1468,6 +1486,14 @@ export default function CheckoutPage() {
   };
 
   const handlePayment = async () => {
+    if (!availablePaymentMethods.some((m) => m.id === paymentMethod)) {
+      toast({
+        title: "Moyen de paiement indisponible",
+        description: "Choisissez un autre moyen de paiement autorisé pour ce panier.",
+        variant: "destructive",
+      });
+      return;
+    }
     setProcessing(true);
 
     const debitWalletForOrder = async (orderIds: string[]): Promise<number> => {
@@ -1603,6 +1629,7 @@ export default function CheckoutPage() {
           transactionId: data.transaction_id ?? null,
           orderIds,
           orderRefLabel: orderRef,
+          checkFunction: momoGateway === "pawapay" ? "pawapay-check" : "kelpay-check",
         });
       } catch (err: any) {
         toast({ title: "Erreur", description: err.message || "Erreur inattendue.", variant: "destructive" });
@@ -2665,6 +2692,7 @@ export default function CheckoutPage() {
                                     transactionId: data.transaction_id ?? null,
                                     orderIds: paymentOrderIds,
                                     orderRefLabel: orderId || "",
+                                    checkFunction: momoGateway === "pawapay" ? "pawapay-check" : "kelpay-check",
                                   });
                                 }
                               } catch (err: any) {
