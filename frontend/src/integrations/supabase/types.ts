@@ -1590,6 +1590,7 @@ export type Database = {
           email: string | null
           first_name: string | null
           gender: string | null
+          discovery_prefs: Json | null
           id: string
           is_banned: boolean
           last_name: string | null
@@ -1609,6 +1610,7 @@ export type Database = {
           email?: string | null
           first_name?: string | null
           gender?: string | null
+          discovery_prefs?: Json | null
           id: string
           is_banned?: boolean
           last_name?: string | null
@@ -1628,6 +1630,7 @@ export type Database = {
           email?: string | null
           first_name?: string | null
           gender?: string | null
+          discovery_prefs?: Json | null
           id?: string
           is_banned?: boolean
           last_name?: string | null
@@ -2854,6 +2857,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      set_own_discovery_prefs: {
+        Args: { p_prefs: Json }
+        Returns: Json
+      }
       expire_inactive_points: {
         Args: { months_limit?: number }
         Returns: number

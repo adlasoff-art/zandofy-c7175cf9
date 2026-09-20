@@ -512,3 +512,17 @@ export function trackPWAPresence(userId?: string) {
     // Silent fail
   }
 }
+
+/** Discovery onboarding funnel events (guest-friendly). */
+export function trackDiscoveryOnboarding(
+  eventType:
+    | "discovery_onboarding_shown"
+    | "discovery_onboarding_step_complete"
+    | "discovery_onboarding_step_skip"
+    | "discovery_onboarding_completed"
+    | "discovery_onboarding_dismissed",
+  metadata: Record<string, unknown> = {},
+  userId?: string,
+) {
+  deferToIdle(() => trackEvent(eventType, { metadata }, userId));
+}

@@ -12,8 +12,8 @@ import { toast } from "sonner";
 import { triggerOrderStatusNotification } from "@/services/order-notifications";
 import {
   STATUS_CONFIG,
-  STATUS_FLOW,
-  LOCAL_STATUS_FLOW,
+  LOCAL_PICKUP_STATUS_FLOW,
+  LOCAL_DELIVERY_STATUS_FLOW,
   getNextStatus,
   getStatusFlow,
   canVendorAdvance,
@@ -96,7 +96,6 @@ interface Order {
 export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false }: { storeId: string; shopType?: string; suppliersEnabled?: boolean }) {
   const { user } = useAuth();
   const isLocalShop = shopType === "local";
-  const activeFlow = isLocalShop ? LOCAL_STATUS_FLOW : STATUS_FLOW;
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -318,7 +317,10 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
 
   const vendorOrderStatusTabs = [
     { key: "all", label: "Toutes" },
-    ...getStatusFlow(shopType).map((s) => ({ key: s, label: STATUS_CONFIG[s]?.label || s })),
+    ...(isLocalShop
+      ? Array.from(new Set([...LOCAL_PICKUP_STATUS_FLOW, ...LOCAL_DELIVERY_STATUS_FLOW]))
+      : getStatusFlow(shopType)
+    ).map((s) => ({ key: s, label: STATUS_CONFIG[s]?.label || s })),
     { key: "cancelled", label: "Annulées" },
     { key: "returned", label: "Retournées" },
   ];
@@ -349,8 +351,8 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
     return true;
   };
 
-  const handleAdvance = (orderId: string, currentStatus: string) => {
-    const next = getNextStatus(currentStatus, shopType);
+  const handleAdvance = (orderId: string, currentStatus: string, deliveryChoice?: string | null) => {
+    const next = getNextStatus(currentStatus, shopType, deliveryChoice);
     if (!next) return;
 
     // International flow: require supplier info for confirmed → preparing
@@ -368,8 +370,8 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
       setRiderModal(orderId);
       return;
     }
-    // Local flow: assign driver at preparing → ready_for_pickup
-    if (isLocalShop && currentStatus === "preparing" && next === "ready_for_pickup") {
+    // Local home delivery: assign rider at preparing → assigning_rider
+    if (isLocalShop && deliveryChoice === "home_delivery" && currentStatus === "preparing" && next === "assigning_rider") {
       setRiderModal(orderId);
       return;
     }
@@ -446,8 +448,10 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
         {paginatedOrders.map((order) => {
         const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
         const StatusIcon = config.icon;
-        const next = getNextStatus(order.status, shopType);
-        const canAdvance = isStaff ? canAdminAdvance(order.status, shopType) : (isLocalShop ? canVendorAdvanceLocal(order.status) : canVendorAdvance(order.status));
+        const next = getNextStatus(order.status, shopType, order.delivery_choice);
+        const canAdvance = isStaff
+          ? canAdminAdvance(order.status, shopType, order.delivery_choice)
+          : (isLocalShop ? canVendorAdvanceLocal(order.status, order.delivery_choice) : canVendorAdvance(order.status));
         const isExpanded = expandedId === order.id;
 
         return (
@@ -845,7 +849,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                 )}
 
                 {/* Mini stepper with dates */}
-                <OrderMiniStepper status={order.status} history={order.history} trackingNumber={order.tracking_number} shopType={shopType} />
+                <OrderMiniStepper status={order.status} history={order.history} trackingNumber={order.tracking_number} shopType={shopType} deliveryChoice={order.delivery_choice} />
 
                 {/* Items */}
                 <div className="space-y-1.5">
@@ -891,7 +895,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                 {/* Status actions */}
                 {next && canAdvance && (
                   <button
-                    onClick={() => handleAdvance(order.id, order.status)}
+                    onClick={() => handleAdvance(order.id, order.status, order.delivery_choice)}
                     disabled={updatingId === order.id}
                     className="w-full py-2 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
@@ -1021,17 +1025,20 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
           onCancel={() => setRiderModal(null)}
           onConfirm={(riderId, riderName, deliveryFee, paymentMethod, confirmationCode) => {
             if (isLocalShop) {
-              // Local flow: assign driver and move to ready_for_pickup
-              updateStatus(riderModal, "ready_for_pickup", {
+              // Local home_delivery only opens this modal (see handleAdvance).
+              // Align with LOCAL_DELIVERY_STATUS_FLOW → assigning_rider.
+              updateStatus(riderModal, "assigning_rider", {
+                assigned_rider_id: riderId,
+                assigned_rider_name: riderName,
                 assigned_driver_id: riderId,
                 assigned_driver_name: riderName,
+                delivery_choice: "home_delivery",
                 delivery_option: "home_delivery",
                 last_mile_fee: deliveryFee || undefined,
                 last_mile_payment_method: paymentMethod,
                 confirmation_code: confirmationCode,
               });
             } else {
-              // International flow: assign rider and move to assigning_rider
               updateStatus(riderModal, "assigning_rider", {
                 assigned_rider_id: riderId,
                 assigned_rider_name: riderName,
@@ -1079,8 +1086,20 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
 }
 
 /** Order stepper with date/time under each step — enlarged for readability */
-function OrderMiniStepper({ status, history, trackingNumber, shopType }: { status: string; history: StatusHistoryEntry[]; trackingNumber?: string | null; shopType?: string }) {
-  const flow = getStatusFlow(shopType);
+function OrderMiniStepper({
+  status,
+  history,
+  trackingNumber,
+  shopType,
+  deliveryChoice,
+}: {
+  status: string;
+  history: StatusHistoryEntry[];
+  trackingNumber?: string | null;
+  shopType?: string;
+  deliveryChoice?: string | null;
+}) {
+  const flow = getStatusFlow(shopType, deliveryChoice);
   const currentIdx = flow.indexOf(status as any);
   const isCancelled = status === "cancelled" || status === "returned";
   const historyMap = new Map(history.map((h) => [h.status, h.created_at]));

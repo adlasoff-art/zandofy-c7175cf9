@@ -27,7 +27,14 @@ export function AuthSettingsPanel() {
         .maybeSingle();
       if (cancelled) return;
       if (data?.value && typeof data.value === "object") {
-        setConfig({ ...AUTH_SETTINGS_DEFAULTS, ...(data.value as Partial<AuthSettings>) });
+        setConfig({
+          ...AUTH_SETTINGS_DEFAULTS,
+          ...(data.value as Partial<AuthSettings>),
+          discovery_onboarding_steps: {
+            ...AUTH_SETTINGS_DEFAULTS.discovery_onboarding_steps,
+            ...((data.value as any).discovery_onboarding_steps || {}),
+          },
+        });
       }
       setLoading(false);
     })();
@@ -104,6 +111,61 @@ export function AuthSettingsPanel() {
             disabled={saving}
             onCheckedChange={(checked) =>
               save({ ...config, address_onboarding_enabled: checked })
+            }
+          />
+        </div>
+        <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
+          <div>
+            <p className="text-sm font-medium">Onboarding découverte</p>
+            <p className="text-xs text-muted-foreground">
+              Préférences catalogue (audience, intérêts, portée) — soft sheet Accueil
+            </p>
+          </div>
+          <Switch
+            checked={config.discovery_onboarding_enabled}
+            disabled={saving}
+            onCheckedChange={(checked) =>
+              save({ ...config, discovery_onboarding_enabled: checked })
+            }
+          />
+        </div>
+        <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
+          <div>
+            <p className="text-sm font-medium">Étape paiement (onboarding)</p>
+            <p className="text-xs text-muted-foreground">Afficher le choix Mobile Money / carte</p>
+          </div>
+          <Switch
+            checked={config.discovery_onboarding_steps.payment}
+            disabled={saving || !config.discovery_onboarding_enabled}
+            onCheckedChange={(checked) =>
+              save({
+                ...config,
+                discovery_onboarding_steps: {
+                  ...config.discovery_onboarding_steps,
+                  payment: checked,
+                },
+              })
+            }
+          />
+        </div>
+        <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
+          <div>
+            <p className="text-sm font-medium">Étape réception (onboarding)</p>
+            <p className="text-xs text-muted-foreground">
+              Afficher livraison / retrait si « ma ville » ou « mon pays »
+            </p>
+          </div>
+          <Switch
+            checked={config.discovery_onboarding_steps.receipt}
+            disabled={saving || !config.discovery_onboarding_enabled}
+            onCheckedChange={(checked) =>
+              save({
+                ...config,
+                discovery_onboarding_steps: {
+                  ...config.discovery_onboarding_steps,
+                  receipt: checked,
+                },
+              })
             }
           />
         </div>

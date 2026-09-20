@@ -8,6 +8,9 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ImpersonationProvider } from "@/contexts/ImpersonationContext";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { CartProvider } from "@/contexts/CartContext";
+import { HomeMarketProvider } from "@/contexts/HomeMarketContext";
+import { DiscoveryPrefsProvider } from "@/contexts/DiscoveryPrefsContext";
+import { DiscoveryOnboardingProvider } from "@/components/discovery/DiscoveryOnboardingSheet";
 import { WishlistProvider } from "@/contexts/WishlistContext";
 import { CompareProvider } from "@/contexts/CompareContext";
 import { CartDrawer } from "@/components/CartDrawer";
@@ -237,6 +240,8 @@ const App = () => (
         <ImpersonationProvider>
         <ImpersonationBanner />
         <CartProvider>
+          <HomeMarketProvider>
+          <DiscoveryPrefsProvider>
           <WishlistProvider>
           <CompareProvider>
           <I18nProvider>
@@ -251,6 +256,7 @@ const App = () => (
             <NotificationListener />
             <OrderAlertListener />
             <AddressOnboardingProvider>
+            <DiscoveryOnboardingProvider>
             <SupportDrawerProvider>
             <ScrollRestoration />
             <MobileChromeSync />
@@ -426,12 +432,15 @@ const App = () => (
             </BanGuard>
             </MaintenanceGuard>
             </SupportDrawerProvider>
+            </DiscoveryOnboardingProvider>
             </AddressOnboardingProvider>
           </UIConfigProvider>
           </ThemeProvider>
           </I18nProvider>
           </CompareProvider>
           </WishlistProvider>
+          </DiscoveryPrefsProvider>
+          </HomeMarketProvider>
         </CartProvider>
         </ImpersonationProvider>
         </GeoBlockGuard>

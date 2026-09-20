@@ -153,7 +153,7 @@ export function CustomerOrderTracker({ orderId }: { orderId: string }) {
   const isActive = data ? ACTIVE_STATUSES.has(data.order.status) : false;
 
   const canSwitchToHub =
-    data?.order?.delivery_choice === "home" &&
+    (data?.order?.delivery_choice === "home_delivery" || data?.order?.delivery_choice === "home") &&
     SWITCHABLE_TO_PICKUP.has(data.order.status);
 
   const switchToHubPickup = async () => {

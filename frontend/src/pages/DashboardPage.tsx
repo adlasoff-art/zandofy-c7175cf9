@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { compressImage } from "@/utils/image-compress";
 import { useI18n } from "@/contexts/I18nContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -17,7 +17,7 @@ import {
   Package, MapPin, User as UserIcon, ChevronRight, ChevronLeft,
   Truck, CheckCircle2, Clock, Box, Gift, MessageCircle, Loader2,
   Plus, Trash2, Home, Briefcase, Star, Edit2, X, Save, Camera, Bell, XCircle,
-  Search, Filter, AlertTriangle, History, RotateCcw, FileText, CreditCard, Wallet,
+  Search, Filter, AlertTriangle, History, RotateCcw, FileText, CreditCard, Wallet, Sparkles,
 } from "lucide-react";
 import { CustomerWalletCard } from "@/components/wallet/CustomerWalletCard";
 
@@ -46,8 +46,7 @@ import {
 
 import {
   ACTIVE_ORDER_STATUSES,
-  CUSTOMER_TRACKING_STEPS,
-  LOCAL_CUSTOMER_TRACKING_STEPS,
+  getCustomerTrackingSteps,
   NON_REVENUE_ORDER_STATUSES,
   STATUS_CONFIG,
   getStepIndex,
@@ -66,15 +65,16 @@ import { Switch } from "@/components/ui/switch";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
 import { CascadingAddressFields, type AddressData } from "@/components/address/CascadingAddressFields";
 import { CustomerPricingTab } from "@/components/customer/CustomerPricingTab";
+import { EmbeddedMessagesPanel } from "@/components/messages/EmbeddedMessagesPanel";
+import { requestDiscoveryOnboarding } from "@/components/discovery/DiscoveryOnboardingSheet";
 
 const TABS = [
   { key: "overview", labelKey: "dashboard.tab.overview", icon: Package },
   { key: "orders", labelKey: "dashboard.tab.orders", icon: Package },
+  { key: "tracking", labelKey: "dashboard.tab.tracking", icon: Truck },
+  { key: "messages", labelKey: "dashboard.tab.messages", icon: MessageCircle },
   { key: "subscriptions", labelKey: "dashboard.tab.subscriptions", icon: CreditCard },
   { key: "wallet", labelKey: "dashboard.tab.wallet", icon: Wallet },
-  { key: "tracking", labelKey: "dashboard.tab.tracking", icon: Truck },
-
-  { key: "messages", labelKey: "dashboard.tab.messages", icon: MessageCircle },
   { key: "notifications", labelKey: "dashboard.tab.notifications", icon: Bell },
   { key: "returns", labelKey: "dashboard.tab.returns", icon: RotateCcw },
   { key: "disputes", labelKey: "dashboard.tab.disputes", icon: AlertTriangle },
@@ -85,7 +85,12 @@ const TABS = [
   { key: "addresses", labelKey: "dashboard.tab.addresses", icon: MapPin },
 ];
 
-const ORDERS_PER_PAGE = 10;
+const TAB_KEYS = new Set(TABS.map((t) => t.key));
+
+function resolveDashboardTab(raw: string | null): string {
+  if (raw && TAB_KEYS.has(raw)) return raw;
+  return "overview";
+}
 
 const STATUS_FILTERS = [
   { key: "all", labelKey: "dashboard.filter.all" },
@@ -188,17 +193,29 @@ export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get("tab") || "overview";
+  const initialTab = resolveDashboardTab(searchParams.get("tab"));
   const [activeTab, setActiveTabState] = useState(initialTab);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const setActiveTab = useCallback((tab: string) => {
-    setActiveTabState(tab);
-    if (tab === "overview") {
+    const next = resolveDashboardTab(tab);
+    setActiveTabState(next);
+    if (next === "overview") {
       setSearchParams({}, { replace: true });
     } else {
-      setSearchParams({ tab }, { replace: true });
+      setSearchParams({ tab: next }, { replace: true });
     }
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+    contentRef.current?.scrollTo?.({ top: 0, behavior: "instant" as ScrollBehavior });
   }, [setSearchParams]);
+
+  // Sync tab from URL (e.g. /dashboard?tab=messages from bottom nav)
+  useEffect(() => {
+    const tab = resolveDashboardTab(searchParams.get("tab"));
+    if (tab !== activeTab) {
+      setActiveTabState(tab);
+    }
+  }, [searchParams, activeTab]);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItemRow[]>([]);
@@ -364,7 +381,7 @@ export default function DashboardPage() {
         {activeTab === "referral" && <ReferralDashboard />}
         {activeTab === "affiliate" && <AffiliateDashboard />}
         {activeTab === "notifications" && <NotificationsTab />}
-        {activeTab === "messages" && <MessagesRedirectTab />}
+        {activeTab === "messages" && <EmbeddedMessagesPanel />}
         {activeTab === "profile" && <ProfileTab user={user} onProfileUpdated={loadProfileName} />}
         {activeTab === "kyc" && (
           <div className="space-y-6">
@@ -456,7 +473,7 @@ export default function DashboardPage() {
           </nav>
 
           {/* Main content */}
-          <div className="flex-1 min-w-0 space-y-4">
+          <div ref={contentRef} className="flex-1 min-w-0 space-y-4">
             {/* KPI Cards — always visible */}
             {!loading && (
               <div className="grid grid-cols-3 xl:grid-cols-6 gap-3">
@@ -1075,6 +1092,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         orderRef={order.order_ref}
         trackingNumber={order.tracking_number}
         shopType={order.shop_type}
+        deliveryChoice={order.delivery_choice}
       />
 
       {/* Status History Timeline */}
@@ -1346,19 +1364,20 @@ function TrackingStepper({
   orderRef,
   trackingNumber,
   shopType,
+  deliveryChoice,
 }: {
   status: string;
   statusHistory?: StatusHistoryRow[];
   orderRef?: string;
   trackingNumber?: string | null;
   shopType?: string | null;
+  deliveryChoice?: string | null;
 }) {
   const { t, locale } = useI18n();
   const dateLocale = locale === "en" ? enUS : fr;
   const navigate = useNavigate();
-  const isLocal = shopType === "local";
-  const steps = isLocal ? LOCAL_CUSTOMER_TRACKING_STEPS : CUSTOMER_TRACKING_STEPS;
-  const currentIdx = getStepIndex(status, shopType || undefined);
+  const steps = getCustomerTrackingSteps(shopType, deliveryChoice);
+  const currentIdx = getStepIndex(status, shopType || undefined, deliveryChoice);
   const isCancelled = status === "cancelled" || status === "returned";
 
   if (isCancelled) {
@@ -1383,121 +1402,64 @@ function TrackingStepper({
     }
   };
 
-  const isClickable = (stepKey: string, done: boolean) => {
-    return done && orderRef && (stepKey === "out_for_delivery" || stepKey === "in_shipping");
-  };
+  const isClickable = (stepKey: string, done: boolean) =>
+    !!done && !!orderRef && (stepKey === "out_for_delivery" || stepKey === "in_shipping");
 
-  const renderStep = (step: (typeof CUSTOMER_TRACKING_STEPS)[0], globalIdx: number, isCurrent: boolean, done: boolean) => {
-    const Icon = step.icon;
-    const ts = historyMap.get(step.key);
-    const clickable = isClickable(step.key, done || isCurrent);
-    return (
-      <div
-        key={step.key}
-        className={`flex flex-col items-center gap-1 flex-1 min-w-0 ${clickable ? "cursor-pointer group" : ""}`}
-        onClick={clickable ? () => handleStepClick(step.key) : undefined}
-        title={clickable ? (step.key === "out_for_delivery" ? t("dashboard.stepper.viewRider") : t("dashboard.stepper.viewShipment")) : undefined}
-      >
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all ${
-          isCurrent ? "bg-primary text-primary-foreground ring-2 ring-primary/30 scale-110"
-            : done ? "bg-primary text-primary-foreground"
-            : "bg-muted text-muted-foreground"
-        } ${clickable ? "group-hover:ring-2 group-hover:ring-primary/50 group-hover:scale-110" : ""}`}>
-          <Icon size={18} />
-        </div>
-        <span className={`text-xs font-semibold text-center leading-tight px-0.5 ${
-          isCurrent ? "text-primary" : done ? "text-foreground" : "text-muted-foreground"
-        } ${clickable ? "group-hover:text-primary underline decoration-dotted underline-offset-2" : ""}`}>
-          {step.label}
-        </span>
-        {ts && (
-          <span className="text-[10px] text-muted-foreground leading-tight">
-            {format(new Date(ts), "dd/MM HH:mm", { locale: dateLocale })}
-          </span>
-        )}
-      </div>
-    );
-  };
-
-  // Local shops: compact single-row / wrapping flow (no intl hub snake grid)
-  if (isLocal) {
-    return (
-      <div className="py-3 overflow-x-auto">
-        <div className="flex items-start gap-0 min-w-max sm:min-w-0 sm:flex-wrap sm:justify-between w-full">
-          {steps.map((step, i) => {
-            const done = i <= currentIdx;
-            const isCur = i === currentIdx;
-            return (
-              <div key={step.key} className="flex items-start">
-                {renderStep(step, i, isCur, done)}
-                {i < steps.length - 1 && (
-                  <div className={`h-0.5 mt-5 flex-shrink-0 w-4 sm:w-6 ${i < currentIdx ? "bg-primary" : "bg-border"}`} />
+  return (
+    <div className="py-3 overflow-x-auto">
+      <div className="flex flex-wrap items-start gap-y-3 gap-x-0 min-w-0 w-full sm:justify-start">
+        {steps.map((step, i) => {
+          const Icon = step.icon;
+          const done = i <= currentIdx;
+          const isCurrent = i === currentIdx;
+          const ts = historyMap.get(step.key);
+          const clickable = isClickable(step.key, done || isCurrent);
+          return (
+            <div key={step.key} className="flex items-start">
+              <div
+                className={`flex flex-col items-center gap-0.5 w-[4.5rem] sm:w-[5.25rem] min-w-0 ${clickable ? "cursor-pointer group" : ""}`}
+                onClick={clickable ? () => handleStepClick(step.key) : undefined}
+                title={
+                  clickable
+                    ? step.key === "out_for_delivery"
+                      ? t("dashboard.stepper.viewRider")
+                      : t("dashboard.stepper.viewShipment")
+                    : undefined
+                }
+              >
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                    isCurrent
+                      ? "bg-primary text-primary-foreground ring-2 ring-primary/30 scale-105"
+                      : done
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                  } ${clickable ? "group-hover:ring-2 group-hover:ring-primary/50" : ""}`}
+                >
+                  <Icon size={14} />
+                </div>
+                <span
+                  className={`text-[10px] sm:text-xs font-medium text-center leading-tight truncate w-full px-0.5 ${
+                    isCurrent ? "text-primary" : done ? "text-foreground" : "text-muted-foreground"
+                  } ${clickable ? "group-hover:text-primary underline decoration-dotted underline-offset-2" : ""}`}
+                >
+                  {step.label}
+                </span>
+                {ts && (
+                  <span className="text-[9px] text-muted-foreground leading-tight">
+                    {format(new Date(ts), "dd/MM HH:mm", { locale: dateLocale })}
+                  </span>
                 )}
               </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // International: 3 rows of 3 — snake flow
-  const ROW1 = CUSTOMER_TRACKING_STEPS.slice(0, 3);
-  const ROW2 = CUSTOMER_TRACKING_STEPS.slice(3, 6);
-  const ROW3 = CUSTOMER_TRACKING_STEPS.slice(6, 9);
-
-  const renderRow = (rowSteps: typeof CUSTOMER_TRACKING_STEPS, startIndex: number) => (
-    <div className="flex items-start w-full">
-      {rowSteps.map((step, i) => {
-        const globalIdx = startIndex + i;
-        const done = globalIdx <= currentIdx;
-        const isCur = globalIdx === currentIdx;
-        return (
-          <div key={step.key} className="flex items-start flex-1 min-w-0">
-            {renderStep(step, globalIdx, isCur, done)}
-            {i < rowSteps.length - 1 && (
-              <div className={`h-0.5 mt-5 flex-shrink-0 w-4 sm:w-6 ${globalIdx < currentIdx ? "bg-primary" : "bg-border"}`} />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-
-  const renderRowReversed = (rowSteps: typeof CUSTOMER_TRACKING_STEPS, startIndex: number) => {
-    const reversed = [...rowSteps].reverse();
-    return (
-      <div className="flex items-start w-full">
-        {reversed.map((step, i) => {
-          const globalIdx = startIndex + (rowSteps.length - 1 - i);
-          const done = globalIdx <= currentIdx;
-          const isCur = globalIdx === currentIdx;
-          return (
-            <div key={step.key} className="flex items-start flex-1 min-w-0">
-              {renderStep(step, globalIdx, isCur, done)}
-              {i < reversed.length - 1 && (
-                <div className={`h-0.5 mt-5 flex-shrink-0 w-4 sm:w-6 ${
-                  Math.min(startIndex + (rowSteps.length - 1 - i), startIndex + (rowSteps.length - 2 - i)) < currentIdx ? "bg-primary" : "bg-border"
-                }`} />
+              {i < steps.length - 1 && (
+                <div
+                  className={`h-0.5 mt-4 shrink-0 w-3 sm:w-4 ${i < currentIdx ? "bg-primary" : "bg-border"}`}
+                />
               )}
             </div>
           );
         })}
       </div>
-    );
-  };
-
-  return (
-    <div className="py-3 space-y-0">
-      {renderRow(ROW1, 0)}
-      <div className="flex justify-end pr-[16%]">
-        <div className={`w-0.5 h-5 ${currentIdx >= 2 ? "bg-primary" : "bg-border"}`} />
-      </div>
-      {renderRowReversed(ROW2, 3)}
-      <div className="flex justify-start pl-[16%]">
-        <div className={`w-0.5 h-5 ${currentIdx >= 5 ? "bg-primary" : "bg-border"}`} />
-      </div>
-      {renderRow(ROW3, 6)}
     </div>
   );
 }
@@ -1722,6 +1684,7 @@ function TrackingTab({ orders }: { orders: OrderRow[] }) {
             orderRef={order.order_ref}
             trackingNumber={order.tracking_number}
             shopType={order.shop_type}
+            deliveryChoice={order.delivery_choice}
           />
           <CustomerOrderTracker orderId={order.id} />
         </div>
@@ -1913,12 +1876,24 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
   if (loading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary" size={20} /></div>;
 
   return (
-    <div className="space-y-6 max-w-lg">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-5xl">
       {/* Profile info */}
       <div className="bg-card border border-border rounded-lg p-6">
-        <h3 className="text-base font-bold text-foreground mb-5 flex items-center gap-2">
-          <UserIcon size={18} /> {t("profile.title")}
-        </h3>
+        <div className="flex items-center justify-between gap-2 mb-5">
+          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+            <UserIcon size={18} /> {t("profile.title")}
+          </h3>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs h-8"
+            onClick={() => requestDiscoveryOnboarding(true)}
+          >
+            <Sparkles size={12} className="mr-1" />
+            Modifier mes goûts
+          </Button>
+        </div>
 
         {/* Avatar */}
         <div className="flex items-center gap-4 mb-6">
@@ -2178,12 +2153,6 @@ function NotificationsTab() {
       )}
     </div>
   );
-}
-
-function MessagesRedirectTab() {
-  const navigate = useNavigate();
-  useEffect(() => { navigate("/messages"); }, [navigate]);
-  return null;
 }
 
 function AddressesTab({ userId }: { userId: string }) {

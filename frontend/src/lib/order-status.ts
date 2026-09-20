@@ -69,53 +69,118 @@ export const STATUS_FLOW: OrderStatus[] = [
   "delivered",
 ];
 
-/** The linear happy-path flow for LOCAL shops (stock physique, livraison directe) */
-export const LOCAL_STATUS_FLOW: OrderStatus[] = [
+/** Local hub / pickup — no freight hub, no rider assignment */
+export const LOCAL_PICKUP_STATUS_FLOW: OrderStatus[] = [
   "pending",
   "confirmed",
   "preparing",
   "ready_for_pickup",
+  "delivered",
+];
+
+/** Local home delivery — preparation then rider last-mile */
+export const LOCAL_DELIVERY_STATUS_FLOW: OrderStatus[] = [
+  "pending",
+  "confirmed",
+  "preparing",
+  "assigning_rider",
+  "rider_assigned",
   "out_for_delivery",
   "delivered",
 ];
 
-/** Tracking steps shown to customers (visual stepper) */
-export const CUSTOMER_TRACKING_STEPS = STATUS_FLOW.map((key) => ({
-  key,
-  label: STATUS_CONFIG[key].label,
-  icon: STATUS_CONFIG[key].icon,
-}));
+/**
+ * @deprecated Prefer LOCAL_PICKUP_STATUS_FLOW / LOCAL_DELIVERY_STATUS_FLOW via getStatusFlow.
+ * Kept as pickup default for callers that omit delivery_choice.
+ */
+export const LOCAL_STATUS_FLOW: OrderStatus[] = LOCAL_PICKUP_STATUS_FLOW;
 
-/** Customer tracking steps for local orders */
-export const LOCAL_CUSTOMER_TRACKING_STEPS = LOCAL_STATUS_FLOW.map((key) => ({
-  key,
-  label: STATUS_CONFIG[key].label,
-  icon: STATUS_CONFIG[key].icon,
-}));
+export type TrackingStep = {
+  key: OrderStatus;
+  label: string;
+  icon: typeof Clock;
+};
+
+function stepsFromFlow(flow: OrderStatus[]): TrackingStep[] {
+  return flow.map((key) => ({
+    key,
+    label: STATUS_CONFIG[key].label,
+    icon: STATUS_CONFIG[key].icon,
+  }));
+}
+
+/** Tracking steps shown to customers (visual stepper) — international */
+export const CUSTOMER_TRACKING_STEPS = stepsFromFlow(STATUS_FLOW);
+
+/** @deprecated Use getCustomerTrackingSteps(shopType, deliveryChoice) */
+export const LOCAL_CUSTOMER_TRACKING_STEPS = stepsFromFlow(LOCAL_PICKUP_STATUS_FLOW);
 
 /** Vendor can advance orders up to "shipped" (index 4) for international */
 export const VENDOR_MAX_STATUS_INDEX = 4; // shipped
 
-/** Vendor can advance local orders up to "out_for_delivery" (index 4) */
-export const VENDOR_LOCAL_MAX_STATUS_INDEX = 4; // out_for_delivery
+/** Vendor local pickup: advance up to ready_for_pickup (index 3) */
+export const VENDOR_LOCAL_PICKUP_MAX_STATUS_INDEX = 3;
 
-/** Get the correct status flow based on shop type */
-export function getStatusFlow(shopType?: string): OrderStatus[] {
-  return shopType === "local" ? LOCAL_STATUS_FLOW : STATUS_FLOW;
+/** Vendor local delivery: advance up to out_for_delivery (index 5) */
+export const VENDOR_LOCAL_DELIVERY_MAX_STATUS_INDEX = 5;
+
+/** @deprecated Use canVendorAdvanceLocal(status, deliveryChoice) */
+export const VENDOR_LOCAL_MAX_STATUS_INDEX = VENDOR_LOCAL_DELIVERY_MAX_STATUS_INDEX;
+
+export type DeliveryChoice = "home_delivery" | "hub_pickup" | string | null | undefined;
+
+/** Get the correct status flow based on shop type + delivery choice */
+export function getStatusFlow(shopType?: string, deliveryChoice?: DeliveryChoice): OrderStatus[] {
+  if (shopType === "local") {
+    return deliveryChoice === "home_delivery"
+      ? LOCAL_DELIVERY_STATUS_FLOW
+      : LOCAL_PICKUP_STATUS_FLOW;
+  }
+  return STATUS_FLOW;
+}
+
+/** Customer-facing tracking steps */
+export function getCustomerTrackingSteps(
+  shopType?: string | null,
+  deliveryChoice?: DeliveryChoice
+): TrackingStep[] {
+  return stepsFromFlow(getStatusFlow(shopType || undefined, deliveryChoice));
 }
 
 /** Get the next status in the flow */
-export function getNextStatus(current: string, shopType?: string): OrderStatus | null {
-  const flow = getStatusFlow(shopType);
+export function getNextStatus(
+  current: string,
+  shopType?: string,
+  deliveryChoice?: DeliveryChoice
+): OrderStatus | null {
+  const flow = getStatusFlow(shopType, deliveryChoice);
   const idx = flow.indexOf(current as OrderStatus);
   return idx >= 0 && idx < flow.length - 1 ? flow[idx + 1] : null;
 }
 
 /** Get step index for stepper UI */
-export function getStepIndex(status: string, shopType?: string): number {
-  const flow = getStatusFlow(shopType);
+export function getStepIndex(
+  status: string,
+  shopType?: string,
+  deliveryChoice?: DeliveryChoice
+): number {
+  const flow = getStatusFlow(shopType, deliveryChoice);
   const idx = flow.indexOf(status as OrderStatus);
-  return idx >= 0 ? idx : 0;
+  if (idx >= 0) return idx;
+
+  // Status not in this flow (legacy / switched mode) — best-effort by global order
+  const globalIdx = ORDER_STATUSES.indexOf(status as OrderStatus);
+  if (globalIdx < 0) return 0;
+  let best = 0;
+  for (let i = 0; i < flow.length; i++) {
+    const stepGlobal = ORDER_STATUSES.indexOf(flow[i]);
+    if (stepGlobal >= 0 && stepGlobal <= globalIdx) best = i;
+  }
+  // Terminal delivered/cancelled outside flow still map to last step visually when past end
+  if (status === "delivered" || status === "cancelled" || status === "returned") {
+    return Math.max(best, flow.length - 1);
+  }
+  return best;
 }
 
 /** Can a vendor advance to the next status? (international flow) */
@@ -125,14 +190,26 @@ export function canVendorAdvance(currentStatus: string): boolean {
 }
 
 /** Can a vendor advance to the next status? (local flow) */
-export function canVendorAdvanceLocal(currentStatus: string): boolean {
-  const idx = LOCAL_STATUS_FLOW.indexOf(currentStatus as OrderStatus);
-  return idx >= 0 && idx < VENDOR_LOCAL_MAX_STATUS_INDEX;
+export function canVendorAdvanceLocal(
+  currentStatus: string,
+  deliveryChoice?: DeliveryChoice
+): boolean {
+  const flow = getStatusFlow("local", deliveryChoice);
+  const maxIdx =
+    deliveryChoice === "home_delivery"
+      ? VENDOR_LOCAL_DELIVERY_MAX_STATUS_INDEX
+      : VENDOR_LOCAL_PICKUP_MAX_STATUS_INDEX;
+  const idx = flow.indexOf(currentStatus as OrderStatus);
+  return idx >= 0 && idx < maxIdx;
 }
 
 /** Can an admin advance to the next status? Always yes if not at end */
-export function canAdminAdvance(currentStatus: string, shopType?: string): boolean {
-  const flow = getStatusFlow(shopType);
+export function canAdminAdvance(
+  currentStatus: string,
+  shopType?: string,
+  deliveryChoice?: DeliveryChoice
+): boolean {
+  const flow = getStatusFlow(shopType, deliveryChoice);
   const idx = flow.indexOf(currentStatus as OrderStatus);
   return idx >= 0 && idx < flow.length - 1;
 }
