@@ -189,6 +189,7 @@ export default function AdminVendorPricingPage() {
     returns_enabled: boolean;
     suppliers_enabled: boolean;
     shipping_labels_enabled: boolean;
+    smart_pricing_enabled: boolean;
     max_products_override: string;
     collaborator_limit_override: string;
     vendor_webhook_url: string;
@@ -292,6 +293,7 @@ export default function AdminVendorPricingPage() {
       returns_enabled: (store as any).returns_enabled ?? false,
       suppliers_enabled: (o as any)?.suppliers_enabled ?? false,
       shipping_labels_enabled: (o as any)?.shipping_labels_enabled ?? false,
+      smart_pricing_enabled: (o as any)?.smart_pricing_enabled ?? false,
       max_products_override: o?.max_products_override != null ? String(o.max_products_override) : "",
       collaborator_limit_override: (o as any)?.collaborator_limit_override != null ? String((o as any).collaborator_limit_override) : "",
       vendor_webhook_url: (o as any)?.vendor_webhook_url ?? "",
@@ -307,7 +309,7 @@ export default function AdminVendorPricingPage() {
 
   const getEditForId = (storeId: string) => {
     const store = stores?.find((s) => s.id === storeId);
-    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, vendor_mobile_money_enabled: true, vendor_card_enabled: true, vendor_mode: "international", returns_enabled: false, suppliers_enabled: false, shipping_labels_enabled: false, max_products_override: "", collaborator_limit_override: "", vendor_webhook_url: "" };
+    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, vendor_mobile_money_enabled: true, vendor_card_enabled: true, vendor_mode: "international", returns_enabled: false, suppliers_enabled: false, shipping_labels_enabled: false, smart_pricing_enabled: false, max_products_override: "", collaborator_limit_override: "", vendor_webhook_url: "" };
     return getEdit(store);
   };
 
@@ -376,6 +378,7 @@ export default function AdminVendorPricingPage() {
       vendor_mode: edit.vendor_mode,
       suppliers_enabled: edit.suppliers_enabled,
       shipping_labels_enabled: edit.shipping_labels_enabled,
+      smart_pricing_enabled: edit.smart_pricing_enabled,
       max_products_override: edit.max_products_override ? Number(edit.max_products_override) : null,
       collaborator_limit_override: edit.collaborator_limit_override ? Number(edit.collaborator_limit_override) : null,
       vendor_webhook_url: edit.vendor_webhook_url || null,
@@ -625,6 +628,17 @@ export default function AdminVendorPricingPage() {
                   <Switch
                     checked={edit.suppliers_enabled}
                     onCheckedChange={(v) => updateEdit(store.id, "suppliers_enabled", v)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Tarification intelligente</p>
+                    <p className="text-[10px] text-muted-foreground">Autorise le calcul auto des prix (boutiques indépendantes). Les boutiques plateforme y ont déjà accès.</p>
+                  </div>
+                  <Switch
+                    checked={edit.smart_pricing_enabled}
+                    onCheckedChange={(v) => updateEdit(store.id, "smart_pricing_enabled", v)}
                   />
                 </div>
 

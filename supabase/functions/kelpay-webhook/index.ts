@@ -272,6 +272,9 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (orderData && ["awaiting_payment"].includes(orderData.status)) {
+        await supabase.rpc("refund_customer_wallet_for_order", {
+          p_order_id: tx.order_id,
+        });
         await supabase
           .from("orders")
           .update({ status: "payment_failed" })

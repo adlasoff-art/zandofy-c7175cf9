@@ -25,6 +25,7 @@ import {
   VENDOR_ORDERS_OR_FILTER,
   hasOffPlatformPaymentProof,
   isPlatformOwnedStore,
+  offPlatformProductProofUrl,
   vendorOffPlatformConfirmUpdates,
   vendorOffPlatformVerifyOnlyUpdates,
 } from "@/lib/off-platform-payment";
@@ -83,6 +84,7 @@ interface Order {
   last_mile_payment_method: string | null;
   rider_cash_collected: boolean | null;
   shipping_payment_proof_url: string | null;
+  product_payment_proof_url: string | null;
   last_mile_payment_proof_url: string | null;
   hub_pickup_proof_url: string | null;
   off_platform_vendor_verified_at: string | null;
@@ -246,6 +248,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
 
     const ordersWithOptionalFields = await withOptionalOrderFields<Order>((data || []) as Order[], [
       "shipping_payment_proof_url",
+      "product_payment_proof_url",
       "last_mile_payment_proof_url",
       "hub_pickup_proof_url",
       "off_platform_vendor_verified_at",
@@ -618,7 +621,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   </div>
                 )}
 
-                {/* Payment proof uploads (vendor view) */}
+                {/* Preuve expédition différée (champ dédié — distinct de la preuve produit hors plateforme) */}
                 {order.shipping_payment_status === "deferred" && (
                   <PaymentProofUpload
                     orderId={order.id}
@@ -661,6 +664,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                             const now = new Date().toISOString();
                             const payload = vendorOffPlatformConfirmUpdates(now, user.id, {
                               preserveVerifiedAt: order.off_platform_vendor_verified_at,
+                              currentShippingPaymentStatus: order.shipping_payment_status,
                             });
                             const { error } = await supabase
                               .from("orders")
@@ -700,16 +704,16 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                       <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <Loader2 size={12} className="animate-spin" /> Chargement…
                       </p>
-                    ) : order.shipping_payment_proof_url ? (
+                    ) : offPlatformProductProofUrl(order) ? (
                       <div className="space-y-2">
                         <p className="text-xs text-muted-foreground">Le client a envoyé une preuve de paiement :</p>
                         <DeliveryProofImage
-                          pathOrUrl={order.shipping_payment_proof_url}
+                          pathOrUrl={offPlatformProductProofUrl(order)!}
                           alt="Preuve de paiement"
                           className="w-full max-w-xs rounded-lg border border-border object-cover cursor-pointer"
                           onClick={async () => {
                             const { getDeliveryProofUrl } = await import("@/lib/delivery-proof-urls");
-                            const u = await getDeliveryProofUrl(order.shipping_payment_proof_url);
+                            const u = await getDeliveryProofUrl(offPlatformProductProofUrl(order));
                             if (u) window.open(u, "_blank");
                           }}
                         />
@@ -728,7 +732,9 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                               const now = new Date().toISOString();
                               const payload = isPlatformOwned
                                 ? vendorOffPlatformVerifyOnlyUpdates(now, user.id)
-                                : vendorOffPlatformConfirmUpdates(now, user.id);
+                                : vendorOffPlatformConfirmUpdates(now, user.id, {
+                                    currentShippingPaymentStatus: order.shipping_payment_status,
+                                  });
                               const { error } = await supabase
                                 .from("orders")
                                 .update(payload as any)

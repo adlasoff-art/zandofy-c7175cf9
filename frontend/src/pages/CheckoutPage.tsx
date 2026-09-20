@@ -132,6 +132,9 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("mobile_money");
   const [processing, setProcessing] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [useWalletCredit, setUseWalletCredit] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletCreditApplied, setWalletCreditApplied] = useState(0);
 
   // Deferred shipping payment
   const [shippingPaymentChoice, setShippingPaymentChoice] = useState<"pay_now" | "pay_on_arrival">("pay_on_arrival");
@@ -560,6 +563,39 @@ export default function CheckoutPage() {
   const effectiveLastMile = deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping" ? lastMileFee : 0;
   
   const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping + effectiveLastMile);
+  const onlineWalletEligible =
+    paymentMethod === "mobile_money" ||
+    paymentMethod === "stripe" ||
+    paymentMethod === "card" ||
+    paymentMethod === "paypal";
+  const payableAfterWallet = Math.max(
+    0,
+    total - (useWalletCredit ? Math.min(walletBalance, total) : 0),
+  );
+
+  // Customer wallet balance (for optional online checkout credit)
+  useEffect(() => {
+    if (!user) {
+      setWalletBalance(0);
+      return;
+    }
+    (supabase as any)
+      .from("customer_wallets")
+      .select("balance")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }: { data: { balance: number } | null }) => {
+        setWalletBalance(Number(data?.balance ?? 0));
+      })
+      .catch(() => setWalletBalance(0));
+  }, [user?.id]);
+
+  // Wallet credit only for online payment methods
+  useEffect(() => {
+    if (paymentMethod === "cod" || paymentMethod === "off_platform") {
+      setUseWalletCredit(false);
+    }
+  }, [paymentMethod]);
 
   // Recalculate last-mile fee when address or delivery option changes
   useEffect(() => {
@@ -801,6 +837,13 @@ export default function CheckoutPage() {
   const applyMoMoFailed = useCallback(
     async (orderIds: string[], message?: string) => {
       if (orderIds.length > 0) {
+        for (const oid of orderIds) {
+          try {
+            await (supabase as any).rpc("refund_customer_wallet_for_order", { p_order_id: oid });
+          } catch (e) {
+            console.error("[wallet refund on fail]", e);
+          }
+        }
         await supabase
           .from("orders")
           .update({ status: "payment_failed" } as any)
@@ -1386,6 +1429,54 @@ export default function CheckoutPage() {
   const handlePayment = async () => {
     setProcessing(true);
 
+    const debitWalletForOrder = async (orderIds: string[]): Promise<number> => {
+      if (!useWalletCredit || !user || !onlineWalletEligible || walletBalance <= 0) return 0;
+      let remaining = walletBalance;
+      let totalApplied = 0;
+      for (const orderIdForDebit of orderIds) {
+        if (remaining <= 0) break;
+        try {
+          const { data, error } = await (supabase as any).rpc("debit_customer_wallet_for_order", {
+            p_order_id: orderIdForDebit,
+            p_amount: remaining,
+            p_user_id: user.id,
+          });
+          if (error) {
+            console.error("[wallet debit]", error);
+            toast({
+              title: "Crédit portefeuille",
+              description: error.message || "Impossible d'appliquer le solde. Paiement au montant total.",
+              variant: "destructive",
+            });
+            break;
+          }
+          const applied = Number(data ?? 0);
+          if (applied > 0) {
+            totalApplied += applied;
+            remaining = Math.max(0, remaining - applied);
+          }
+        } catch (err: any) {
+          console.error("[wallet debit]", err);
+          break;
+        }
+      }
+      if (totalApplied > 0) {
+        setWalletCreditApplied(totalApplied);
+        setWalletBalance((b) => Math.max(0, b - totalApplied));
+      }
+      return totalApplied;
+    };
+
+    const refundWalletForOrders = async (orderIds: string[]) => {
+      for (const oid of orderIds) {
+        try {
+          await (supabase as any).rpc("refund_customer_wallet_for_order", { p_order_id: oid });
+        } catch (e) {
+          console.error("[wallet refund]", e);
+        }
+      }
+    };
+
     if (paymentMethod === "mobile_money") {
       let createdOrderIds: string[] = [];
       // Validate phone
@@ -1406,18 +1497,48 @@ export default function CheckoutPage() {
           return;
         }
 
-        // Call KelPay payment edge function
+        const appliedCredit = await debitWalletForOrder(orderIds);
+
+        // Remaining payable from DB (authoritative after debit)
+        const { data: orderPayRows } = await supabase
+          .from("orders")
+          .select("id, total, wallet_credit_applied")
+          .in("id", orderIds);
+        const remainingByOrder = (orderPayRows || []).map((o: any) => ({
+          id: o.id,
+          remaining: Math.max(
+            0,
+            Math.round((Number(o.total || 0) - Number(o.wallet_credit_applied || 0)) * 100) / 100
+          ),
+        }));
+        const totalRemaining = remainingByOrder.reduce((s, o) => s + o.remaining, 0);
+        const firstRemaining =
+          remainingByOrder.find((o) => o.id === orderIds[0])?.remaining ?? totalRemaining;
+
+        // Fully covered by wallet — mark paid like MoMo success
+        if (totalRemaining <= 0) {
+          await applyMoMoSuccess(orderIds, orderRef);
+          setProcessing(false);
+          return;
+        }
+
+        // Call KelPay for first order remainder only (server validates against that order)
+        const kelpayAmount = firstRemaining;
         const { data, error } = await supabase.functions.invoke("kelpay-payment", {
           body: {
             order_id: orderIds[0],
             phone_number: cleanPhone,
-            amount: total,
+            amount: kelpayAmount,
             currency: "USD",
             provider: mobileMoneyProvider,
           },
         });
 
         if (error || !data?.success) {
+          await refundWalletForOrders(orderIds);
+          if (createdOrderIds.length > 0) {
+            await supabase.from("orders").update({ status: "payment_failed" } as any).in("id", createdOrderIds);
+          }
           toast({
             title: "Paiement refusé",
             description: data?.error || error?.message || "La requête de paiement a été refusée.",
@@ -1454,6 +1575,21 @@ export default function CheckoutPage() {
         setProcessing(true);
         const { orderRef, orderIds } = await createOrderForPayment();
         if (orderIds.length === 0) throw new Error("Impossible de créer la commande");
+        const appliedCredit = await debitWalletForOrder(orderIds);
+        const { data: cardOrderRows } = await supabase
+          .from("orders")
+          .select("id, total, wallet_credit_applied")
+          .in("id", orderIds);
+        const cardRemaining = (cardOrderRows || []).reduce(
+          (s: number, o: any) =>
+            s + Math.max(0, Number(o.total || 0) - Number(o.wallet_credit_applied || 0)),
+          0
+        );
+        if (cardRemaining <= 0) {
+          await applyMoMoSuccess(orderIds, orderRef);
+          setProcessing(false);
+          return;
+        }
         const { data, error } = await supabase.functions.invoke("keccel-cardpay", {
           body: {
             order_id: orderIds[0],
@@ -1463,11 +1599,16 @@ export default function CheckoutPage() {
         });
         if (error) {
           console.error("keccel-cardpay SDK error:", error);
+          await refundWalletForOrders(orderIds);
           throw new Error(error.message || "Erreur lors de l'initiation du paiement");
         }
-        if (!data) throw new Error("Pas de réponse de la passerelle de paiement");
+        if (!data) {
+          await refundWalletForOrders(orderIds);
+          throw new Error("Pas de réponse de la passerelle de paiement");
+        }
         if (data.success === false) {
           console.error("keccel-cardpay API error:", data);
+          await refundWalletForOrders(orderIds);
           throw new Error("Redirection carte indisponible. Veuillez réessayer ou choisir Mobile Money.");
         }
         if (data.redirect_url) {
@@ -1482,6 +1623,7 @@ export default function CheckoutPage() {
           // passerelle. On ne doit JAMAIS afficher "Commande confirmée" ici.
           // On marque les commandes en payment_failed et on lève une erreur.
           if (orderIds.length > 0) {
+            await refundWalletForOrders(orderIds);
             await supabase
               .from("orders")
               .update({ status: "payment_failed" } as any)
@@ -1499,12 +1641,14 @@ export default function CheckoutPage() {
             .eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "")
             .eq("status", "awaiting_payment")
             .order("created_at", { ascending: false })
-            .limit(1);
+            .limit(5);
           if (pendingOrders && pendingOrders.length > 0) {
+            const ids = pendingOrders.map((o: any) => o.id);
+            await refundWalletForOrders(ids);
             await supabase
               .from("orders")
               .update({ status: "payment_failed" })
-              .eq("id", pendingOrders[0].id)
+              .in("id", ids)
               .eq("status", "awaiting_payment");
           }
         } catch (cleanupErr) {
@@ -1514,7 +1658,8 @@ export default function CheckoutPage() {
         setProcessing(false);
       }
     } else {
-      // COD, off_platform
+      // COD, off_platform — never apply wallet credit
+      setUseWalletCredit(false);
       await new Promise(r => setTimeout(r, 1500));
       const { orderRef } = await createOrderForPayment();
       setOrderId(orderRef);
@@ -1826,9 +1971,15 @@ export default function CheckoutPage() {
             <span className="text-primary font-medium">{t("checkout.hubPickupFree") || "Retrait à l'agence (gratuit)"}</span>
           </div>
         )}
+        {useWalletCredit && walletBalance > 0 && onlineWalletEligible && (
+          <div className="flex justify-between text-primary">
+            <span>Portefeuille</span>
+            <span>-{formatPrice(Math.min(walletBalance, total))}</span>
+          </div>
+        )}
         <div className="flex justify-between font-bold text-foreground pt-2 border-t border-border text-base">
           <span>{t("cart.total")}</span>
-          <span>{formatPrice(total)}</span>
+          <span>{formatPrice(useWalletCredit && onlineWalletEligible ? payableAfterWallet : total)}</span>
         </div>
       </div>
 
@@ -2450,7 +2601,7 @@ export default function CheckoutPage() {
                                   body: {
                                     order_id: paymentOrderIds[0],
                                     phone_number: cleanPhone,
-                                    amount: total,
+                                    amount: Math.max(0, Math.round((total - walletCreditApplied) * 100) / 100),
                                     currency: "USD",
                                     provider: retryProvider,
                                   },
@@ -2484,6 +2635,25 @@ export default function CheckoutPage() {
                       </div>
                     )}
                   </div>
+                )}
+
+                {walletBalance > 0 && onlineWalletEligible && (
+                  <label className="flex items-start gap-2.5 pt-2 border-t border-border cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={useWalletCredit}
+                      onChange={(e) => setUseWalletCredit(e.target.checked)}
+                    />
+                    <span className="text-sm text-foreground">
+                      Utiliser mon solde portefeuille ({walletBalance.toFixed(2)} USD)
+                      {useWalletCredit && (
+                        <span className="block text-xs text-muted-foreground mt-0.5">
+                          Reste à payer : {formatPrice(payableAfterWallet)}
+                        </span>
+                      )}
+                    </span>
+                  </label>
                 )}
 
                 {paymentMethod === "cod" && (
@@ -2578,7 +2748,7 @@ export default function CheckoutPage() {
                           {processing ? (
                             <><Loader2 size={16} className="animate-spin mr-2" /> {t("checkout.processing")}</>
                           ) : (
-                            `${t("checkout.placeOrder")} — ${formatPrice(total)}`
+                            `${t("checkout.placeOrder")} — ${formatPrice(useWalletCredit && onlineWalletEligible ? payableAfterWallet : total)}`
                           )}
                         </Button>
                         {!termsAccepted && (
@@ -2591,13 +2761,13 @@ export default function CheckoutPage() {
                       <div className="fixed inset-x-0 bottom-0 z-40 bg-card/95 backdrop-blur-sm border-t border-border p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] space-y-2">
                         <div className="flex justify-between text-sm px-1">
                           <span className="text-muted-foreground">Total</span>
-                          <span className="font-bold text-foreground">{formatPrice(total)}</span>
+                          <span className="font-bold text-foreground">{formatPrice(useWalletCredit && onlineWalletEligible ? payableAfterWallet : total)}</span>
                         </div>
                         <Button onClick={handlePayment} disabled={processing || !termsAccepted} className="w-full h-12 font-bold min-h-[44px] active:scale-[0.99]">
                           {processing ? (
                             <><Loader2 size={16} className="animate-spin mr-2" /> {t("checkout.processing")}</>
                           ) : (
-                            `${t("checkout.placeOrder")} — ${formatPrice(total)}`
+                            `${t("checkout.placeOrder")} — ${formatPrice(useWalletCredit && onlineWalletEligible ? payableAfterWallet : total)}`
                           )}
                         </Button>
                       </div>

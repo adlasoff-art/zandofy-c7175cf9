@@ -5,7 +5,11 @@ export const VENDOR_ORDERS_OR_FILTER =
 export type OffPlatformOrderFields = {
   payment_method?: string | null;
   status?: string;
+  /** Preuve paiement produit (hors plateforme). */
+  product_payment_proof_url?: string | null;
+  /** Preuve expédition différée (ne pas confondre avec produit). */
   shipping_payment_proof_url?: string | null;
+  shipping_payment_status?: string | null;
   off_platform_vendor_verified_at?: string | null;
   off_platform_admin_released_at?: string | null;
 };
@@ -14,8 +18,15 @@ export function isPlatformOwnedStore(flag: boolean | null | undefined): boolean 
   return flag === true;
 }
 
+/** URL preuve produit hors plateforme (fallback legacy sur shipping_* avant backfill). */
+export function offPlatformProductProofUrl(order: OffPlatformOrderFields): string | null {
+  const product = order.product_payment_proof_url?.trim();
+  if (product) return product;
+  return order.shipping_payment_proof_url?.trim() || null;
+}
+
 export function hasOffPlatformPaymentProof(order: OffPlatformOrderFields): boolean {
-  return !!order.shipping_payment_proof_url?.trim();
+  return !!offPlatformProductProofUrl(order);
 }
 
 export function isOffPlatformAwaitingPayment(order: OffPlatformOrderFields): boolean {
@@ -59,17 +70,61 @@ export function canAdminReleaseOffPlatform(
   return allowOverrideWithoutVendor;
 }
 
-/** Boutique non-plateforme : le vendeur confirme → pending + paid. */
+/**
+ * Ne marquer l'expédition payée que si elle était encore "unpaid".
+ * Les commandes hors plateforme partent en "deferred" au checkout — ne pas écraser.
+ * Statuts absents / null / deferred / paid → aucun patch (forward-safe).
+ */
+export function shippingStatusPatchForOffPlatformConfirm(
+  currentShippingPaymentStatus?: string | null,
+): { shipping_payment_status: "paid" } | Record<string, never> {
+  if (currentShippingPaymentStatus === "unpaid") {
+    return { shipping_payment_status: "paid" };
+  }
+  return {};
+}
+
+/** Boutique non-plateforme : le vendeur confirme le paiement produit → pending. */
 export function vendorOffPlatformConfirmUpdates(
   now: string,
   userId: string,
-  options?: { preserveVerifiedAt?: string | null },
+  options?: {
+    preserveVerifiedAt?: string | null;
+    currentShippingPaymentStatus?: string | null;
+  },
 ) {
   return {
     off_platform_vendor_verified_at: options?.preserveVerifiedAt || now,
     off_platform_vendor_verified_by: userId,
     status: "pending" as const,
-    shipping_payment_status: "paid" as const,
+    ...shippingStatusPatchForOffPlatformConfirm(options?.currentShippingPaymentStatus),
+  };
+}
+
+/** Alias explicite (même payload que vendorOffPlatformConfirmUpdates). */
+export function offPlatformProductConfirmFields(
+  now: string,
+  userId: string,
+  currentShippingPaymentStatus?: string | null,
+  options?: { preserveVerifiedAt?: string | null },
+) {
+  return vendorOffPlatformConfirmUpdates(now, userId, {
+    preserveVerifiedAt: options?.preserveVerifiedAt,
+    currentShippingPaymentStatus,
+  });
+}
+
+/** Libération admin (boutique plateforme) → pending + timestamps admin. */
+export function adminOffPlatformReleaseFields(
+  now: string,
+  userId: string,
+  currentShippingPaymentStatus?: string | null,
+) {
+  return {
+    status: "pending" as const,
+    off_platform_admin_released_at: now,
+    off_platform_admin_released_by: userId,
+    ...shippingStatusPatchForOffPlatformConfirm(currentShippingPaymentStatus),
   };
 }
 

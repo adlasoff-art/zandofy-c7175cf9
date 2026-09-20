@@ -123,8 +123,10 @@ export function VendorWalletTab({ storeId }: Props) {
     return (
       <div className="text-center py-12 space-y-2">
         <Wallet size={40} className="mx-auto text-muted-foreground/20" />
-        <p className="text-sm font-medium text-foreground">Portefeuille non activé</p>
-        <p className="text-xs text-muted-foreground">Votre portefeuille sera créé automatiquement après votre première commande livrée.</p>
+        <p className="text-sm font-medium text-foreground">Portefeuille en cours d&apos;activation</p>
+        <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+          Solde disponible après livraison des commandes. Le portefeuille est créé avec votre boutique.
+        </p>
       </div>
     );
   }

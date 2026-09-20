@@ -204,6 +204,7 @@ export default function AdminOrdersPage() {
       const ordersData = await withOptionalOrderFields<any>((data ?? []) as any[], [
         "deferred_payment_provider",
         "shipping_payment_proof_url",
+        "product_payment_proof_url",
         "off_platform_vendor_verified_at",
         "off_platform_vendor_verified_by",
         "off_platform_admin_released_at",

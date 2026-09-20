@@ -466,12 +466,15 @@ describe("Off-platform dual validation", () => {
       canAdminReleaseOffPlatform,
       hasOffPlatformPaymentProof,
       vendorOffPlatformConfirmUpdates,
+      adminOffPlatformReleaseFields,
+      shippingStatusPatchForOffPlatformConfirm,
     } = await import("@/lib/off-platform-payment");
 
     const waiting = {
       payment_method: "off_platform",
       status: "awaiting_payment",
-      shipping_payment_proof_url: "payment-proofs/x/a.jpg",
+      product_payment_proof_url: "payment-proofs/x/product.jpg",
+      shipping_payment_proof_url: null,
       off_platform_vendor_verified_at: "2026-05-24T12:00:00Z",
       off_platform_admin_released_at: null,
     };
@@ -484,9 +487,35 @@ describe("Off-platform dual validation", () => {
     expect(canAdminReleaseOffPlatform(waiting, false, false)).toBe(false);
     expect(hasOffPlatformPaymentProof(waiting)).toBe(true);
 
-    const confirm = vendorOffPlatformConfirmUpdates("2026-05-24T13:00:00Z", "user-1");
-    expect(confirm.status).toBe("pending");
-    expect(confirm.shipping_payment_status).toBe("paid");
+    // Fallback legacy: preuve encore dans shipping_*
+    expect(
+      hasOffPlatformPaymentProof({
+        payment_method: "off_platform",
+        shipping_payment_proof_url: "payment-proofs/x/legacy.jpg",
+      }),
+    ).toBe(true);
+
+    // deferred (cas hors plateforme checkout) : ne pas écraser shipping_payment_status
+    const confirmDeferred = vendorOffPlatformConfirmUpdates("2026-05-24T13:00:00Z", "user-1", {
+      currentShippingPaymentStatus: "deferred",
+    });
+    expect(confirmDeferred.status).toBe("pending");
+    expect(confirmDeferred).not.toHaveProperty("shipping_payment_status");
+    expect(shippingStatusPatchForOffPlatformConfirm("deferred")).toEqual({});
+    expect(shippingStatusPatchForOffPlatformConfirm(null)).toEqual({});
+    expect(shippingStatusPatchForOffPlatformConfirm(undefined)).toEqual({});
+    expect(shippingStatusPatchForOffPlatformConfirm("paid")).toEqual({});
+
+    // unpaid (edge) : peut passer à paid
+    const confirmUnpaid = vendorOffPlatformConfirmUpdates("2026-05-24T13:00:00Z", "user-1", {
+      currentShippingPaymentStatus: "unpaid",
+    });
+    expect(confirmUnpaid.shipping_payment_status).toBe("paid");
+
+    const adminRelease = adminOffPlatformReleaseFields("2026-05-24T14:00:00Z", "admin-1", "deferred");
+    expect(adminRelease.status).toBe("pending");
+    expect(adminRelease.off_platform_admin_released_at).toBe("2026-05-24T14:00:00Z");
+    expect(adminRelease).not.toHaveProperty("shipping_payment_status");
 
     const cardAwaiting = {
       payment_method: "stripe",

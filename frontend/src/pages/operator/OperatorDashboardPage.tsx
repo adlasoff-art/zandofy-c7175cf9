@@ -216,6 +216,7 @@ export default function OperatorDashboardPage() {
         <QuickLink to="/operator/rates" icon={Banknote} label="Définir mes tarifs" />
         <QuickLink to="/operator/coverage" icon={Truck} label="Zones de couverture" />
         <QuickLink to="/operator/billing" icon={Star} label="Voir la facturation" />
+        <QuickLink to="/operator/wallet" icon={Banknote} label="Portefeuille" />
       </div>
     </div>
   );

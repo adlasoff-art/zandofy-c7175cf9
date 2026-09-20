@@ -162,6 +162,7 @@ const OperatorFleetPage = lazyRetry(() => import("./pages/operator/OperatorFleet
 const OperatorCoveragePage = lazyRetry(() => import("./pages/operator/OperatorCoveragePage"));
 const OperatorRatesPage = lazyRetry(() => import("./pages/operator/OperatorRatesPage"));
 const OperatorBillingPage = lazyRetry(() => import("./pages/operator/OperatorBillingPage"));
+const OperatorWalletPage = lazyRetry(() => import("./pages/operator/OperatorWalletPage"));
 const OperatorSettingsPage = lazyRetry(() => import("./pages/operator/OperatorSettingsPage"));
 const ForwarderDashboardPage = lazyRetry(() => import("./pages/forwarder/ForwarderDashboardPage"));
 const ForwarderProfilesPage = lazyRetry(() => import("./pages/forwarder/ForwarderProfilesPage"));
@@ -397,6 +398,7 @@ const App = () => (
                   <Route path="coverage" element={<OperatorCoveragePage />} />
                   <Route path="rates" element={<OperatorRatesPage />} />
                   <Route path="billing" element={<OperatorBillingPage />} />
+                  <Route path="wallet" element={<OperatorWalletPage />} />
                   <Route path="settings" element={<OperatorSettingsPage />} />
                 </Route>
                 <Route

@@ -17,8 +17,10 @@ import {
   Package, MapPin, User as UserIcon, ChevronRight, ChevronLeft,
   Truck, CheckCircle2, Clock, Box, Gift, MessageCircle, Loader2,
   Plus, Trash2, Home, Briefcase, Star, Edit2, X, Save, Camera, Bell, XCircle,
-  Search, Filter, AlertTriangle, History, RotateCcw, FileText, CreditCard,
+  Search, Filter, AlertTriangle, History, RotateCcw, FileText, CreditCard, Wallet,
 } from "lucide-react";
+import { CustomerWalletCard } from "@/components/wallet/CustomerWalletCard";
+
 import { RetryPaymentModal } from "@/components/payments/RetryPaymentModal";
 import { PushPermissionPrompt } from "@/components/PushPermissionPrompt";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -69,7 +71,9 @@ const TABS = [
   { key: "overview", labelKey: "dashboard.tab.overview", icon: Package },
   { key: "orders", labelKey: "dashboard.tab.orders", icon: Package },
   { key: "subscriptions", labelKey: "dashboard.tab.subscriptions", icon: CreditCard },
+  { key: "wallet", labelKey: "dashboard.tab.wallet", icon: Wallet },
   { key: "tracking", labelKey: "dashboard.tab.tracking", icon: Truck },
+
   { key: "messages", labelKey: "dashboard.tab.messages", icon: MessageCircle },
   { key: "notifications", labelKey: "dashboard.tab.notifications", icon: Bell },
   { key: "returns", labelKey: "dashboard.tab.returns", icon: RotateCcw },
@@ -117,6 +121,7 @@ interface OrderRow {
   last_mile_payment_status: string | null;
   rider_cash_collected: boolean | null;
   shipping_payment_proof_url: string | null;
+  product_payment_proof_url: string | null;
   last_mile_payment_proof_url: string | null;
   hub_pickup_proof_url: string | null;
   store_id: string | null;
@@ -216,6 +221,7 @@ export default function DashboardPage() {
     }
     const ordersWithOptionalFields = await withOptionalOrderFields<OrderRow>((data || []) as OrderRow[], [
       "shipping_payment_proof_url",
+      "product_payment_proof_url",
       "last_mile_payment_proof_url",
       "hub_pickup_proof_url",
       "delivery_date_requested",
@@ -350,7 +356,9 @@ export default function DashboardPage() {
           />
         )}
         {activeTab === "subscriptions" && <CustomerPricingTab />}
+        {activeTab === "wallet" && <CustomerWalletCard />}
         {activeTab === "tracking" && <TrackingTab orders={orders} />}
+
         {activeTab === "returns" && <ReturnsList />}
         {activeTab === "disputes" && <DisputesList />}
         {activeTab === "referral" && <ReferralDashboard />}
@@ -912,11 +920,11 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           </div>
           <PaymentProofUpload
             orderId={order.id}
-            field="shipping_payment_proof_url"
+            field="product_payment_proof_url"
             label={t("dashboard.detail.proof.order")}
-            existingUrl={order.shipping_payment_proof_url}
+            existingUrl={order.product_payment_proof_url || order.shipping_payment_proof_url}
           />
-          {order.shipping_payment_proof_url && (
+          {(order.product_payment_proof_url || order.shipping_payment_proof_url) && (
             <div className="flex items-center gap-2 text-xs bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-2.5">
               <span className="text-blue-700 dark:text-blue-400 font-medium">
                 {t("dashboard.detail.offPlatform.waiting")}

@@ -13,6 +13,8 @@ import {
   isOffPlatformAwaitingAdminRelease,
   isOffPlatformAwaitingPayment,
   isPlatformOwnedStore,
+  adminOffPlatformReleaseFields,
+  offPlatformProductProofUrl,
   type OffPlatformOrderFields,
 } from "@/lib/off-platform-payment";
 
@@ -49,9 +51,10 @@ export function OffPlatformReleasePanel({
   const alreadyReleased = !!order.off_platform_admin_released_at;
 
   const openProof = async () => {
-    if (!order.shipping_payment_proof_url) return;
+    const proof = offPlatformProductProofUrl(order);
+    if (!proof) return;
     const { getDeliveryProofUrl } = await import("@/lib/delivery-proof-urls");
-    const u = await getDeliveryProofUrl(order.shipping_payment_proof_url);
+    const u = await getDeliveryProofUrl(proof);
     if (u) window.open(u, "_blank");
   };
 
@@ -68,14 +71,14 @@ export function OffPlatformReleasePanel({
     }
     setBusy(true);
     const now = new Date().toISOString();
+    const payload = adminOffPlatformReleaseFields(
+      now,
+      userId,
+      order.shipping_payment_status,
+    );
     const { error } = await supabase
       .from("orders")
-      .update({
-        status: "pending",
-        shipping_payment_status: "paid",
-        off_platform_admin_released_at: now,
-        off_platform_admin_released_by: userId,
-      } as any)
+      .update(payload as any)
       .eq("id", order.id);
 
     if (error) {
@@ -84,14 +87,15 @@ export function OffPlatformReleasePanel({
       return;
     }
 
-    if (overrideWithoutVendor && !order.off_platform_vendor_verified_at) {
-      await supabase.from("order_status_history").insert({
-        order_id: order.id,
-        status: "awaiting_payment",
-        notes: "Admin : libération sans validation vendeur (override)",
-        changed_by: userId,
-      });
-    }
+    await supabase.from("order_status_history").insert({
+      order_id: order.id,
+      status: "pending",
+      notes:
+        overrideWithoutVendor && !order.off_platform_vendor_verified_at
+          ? "Admin : libération sans validation vendeur (override)"
+          : "Admin : libération hors plateforme",
+      changed_by: userId,
+    });
 
     toast.success("Commande libérée — le vendeur peut traiter la logistique.");
     triggerOrderStatusNotification(order.id, "pending");
@@ -116,11 +120,12 @@ export function OffPlatformReleasePanel({
     setBusy(false);
   };
 
-  const proofBlock = order.shipping_payment_proof_url ? (
+  const productProof = offPlatformProductProofUrl(order);
+  const proofBlock = productProof ? (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground">Preuve de paiement client :</p>
       <DeliveryProofImage
-        pathOrUrl={order.shipping_payment_proof_url}
+        pathOrUrl={productProof}
         alt="Preuve de paiement"
         className="w-full max-w-xs rounded-lg border border-border object-cover cursor-pointer"
         onClick={openProof}

@@ -105,7 +105,50 @@ Deno.serve(async (req) => {
       );
     }
 
-    const cleanAmount = Math.round(Number(amount) * 100) / 100;
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+    // Server-authoritative amount: order.total − wallet_credit_applied
+    const { data: orderRow, error: orderErr } = await supabaseAdmin
+      .from("orders")
+      .select("id, total, wallet_credit_applied, user_id, status, payment_method")
+      .eq("id", order_id)
+      .maybeSingle();
+    if (orderErr || !orderRow) {
+      return new Response(
+        JSON.stringify({ error: "Commande introuvable" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (orderRow.user_id && userId && orderRow.user_id !== userId) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const expected =
+      Math.round(
+        (Number(orderRow.total || 0) - Number(orderRow.wallet_credit_applied || 0)) * 100
+      ) / 100;
+    const clientAmount = Math.round(Number(amount) * 100) / 100;
+    if (expected <= 0) {
+      return new Response(
+        JSON.stringify({ error: "Commande déjà couverte par le portefeuille" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (Math.abs(clientAmount - expected) > 0.02) {
+      return new Response(
+        JSON.stringify({
+          error: "Montant invalide",
+          expected,
+          received: clientAmount,
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const cleanAmount = expected;
     const reference = `ZPY-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     const callbackUrl = `${supabaseUrl}/functions/v1/kelpay-webhook`;
 
@@ -138,7 +181,6 @@ Deno.serve(async (req) => {
     const kelpayData = await kelpayResponse.json();
     console.log("KelPay response:", JSON.stringify(kelpayData));
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     const isAccepted = kelpayData.code === "0";
     const isSentToMobile =

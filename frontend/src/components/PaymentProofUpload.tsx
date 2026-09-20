@@ -8,7 +8,7 @@ import { useEffect } from "react";
 
 interface PaymentProofUploadProps {
   orderId: string;
-  field: "shipping_payment_proof_url" | "last_mile_payment_proof_url" | "hub_pickup_proof_url";
+  field: "shipping_payment_proof_url" | "product_payment_proof_url" | "last_mile_payment_proof_url" | "hub_pickup_proof_url";
   label?: string;
   onUploaded?: (url: string) => void;
   existingUrl?: string | null;

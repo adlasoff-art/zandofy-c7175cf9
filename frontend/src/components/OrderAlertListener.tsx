@@ -78,18 +78,21 @@ export function OrderAlertListener() {
 
     const { data } = await supabase
       .from("orders")
-      .select("order_ref, updated_at")
+      .select("order_ref, updated_at, product_payment_proof_url, shipping_payment_proof_url")
       .in("store_id", storeIdsRef.current)
       .eq("payment_method", "off_platform")
       .eq("status", "awaiting_payment")
-      .not("shipping_payment_proof_url", "is", null)
       .is("off_platform_vendor_verified_at", null)
       .gt("updated_at", lastSeenOffPlatformProofRef.current)
       .order("updated_at", { ascending: true })
-      .limit(10);
+      .limit(20);
 
-    if (data && data.length > 0) {
-      const latest = data[data.length - 1] as any;
+    const withProof = (data || []).filter(
+      (o: any) => !!(o.product_payment_proof_url || o.shipping_payment_proof_url),
+    );
+
+    if (withProof.length > 0) {
+      const latest = withProof[withProof.length - 1] as any;
       toast("Preuve hors plateforme à vérifier", {
         description: `Commande ${latest.order_ref}`,
         icon: <CreditCard size={16} />,
