@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
     // Fetch order
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, order_ref, user_id, total, subtotal, shipping_cost, status, last_mile_fee")
+      .select("id, order_ref, user_id, total, subtotal, shipping_cost, status, last_mile_fee, wallet_credit_applied")
       .eq("id", order_id)
       .maybeSingle();
     if (orderError || !order) return errorResponse("Commande introuvable");
@@ -104,7 +104,10 @@ Deno.serve(async (req) => {
     let amount: number;
     if (pType === "shipping") amount = Number(order.shipping_cost) || 0;
     else if (pType === "last_mile") amount = Number(order.last_mile_fee) || 0;
-    else amount = Number(order.total) || 0;
+    else {
+      const walletCredit = Number((order as any).wallet_credit_applied) || 0;
+      amount = Math.max(0, (Number(order.total) || 0) - walletCredit);
+    }
     if (amount <= 0) return errorResponse("Montant invalide");
 
     // Keccel exige amount entier — arrondi sup (perte max 1 cent côté client pour prix .99)

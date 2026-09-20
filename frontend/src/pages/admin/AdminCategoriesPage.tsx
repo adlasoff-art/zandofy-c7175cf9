@@ -14,6 +14,7 @@ interface Category {
   image_url: string | null;
   parent_id: string | null;
   sort_order: number;
+  apparel_fields_enabled?: boolean;
 }
 
 interface TreeNode extends Category {
@@ -47,9 +48,10 @@ interface FormState {
   display_mode: string;
   parent_id: string;
   sort_order: number;
+  apparel_fields_enabled: boolean;
 }
 
-const emptyForm: FormState = { mode: "add", name: "", name_fr: "", icon: "", image_url: "", display_mode: "icon", parent_id: "", sort_order: 0 };
+const emptyForm: FormState = { mode: "add", name: "", name_fr: "", icon: "", image_url: "", display_mode: "icon", parent_id: "", sort_order: 0, apparel_fields_enabled: false };
 
 export default function AdminCategoriesPage() {
   const queryClient = useQueryClient();
@@ -147,6 +149,7 @@ export default function AdminCategoriesPage() {
         display_mode: f.display_mode || "icon",
         parent_id: f.parent_id || null,
         sort_order: f.sort_order,
+        apparel_fields_enabled: !!f.apparel_fields_enabled,
       };
       if (f.mode === "edit" && f.id) {
         const { error } = await (supabase as any).from("categories").update(payload).eq("id", f.id);
@@ -179,7 +182,7 @@ export default function AdminCategoriesPage() {
   });
 
   const openEdit = (cat: Category) => {
-    setForm({ mode: "edit", id: cat.id, name: cat.name, name_fr: cat.name_fr, icon: cat.icon || "", image_url: cat.image_url || "", display_mode: (cat as any).display_mode || "icon", parent_id: cat.parent_id || "", sort_order: cat.sort_order ?? 0 });
+    setForm({ mode: "edit", id: cat.id, name: cat.name, name_fr: cat.name_fr, icon: cat.icon || "", image_url: cat.image_url || "", display_mode: (cat as any).display_mode || "icon", parent_id: cat.parent_id || "", sort_order: cat.sort_order ?? 0, apparel_fields_enabled: !!(cat as any).apparel_fields_enabled });
     setShowForm(true);
   };
 
@@ -297,6 +300,17 @@ export default function AdminCategoriesPage() {
                 {parentOptions.map((c) => <option key={c.id} value={c.id}>{c.name_fr}</option>)}
               </select>
             </div>
+            <label className="flex items-center justify-between gap-3 p-2 rounded-lg bg-muted/40 border border-border">
+              <div>
+                <p className="text-xs font-medium text-foreground">Champs textile / mode</p>
+                <p className="text-[10px] text-muted-foreground">Affiche la taille mannequin (et attributs mode) dans le formulaire vendeur.</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={form.apparel_fields_enabled}
+                onChange={(e) => setForm((f) => ({ ...f, apparel_fields_enabled: e.target.checked }))}
+              />
+            </label>
             <button
               onClick={() => saveMutation.mutate(form)}
               disabled={!form.name || !form.name_fr || saveMutation.isPending}

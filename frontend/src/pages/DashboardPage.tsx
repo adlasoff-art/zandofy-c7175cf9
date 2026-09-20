@@ -17,8 +17,10 @@ import {
   Package, MapPin, User as UserIcon, ChevronRight, ChevronLeft,
   Truck, CheckCircle2, Clock, Box, Gift, MessageCircle, Loader2,
   Plus, Trash2, Home, Briefcase, Star, Edit2, X, Save, Camera, Bell, XCircle,
-  Search, Filter, AlertTriangle, History, RotateCcw, FileText, CreditCard,
+  Search, Filter, AlertTriangle, History, RotateCcw, FileText, CreditCard, Wallet,
 } from "lucide-react";
+import { CustomerWalletCard } from "@/components/wallet/CustomerWalletCard";
+
 import { RetryPaymentModal } from "@/components/payments/RetryPaymentModal";
 import { PushPermissionPrompt } from "@/components/PushPermissionPrompt";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -69,7 +71,9 @@ const TABS = [
   { key: "overview", labelKey: "dashboard.tab.overview", icon: Package },
   { key: "orders", labelKey: "dashboard.tab.orders", icon: Package },
   { key: "subscriptions", labelKey: "dashboard.tab.subscriptions", icon: CreditCard },
+  { key: "wallet", labelKey: "dashboard.tab.wallet", icon: Wallet },
   { key: "tracking", labelKey: "dashboard.tab.tracking", icon: Truck },
+
   { key: "messages", labelKey: "dashboard.tab.messages", icon: MessageCircle },
   { key: "notifications", labelKey: "dashboard.tab.notifications", icon: Bell },
   { key: "returns", labelKey: "dashboard.tab.returns", icon: RotateCcw },
@@ -352,7 +356,9 @@ export default function DashboardPage() {
           />
         )}
         {activeTab === "subscriptions" && <CustomerPricingTab />}
+        {activeTab === "wallet" && <CustomerWalletCard />}
         {activeTab === "tracking" && <TrackingTab orders={orders} />}
+
         {activeTab === "returns" && <ReturnsList />}
         {activeTab === "disputes" && <DisputesList />}
         {activeTab === "referral" && <ReferralDashboard />}

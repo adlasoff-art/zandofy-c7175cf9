@@ -20,7 +20,7 @@ interface MediaUploaderProps {
   acceptVideo?: boolean;
   storeId: string;
   onUploadingChange?: (uploading: boolean) => void;
-  /** Soft cap for gallery (cover is separate). Default 29 so cover+gallery ≤ 30. */
+  /** Soft cap for gallery images (cover is separate). Default 4 so cover+gallery images ≤ 5. Videos do not count toward this cap when acceptVideo. */
   maxItems?: number;
 }
 
@@ -43,7 +43,27 @@ export function MediaUploader({
   };
 
   const accept = acceptVideo ? "image/*,video/mp4,video/webm,video/quicktime" : "image/*";
-  const limit = maxItems ?? (multiple ? 29 : 1);
+  const limit = maxItems ?? (multiple ? 4 : 1);
+  const imageItems = items.filter((i) => i.type === "image");
+  const videoItems = items.filter((i) => i.type === "video");
+  const MAX_VIDEOS = 3;
+
+  const readVideoDuration = (file: File): Promise<number> =>
+    new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      video.onloadedmetadata = () => {
+        const duration = video.duration;
+        URL.revokeObjectURL(objectUrl);
+        resolve(duration);
+      };
+      video.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("metadata"));
+      };
+      video.src = objectUrl;
+    });
 
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -52,21 +72,51 @@ export function MediaUploader({
       return;
     }
 
-    const remaining = multiple ? Math.max(0, limit - items.length) : 1;
-    if (remaining <= 0) {
-      toast.error(`Maximum ${limit} fichier(s) pour cette zone.`);
+    const remainingImages = multiple ? Math.max(0, limit - imageItems.length) : Math.max(0, 1 - imageItems.length);
+    const remainingVideos = acceptVideo ? Math.max(0, MAX_VIDEOS - videoItems.length) : 0;
+    if (remainingImages <= 0 && remainingVideos <= 0) {
+      toast.error(
+        acceptVideo
+          ? `Maximum ${limit} image(s) et ${MAX_VIDEOS} vidéo(s) pour cette zone.`
+          : `Maximum ${limit} fichier(s) pour cette zone.`
+      );
       return;
     }
 
     setUploadingState(true);
     const newItems: MediaItem[] = [];
     let failureCount = 0;
+    let imagesAdded = 0;
+    let videosAdded = 0;
 
     try {
-      const fileList = Array.from(files).slice(0, remaining);
+      const fileList = Array.from(files);
       for (let i = 0; i < fileList.length; i++) {
         const raw = fileList[i];
         const isVideo = raw.type.startsWith("video/");
+        if (isVideo) {
+          if (!acceptVideo || videosAdded >= remainingVideos) {
+            if (isVideo && !acceptVideo) {
+              toast.error("Les vidéos ne sont pas acceptées ici.");
+            }
+            continue;
+          }
+          try {
+            const duration = await readVideoDuration(raw);
+            if (!Number.isFinite(duration) || duration > 30) {
+              failureCount += 1;
+              toast.error(`Vidéo « ${raw.name} » refusée : maximum 30 secondes.`);
+              continue;
+            }
+          } catch {
+            failureCount += 1;
+            toast.error(`Impossible de lire la durée de « ${raw.name} ».`);
+            continue;
+          }
+        } else if (imagesAdded >= remainingImages) {
+          continue;
+        }
+
         const file = isVideo ? raw : await compressImage(raw);
         const ext = sanitizeExtension(file.name, isVideo ? "mp4" : "jpg");
         // Path must start with store UUID folder for storage RLS (owner upload policy).
@@ -100,8 +150,10 @@ export function MediaUploader({
         newItems.push({
           url: urlData.publicUrl,
           type: isVideo ? "video" : "image",
-          position: items.length + i,
+          position: items.length + newItems.length,
         });
+        if (isVideo) videosAdded += 1;
+        else imagesAdded += 1;
       }
 
       if (inputRef.current) inputRef.current.value = "";
@@ -109,16 +161,16 @@ export function MediaUploader({
       if (newItems.length === 0) {
         toast.error(
           failureCount > 0
-            ? "Aucune image n'a pu être téléversée. Vérifiez le format, la taille et votre connexion."
-            : "Aucune image n'a pu être téléversée."
+            ? "Aucun média n'a pu être téléversé. Vérifiez le format, la taille et votre connexion."
+            : "Aucun média n'a pu être téléversé."
         );
         return;
       }
 
       if (multiple) {
-        onChange([...items, ...newItems].slice(0, limit));
+        onChange([...items, ...newItems]);
       } else {
-        onChange(newItems.slice(0, 1));
+        onChange(newItems.filter((m) => m.type === "image").slice(0, 1));
       }
     } catch (err) {
       console.error("MediaUploader unexpected error:", err);
@@ -132,7 +184,9 @@ export function MediaUploader({
     onChange(items.filter((_, i) => i !== index));
   };
 
-  const canAdd = multiple ? items.length < limit : items.length === 0;
+  const canAdd = multiple
+    ? imageItems.length < limit || (acceptVideo && videoItems.length < MAX_VIDEOS)
+    : items.length === 0;
 
   return (
     <div>

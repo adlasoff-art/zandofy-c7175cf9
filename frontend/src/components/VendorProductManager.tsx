@@ -20,8 +20,21 @@ import { useStoreKybGate } from "@/hooks/use-store-kyb-gate";
 import { StoreKybGateBanner } from "@/components/vendor/StoreKybGateBanner";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 import { generateProductSlug } from "@/utils/productSlug";
+import {
+  deleteBlockedMessage,
+  fetchProductOrderGuards,
+  priceLockedMessage,
+} from "@/lib/product-order-guards";
+import {
+  countWords,
+  deriveSeoKeywords,
+  imageCount,
+  isVideoMediaUrl,
+} from "@/lib/product-catalogue-validation";
 
-const MAX_GALLERY_IMAGES = 30;
+/** Max product images (cover + gallery). Videos do not count. */
+const MAX_GALLERY_IMAGES = 5;
+const REQUIRED_IMAGES = 5;
 
 /** Accept product-media Storage URLs, or keep an URL already on this product (legacy). */
 function isAllowedProductMediaUrl(url: string, existingUrls?: Set<string>): boolean {
@@ -84,6 +97,7 @@ interface Product {
 interface Category {
   id: string;
   name_fr: string;
+  apparel_fields_enabled?: boolean;
 }
 
 interface MediaItem {
@@ -124,13 +138,14 @@ const EMPTY_FORM = {
   height_cm: 0,
   cost_real: 0,
   cost_calc: 0,
-  auto_pricing_enabled: true,
+  auto_pricing_enabled: false,
   vendor_extra_margin: 0,
   model_size: "",
   prep_days_min: 2,
   prep_days_max: 5,
   can_ship_air: true,
   can_ship_sea: false,
+  offers_home_delivery: false,
   meta_title: "",
   meta_description: "",
   seo_keywords: "",
@@ -152,12 +167,23 @@ interface ProductDraftSnapshot {
 
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 
-export function VendorProductManager({ storeId, suppliersEnabled = false }: { storeId: string; suppliersEnabled?: boolean }) {
+export function VendorProductManager({
+  storeId,
+  suppliersEnabled = false,
+  shopType = "international",
+  isPlatformOwned = false,
+}: {
+  storeId: string;
+  suppliersEnabled?: boolean;
+  shopType?: "local" | "international";
+  isPlatformOwned?: boolean;
+}) {
   const { user } = useAuth();
   const { subscription, tierConfig, canAddProduct } = useVendorSubscription(storeId);
   const { data: suspensionStatus } = useStoreSuspension(storeId);
   const { data: kybGate } = useStoreKybGate(storeId);
   const listingBlocked = isActivityBlocked(suspensionStatus, "product_listing") || !!kybGate?.blocked;
+  const isLocalShop = shopType === "local";
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -171,6 +197,8 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   const [saving, setSaving] = useState(false);
   const [mediaUploading, setMediaUploading] = useState(false);
   const mediaUploadingCountRef = useRef(0);
+  const metaDescriptionTouched = useRef(false);
+  const seoKeywordsTouched = useRef(false);
   const handleMediaUploadingChange = useCallback((uploading: boolean) => {
     mediaUploadingCountRef.current = Math.max(
       0,
@@ -185,6 +213,12 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
   const [colors, setColors] = useState<ColorVariant[]>([]);
   const [dynamicSelections, setDynamicSelections] = useState<DynamicVariantSelection[]>([]);
   const [customVariantValues, setCustomVariantValues] = useState<CustomVariantValue[]>([]);
+  const [priceLocked, setPriceLocked] = useState(false);
+  const [hasOrderHistory, setHasOrderHistory] = useState(false);
+  const [includeStyle, setIncludeStyle] = useState(false);
+  const [includeSeason, setIncludeSeason] = useState(false);
+  const [includeCare, setIncludeCare] = useState(false);
+  const [includeMaterial, setIncludeMaterial] = useState(false);
 
   const showForm = creating || !!editing;
   const draftStorageKey = useMemo(
@@ -204,7 +238,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     const { data, error } = await (supabase
       .from("products")
       .select(
-        "id, name, name_fr, slug, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea, meta_title, meta_description, seo_keywords, product_images(id, image_url, position)"
+        "id, name, name_fr, slug, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, cost_real, cost_calc, auto_pricing_enabled, vendor_extra_margin, model_size, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea, offers_home_delivery, meta_title, meta_description, seo_keywords, product_images(id, image_url, position)"
       ) as any)
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
@@ -238,8 +272,8 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
 
   useEffect(() => {
     loadProducts();
-    supabase.from("categories").select("id, name_fr").then(({ data }) => {
-      if (data) setCategories(data);
+    supabase.from("categories").select("id, name_fr, apparel_fields_enabled").then(({ data }) => {
+      if (data) setCategories(data as Category[]);
     });
     (supabase as any).from("trend_tags").select("id, name_fr").eq("is_active", true).order("sort_order").then(({ data }: any) => {
       if (data) setTrendTags(data);
@@ -381,6 +415,14 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     setColors([]);
     setDynamicSelections([]);
     setCustomVariantValues([]);
+    setPriceLocked(false);
+    setHasOrderHistory(false);
+    setIncludeStyle(false);
+    setIncludeSeason(false);
+    setIncludeCare(false);
+    setIncludeMaterial(false);
+    metaDescriptionTouched.current = false;
+    seoKeywordsTouched.current = false;
     setCreating(true);
   };
 
@@ -391,6 +433,12 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     }
     setCreating(false);
     setEditing(product);
+    setPriceLocked(false);
+    setHasOrderHistory(false);
+    void fetchProductOrderGuards(product.id).then((g) => {
+      setPriceLocked(g.hasActiveOrders);
+      setHasOrderHistory(g.hasAnyOrders);
+    });
     setForm({
       name: product.name,
       name_fr: product.name_fr,
@@ -424,17 +472,24 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       cost_calc: (product as any).cost_calc || 0,
       prep_days_min: (product as any).prep_days_min ?? 2,
       prep_days_max: (product as any).prep_days_max ?? 5,
-      auto_pricing_enabled: (product as any).auto_pricing_enabled !== false,
+      auto_pricing_enabled: !!(product as any).auto_pricing_enabled,
       vendor_extra_margin: (product as any).vendor_extra_margin || 0,
       model_size: (product as any).model_size || "",
       can_ship_air: (product as any).can_ship_air !== false,
       can_ship_sea: (product as any).can_ship_sea === true,
+      offers_home_delivery: !!(product as any).offers_home_delivery,
       meta_title: (product as any).meta_title || "",
       meta_description: (product as any).meta_description || "",
       seo_keywords: Array.isArray((product as any).seo_keywords)
         ? (product as any).seo_keywords.join(", ")
         : "",
     });
+    setIncludeMaterial(!!(product.material || "").trim());
+    setIncludeStyle(!!((product as any).style || "").trim());
+    setIncludeSeason(!!((product as any).season || "").trim());
+    setIncludeCare(!!((product as any).care_instructions || "").trim());
+    metaDescriptionTouched.current = false;
+    seoKeywordsTouched.current = false;
     // Split images: position 0 = main, rest = variations
     const sorted = [...product.images].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     const main = sorted.length > 0 ? [{ id: sorted[0].id, url: sorted[0].image_url, type: "image" as const, position: 0 }] : [];
@@ -476,6 +531,14 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
     clearDraft();
     setEditing(null);
     setCreating(false);
+    setPriceLocked(false);
+    setHasOrderHistory(false);
+    setIncludeStyle(false);
+    setIncludeSeason(false);
+    setIncludeCare(false);
+    setIncludeMaterial(false);
+    metaDescriptionTouched.current = false;
+    seoKeywordsTouched.current = false;
   };
 
   const handleSave = async () => {
@@ -487,13 +550,28 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       toast.error("Nom et prix sont obligatoires");
       return;
     }
-    // Produits déjà en catalogue / file / révision : ne jamais enregistrer sans photo
-    const requiresPhoto =
+    // Produits déjà en catalogue / file / révision : textes + exactement 5 images
+    const requiresPublishQuality =
       editing?.publish_status === "published" ||
       editing?.publish_status === "pending_approval" ||
       editing?.publish_status === "revision_requested";
-    if (requiresPhoto && mainImage.length === 0 && variationMedia.length === 0) {
-      toast.error("Ajoutez au moins une photo avant d'enregistrer ce produit");
+    if (requiresPublishQuality) {
+      if (countWords(form.short_description) < 15) {
+        toast.error("La description courte doit contenir au moins 15 mots");
+        return;
+      }
+      if ((form.description || "").trim().length < 200) {
+        toast.error("La description longue doit contenir au moins 200 caractères");
+        return;
+      }
+    }
+    const currentImageCount = imageCount(mainImage, variationMedia);
+    if (requiresPublishQuality && currentImageCount !== REQUIRED_IMAGES) {
+      toast.error(`Ce produit nécessite exactement ${REQUIRED_IMAGES} photos (actuellement ${currentImageCount})`);
+      return;
+    }
+    if (currentImageCount > MAX_GALLERY_IMAGES) {
+      toast.error(`Maximum ${MAX_GALLERY_IMAGES} photos par produit.`);
       return;
     }
     setSaving(true);
@@ -507,46 +585,59 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       ? await generateProductSlug(displayName, editing?.id)
       : (editing as any).slug;
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       name: form.name || form.name_fr,
       name_fr: form.name_fr,
       slug,
-      price: form.price,
-      original_price: form.original_price || null,
       currency: form.currency,
       description: form.description || null,
       short_description: form.short_description || null,
       moq: form.moq ? Math.round(Number(form.moq)) : 1,
       sku: form.sku || null,
       is_new: form.is_new,
-      is_sale: form.is_sale,
-      discount: form.discount ? Math.round(Number(form.discount)) : 0,
-      material: form.material || null,
-      style: form.style || null,
-      season: form.season || null,
-      care_instructions: form.care_instructions || null,
+      is_sale: priceLocked ? (editing as any)?.is_sale ?? form.is_sale : form.is_sale,
+      discount: priceLocked
+        ? (editing as any)?.discount ?? form.discount
+        : form.discount
+          ? Math.round(Number(form.discount))
+          : 0,
+      material: includeMaterial ? (form.material || null) : null,
+      style: includeStyle ? (form.style || null) : null,
+      season: includeSeason ? (form.season || null) : null,
+      care_instructions: includeCare ? (form.care_instructions || null) : null,
       origin_country: form.origin_country || null,
       category_id: form.category_id && form.category_id.trim() !== '' ? form.category_id : null,
       trend_tag_id: form.trend_tag_id && form.trend_tag_id.trim() !== '' ? form.trend_tag_id : null,
       supplier_id: form.supplier_id && form.supplier_id.trim() !== '' ? form.supplier_id : null,
       supplier_product_id: form.supplier_product_id && form.supplier_product_id.trim() !== '' ? form.supplier_product_id : null,
       store_id: storeId,
-      flash_timer_enabled: form.flash_timer_enabled,
-      promo_start_date: form.promo_start_date ? new Date(form.promo_start_date).toISOString() : null,
-      promo_end_date: form.promo_end_date ? new Date(form.promo_end_date).toISOString() : null,
+      flash_timer_enabled: priceLocked
+        ? !!(editing as any)?.flash_timer_enabled
+        : form.flash_timer_enabled,
+      promo_start_date: priceLocked
+        ? (editing as any)?.promo_start_date ?? null
+        : form.promo_start_date
+          ? new Date(form.promo_start_date).toISOString()
+          : null,
+      promo_end_date: priceLocked
+        ? (editing as any)?.promo_end_date ?? null
+        : form.promo_end_date
+          ? new Date(form.promo_end_date).toISOString()
+          : null,
       weight_grams: form.weight_grams ? Math.round(Number(form.weight_grams)) : null,
       length_cm: form.length_cm || null,
       width_cm: form.width_cm || null,
       height_cm: form.height_cm || null,
       prep_days_min: form.prep_days_min ? Math.round(Number(form.prep_days_min)) : 2,
       prep_days_max: form.prep_days_max ? Math.round(Number(form.prep_days_max)) : 5,
-      cost_real: form.cost_real || null,
-      cost_calc: form.cost_calc || null,
-      auto_pricing_enabled: form.auto_pricing_enabled,
-      vendor_extra_margin: form.vendor_extra_margin || 0,
-      model_size: form.model_size && form.model_size.trim() !== '' ? form.model_size.trim() : null,
-      can_ship_air: form.can_ship_air,
-      can_ship_sea: form.can_ship_sea,
+      model_size: (() => {
+        const cat = categories.find((c) => c.id === form.category_id);
+        if (!cat?.apparel_fields_enabled) return null;
+        return form.model_size && form.model_size.trim() !== "" ? form.model_size.trim() : null;
+      })(),
+      can_ship_air: isLocalShop ? false : form.can_ship_air,
+      can_ship_sea: isLocalShop ? false : form.can_ship_sea,
+      offers_home_delivery: isLocalShop ? !!form.offers_home_delivery : false,
       meta_title: form.meta_title.trim() || null,
       meta_description: form.meta_description.trim() || null,
       seo_keywords: (() => {
@@ -557,6 +648,15 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
         return keywords.length > 0 ? keywords : null;
       })(),
     };
+
+    if (!priceLocked) {
+      payload.price = form.price;
+      payload.original_price = form.original_price || null;
+      payload.cost_real = form.cost_real || null;
+      payload.cost_calc = form.cost_calc || null;
+      payload.auto_pricing_enabled = form.auto_pricing_enabled;
+      payload.vendor_extra_margin = form.vendor_extra_margin || 0;
+    }
 
     let productId = editing?.id;
     const wasPublished = editing?.publish_status === "published";
@@ -612,7 +712,10 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
         .map((m, i) => ({ image_url: m.url.trim(), position: i + 1 }));
       const allMedia = [...cover, ...gallery];
 
-      if (allMedia.length > MAX_GALLERY_IMAGES) {
+      const syncedImageCount = allMedia.filter(
+        (m) => !isVideoMediaUrl(m.image_url)
+      ).length;
+      if (syncedImageCount > MAX_GALLERY_IMAGES) {
         abortSave(`Maximum ${MAX_GALLERY_IMAGES} photos par produit.`);
         return;
       }
@@ -903,18 +1006,34 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       toast.error("Catalogue bloqué : boutique suspendue, bannie ou archivée");
       return;
     }
-    // Toujours vérifier en base (évite un cache liste périmé)
-    const { count, error: countErr } = await supabase
+    // Toujours vérifier en base (évite un cache liste périmé) — exactement 5 images, hors vidéos
+    const { data: imgRows, error: countErr } = await supabase
       .from("product_images")
-      .select("id", { count: "exact", head: true })
+      .select("image_url")
       .eq("product_id", productId);
     if (countErr) {
       toast.error("Impossible de vérifier les photos avant soumission");
       return;
     }
-    if (!count || count < 1) {
-      toast.error("Ajoutez au moins une photo avant de soumettre pour approbation");
+    const photoCount = (imgRows || []).filter(
+      (row: { image_url: string }) => !isVideoMediaUrl(row.image_url || "")
+    ).length;
+    if (photoCount !== REQUIRED_IMAGES) {
+      toast.error(
+        `Ajoutez exactement ${REQUIRED_IMAGES} photos avant de soumettre (actuellement ${photoCount})`
+      );
       return;
+    }
+    const product = products.find((p) => p.id === productId);
+    if (product) {
+      if (countWords(product.short_description || "") < 15) {
+        toast.error("Description courte : au moins 15 mots avant soumission");
+        return;
+      }
+      if ((product.description || "").trim().length < 200) {
+        toast.error("Description longue : au moins 200 caractères avant soumission");
+        return;
+      }
     }
 
     const { error } = await supabase
@@ -935,11 +1054,32 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
       return;
     }
     setDeleting(id);
-    await supabase.from("product_images").delete().eq("product_id", id);
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) toast.error("Erreur lors de la suppression");
-    else { toast.success("Produit supprimé"); loadProducts(); }
-    setDeleting(null);
+    try {
+      const guards = await fetchProductOrderGuards(id);
+      if (guards.hasAnyOrders) {
+        toast.error(deleteBlockedMessage(guards.hasActiveOrders));
+        if (!guards.hasActiveOrders) {
+          const { error } = await supabase
+            .from("products")
+            .update({ publish_status: "draft" } as any)
+            .eq("id", id);
+          if (!error) {
+            toast.success("Produit dépublié (historique de commandes conservé)");
+            loadProducts();
+          }
+        }
+        return;
+      }
+      await supabase.from("product_images").delete().eq("product_id", id);
+      const { error } = await supabase.from("products").delete().eq("id", id);
+      if (error) toast.error("Erreur lors de la suppression : " + (error.message || "inconnue"));
+      else {
+        toast.success("Produit supprimé");
+        loadProducts();
+      }
+    } finally {
+      setDeleting(null);
+    }
   };
 
   const handleUnpublish = async (productId: string) => {
@@ -983,11 +1123,12 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
 
           {/* Gallery media (additional photos / video — not color-variant SKUs) */}
           <MediaUploader
-            label="Galerie — autres photos / vidéo"
+            label="Galerie — autres photos / vidéo (max 4 photos + vidéos ≤30s)"
             items={variationMedia}
             onChange={setVariationMedia}
             multiple={true}
             acceptVideo={true}
+            maxItems={4}
             storeId={storeId}
             onUploadingChange={handleMediaUploadingChange}
           />
@@ -995,32 +1136,53 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
           <Field label="Nom (FR) *" value={form.name_fr} onChange={(v) => setForm({ ...form, name_fr: v })} />
           <Field label="Nom (EN)" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
           {/* Pricing Calculator */}
+          {priceLocked && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+              {priceLockedMessage(true)}
+            </div>
+          )}
           <PricingCalculator
             costReal={form.cost_real}
             costCalc={form.cost_calc}
-            autoPricingEnabled={form.auto_pricing_enabled}
+            autoPricingEnabled={form.auto_pricing_enabled && !priceLocked}
             vendorExtraMargin={form.vendor_extra_margin}
             price={form.price}
             originalPrice={form.original_price}
             storeId={storeId}
             categoryId={form.category_id || undefined}
-            onCostRealChange={(v) => setForm((f) => ({ ...f, cost_real: v }))}
-            onCostCalcChange={(v) => setForm((f) => ({ ...f, cost_calc: v }))}
-            onAutoPricingChange={(v) => setForm((f) => ({ ...f, auto_pricing_enabled: v }))}
-            onVendorExtraMarginChange={(v) => setForm((f) => ({ ...f, vendor_extra_margin: v }))}
-            onPriceChange={(v) => setForm((f) => ({ ...f, price: v }))}
-            onOriginalPriceChange={(v) => setForm((f) => ({ ...f, original_price: v }))}
+            isPlatformOwned={isPlatformOwned}
+            onCostRealChange={(v) => !priceLocked && setForm((f) => ({ ...f, cost_real: v }))}
+            onCostCalcChange={(v) => !priceLocked && setForm((f) => ({ ...f, cost_calc: v }))}
+            onAutoPricingChange={(v) => !priceLocked && setForm((f) => ({ ...f, auto_pricing_enabled: v }))}
+            onVendorExtraMarginChange={(v) => !priceLocked && setForm((f) => ({ ...f, vendor_extra_margin: v }))}
+            onPriceChange={(v) => !priceLocked && setForm((f) => ({ ...f, price: v }))}
+            onOriginalPriceChange={(v) => !priceLocked && setForm((f) => ({ ...f, original_price: v }))}
           />
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Prix *" type="number" value={String(form.price)} onChange={(v) => setForm({ ...form, price: Number(v) })} disabled={form.auto_pricing_enabled} />
-            <Field label="Ancien prix" type="number" value={String(form.original_price || "")} onChange={(v) => setForm({ ...form, original_price: v ? Number(v) : null })} disabled={form.auto_pricing_enabled} />
+            <Field label="Prix *" type="number" value={String(form.price)} onChange={(v) => setForm({ ...form, price: Number(v) })} disabled={form.auto_pricing_enabled || priceLocked} />
+            <Field label="Ancien prix" type="number" value={String(form.original_price || "")} onChange={(v) => setForm({ ...form, original_price: v ? Number(v) : null })} disabled={form.auto_pricing_enabled || priceLocked} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="MOQ" type="number" value={String(form.moq)} onChange={(v) => setForm({ ...form, moq: Number(v) })} />
             <Field label="SKU" value={form.sku} onChange={(v) => setForm({ ...form, sku: v })} />
           </div>
-          <Field label="Description courte" value={form.short_description} onChange={(v) => setForm({ ...form, short_description: v })} />
+          <Field
+            label={`Description courte * (${countWords(form.short_description)}/15 mots min)`}
+            value={form.short_description}
+            onChange={(v) => {
+              setForm((f) => {
+                const next = { ...f, short_description: v };
+                if (!metaDescriptionTouched.current) {
+                  next.meta_description = v.slice(0, 160);
+                }
+                if (!seoKeywordsTouched.current) {
+                  next.seo_keywords = deriveSeoKeywords(v);
+                }
+                return next;
+              });
+            }}
+          />
           <div className="rounded-lg border border-border p-3 space-y-3 bg-muted/20">
             <p className="text-xs font-semibold text-foreground">Référencement (SEO)</p>
             <Field
@@ -1035,7 +1197,10 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
               </label>
               <textarea
                 value={form.meta_description}
-                onChange={(e) => setForm({ ...form, meta_description: e.target.value.slice(0, 180) })}
+                onChange={(e) => {
+                  metaDescriptionTouched.current = true;
+                  setForm({ ...form, meta_description: e.target.value.slice(0, 180) });
+                }}
                 rows={3}
                 className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
                 placeholder="Description pour Google (recommandé ≤160 car.)"
@@ -1044,12 +1209,17 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             <Field
               label="Mots-clés SEO (virgules)"
               value={form.seo_keywords}
-              onChange={(v) => setForm({ ...form, seo_keywords: v })}
+              onChange={(v) => {
+                seoKeywordsTouched.current = true;
+                setForm({ ...form, seo_keywords: v });
+              }}
               placeholder="import chine, prix usine, …"
             />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground">Description</label>
+            <label className="text-xs text-muted-foreground">
+              Description * ({(form.description || "").trim().length}/200 car. min)
+            </label>
             <textarea
               className="w-full mt-1 px-3 py-2 text-sm bg-card border border-border rounded-md resize-none"
               rows={3}
@@ -1057,26 +1227,48 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
             {(form.description || "").trim().length > 0 &&
-              (form.description || "").trim().length < 150 && (
+              (form.description || "").trim().length < 200 && (
                 <p className="text-[11px] text-amber-600 mt-1">
-                  Conseil SEO : visez au moins 150 caractères de description réelle (actuellement{" "}
+                  Minimum 200 caractères requis (actuellement{" "}
                   {(form.description || "").trim().length}).
                 </p>
               )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Matière" value={form.material} onChange={(v) => setForm({ ...form, material: v })} />
-            <Field label="Style" value={form.style} onChange={(v) => setForm({ ...form, style: v })} placeholder="Ex: Décontracté, Chic, Sportif" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Saison" value={form.season} onChange={(v) => setForm({ ...form, season: v })} placeholder="Ex: Été, Hiver, Toute saison" />
-            <Field label="Entretien" value={form.care_instructions} onChange={(v) => setForm({ ...form, care_instructions: v })} placeholder="Ex: Lavage à la main" />
+          <div className="space-y-2 border border-border rounded-lg p-3 bg-muted/10">
+            <p className="text-xs font-semibold text-foreground">Attributs produit (optionnels)</p>
+            <div className="flex flex-wrap gap-3 text-xs">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={includeMaterial} onChange={(e) => setIncludeMaterial(e.target.checked)} />
+                Matière
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={includeStyle} onChange={(e) => setIncludeStyle(e.target.checked)} />
+                Style
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={includeSeason} onChange={(e) => setIncludeSeason(e.target.checked)} />
+                Saison
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={includeCare} onChange={(e) => setIncludeCare(e.target.checked)} />
+                Entretien
+              </label>
+            </div>
+            {includeMaterial && (
+              <Field label="Matière" value={form.material} onChange={(v) => setForm({ ...form, material: v })} />
+            )}
+            {includeStyle && (
+              <Field label="Style" value={form.style} onChange={(v) => setForm({ ...form, style: v })} placeholder="Ex: Décontracté, Chic, Sportif" />
+            )}
+            {includeSeason && (
+              <Field label="Saison" value={form.season} onChange={(v) => setForm({ ...form, season: v })} placeholder="Ex: Été, Hiver, Toute saison" />
+            )}
+            {includeCare && (
+              <Field label="Entretien" value={form.care_instructions} onChange={(v) => setForm({ ...form, care_instructions: v })} placeholder="Ex: Lavage à la main" />
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <CountryCombobox value={form.origin_country} onChange={(v) => setForm({ ...form, origin_country: v })} />
-          </div>
-          <div>
-            <Field label="Taille du mannequin (ex: M, XL, 42)" value={form.model_size} onChange={(v) => setForm({ ...form, model_size: v })} />
           </div>
           <div>
             <SearchableCombobox
@@ -1089,6 +1281,11 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
               options={categories.map((c) => ({ value: c.id, label: c.name_fr }))}
             />
           </div>
+          {categories.find((c) => c.id === form.category_id)?.apparel_fields_enabled && (
+            <div>
+              <Field label="Taille du mannequin (ex: M, XL, 42)" value={form.model_size} onChange={(v) => setForm({ ...form, model_size: v })} />
+            </div>
+          )}
           <div>
             <SearchableCombobox
               label="Tag Tendance"
@@ -1215,7 +1412,7 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
               Nouveau
             </label>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={form.is_sale || false} onChange={(e) => setForm({ ...form, is_sale: e.target.checked })} />
+              <input type="checkbox" checked={form.is_sale || false} disabled={priceLocked} onChange={(e) => setForm({ ...form, is_sale: e.target.checked })} />
               En promo
             </label>
           </div>
@@ -1254,37 +1451,57 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
 
           {/* Modes d'expédition */}
           <div className="border-t border-border pt-3 mt-1">
-            <label className="text-xs font-semibold text-foreground">✈️ Modes d'expédition disponibles</label>
-            <p className="text-[10px] text-muted-foreground mb-2">Cochez les modes d'expédition possibles pour ce produit</p>
+            <label className="text-xs font-semibold text-foreground">
+              {isLocalShop ? "🚚 Livraison locale" : "✈️ Modes d'expédition disponibles"}
+            </label>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              {isLocalShop
+                ? "Indiquez si ce produit est livrable à domicile"
+                : "Cochez les modes d'expédition possibles pour ce produit"}
+            </p>
           </div>
-          <div className="flex gap-4">
+          {isLocalShop ? (
             <label className="flex items-center gap-2 text-xs cursor-pointer">
               <input
                 type="checkbox"
-                checked={form.can_ship_air}
-                onChange={(e) => {
-                  const val = e.target.checked;
-                  if (!val && !form.can_ship_sea) { return; }
-                  setForm({ ...form, can_ship_air: val });
-                }}
+                checked={form.offers_home_delivery}
+                onChange={(e) => setForm({ ...form, offers_home_delivery: e.target.checked })}
                 className="rounded border-border"
               />
-              ✈️ Aérien
+              Livraison à domicile proposée
             </label>
-            <label className="flex items-center gap-2 text-xs cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.can_ship_sea}
-                onChange={(e) => {
-                  const val = e.target.checked;
-                  if (!val && !form.can_ship_air) { return; }
-                  setForm({ ...form, can_ship_sea: val });
-                }}
-                className="rounded border-border"
-              />
-              🚢 Maritime
-            </label>
-          </div>
+          ) : (
+            <>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.can_ship_air}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      if (!val && !form.can_ship_sea) { return; }
+                      setForm({ ...form, can_ship_air: val });
+                    }}
+                    className="rounded border-border"
+                  />
+                  ✈️ Aérien
+                </label>
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.can_ship_sea}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      if (!val && !form.can_ship_air) { return; }
+                      setForm({ ...form, can_ship_sea: val });
+                    }}
+                    className="rounded border-border"
+                  />
+                  🚢 Maritime
+                </label>
+              </div>
+            </>
+          )}
 
           {/* Délai de préparation fournisseur */}
           <div className="border-t border-border pt-3 mt-1">
@@ -1296,13 +1513,15 @@ export function VendorProductManager({ storeId, suppliersEnabled = false }: { st
             <Field label="Max (jours)" type="number" value={String(form.prep_days_max)} onChange={(v) => setForm({ ...form, prep_days_max: Number(v) })} />
           </div>
 
-          <ShippingEstimator
-            weightGrams={form.weight_grams}
-            lengthCm={form.length_cm}
-            widthCm={form.width_cm}
-            heightCm={form.height_cm}
-            categoryId={form.category_id || undefined}
-          />
+          {!isLocalShop && (
+            <ShippingEstimator
+              weightGrams={form.weight_grams}
+              lengthCm={form.length_cm}
+              widthCm={form.width_cm}
+              heightCm={form.height_cm}
+              categoryId={form.category_id || undefined}
+            />
+          )}
 
           {/* Promotion timer */}
           <PromotionTimer

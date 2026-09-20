@@ -11,7 +11,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import {
   LayoutDashboard, Truck, Users, MapPin, Banknote, Settings, ChevronRight,
-  AlertCircle, Loader2, ShieldAlert, ArrowLeft, Building2,
+  AlertCircle, Loader2, ShieldAlert, ArrowLeft, Building2, Wallet,
 } from "lucide-react";
 import { useOperatorContext } from "@/hooks/use-operator-context";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ const NAV_ITEMS = [
   { to: "/operator/coverage", label: "Couverture",      icon: MapPin },
   { to: "/operator/rates",    label: "Tarifs",          icon: Banknote },
   { to: "/operator/billing",  label: "Facturation",     icon: Banknote },
+  { to: "/operator/wallet",   label: "Portefeuille",    icon: Wallet },
   { to: "/operator/settings", label: "Paramètres",      icon: Settings },
 ];
 

@@ -1,7 +1,56 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Store, Globe, Mail, Phone, Clock, User, ExternalLink, Loader2, ImageIcon, Link } from "lucide-react";
+import { Store, Globe, Mail, Phone, Clock, User, ExternalLink, Loader2, ImageIcon, Link, Copy } from "lucide-react";
+import { toast } from "sonner";
+
+function truncateMiddle(url: string, max = 40): string {
+  if (url.length <= max) return url;
+  const keep = Math.floor((max - 1) / 2);
+  return `${url.slice(0, keep)}…${url.slice(-keep)}`;
+}
+
+function TruncatedCopyUrl({ url, label }: { url: string; label?: string }) {
+  const safe =
+    typeof url === "string" &&
+    (url.startsWith("https://") || url.startsWith("http://"));
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Lien copié");
+    } catch {
+      toast.error("Impossible de copier");
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+      {safe ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary hover:underline truncate min-w-0"
+          title={url}
+        >
+          {label ? `${label} · ${truncateMiddle(url)}` : truncateMiddle(url)}
+        </a>
+      ) : (
+        <span className="text-muted-foreground truncate min-w-0" title={url}>
+          {label ? `${label} · ${truncateMiddle(url)}` : truncateMiddle(url)}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); void copy(); }}
+        className="p-0.5 rounded hover:bg-muted shrink-0 text-muted-foreground hover:text-foreground"
+        title="Copier le lien"
+      >
+        <Copy size={11} />
+      </button>
+    </div>
+  );
+}
 
 interface SupplierInfo {
   id: string;
@@ -103,20 +152,20 @@ export function SupplierPopover({ productId }: { productId: string | null }) {
             {supplier.store_url && (
               <div className="flex items-start gap-2 text-xs">
                 <ExternalLink size={11} className="text-muted-foreground mt-0.5 shrink-0" />
-                <a href={supplier.store_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
-                  Boutique fournisseur
-                </a>
+                <TruncatedCopyUrl url={supplier.store_url} label="Boutique" />
               </div>
             )}
             {/* Supplier product link */}
             {supplierProduct?.product_url && (
               <div className="flex items-start gap-2 text-xs">
                 <Link size={11} className="text-muted-foreground mt-0.5 shrink-0" />
-                <a href={supplierProduct.product_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
-                  {supplierProduct.label || "Lien du produit"}
-                </a>
+                <TruncatedCopyUrl
+                  url={supplierProduct.product_url}
+                  label={supplierProduct.label || "Produit"}
+                />
               </div>
             )}
+
             {supplier.email && (
               <InfoRow icon={Mail} label="Email" value={supplier.email} />
             )}
@@ -243,29 +292,18 @@ export function OrderSuppliersPopover({ items }: { items: { product_id: string |
                           <p className="text-muted-foreground">{sup.agent_name}{sup.platform_name ? ` · ${sup.platform_name}` : ""}</p>
                           {sup.direct_contact && <p className="text-muted-foreground">{sup.direct_contact}</p>}
                           {sup.store_url && (
-                            <a
-                              href={sup.store_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-primary hover:underline mt-0.5"
-                              title={sup.store_url}
-                            >
-                              <ExternalLink size={10} className="shrink-0" />
-                              <span>Boutique</span>
-                            </a>
+                            <div className="flex items-center gap-1 mt-0.5 min-w-0">
+                              <ExternalLink size={10} className="shrink-0 text-muted-foreground" />
+                              <TruncatedCopyUrl url={sup.store_url} label="Boutique" />
+                            </div>
                           )}
                           {sp?.product_url && (
-                            <a
-                              href={sp.product_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-primary hover:underline mt-0.5 ml-2"
-                              title={sp.product_url}
-                            >
-                              <Link size={10} className="shrink-0" />
-                              <span>{sp.label || "Produit"}</span>
-                            </a>
+                            <div className="flex items-center gap-1 mt-0.5 min-w-0">
+                              <Link size={10} className="shrink-0 text-muted-foreground" />
+                              <TruncatedCopyUrl url={sp.product_url} label={sp.label || "Produit"} />
+                            </div>
                           )}
+
                         </div>
                       </div>
                     ) : (

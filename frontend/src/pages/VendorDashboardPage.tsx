@@ -316,7 +316,14 @@ export default function VendorDashboardPage() {
 
   const renderTabContent = () => (
     <>
-      {activeTab === "catalogue" && <VendorProductManager storeId={store!.id} suppliersEnabled={suppliersEnabled} />}
+      {activeTab === "catalogue" && (
+        <VendorProductManager
+          storeId={store!.id}
+          suppliersEnabled={suppliersEnabled}
+          shopType={(store as any)?.shop_type === "local" ? "local" : "international"}
+          isPlatformOwned={!!store?.is_platform_owned}
+        />
+      )}
       {activeTab === "orders" && <VendorOrderManager storeId={store!.id} shopType={(store as any)?.shop_type} suppliersEnabled={suppliersEnabled} />}
       {activeTab === "deliveries" && <VendorRiderTracking storeId={store!.id} />}
       {activeTab === "promos" && <VendorPromotionsTab storeId={store!.id} />}

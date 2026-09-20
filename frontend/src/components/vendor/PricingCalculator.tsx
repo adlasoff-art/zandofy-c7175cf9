@@ -23,6 +23,8 @@ interface PricingCalculatorProps {
   originalPrice: number | null;
   storeId: string;
   categoryId?: string | null;
+  /** Optional override; otherwise loaded from stores.is_platform_owned */
+  isPlatformOwned?: boolean;
   onCostRealChange: (v: number) => void;
   onCostCalcChange: (v: number) => void;
   onAutoPricingChange: (v: boolean) => void;
@@ -34,6 +36,7 @@ interface PricingCalculatorProps {
 export function PricingCalculator({
   costReal, costCalc, autoPricingEnabled, vendorExtraMargin,
   price, originalPrice, storeId, categoryId,
+  isPlatformOwned: isPlatformOwnedProp,
   onCostRealChange, onCostCalcChange, onAutoPricingChange,
   onVendorExtraMarginChange, onPriceChange, onOriginalPriceChange,
 }: PricingCalculatorProps) {
@@ -44,8 +47,10 @@ export function PricingCalculator({
     vendor_extra_margin_enabled?: boolean;
     margin_pct?: number;
     multiplier?: number;
+    smart_pricing_enabled?: boolean;
   } | null>(null);
-  const [isPlatformOwned, setIsPlatformOwned] = useState<boolean>(false);
+  const [overridesLoaded, setOverridesLoaded] = useState(false);
+  const [isPlatformOwnedLoaded, setIsPlatformOwnedLoaded] = useState<boolean>(false);
   const [categoryOverride, setCategoryOverride] = useState<{
     margin_pct: number | null;
     multiplier: number | null;
@@ -53,7 +58,12 @@ export function PricingCalculator({
     description: string | null;
   } | null>(null);
 
+  const isPlatformOwned = isPlatformOwnedProp ?? isPlatformOwnedLoaded;
+  const smartPricingEnabled = !!overrides?.smart_pricing_enabled;
+  const allowAuto = isPlatformOwned || smartPricingEnabled;
+
   useEffect(() => {
+    setOverridesLoaded(false);
     // Load global pricing settings
     supabase
       .from("platform_settings")
@@ -74,14 +84,16 @@ export function PricingCalculator({
         }
       });
 
-    // Load vendor-specific overrides
+    // Load vendor-specific overrides (incl. smart pricing gate)
     (supabase as any)
       .from("vendor_pricing_overrides")
-      .select("max_multiplier, max_extra_margin, vendor_extra_margin_enabled, margin_pct, multiplier")
+      .select("max_multiplier, max_extra_margin, vendor_extra_margin_enabled, margin_pct, multiplier, smart_pricing_enabled")
       .eq("store_id", storeId)
       .maybeSingle()
       .then(({ data }: any) => {
         if (data) setOverrides(data);
+        else setOverrides(null);
+        setOverridesLoaded(true);
       });
 
     // Load store's platform-owned flag
@@ -91,9 +103,17 @@ export function PricingCalculator({
       .eq("id", storeId)
       .maybeSingle()
       .then(({ data }: any) => {
-        if (data) setIsPlatformOwned(!!data.is_platform_owned);
+        if (data) setIsPlatformOwnedLoaded(!!data.is_platform_owned);
       });
   }, [storeId]);
+
+  // Force auto pricing off only after overrides are known (avoid race clearing independents)
+  useEffect(() => {
+    if (!overridesLoaded && isPlatformOwnedProp == null) return;
+    if (!allowAuto && autoPricingEnabled) {
+      onAutoPricingChange(false);
+    }
+  }, [allowAuto, autoPricingEnabled, onAutoPricingChange, overridesLoaded, isPlatformOwnedProp]);
 
   // Load category-level pricing override (if any)
   useEffect(() => {
@@ -191,13 +211,25 @@ export function PricingCalculator({
           <Calculator size={16} className="text-primary" />
           <span className="text-sm font-semibold text-foreground">Tarification intelligente</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Calcul auto</span>
-          <Switch checked={autoPricingEnabled} onCheckedChange={onAutoPricingChange} />
-        </div>
+        {allowAuto ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Calcul auto</span>
+            <Switch checked={autoPricingEnabled} onCheckedChange={onAutoPricingChange} />
+          </div>
+        ) : (
+          <span className="text-[10px] text-muted-foreground max-w-[180px] text-right">
+            Calcul auto désactivé — l&apos;admin doit activer la tarification intelligente.
+          </span>
+        )}
       </div>
 
-      {autoPricingEnabled && (
+      {!allowAuto && (
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <Info size={12} /> Mode manuel uniquement. Contactez le support pour activer le calcul automatique.
+        </p>
+      )}
+
+      {allowAuto && autoPricingEnabled && (
         <>
           {isPlatformOwned && (
             <div className="text-[11px] bg-primary/5 border border-primary/20 rounded-md p-2 flex items-start gap-1.5 text-foreground/80">
@@ -335,7 +367,7 @@ export function PricingCalculator({
         </>
       )}
 
-      {!autoPricingEnabled && (
+      {!autoPricingEnabled && allowAuto && (
         <p className="text-xs text-muted-foreground flex items-center gap-1">
           <Info size={12} /> Mode manuel : saisissez le prix et l'ancien prix directement ci-dessous.
         </p>
