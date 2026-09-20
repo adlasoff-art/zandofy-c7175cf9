@@ -15,7 +15,11 @@ import { ChevronRight, TrendingUp, Flame, Users } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useHomeMarket } from "@/contexts/HomeMarketContext";
 import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
-import { rankProductsByDiscoveryPrefs } from "@/lib/discovery-prefs";
+import { useAuthSettings } from "@/hooks/use-auth-settings";
+import { useAuth } from "@/contexts/AuthContext";
+import { assembleDiscoveryFeed, expandInterestCategoryIds } from "@/lib/discovery-engine";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const PAGE_SIZE = 24;
 
@@ -50,7 +54,19 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
   const { t, locale } = useI18n();
   const { market, shopTypeFilter } = useHomeMarket();
   const { prefs, hasCompleted } = useDiscoveryPrefs();
-  /** POP restore only for unfiltered Accueil — never across markets. */
+  const { data: authSettings } = useAuthSettings();
+  const { user } = useAuth();
+  const { data: categoryTree = [] } = useQuery({
+    queryKey: ["discovery-category-tree"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("categories").select("id, parent_id").limit(2000);
+      if (error) throw error;
+      return (data || []) as { id: string; parent_id: string | null }[];
+    },
+    staleTime: 10 * 60 * 1000,
+    enabled: hasCompleted,
+  });
+  const effectiveShopType = hasCompleted ? undefined : shopTypeFilter;
   const cached =
     restoreFromCache && market === "all" ? readProductGridCache("all") : null;
   const marketRef = useRef(market);
@@ -126,10 +142,24 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
       return;
     }
     setPopularLoading(true);
-    fetchProducts({ limit: 12, orderBy: "popular", shopType: shopTypeFilter })
+    fetchProducts({ limit: 24, orderBy: "popular", shopType: effectiveShopType })
       .then((items) => {
         if (cancelled) return;
-        setPopularProducts(items);
+        const ranked =
+          hasCompleted
+            ? assembleDiscoveryFeed(items, {
+                prefs,
+                mix: authSettings?.discovery_mix,
+                take: 12,
+                interestCategoryIds: expandInterestCategoryIds(
+                  prefs.interest_category_ids,
+                  categoryTree,
+                ),
+                surface: "home_popular",
+                seedKey: user?.id || "guest",
+              })
+            : items.slice(0, 12);
+        setPopularProducts(ranked);
         setPopularLoading(false);
       })
       .catch(() => {
@@ -138,7 +168,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
     return () => {
       cancelled = true;
     };
-  }, [shopTypeFilter, market]);
+  }, [shopTypeFilter, market, effectiveShopType, hasCompleted, prefs, authSettings?.discovery_mix, categoryTree, user?.id]);
 
   // Load category sections (capped fan-out)
   useEffect(() => {
@@ -162,15 +192,29 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
         try {
           const data = await fetchProducts({
             categoryId: cat.id,
-            limit: 6,
-            shopType: shopTypeFilter,
+            limit: hasCompleted ? 18 : 6,
+            shopType: effectiveShopType,
           });
           if (cancelled || data.length === 0) continue;
+          const products =
+            hasCompleted
+              ? assembleDiscoveryFeed(data, {
+                  prefs,
+                  mix: authSettings?.discovery_mix,
+                  take: 6,
+                  interestCategoryIds: expandInterestCategoryIds(
+                    prefs.interest_category_ids,
+                    categoryTree,
+                  ),
+                  surface: `home_cat_${cat.id}`,
+                  seedKey: user?.id || "guest",
+                })
+              : data;
           setCategorySections((prev) => {
             const label = t(target.labelKey) || target.labelFr;
             const href = categoryPath(cat, locale);
             if (prev.find((s) => s.href === href)) return prev;
-            return [...prev, { label, products: data, href }];
+            return [...prev, { label, products, href }];
           });
         } catch {
           /* skip section */
@@ -180,7 +224,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
     return () => {
       cancelled = true;
     };
-  }, [t, locale, shopTypeFilter, market]);
+  }, [t, locale, shopTypeFilter, market, effectiveShopType, hasCompleted, prefs, authSettings?.discovery_mix, categoryTree, user?.id]);
 
   // Load main Tendances products when tab / market changes (session shuffle; POP uses cache)
   useEffect(() => {
@@ -208,7 +252,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
     setHasMore(true);
     loadingMoreRef.current = false;
 
-    const params: any = { limit: PAGE_SIZE, shopType: shopTypeFilter };
+    const params: any = { limit: PAGE_SIZE, shopType: effectiveShopType };
     if (activeTab !== "all") {
       params.trendTagId = activeTab;
     }
@@ -222,7 +266,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
             ? fetchProducts({
                 limit: PAGE_SIZE,
                 offset: PAGE_SIZE * 2,
-                shopType: shopTypeFilter,
+                shopType: effectiveShopType,
               })
             : Promise.resolve([] as Product[]),
         ]);
@@ -238,7 +282,14 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
           activeTab === "all" ? shuffleBySessionSeed(mixed, getHomeShuffleSeed()) : mixed;
         const ranked =
           hasCompleted && activeTab === "all"
-            ? rankProductsByDiscoveryPrefs(ordered, prefs, PAGE_SIZE)
+            ? assembleDiscoveryFeed(ordered, {
+                prefs,
+                mix: authSettings?.discovery_mix,
+                take: PAGE_SIZE,
+                interestCategoryIds: expandInterestCategoryIds(prefs.interest_category_ids, categoryTree),
+                surface: "home_grid",
+                seedKey: user?.id || "guest",
+              })
             : ordered.slice(0, PAGE_SIZE);
         setProducts(ranked);
         setCurrentOffset(Math.max(recent.length, ranked.length));
@@ -255,7 +306,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
     return () => {
       cancelled = true;
     };
-  }, [activeTab, retryKey, shopTypeFilter, market, hasCompleted, prefs]);
+  }, [activeTab, retryKey, effectiveShopType, market, hasCompleted, prefs, authSettings?.discovery_mix, categoryTree, user?.id]);
 
   // Re-tap Accueil / pull-to-refresh → reshuffle without full remount of page chrome
   useEffect(() => {
@@ -273,7 +324,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
 
     try {
       const totalLoaded = products.length + moreProducts.length;
-      const params: any = { limit: PAGE_SIZE, offset: totalLoaded, shopType: shopTypeFilter };
+      const params: any = { limit: PAGE_SIZE, offset: totalLoaded, shopType: effectiveShopType };
       if (activeTab !== "all") {
         params.trendTagId = activeTab;
       }
@@ -291,7 +342,21 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
       }
 
       if (newProducts.length > 0) {
-        setMoreProducts((prev) => [...prev, ...newProducts]);
+        const rankedNew =
+          hasCompleted && activeTab === "all"
+            ? assembleDiscoveryFeed(newProducts, {
+                prefs,
+                mix: authSettings?.discovery_mix,
+                take: newProducts.length,
+                interestCategoryIds: expandInterestCategoryIds(
+                  prefs.interest_category_ids,
+                  categoryTree,
+                ),
+                surface: "home_grid_more",
+                seedKey: user?.id || "guest",
+              })
+            : newProducts;
+        setMoreProducts((prev) => [...prev, ...rankedNew]);
       }
     } catch (err) {
       console.error("[ProductGrid] Load more failed:", err);
@@ -299,7 +364,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [hasMore, products, moreProducts, activeTab, shopTypeFilter]);
+  }, [hasMore, products, moreProducts, activeTab, effectiveShopType, hasCompleted, prefs, authSettings?.discovery_mix, categoryTree, user?.id]);
 
   // Infinite scroll sentinel (replaces "Voir plus" click). Fallback button if IO missing.
   const loadMoreRef = useRef<HTMLDivElement | null>(null);

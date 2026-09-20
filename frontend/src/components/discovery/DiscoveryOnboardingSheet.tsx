@@ -24,6 +24,7 @@ import {
   type ShoppingAudience,
 } from "@/lib/discovery-prefs";
 import { trackDiscoveryOnboarding } from "@/hooks/use-analytics";
+import { setDiscoverySheetOpen } from "@/lib/discovery-sheet-bus";
 import { Check, ChevronRight, Sparkles, X } from "lucide-react";
 
 type StepId = "audience" | "interests" | "scope" | "receipt" | "payment" | "country";
@@ -134,13 +135,15 @@ export function DiscoveryOnboardingProvider({ children }: { children: ReactNode 
     return () => window.clearTimeout(t);
   }, [authSettingsFetched, enabled, hideOnAuthRoutes, hasCompleted, location.pathname, forceEdit, open]);
 
-  // Lock body scroll while sheet is open
+  // Lock body scroll while sheet is open + notify popup bus
   useEffect(() => {
+    setDiscoverySheetOpen(open);
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
+      setDiscoverySheetOpen(false);
     };
   }, [open]);
 
@@ -273,28 +276,28 @@ export function DiscoveryOnboardingProvider({ children }: { children: ReactNode 
   return (
     <>
       {children}
-      <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center">
+      <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
         <button
           type="button"
-          className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
+          className="absolute inset-0 bg-black/60 backdrop-blur-[3px]"
           aria-label="Fermer"
           onClick={closeDismiss}
         />
         <div
           role="dialog"
           aria-modal="true"
-          className="relative w-full sm:max-w-lg max-h-[92vh] overflow-y-auto bg-card border border-border sm:rounded-2xl rounded-t-2xl shadow-2xl p-5 sm:p-6 animate-in slide-in-from-bottom-4 duration-300"
+          className="relative w-full sm:max-w-2xl lg:max-w-3xl max-h-[96vh] sm:max-h-[90vh] overflow-y-auto bg-primary text-primary-foreground border border-primary/20 sm:rounded-3xl rounded-t-3xl shadow-2xl p-6 sm:p-10 animate-in slide-in-from-bottom-4 fade-in zoom-in-95 duration-400"
         >
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                <Sparkles size={18} className="text-primary" />
+          <div className="flex items-start justify-between gap-3 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-primary-foreground/15 flex items-center justify-center ring-2 ring-primary-foreground/25">
+                <Sparkles size={22} className="text-primary-foreground" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-foreground leading-tight">
+                <h2 className="text-lg sm:text-xl font-bold text-primary-foreground leading-tight">
                   Une meilleure expérience pour vous
                 </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-sm text-primary-foreground/80 mt-1">
                   Quelques choix pour afficher ce qui vous correspond
                 </p>
               </div>
@@ -302,14 +305,14 @@ export function DiscoveryOnboardingProvider({ children }: { children: ReactNode 
             <button
               type="button"
               onClick={closeDismiss}
-              className="p-1.5 rounded-md text-muted-foreground hover:bg-muted"
+              className="p-2 rounded-md text-primary-foreground/80 hover:bg-primary-foreground/10"
               aria-label="Fermer"
             >
-              <X size={18} />
+              <X size={20} />
             </button>
           </div>
 
-          <Progress value={progress} className="h-1.5 mb-5" />
+          <Progress value={progress} className="h-2 mb-6 bg-primary-foreground/20 [&>div]:bg-primary-foreground" />
 
           {currentStep === "audience" && (
             <StepBlock title="Vous cherchez plutôt des articles pour… ?">
@@ -340,23 +343,23 @@ export function DiscoveryOnboardingProvider({ children }: { children: ReactNode 
                       type="button"
                       onClick={() => toggleInterest(c.id)}
                       className={cn(
-                        "relative flex flex-col items-center gap-1.5 p-2 rounded-xl border text-center transition-all",
+                        "relative flex flex-col items-center gap-2 p-3 rounded-2xl border text-center transition-all",
                         selected
-                          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                          : "border-border hover:border-foreground/30",
+                          ? "border-primary-foreground bg-primary-foreground text-primary ring-2 ring-primary-foreground/40"
+                          : "border-primary-foreground/35 text-primary-foreground bg-primary-foreground/5 hover:bg-primary-foreground/15",
                       )}
                     >
                       {selected && (
-                        <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                          <Check size={10} />
+                        <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                          <Check size={12} />
                         </span>
                       )}
                       {c.image_url ? (
-                        <img src={c.image_url} alt="" className="w-10 h-10 object-cover rounded-lg" />
+                        <img src={c.image_url} alt="" className="w-14 h-14 object-cover rounded-xl" />
                       ) : (
-                        <div className="w-10 h-10 rounded-lg bg-muted" />
+                        <div className="w-14 h-14 rounded-xl bg-primary-foreground/20" />
                       )}
-                      <span className="text-[11px] font-medium leading-tight line-clamp-2">
+                      <span className="text-xs font-medium leading-tight line-clamp-2">
                         {c.name_fr || c.name}
                       </span>
                     </button>
@@ -420,7 +423,7 @@ export function DiscoveryOnboardingProvider({ children }: { children: ReactNode 
               </div>
               <button
                 type="button"
-                className="text-xs text-muted-foreground underline mt-3"
+                className="text-xs text-primary-foreground/80 underline mt-3"
                 onClick={skipPayment}
               >
                 Passer cette étape
@@ -441,20 +444,25 @@ export function DiscoveryOnboardingProvider({ children }: { children: ReactNode 
             </StepBlock>
           )}
 
-          <div className="flex items-center gap-2 mt-6">
+          <div className="flex items-center gap-3 mt-8">
             {stepIndex > 0 && (
-              <Button type="button" variant="outline" onClick={() => setStepIndex((i) => i - 1)}>
+              <Button
+                type="button"
+                variant="outline"
+                className="border-primary-foreground/40 text-primary-foreground bg-transparent hover:bg-primary-foreground/10"
+                onClick={() => setStepIndex((i) => i - 1)}
+              >
                 Retour
               </Button>
             )}
             <Button
               type="button"
-              className="flex-1"
+              className="flex-1 bg-primary-foreground text-primary hover:bg-primary-foreground/90 h-11 text-base"
               disabled={!canContinue()}
               onClick={goNext}
             >
               {stepIndex >= steps.length - 1 ? "Voir mon catalogue" : "Continuer"}
-              <ChevronRight size={16} className="ml-1" />
+              <ChevronRight size={18} className="ml-1" />
             </Button>
           </div>
         </div>
@@ -473,10 +481,10 @@ function StepBlock({
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
+        <h3 className="text-base sm:text-lg font-semibold text-primary-foreground">{title}</h3>
+        {hint && <p className="text-sm text-primary-foreground/75 mt-1">{hint}</p>}
       </div>
       {children}
     </div>
@@ -499,11 +507,11 @@ function ChoiceCard({
       type="button"
       onClick={onClick}
       className={cn(
-        "px-3 py-3 rounded-xl border text-sm font-medium transition-all text-left",
+        "px-4 py-4 rounded-2xl border text-sm sm:text-base font-medium transition-all text-left",
         fullWidth ? "w-full" : "",
         selected
-          ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/30"
-          : "border-border text-foreground hover:border-foreground/40",
+          ? "border-primary-foreground bg-primary-foreground text-primary ring-2 ring-primary-foreground/40"
+          : "border-primary-foreground/35 text-primary-foreground bg-primary-foreground/5 hover:bg-primary-foreground/15",
       )}
     >
       {label}

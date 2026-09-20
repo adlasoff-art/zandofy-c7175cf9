@@ -7,7 +7,7 @@ const SEARCH_SELECT = `
   id, name, name_fr, slug, price, original_price, currency, discount, is_new, is_sale,
   sales_count, store_id, category_id, created_at, short_description, origin_country,
   rating, review_count, moq, publish_status,
-  shop_type, store_is_verified, store_is_certified,
+  shop_type, store_is_verified, store_is_certified, gender_target,
   categories(name, name_fr),
   product_images(image_url, position),
   product_colors(color_hex, color_name),

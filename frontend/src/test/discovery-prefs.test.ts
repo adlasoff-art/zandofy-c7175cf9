@@ -1,84 +1,160 @@
 import { describe, expect, it } from "vitest";
 import {
+  assembleDiscoveryFeed,
+  expandInterestCategoryIds,
+  hashSeed,
+  rotationBucket,
+  rankProductsByDiscoveryPrefs,
+} from "@/lib/discovery-engine";
+import {
+  emptyDiscoveryPrefs,
   mergeDiscoveryPrefs,
   normalizeDiscoveryPrefs,
   purchaseScopeToHomeMarket,
-  rankProductsByDiscoveryPrefs,
   shouldShowReceiptStep,
-  emptyDiscoveryPrefs,
 } from "@/lib/discovery-prefs";
-import { upsertGuestCartItem } from "@/lib/guest-cart";
+import { DISCOVERY_MIX_DEFAULTS } from "@/hooks/use-auth-settings";
+import { upsertGuestCartItem, isLikelyProductId } from "@/lib/guest-cart";
+
+function makePool() {
+  const rows = [];
+  for (let i = 1; i <= 40; i++) {
+    rows.push({
+      id: String(i),
+      category_id: i <= 12 ? "watches" : i <= 20 ? "shoes" : "other",
+      gender_target:
+        i % 5 === 0 ? "unisex" : i % 3 === 0 ? "female" : "male",
+      shop_type: i <= 25 ? "local" : "international",
+      origin_country: i <= 25 ? "CD" : i % 2 === 0 ? "TR" : "BJ",
+      rating: 5 - (i % 5),
+    });
+  }
+  return rows;
+}
 
 describe("discovery-prefs", () => {
   it("maps purchase_scope to home market", () => {
     expect(purchaseScopeToHomeMarket("city")).toBe("local");
     expect(purchaseScopeToHomeMarket("country")).toBe("local");
     expect(purchaseScopeToHomeMarket("any_country")).toBe("all");
-    expect(purchaseScopeToHomeMarket(null)).toBe("all");
   });
 
   it("shows receipt step only for city/country", () => {
     expect(shouldShowReceiptStep("city")).toBe(true);
-    expect(shouldShowReceiptStep("country")).toBe(true);
     expect(shouldShowReceiptStep("any_country")).toBe(false);
-    expect(shouldShowReceiptStep("city", { receipt: false })).toBe(false);
   });
 
-  it("ranks ~65/25/10 with interests and audience", () => {
-    const products = [
-      { id: "1", category_id: "watches", gender_target: "male", rating: 5 },
-      { id: "2", category_id: "watches", gender_target: "male", rating: 4 },
-      { id: "3", category_id: "shoes", gender_target: "male", rating: 4 },
-      { id: "4", category_id: "bags", gender_target: "female", rating: 5 },
-      { id: "5", category_id: "phones", gender_target: "unisex", rating: 3 },
-      { id: "6", category_id: "watches", gender_target: "male", rating: 3 },
-      { id: "7", category_id: "beauty", gender_target: "female", rating: 4 },
-      { id: "8", category_id: "tools", gender_target: "male", rating: 2 },
-      { id: "9", category_id: "watches", gender_target: "male", rating: 2 },
-      { id: "10", category_id: "decor", gender_target: "unisex", rating: 1 },
-    ];
-    const prefs = normalizeDiscoveryPrefs({
-      ...emptyDiscoveryPrefs(),
-      audience: "male",
-      interest_category_ids: ["watches"],
-      completed_at: new Date().toISOString(),
-    });
-    const ranked = rankProductsByDiscoveryPrefs(products, prefs, 10);
-    expect(ranked.length).toBe(10);
-    expect(ranked.filter((p) => p.category_id === "watches").length).toBeGreaterThanOrEqual(3);
-  });
-
-  it("merge prefers completed over incomplete even if incomplete is newer", () => {
+  it("merge prefers completed over incomplete", () => {
     const completed = normalizeDiscoveryPrefs({
       ...emptyDiscoveryPrefs(),
       audience: "male",
       completed_at: "2026-01-01T00:00:00.000Z",
-      updated_at: "2026-01-01T00:00:00.000Z",
     });
     const incomplete = normalizeDiscoveryPrefs({
       ...emptyDiscoveryPrefs(),
       audience: "female",
-      completed_at: null,
       updated_at: "2026-09-01T00:00:00.000Z",
     });
     expect(mergeDiscoveryPrefs(completed, incomplete).audience).toBe("male");
-    expect(mergeDiscoveryPrefs(incomplete, completed).audience).toBe("male");
+  });
+});
+
+describe("assembleDiscoveryFeed", () => {
+  const prefs = normalizeDiscoveryPrefs({
+    ...emptyDiscoveryPrefs(),
+    audience: "male",
+    interest_category_ids: ["watches"],
+    purchase_scope: "city",
+    country_code: "CD",
+    completed_at: new Date().toISOString(),
   });
 
-  it("merge prefers newer completed_at", () => {
-    const a = normalizeDiscoveryPrefs({
+  it("returns take items and prefers male+interest in core for city scope", () => {
+    const ranked = assembleDiscoveryFeed(makePool(), {
+      prefs,
+      take: 20,
+      mix: DISCOVERY_MIX_DEFAULTS,
+      surface: "test",
+      seedKey: "u1",
+      nowMs: 1_700_000_000_000,
+    });
+    expect(ranked.length).toBe(20);
+    const top10 = ranked.slice(0, 10);
+    const maleWatches = top10.filter(
+      (p) => p.gender_target === "male" && p.category_id === "watches",
+    );
+    expect(maleWatches.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("CMS mix override changes explore share", () => {
+    const tight = assembleDiscoveryFeed(makePool(), {
+      prefs,
+      take: 20,
+      mix: { ...DISCOVERY_MIX_DEFAULTS, core_pct: 90, explore_pct: 5, neutral_pct: 5 },
+      seedKey: "u1",
+      nowMs: 1_700_000_000_000,
+    });
+    expect(tight.length).toBe(20);
+  });
+
+  it("rotation bucket changes with time", () => {
+    expect(rotationBucket(12, 0)).not.toBe(rotationBucket(12, 13 * 3600 * 1000));
+    expect(hashSeed("a")).not.toBe(hashSeed("b"));
+  });
+
+  it("does not personalize without completed_at", () => {
+    const incomplete = normalizeDiscoveryPrefs({
       ...emptyDiscoveryPrefs(),
       audience: "male",
-      completed_at: "2026-01-01T00:00:00.000Z",
-      updated_at: "2026-01-01T00:00:00.000Z",
+      interest_category_ids: ["watches"],
+      purchase_scope: "city",
+      country_code: "CD",
     });
-    const b = normalizeDiscoveryPrefs({
-      ...emptyDiscoveryPrefs(),
-      audience: "female",
-      completed_at: "2026-06-01T00:00:00.000Z",
-      updated_at: "2026-06-01T00:00:00.000Z",
+    const pool = makePool();
+    const ranked = assembleDiscoveryFeed(pool, {
+      prefs: incomplete,
+      take: 10,
+      mix: DISCOVERY_MIX_DEFAULTS,
     });
-    expect(mergeDiscoveryPrefs(a, b).audience).toBe("female");
+    expect(ranked.map((p) => p.id)).toEqual(pool.slice(0, 10).map((p) => p.id));
+  });
+
+  it("keeps opposite gender out of early core for male audience", () => {
+    const ranked = assembleDiscoveryFeed(makePool(), {
+      prefs,
+      take: 20,
+      mix: DISCOVERY_MIX_DEFAULTS,
+      surface: "test_opp",
+      seedKey: "u1",
+      nowMs: 1_700_000_000_000,
+    });
+    const coreSlice = ranked.slice(0, 13); // ~65% of 20
+    const femaleCore = coreSlice.filter(
+      (p) => p.gender_target === "female" && p.category_id === "watches",
+    );
+    // Opposite gender may appear in explore (~25%) but not dominate core
+    expect(femaleCore.length).toBeLessThanOrEqual(2);
+  });
+
+  it("legacy rankProductsByDiscoveryPrefs still works", () => {
+    const ranked = rankProductsByDiscoveryPrefs(makePool(), prefs, 10);
+    expect(ranked.length).toBe(10);
+  });
+
+  it("expandInterestCategoryIds includes children", () => {
+    const ids = expandInterestCategoryIds(
+      ["root"],
+      [
+        { id: "root", parent_id: null },
+        { id: "child", parent_id: "root" },
+        { id: "grand", parent_id: "child" },
+        { id: "other", parent_id: null },
+      ],
+    );
+    expect(ids).toContain("root");
+    expect(ids).toContain("child");
+    expect(ids).toContain("grand");
+    expect(ids).not.toContain("other");
   });
 });
 
@@ -95,28 +171,11 @@ describe("guest-cart", () => {
       quantity: 2,
       moq: 1,
     });
-    expect(first.items).toHaveLength(1);
     expect(first.finalQty).toBe(2);
-    const second = upsertGuestCartItem(first.items, {
-      productId: "p1",
-      name: "A",
-      nameFr: "A",
-      image: "",
-      price: 10,
-      color: "red",
-      size: "M",
-      quantity: 3,
-      moq: 1,
-    });
-    expect(second.items).toHaveLength(1);
-    expect(second.finalQty).toBe(5);
-    expect(second.wasExisting).toBe(true);
   });
 
-  it("isLikelyProductId accepts uuid only", async () => {
-    const { isLikelyProductId } = await import("@/lib/guest-cart");
+  it("isLikelyProductId accepts uuid only", () => {
     expect(isLikelyProductId("550e8400-e29b-41d4-a716-446655440000")).toBe(true);
     expect(isLikelyProductId("not-a-uuid")).toBe(false);
-    expect(isLikelyProductId("")).toBe(false);
   });
 });

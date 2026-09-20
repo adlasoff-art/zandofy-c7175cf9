@@ -36,6 +36,7 @@ import { TieredPricingTable, calculateTieredPrice, type PricingTier } from "@/co
 import { QuantitySelector } from "@/components/QuantitySelector";
 import { FlashTimer } from "@/components/FlashTimer";
 import { useToast } from "@/hooks/use-toast";
+import { useDiscoveryRankedProducts } from "@/hooks/use-discovery-ranked";
 import {
   Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
@@ -112,36 +113,38 @@ export default function ProductPage() {
 
   const wishlisted = product ? isInWishlist(product.id) : false;
 
-  const { data: relatedProducts } = useQuery({
+  const { data: relatedProductsRaw } = useQuery({
     queryKey: ["related-products", product?.categoryId],
     queryFn: async () => {
       if (!product?.categoryId) return [];
-      // First try: products in same subcategory
-      let results = await fetchProducts({ categoryId: product.categoryId, limit: 12 });
-      results = results.filter(p => p.id !== product.id);
-      // Fallback: if < 6 results, try parent category
+      let results = await fetchProducts({ categoryId: product.categoryId, limit: 24 });
+      results = results.filter((p) => p.id !== product.id);
       if (results.length < 6 && product.categoryFr) {
-        // Get parent category id
         const { data: cat } = await supabase
           .from("categories")
           .select("parent_id")
           .eq("id", product.categoryId)
           .maybeSingle();
         if (cat?.parent_id) {
-          const parentResults = await fetchProducts({ categoryId: cat.parent_id, limit: 12 });
-          const existingIds = new Set(results.map(r => r.id));
+          const parentResults = await fetchProducts({ categoryId: cat.parent_id, limit: 24 });
+          const existingIds = new Set(results.map((r) => r.id));
           existingIds.add(product.id);
           for (const pr of parentResults) {
-            if (!existingIds.has(pr.id) && results.length < 6) {
+            if (!existingIds.has(pr.id) && results.length < 24) {
               results.push(pr);
             }
           }
         }
       }
-      return results.slice(0, 6);
+      return results;
     },
     enabled: !!product?.categoryId,
   });
+  const relatedProducts = useDiscoveryRankedProducts(
+    relatedProductsRaw || [],
+    "product_related",
+    12,
+  );
 
   const { data: pricingTiersRaw } = useQuery({
     queryKey: ["pricing-tiers", id],

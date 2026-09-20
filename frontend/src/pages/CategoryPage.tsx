@@ -22,6 +22,7 @@ import { SlidersHorizontal, X } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useSeoConfig } from "@/hooks/use-seo-config";
 import { slugify } from "@/utils/slugify";
+import { useDiscoveryRankedProducts } from "@/hooks/use-discovery-ranked";
 
 function applySeoTemplate(tpl: string, vars: Record<string, string>): string {
   return (tpl || "").replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? "");
@@ -166,6 +167,12 @@ export default function CategoryPage() {
     return result;
   }, [products, priceRange, selectedSizes, selectedColors, sortBy]);
 
+  const rankedFiltered = useDiscoveryRankedProducts(
+    filteredProducts,
+    "category",
+    filteredProducts.length || undefined,
+  );
+
   const activeFiltersCount = (selectedSizes.length > 0 ? 1 : 0) + (selectedColors.length > 0 ? 1 : 0) + (priceRange[0] > 0 || priceRange[1] < 10000 ? 1 : 0);
 
   if (catLoading) {
@@ -210,8 +217,8 @@ export default function CategoryPage() {
       brand: seoConfig.brand_name || "Zandofy",
     }) ||
     (locale === "fr"
-      ? `Découvrez ${filteredProducts?.length || 0} produits ${catLabel} sur Zandofy. Import Chine, livraison Afrique.`
-      : `Discover ${filteredProducts?.length || 0} ${catLabel} products on Zandofy. China import, Africa delivery.`);
+      ? `Découvrez ${rankedFiltered?.length || 0} produits ${catLabel} sur Zandofy. Import Chine, livraison Afrique.`
+      : `Discover ${rankedFiltered?.length || 0} ${catLabel} products on Zandofy. China import, Africa delivery.`);
 
   const catFaq = Array.isArray((category as any).seo_faq)
     ? ((category as any).seo_faq as { question?: string; answer?: string }[]).filter(
@@ -245,7 +252,7 @@ export default function CategoryPage() {
             { name: category.name_fr || category.name || slug, url: `/category/${slugify(category.name || slug || "")}` },
           ]),
           buildProductItemListJsonLd(
-            (filteredProducts || []).map((p) => ({
+            (rankedFiltered || []).map((p) => ({
               id: p.id,
               slug: p.slug,
               name: locale === "fr" ? p.nameFr : p.name,
@@ -289,7 +296,7 @@ export default function CategoryPage() {
             <div>
               <h1 className="text-2xl font-bold text-foreground">{catLabel}</h1>
               <p className="text-sm text-muted-foreground mt-1">
-                {filteredProducts?.length || 0} {t("filter.products")}
+                {rankedFiltered?.length || 0} {t("filter.products")}
               </p>
             </div>
           </div>
@@ -449,9 +456,9 @@ export default function CategoryPage() {
           <div className={PRODUCT_GRID_CLASS}>
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => <ProductCardSkeleton key={i} />)}
           </div>
-        ) : filteredProducts && filteredProducts.length > 0 ? (
+        ) : rankedFiltered && rankedFiltered.length > 0 ? (
           <div className={PRODUCT_GRID_CLASS}>
-            {filteredProducts.map((p: any) => (
+            {rankedFiltered.map((p: any) => (
               <Link key={p.id} to={`/product/${p.slug || p.id}`} className="cursor-pointer">
                 <ProductCard product={p} />
               </Link>

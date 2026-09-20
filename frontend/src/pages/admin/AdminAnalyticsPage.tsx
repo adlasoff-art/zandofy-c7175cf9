@@ -8,12 +8,13 @@ import {
   BarChart3, Users, Eye, MousePointer, Smartphone, Monitor, Tablet,
   Globe, TrendingUp, Clock, Download, Store, Heart, ShoppingCart,
   Package, ChevronLeft, ChevronRight, ArrowUpDown, Wifi, UserPlus,
-  MapPin,
+  MapPin, Sparkles,
 } from "lucide-react";
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Legend,
 } from "recharts";
+import { DiscoveryAnalyticsSection } from "@/components/admin/DiscoveryAnalyticsSection";
 
 const PERIODS = [
   { key: "1h", label: "1h", hours: 1 },
@@ -785,6 +786,9 @@ export default function AdminAnalyticsPage() {
               <TabsTrigger value="products" className="text-xs">
                 <Package size={14} className="mr-1" /> Produits
               </TabsTrigger>
+              <TabsTrigger value="discovery" className="text-xs">
+                <Sparkles size={14} className="mr-1" /> Discovery
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="overview">
               <OverviewTab
@@ -804,6 +808,9 @@ export default function AdminAnalyticsPage() {
             </TabsContent>
             <TabsContent value="products">
               <ProductTrackingTab period={period} since={since} />
+            </TabsContent>
+            <TabsContent value="discovery">
+              <DiscoveryAnalyticsSection since={since} />
             </TabsContent>
           </Tabs>
         )}

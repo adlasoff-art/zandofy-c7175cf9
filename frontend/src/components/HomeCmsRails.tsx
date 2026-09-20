@@ -9,7 +9,9 @@ import { categoryPath } from "@/lib/category-slug";
 import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 import { useI18n } from "@/contexts/I18nContext";
 import { useHomeMarket } from "@/contexts/HomeMarketContext";
+import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
 import { sanitizeRouterTo } from "@/lib/safe-href";
+import { useDiscoveryRankedProducts } from "@/hooks/use-discovery-ranked";
 
 type DisplayMode = "rail" | "grid_page";
 
@@ -35,9 +37,71 @@ type LoadedSection = {
   displayMode: DisplayMode;
 };
 
+function CmsSectionView({ section }: { section: LoadedSection }) {
+  const ranked = useDiscoveryRankedProducts(
+    section.products,
+    `home_cms_${section.id}`,
+    section.products.length,
+  );
+  if (section.displayMode === "grid_page") {
+    return (
+      <section
+        className="py-4 bg-muted/30 dark:bg-muted/10"
+        aria-labelledby={`cms-grid-${section.id}`}
+      >
+        <div className="container">
+          {section.href ? (
+            <Link to={section.href} className="flex items-center gap-2 mb-4 group w-fit">
+              <h2
+                id={`cms-grid-${section.id}`}
+                className="text-base md:text-lg font-bold text-foreground group-hover:text-primary transition-colors"
+              >
+                {section.title}
+              </h2>
+              <ChevronRight
+                size={16}
+                className="text-muted-foreground group-hover:text-primary transition-colors"
+              />
+            </Link>
+          ) : (
+            <h2
+              id={`cms-grid-${section.id}`}
+              className="text-base md:text-lg font-bold text-foreground mb-4"
+            >
+              {section.title}
+            </h2>
+          )}
+          <div className={PRODUCT_GRID_CLASS}>
+            {ranked.map((product, i) => (
+              <Link
+                to={`/product/${product.slug || product.id}`}
+                key={product.id}
+                className="block"
+              >
+                <ProductCard product={product} index={i} />
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+  return (
+    <ProductRail
+      title={section.title}
+      titleId={`cms-rail-${section.id}`}
+      seeAllHref={section.href}
+      products={ranked}
+      skeletonCount={12}
+      className="bg-muted/30 dark:bg-muted/10"
+    />
+  );
+}
+
 export function HomeCmsRails() {
   const { locale } = useI18n();
   const { shopTypeFilter } = useHomeMarket();
+  const { hasCompleted } = useDiscoveryPrefs();
   const [sections, setSections] = useState<LoadedSection[]>([]);
 
   useEffect(() => {
@@ -56,6 +120,7 @@ export function HomeCmsRails() {
         return;
       }
 
+      const shopType = hasCompleted ? undefined : shopTypeFilter;
       const loaded: LoadedSection[] = [];
       for (const section of rows) {
         const entityId = section.config?.entity_id;
@@ -67,8 +132,8 @@ export function HomeCmsRails() {
           if (section.section_key === "category_rail") {
             const products = await fetchProducts({
               categoryId: entityId,
-              limit,
-              shopType: shopTypeFilter,
+              limit: hasCompleted ? Math.min(limit * 2, 48) : limit,
+              shopType,
             });
             if (products.length === 0) continue;
             const { data: cat } = await supabase
@@ -89,8 +154,8 @@ export function HomeCmsRails() {
           } else if (section.section_key === "store_rail") {
             const products = await fetchProducts({
               storeId: entityId,
-              limit,
-              shopType: shopTypeFilter,
+              limit: hasCompleted ? Math.min(limit * 2, 48) : limit,
+              shopType,
             });
             if (products.length === 0) continue;
             loaded.push({
@@ -110,66 +175,15 @@ export function HomeCmsRails() {
     return () => {
       cancelled = true;
     };
-  }, [locale, shopTypeFilter]);
+  }, [locale, shopTypeFilter, hasCompleted]);
 
   if (sections.length === 0) return null;
 
   return (
     <>
-      {sections.map((section) =>
-        section.displayMode === "grid_page" ? (
-          <section
-            key={section.id}
-            className="py-4 bg-muted/30 dark:bg-muted/10"
-            aria-labelledby={`cms-grid-${section.id}`}
-          >
-            <div className="container">
-              {section.href ? (
-                <Link to={section.href} className="flex items-center gap-2 mb-4 group w-fit">
-                  <h2
-                    id={`cms-grid-${section.id}`}
-                    className="text-base md:text-lg font-bold text-foreground group-hover:text-primary transition-colors"
-                  >
-                    {section.title}
-                  </h2>
-                  <ChevronRight
-                    size={16}
-                    className="text-muted-foreground group-hover:text-primary transition-colors"
-                  />
-                </Link>
-              ) : (
-                <h2
-                  id={`cms-grid-${section.id}`}
-                  className="text-base md:text-lg font-bold text-foreground mb-4"
-                >
-                  {section.title}
-                </h2>
-              )}
-              <div className={PRODUCT_GRID_CLASS}>
-                {section.products.map((product, i) => (
-                  <Link
-                    to={`/product/${product.slug || product.id}`}
-                    key={product.id}
-                    className="block"
-                  >
-                    <ProductCard product={product} index={i} />
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </section>
-        ) : (
-          <ProductRail
-            key={section.id}
-            title={section.title}
-            titleId={`cms-rail-${section.id}`}
-            seeAllHref={section.href}
-            products={section.products}
-            skeletonCount={12}
-            className="bg-muted/30 dark:bg-muted/10"
-          />
-        ),
-      )}
+      {sections.map((section) => (
+        <CmsSectionView key={section.id} section={section} />
+      ))}
     </>
   );
 }
