@@ -618,8 +618,9 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   </div>
                 )}
 
-                {/* Payment proof uploads (vendor view) */}
-                {order.shipping_payment_status === "deferred" && (
+                {/* Preuve expédition différée — pas pour hors plateforme :
+                    shipping_payment_proof_url y est déjà la preuve PRODUIT client. */}
+                {order.shipping_payment_status === "deferred" && order.payment_method !== "off_platform" && (
                   <PaymentProofUpload
                     orderId={order.id}
                     field="shipping_payment_proof_url"
@@ -661,6 +662,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                             const now = new Date().toISOString();
                             const payload = vendorOffPlatformConfirmUpdates(now, user.id, {
                               preserveVerifiedAt: order.off_platform_vendor_verified_at,
+                              currentShippingPaymentStatus: order.shipping_payment_status,
                             });
                             const { error } = await supabase
                               .from("orders")
@@ -728,7 +730,9 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                               const now = new Date().toISOString();
                               const payload = isPlatformOwned
                                 ? vendorOffPlatformVerifyOnlyUpdates(now, user.id)
-                                : vendorOffPlatformConfirmUpdates(now, user.id);
+                                : vendorOffPlatformConfirmUpdates(now, user.id, {
+                                    currentShippingPaymentStatus: order.shipping_payment_status,
+                                  });
                               const { error } = await supabase
                                 .from("orders")
                                 .update(payload as any)
