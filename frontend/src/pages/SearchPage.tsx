@@ -14,6 +14,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SlidersHorizontal, X, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
+import { useDiscoveryRankedProducts } from "@/hooks/use-discovery-ranked";
 
 export default function SearchPage() {
   const { t, locale, formatPrice } = useI18n();
@@ -22,7 +23,8 @@ export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryParam = searchParams.get("q") || "";
 
-  const [products, setProducts] = useState<Product[]>([]);
+  const [rawProducts, setProducts] = useState<Product[]>([]);
+  const products = useDiscoveryRankedProducts(rawProducts, "search", rawProducts.length || undefined);
   const [loading, setLoading] = useState(true);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(true);

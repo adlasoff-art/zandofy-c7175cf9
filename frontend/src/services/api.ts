@@ -54,6 +54,8 @@ export interface Product {
   store?: any;
   sellerRank?: number;
   shopType?: string;
+  storeCityId?: string;
+  storeCity?: string;
   metaTitle?: string;
   metaDescription?: string;
   seoKeywords?: string[];
@@ -156,6 +158,8 @@ export function mapProduct(row: any): Product {
       const raw = row.shop_type || storeData?.shop_type;
       return raw === "local" || raw === "international" ? raw : undefined;
     })(),
+    storeCityId: row.store_city_id || undefined,
+    storeCity: row.store_city || undefined,
     metaTitle: row.meta_title || undefined,
     metaDescription: row.meta_description || undefined,
     seoKeywords: Array.isArray(row.seo_keywords) ? row.seo_keywords : undefined,
@@ -188,6 +192,7 @@ export const PRODUCT_LIST_SELECT = `
   id, name, name_fr, slug, price, original_price, currency, discount, is_new, is_sale,
   sales_count, rating, review_count, store_id, category_id, created_at, short_description, origin_country,
   shop_type, store_is_verified, store_is_certified, gender_target,
+  store_city_id, store_city,
   categories(name, name_fr),
   product_images(image_url, position),
   product_colors(color_hex, color_name)

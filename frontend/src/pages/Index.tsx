@@ -22,6 +22,7 @@ const ProductGrid = lazyRetry(() => import("@/components/ProductGrid").then(m =>
 const FeaturedSidebar = lazyRetry(() => import("@/components/FeaturedSidebar").then(m => ({ default: m.FeaturedSidebar })));
 const RecommendationsSection = lazyRetry(() => import("@/components/RecommendationsSection").then(m => ({ default: m.RecommendationsSection })));
 const HomeCmsRails = lazyRetry(() => import("@/components/HomeCmsRails").then(m => ({ default: m.HomeCmsRails })));
+const HomeSamplesRail = lazyRetry(() => import("@/components/HomeSamplesRail").then(m => ({ default: m.HomeSamplesRail })));
 const Footer = lazyRetry(() => import("@/components/Footer").then(m => ({ default: m.Footer })));
 const FloatingActions = lazyRetry(() => import("@/components/FloatingActions").then(m => ({ default: m.FloatingActions })));
 
@@ -134,6 +135,12 @@ const Index = () => {
         <LazyMount minHeight={280} initialShown={restoreHomeLayout}>
           <Suspense fallback={<div style={{ minHeight: 280 }} />}>
             <RecommendationsSection />
+          </Suspense>
+        </LazyMount>
+
+        <LazyMount minHeight={200} initialShown={restoreHomeLayout}>
+          <Suspense fallback={null}>
+            <HomeSamplesRail />
           </Suspense>
         </LazyMount>
 

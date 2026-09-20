@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useKybSubmission, KYB_REQUIRED_DOCS, getSignedKybUrl, type KybDocType } from "@/hooks/use-kyb-kyc-v2";
 import { useStoreKybGate } from "@/hooks/use-store-kyb-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CascadingAddressFields, type AddressData } from "@/components/address/CascadingAddressFields";
+import { resolveCountryCode } from "@/components/vendor/CountryCombobox";
 import { ShieldCheck, Upload, FileCheck, Trash2, ExternalLink, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 interface Props { storeId: string; }
@@ -21,11 +23,46 @@ const STATUS_BADGE: Record<string, { label: string; variant: "default" | "second
   needs_changes: { label: "Modifications requises", variant: "destructive" },
 };
 
+const emptyGeo = (): AddressData => ({
+  country: "CD",
+  province: "",
+  province_id: "",
+  city: "",
+  commune: "",
+  quartier: "",
+  address: "",
+  postal_code: "",
+});
+
 export function VendorKybV2Tab({ storeId }: Props) {
   const { submission, documents, loading, updateFields, uploadDocument, deleteDocument, submit } = useKybSubmission(storeId);
   const { data: gate } = useStoreKybGate(storeId);
   const [uploading, setUploading] = useState<KybDocType | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [geo, setGeo] = useState<AddressData>(emptyGeo);
+  const geoHydratedFor = useRef<string | null>(null);
+  const addressSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    geoHydratedFor.current = null;
+  }, [storeId]);
+
+  useEffect(() => {
+    if (!submission) return;
+    // Avoid clobbering in-progress edits after every field save/reload
+    if (geoHydratedFor.current === submission.id) return;
+    geoHydratedFor.current = submission.id;
+    setGeo({
+      ...emptyGeo(),
+      country: resolveCountryCode(submission.business_country, "CD"),
+      city: submission.business_city ?? "",
+      address: submission.business_address ?? "",
+    });
+  }, [submission]);
+
+  useEffect(() => () => {
+    if (addressSaveTimer.current) clearTimeout(addressSaveTimer.current);
+  }, []);
 
   if (loading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="animate-spin text-primary" /></div>;
@@ -43,6 +80,28 @@ export function VendorKybV2Tab({ storeId }: Props) {
   const handleField = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isLocked) return;
     void updateFields({ [field]: e.target.value } as any);
+  };
+
+  const persistGeoPatch = (patch: Partial<{ business_country: string; business_city: string; business_address: string }>) => {
+    if (isLocked) return;
+    void updateFields(patch as any);
+  };
+
+  const handleGeoChange = (field: keyof AddressData, value: string) => {
+    if (isLocked) return;
+    setGeo((prev) => ({ ...prev, [field]: value }));
+    // Discrete selects → persist immediately; address free-text → debounce (avoid reload per keystroke)
+    if (field === "country") {
+      if (addressSaveTimer.current) clearTimeout(addressSaveTimer.current);
+      persistGeoPatch({ business_country: value, business_city: "" });
+    } else if (field === "city") {
+      persistGeoPatch({ business_city: value });
+    } else if (field === "address") {
+      if (addressSaveTimer.current) clearTimeout(addressSaveTimer.current);
+      addressSaveTimer.current = setTimeout(() => {
+        persistGeoPatch({ business_address: value });
+      }, 700);
+    }
   };
 
   return (
@@ -103,9 +162,15 @@ export function VendorKybV2Tab({ storeId }: Props) {
           <div><Label>NIF (n° impôt)</Label><Input disabled={isLocked} defaultValue={submission?.tax_nif ?? ""} onBlur={handleField("tax_nif")} /></div>
           <div><Label>Nom complet du dirigeant</Label><Input disabled={isLocked} defaultValue={submission?.director_full_name ?? ""} onBlur={handleField("director_full_name")} /></div>
           <div><Label>N° pièce d&apos;identité du dirigeant</Label><Input disabled={isLocked} defaultValue={submission?.director_id_number ?? ""} onBlur={handleField("director_id_number")} /></div>
-          <div className="md:col-span-2"><Label>Adresse de l&apos;entreprise</Label><Input disabled={isLocked} defaultValue={submission?.business_address ?? ""} onBlur={handleField("business_address")} /></div>
-          <div><Label>Pays</Label><Input disabled={isLocked} defaultValue={submission?.business_country ?? ""} onBlur={handleField("business_country")} placeholder="RDC" /></div>
-          <div><Label>Ville</Label><Input disabled={isLocked} defaultValue={submission?.business_city ?? ""} onBlur={handleField("business_city")} /></div>
+          <div className="md:col-span-2 space-y-2">
+            <Label>Adresse de l&apos;entreprise</Label>
+            <div className={isLocked ? "pointer-events-none opacity-60" : undefined}>
+              <CascadingAddressFields data={geo} onChange={handleGeoChange} showPostalCode={false} />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Pays stocké en code ISO (ex. CD). Anciennes valeurs libres (ex. « RDC ») restent jusqu&apos;à resaisie.
+            </p>
+          </div>
           <div><Label>Banque</Label><Input disabled={isLocked} defaultValue={submission?.bank_name ?? ""} onBlur={handleField("bank_name")} /></div>
           <div><Label>Titulaire du compte</Label><Input disabled={isLocked} defaultValue={submission?.bank_account_holder ?? ""} onBlur={handleField("bank_account_holder")} /></div>
           <div className="md:col-span-2"><Label>Numéro de compte / IBAN</Label><Input disabled={isLocked} defaultValue={submission?.bank_account_number ?? ""} onBlur={handleField("bank_account_number")} /></div>

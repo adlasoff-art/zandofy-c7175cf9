@@ -7,6 +7,8 @@ import { shuffleByDailySeed } from "@/lib/daily-shuffle";
 import { SUPER_PROMO_CARD_SLOT_CLASS } from "@/lib/product-image-fit";
 import { useHomeMarket } from "@/contexts/HomeMarketContext";
 import { useI18n } from "@/contexts/I18nContext";
+import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
+import { useDiscoveryRankedProducts } from "@/hooks/use-discovery-ranked";
 
 function useCountdown(targetDate: Date) {
   const [timeLeft, setTimeLeft] = useState(getTimeLeft(targetDate));
@@ -31,10 +33,12 @@ function getTimeLeft(target: Date) {
 }
 
 export function FlashSales() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const { t } = useI18n();
   const { shopTypeFilter } = useHomeMarket();
+  const { hasCompleted } = useDiscoveryPrefs();
+  const products = useDiscoveryRankedProducts(rawProducts, "home_flash", 16);
 
   // Find the nearest promo end date from fetched products, fallback to 8h
   const [saleEnd, setSaleEnd] = useState(() => new Date(Date.now() + 8 * 60 * 60 * 1000));
@@ -43,9 +47,10 @@ export function FlashSales() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchFlashSaleProducts({ shopType: shopTypeFilter }).then((data) => {
+    // When discovery completed, fetch both markets so the engine can mix 65/25/10 geo buckets
+    fetchFlashSaleProducts({ shopType: hasCompleted ? undefined : shopTypeFilter }).then((data) => {
       if (cancelled) return;
-      setProducts(shuffleByDailySeed(data));
+      setRawProducts(shuffleByDailySeed(data));
       setLoading(false);
 
       const now = Date.now();
@@ -60,7 +65,7 @@ export function FlashSales() {
     return () => {
       cancelled = true;
     };
-  }, [shopTypeFilter]);
+  }, [shopTypeFilter, hasCompleted]);
 
   if (!loading && products.length === 0) return null;
 

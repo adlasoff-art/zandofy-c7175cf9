@@ -520,7 +520,9 @@ export function trackDiscoveryOnboarding(
     | "discovery_onboarding_step_complete"
     | "discovery_onboarding_step_skip"
     | "discovery_onboarding_completed"
-    | "discovery_onboarding_dismissed",
+    | "discovery_onboarding_dismissed"
+    | "discovery_feed_assembled"
+    | "checkout_pref_applied",
   metadata: Record<string, unknown> = {},
   userId?: string,
 ) {

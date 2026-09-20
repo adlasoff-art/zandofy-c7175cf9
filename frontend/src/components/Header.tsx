@@ -323,7 +323,7 @@ export function Header() {
 
             {user && (
               <Link
-                to="/messages"
+                to="/dashboard?tab=messages"
                 className="hidden md:flex p-2 text-foreground hover:text-primary transition-colors relative"
                 aria-label={t("header.messages")}
                 title={t("header.messages")}
@@ -384,7 +384,7 @@ export function Header() {
                   <div className="absolute right-0 top-full mt-1 w-56 bg-popover border border-border rounded-lg shadow-lg z-50 py-1 animate-fade-in">
                     <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border">{user.email}</div>
                     <Link to="/dashboard" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.mySpace")}</Link>
-                    <Link to="/messages" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.messages")} {unreadCount > 0 && `(${unreadCount})`}</Link>
+                    <Link to="/dashboard?tab=messages" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.messages")} {unreadCount > 0 && `(${unreadCount})`}</Link>
                     <Link to="/vendor" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.vendorSpace")}</Link>
                     <Link to="/become-vendor" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-primary font-medium hover:bg-muted transition-colors">{t("header.becomeVendor")}</Link>
                     {isOperator ? (

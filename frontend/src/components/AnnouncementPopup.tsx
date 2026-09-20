@@ -1,9 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
 import { imgUrl } from "@/lib/image-url";
+import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
+import { useAuthSettings } from "@/hooks/use-auth-settings";
+import { isDiscoverySnoozed } from "@/lib/discovery-prefs";
+import {
+  isDiscoverySheetOpen,
+  subscribeDiscoverySheetOpen,
+} from "@/lib/discovery-sheet-bus";
 
 interface PopupData {
   id: string;
@@ -18,6 +24,36 @@ interface PopupData {
 export function AnnouncementPopup() {
   const [popup, setPopup] = useState<PopupData | null>(null);
   const [open, setOpen] = useState(false);
+  const { hasCompleted } = useDiscoveryPrefs();
+  const { data: authSettings } = useAuthSettings();
+  const timerRef = useRef<number | null>(null);
+  const pendingRef = useRef<PopupData | null>(null);
+
+  const delaySec = authSettings?.discovery_popup_delay_sec ?? 15;
+  const discoveryEnabled = authSettings?.discovery_onboarding_enabled !== false;
+
+  const tryOpen = (p: PopupData) => {
+    if (isDiscoverySheetOpen()) {
+      pendingRef.current = p;
+      return;
+    }
+    // Wait for discovery only when the feature is on and user has not finished/snoozed
+    if (discoveryEnabled && !hasCompleted && !isDiscoverySnoozed()) {
+      pendingRef.current = p;
+      return;
+    }
+    const waitMs =
+      discoveryEnabled && (hasCompleted || isDiscoverySnoozed()) ? delaySec * 1000 : 1500;
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => {
+      if (isDiscoverySheetOpen()) {
+        pendingRef.current = p;
+        return;
+      }
+      setPopup(p);
+      setOpen(true);
+    }, waitMs);
+  };
 
   useEffect(() => {
     supabase
@@ -31,22 +67,40 @@ export function AnnouncementPopup() {
       .then(({ data }) => {
         if (!data) return;
         const p = data as any as PopupData;
-        
-        // Check frequency
         const key = `popup_seen_${p.id}`;
         const lastSeen = localStorage.getItem(key);
-        
         if (p.display_frequency === "once" && lastSeen) return;
         if (p.display_frequency === "daily") {
           const today = new Date().toDateString();
           if (lastSeen === today) return;
         }
-        
-        setPopup(p);
-        // Small delay for better UX
-        setTimeout(() => setOpen(true), 1500);
+        tryOpen(p);
       });
-  }, []);
+
+    return () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasCompleted, delaySec, discoveryEnabled]);
+
+  useEffect(() => {
+    return subscribeDiscoverySheetOpen((sheetOpen) => {
+      if (sheetOpen) {
+        setOpen(false);
+        return;
+      }
+      const pending = pendingRef.current;
+      if (!pending) return;
+      if (discoveryEnabled && !hasCompleted && !isDiscoverySnoozed()) return;
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      timerRef.current = window.setTimeout(() => {
+        if (isDiscoverySheetOpen()) return;
+        setPopup(pending);
+        pendingRef.current = null;
+        setOpen(true);
+      }, delaySec * 1000);
+    });
+  }, [hasCompleted, delaySec, discoveryEnabled]);
 
   const handleClose = () => {
     setOpen(false);

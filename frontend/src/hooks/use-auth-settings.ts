@@ -1,6 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+export type DiscoveryMixConfig = {
+  core_pct: number;
+  explore_pct: number;
+  neutral_pct: number;
+  /** Of total feed when purchase_scope = city */
+  city_pct: number;
+  /** Of total feed when purchase_scope = city (with city_pct should ≈ core_pct) */
+  country_within_core_pct: number;
+  rotation_hours: number;
+};
+
 export type AuthSettings = {
   mode: "fluid" | "strict";
   collect_phone_on_signup: boolean;
@@ -11,6 +22,18 @@ export type AuthSettings = {
     payment: boolean;
     receipt: boolean;
   };
+  discovery_mix: DiscoveryMixConfig;
+  /** Seconds after discovery complete/dismiss before CMS announcement popup */
+  discovery_popup_delay_sec: number;
+};
+
+export const DISCOVERY_MIX_DEFAULTS: DiscoveryMixConfig = {
+  core_pct: 65,
+  explore_pct: 25,
+  neutral_pct: 10,
+  city_pct: 45,
+  country_within_core_pct: 20,
+  rotation_hours: 12,
 };
 
 export const AUTH_SETTINGS_DEFAULTS: AuthSettings = {
@@ -23,14 +46,42 @@ export const AUTH_SETTINGS_DEFAULTS: AuthSettings = {
     payment: true,
     receipt: true,
   },
+  discovery_mix: { ...DISCOVERY_MIX_DEFAULTS },
+  discovery_popup_delay_sec: 15,
 };
 
 export const AUTH_SETTINGS_QUERY_KEY = ["platform-auth-settings"] as const;
 
+function clampPct(n: unknown, fallback: number): number {
+  const v = typeof n === "number" ? n : Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.min(100, Math.max(0, Math.round(v)));
+}
+
+export function normalizeDiscoveryMix(raw: unknown): DiscoveryMixConfig {
+  const d = DISCOVERY_MIX_DEFAULTS;
+  if (!raw || typeof raw !== "object") return { ...d };
+  const v = raw as Partial<DiscoveryMixConfig>;
+  return {
+    core_pct: clampPct(v.core_pct, d.core_pct),
+    explore_pct: clampPct(v.explore_pct, d.explore_pct),
+    neutral_pct: clampPct(v.neutral_pct, d.neutral_pct),
+    city_pct: clampPct(v.city_pct, d.city_pct),
+    country_within_core_pct: clampPct(v.country_within_core_pct, d.country_within_core_pct),
+    rotation_hours: Math.min(168, Math.max(1, clampPct(v.rotation_hours, d.rotation_hours) || d.rotation_hours)),
+  };
+}
+
+/** Sum of core+explore+neutral; warn UI if not ~100. */
+export function discoveryMixSum(m: DiscoveryMixConfig): number {
+  return m.core_pct + m.explore_pct + m.neutral_pct;
+}
+
 function normalizeAuthSettings(raw: unknown): AuthSettings {
-  if (!raw || typeof raw !== "object") return { ...AUTH_SETTINGS_DEFAULTS };
+  if (!raw || typeof raw !== "object") return { ...AUTH_SETTINGS_DEFAULTS, discovery_mix: { ...DISCOVERY_MIX_DEFAULTS } };
   const v = raw as Partial<AuthSettings> & {
     discovery_onboarding_steps?: Partial<AuthSettings["discovery_onboarding_steps"]>;
+    discovery_mix?: Partial<DiscoveryMixConfig>;
   };
   return {
     mode: v.mode === "strict" ? "strict" : "fluid",
@@ -42,6 +93,11 @@ function normalizeAuthSettings(raw: unknown): AuthSettings {
       payment: v.discovery_onboarding_steps?.payment !== false,
       receipt: v.discovery_onboarding_steps?.receipt !== false,
     },
+    discovery_mix: normalizeDiscoveryMix(v.discovery_mix),
+    discovery_popup_delay_sec: Math.min(
+      120,
+      Math.max(0, typeof v.discovery_popup_delay_sec === "number" ? v.discovery_popup_delay_sec : 15),
+    ),
   };
 }
 
@@ -54,13 +110,14 @@ export function useAuthSettings() {
         .select("value")
         .eq("key", "auth_settings")
         .maybeSingle();
-      // RLS miss / network: fall back to product defaults (do not break signup)
       if (error) {
         console.warn("[useAuthSettings]", error.message);
-        return { ...AUTH_SETTINGS_DEFAULTS };
+        return { ...AUTH_SETTINGS_DEFAULTS, discovery_mix: { ...DISCOVERY_MIX_DEFAULTS } };
       }
       return normalizeAuthSettings(data?.value);
     },
     staleTime: 60_000,
   });
 }
+
+export { normalizeAuthSettings };

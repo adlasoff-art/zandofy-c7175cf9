@@ -21,6 +21,8 @@ export type DiscoveryPrefs = {
   receipt_mode: ReceiptMode | null;
   payment_prefs: PaymentPref[];
   country_code: string | null;
+  /** Admin geo `cities.id` when purchase_scope is city (I7). */
+  city_id: string | null;
   completed_at: string | null;
   skipped_at: string | null;
   updated_at: string;
@@ -42,6 +44,7 @@ export function emptyDiscoveryPrefs(): DiscoveryPrefs {
     receipt_mode: null,
     payment_prefs: [],
     country_code: null,
+    city_id: null,
     completed_at: null,
     skipped_at: null,
     updated_at: new Date().toISOString(),
@@ -72,6 +75,11 @@ export function normalizeDiscoveryPrefs(raw: unknown): DiscoveryPrefs {
         )
       : [],
     country_code: typeof v.country_code === "string" && v.country_code.length === 2 ? v.country_code.toUpperCase() : null,
+    city_id:
+      typeof v.city_id === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v.city_id)
+        ? v.city_id
+        : null,
     completed_at: typeof v.completed_at === "string" ? v.completed_at : null,
     skipped_at: typeof v.skipped_at === "string" ? v.skipped_at : null,
     updated_at: typeof v.updated_at === "string" ? v.updated_at : new Date().toISOString(),
@@ -152,82 +160,6 @@ export function audienceToProfileGender(audience: ShoppingAudience | null | unde
   if (audience === "male") return "male";
   if (audience === "female") return "female";
   return null;
-}
-
-/**
- * Mix products ~65% interest×audience, ~25% same-audience exploration, ~10% other.
- * Falls back to rating order when pools are thin.
- */
-export function rankProductsByDiscoveryPrefs<
-  T extends {
-    id: string;
-    category_id?: string | null;
-    categoryId?: string | null;
-    gender_target?: string | null;
-    genderTarget?: string | null;
-    rating?: number | null;
-  },
->(products: T[], prefs: DiscoveryPrefs | null, take = 24): T[] {
-  if (!products.length) return [];
-  if (!prefs?.completed_at && !prefs?.audience && !(prefs?.interest_category_ids?.length)) {
-    return products.slice(0, take);
-  }
-
-  const interestSet = new Set(prefs?.interest_category_ids || []);
-  const genderTargets = audienceToGenderTargets(prefs?.audience ?? null);
-  const genderSet = new Set(genderTargets.map((g) => g.toLowerCase()));
-
-  const catId = (p: T) => p.category_id || p.categoryId || null;
-  const genderOf = (p: T) => (p.gender_target || p.genderTarget || "").toLowerCase();
-
-  const matchesGender = (p: T) => {
-    if (genderSet.size === 0) return true;
-    const g = genderOf(p);
-    if (!g || g === "unisex") return true;
-    return genderSet.has(g);
-  };
-
-  const inInterest = (p: T) => {
-    const id = catId(p);
-    return interestSet.size > 0 && !!id && interestSet.has(id);
-  };
-
-  const primary = products.filter((p) => inInterest(p) && matchesGender(p));
-  const exploration = products.filter((p) => !inInterest(p) && matchesGender(p));
-  const other = products.filter((p) => !matchesGender(p));
-
-  const nPrimary = Math.max(1, Math.round(take * 0.65));
-  const nExplore = Math.max(1, Math.round(take * 0.25));
-  const nOther = Math.max(0, take - nPrimary - nExplore);
-
-  const pick = (pool: T[], n: number, exclude: Set<string>) => {
-    const out: T[] = [];
-    for (const p of pool) {
-      if (out.length >= n) break;
-      if (exclude.has(p.id)) continue;
-      out.push(p);
-      exclude.add(p.id);
-    }
-    return out;
-  };
-
-  const taken = new Set<string>();
-  const result = [
-    ...pick(primary, nPrimary, taken),
-    ...pick(exploration, nExplore, taken),
-    ...pick(other, nOther, taken),
-  ];
-
-  if (result.length < take) {
-    for (const p of products) {
-      if (result.length >= take) break;
-      if (taken.has(p.id)) continue;
-      result.push(p);
-      taken.add(p.id);
-    }
-  }
-
-  return result.slice(0, take);
 }
 
 /**

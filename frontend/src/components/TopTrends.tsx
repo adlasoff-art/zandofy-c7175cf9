@@ -6,13 +6,17 @@ import { fetchProducts, type Product } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/contexts/I18nContext";
 import { useHomeMarket } from "@/contexts/HomeMarketContext";
+import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
+import { useDiscoveryRankedProducts } from "@/hooks/use-discovery-ranked";
 
 export function TopTrends() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const { t } = useI18n();
   const { shopTypeFilter } = useHomeMarket();
+  const { hasCompleted } = useDiscoveryPrefs();
+  const products = useDiscoveryRankedProducts(rawProducts, "home_trends", 12);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,21 +31,22 @@ export function TopTrends() {
 
         if (cancelled) return;
         const trendingIds: string[] = (trending || []).map((t: any) => t.product_id);
-        const base = { shopType: shopTypeFilter } as const;
+        const shopType = hasCompleted ? undefined : shopTypeFilter;
+        const base = { shopType } as const;
 
         if (trendingIds.length > 0) {
-          const allProducts = await fetchProducts({ limit: 24, ...base });
+          const allProducts = await fetchProducts({ limit: 48, ...base });
           if (cancelled) return;
           const trendingSet = new Set(trendingIds);
           const ordered = trendingIds
             .map((id) => allProducts.find((p) => p.id === id))
             .filter(Boolean) as Product[];
           const rest = allProducts.filter((p) => !trendingSet.has(p.id));
-          setProducts([...ordered, ...rest].slice(0, 12));
+          setRawProducts([...ordered, ...rest].slice(0, 48));
         } else {
-          const data = await fetchProducts({ limit: 12, ...base });
+          const data = await fetchProducts({ limit: 48, ...base });
           if (cancelled) return;
-          setProducts(data);
+          setRawProducts(data);
         }
       } catch (err) {
         if (cancelled) return;
@@ -54,15 +59,14 @@ export function TopTrends() {
     return () => {
       cancelled = true;
     };
-  }, [shopTypeFilter]);
+  }, [shopTypeFilter, hasCompleted]);
 
   const loadProducts = () => {
-    // Used by retry button — bump by re-running effect via temporary error clear
     setError(false);
     setLoading(true);
-    fetchProducts({ limit: 12, shopType: shopTypeFilter })
+    fetchProducts({ limit: 48, shopType: hasCompleted ? undefined : shopTypeFilter })
       .then((data) => {
-        setProducts(data);
+        setRawProducts(data);
         setLoading(false);
       })
       .catch(() => {
