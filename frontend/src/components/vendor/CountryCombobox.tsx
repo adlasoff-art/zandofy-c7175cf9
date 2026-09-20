@@ -12,6 +12,25 @@ export function getCountryName(code: string): string {
   return COUNTRY_MAP[code] || code;
 }
 
+/** Resolve free-text or ISO input to an ISO-3166-1 alpha-2 code when possible. */
+export function resolveCountryCode(raw: string | null | undefined, fallback = ""): string {
+  if (!raw) return fallback;
+  const v = raw.trim();
+  if (!v) return fallback;
+  if (v.length === 2 && COUNTRY_MAP[v.toUpperCase()]) return v.toUpperCase();
+  const lower = v.toLowerCase();
+  if (lower === "rdc" || lower === "drc" || lower.includes("congo démocratique") || lower.includes("rd congo") || lower === "congo-kinshasa") {
+    return "CD";
+  }
+  if (lower === "congo" || lower.includes("congo-brazzaville")) return "CG";
+  const byName = Object.entries(COUNTRY_MAP).find(([, name]) => name.toLowerCase() === lower);
+  if (byName) return byName[0];
+  // Partial name match (e.g. "France", "Belge")
+  const partial = Object.entries(COUNTRY_MAP).find(([, name]) => name.toLowerCase().includes(lower) || lower.includes(name.toLowerCase()));
+  if (partial && lower.length >= 4) return partial[0];
+  return fallback;
+}
+
 export function CountryCombobox({ value, onChange, label = "Pays d'origine", placeholder = "Sélectionner un pays...", noneLabel = "— Aucun —", showNone = true, allowedCodes }: { value: string; onChange: (v: string) => void; label?: string; placeholder?: string; noneLabel?: string; showNone?: boolean; allowedCodes?: string[] }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");

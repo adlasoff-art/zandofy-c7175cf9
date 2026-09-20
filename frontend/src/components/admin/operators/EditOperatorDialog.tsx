@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import { CascadingAddressFields, type AddressData } from "@/components/address/CascadingAddressFields";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -40,9 +41,31 @@ export function EditOperatorDialog({
 }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<Partial<OperatorLike>>({});
+  const [hq, setHq] = useState<AddressData>({
+    country: "CD",
+    province: "",
+    province_id: "",
+    city: "",
+    commune: "",
+    quartier: "",
+    address: "",
+    postal_code: "",
+  });
 
   useEffect(() => {
-    if (operator) setForm({ ...operator });
+    if (operator) {
+      setForm({ ...operator });
+      setHq({
+        country: operator.headquarters_country || "CD",
+        province: "",
+        province_id: "",
+        city: operator.headquarters_city || "",
+        commune: "",
+        quartier: "",
+        address: "",
+        postal_code: "",
+      });
+    }
   }, [operator]);
 
   const update = useMutation({
@@ -51,12 +74,14 @@ export function EditOperatorDialog({
       const patch: Record<string, unknown> = {};
       const fields: (keyof OperatorLike)[] = [
         "company_name", "legal_name", "registration_number", "tax_id",
-        "contact_email", "contact_phone", "headquarters_city", "headquarters_country",
+        "contact_email", "contact_phone",
         "platform_commission_pct", "max_riders", "is_active",
       ];
       fields.forEach((f) => {
         if (form[f] !== operator[f]) patch[f] = form[f];
       });
+      if (hq.country !== operator.headquarters_country) patch.headquarters_country = hq.country;
+      if (hq.city !== operator.headquarters_city) patch.headquarters_city = hq.city;
       if (Object.keys(patch).length === 0) {
         throw new Error("Aucun changement à enregistrer");
       }
@@ -93,8 +118,14 @@ export function EditOperatorDialog({
           <div><Label>NIF / Tax ID</Label><Input value={form.tax_id ?? ""} onChange={(e) => set("tax_id", e.target.value)} /></div>
           <div><Label>Email contact</Label><Input type="email" value={form.contact_email ?? ""} onChange={(e) => set("contact_email", e.target.value)} /></div>
           <div><Label>Téléphone</Label><Input value={form.contact_phone ?? ""} onChange={(e) => set("contact_phone", e.target.value)} /></div>
-          <div><Label>Ville siège</Label><Input value={form.headquarters_city ?? ""} onChange={(e) => set("headquarters_city", e.target.value)} /></div>
-          <div><Label>Pays siège (ISO)</Label><Input value={form.headquarters_country ?? ""} onChange={(e) => set("headquarters_country", e.target.value)} /></div>
+          <div className="md:col-span-2 space-y-2">
+            <Label>Siège (zones géographiques)</Label>
+            <CascadingAddressFields
+              data={hq}
+              onChange={(field, value) => setHq((prev) => ({ ...prev, [field]: value }))}
+              showPostalCode={false}
+            />
+          </div>
           <div><Label>Commission plateforme (%)</Label><Input type="number" step="0.01" min={0} max={50} value={String(form.platform_commission_pct ?? 0)} onChange={(e) => set("platform_commission_pct", parseFloat(e.target.value) || 0)} /></div>
           <div><Label>Quota livreurs</Label><Input type="number" min={1} value={String(form.max_riders ?? 1)} onChange={(e) => set("max_riders", parseInt(e.target.value) || 1)} /></div>
           <div className="flex items-center justify-between border border-border rounded-md p-3 md:col-span-2">

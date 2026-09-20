@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { CountryCombobox } from "@/components/vendor/CountryCombobox";
+import { getCountryName } from "@/components/vendor/CountryCombobox";
+import { CascadingAddressFields, type AddressData } from "@/components/address/CascadingAddressFields";
 import { Camera, Upload, Loader2, FileImage, X, ChevronRight, ChevronLeft, ShieldCheck } from "lucide-react";
 import type { KycVerification } from "@/hooks/use-kyc";
 import { sanitizeExtension } from "@/utils/sanitize-filename";
@@ -43,11 +44,16 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
 
-  const [country, setCountry] = useState(existingKyc?.address_country || "CD");
-  const [city, setCity] = useState(existingKyc?.address_city || "");
-  const [street, setStreet] = useState(existingKyc?.address_street || "");
-  const [district, setDistrict] = useState(existingKyc?.address_district || "");
-  const [postalCode, setPostalCode] = useState(existingKyc?.address_postal_code || "");
+  const [addressData, setAddressData] = useState<AddressData>({
+    country: existingKyc?.address_country || "CD",
+    province: "",
+    province_id: "",
+    city: existingKyc?.address_city || "",
+    commune: "",
+    quartier: existingKyc?.address_district || "",
+    address: existingKyc?.address_street || "",
+    postal_code: existingKyc?.address_postal_code || "",
+  });
 
   const frontInputRef = useRef<HTMLInputElement>(null);
   const backInputRef = useRef<HTMLInputElement>(null);
@@ -85,7 +91,7 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
       toast({ title: "Selfie requis", description: "Veuillez prendre un selfie avec votre document.", variant: "destructive" });
       return;
     }
-    if (!city.trim() || !street.trim()) {
+    if (!addressData.city.trim() || !addressData.address.trim()) {
       toast({ title: "Adresse incomplète", description: "Ville et rue sont obligatoires.", variant: "destructive" });
       return;
     }
@@ -107,11 +113,11 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
         document_front_url: frontUrl,
         document_back_url: backUrl,
         selfie_url: selfieUrl,
-        address_country: country,
-        address_city: city,
-        address_street: street,
-        address_district: district || null,
-        address_postal_code: postalCode || null,
+        address_country: addressData.country,
+        address_city: addressData.city,
+        address_street: addressData.address,
+        address_district: addressData.quartier || addressData.commune || null,
+        address_postal_code: addressData.postal_code || null,
         rejection_reason: null,
       };
 
@@ -305,35 +311,18 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
             <p>Entrez l'adresse figurant sur votre document d'identité.</p>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs">Pays *</Label>
-            <CountryCombobox value={country} onChange={setCountry} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Ville *</Label>
-            <Input value={city} onChange={e => setCity(e.target.value)} placeholder="Kinshasa" required />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Rue / Avenue *</Label>
-            <Input value={street} onChange={e => setStreet(e.target.value)} placeholder="Avenue de la Libération, 45" required />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Quartier / District</Label>
-              <Input value={district} onChange={e => setDistrict(e.target.value)} placeholder="Gombe" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Code postal</Label>
-              <Input value={postalCode} onChange={e => setPostalCode(e.target.value)} placeholder="" />
-            </div>
-          </div>
+          <CascadingAddressFields
+            data={addressData}
+            onChange={(field, value) => setAddressData((prev) => ({ ...prev, [field]: value }))}
+            showPostalCode
+          />
 
           <div className="flex gap-3">
             <Button variant="outline" className="flex-1" onClick={() => setStep("selfie")}>
               <ChevronLeft size={16} /> Retour
             </Button>
             <Button className="flex-1" onClick={() => {
-              if (!city.trim() || !street.trim()) {
+              if (!addressData.city.trim() || !addressData.address.trim()) {
                 toast({ title: "Requis", description: "Ville et rue sont obligatoires.", variant: "destructive" });
                 return;
               }
@@ -359,7 +348,9 @@ export function KycSubmissionForm({ existingKyc, onSuccess }: Props) {
               <span className="text-muted-foreground">Selfie</span>
               <span className="text-foreground">{selfieFile ? "✅ Uploadé" : existingKyc?.selfie_url ? "✅ Existant" : "❌ Manquant"}</span>
               <span className="text-muted-foreground">Adresse</span>
-              <span className="text-foreground">{street}, {city}, {country}</span>
+              <span className="text-foreground">
+                {[addressData.address, addressData.city, getCountryName(addressData.country)].filter(Boolean).join(", ")}
+              </span>
             </div>
           </div>
 

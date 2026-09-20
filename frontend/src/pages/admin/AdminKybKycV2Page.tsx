@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
+import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { ShieldCheck, ExternalLink, Loader2, Building2, FileText, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -138,7 +139,7 @@ function KybReviewDrawer({ submission, onClose, onDone }: { submission: KybQueue
               <div><span className="text-muted-foreground">NIF</span><p className="font-medium">{submission.tax_nif || "—"}</p></div>
               <div><span className="text-muted-foreground">Dirigeant</span><p className="font-medium">{submission.director_full_name || "—"}</p></div>
               <div><span className="text-muted-foreground">Pièce dirigeant</span><p className="font-medium">{submission.director_id_number || "—"}</p></div>
-              <div><span className="text-muted-foreground">Pays / Ville</span><p className="font-medium">{submission.business_country} / {submission.business_city}</p></div>
+              <div><span className="text-muted-foreground">Pays / Ville</span><p className="font-medium">{getCountryName(submission.business_country || "")} ({submission.business_country || "—"}) / {submission.business_city || "—"}</p></div>
               <div className="col-span-2"><span className="text-muted-foreground">Adresse</span><p className="font-medium">{submission.business_address || "—"}</p></div>
               <div><span className="text-muted-foreground">Banque</span><p className="font-medium">{submission.bank_name || "—"}</p></div>
               <div><span className="text-muted-foreground">Titulaire</span><p className="font-medium">{submission.bank_account_holder || "—"}</p></div>
