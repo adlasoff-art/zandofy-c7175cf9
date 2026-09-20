@@ -97,7 +97,7 @@ export function MobileAccountMenu() {
         { to: "/dashboard?tab=orders", icon: FileText, label: t("account.item.orders") || "Mes commandes" },
         { to: "/dashboard?tab=subscriptions", icon: Award, label: t("account.item.subscriptions") || "Mes abonnements" },
         { to: "/wishlist", icon: Heart, label: t("account.item.wishlist") || "Liste de souhaits" },
-        { to: "/messages", icon: MessageSquare, label: t("account.item.messages") || "Messages" },
+        { to: "/dashboard?tab=messages", icon: MessageSquare, label: t("account.item.messages") || "Messages" },
         { to: "/sourcing", icon: Sparkles, label: t("account.item.sourcing") || "Trouvez-moi ce produit" },
         ...(isVendor && suppliersEnabled ? [{ to: "/vendor?tab=suppliers", icon: Package, label: t("account.item.suppliers") || "Fournisseurs" }] : []),
       ],

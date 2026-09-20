@@ -26,7 +26,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { icon: Home, labelKey: "bottomNav.home", path: "/", kind: "link" },
   { icon: LayoutGrid, labelKey: "bottomNav.categories", path: "#categories", kind: "categories" },
-  { icon: MessageCircle, labelKey: "bottomNav.messages", path: "/messages", kind: "messages" },
+  { icon: MessageCircle, labelKey: "bottomNav.messages", path: "/dashboard?tab=messages", kind: "messages" },
   { icon: ShoppingBag, labelKey: "bottomNav.cart", path: "#cart", kind: "cart" },
   { icon: User, labelKey: "bottomNav.account", path: "/account", kind: "account" },
 ];
@@ -72,10 +72,15 @@ export function MobileBottomNav() {
           let isActive = false;
           if (item.kind === "categories") isActive = categoriesOpen;
           else if (item.kind === "account") {
+            const dashTab = new URLSearchParams(location.search).get("tab");
             isActive =
-              location.pathname === "/account" || location.pathname.startsWith("/dashboard");
+              location.pathname === "/account" ||
+              (location.pathname.startsWith("/dashboard") && dashTab !== "messages");
           } else if (item.kind === "messages") {
-            isActive = location.pathname.startsWith("/messages");
+            isActive =
+              location.pathname.startsWith("/messages") ||
+              (location.pathname.startsWith("/dashboard") &&
+                new URLSearchParams(location.search).get("tab") === "messages");
           } else if (item.kind === "link") {
             isActive = location.pathname === item.path;
           }

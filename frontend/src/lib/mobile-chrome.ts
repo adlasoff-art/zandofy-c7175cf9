@@ -6,7 +6,7 @@ export function shouldHideMobileBottomNav(pathname: string): boolean {
   if (pathname === "/auth" || pathname.startsWith("/auth/")) return true;
   if (pathname === "/reset-password") return true;
   if (pathname === "/banned") return true;
-  // Full-screen chat / messages thread
+  // Full-screen chat legacy — /messages redirects to dashboard tab; keep hide during hop
   if (pathname === "/messages" || pathname.startsWith("/messages/")) return true;
   return false;
 }
