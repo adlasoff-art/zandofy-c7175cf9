@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ShieldCheck, Globe, AlertTriangle, Bell } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ShieldCheck, Globe, AlertTriangle, Bell, Phone } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useGeoDetection } from "@/hooks/use-geo-detection";
 import { useActiveGeo } from "@/hooks/useActiveGeo";
@@ -15,6 +15,7 @@ import { sanitizeAuthRedirect } from "@/lib/auth-redirect";
 import { LegalModal } from "@/components/auth/LegalModal";
 import { HoneypotField, isHoneypotTriggered } from "@/components/security/FormProtection";
 import { SEOHead } from "@/components/SEOHead";
+import { BrandLogo } from "@/components/BrandLogo";
 import {
   signInWithGoogle,
   checkRateLimit,
@@ -389,9 +390,8 @@ export default function AuthPage() {
       <SEOHead title="Connexion" description="Connectez-vous à votre compte Zandofy." noindex />
       <header className="border-b border-border bg-card">
         <div className="container flex items-center h-14">
-          <a href="/" className="text-xl font-bold tracking-[0.18em] uppercase text-foreground" style={{ fontWeight: 800 }}>
-            ZANDOFY
-          </a>
+          {/* Same CMS logo+text as site header — auth previously forced text-only "ZANDOFY" */}
+          <BrandLogo variant="header" />
         </div>
       </header>
 
@@ -585,19 +585,23 @@ export default function AuthPage() {
               <Label htmlFor="identifier" className="text-xs">
                 {mode === "forgot"
                   ? t("auth.email")
-                  : t("auth.identifier") || "Email ou téléphone"}
+                  : t("auth.identifier") || "Téléphone ou email"}
               </Label>
               <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                {mode === "forgot" ? (
+                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                ) : (
+                  <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                )}
                 <Input
                   id="identifier"
                   type="text"
-                  inputMode="email"
+                  inputMode={mode === "forgot" ? "email" : "text"}
                   autoComplete="username"
                   placeholder={
                     mode === "forgot"
-                      ? "example@mail.com"
-                      : t("auth.identifierPlaceholder") || "email@mail.com ou +243…"
+                      ? "exemple@mail.com"
+                      : t("auth.identifierPlaceholder") || "+243 80X XXX XXX ou email@exemple.com"
                   }
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
@@ -695,30 +699,47 @@ export default function AuthPage() {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-muted-foreground">
-            {mode === "login" ? (
-              <>
-                {t("auth.noAccount")}{" "}
-                <button onClick={() => setMode("signup")} className="text-primary font-medium hover:underline">
-                  {t("auth.signupButton")}
+          <div className="text-center space-y-1.5">
+            <p className="text-sm text-muted-foreground">
+              {mode === "login" ? (
+                <>
+                  {t("auth.noAccount")}{" "}
+                  <button
+                    type="button"
+                    onClick={() => setMode("signup")}
+                    className="text-primary font-medium hover:underline"
+                  >
+                    {t("auth.signupButton")}
+                  </button>
+                </>
+              ) : mode === "signup" ? (
+                <>
+                  {t("auth.hasAccount")}{" "}
+                  <button
+                    type="button"
+                    onClick={() => setMode("login")}
+                    className="text-primary font-medium hover:underline"
+                  >
+                    {t("auth.loginButton")}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMode("login")}
+                  className="text-primary font-medium hover:underline inline-flex items-center gap-1"
+                >
+                  <ArrowLeft size={14} /> {t("auth.backToLogin")}
                 </button>
-              </>
-            ) : mode === "signup" ? (
-              <>
-                {t("auth.hasAccount")}{" "}
-                <button onClick={() => setMode("login")} className="text-primary font-medium hover:underline">
-                  {t("auth.loginButton")}
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => setMode("login")}
-                className="text-primary font-medium hover:underline inline-flex items-center gap-1"
-              >
-                <ArrowLeft size={14} /> {t("auth.backToLogin")}
-              </button>
+              )}
+            </p>
+            {mode === "login" && (
+              <p className="text-xs text-muted-foreground/90 leading-relaxed max-w-sm mx-auto">
+                {t("auth.signupHook") ||
+                  "Rejoignez des milliers d’acheteurs qui dénichent déjà leurs prix usine — créez votre compte en quelques secondes avec votre numéro."}
+              </p>
             )}
-          </p>
+          </div>
 
           <p className="text-center text-[11px] text-muted-foreground/60 flex items-center justify-center gap-1">
             <ShieldCheck size={12} />
