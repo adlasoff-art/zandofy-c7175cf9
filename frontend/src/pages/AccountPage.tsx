@@ -2,6 +2,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { MobileAccountMenu } from "@/components/MobileAccountMenu";
 import { SEOHead } from "@/components/SEOHead";
+import { ProfileCompletionBanner } from "@/components/ProfileCompletionBanner";
 
 export default function AccountPage() {
   const { user, loading } = useAuth();
@@ -13,6 +14,9 @@ export default function AccountPage() {
   return (
     <>
       <SEOHead title="Mon compte" description="Espace compte Zandofy." canonical="/account" noindex />
+      <div className="container pt-3 pb-0">
+        <ProfileCompletionBanner />
+      </div>
       <MobileAccountMenu />
     </>
   );

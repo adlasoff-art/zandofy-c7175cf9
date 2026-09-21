@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWishlist } from "@/contexts/WishlistContext";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { MobileBackButton } from "@/components/navigation/MobileBackButton";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { SEOHead } from "@/components/SEOHead";
-import { Heart, Share2, Copy } from "lucide-react";
+import { Heart, Share2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/contexts/I18nContext";
@@ -16,35 +17,51 @@ import { PRODUCT_GRID_CLASS } from "@/lib/product-image-fit";
 
 export default function WishlistPage() {
   const { user } = useAuth();
+  const { wishlistIds, isLoading: wishlistLoading } = useWishlist();
   const { t } = useI18n();
+  const guestIdList = [...wishlistIds];
 
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ["wishlist-products", user?.id],
+    queryKey: ["wishlist-products", user?.id ?? "guest", guestIdList.join(",")],
     queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase
-        .from("wishlists")
-        .select(`
-          product_id,
-          products:product_id (
-            *,
-            categories(name, name_fr),
-            product_images(image_url, position),
-            product_colors(color_hex, color_name),
-            product_sizes(size_label)
-          )
-        `)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      if (user) {
+        const { data, error } = await supabase
+          .from("wishlists")
+          .select(`
+            product_id,
+            products:product_id (
+              *,
+              categories(name, name_fr),
+              product_images(image_url, position),
+              product_colors(color_hex, color_name),
+              product_sizes(size_label)
+            )
+          `)
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
 
+        if (error) throw error;
+        return (data || [])
+          .map((r: any) => r.products)
+          .filter(Boolean)
+          .map(mapProduct);
+      }
+
+      if (guestIdList.length === 0) return [];
+      const { data, error } = await supabase
+        .from("products_public")
+        .select("*")
+        .in("id", guestIdList)
+        .eq("publish_status", "published");
       if (error) throw error;
-      return (data || [])
-        .map((r: any) => r.products)
-        .filter(Boolean)
-        .map(mapProduct);
+      const byId = new Map((data || []).map((row: any) => [row.id, mapProduct(row)]));
+      // Preserve guest list order
+      return guestIdList.map((id) => byId.get(id)).filter(Boolean);
     },
-    enabled: !!user,
+    enabled: !!user || guestIdList.length >= 0,
   });
+
+  const loading = user ? isLoading || wishlistLoading : isLoading;
 
   return (
     <div className="min-h-screen bg-background">
@@ -83,13 +100,7 @@ export default function WishlistPage() {
           )}
         </div>
 
-        {!user ? (
-          <div className="text-center py-20">
-            <Heart size={48} className="mx-auto text-muted-foreground/30 mb-4" />
-            <p className="text-muted-foreground mb-4">{t("wishlist.loginRequired")}</p>
-            <Button asChild><Link to="/auth">{t("general.loginButton")}</Link></Button>
-          </div>
-        ) : isLoading ? (
+        {loading ? (
           <div className={PRODUCT_GRID_CLASS}>
             {Array.from({ length: 8 }).map((_, i) => (
               <ProductCardSkeleton key={i} />
@@ -105,13 +116,26 @@ export default function WishlistPage() {
             </Button>
           </div>
         ) : (
-          <div className={PRODUCT_GRID_CLASS}>
-            {products.map((p) => (
-              <Link key={p.id} to={`/product/${p.slug || p.id}`} className="cursor-pointer">
-                <ProductCard product={p} />
-              </Link>
-            ))}
-          </div>
+          <>
+            <div className={PRODUCT_GRID_CLASS}>
+              {products.map((p: any) => (
+                <Link key={p.id} to={`/product/${p.slug || p.id}`} className="cursor-pointer">
+                  <ProductCard product={p} />
+                </Link>
+              ))}
+            </div>
+            {!user && (
+              <div className="mt-8 text-center space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  {t("wishlist.syncHint") ||
+                    "Connectez-vous pour synchroniser vos favoris sur tous vos appareils."}
+                </p>
+                <Button asChild variant="outline" className="min-h-[44px]">
+                  <Link to="/auth?redirect=%2Fwishlist">{t("general.loginButton")}</Link>
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </main>
       <Footer />

@@ -177,11 +177,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         return;
       }
+      // Block checkout until merge + server prices are loaded (avoid guest client prices)
+      setLoading(true);
       if (mergeDoneForUser.current !== user.id) {
         mergeDoneForUser.current = user.id;
         await mergeGuestIntoDb();
       }
       if (!cancelled) await fetchDbCart();
+      else setLoading(false);
     })();
     return () => {
       cancelled = true;

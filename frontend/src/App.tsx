@@ -34,6 +34,7 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { MaintenanceGuard } from "@/components/MaintenanceGuard";
 import { CookieConsent } from "@/components/CookieConsent";
 import { AnnouncementPopup } from "@/components/AnnouncementPopup";
+import { WelcomeDiscoveryDialog } from "@/components/WelcomeDiscoveryDialog";
 import { AutomationPopup } from "@/components/AutomationPopup";
 import { DynamicFavicon } from "@/components/DynamicFavicon";
 import { UserPresenceTracker } from "@/components/UserPresenceTracker";
@@ -277,6 +278,7 @@ const App = () => (
             <OfflineIndicator />
             <CookieConsent />
             <AnnouncementPopup />
+            <WelcomeDiscoveryDialog />
             <AutomationPopup />
             <MaintenanceGuard>
             <BanGuard>

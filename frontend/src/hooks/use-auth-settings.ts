@@ -30,6 +30,8 @@ export type AuthSettings = {
   discovery_mix: DiscoveryMixConfig;
   /** Seconds after discovery complete/dismiss before CMS announcement popup */
   discovery_popup_delay_sec: number;
+  /** Email magic-link / OTP button on AuthPage (default off) */
+  magic_link_enabled: boolean;
 };
 
 export const DISCOVERY_MIX_DEFAULTS: DiscoveryMixConfig = {
@@ -54,6 +56,7 @@ export const AUTH_SETTINGS_DEFAULTS: AuthSettings = {
   },
   discovery_mix: { ...DISCOVERY_MIX_DEFAULTS },
   discovery_popup_delay_sec: 15,
+  magic_link_enabled: false,
 };
 
 export const AUTH_SETTINGS_QUERY_KEY = ["platform-auth-settings"] as const;
@@ -110,6 +113,8 @@ function normalizeAuthSettings(raw: unknown): AuthSettings {
       120,
       Math.max(0, typeof v.discovery_popup_delay_sec === "number" ? v.discovery_popup_delay_sec : 15),
     ),
+    // Soft default false when absent
+    magic_link_enabled: v.magic_link_enabled === true,
   };
 }
 

@@ -49,6 +49,7 @@ export function AuthSettingsPanel() {
             typeof raw.discovery_popup_delay_sec === "number"
               ? raw.discovery_popup_delay_sec
               : AUTH_SETTINGS_DEFAULTS.discovery_popup_delay_sec,
+          magic_link_enabled: raw.magic_link_enabled === true,
         });
       }
       setLoading(false);
@@ -114,13 +115,28 @@ export function AuthSettingsPanel() {
         <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
           <div>
             <p className="text-sm font-medium">Téléphone à l&apos;inscription</p>
-            <p className="text-xs text-muted-foreground">Champ optionnel → profiles.phone</p>
+            <p className="text-xs text-muted-foreground">
+              Accepte téléphone comme identifiant (email technique) — champ unifié Auth
+            </p>
           </div>
           <Switch
             checked={config.collect_phone_on_signup}
             disabled={saving}
             onCheckedChange={(checked) =>
               save({ ...config, collect_phone_on_signup: checked })
+            }
+          />
+        </div>
+        <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg">
+          <div>
+            <p className="text-sm font-medium">Connexion rapide email (lien OTP)</p>
+            <p className="text-xs text-muted-foreground">Désactivé par défaut — Google + mot de passe recommandés</p>
+          </div>
+          <Switch
+            checked={config.magic_link_enabled === true}
+            disabled={saving}
+            onCheckedChange={(checked) =>
+              save({ ...config, magic_link_enabled: checked })
             }
           />
         </div>

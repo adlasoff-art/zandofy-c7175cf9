@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data: existing } = await supabase
         .from("profiles")
-        .select("id, email, first_name, last_name")
+        .select("id, email, first_name, last_name, phone")
         .eq("id", authUser.id)
         .maybeSingle();
 
@@ -45,15 +45,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
       const firstNameMeta = typeof metadata.first_name === "string" ? metadata.first_name.trim() : "";
       const lastNameMeta = typeof metadata.last_name === "string" ? metadata.last_name.trim() : "";
+      const phoneMeta = typeof metadata.phone === "string" ? metadata.phone.trim() : "";
+      const placeholderMeta = metadata.email_is_placeholder === true;
 
       const firstName = firstNameMeta || (fullName ? fullName.split(" ")[0] : null);
       const lastName = lastNameMeta || (fullName.includes(" ") ? fullName.split(" ").slice(1).join(" ") : null);
 
       if (existing) {
-        const patch: Record<string, string | null> = {};
+        const patch: Record<string, string | boolean | null> = {};
         if (!existing.email && authUser.email) patch.email = authUser.email;
         if (!existing.first_name && firstName) patch.first_name = firstName;
         if (!existing.last_name && lastName) patch.last_name = lastName;
+        if (!(existing as any).phone && phoneMeta) patch.phone = phoneMeta;
+        if (placeholderMeta) patch.email_is_placeholder = true;
 
         if (Object.keys(patch).length > 0) {
           await supabase
@@ -71,6 +75,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: authUser.email ?? null,
         first_name: firstName || null,
         last_name: lastName || null,
+        phone: phoneMeta || null,
+        email_is_placeholder: placeholderMeta,
       });
 
       if (error && error.code !== "23505") {

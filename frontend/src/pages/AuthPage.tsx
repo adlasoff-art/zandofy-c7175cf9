@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ShieldCheck, Globe, AlertTriangle, Bell, Phone } from "lucide-react";
-import { useEffect } from "react";
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, ShieldCheck, Globe, AlertTriangle, Bell } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useGeoDetection } from "@/hooks/use-geo-detection";
 import { useActiveGeo } from "@/hooks/useActiveGeo";
@@ -25,15 +24,29 @@ import {
   checkResetAllowed,
   recordPasswordReset,
   getResetsRemaining,
+  parseAuthIdentifier,
 } from "@/lib/auth-helpers";
+
+function signupLandingRedirect(rawRedirect: string | null): string {
+  if (!rawRedirect) return "/account";
+  const safe = sanitizeAuthRedirect(rawRedirect);
+  return safe === "/" ? "/account" : safe;
+}
+
+async function resolvePhoneEmail(phoneE164: string): Promise<string | null> {
+  const { data, error } = await supabase.functions.invoke("resolve-auth-identifier", {
+    body: { phone: phoneE164 },
+  });
+  if (error || !data?.email || typeof data.email !== "string") return null;
+  return data.email;
+}
 
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [lockoutMsg, setLockoutMsg] = useState<string | null>(null);
@@ -47,25 +60,31 @@ export default function AuthPage() {
   const { isCountryActive, loading: geoLoading } = useActiveGeo();
   const { data: authSettings } = useAuthSettings();
   const isFluid = (authSettings?.mode ?? "fluid") === "fluid";
-  const collectPhone = authSettings?.collect_phone_on_signup !== false;
+  const magicLinkEnabled = authSettings?.magic_link_enabled === true;
   const [notifyMeSent, setNotifyMeSent] = useState(false);
   const [notifyMeLoading, setNotifyMeLoading] = useState(false);
 
   const searchParams = new URLSearchParams(window.location.search);
   const refCode = searchParams.get("ref") || "";
-  const redirectTo = searchParams.get("redirect") || "/";
+  const rawRedirect = searchParams.get("redirect");
+  const redirectTo = rawRedirect || "/";
   const initialMode = searchParams.get("mode") === "signup" ? "signup" : "login";
   const prefillEmail = searchParams.get("email") || "";
 
   useEffect(() => {
     if (user) {
-      navigate(sanitizeAuthRedirect(redirectTo), { replace: true });
+      // Use live `mode` only — `initialMode` from URL must not force /account after login switch
+      const dest =
+        mode === "signup"
+          ? signupLandingRedirect(rawRedirect)
+          : sanitizeAuthRedirect(redirectTo);
+      navigate(dest, { replace: true });
     }
-  }, [user, navigate, redirectTo]);
+  }, [user, navigate, redirectTo, rawRedirect, mode]);
 
   useEffect(() => {
     setMode(initialMode);
-    if (prefillEmail && !email) setEmail(prefillEmail);
+    if (prefillEmail && !identifier) setIdentifier(prefillEmail);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -74,7 +93,6 @@ export default function AuthPage() {
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Honeypot check
     const form = e.target as HTMLFormElement;
     if (isHoneypotTriggered(form)) {
       console.warn("[Security] Bot detected via honeypot on auth form.");
@@ -91,13 +109,23 @@ export default function AuthPage() {
     setLockoutMsg(null);
     setLoading(true);
 
+    const parsed = parseAuthIdentifier(identifier);
+
     try {
       if (mode === "signup") {
-        // Block signup if country is not active
         if (geo.country_code && !isCountryActive(geo.country_code)) {
           toast({
             title: "Service indisponible",
             description: `Zandofy n'est pas encore disponible en ${geo.country_name}. Utilisez l'option "Me notifier" ci-dessus.`,
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+        if (parsed.kind === "invalid") {
+          toast({
+            title: "Identifiant invalide",
+            description: "Entrez un email valide ou un numéro de téléphone.",
             variant: "destructive",
           });
           setLoading(false);
@@ -113,17 +141,23 @@ export default function AuthPage() {
           return;
         }
 
+        const authEmail = parsed.kind === "email" ? parsed.email : parsed.syntheticEmail;
+        const phoneE164 = parsed.kind === "phone" ? parsed.e164 : null;
+        const emailIsPlaceholder = parsed.kind === "phone";
+
         const { data: signUpData, error } = await supabase.auth.signUp({
-          email,
+          email: authEmail,
           password,
           options: {
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: `${window.location.origin}/account`,
             data: {
               first_name: firstName,
               last_name: lastName,
               referral_code: refCode,
               detected_country: geo.country_code,
               detected_city: geo.city,
+              phone: phoneE164,
+              email_is_placeholder: emailIsPlaceholder,
             },
           },
         });
@@ -157,56 +191,70 @@ export default function AuthPage() {
           }
         }
 
-        if (signUpData.user && collectPhone && phone.trim() && signUpData.session) {
-          await supabase
-            .from("profiles")
-            .update({ phone: phone.trim() })
-            .eq("id", signUpData.user.id);
-        }
+        const patchProfile = async (userId: string) => {
+          const patch: Record<string, unknown> = {
+            email_is_placeholder: emailIsPlaceholder,
+          };
+          if (phoneE164) patch.phone = phoneE164;
+          await supabase.from("profiles").update(patch).eq("id", userId);
+        };
 
         resetLoginAttempts();
         setAttemptsLeft(null);
 
-        const safeRedirect = sanitizeAuthRedirect(redirectTo);
-        if (signUpData.session) {
+        const safeRedirect = signupLandingRedirect(rawRedirect);
+
+        const finishOk = async (userId?: string) => {
+          if (userId) await patchProfile(userId);
           toast({
             title: t("auth.signupSuccess") || "Compte créé",
             description: isFluid
-              ? (t("auth.signupFluidDesc") || "Bienvenue ! Vous pouvez commencer à naviguer.")
+              ? t("auth.signupFluidDesc") || "Bienvenue ! Vous pouvez commencer à naviguer."
               : t("auth.signupSuccessDesc"),
           });
           navigate(safeRedirect);
+        };
+
+        if (signUpData.session && signUpData.user) {
+          await finishOk(signUpData.user.id);
           setLoading(false);
           return;
         }
 
-        // Fluid but Confirm email still ON: try immediate password sign-in
         if (isFluid) {
           const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-            email,
+            email: authEmail,
             password,
           });
-          if (!signInErr && signInData.session) {
-            if (signUpData.user && collectPhone && phone.trim()) {
-              await supabase
-                .from("profiles")
-                .update({ phone: phone.trim() })
-                .eq("id", signUpData.user.id);
-            }
-            toast({
-              title: t("auth.signupSuccess") || "Compte créé",
-              description: t("auth.signupFluidDesc") || "Bienvenue ! Vous pouvez commencer à naviguer.",
-            });
-            navigate(safeRedirect);
+          if (!signInErr && signInData.session && signUpData.user) {
+            await finishOk(signUpData.user.id);
             setLoading(false);
             return;
           }
+          toast({
+            title: "Configuration auth",
+            description:
+              "Compte créé mais session absente. Vérifiez que « Confirm email » est désactivé (mode fluide) dans Supabase Auth.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
         }
 
         toast({ title: t("auth.signupSuccess"), description: t("auth.signupSuccessDesc") });
         setMode("login");
       } else if (mode === "forgot") {
-        // Check password reset rate limit
+        if (parsed.kind !== "email") {
+          toast({
+            title: "Email requis",
+            description:
+              "La réinitialisation du mot de passe nécessite un email. Ajoutez un email dans votre compte si vous vous êtes inscrit avec un téléphone.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
         const resetCheck = checkResetAllowed();
         if (!resetCheck.allowed) {
           toast({ title: "Limite atteinte", description: resetCheck.message, variant: "destructive" });
@@ -214,7 +262,7 @@ export default function AuthPage() {
           return;
         }
 
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        const { error } = await supabase.auth.resetPasswordForEmail(parsed.email, {
           redirectTo: `${window.location.origin}/reset-password`,
         });
         if (error) throw error;
@@ -228,9 +276,34 @@ export default function AuthPage() {
         });
         setMode("login");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        // Login
+        if (parsed.kind === "invalid") {
+          toast({
+            title: "Identifiant invalide",
+            description: "Entrez un email valide ou un numéro de téléphone.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        let authEmail = parsed.kind === "email" ? parsed.email : "";
+        if (parsed.kind === "phone") {
+          const resolved = await resolvePhoneEmail(parsed.e164);
+          if (!resolved) {
+            const result = recordFailedLoginWithEmail(parsed.e164);
+            setAttemptsLeft(result.attemptsLeft);
+            if (result.locked) {
+              setLockoutMsg(`Compte temporairement verrouillé. Réessayez dans 60 minutes.`);
+            }
+            throw new Error("Identifiant ou mot de passe incorrect.");
+          }
+          authEmail = resolved;
+        }
+
+        const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password });
         if (error) {
-          const result = recordFailedLoginWithEmail(email);
+          const result = recordFailedLoginWithEmail(authEmail);
           setAttemptsLeft(result.attemptsLeft);
           if (result.locked) {
             setLockoutMsg(`Compte temporairement verrouillé. Réessayez dans 60 minutes.`);
@@ -260,7 +333,8 @@ export default function AuthPage() {
     }
     setLoading(true);
     try {
-      const { error } = await signInWithGoogle();
+      const dest = mode === "signup" ? signupLandingRedirect(rawRedirect) : sanitizeAuthRedirect(redirectTo);
+      const { error } = await signInWithGoogle(dest);
       if (error) {
         toast({ title: t("auth.error"), description: error, variant: "destructive" });
       }
@@ -272,8 +346,14 @@ export default function AuthPage() {
   };
 
   const handleMagicLink = async () => {
-    if (!email.trim()) {
-      toast({ title: "Email requis", description: "Entrez votre email pour recevoir un lien de connexion.", variant: "destructive" });
+    if (!magicLinkEnabled) return;
+    const parsed = parseAuthIdentifier(identifier);
+    if (parsed.kind !== "email") {
+      toast({
+        title: "Email requis",
+        description: "Entrez votre email pour recevoir un lien de connexion.",
+        variant: "destructive",
+      });
       return;
     }
     const rl = checkRateLimit();
@@ -286,7 +366,7 @@ export default function AuthPage() {
     try {
       const safeRedirect = sanitizeAuthRedirect(redirectTo);
       const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
+        email: parsed.email,
         options: {
           emailRedirectTo: `${window.location.origin}${safeRedirect}`,
           shouldCreateUser: mode === "signup",
@@ -331,12 +411,14 @@ export default function AuthPage() {
             {!geo.loading && geo.country_name && mode === "signup" && (
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-xs text-muted-foreground">
                 <Globe size={12} />
-                <span>{geo.country_name}{geo.city ? ` · ${geo.city}` : ""}</span>
+                <span>
+                  {geo.country_name}
+                  {geo.city ? ` · ${geo.city}` : ""}
+                </span>
               </div>
             )}
           </div>
 
-          {/* Country not active — block signup */}
           {mode === "signup" && !geo.loading && !geoLoading && geo.country_code && !isCountryActive(geo.country_code) && (
             <div className="rounded-lg border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30 p-4 space-y-3">
               <div className="flex items-start gap-2">
@@ -346,7 +428,7 @@ export default function AuthPage() {
                     Service indisponible dans votre région
                   </p>
                   <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
-                    Zandofy n'est pas encore disponible en <strong>{geo.country_name}</strong>. Nous travaillons à étendre notre couverture.
+                    Zandofy n&apos;est pas encore disponible en <strong>{geo.country_name}</strong>.
                   </p>
                 </div>
               </div>
@@ -359,16 +441,18 @@ export default function AuthPage() {
                   onClick={async () => {
                     setNotifyMeLoading(true);
                     try {
-                      // Send notification email via edge function or simple insert
                       await (supabase as any).from("notifications").insert({
                         user_id: "00000000-0000-0000-0000-000000000000",
                         type: "system",
                         title: "Demande notify-me",
-                        message: `Pays: ${geo.country_name} (${geo.country_code}), Ville: ${geo.city || "N/A"}, Email: ${email || "non renseigné"}`,
+                        message: `Pays: ${geo.country_name} (${geo.country_code}), Ville: ${geo.city || "N/A"}, Contact: ${identifier || "non renseigné"}`,
                         link: "/admin/geography",
                       });
                       setNotifyMeSent(true);
-                      toast({ title: "Demande enregistrée", description: "Vous serez notifié dès que le service sera disponible dans votre région." });
+                      toast({
+                        title: "Demande enregistrée",
+                        description: "Vous serez notifié dès que le service sera disponible dans votre région.",
+                      });
                     } catch {
                       toast({ title: "Erreur", description: "Impossible d'enregistrer la demande.", variant: "destructive" });
                     } finally {
@@ -397,7 +481,6 @@ export default function AuthPage() {
             </div>
           )}
 
-          {/* Show remaining attempts warning */}
           {mode === "login" && attemptsLeft !== null && attemptsLeft > 0 && attemptsLeft <= 3 && !lockoutMsg && (
             <div className="flex items-center gap-2 rounded-md border border-orange-300 bg-orange-50 dark:bg-orange-950/20 p-3 text-sm text-orange-700 dark:text-orange-400">
               <AlertTriangle size={16} className="shrink-0" />
@@ -418,28 +501,46 @@ export default function AuthPage() {
                 disabled={loading}
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                  <path
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                    fill="#4285F4"
+                  />
+                  <path
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    fill="#34A853"
+                  />
+                  <path
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                    fill="#FBBC05"
+                  />
+                  <path
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    fill="#EA4335"
+                  />
                 </svg>
                 {t("auth.continueGoogle")}
               </Button>
 
-              <Button
-                type="button"
-                variant="secondary"
-                className="w-full h-11 gap-2 text-sm font-medium"
-                onClick={handleMagicLink}
-                disabled={loading || !!lockoutMsg}
-              >
-                <Mail size={16} />
-                Connexion rapide par email (lien OTP)
-              </Button>
+              {magicLinkEnabled && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full h-11 gap-2 text-sm font-medium"
+                  onClick={handleMagicLink}
+                  disabled={loading || !!lockoutMsg}
+                >
+                  <Mail size={16} />
+                  Connexion rapide par email (lien OTP)
+                </Button>
+              )}
 
               <div className="relative">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-                <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">{t("auth.or")}</span></div>
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">{t("auth.or")}</span>
+                </div>
               </div>
             </>
           )}
@@ -449,54 +550,85 @@ export default function AuthPage() {
             {mode === "signup" && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="firstName" className="text-xs">{t("auth.firstName")}</Label>
+                  <Label htmlFor="firstName" className="text-xs">
+                    {t("auth.firstName")}
+                  </Label>
                   <div className="relative">
                     <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input id="firstName" placeholder="Jean" value={firstName} onChange={e => setFirstName(e.target.value)} className="pl-9 h-11" required />
+                    <Input
+                      id="firstName"
+                      placeholder="Jean"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="pl-9 h-11"
+                      required
+                    />
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="lastName" className="text-xs">{t("auth.lastName")}</Label>
-                  <Input id="lastName" placeholder="Dupont" value={lastName} onChange={e => setLastName(e.target.value)} className="h-11" required />
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-xs">{t("auth.email")}</Label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input id="email" type="email" placeholder="example@mail.com" value={email} onChange={e => setEmail(e.target.value)} className="pl-9 h-11" required />
-              </div>
-            </div>
-
-            {mode === "signup" && collectPhone && (
-              <div className="space-y-1.5">
-                <Label htmlFor="phone" className="text-xs">
-                  {t("auth.phone") || "Téléphone"}{" "}
-                  <span className="text-muted-foreground font-normal">({t("common.optional") || "optionnel"})</span>
-                </Label>
-                <div className="relative">
-                  <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Label htmlFor="lastName" className="text-xs">
+                    {t("auth.lastName")}
+                  </Label>
                   <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+243 …"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="pl-9 h-11"
+                    id="lastName"
+                    placeholder="Dupont"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="h-11"
+                    required
                   />
                 </div>
               </div>
             )}
 
+            <div className="space-y-1.5">
+              <Label htmlFor="identifier" className="text-xs">
+                {mode === "forgot"
+                  ? t("auth.email")
+                  : t("auth.identifier") || "Email ou téléphone"}
+              </Label>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="identifier"
+                  type="text"
+                  inputMode="email"
+                  autoComplete="username"
+                  placeholder={
+                    mode === "forgot"
+                      ? "example@mail.com"
+                      : t("auth.identifierPlaceholder") || "email@mail.com ou +243…"
+                  }
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  className="pl-9 h-11"
+                  required
+                />
+              </div>
+            </div>
+
             {mode !== "forgot" && (
               <div className="space-y-1.5">
-                <Label htmlFor="password" className="text-xs">{t("auth.password")}</Label>
+                <Label htmlFor="password" className="text-xs">
+                  {t("auth.password")}
+                </Label>
                 <div className="relative">
                   <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="pl-9 pr-10 h-11" required minLength={8} />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-9 pr-10 h-11"
+                    required
+                    minLength={8}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
@@ -504,7 +636,10 @@ export default function AuthPage() {
                   <div className="space-y-1">
                     <div className="flex gap-1 h-1.5">
                       {[1, 2, 3, 4, 5].map((i) => (
-                        <div key={i} className={`flex-1 rounded-full transition-colors ${i <= pwStrength.score ? pwStrength.color : "bg-muted"}`} />
+                        <div
+                          key={i}
+                          className={`flex-1 rounded-full transition-colors ${i <= pwStrength.score ? pwStrength.color : "bg-muted"}`}
+                        />
                       ))}
                     </div>
                     <p className="text-xs text-muted-foreground">Force : {pwStrength.label}</p>
@@ -522,15 +657,27 @@ export default function AuthPage() {
             {mode === "signup" && (
               <p className="text-xs text-muted-foreground leading-relaxed">
                 En créant un compte, vous acceptez nos{" "}
-                <button type="button" onClick={() => setLegalModal("terms")} className="text-primary hover:underline font-medium">
-                  Conditions d'utilisation
+                <button
+                  type="button"
+                  onClick={() => setLegalModal("terms")}
+                  className="text-primary hover:underline font-medium"
+                >
+                  Conditions d&apos;utilisation
                 </button>
                 , notre{" "}
-                <button type="button" onClick={() => setLegalModal("privacy")} className="text-primary hover:underline font-medium">
+                <button
+                  type="button"
+                  onClick={() => setLegalModal("privacy")}
+                  className="text-primary hover:underline font-medium"
+                >
                   Politique de confidentialité
-                </button>
-                {" "}et notre{" "}
-                <button type="button" onClick={() => setLegalModal("cookies")} className="text-primary hover:underline font-medium">
+                </button>{" "}
+                et notre{" "}
+                <button
+                  type="button"
+                  onClick={() => setLegalModal("cookies")}
+                  className="text-primary hover:underline font-medium"
+                >
                   Politique de cookies
                 </button>
                 .
@@ -538,17 +685,38 @@ export default function AuthPage() {
             )}
 
             <Button type="submit" className="w-full h-12 font-bold" disabled={loading || !!lockoutMsg}>
-              {loading ? t("auth.loading") : mode === "login" ? t("auth.loginButton") : mode === "signup" ? t("auth.signupButton") : t("auth.sendLink")}
+              {loading
+                ? t("auth.loading")
+                : mode === "login"
+                  ? t("auth.loginButton")
+                  : mode === "signup"
+                    ? t("auth.signupButton")
+                    : t("auth.sendLink")}
             </Button>
           </form>
 
           <p className="text-center text-sm text-muted-foreground">
             {mode === "login" ? (
-              <>{t("auth.noAccount")} <button onClick={() => setMode("signup")} className="text-primary font-medium hover:underline">{t("auth.signupButton")}</button></>
+              <>
+                {t("auth.noAccount")}{" "}
+                <button onClick={() => setMode("signup")} className="text-primary font-medium hover:underline">
+                  {t("auth.signupButton")}
+                </button>
+              </>
             ) : mode === "signup" ? (
-              <>{t("auth.hasAccount")} <button onClick={() => setMode("login")} className="text-primary font-medium hover:underline">{t("auth.loginButton")}</button></>
+              <>
+                {t("auth.hasAccount")}{" "}
+                <button onClick={() => setMode("login")} className="text-primary font-medium hover:underline">
+                  {t("auth.loginButton")}
+                </button>
+              </>
             ) : (
-              <button onClick={() => setMode("login")} className="text-primary font-medium hover:underline inline-flex items-center gap-1"><ArrowLeft size={14} /> {t("auth.backToLogin")}</button>
+              <button
+                onClick={() => setMode("login")}
+                className="text-primary font-medium hover:underline inline-flex items-center gap-1"
+              >
+                <ArrowLeft size={14} /> {t("auth.backToLogin")}
+              </button>
             )}
           </p>
 

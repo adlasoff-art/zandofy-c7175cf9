@@ -224,3 +224,6 @@ verify_jwt = false
 
 [functions.publish-social-product]
 verify_jwt = false
+
+[functions.resolve-auth-identifier]
+verify_jwt = false
