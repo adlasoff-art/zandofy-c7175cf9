@@ -73,13 +73,14 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (user) {
+      // Use live `mode` only — `initialMode` from URL must not force /account after login switch
       const dest =
-        mode === "signup" || initialMode === "signup"
+        mode === "signup"
           ? signupLandingRedirect(rawRedirect)
           : sanitizeAuthRedirect(redirectTo);
       navigate(dest, { replace: true });
     }
-  }, [user, navigate, redirectTo, rawRedirect, mode, initialMode]);
+  }, [user, navigate, redirectTo, rawRedirect, mode]);
 
   useEffect(() => {
     setMode(initialMode);

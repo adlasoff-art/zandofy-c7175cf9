@@ -10,6 +10,11 @@ import {
   isDiscoverySheetOpen,
   subscribeDiscoverySheetOpen,
 } from "@/lib/discovery-sheet-bus";
+import {
+  releasePromoDialog,
+  subscribePromoDialog,
+  tryAcquirePromoDialog,
+} from "@/lib/promo-dialog-bus";
 
 interface PopupData {
   id: string;
@@ -28,9 +33,31 @@ export function AnnouncementPopup() {
   const { data: authSettings } = useAuthSettings();
   const timerRef = useRef<number | null>(null);
   const pendingRef = useRef<PopupData | null>(null);
+  const unsubPromoRef = useRef<(() => void) | null>(null);
 
   const delaySec = authSettings?.discovery_popup_delay_sec ?? 15;
   const discoveryEnabled = authSettings?.discovery_onboarding_enabled !== false;
+
+  const showPopup = (p: PopupData) => {
+    if (!tryAcquirePromoDialog("announcement")) {
+      pendingRef.current = p;
+      unsubPromoRef.current?.();
+      unsubPromoRef.current = subscribePromoDialog((owner) => {
+        if (owner !== null) return;
+        const pending = pendingRef.current;
+        if (!pending) return;
+        if (!tryAcquirePromoDialog("announcement")) return;
+        pendingRef.current = null;
+        unsubPromoRef.current?.();
+        unsubPromoRef.current = null;
+        setPopup(pending);
+        setOpen(true);
+      });
+      return;
+    }
+    setPopup(p);
+    setOpen(true);
+  };
 
   const tryOpen = (p: PopupData) => {
     if (isDiscoverySheetOpen()) {
@@ -50,8 +77,7 @@ export function AnnouncementPopup() {
         pendingRef.current = p;
         return;
       }
-      setPopup(p);
-      setOpen(true);
+      showPopup(p);
     }, waitMs);
   };
 
@@ -79,6 +105,8 @@ export function AnnouncementPopup() {
 
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
+      unsubPromoRef.current?.();
+      releasePromoDialog("announcement");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasCompleted, delaySec, discoveryEnabled]);
@@ -87,6 +115,7 @@ export function AnnouncementPopup() {
     return subscribeDiscoverySheetOpen((sheetOpen) => {
       if (sheetOpen) {
         setOpen(false);
+        releasePromoDialog("announcement");
         return;
       }
       const pending = pendingRef.current;
@@ -95,15 +124,15 @@ export function AnnouncementPopup() {
       if (timerRef.current) window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(() => {
         if (isDiscoverySheetOpen()) return;
-        setPopup(pending);
+        showPopup(pending);
         pendingRef.current = null;
-        setOpen(true);
       }, delaySec * 1000);
     });
   }, [hasCompleted, delaySec, discoveryEnabled]);
 
   const handleClose = () => {
     setOpen(false);
+    releasePromoDialog("announcement");
     if (popup) {
       const key = `popup_seen_${popup.id}`;
       if (popup.display_frequency === "daily") {

@@ -574,6 +574,7 @@ export default function DashboardPage() {
 // OverviewTab removed — KPIs are now always visible above the tab content.
 // The "overview" tab now only shows LoyaltyProgress (rendered inline in renderTabContent).
 
+const ORDERS_PER_PAGE = 10;
 
 function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, statusHistory, onCancelSuccess }: {
   orders: OrderRow[];

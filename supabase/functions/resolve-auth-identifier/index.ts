@@ -103,14 +103,15 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Same status/body as invalid phone — avoid enumeration via 404 vs 400
     if (!profileId) {
-      return json({ error: "invalid_credentials" }, 404);
+      return json({ error: "invalid_credentials" }, 400);
     }
 
     const { data: userData, error: userErr } = await admin.auth.admin.getUserById(profileId);
     const email = userData?.user?.email;
     if (userErr || !email) {
-      return json({ error: "invalid_credentials" }, 404);
+      return json({ error: "invalid_credentials" }, 400);
     }
 
     return json({ email });

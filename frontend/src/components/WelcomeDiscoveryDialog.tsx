@@ -5,8 +5,12 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
 import { useAuthSettings } from "@/hooks/use-auth-settings";
-import { isDiscoverySnoozed } from "@/lib/discovery-prefs";
 import { isDiscoverySheetOpen, subscribeDiscoverySheetOpen } from "@/lib/discovery-sheet-bus";
+import {
+  releasePromoDialog,
+  subscribePromoDialog,
+  tryAcquirePromoDialog,
+} from "@/lib/promo-dialog-bus";
 import { fetchFlashSaleProducts, fetchProducts, type Product } from "@/services/api";
 import {
   assembleDiscoveryFeed,
@@ -34,9 +38,15 @@ export function WelcomeDiscoveryDialog() {
   const [open, setOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const timerRef = useRef<number | null>(null);
-  const startedRef = useRef(false);
+  /** Which userId already scheduled welcome (reset on logout / switch). */
+  const startedForUser = useRef<string | null>(null);
+  const unsubPromoRef = useRef<(() => void) | null>(null);
 
-  const { data: categoryTree = EMPTY_CATEGORY_TREE } = useQuery({
+  const {
+    data: categoryTree = EMPTY_CATEGORY_TREE,
+    isFetched: categoryFetched,
+    isError: categoryError,
+  } = useQuery({
     queryKey: ["discovery-category-tree"],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
@@ -53,56 +63,89 @@ export function WelcomeDiscoveryDialog() {
   useEffect(() => {
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
+      unsubPromoRef.current?.();
+      releasePromoDialog("welcome");
     };
   }, []);
 
   useEffect(() => {
-    if (!user || !hasCompleted) return;
-    if (isDiscoverySnoozed() && !hasCompleted) return;
+    if (!user) {
+      startedForUser.current = null;
+      setOpen(false);
+      setProducts([]);
+      unsubPromoRef.current?.();
+      unsubPromoRef.current = null;
+      releasePromoDialog("welcome");
+      return;
+    }
+    if (!hasCompleted) return;
+    // Wait for category tree so Discovery ranking uses real apparel/interest expansion
+    if (!categoryFetched && !categoryError) return;
+
     try {
       if (localStorage.getItem(welcomeSeenKey(user.id))) return;
     } catch {
       return;
     }
-    if (startedRef.current) return;
-    startedRef.current = true;
+    if (startedForUser.current === user.id) return;
+    startedForUser.current = user.id;
 
     const delaySec = authSettings?.discovery_popup_delay_sec ?? 15;
+    const userId = user.id;
 
     const run = async () => {
       if (isDiscoverySheetOpen()) return;
-      try {
-        const [flash, popular] = await Promise.all([
-          fetchFlashSaleProducts({}).catch(() => [] as Product[]),
-          fetchProducts({ limit: 48, orderBy: "popular" }),
-        ]);
-        const pool = [...flash, ...popular];
-        const seen = new Set<string>();
-        const unique = pool.filter((p) => {
-          if (seen.has(p.id)) return false;
-          seen.add(p.id);
-          return true;
-        });
-        const ranked = assembleDiscoveryFeed(unique, {
-          prefs,
-          mix: authSettings?.discovery_mix,
-          take: 8,
-          interestCategoryIds: expandInterestCategoryIds(prefs.interest_category_ids, categoryTree),
-          apparelCategoryIds: expandApparelCategoryIds(categoryTree),
-          surface: "welcome_dialog",
-          seedKey: user.id,
-        });
-        // Prefer sale/promo items when present
-        const promoFirst = [
-          ...ranked.filter((p) => (p.discount && p.discount > 0) || p.promoEndDate || p.isSale),
-          ...ranked.filter((p) => !((p.discount && p.discount > 0) || p.promoEndDate || p.isSale)),
-        ].slice(0, 6);
-        if (promoFirst.length === 0) return;
-        setProducts(promoFirst);
-        setOpen(true);
-      } catch (e) {
-        console.warn("[WelcomeDiscoveryDialog]", e);
-      }
+
+      const attemptOpen = async () => {
+        if (!tryAcquirePromoDialog("welcome")) {
+          // Announcement (or other) holds slot — wait once then retry
+          unsubPromoRef.current?.();
+          unsubPromoRef.current = subscribePromoDialog((owner) => {
+            if (owner !== null) return;
+            unsubPromoRef.current?.();
+            unsubPromoRef.current = null;
+            void attemptOpen();
+          });
+          return;
+        }
+        try {
+          const [flash, popular] = await Promise.all([
+            fetchFlashSaleProducts({}).catch(() => [] as Product[]),
+            fetchProducts({ limit: 48, orderBy: "popular" }),
+          ]);
+          const pool = [...flash, ...popular];
+          const seen = new Set<string>();
+          const unique = pool.filter((p) => {
+            if (seen.has(p.id)) return false;
+            seen.add(p.id);
+            return true;
+          });
+          const ranked = assembleDiscoveryFeed(unique, {
+            prefs,
+            mix: authSettings?.discovery_mix,
+            take: 8,
+            interestCategoryIds: expandInterestCategoryIds(prefs.interest_category_ids, categoryTree),
+            apparelCategoryIds: expandApparelCategoryIds(categoryTree),
+            surface: "welcome_dialog",
+            seedKey: userId,
+          });
+          const promoFirst = [
+            ...ranked.filter((p) => (p.discount && p.discount > 0) || p.promoEndDate || p.isSale),
+            ...ranked.filter((p) => !((p.discount && p.discount > 0) || p.promoEndDate || p.isSale)),
+          ].slice(0, 6);
+          if (promoFirst.length === 0) {
+            releasePromoDialog("welcome");
+            return;
+          }
+          setProducts(promoFirst);
+          setOpen(true);
+        } catch (e) {
+          console.warn("[WelcomeDiscoveryDialog]", e);
+          releasePromoDialog("welcome");
+        }
+      };
+
+      void attemptOpen();
     };
 
     const schedule = () => {
@@ -121,11 +164,23 @@ export function WelcomeDiscoveryDialog() {
     schedule();
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
+      unsubPromoRef.current?.();
+      unsubPromoRef.current = null;
     };
-  }, [user?.id, hasCompleted, prefs, authSettings?.discovery_mix, authSettings?.discovery_popup_delay_sec, categoryTree]);
+  }, [
+    user?.id,
+    hasCompleted,
+    prefs,
+    authSettings?.discovery_mix,
+    authSettings?.discovery_popup_delay_sec,
+    categoryTree,
+    categoryFetched,
+    categoryError,
+  ]);
 
   const handleClose = () => {
     setOpen(false);
+    releasePromoDialog("welcome");
     if (user) {
       try {
         localStorage.setItem(welcomeSeenKey(user.id), "1");

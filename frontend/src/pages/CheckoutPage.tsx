@@ -987,11 +987,8 @@ export default function CheckoutPage() {
     );
   }
 
-  // Unique boot: cart hydrating OR KYC/order-count still settling — no flash screens
-  if (
-    step !== "confirmation" &&
-    ((cartLoading && items.length === 0) || !isKycReady)
-  ) {
+  // Unique boot: cart hydrating (incl. post-login merge) OR KYC settling — no flash / guest prices
+  if (step !== "confirmation" && (cartLoading || !isKycReady)) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -1487,6 +1484,14 @@ export default function CheckoutPage() {
   };
 
   const handlePayment = async () => {
+    if (cartLoading) {
+      toast({
+        title: "Panier en cours de synchronisation",
+        description: "Patientez une seconde puis réessayez.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!availablePaymentMethods.some((m) => m.id === paymentMethod)) {
       toast({
         title: "Moyen de paiement indisponible",
@@ -2819,7 +2824,7 @@ export default function CheckoutPage() {
                     </label>
                     {isDesktop ? (
                       <>
-                        <Button onClick={handlePayment} disabled={processing || !termsAccepted} className="w-full h-12 font-bold min-h-[44px]">
+                        <Button onClick={handlePayment} disabled={processing || cartLoading || !termsAccepted} className="w-full h-12 font-bold min-h-[44px]">
                           {processing ? (
                             <><Loader2 size={16} className="animate-spin mr-2" /> {t("checkout.processing")}</>
                           ) : (
@@ -2838,7 +2843,7 @@ export default function CheckoutPage() {
                           <span className="text-muted-foreground">Total</span>
                           <span className="font-bold text-foreground">{formatPrice(useWalletCredit && onlineWalletEligible ? payableAfterWallet : total)}</span>
                         </div>
-                        <Button onClick={handlePayment} disabled={processing || !termsAccepted} className="w-full h-12 font-bold min-h-[44px] active:scale-[0.99]">
+                        <Button onClick={handlePayment} disabled={processing || cartLoading || !termsAccepted} className="w-full h-12 font-bold min-h-[44px] active:scale-[0.99]">
                           {processing ? (
                             <><Loader2 size={16} className="animate-spin mr-2" /> {t("checkout.processing")}</>
                           ) : (

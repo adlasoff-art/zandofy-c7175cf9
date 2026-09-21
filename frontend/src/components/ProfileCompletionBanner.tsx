@@ -87,7 +87,7 @@ export function ProfileCompletionBanner({ className = "" }: { className?: string
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <Button asChild size="sm" variant="outline" className="h-8 border-amber-400">
-          <Link to="/account?tab=settings">{t("profile.completeCta") || "Compléter"}</Link>
+          <Link to="/dashboard?tab=profile">{t("profile.completeCta") || "Compléter"}</Link>
         </Button>
         <button
           type="button"
