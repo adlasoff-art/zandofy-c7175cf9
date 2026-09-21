@@ -80,7 +80,7 @@ export function OrderAlertListener() {
       .from("orders")
       .select("order_ref, updated_at, product_payment_proof_url, shipping_payment_proof_url")
       .in("store_id", storeIdsRef.current)
-      .eq("payment_method", "off_platform")
+      .in("payment_method", ["off_platform", "whatsapp"])
       .eq("status", "awaiting_payment")
       .is("off_platform_vendor_verified_at", null)
       .gt("updated_at", lastSeenOffPlatformProofRef.current)
@@ -93,7 +93,7 @@ export function OrderAlertListener() {
 
     if (withProof.length > 0) {
       const latest = withProof[withProof.length - 1] as any;
-      toast("Preuve hors plateforme à vérifier", {
+      toast("Preuve hors plateforme / WhatsApp à vérifier", {
         description: `Commande ${latest.order_ref}`,
         icon: <CreditCard size={16} />,
         duration: 8000,
@@ -108,7 +108,7 @@ export function OrderAlertListener() {
     const { data } = await supabase
       .from("orders")
       .select("order_ref, store_id, off_platform_vendor_verified_at")
-      .eq("payment_method", "off_platform")
+      .in("payment_method", ["off_platform", "whatsapp"])
       .eq("status", "awaiting_payment")
       .not("off_platform_vendor_verified_at", "is", null)
       .is("off_platform_admin_released_at", null)

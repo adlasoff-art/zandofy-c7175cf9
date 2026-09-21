@@ -737,7 +737,7 @@ export default function AdminVendorAccountingPage() {
                                               <td className="py-1 pr-3 font-medium text-primary">{o.orderRef}</td>
                                               <td className="py-1 px-2">
                                                 <Badge variant="outline" className="text-[8px]">
-                                                  {o.paymentMethod === "stripe" || o.paymentMethod === "card" ? "Carte (Keccel)" : o.paymentMethod === "mobile_money" ? "MoMo" : o.paymentMethod === "cod" ? "COD" : o.paymentMethod === "off_platform" ? "Hors pl." : o.paymentMethod}
+                                                  {o.paymentMethod === "stripe" || o.paymentMethod === "card" ? "Carte (Keccel)" : o.paymentMethod === "mobile_money" ? "MoMo" : o.paymentMethod === "cod" ? "COD" : o.paymentMethod === "off_platform" ? "Hors pl." : o.paymentMethod === "whatsapp" ? "WhatsApp" : o.paymentMethod}
                                                 </Badge>
                                               </td>
                                               <td className="text-right py-1 px-2 font-medium">${fmt(o.totalRevenue)}</td>

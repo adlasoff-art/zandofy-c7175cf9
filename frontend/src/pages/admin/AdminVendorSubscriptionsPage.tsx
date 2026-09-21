@@ -253,7 +253,7 @@ export default function AdminVendorSubscriptionsPage() {
                     {/* WhatsApp toggle */}
                     <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1">
                       <label className="text-xs text-muted-foreground flex items-center gap-1">
-                        <MessageCircle size={12} /> WhatsApp
+                        <MessageCircle size={12} /> WhatsApp (checkout / contact)
                       </label>
                       <Switch
                         checked={sub?.is_whatsapp_enabled || false}

@@ -149,6 +149,7 @@ export function VendorAnalyticsProTab({ storeId }: Props) {
                 <SelectItem value="card">Carte</SelectItem>
                 <SelectItem value="cod">COD</SelectItem>
                 <SelectItem value="off_platform">Hors plateforme</SelectItem>
+                <SelectItem value="whatsapp">WhatsApp</SelectItem>
               </SelectContent>
             </Select>
           </div>

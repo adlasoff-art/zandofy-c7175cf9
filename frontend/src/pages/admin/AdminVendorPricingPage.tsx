@@ -182,6 +182,7 @@ export default function AdminVendorPricingPage() {
     is_platform_owned: boolean;
     vendor_cod_enabled: boolean;
     vendor_off_platform_enabled: boolean;
+    vendor_whatsapp_enabled: boolean;
     vendor_custom_payment_numbers_enabled: boolean;
     vendor_mobile_money_enabled: boolean;
     vendor_card_enabled: boolean;
@@ -286,6 +287,7 @@ export default function AdminVendorPricingPage() {
       is_platform_owned: store.is_platform_owned ?? false,
       vendor_cod_enabled: (o as any)?.vendor_cod_enabled ?? false,
       vendor_off_platform_enabled: (o as any)?.vendor_off_platform_enabled ?? false,
+      vendor_whatsapp_enabled: (o as any)?.vendor_whatsapp_enabled ?? false,
       vendor_custom_payment_numbers_enabled: (o as any)?.vendor_custom_payment_numbers_enabled ?? false,
       vendor_mobile_money_enabled: (o as any)?.vendor_mobile_money_enabled ?? true,
       vendor_card_enabled: (o as any)?.vendor_card_enabled ?? true,
@@ -309,7 +311,7 @@ export default function AdminVendorPricingPage() {
 
   const getEditForId = (storeId: string) => {
     const store = stores?.find((s) => s.id === storeId);
-    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_custom_payment_numbers_enabled: false, vendor_mobile_money_enabled: true, vendor_card_enabled: true, vendor_mode: "international", returns_enabled: false, suppliers_enabled: false, shipping_labels_enabled: false, smart_pricing_enabled: false, max_products_override: "", collaborator_limit_override: "", vendor_webhook_url: "" };
+    if (!store) return { margin_pct: "", multiplier: "", max_extra_margin: "", vendor_extra_margin_enabled: false, commission_rate: "", is_platform_owned: false, vendor_cod_enabled: false, vendor_off_platform_enabled: false, vendor_whatsapp_enabled: false, vendor_custom_payment_numbers_enabled: false, vendor_mobile_money_enabled: true, vendor_card_enabled: true, vendor_mode: "international", returns_enabled: false, suppliers_enabled: false, shipping_labels_enabled: false, smart_pricing_enabled: false, max_products_override: "", collaborator_limit_override: "", vendor_webhook_url: "" };
     return getEdit(store);
   };
 
@@ -371,6 +373,7 @@ export default function AdminVendorPricingPage() {
       commission_rate: edit.commission_rate ? Number(edit.commission_rate) : null,
       vendor_cod_enabled: edit.vendor_cod_enabled,
       vendor_off_platform_enabled: edit.vendor_off_platform_enabled,
+      vendor_whatsapp_enabled: edit.vendor_whatsapp_enabled,
       vendor_custom_payment_numbers_enabled: edit.vendor_custom_payment_numbers_enabled,
       mm_granted_by_admin: !!edit.vendor_custom_payment_numbers_enabled,
       vendor_mobile_money_enabled: edit.vendor_mobile_money_enabled,
@@ -595,6 +598,17 @@ export default function AdminVendorPricingPage() {
                   <Switch
                     checked={edit.vendor_off_platform_enabled}
                     onCheckedChange={(v) => updateEdit(store.id, "vendor_off_platform_enabled", v)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Paiement WhatsApp</p>
+                    <p className="text-[10px] text-muted-foreground">Autorise le checkout WhatsApp (commande enregistrée + récépissé au vendeur). Nécessite un numéro WhatsApp + abonnement WhatsApp.</p>
+                  </div>
+                  <Switch
+                    checked={edit.vendor_whatsapp_enabled}
+                    onCheckedChange={(v) => updateEdit(store.id, "vendor_whatsapp_enabled", v)}
                   />
                 </div>
 

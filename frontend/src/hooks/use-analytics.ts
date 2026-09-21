@@ -522,7 +522,11 @@ export function trackDiscoveryOnboarding(
     | "discovery_onboarding_completed"
     | "discovery_onboarding_dismissed"
     | "discovery_feed_assembled"
-    | "checkout_pref_applied",
+    | "checkout_pref_applied"
+    | "checkout_whatsapp_selected"
+    | "checkout_whatsapp_order_created"
+    | "checkout_whatsapp_redirect_ok"
+    | "checkout_whatsapp_redirect_fail",
   metadata: Record<string, unknown> = {},
   userId?: string,
 ) {

@@ -67,6 +67,9 @@ import { CascadingAddressFields, type AddressData } from "@/components/address/C
 import { CustomerPricingTab } from "@/components/customer/CustomerPricingTab";
 import { EmbeddedMessagesPanel } from "@/components/messages/EmbeddedMessagesPanel";
 import { requestDiscoveryOnboarding } from "@/components/discovery/DiscoveryOnboardingSheet";
+import { isDeferredVendorPaymentMethod } from "@/lib/off-platform-payment";
+import { buildWhatsAppOrderReceiptMessage } from "@/lib/whatsapp-order-receipt";
+import { openStoreWhatsApp } from "@/lib/whatsapp";
 
 const TABS = [
   { key: "overview", labelKey: "dashboard.tab.overview", icon: Package },
@@ -111,6 +114,7 @@ interface OrderRow {
   coupon_code: string | null;
   shipping_first_name: string | null;
   shipping_last_name: string | null;
+  shipping_phone: string | null;
   shipping_address: string | null;
   shipping_city: string | null;
   shipping_country: string | null;
@@ -230,7 +234,7 @@ export default function DashboardPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_ref, created_at, total, status, subtotal, shipping_cost, discount_amount, coupon_code, shipping_first_name, shipping_last_name, shipping_address, shipping_city, shipping_country, payment_method, tracking_number, assigned_rider_name, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, last_mile_payment_status, rider_cash_collected, store_id")
+      .select("id, order_ref, created_at, total, status, subtotal, shipping_cost, discount_amount, coupon_code, shipping_first_name, shipping_last_name, shipping_phone, shipping_address, shipping_city, shipping_country, payment_method, tracking_number, assigned_rider_name, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, last_mile_payment_status, rider_cash_collected, store_id")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }) as any;
     if (error) {
@@ -661,7 +665,10 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
           {paginated.map(order => {
             const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
             const canCancel = order.status === "pending";
-            const canRetryPayment = ["awaiting_payment", "payment_failed"].includes(order.status);
+            // MoMo/card retry only — deferred vendor payments use proof / WhatsApp, not RetryPaymentModal
+            const canRetryPayment =
+              ["awaiting_payment", "payment_failed"].includes(order.status) &&
+              !isDeferredVendorPaymentMethod(order.payment_method);
             return (
               <div key={order.id} className="bg-card border border-border rounded-lg p-4 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
@@ -746,6 +753,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [existingReviews, setExistingReviews] = useState<Set<string>>(new Set());
+  const [whatsappOpening, setWhatsappOpening] = useState(false);
 
   // Check if store has returns_enabled
   useEffect(() => {
@@ -779,8 +787,34 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
   const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
   const canCancel = order.status === "pending";
   const canReturn = order.status === "delivered" && returnsEnabled;
-  const canRetryPayment = ["awaiting_payment", "payment_failed"].includes(order.status);
+  const canRetryPayment =
+    ["awaiting_payment", "payment_failed"].includes(order.status) &&
+    !isDeferredVendorPaymentMethod(order.payment_method);
   const canDispute = ["delivered", "returned"].includes(order.status);
+
+  const reopenWhatsApp = async () => {
+    if (!order.store_id || whatsappOpening) return;
+    setWhatsappOpening(true);
+    try {
+      const receipt = buildWhatsAppOrderReceiptMessage({
+        orderRef: order.order_ref,
+        lines: orderItems.map((i) => ({
+          name: i.product_name,
+          quantity: i.quantity,
+          variant: [i.color, i.size].filter(Boolean).join(" / ") || null,
+          unitPrice: i.price,
+        })),
+        total: Number(order.subtotal) || 0,
+        customerPhone: order.shipping_phone,
+        customerName: [order.shipping_first_name, order.shipping_last_name].filter(Boolean).join(" "),
+        dashboardUrl: `${window.location.origin}/dashboard?tab=orders`,
+        locale: locale === "en" ? "en" : "fr",
+      });
+      await openStoreWhatsApp(order.store_id, receipt);
+    } finally {
+      setWhatsappOpening(false);
+    }
+  };
 
   const handleSubmitReview = async (productId: string) => {
     if (!user || !reviewRating) return;
@@ -855,7 +889,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
       <div className="flex flex-wrap gap-1.5 text-[10px]">
         {order.payment_method && (
           <span className="px-2 py-0.5 rounded-full bg-muted font-medium">
-            {t("dashboard.detail.payment")} {order.payment_method === "stripe" || order.payment_method === "card" ? t("dashboard.detail.pm.card") : order.payment_method === "paypal" ? t("dashboard.detail.pm.paypal") : order.payment_method === "mobile_money" ? t("dashboard.detail.pm.mobileMoney") : order.payment_method === "cod" ? t("dashboard.detail.pm.cod") : order.payment_method === "off_platform" ? t("dashboard.detail.pm.offPlatform") : order.payment_method}
+            {t("dashboard.detail.payment")} {order.payment_method === "stripe" || order.payment_method === "card" ? t("dashboard.detail.pm.card") : order.payment_method === "paypal" ? t("dashboard.detail.pm.paypal") : order.payment_method === "mobile_money" ? t("dashboard.detail.pm.mobileMoney") : order.payment_method === "cod" ? t("dashboard.detail.pm.cod") : order.payment_method === "off_platform" ? t("dashboard.detail.pm.offPlatform") : order.payment_method === "whatsapp" ? (t("dashboard.detail.pm.whatsapp") || "WhatsApp") : order.payment_method}
           </span>
         )}
         {order.shipping_payment_status && (
@@ -928,14 +962,36 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         </div>
       )}
 
-      {/* Order payment proof for off-platform orders */}
-      {order.payment_method === "off_platform" && order.status === "awaiting_payment" && (
+      {/* Order payment proof for deferred vendor payments (off_platform / whatsapp) */}
+      {(order.payment_method === "off_platform" || order.payment_method === "whatsapp") &&
+        order.status === "awaiting_payment" && (
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md p-2.5">
             <span className="text-amber-700 dark:text-amber-400 font-medium">
-              {t("dashboard.detail.offPlatform.pendingProduct")} <strong>{formatPrice(Number(order.subtotal))}</strong>
+              {order.payment_method === "whatsapp"
+                ? (t("dashboard.detail.whatsapp.pendingProduct") ||
+                    "Commande WhatsApp en attente — montant produit ")
+                : t("dashboard.detail.offPlatform.pendingProduct")}{" "}
+              <strong>{formatPrice(Number(order.subtotal))}</strong>
             </span>
           </div>
+          {order.payment_method === "whatsapp" && order.store_id && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full gap-2 border-emerald-300 text-emerald-800"
+              disabled={whatsappOpening}
+              onClick={() => void reopenWhatsApp()}
+            >
+              {whatsappOpening ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <MessageCircle size={14} />
+              )}
+              {t("dashboard.detail.whatsapp.reopen") || "Rouvrir WhatsApp avec le vendeur"}
+            </Button>
+          )}
           <PaymentProofUpload
             orderId={order.id}
             field="product_payment_proof_url"

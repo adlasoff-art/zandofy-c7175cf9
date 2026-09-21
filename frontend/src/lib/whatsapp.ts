@@ -102,3 +102,17 @@ export async function openStoreWhatsApp(
   openWhatsAppUrl(targetUrl, useSameTab);
   return { ok: true };
 }
+
+/** Open WhatsApp with a known E.164-ish digit string (no store lookup). */
+export function openWhatsAppWithDigits(
+  digitsRaw: string,
+  message: string,
+): { ok: boolean; reason?: string } {
+  const useSameTab = isMobileOrPWA();
+  const digits = normalizeWhatsAppDigits(digitsRaw);
+  if (!digits) return { ok: false, reason: "invalid_number" };
+  const urls = buildWhatsAppUrls(digits, message);
+  const targetUrl = useSameTab ? urls.universal : urls.webSend;
+  openWhatsAppUrl(targetUrl, useSameTab);
+  return { ok: true };
+}

@@ -34,6 +34,7 @@ export function getGatewayRateForMethod(method: string, fees: GatewayFees = DEFA
       return fees.paypal_fee_pct ?? 3.9;
     case "cod":
     case "off_platform":
+    case "whatsapp":
     case "unknown":
       return 0;
     default:

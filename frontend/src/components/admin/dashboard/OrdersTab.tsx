@@ -187,7 +187,7 @@ export function OrdersTab({ period, geoFilters }: Props) {
   };
 
   const methodLabels: Record<string, string> = {
-    stripe: "Carte (Keccel)", mobile_money: "MoMo", cod: "COD", off_platform: "Hors pl.", paypal: "PayPal", card: "Carte (Keccel)",
+    stripe: "Carte (Keccel)", mobile_money: "MoMo", cod: "COD", off_platform: "Hors pl.", whatsapp: "WhatsApp", paypal: "PayPal", card: "Carte (Keccel)",
   };
 
   return (

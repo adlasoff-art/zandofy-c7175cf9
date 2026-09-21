@@ -71,7 +71,7 @@ export function VendorsTab({ period, geoFilters }: Props) {
   const { topByRevenue = [], topByCount = [], entries = [], totalVendors = 0, newStores = 0 } = vendorData ?? {};
 
   const methodLabel = (m: string) => {
-    const labels: Record<string, string> = { mobile_money: "Mobile Money", cod: "Contre remboursement", stripe: "Carte (Keccel)", card: "Carte (Keccel)", off_platform: "Hors plateforme", paypal: "PayPal", unknown: "Non spécifié" };
+    const labels: Record<string, string> = { mobile_money: "Mobile Money", cod: "Contre remboursement", stripe: "Carte (Keccel)", card: "Carte (Keccel)", off_platform: "Hors plateforme", whatsapp: "WhatsApp", paypal: "PayPal", unknown: "Non spécifié" };
     return labels[m] || m;
   };
 
