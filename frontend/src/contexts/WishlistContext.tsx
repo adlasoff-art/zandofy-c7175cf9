@@ -1,9 +1,24 @@
-import { createContext, useContext, useCallback, useEffect, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { requestAddressOnboarding } from "@/lib/address-onboarding-bus";
+import { isLikelyProductId } from "@/lib/guest-cart";
+import {
+  clearGuestWishlist,
+  readGuestWishlist,
+  toggleGuestWishlistId,
+  writeGuestWishlist,
+} from "@/lib/guest-wishlist";
 
 interface WishlistContextType {
   wishlistIds: Set<string>;
@@ -19,8 +34,12 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [guestIds, setGuestIds] = useState<string[]>(() =>
+    typeof window !== "undefined" ? readGuestWishlist() : [],
+  );
+  const mergeDoneForUser = useRef<string | null>(null);
 
-  const { data: wishlistItems = [], isLoading } = useQuery({
+  const { data: wishlistItems = [], isLoading: dbLoading } = useQuery({
     queryKey: ["wishlist", user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -34,7 +53,40 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     enabled: !!user,
   });
 
-  const wishlistIds = new Set(wishlistItems);
+  // Merge guest → DB once per login
+  useEffect(() => {
+    if (!user) {
+      mergeDoneForUser.current = null;
+      setGuestIds(readGuestWishlist());
+      return;
+    }
+    if (mergeDoneForUser.current === user.id) return;
+    mergeDoneForUser.current = user.id;
+
+    void (async () => {
+      const guest = readGuestWishlist();
+      if (guest.length === 0) return;
+      const remaining: string[] = [];
+      for (const productId of guest) {
+        if (!isLikelyProductId(productId)) continue;
+        const { error } = await supabase.from("wishlists").insert({
+          user_id: user.id,
+          product_id: productId,
+        });
+        // Unique violation / already exists → treat as merged
+        if (error && error.code !== "23505") {
+          console.warn("[Wishlist] guest merge skip", productId, error.message);
+          remaining.push(productId);
+        }
+      }
+      if (remaining.length === 0) clearGuestWishlist();
+      else writeGuestWishlist(remaining);
+      setGuestIds(remaining);
+      await queryClient.invalidateQueries({ queryKey: ["wishlist", user.id] });
+    })();
+  }, [user?.id, queryClient]);
+
+  const wishlistIds = new Set(user ? wishlistItems : guestIds);
 
   const addMutation = useMutation({
     mutationFn: async (productId: string) => {
@@ -68,7 +120,10 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     onMutate: async (productId) => {
       await queryClient.cancelQueries({ queryKey: ["wishlist", user?.id] });
       const prev = queryClient.getQueryData<string[]>(["wishlist", user?.id]) || [];
-      queryClient.setQueryData(["wishlist", user?.id], prev.filter((id) => id !== productId));
+      queryClient.setQueryData(
+        ["wishlist", user?.id],
+        prev.filter((id) => id !== productId),
+      );
       return { prev };
     },
     onError: (_err, _productId, context) => {
@@ -78,12 +133,21 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["wishlist", user?.id] }),
   });
 
-  const isInWishlist = useCallback((productId: string) => wishlistIds.has(productId), [wishlistIds]);
+  const isInWishlist = useCallback(
+    (productId: string) => wishlistIds.has(productId),
+    [wishlistIds],
+  );
 
   const toggleWishlist = useCallback(
     (productId: string) => {
+      if (!isLikelyProductId(productId)) {
+        toast({ title: "Erreur", description: "Produit invalide.", variant: "destructive" });
+        return;
+      }
       if (!user) {
-        toast({ title: "Connexion requise", description: "Veuillez vous connecter pour enregistrer vos favoris" });
+        const next = toggleGuestWishlistId(readGuestWishlist(), productId);
+        writeGuestWishlist(next);
+        setGuestIds(next);
         return;
       }
       if (wishlistIds.has(productId)) {
@@ -93,11 +157,19 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
         requestAddressOnboarding();
       }
     },
-    [user, wishlistIds, addMutation, removeMutation, toast]
+    [user, wishlistIds, addMutation, removeMutation, toast],
   );
 
   return (
-    <WishlistContext.Provider value={{ wishlistIds, count: wishlistIds.size, isInWishlist, toggleWishlist, isLoading }}>
+    <WishlistContext.Provider
+      value={{
+        wishlistIds,
+        count: wishlistIds.size,
+        isInWishlist,
+        toggleWishlist,
+        isLoading: !!user && dbLoading,
+      }}
+    >
       {children}
     </WishlistContext.Provider>
   );
