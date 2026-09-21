@@ -106,21 +106,7 @@ export function CartDrawer() {
           </SheetTitle>
         </SheetHeader>
 
-        {!user ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6 min-h-[50vh]">
-            <ShoppingBag size={48} className="text-muted-foreground" />
-            <p className="text-muted-foreground">{t("cart.loginRequired")}</p>
-            <Button
-              type="button"
-              className="min-h-[44px] px-6"
-              onClick={goAuthForCheckout}
-              onPointerEnter={prefetchCheckoutChunk}
-              onFocus={prefetchCheckoutChunk}
-            >
-              {t("cart.login")}
-            </Button>
-          </div>
-        ) : loading && items.length === 0 ? (
+        {user && loading && items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6 min-h-[50vh]">
             <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
             <p className="text-sm text-muted-foreground">{t("cart.loading") || "Chargement du panier…"}</p>
@@ -229,6 +215,11 @@ export function CartDrawer() {
                 />
               )}
               <p className="text-xs text-muted-foreground">{t("cart.shippingAtCheckout")}</p>
+              {!user && (
+                <p className="text-xs text-muted-foreground text-center">
+                  {t("cart.loginToCheckout") || "Connectez-vous pour finaliser votre commande."}
+                </p>
+              )}
               {noneSelected ? (
                 <Button type="button" className="w-full h-12 min-h-[44px] font-bold" disabled>
                   {t("cart.selectItems")}
@@ -237,7 +228,7 @@ export function CartDrawer() {
                 <Button
                   type="button"
                   className="w-full h-12 min-h-[44px] font-bold active:scale-[0.98] transition-transform"
-                  onClick={goCheckout}
+                  onClick={user ? goCheckout : goAuthForCheckout}
                   onPointerEnter={prefetchCheckoutChunk}
                   onFocus={prefetchCheckoutChunk}
                 >
