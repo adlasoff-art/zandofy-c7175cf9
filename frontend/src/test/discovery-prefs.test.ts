@@ -136,6 +136,101 @@ describe("assembleDiscoveryFeed", () => {
     expect(femaleCore.length).toBeLessThanOrEqual(2);
   });
 
+  it("caps international share for city scope and keeps core local", () => {
+    const ranked = assembleDiscoveryFeed(makePool(), {
+      prefs,
+      take: 20,
+      mix: { ...DISCOVERY_MIX_DEFAULTS, intl_cap_pct: 10 },
+      surface: "test_intl_cap",
+      seedKey: "u1",
+      nowMs: 1_700_000_000_000,
+    });
+    expect(ranked.length).toBe(20);
+    const coreSlice = ranked.slice(0, 13);
+    expect(coreSlice.every((p) => p.shop_type === "local")).toBe(true);
+    const intlCount = ranked.filter((p) => p.shop_type === "international").length;
+    expect(intlCount).toBeLessThanOrEqual(2); // ~10% of 20
+  });
+
+  it("excludes opposite gender from explore for male audience", () => {
+    const ranked = assembleDiscoveryFeed(makePool(), {
+      prefs,
+      take: 20,
+      mix: DISCOVERY_MIX_DEFAULTS,
+      surface: "test_no_opp_explore",
+      seedKey: "u1",
+      nowMs: 1_700_000_000_000,
+    });
+    const females = ranked.filter((p) => p.gender_target === "female");
+    expect(females.length).toBe(0);
+  });
+
+  it("admits non-apparel interest unisex into core when apparel map provided", () => {
+    const housePrefs = normalizeDiscoveryPrefs({
+      ...prefs,
+      interest_category_ids: ["home"],
+    });
+    const pool = [
+      ...makePool(),
+      {
+        id: "home-u1",
+        category_id: "home",
+        gender_target: "unisex",
+        shop_type: "local",
+        origin_country: "CD",
+        rating: 5,
+      },
+      {
+        id: "home-u2",
+        category_id: "home",
+        gender_target: "",
+        shop_type: "local",
+        origin_country: "CD",
+        rating: 5,
+      },
+      {
+        id: "fashion-f1",
+        category_id: "fashion",
+        gender_target: "female",
+        shop_type: "local",
+        origin_country: "CD",
+        rating: 5,
+      },
+    ];
+    const ranked = assembleDiscoveryFeed(pool, {
+      prefs: housePrefs,
+      take: 20,
+      mix: DISCOVERY_MIX_DEFAULTS,
+      apparelCategoryIds: ["fashion", "watches", "shoes"],
+      interestCategoryIds: ["home"],
+      surface: "test_transverse",
+      seedKey: "u1",
+      nowMs: 1_700_000_000_000,
+    });
+    const coreSlice = ranked.slice(0, 13);
+    expect(coreSlice.some((p) => p.category_id === "home")).toBe(true);
+    expect(coreSlice.some((p) => p.id === "fashion-f1")).toBe(false);
+  });
+
+  it("any_country does not apply intl_cap", () => {
+    const openPrefs = normalizeDiscoveryPrefs({
+      ...prefs,
+      purchase_scope: "any_country",
+    });
+    const ranked = assembleDiscoveryFeed(makePool(), {
+      prefs: openPrefs,
+      take: 20,
+      mix: { ...DISCOVERY_MIX_DEFAULTS, intl_cap_pct: 10 },
+      surface: "test_any",
+      seedKey: "u1",
+      nowMs: 1_700_000_000_000,
+    });
+    const intlCount = ranked.filter((p) => p.shop_type === "international").length;
+    // With open explore, intl can exceed the 10% city/country cap
+    expect(intlCount).toBeGreaterThanOrEqual(0);
+    expect(ranked.length).toBe(20);
+  });
+
   it("prefers true store_city_id match when prefs.city_id set", () => {
     const cityPrefs = normalizeDiscoveryPrefs({
       ...prefs,

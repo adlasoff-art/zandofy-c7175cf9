@@ -6,11 +6,22 @@ import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
 import { useAuthSettings } from "@/hooks/use-auth-settings";
 import {
   assembleDiscoveryFeed,
+  expandApparelCategoryIds,
   expandInterestCategoryIds,
   EMPTY_CATEGORY_TREE,
+  type CategoryTreeNode,
   type DiscoveryProductLike,
 } from "@/lib/discovery-engine";
 import { trackDiscoveryOnboarding } from "@/hooks/use-analytics";
+
+async function fetchDiscoveryCategoryTree(): Promise<CategoryTreeNode[]> {
+  const { data, error } = await (supabase as any)
+    .from("categories")
+    .select("id, parent_id, apparel_fields_enabled")
+    .limit(2000);
+  if (error) throw error;
+  return (data || []) as CategoryTreeNode[];
+}
 
 /**
  * Rank a product list with discovery prefs + CMS mix when onboarding completed.
@@ -27,16 +38,9 @@ export function useDiscoveryRankedProducts<T extends DiscoveryProductLike>(
 
   const { data: categoriesData } = useQuery({
     queryKey: ["discovery-category-tree"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("categories")
-        .select("id, parent_id")
-        .limit(2000);
-      if (error) throw error;
-      return (data || []) as { id: string; parent_id: string | null }[];
-    },
+    queryFn: fetchDiscoveryCategoryTree,
     staleTime: 10 * 60 * 1000,
-    enabled: hasCompleted && prefs.interest_category_ids.length > 0,
+    enabled: hasCompleted,
   });
   const categories = categoriesData ?? EMPTY_CATEGORY_TREE;
 
@@ -46,11 +50,13 @@ export function useDiscoveryRankedProducts<T extends DiscoveryProductLike>(
       prefs.interest_category_ids,
       categories,
     );
+    const apparelCategoryIds = expandApparelCategoryIds(categories);
     return assembleDiscoveryFeed(products, {
       prefs,
       mix: authSettings?.discovery_mix,
       take: take ?? products.length,
       interestCategoryIds,
+      apparelCategoryIds,
       surface,
       seedKey: user?.id || "guest",
     });

@@ -10,6 +10,11 @@ export type DiscoveryMixConfig = {
   /** Of total feed when purchase_scope = city (with city_pct should ≈ core_pct) */
   country_within_core_pct: number;
   rotation_hours: number;
+  /**
+   * Max % of take that may be international when scope is city/country (0–25).
+   * Ignored for any_country. Default 10 when absent (backward compatible).
+   */
+  intl_cap_pct: number;
 };
 
 export type AuthSettings = {
@@ -34,6 +39,7 @@ export const DISCOVERY_MIX_DEFAULTS: DiscoveryMixConfig = {
   city_pct: 45,
   country_within_core_pct: 20,
   rotation_hours: 12,
+  intl_cap_pct: 10,
 };
 
 export const AUTH_SETTINGS_DEFAULTS: AuthSettings = {
@@ -62,6 +68,10 @@ export function normalizeDiscoveryMix(raw: unknown): DiscoveryMixConfig {
   const d = DISCOVERY_MIX_DEFAULTS;
   if (!raw || typeof raw !== "object") return { ...d };
   const v = raw as Partial<DiscoveryMixConfig>;
+  const intlRaw =
+    typeof v.intl_cap_pct === "number" || typeof v.intl_cap_pct === "string"
+      ? Number(v.intl_cap_pct)
+      : d.intl_cap_pct;
   return {
     core_pct: clampPct(v.core_pct, d.core_pct),
     explore_pct: clampPct(v.explore_pct, d.explore_pct),
@@ -69,6 +79,8 @@ export function normalizeDiscoveryMix(raw: unknown): DiscoveryMixConfig {
     city_pct: clampPct(v.city_pct, d.city_pct),
     country_within_core_pct: clampPct(v.country_within_core_pct, d.country_within_core_pct),
     rotation_hours: Math.min(168, Math.max(1, clampPct(v.rotation_hours, d.rotation_hours) || d.rotation_hours)),
+    // Soft feature: absent → 10; clamp 0–25
+    intl_cap_pct: Math.min(25, Math.max(0, Number.isFinite(intlRaw) ? Math.round(intlRaw) : d.intl_cap_pct)),
   };
 }
 
