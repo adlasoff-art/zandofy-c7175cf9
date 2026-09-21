@@ -9,6 +9,7 @@ import { mapProduct, PRODUCT_LIST_SELECT, type Product } from "@/services/api";
 import { useHomeMarket } from "@/contexts/HomeMarketContext";
 import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
 import { useDiscoveryRankedProducts } from "@/hooks/use-discovery-ranked";
+import { discoveryShopTypeFilter, prefersLocalDiscoveryScope } from "@/lib/discovery-fetch";
 
 const RECO_SELECT = `${PRODUCT_LIST_SELECT.trim()}, gender_target`;
 
@@ -55,11 +56,33 @@ export function RecommendationsSection() {
           .select(RECO_SELECT)
           .eq("publish_status", "published")
           .order("rating", { ascending: false })
-          .limit(80);
-        if (!hasCompleted && shopTypeFilter) q = (q as any).eq("shop_type", shopTypeFilter);
+          .limit(hasCompleted ? 80 : 80);
+        const shopType = discoveryShopTypeFilter(hasCompleted, prefs.purchase_scope, shopTypeFilter);
+        if (shopType) q = (q as any).eq("shop_type", shopType);
         const { data: allProducts } = await q;
         if (cancelled) return;
-        const list = (allProducts || []) as any[];
+        let list = (allProducts || []) as any[];
+
+        // Local-first backfill if pool too thin for ranking
+        if (
+          prefersLocalDiscoveryScope(hasCompleted, prefs.purchase_scope) &&
+          shopType === "local" &&
+          list.length < 12
+        ) {
+          const { data: open } = await supabase
+            .from("products_public")
+            .select(RECO_SELECT)
+            .eq("publish_status", "published")
+            .order("rating", { ascending: false })
+            .limit(80);
+          if (cancelled) return;
+          const seen = new Set(list.map((p) => p.id));
+          for (const p of open || []) {
+            if (seen.has(p.id)) continue;
+            seen.add(p.id);
+            list.push(p);
+          }
+        }
 
         let combined: Product[];
 
@@ -121,7 +144,12 @@ export function RecommendationsSection() {
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
           .limit(48);
-        if (!hasCompleted && shopTypeFilter) fallbackQ = (fallbackQ as any).eq("shop_type", shopTypeFilter);
+        const fallbackShop = discoveryShopTypeFilter(
+          hasCompleted,
+          prefs.purchase_scope,
+          shopTypeFilter,
+        );
+        if (fallbackShop) fallbackQ = (fallbackQ as any).eq("shop_type", fallbackShop);
         const { data: popular } = await fallbackQ;
         if (!cancelled) setRawProducts((popular || []).map((p: any) => mapProduct(p)));
       }
@@ -131,7 +159,7 @@ export function RecommendationsSection() {
     return () => {
       cancelled = true;
     };
-  }, [user, shopTypeFilter, prefs.audience, hasCompleted]);
+  }, [user, shopTypeFilter, prefs.audience, prefs.purchase_scope, hasCompleted]);
 
   if (!loading && !products.length) return null;
 

@@ -9,6 +9,11 @@ import { useHomeMarket } from "@/contexts/HomeMarketContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
 import { useDiscoveryRankedProducts } from "@/hooks/use-discovery-ranked";
+import {
+  discoveryShopTypeFilter,
+  fetchWithLocalFirstBackfill,
+  prefersLocalDiscoveryScope,
+} from "@/lib/discovery-fetch";
 
 function useCountdown(targetDate: Date) {
   const [timeLeft, setTimeLeft] = useState(getTimeLeft(targetDate));
@@ -37,7 +42,7 @@ export function FlashSales() {
   const [loading, setLoading] = useState(true);
   const { t } = useI18n();
   const { shopTypeFilter } = useHomeMarket();
-  const { hasCompleted } = useDiscoveryPrefs();
+  const { prefs, hasCompleted } = useDiscoveryPrefs();
   const products = useDiscoveryRankedProducts(rawProducts, "home_flash", 16);
 
   // Find the nearest promo end date from fetched products, fallback to 8h
@@ -47,8 +52,12 @@ export function FlashSales() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    // When discovery completed, fetch both markets so the engine can mix 65/25/10 geo buckets
-    fetchFlashSaleProducts({ shopType: hasCompleted ? undefined : shopTypeFilter }).then((data) => {
+    const shopType = discoveryShopTypeFilter(hasCompleted, prefs.purchase_scope, shopTypeFilter);
+    const localFirst = prefersLocalDiscoveryScope(hasCompleted, prefs.purchase_scope);
+    void fetchWithLocalFirstBackfill(
+      (st) => fetchFlashSaleProducts({ shopType: st }),
+      { shopType, preferLocalBackfill: localFirst, minCount: 16 },
+    ).then((data) => {
       if (cancelled) return;
       setRawProducts(shuffleByDailySeed(data));
       setLoading(false);
@@ -65,7 +74,7 @@ export function FlashSales() {
     return () => {
       cancelled = true;
     };
-  }, [shopTypeFilter, hasCompleted]);
+  }, [shopTypeFilter, hasCompleted, prefs.purchase_scope]);
 
   if (!loading && products.length === 0) return null;
 

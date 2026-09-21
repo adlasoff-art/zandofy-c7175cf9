@@ -7,7 +7,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAuthSettings } from "@/hooks/use-auth-settings";
-import { assembleDiscoveryFeed, expandInterestCategoryIds, EMPTY_CATEGORY_TREE } from "@/lib/discovery-engine";
+import { assembleDiscoveryFeed, expandApparelCategoryIds, expandInterestCategoryIds, EMPTY_CATEGORY_TREE } from "@/lib/discovery-engine";
 import { useQuery } from "@tanstack/react-query";
 
 interface FeaturedPlacement {
@@ -162,9 +162,16 @@ export function FeaturedSidebar() {
   const { data: categoryTreeData } = useQuery({
     queryKey: ["discovery-category-tree"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("categories").select("id, parent_id").limit(2000);
+      const { data, error } = await (supabase as any)
+        .from("categories")
+        .select("id, parent_id, apparel_fields_enabled")
+        .limit(2000);
       if (error) throw error;
-      return (data || []) as { id: string; parent_id: string | null }[];
+      return (data || []) as {
+        id: string;
+        parent_id: string | null;
+        apparel_fields_enabled?: boolean | null;
+      }[];
     },
     staleTime: 10 * 60 * 1000,
     enabled: hasCompleted,
@@ -209,6 +216,7 @@ export function FeaturedSidebar() {
                 prefs.interest_category_ids,
                 categoryTree,
               ),
+              apparelCategoryIds: expandApparelCategoryIds(categoryTree),
               surface: "home_featured",
               seedKey: user?.id || "guest",
             });

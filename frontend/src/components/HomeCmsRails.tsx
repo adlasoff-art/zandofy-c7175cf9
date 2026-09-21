@@ -12,6 +12,11 @@ import { useHomeMarket } from "@/contexts/HomeMarketContext";
 import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
 import { sanitizeRouterTo } from "@/lib/safe-href";
 import { useDiscoveryRankedProducts } from "@/hooks/use-discovery-ranked";
+import {
+  discoveryShopTypeFilter,
+  fetchWithLocalFirstBackfill,
+  prefersLocalDiscoveryScope,
+} from "@/lib/discovery-fetch";
 
 type DisplayMode = "rail" | "grid_page";
 
@@ -101,7 +106,7 @@ function CmsSectionView({ section }: { section: LoadedSection }) {
 export function HomeCmsRails() {
   const { locale } = useI18n();
   const { shopTypeFilter } = useHomeMarket();
-  const { hasCompleted } = useDiscoveryPrefs();
+  const { prefs, hasCompleted } = useDiscoveryPrefs();
   const [sections, setSections] = useState<LoadedSection[]>([]);
 
   useEffect(() => {
@@ -120,21 +125,27 @@ export function HomeCmsRails() {
         return;
       }
 
-      const shopType = hasCompleted ? undefined : shopTypeFilter;
+      const shopType = discoveryShopTypeFilter(hasCompleted, prefs.purchase_scope, shopTypeFilter);
+      const localFirst = prefersLocalDiscoveryScope(hasCompleted, prefs.purchase_scope);
       const loaded: LoadedSection[] = [];
       for (const section of rows) {
         const entityId = section.config?.entity_id;
         if (!entityId) continue;
         const limit = Math.min(Math.max(section.config?.limit ?? 12, 4), 24);
+        const fetchLimit = hasCompleted ? Math.min(limit * 2, 48) : limit;
         const displayMode: DisplayMode =
           section.config?.display_mode === "grid_page" ? "grid_page" : "rail";
         try {
           if (section.section_key === "category_rail") {
-            const products = await fetchProducts({
-              categoryId: entityId,
-              limit: hasCompleted ? Math.min(limit * 2, 48) : limit,
-              shopType,
-            });
+            const products = await fetchWithLocalFirstBackfill(
+              (st) =>
+                fetchProducts({
+                  categoryId: entityId,
+                  limit: fetchLimit,
+                  shopType: st,
+                }),
+              { shopType, preferLocalBackfill: localFirst, minCount: limit },
+            );
             if (products.length === 0) continue;
             const { data: cat } = await supabase
               .from("categories")
@@ -152,11 +163,15 @@ export function HomeCmsRails() {
               displayMode,
             });
           } else if (section.section_key === "store_rail") {
-            const products = await fetchProducts({
-              storeId: entityId,
-              limit: hasCompleted ? Math.min(limit * 2, 48) : limit,
-              shopType,
-            });
+            const products = await fetchWithLocalFirstBackfill(
+              (st) =>
+                fetchProducts({
+                  storeId: entityId,
+                  limit: fetchLimit,
+                  shopType: st,
+                }),
+              { shopType, preferLocalBackfill: localFirst, minCount: limit },
+            );
             if (products.length === 0) continue;
             loaded.push({
               id: section.id,
@@ -175,7 +190,7 @@ export function HomeCmsRails() {
     return () => {
       cancelled = true;
     };
-  }, [locale, shopTypeFilter, hasCompleted]);
+  }, [locale, shopTypeFilter, hasCompleted, prefs.purchase_scope]);
 
   if (sections.length === 0) return null;
 

@@ -213,6 +213,7 @@ export function AuthSettingsPanel() {
                 ["neutral_pct", "Neutre %"],
                 ["city_pct", "Ville % (total)"],
                 ["country_within_core_pct", "Pays % (total)"],
+                ["intl_cap_pct", "Plafond intl % (ville/pays)"],
                 ["rotation_hours", "Rotation (h)"],
               ] as const
             ).map(([key, label]) => (
@@ -221,7 +222,9 @@ export function AuthSettingsPanel() {
                 <Input
                   type="number"
                   min={0}
-                  max={key === "rotation_hours" ? 168 : 100}
+                  max={
+                    key === "rotation_hours" ? 168 : key === "intl_cap_pct" ? 25 : 100
+                  }
                   disabled={saving}
                   value={config.discovery_mix[key]}
                   onChange={(e) => {

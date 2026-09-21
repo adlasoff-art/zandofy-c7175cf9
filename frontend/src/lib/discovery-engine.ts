@@ -1,5 +1,6 @@
 /**
  * Discovery feed assembler — CMS ratios + prefs + geo proxy + rotation seed.
+ * Local-first (city/country): core excludes intl; explore intl capped; apparel-aware core.
  * @see docs/DISCOVERY_ENGINE.md
  */
 
@@ -17,6 +18,11 @@ export type DiscoveryMixConfig = {
   city_pct: number;
   country_within_core_pct: number;
   rotation_hours: number;
+  /**
+   * Max share of total feed that may be international when scope is city/country.
+   * Clamped 0–25; ignored for any_country. Soft default 10 when absent.
+   */
+  intl_cap_pct: number;
 };
 
 export const DISCOVERY_MIX_FALLBACK: DiscoveryMixConfig = {
@@ -26,10 +32,17 @@ export const DISCOVERY_MIX_FALLBACK: DiscoveryMixConfig = {
   city_pct: 45,
   country_within_core_pct: 20,
   rotation_hours: 12,
+  intl_cap_pct: 10,
 };
 
 /** Stable empty category tree — avoid `= []` default identity storms in effect deps. */
-export const EMPTY_CATEGORY_TREE: { id: string; parent_id: string | null }[] = [];
+export const EMPTY_CATEGORY_TREE: CategoryTreeNode[] = [];
+
+export type CategoryTreeNode = {
+  id: string;
+  parent_id?: string | null;
+  apparel_fields_enabled?: boolean | null;
+};
 
 export type DiscoveryProductLike = {
   id: string;
@@ -54,6 +67,11 @@ export type AssembleDiscoveryOptions = {
   take?: number;
   /** Expanded interest set (roots + descendants). */
   interestCategoryIds?: string[];
+  /**
+   * Expanded apparel category ids (flag true + descendants).
+   * When empty/absent, treat all categories as apparel-strict for core gender.
+   */
+  apparelCategoryIds?: string[] | Set<string>;
   surface?: string;
   seedKey?: string;
   nowMs?: number;
@@ -148,6 +166,19 @@ function sameCountry(p: DiscoveryProductLike, country: string | null) {
   return o === country.toUpperCase();
 }
 
+/** International shop OR foreign origin — used for feed-wide intl_cap accounting. */
+function isIntlLike(p: DiscoveryProductLike, country: string | null) {
+  if (isIntlShop(p)) return true;
+  if (country && originOf(p) && originOf(p) !== country.toUpperCase()) return true;
+  return false;
+}
+
+function clampIntlCap(n: unknown): number {
+  const v = typeof n === "number" ? n : Number(n);
+  if (!Number.isFinite(v)) return DISCOVERY_MIX_FALLBACK.intl_cap_pct;
+  return Math.min(25, Math.max(0, Math.round(v)));
+}
+
 function pick<T extends { id: string }>(pool: T[], n: number, exclude: Set<string>): T[] {
   const out: T[] = [];
   for (const p of pool) {
@@ -183,8 +214,22 @@ function countsForTake(take: number, mix: DiscoveryMixConfig, scope: PurchaseSco
 }
 
 /**
+ * Apparel category ids = nodes with apparel_fields_enabled + all descendants.
+ */
+export function expandApparelCategoryIds(categories: CategoryTreeNode[]): string[] {
+  const roots = categories.filter((c) => c.apparel_fields_enabled === true).map((c) => c.id);
+  if (!roots.length) return [];
+  return expandInterestCategoryIds(roots, categories);
+}
+
+function toIdSet(ids: string[] | Set<string> | undefined): Set<string> {
+  if (!ids) return new Set();
+  return ids instanceof Set ? ids : new Set(ids);
+}
+
+/**
  * Assemble a discovery-ranked slice.
- * Requires completed_at (or explicit audience+interests via completed flow) — callers gate on hasCompleted.
+ * Requires completed_at — callers gate on hasCompleted.
  */
 export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
   products: T[],
@@ -199,15 +244,23 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
     return products.slice(0, take);
   }
 
-  const mix: DiscoveryMixConfig = { ...DISCOVERY_MIX_FALLBACK, ...(opts.mix || {}) };
+  const mixRaw: DiscoveryMixConfig = { ...DISCOVERY_MIX_FALLBACK, ...(opts.mix || {}) };
+  const mix: DiscoveryMixConfig = {
+    ...mixRaw,
+    intl_cap_pct: clampIntlCap(mixRaw.intl_cap_pct),
+  };
   const interestIds = opts.interestCategoryIds?.length
     ? opts.interestCategoryIds
     : prefs.interest_category_ids || [];
   const interestSet = new Set(interestIds);
+  const apparelSet = toIdSet(opts.apparelCategoryIds);
+  /** When tree not loaded yet, keep legacy strict gender core (safer than opening all unisex). */
+  const apparelKnown = apparelSet.size > 0;
   const country = prefs.country_code;
   const cityId = prefs.city_id;
   const scope = prefs.purchase_scope;
   const audience = prefs.audience;
+  const localScoped = scope === "city" || scope === "country";
 
   const seed = hashSeed(
     `${opts.seedKey || "guest"}|${rotationBucket(mix.rotation_hours, opts.nowMs)}|${opts.surface || "default"}`,
@@ -219,14 +272,27 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
     return interestSet.size === 0 ? true : !!id && interestSet.has(id);
   };
 
+  const isApparel = (p: T) => {
+    if (!apparelKnown) return true;
+    const id = catId(p);
+    // Unknown / missing category → apparel-strict (never open unisex core by accident)
+    if (!id) return true;
+    return apparelSet.has(id);
+  };
+
+  /** Core eligibility: apparel → strict audience; non-apparel interest → OK even unisex. */
+  const eligibleCore = (p: T) => {
+    if (!inInterest(p)) return false;
+    if (isApparel(p)) return matchesAudienceCore(p, audience);
+    return true;
+  };
+
   const coreAudience = (p: T) => matchesAudienceCore(p, audience);
   const isNeutral = (p: T) => isNeutralGender(genderOf(p));
+  const isLocalMarket = (p: T) => isLocalShop(p) && sameCountry(p, country);
 
-  const localSame = shuffled.filter((p) => isLocalShop(p) && sameCountry(p, country));
-  // I7: true city match when prefs.city_id + store_city_id available; else V1 seed partition
-  const trueCity = cityId
-    ? localSame.filter((p) => sameCity(p, cityId))
-    : [];
+  const localSame = shuffled.filter((p) => isLocalMarket(p));
+  const trueCity = cityId ? localSame.filter((p) => sameCity(p, cityId)) : [];
   const trueCityA = seededShuffle(trueCity, seed ^ 0xa5a5);
   const localSameA = seededShuffle(localSame, seed ^ 0xa5a5);
   const mid = Math.ceil(localSameA.length / 2);
@@ -236,32 +302,79 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
       ? localSameA.filter((p) => !sameCity(p, cityId))
       : localSameA.slice(mid);
 
-  const corePoolBase = shuffled.filter((p) => coreAudience(p) && inInterest(p));
-  const coreLocalInterest = corePoolBase.filter((p) => isLocalShop(p) && sameCountry(p, country));
+  const corePoolBase = shuffled.filter((p) => eligibleCore(p));
+  const coreLocalInterest = corePoolBase.filter((p) => isLocalMarket(p));
   const coreAnyInterest = corePoolBase;
 
-  // Soft core: audience match without interest (used only for core backfill, never opposite gender)
+  // Soft core: audience match without interest (apparel-style gender fill only)
   const coreAudienceOnly = shuffled.filter((p) => coreAudience(p) && !inInterest(p));
 
-  const explorePool = seededShuffle(
+  // Transverse: non-apparel outside interests (Maison/Auto/…)
+  const transverseLocal = seededShuffle(
     shuffled.filter((p) => {
-      if (isNeutral(p)) return false;
-      if (isIntlShop(p)) return true;
-      if (country && originOf(p) && originOf(p) !== country) return true;
+      if (!isLocalMarket(p)) return false;
+      if (inInterest(p)) return false;
+      if (apparelKnown && isApparel(p)) return false;
+      if (isOppositeAudience(p, audience)) return false;
+      return true;
+    }),
+    seed ^ 0x9abc,
+  );
+
+  // Explore local: out-of-interest / transverse, never opposite H/F when audience is male/female
+  const exploreLocal = seededShuffle(
+    shuffled.filter((p) => {
+      if (!isLocalMarket(p)) return false;
+      if (isOppositeAudience(p, audience)) return false;
       if (!inInterest(p) && coreAudience(p)) return true;
-      if (isOppositeAudience(p, audience)) return true;
+      if (apparelKnown && !isApparel(p) && !inInterest(p)) return true;
       return false;
     }),
     seed ^ 0x1234,
   );
 
-  const neutralPool = seededShuffle(
-    shuffled.filter((p) => isNeutral(p)),
+  const exploreIntl = seededShuffle(
+    shuffled.filter((p) => {
+      if (isOppositeAudience(p, audience)) return false;
+      return isIntlLike(p, country);
+    }),
+    seed ^ 0x2345,
+  );
+
+  // Legacy open explore when any_country (no intl cap) — still no opposite gender
+  const exploreOpen = seededShuffle(
+    shuffled.filter((p) => {
+      if (isNeutral(p)) return false;
+      if (isOppositeAudience(p, audience)) return false;
+      if (isIntlLike(p, country)) return true;
+      if (!inInterest(p) && coreAudience(p)) return true;
+      if (apparelKnown && !isApparel(p) && !inInterest(p)) return true;
+      return false;
+    }),
+    seed ^ 0x1234,
+  );
+
+  // Neutral: unisex/empty + soft transverse. Local-scoped: keep intl out of the primary pool
+  // so C cannot silently blow intl_cap (intl unisex only via capped fill below).
+  const neutralLocal = seededShuffle(
+    [
+      ...shuffled.filter((p) => isNeutral(p) && !isIntlLike(p, country)),
+      ...transverseLocal.filter((p) => !isNeutral(p)),
+    ],
     seed ^ 0x5678,
   );
+  const neutralIntl = seededShuffle(
+    shuffled.filter((p) => isNeutral(p) && isIntlLike(p, country) && !isOppositeAudience(p, audience)),
+    seed ^ 0x5679,
+  );
+  const neutralPool = localScoped ? neutralLocal : seededShuffle([...neutralLocal, ...neutralIntl], seed ^ 0x5678);
 
   const { explore: nExplore, neutral: nNeutral, city: nCity, country: nCountry, restCore, core: nCore } =
     countsForTake(take, mix, scope);
+
+  const intlCapSlots = localScoped
+    ? Math.min(nExplore + nNeutral, Math.round((take * mix.intl_cap_pct) / 100))
+    : take;
 
   const taken = new Set<string>();
   const result: T[] = [];
@@ -271,14 +384,20 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
     result.push(...pick(pool, n, taken));
   };
 
+  const intlUsed = () => result.filter((p) => isIntlLike(p, country)).length;
+  const intlRemaining = () => (localScoped ? Math.max(0, intlCapSlots - intlUsed()) : take);
+  const pushIntlCapped = (pool: T[], n: number) => {
+    if (n <= 0) return;
+    pushFrom(pool, Math.min(n, intlRemaining()));
+  };
+
   if (scope === "city") {
-    // Never inject unfiltered proxy into core — only audience+interest (or audience-only as soft fill)
-    const cityCore = cityProxy.filter((p) => coreAudience(p) && inInterest(p));
-    const countryCore = countryProxy.filter((p) => coreAudience(p) && inInterest(p));
+    const cityCore = cityProxy.filter((p) => eligibleCore(p));
+    const countryCore = countryProxy.filter((p) => eligibleCore(p));
     pushFrom(cityCore, nCity);
     if (result.length < nCity) {
       pushFrom(
-        cityProxy.filter((p) => coreAudience(p)),
+        cityProxy.filter((p) => coreAudience(p) || (apparelKnown && !isApparel(p) && inInterest(p))),
         nCity - result.length,
       );
     }
@@ -286,17 +405,44 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
     pushFrom(countryCore, nCountry);
     if (result.length < afterCity + nCountry) {
       pushFrom(
-        countryProxy.filter((p) => coreAudience(p)),
+        countryProxy.filter((p) => coreAudience(p) || (apparelKnown && !isApparel(p) && inInterest(p))),
         afterCity + nCountry - result.length,
       );
     }
     pushFrom(coreLocalInterest, restCore);
+    // Local-only core fill — never inject intl into heart when scoped
     const needCore = nCore - result.length;
-    if (needCore > 0) pushFrom(coreAnyInterest, needCore);
-    if (result.length < nCore) pushFrom(coreAudienceOnly, nCore - result.length);
+    if (needCore > 0) {
+      pushFrom(
+        coreAudienceOnly.filter((p) => isLocalMarket(p)),
+        needCore,
+      );
+    }
+    if (result.length < nCore) {
+      // Soft local fill: gendered audience OR known non-apparel (not unknown/uncategorized)
+      pushFrom(
+        localSame.filter(
+          (p) => coreAudience(p) || (apparelKnown && !isApparel(p)),
+        ),
+        nCore - result.length,
+      );
+    }
   } else if (scope === "country") {
-    pushFrom(coreLocalInterest.length ? coreLocalInterest : coreAnyInterest, nCore);
-    if (result.length < nCore) pushFrom(coreAudienceOnly, nCore - result.length);
+    pushFrom(coreLocalInterest.length ? coreLocalInterest : coreAnyInterest.filter(isLocalMarket), nCore);
+    if (result.length < nCore) {
+      pushFrom(
+        coreAudienceOnly.filter((p) => isLocalMarket(p)),
+        nCore - result.length,
+      );
+    }
+    if (result.length < nCore) {
+      pushFrom(
+        localSame.filter(
+          (p) => coreAudience(p) || (apparelKnown && !isApparel(p)),
+        ),
+        nCore - result.length,
+      );
+    }
   } else {
     const boosted = [
       ...coreAnyInterest.filter((p) => sameCountry(p, country)),
@@ -306,22 +452,70 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
     if (result.length < nCore) pushFrom(coreAudienceOnly, nCore - result.length);
   }
 
-  pushFrom(explorePool, nExplore);
-  pushFrom(neutralPool, nNeutral);
-
-  // Strict backfill: never dump opposite-gender into leftover slots after A/B/C
-  if (result.length < take) pushFrom(coreAnyInterest, take - result.length);
-  if (result.length < take) pushFrom(coreAudienceOnly, take - result.length);
-  if (result.length < take) pushFrom(explorePool, take - result.length);
-  if (result.length < take) pushFrom(neutralPool, take - result.length);
-  // Last resort: remaining catalogue excluding hard opposite gender when audience is male/female
-  if (result.length < take) {
-    const safe = shuffled.filter((p) => !isOppositeAudience(p, audience));
-    pushFrom(safe, take - result.length);
+  // Explore: local first, then intl up to remaining cap (local scope) / open explore (any_country)
+  if (localScoped) {
+    const beforeExplore = result.length;
+    pushFrom(exploreLocal, nExplore);
+    pushFrom(transverseLocal, nExplore - (result.length - beforeExplore));
+    const localExploreUsed = result.length - beforeExplore;
+    pushIntlCapped(exploreIntl, Math.max(0, nExplore - localExploreUsed));
+  } else {
+    pushFrom(exploreOpen, nExplore);
   }
-  // Never dump opposite gender for male/female; for both/any allow residual catalogue
+
+  // Neutral: local first; intl unisex only within remaining intl_cap
+  pushFrom(neutralPool, nNeutral);
+  if (localScoped && result.length < nCore + nExplore + nNeutral) {
+    const needNeutral = nCore + nExplore + nNeutral - result.length;
+    pushIntlCapped(neutralIntl, needNeutral);
+  }
+
+  // Strict backfill: local-first when scoped; never dump opposite-gender or uncapped intl
+  if (result.length < take) {
+    if (localScoped) {
+      pushFrom(coreLocalInterest, take - result.length);
+      if (result.length < take) pushFrom(exploreLocal, take - result.length);
+      if (result.length < take) pushFrom(neutralLocal, take - result.length);
+      if (result.length < take) {
+        const safeLocal = localSame.filter((p) => !isOppositeAudience(p, audience));
+        pushFrom(safeLocal, take - result.length);
+      }
+      if (result.length < take) pushIntlCapped(exploreIntl, take - result.length);
+      if (result.length < take) pushIntlCapped(neutralIntl, take - result.length);
+    } else {
+      if (result.length < take) pushFrom(coreAnyInterest, take - result.length);
+      if (result.length < take) pushFrom(coreAudienceOnly, take - result.length);
+      if (result.length < take) pushFrom(exploreOpen, take - result.length);
+      if (result.length < take) pushFrom(neutralPool, take - result.length);
+    }
+  }
+
+  if (result.length < take) {
+    if (localScoped) {
+      // Exhaust local catalogue before any uncapped residual
+      const safeLocal = shuffled.filter(
+        (p) => !isOppositeAudience(p, audience) && !isIntlLike(p, country),
+      );
+      pushFrom(safeLocal, take - result.length);
+      if (result.length < take) {
+        const safeIntl = shuffled.filter(
+          (p) => !isOppositeAudience(p, audience) && isIntlLike(p, country),
+        );
+        pushIntlCapped(safeIntl, take - result.length);
+      }
+    } else {
+      const safe = shuffled.filter((p) => !isOppositeAudience(p, audience));
+      pushFrom(safe, take - result.length);
+    }
+  }
   if (result.length < take && (audience === "both" || audience === "any" || !audience)) {
-    pushFrom(shuffled, take - result.length);
+    if (localScoped) {
+      const localRest = shuffled.filter((p) => !isIntlLike(p, country));
+      pushFrom(localRest, take - result.length);
+      if (result.length < take) pushIntlCapped(shuffled, take - result.length);
+    } else {
+      pushFrom(shuffled, take - result.length);
+    }
   }
 
   return result.slice(0, take);
