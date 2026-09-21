@@ -37,6 +37,7 @@ import {
 import { usePaymentMethods } from "@/hooks/use-payment-methods";
 import { useKycStatus } from "@/hooks/use-kyc";
 import { KycBanner } from "@/components/kyc/KycBanner";
+import { ProfileCompletionBanner } from "@/components/ProfileCompletionBanner";
 import { getColorDisplay } from "@/utils/colorName";
 import { useStorePaymentNumbers } from "@/hooks/use-store-payment-numbers";
 import { resolveOffPlatformAccess } from "@/hooks/use-vendor-off-platform-access";
@@ -2099,6 +2100,7 @@ export default function CheckoutPage() {
       <SEOHead title="Checkout" description="Finaliser votre commande Zandofy." canonical="/checkout" noindex />
       <Header />
       <main className="container py-4 md:py-10">
+        <ProfileCompletionBanner className="mb-4" />
         {/* Mobile checkout progress + back */}
         {!isDesktop && step !== "confirmation" && (
           <div className="mb-4 space-y-3">
