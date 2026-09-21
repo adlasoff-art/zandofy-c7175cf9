@@ -8,6 +8,11 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useHomeMarket } from "@/contexts/HomeMarketContext";
 import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
 import { useDiscoveryRankedProducts } from "@/hooks/use-discovery-ranked";
+import {
+  discoveryShopTypeFilter,
+  fetchWithLocalFirstBackfill,
+  prefersLocalDiscoveryScope,
+} from "@/lib/discovery-fetch";
 
 export function TopTrends() {
   const [rawProducts, setRawProducts] = useState<Product[]>([]);
@@ -15,7 +20,7 @@ export function TopTrends() {
   const [error, setError] = useState(false);
   const { t } = useI18n();
   const { shopTypeFilter } = useHomeMarket();
-  const { hasCompleted } = useDiscoveryPrefs();
+  const { prefs, hasCompleted } = useDiscoveryPrefs();
   const products = useDiscoveryRankedProducts(rawProducts, "home_trends", 12);
 
   useEffect(() => {
@@ -31,12 +36,17 @@ export function TopTrends() {
 
         if (cancelled) return;
         const trendingIds: string[] = (trending || []).map((t: any) => t.product_id);
-        const shopType = hasCompleted ? undefined : shopTypeFilter;
-        const base = { shopType } as const;
+        const shopType = discoveryShopTypeFilter(hasCompleted, prefs.purchase_scope, shopTypeFilter);
+        const localFirst = prefersLocalDiscoveryScope(hasCompleted, prefs.purchase_scope);
+        const fetchLimit = hasCompleted ? 48 : 48;
+
+        const allProducts = await fetchWithLocalFirstBackfill(
+          (st) => fetchProducts({ limit: fetchLimit, shopType: st }),
+          { shopType, preferLocalBackfill: localFirst, minCount: 12 },
+        );
+        if (cancelled) return;
 
         if (trendingIds.length > 0) {
-          const allProducts = await fetchProducts({ limit: 48, ...base });
-          if (cancelled) return;
           const trendingSet = new Set(trendingIds);
           const ordered = trendingIds
             .map((id) => allProducts.find((p) => p.id === id))
@@ -44,9 +54,7 @@ export function TopTrends() {
           const rest = allProducts.filter((p) => !trendingSet.has(p.id));
           setRawProducts([...ordered, ...rest].slice(0, 48));
         } else {
-          const data = await fetchProducts({ limit: 48, ...base });
-          if (cancelled) return;
-          setRawProducts(data);
+          setRawProducts(allProducts);
         }
       } catch (err) {
         if (cancelled) return;
@@ -59,12 +67,17 @@ export function TopTrends() {
     return () => {
       cancelled = true;
     };
-  }, [shopTypeFilter, hasCompleted]);
+  }, [shopTypeFilter, hasCompleted, prefs.purchase_scope]);
 
   const loadProducts = () => {
     setError(false);
     setLoading(true);
-    fetchProducts({ limit: 48, shopType: hasCompleted ? undefined : shopTypeFilter })
+    const shopType = discoveryShopTypeFilter(hasCompleted, prefs.purchase_scope, shopTypeFilter);
+    const localFirst = prefersLocalDiscoveryScope(hasCompleted, prefs.purchase_scope);
+    void fetchWithLocalFirstBackfill(
+      (st) => fetchProducts({ limit: 48, shopType: st }),
+      { shopType, preferLocalBackfill: localFirst, minCount: 12 },
+    )
       .then((data) => {
         setRawProducts(data);
         setLoading(false);

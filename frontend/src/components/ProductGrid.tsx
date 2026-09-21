@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { ProductRail } from "@/components/ProductRail";
@@ -17,7 +17,12 @@ import { useHomeMarket } from "@/contexts/HomeMarketContext";
 import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
 import { useAuthSettings } from "@/hooks/use-auth-settings";
 import { useAuth } from "@/contexts/AuthContext";
-import { assembleDiscoveryFeed, expandInterestCategoryIds, EMPTY_CATEGORY_TREE } from "@/lib/discovery-engine";
+import { assembleDiscoveryFeed, expandApparelCategoryIds, expandInterestCategoryIds, EMPTY_CATEGORY_TREE } from "@/lib/discovery-engine";
+import {
+  discoveryShopTypeFilter,
+  fetchWithLocalFirstBackfill,
+  prefersLocalDiscoveryScope,
+} from "@/lib/discovery-fetch";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
@@ -59,15 +64,35 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
   const { data: categoryTreeData } = useQuery({
     queryKey: ["discovery-category-tree"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("categories").select("id, parent_id").limit(2000);
+      const { data, error } = await (supabase as any)
+        .from("categories")
+        .select("id, parent_id, apparel_fields_enabled")
+        .limit(2000);
       if (error) throw error;
-      return (data || []) as { id: string; parent_id: string | null }[];
+      return (data || []) as {
+        id: string;
+        parent_id: string | null;
+        apparel_fields_enabled?: boolean | null;
+      }[];
     },
     staleTime: 10 * 60 * 1000,
     enabled: hasCompleted,
   });
   const categoryTree = categoryTreeData ?? EMPTY_CATEGORY_TREE;
-  const effectiveShopType = hasCompleted ? undefined : shopTypeFilter;
+  const apparelCategoryIds = useMemo(
+    () => expandApparelCategoryIds(categoryTree),
+    [categoryTree],
+  );
+  const interestExpanded = useMemo(
+    () => expandInterestCategoryIds(prefs.interest_category_ids, categoryTree),
+    [prefs.interest_category_ids, categoryTree],
+  );
+  const effectiveShopType = discoveryShopTypeFilter(
+    hasCompleted,
+    prefs.purchase_scope,
+    shopTypeFilter,
+  );
+  const localFirst = prefersLocalDiscoveryScope(hasCompleted, prefs.purchase_scope);
   const cached =
     restoreFromCache && market === "all" ? readProductGridCache("all") : null;
   const marketRef = useRef(market);
@@ -143,7 +168,11 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
       return;
     }
     setPopularLoading(true);
-    fetchProducts({ limit: 24, orderBy: "popular", shopType: effectiveShopType })
+    const popularLimit = hasCompleted ? 48 : 24;
+    void fetchWithLocalFirstBackfill(
+      (shopType) => fetchProducts({ limit: popularLimit, orderBy: "popular", shopType }),
+      { shopType: effectiveShopType, preferLocalBackfill: localFirst, minCount: 12 },
+    )
       .then((items) => {
         if (cancelled) return;
         const ranked =
@@ -152,10 +181,8 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
                 prefs,
                 mix: authSettings?.discovery_mix,
                 take: 12,
-                interestCategoryIds: expandInterestCategoryIds(
-                  prefs.interest_category_ids,
-                  categoryTree,
-                ),
+                interestCategoryIds: interestExpanded,
+                apparelCategoryIds,
                 surface: "home_popular",
                 seedKey: user?.id || "guest",
               })
@@ -169,7 +196,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
     return () => {
       cancelled = true;
     };
-  }, [shopTypeFilter, market, effectiveShopType, hasCompleted, prefs, authSettings?.discovery_mix, categoryTree, user?.id]);
+  }, [shopTypeFilter, market, effectiveShopType, localFirst, hasCompleted, prefs, authSettings?.discovery_mix, interestExpanded, apparelCategoryIds, user?.id]);
 
   // Load category sections (capped fan-out)
   useEffect(() => {
@@ -191,11 +218,15 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
         const cat = cats.find((c) => categoryMatchesKeys(c, target.keys));
         if (!cat) continue;
         try {
-          const data = await fetchProducts({
-            categoryId: cat.id,
-            limit: hasCompleted ? 18 : 6,
-            shopType: effectiveShopType,
-          });
+          const data = await fetchWithLocalFirstBackfill(
+            (shopType) =>
+              fetchProducts({
+                categoryId: cat.id,
+                limit: hasCompleted ? 18 : 6,
+                shopType,
+              }),
+            { shopType: effectiveShopType, preferLocalBackfill: localFirst, minCount: 6 },
+          );
           if (cancelled || data.length === 0) continue;
           const products =
             hasCompleted
@@ -203,10 +234,8 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
                   prefs,
                   mix: authSettings?.discovery_mix,
                   take: 6,
-                  interestCategoryIds: expandInterestCategoryIds(
-                    prefs.interest_category_ids,
-                    categoryTree,
-                  ),
+                  interestCategoryIds: interestExpanded,
+                  apparelCategoryIds,
                   surface: `home_cat_${cat.id}`,
                   seedKey: user?.id || "guest",
                 })
@@ -225,7 +254,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
     return () => {
       cancelled = true;
     };
-  }, [t, locale, shopTypeFilter, market, effectiveShopType, hasCompleted, prefs, authSettings?.discovery_mix, categoryTree, user?.id]);
+  }, [t, locale, shopTypeFilter, market, effectiveShopType, localFirst, hasCompleted, prefs, authSettings?.discovery_mix, interestExpanded, apparelCategoryIds, user?.id]);
 
   // Load main Tendances products when tab / market changes (session shuffle; POP uses cache)
   useEffect(() => {
@@ -253,22 +282,30 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
     setHasMore(true);
     loadingMoreRef.current = false;
 
-    const params: any = { limit: PAGE_SIZE, shopType: effectiveShopType };
+    const fetchLimit = hasCompleted ? PAGE_SIZE * 2 : PAGE_SIZE;
+    const paramsBase: any = { limit: fetchLimit };
     if (activeTab !== "all") {
-      params.trendTagId = activeTab;
+      paramsBase.trendTagId = activeTab;
     }
 
     (async () => {
       try {
-        // Mix recent + older catalogue before session shuffle (wave E)
+        // Mix recent + older catalogue before session shuffle (wave E); local-first + backfill when scoped
         const [recent, older] = await Promise.all([
-          fetchProducts(params),
+          fetchWithLocalFirstBackfill(
+            (shopType) => fetchProducts({ ...paramsBase, shopType }),
+            { shopType: effectiveShopType, preferLocalBackfill: localFirst, minCount: PAGE_SIZE },
+          ),
           activeTab === "all"
-            ? fetchProducts({
-                limit: PAGE_SIZE,
-                offset: PAGE_SIZE * 2,
-                shopType: effectiveShopType,
-              })
+            ? fetchWithLocalFirstBackfill(
+                (shopType) =>
+                  fetchProducts({
+                    limit: fetchLimit,
+                    offset: PAGE_SIZE * 2,
+                    shopType,
+                  }),
+                { shopType: effectiveShopType, preferLocalBackfill: localFirst, minCount: PAGE_SIZE },
+              )
             : Promise.resolve([] as Product[]),
         ]);
         if (cancelled) return;
@@ -287,7 +324,8 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
                 prefs,
                 mix: authSettings?.discovery_mix,
                 take: PAGE_SIZE,
-                interestCategoryIds: expandInterestCategoryIds(prefs.interest_category_ids, categoryTree),
+                interestCategoryIds: interestExpanded,
+                apparelCategoryIds,
                 surface: "home_grid",
                 seedKey: user?.id || "guest",
               })
@@ -307,7 +345,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
     return () => {
       cancelled = true;
     };
-  }, [activeTab, retryKey, effectiveShopType, market, hasCompleted, prefs, authSettings?.discovery_mix, categoryTree, user?.id]);
+  }, [activeTab, retryKey, effectiveShopType, localFirst, market, hasCompleted, prefs, authSettings?.discovery_mix, interestExpanded, apparelCategoryIds, user?.id]);
 
   // Re-tap Accueil / pull-to-refresh → reshuffle without full remount of page chrome
   useEffect(() => {
@@ -325,12 +363,15 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
 
     try {
       const totalLoaded = products.length + moreProducts.length;
-      const params: any = { limit: PAGE_SIZE, offset: totalLoaded, shopType: effectiveShopType };
-      if (activeTab !== "all") {
-        params.trendTagId = activeTab;
-      }
-
-      const data = await fetchProducts(params);
+      const loadLimit = hasCompleted ? PAGE_SIZE * 2 : PAGE_SIZE;
+      const data = await fetchWithLocalFirstBackfill(
+        (shopType) => {
+          const params: any = { limit: loadLimit, offset: totalLoaded, shopType };
+          if (activeTab !== "all") params.trendTagId = activeTab;
+          return fetchProducts(params);
+        },
+        { shopType: effectiveShopType, preferLocalBackfill: localFirst, minCount: PAGE_SIZE },
+      );
 
       const existingIds = new Set([
         ...products.map((p) => p.id),
@@ -348,15 +389,13 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
             ? assembleDiscoveryFeed(newProducts, {
                 prefs,
                 mix: authSettings?.discovery_mix,
-                take: newProducts.length,
-                interestCategoryIds: expandInterestCategoryIds(
-                  prefs.interest_category_ids,
-                  categoryTree,
-                ),
+                take: Math.min(newProducts.length, PAGE_SIZE),
+                interestCategoryIds: interestExpanded,
+                apparelCategoryIds,
                 surface: "home_grid_more",
                 seedKey: user?.id || "guest",
               })
-            : newProducts;
+            : newProducts.slice(0, PAGE_SIZE);
         setMoreProducts((prev) => [...prev, ...rankedNew]);
       }
     } catch (err) {
@@ -365,7 +404,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [hasMore, products, moreProducts, activeTab, effectiveShopType, hasCompleted, prefs, authSettings?.discovery_mix, categoryTree, user?.id]);
+  }, [hasMore, products, moreProducts, activeTab, effectiveShopType, localFirst, hasCompleted, prefs, authSettings?.discovery_mix, interestExpanded, apparelCategoryIds, user?.id]);
 
   // Infinite scroll sentinel (replaces "Voir plus" click). Fallback button if IO missing.
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
