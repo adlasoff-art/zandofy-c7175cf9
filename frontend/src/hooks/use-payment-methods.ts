@@ -11,6 +11,8 @@ export interface PaymentMethodsConfig {
   stripe: boolean;
   cod: boolean;
   off_platform: boolean;
+  /** WhatsApp checkout payment — default OFF until admin enables */
+  whatsapp: boolean;
   paypal: boolean;
   stripe_notice_enabled?: boolean;
   stripe_notice_text?: string;
@@ -22,6 +24,7 @@ const DEFAULT_CONFIG: PaymentMethodsConfig = {
   stripe: true,
   cod: true,
   off_platform: true,
+  whatsapp: false,
   paypal: true,
   stripe_notice_enabled: false,
   stripe_notice_text: "Pour l'instant, ce moyen de paiement n'est pas actif.",
@@ -45,6 +48,8 @@ export function usePaymentMethods() {
           stripe: cardEnabled,
           cod: v.cod === true,
           off_platform: v.off_platform === true,
+          // Fail closed: only when explicitly true
+          whatsapp: v.whatsapp === true,
           paypal: v.paypal !== false,
           stripe_notice_enabled: !!v.stripe_notice_enabled,
           stripe_notice_text: v.stripe_notice_text || DEFAULT_CONFIG.stripe_notice_text,

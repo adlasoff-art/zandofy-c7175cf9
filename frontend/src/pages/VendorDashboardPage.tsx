@@ -1241,8 +1241,9 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
             Numéro WhatsApp Business
           </label>
           <p className="text-xs text-muted-foreground mb-2">
-            Renseignez votre numéro WhatsApp Business (avec indicatif pays, ex: +243812345678). 
-            Les clients seront redirigés vers votre WhatsApp Business lorsqu'ils cliquent sur le bouton WhatsApp.
+            Renseignez votre numéro WhatsApp Business (avec indicatif pays, ex: +243812345678).
+            Requis pour le paiement WhatsApp au checkout (si activé par l&apos;admin) et pour le contact clients.
+            Les clients seront redirigés vers ce numéro avec le récépissé de commande.
           </p>
           <input
             type="tel"

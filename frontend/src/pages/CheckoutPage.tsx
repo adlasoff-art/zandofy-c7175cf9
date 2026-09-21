@@ -32,7 +32,7 @@ import { useI18n } from "@/contexts/I18nContext";
 import {
   CreditCard, Smartphone, Truck, ChevronRight, Check, ShieldCheck,
   ArrowLeft, Package, MapPin, Banknote, Tag, Plus, Trash2, Home, Briefcase, X, Loader2, Coins, Upload,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, MessageCircle,
 } from "lucide-react";
 import { usePaymentMethods } from "@/hooks/use-payment-methods";
 import { useKycStatus } from "@/hooks/use-kyc";
@@ -50,9 +50,12 @@ import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
 import { trackDiscoveryOnboarding } from "@/hooks/use-analytics";
 import { resolveMomoGateway, discoveryPrefToCheckoutMethod } from "@/lib/payment-gateways";
 import { usePaymentGateways } from "@/hooks/use-payment-gateways";
+import { isDeferredVendorPaymentMethod } from "@/lib/off-platform-payment";
+import { buildWhatsAppOrderReceiptMessage } from "@/lib/whatsapp-order-receipt";
+import { openStoreWhatsApp } from "@/lib/whatsapp";
 
 type Step = "shipping" | "payment" | "confirmation";
-type PaymentMethod = "stripe" | "card" | "paypal" | "mobile_money" | "cod" | "off_platform";
+type PaymentMethod = "stripe" | "card" | "paypal" | "mobile_money" | "cod" | "off_platform" | "whatsapp";
 
 interface ShippingInfo {
   firstName: string;
@@ -116,7 +119,7 @@ export default function CheckoutPage() {
   const [resendingConfirm, setResendingConfirm] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { t, formatPrice } = useI18n();
+  const { t, formatPrice, locale } = useI18n();
   const { data: paymentConfig, isFetched: paymentConfigFetched } = usePaymentMethods();
   const { isVerified: isKycVerified, isOrderBlocked, needsKyc, kycStatus, isKycReady } = useKycStatus();
   const { data: homeDeliveryEnabled = false } = useHomeDeliveryEnabled();
@@ -171,9 +174,13 @@ export default function CheckoutPage() {
   const [paymentOrderIds, setPaymentOrderIds] = useState<string[]>([]);
    const [vendorCodAllowed, setVendorCodAllowed] = useState(false);
    const [vendorOffPlatformAllowed, setVendorOffPlatformAllowed] = useState(false);
+   const [vendorWhatsappAllowed, setVendorWhatsappAllowed] = useState(false);
    const [vendorMobileMoneyAllowed, setVendorMobileMoneyAllowed] = useState(true);
    const [vendorCardAllowed, setVendorCardAllowed] = useState(true);
    const [cartStoreIds, setCartStoreIds] = useState<string[]>([]);
+   const [whatsappFollowUps, setWhatsappFollowUps] = useState<
+     Array<{ storeId: string; orderRef: string; orderId: string; receiptMessage: string }>
+   >([]);
   const paymentChannelRef = useRef<any>(null);
   const paymentWatchRef = useRef<MoMoPaymentWatchHandle | null>(null);
   const { data: paymentNumbers = [] } = useStorePaymentNumbers(cartStoreIds);
@@ -416,6 +423,7 @@ export default function CheckoutPage() {
       if (productIds.length === 0) {
         setVendorCodAllowed(false);
         setVendorOffPlatformAllowed(false);
+        setVendorWhatsappAllowed(false);
         setVendorMobileMoneyAllowed(true);
         setVendorCardAllowed(true);
         setCartStoreIds([]);
@@ -429,6 +437,7 @@ export default function CheckoutPage() {
       if (storeIds.length === 0) {
         setVendorCodAllowed(false);
         setVendorOffPlatformAllowed(false);
+        setVendorWhatsappAllowed(false);
         setVendorMobileMoneyAllowed(true);
         setVendorCardAllowed(true);
         setVendorFlagsReady(true);
@@ -442,9 +451,10 @@ export default function CheckoutPage() {
       );
       if (flagsErr) {
         console.warn("[checkout] get_checkout_vendor_payment_flags:", flagsErr.message);
-        // Fail closed on COD / off-platform; fail open on platform MoMo/card (historical defaults)
+        // Fail closed on COD / off-platform / whatsapp; fail open on platform MoMo/card (historical defaults)
         setVendorCodAllowed(false);
         setVendorOffPlatformAllowed(false);
+        setVendorWhatsappAllowed(false);
         setVendorMobileMoneyAllowed(true);
         setVendorCardAllowed(true);
         setVendorFlagsReady(true);
@@ -457,6 +467,7 @@ export default function CheckoutPage() {
         vendor_off_platform_enabled: boolean;
         vendor_mobile_money_enabled: boolean;
         vendor_card_enabled: boolean;
+        vendor_whatsapp_enabled?: boolean;
       }>;
       const byStore = new Map(flags.map((f) => [f.store_id, f]));
 
@@ -478,6 +489,32 @@ export default function CheckoutPage() {
       } else {
         const accessResults = await Promise.all(storeIds.map((id) => resolveOffPlatformAccess(id)));
         setVendorOffPlatformAllowed(accessResults.every((a) => a.allowed));
+      }
+
+      // WhatsApp: override flag from RPC + server eligibility (number + sub)
+      const waFlagsOk = storeIds.every(
+        (id) => byStore.get(id)?.vendor_whatsapp_enabled === true,
+      );
+      if (!waFlagsOk) {
+        setVendorWhatsappAllowed(false);
+      } else {
+        const { data: waRows, error: waErr } = await (supabase as any).rpc(
+          "get_checkout_whatsapp_allowed",
+          { p_store_ids: storeIds },
+        );
+        if (waErr) {
+          console.warn("[checkout] get_checkout_whatsapp_allowed:", waErr.message);
+          // Fallback: if RPC missing (migration not applied), require flag only + fail closed on number via EF later
+          setVendorWhatsappAllowed(false);
+        } else {
+          const waByStore = new Map(
+            ((waRows || []) as Array<{ store_id: string; allowed: boolean }>).map((r) => [
+              r.store_id,
+              r.allowed === true,
+            ]),
+          );
+          setVendorWhatsappAllowed(storeIds.every((id) => waByStore.get(id) === true));
+        }
       }
       setVendorFlagsReady(true);
     };
@@ -606,7 +643,7 @@ export default function CheckoutPage() {
 
   // Wallet credit only for online payment methods
   useEffect(() => {
-    if (paymentMethod === "cod" || paymentMethod === "off_platform") {
+    if (paymentMethod === "cod" || isDeferredVendorPaymentMethod(paymentMethod)) {
       setUseWalletCredit(false);
     }
   }, [paymentMethod]);
@@ -778,14 +815,28 @@ export default function CheckoutPage() {
       { id: "paypal" as const, label: "PayPal", sub: "Paiement via votre compte PayPal", icon: <CreditCard size={20} />, configKey: "paypal" as const },
       { id: "cod" as const, label: t("checkout.cashOnDelivery"), sub: isKycVerified ? "Cash on Delivery" : "KYC requis", icon: <Banknote size={20} />, configKey: "cod" as const },
       { id: "off_platform" as const, label: "Paiement hors plateforme", sub: "Transfert direct, puis envoyez la preuve", icon: <Banknote size={20} />, configKey: "off_platform" as const },
+      {
+        id: "whatsapp" as const,
+        label: t("checkout.whatsapp") || "WhatsApp",
+        sub: t("checkout.whatsappSub") || "Commande au vendeur, confirmation ensuite",
+        icon: <MessageCircle size={20} />,
+        configKey: "whatsapp" as const,
+      },
     ];
     return all
-      .filter((m) => (m.id === "card" ? paymentConfig?.stripe !== false : m.id === "paypal" ? (paymentConfig as any)?.paypal !== false : m.id === "off_platform" ? (paymentConfig as any)?.off_platform !== false : paymentConfig?.[m.configKey] !== false))
+      .filter((m) => {
+        if (m.id === "card") return paymentConfig?.stripe !== false;
+        if (m.id === "paypal") return (paymentConfig as any)?.paypal !== false;
+        if (m.id === "off_platform") return (paymentConfig as any)?.off_platform !== false;
+        if (m.id === "whatsapp") return (paymentConfig as any)?.whatsapp === true;
+        return paymentConfig?.[m.configKey] !== false;
+      })
       .filter((m) => m.id !== "cod" || (isKycVerified && vendorCodAllowed))
       .filter((m) => m.id !== "off_platform" || vendorOffPlatformAllowed)
+      .filter((m) => m.id !== "whatsapp" || vendorWhatsappAllowed)
       .filter((m) => m.id !== "mobile_money" || vendorMobileMoneyAllowed)
       .filter((m) => m.id !== "card" || vendorCardAllowed);
-  }, [t, paymentConfig, isKycVerified, vendorCodAllowed, vendorOffPlatformAllowed, vendorMobileMoneyAllowed, vendorCardAllowed]);
+  }, [t, paymentConfig, isKycVerified, vendorCodAllowed, vendorOffPlatformAllowed, vendorWhatsappAllowed, vendorMobileMoneyAllowed, vendorCardAllowed]);
 
   const primaryPaymentMethod = useMemo(
     () => availablePaymentMethods.find((m) => m.id === "mobile_money") ?? availablePaymentMethods[0] ?? null,
@@ -1202,6 +1253,13 @@ export default function CheckoutPage() {
     });
 
     const createdOrderIds: string[] = [];
+    const createdOrderMeta: Array<{
+      orderId: string;
+      storeId: string;
+      orderRef: string;
+      lines: Array<{ name: string; quantity: number; variant?: string | null; unitPrice?: number }>;
+      total: number;
+    }> = [];
     const storeEntries = [...storeGroups.entries()];
     const needsSuffix = storeEntries.length > 1;
 
@@ -1297,9 +1355,9 @@ export default function CheckoutPage() {
       const orderDiscount = preciseRound(discountAmount * ratio, 2);
       const orderPointsDiscount = preciseRound(pointsDiscount * ratio, 2);
       
-      // Off-platform: ONLY product amount is charged. Shipping & delivery are always deferred.
-      const isOffPlatform = paymentMethod === "off_platform";
-      const effectiveShip = (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform) ? 0 : orderShippingCost;
+      // Deferred vendor payment (off_platform / whatsapp): product only; shipping deferred.
+      const isDeferredVendorPay = isDeferredVendorPaymentMethod(paymentMethod);
+      const effectiveShip = (shippingPaymentChoice === "pay_on_arrival" || isDeferredVendorPay) ? 0 : orderShippingCost;
       const orderTotal = Math.max(0, preciseRound(orderSubtotal - orderDiscount - orderPointsDiscount + effectiveShip, 2));
       
       // Unique order_ref per sub-order (suffix A, B, C...)
@@ -1311,7 +1369,7 @@ export default function CheckoutPage() {
           user_id: user!.id,
           store_id: storeId !== "default" ? storeId : null,
           origin_country: orderOriginCountry,
-          // Toute commande dont le paiement est asynchrone (webhook ou validation hors plateforme)
+          // Toute commande dont le paiement est asynchrone (webhook ou validation hors plateforme / WhatsApp)
           // commence en `awaiting_payment` — elle n'est PAS encore une commande à notifier.
           // Seul COD (cash à la livraison) commence en `pending` car il n'y a aucun paiement à attendre.
           status:
@@ -1319,7 +1377,7 @@ export default function CheckoutPage() {
               paymentMethod === "card" ||
               paymentMethod === "paypal" ||
               paymentMethod === "stripe" ||
-              paymentMethod === "off_platform")
+              isDeferredVendorPay)
               ? "awaiting_payment"
               : "pending",
           payment_method: paymentMethod,
@@ -1345,7 +1403,7 @@ export default function CheckoutPage() {
           // En attendant : "unpaid" pour les paiements asynchrones, "paid" pour COD/cash où la commande
           // n'attend pas de webhook (la livraison est facturée à l'arrivée).
           shipping_payment_status:
-            (shippingPaymentChoice === "pay_on_arrival" || isOffPlatform)
+            (shippingPaymentChoice === "pay_on_arrival" || isDeferredVendorPay)
               ? "deferred"
               : (paymentMethod === "mobile_money" || paymentMethod === "card" || paymentMethod === "paypal" || paymentMethod === "stripe")
                 ? "unpaid"
@@ -1374,10 +1432,10 @@ export default function CheckoutPage() {
             deliveryOption === "home_delivery" && selectedOperator
               ? new Date(Date.now() + 30 * 60 * 1000).toISOString()
               : null,
-          last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isOffPlatform ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
+          last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isDeferredVendorPay ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
           last_mile_payment_status:
             deliveryOption === "home_delivery" && lastMileFee > 0
-              ? (isOffPlatform
+              ? (isDeferredVendorPay
                   ? "deferred"
                   : (lastMilePayment === "pay_with_shipping"
                       ? ((paymentMethod === "mobile_money" || paymentMethod === "card" || paymentMethod === "paypal" || paymentMethod === "stripe")
@@ -1398,6 +1456,20 @@ export default function CheckoutPage() {
 
       if (!orderErr && order) {
         createdOrderIds.push(order.id);
+        if (storeId !== "default") {
+          createdOrderMeta.push({
+            orderId: order.id,
+            storeId,
+            orderRef,
+            lines: storeItems.map((i) => ({
+              name: i.nameFr || i.name,
+              quantity: i.quantity,
+              variant: [i.color, i.size].filter(Boolean).join(" / ") || null,
+              unitPrice: i.price,
+            })),
+            total: orderSubtotal,
+          });
+        }
         await supabase.from("order_items").insert(
           storeItems.map((item) => ({
             order_id: order.id,
@@ -1480,7 +1552,7 @@ export default function CheckoutPage() {
       }
     }
 
-    return { orderRef: baseRef, orderIds: createdOrderIds };
+    return { orderRef: baseRef, orderIds: createdOrderIds, orders: createdOrderMeta };
   };
 
   const handlePayment = async () => {
@@ -1500,6 +1572,39 @@ export default function CheckoutPage() {
       });
       return;
     }
+
+    // Defense in depth: re-verify WhatsApp eligibility at submit (fail closed)
+    if (paymentMethod === "whatsapp") {
+      if (!vendorWhatsappAllowed || cartStoreIds.length === 0) {
+        toast({
+          title: "WhatsApp indisponible",
+          description: "Ce panier n’est plus éligible au paiement WhatsApp. Choisissez un autre moyen.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const { data: waRows, error: waErr } = await (supabase as any).rpc("get_checkout_whatsapp_allowed", {
+        p_store_ids: cartStoreIds,
+      });
+      if (
+        waErr ||
+        !cartStoreIds.every((id) =>
+          ((waRows || []) as Array<{ store_id: string; allowed: boolean }>).some(
+            (r) => r.store_id === id && r.allowed === true,
+          ),
+        )
+      ) {
+        toast({
+          title: "WhatsApp indisponible",
+          description:
+            "Le vendeur n’accepte plus WhatsApp pour le moment (numéro ou autorisation manquants).",
+          variant: "destructive",
+        });
+        setVendorWhatsappAllowed(false);
+        return;
+      }
+    }
+
     setProcessing(true);
 
     const debitWalletForOrder = async (orderIds: string[]): Promise<number> => {
@@ -1733,18 +1838,81 @@ export default function CheckoutPage() {
         setProcessing(false);
       }
     } else {
-      // COD, off_platform — never apply wallet credit
+      // COD, off_platform, whatsapp — never apply wallet credit
       setUseWalletCredit(false);
-      await new Promise(r => setTimeout(r, 1500));
-      const { orderRef } = await createOrderForPayment();
-      setOrderId(orderRef);
-      await removeSelectedItems();
-      goToStep("confirmation");
-      setProcessing(false);
-      if (paymentMethod === "off_platform") {
-        toast({ title: "Commande enregistrée", description: `N° ${orderRef} — Uploadez obligatoirement votre preuve de paiement depuis votre espace client (validation vendeur).` });
-      } else {
-        toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
+      try {
+        await new Promise((r) => setTimeout(r, 1500));
+        const { orderRef, orderIds, orders: waOrders } = await createOrderForPayment();
+        if (!orderIds.length) {
+          toast({
+            title: "Erreur",
+            description: "Impossible de créer la commande.",
+            variant: "destructive",
+          });
+          setProcessing(false);
+          return;
+        }
+        setOrderId(orderRef);
+        // Snapshot receipt messages BEFORE clearing cart
+        if (paymentMethod === "whatsapp") {
+          const followUps = (waOrders || []).map((o) => {
+            const receiptMessage = buildWhatsAppOrderReceiptMessage({
+              orderRef: o.orderRef || orderRef,
+              lines: o.lines || [],
+              total: o.total ?? 0,
+              customerPhone: shipping.phone,
+              customerName: [shipping.firstName, shipping.lastName].filter(Boolean).join(" "),
+              dashboardUrl: `${window.location.origin}/dashboard?tab=orders`,
+              locale: locale === "en" ? "en" : "fr",
+            });
+            return {
+              storeId: o.storeId,
+              orderRef: o.orderRef,
+              orderId: o.orderId,
+              receiptMessage,
+            };
+          });
+          setWhatsappFollowUps(followUps);
+          const first = followUps[0];
+          if (first?.storeId) {
+            void openStoreWhatsApp(first.storeId, first.receiptMessage).then((r) => {
+              trackDiscoveryOnboarding(
+                r.ok ? "checkout_whatsapp_redirect_ok" : "checkout_whatsapp_redirect_fail",
+                { store_id: first.storeId, order_ref: first.orderRef },
+                user?.id,
+              );
+            });
+          }
+          trackDiscoveryOnboarding("checkout_whatsapp_order_created", { order_ref: orderRef }, user?.id);
+        } else {
+          setWhatsappFollowUps([]);
+        }
+        await removeSelectedItems();
+        goToStep("confirmation");
+        setProcessing(false);
+        if (paymentMethod === "off_platform") {
+          toast({
+            title: "Commande enregistrée",
+            description: `N° ${orderRef} — Uploadez obligatoirement votre preuve de paiement depuis votre espace client (validation vendeur).`,
+          });
+        } else if (paymentMethod === "whatsapp") {
+          toast({
+            title: t("checkout.whatsappRegistered") || "Commande enregistrée",
+            description:
+              t("checkout.whatsappRegisteredDesc") ||
+              `N° ${orderRef} — Finalisez avec le vendeur sur WhatsApp (confirmation ensuite).`,
+          });
+        } else {
+          toast({ title: t("checkout.orderConfirmed"), description: `N° ${orderRef}` });
+        }
+      } catch (err: any) {
+        console.error("[checkout deferred]", err);
+        toast({
+          title: "Erreur",
+          description: err?.message || "Impossible de créer la commande.",
+          variant: "destructive",
+        });
+        setProcessing(false);
       }
     }
   };
@@ -2072,7 +2240,12 @@ export default function CheckoutPage() {
       key={method.id}
       type="button"
       disabled={method.id === "card" && paymentConfig?.stripe === false}
-      onClick={() => setPaymentMethod(method.id)}
+      onClick={() => {
+        setPaymentMethod(method.id);
+        if (method.id === "whatsapp") {
+          trackDiscoveryOnboarding("checkout_whatsapp_selected", {}, user?.id);
+        }
+      }}
       className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-all text-left min-h-[44px] ${
         method.id === "card" && paymentConfig?.stripe === false
           ? "border-border bg-muted/40 opacity-60 cursor-not-allowed"
@@ -2744,6 +2917,19 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                {paymentMethod === "whatsapp" && (
+                  <div className="pt-2 border-t border-border space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      {t("checkout.amountDue") || "Montant à payer"} :{" "}
+                      <strong className="text-foreground">{formatPrice(total)}</strong>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("checkout.whatsappHint") ||
+                        "En commandant, votre commande est enregistrée sur Zandofy et un récépissé s’ouvre sur WhatsApp pour le vendeur. Le paiement sera confirmé ensuite."}
+                    </p>
+                  </div>
+                )}
+
                 {paymentMethod === "off_platform" && (
                   <div className="pt-2 border-t border-border space-y-3">
                     <p className="text-sm text-muted-foreground">
@@ -2863,7 +3049,9 @@ export default function CheckoutPage() {
                   <Check size={32} className="text-primary" />
                 </div>
                 <h2 className="text-2xl font-bold text-foreground">
-                  {paymentMethod === "off_platform" ? "Commande enregistrée" : t("checkout.orderConfirmed")}
+                  {isDeferredVendorPaymentMethod(paymentMethod)
+                    ? t("checkout.orderRegistered") || "Commande enregistrée"
+                    : t("checkout.orderConfirmed")}
                 </h2>
                 <p className="text-muted-foreground">
                   {t("checkout.orderRef")} : <span className="font-bold text-foreground">{orderId}</span>
@@ -2879,14 +3067,48 @@ export default function CheckoutPage() {
                     </p>
                   </div>
                 )}
+                {paymentMethod === "whatsapp" && (
+                  <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-lg p-4 text-left space-y-3">
+                    <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                      {t("checkout.whatsappPendingTitle") || "Commande reçue — confirmation WhatsApp"}
+                    </p>
+                    <p className="text-xs text-emerald-800/90 dark:text-emerald-400">
+                      {t("checkout.whatsappPendingDesc") ||
+                        "Votre commande est enregistrée mais pas encore payée/validée. Échangez avec le vendeur sur WhatsApp pour finaliser. Vous pouvez aussi uploader une preuve depuis votre espace client."}
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {(whatsappFollowUps.length > 0 ? whatsappFollowUps : []).map((fu) => (
+                        <Button
+                          key={fu.orderId}
+                          type="button"
+                          variant="outline"
+                          className="w-full gap-2 border-emerald-300"
+                          onClick={() => {
+                            void openStoreWhatsApp(fu.storeId, fu.receiptMessage);
+                          }}
+                        >
+                          <MessageCircle size={14} />
+                          {t("checkout.openWhatsApp") || "Ouvrir WhatsApp"}
+                          {whatsappFollowUps.length > 1 ? ` (${fu.orderRef})` : ""}
+                        </Button>
+                      ))}
+                      {whatsappFollowUps.length === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {t("checkout.whatsappRetryLater") ||
+                            "Rouvrir WhatsApp depuis votre tableau de bord si besoin."}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {appliedCoupon && (
                   <p className="text-sm text-primary font-medium">
                     {t("checkout.promoCode")} {appliedCoupon.code} — -{formatPrice(discountAmount)}
                   </p>
                 )}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-                  {paymentMethod === "off_platform" ? (
-                    <Link to="/dashboard"><Button className="gap-2"><Upload size={14} /> Terminer ma commande</Button></Link>
+                  {isDeferredVendorPaymentMethod(paymentMethod) ? (
+                    <Link to="/dashboard"><Button className="gap-2"><Upload size={14} /> {t("checkout.finishOrder") || "Terminer ma commande"}</Button></Link>
                   ) : (
                     <Link to="/"><Button>{t("checkout.backHome")}</Button></Link>
                   )}

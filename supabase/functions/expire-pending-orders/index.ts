@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     //  - Mobile Money : 6 min  (3 min KelPay + 3 min de grâce — comportement historique)
     //  - Carte / PayPal / Stripe : 15 min (le client doit saisir ses infos sur la
     //    passerelle Mastercard/Keccel, ça prend plus de temps qu'un push USSD)
-    //  - off_platform : 24 h  (validation manuelle vendeur — ne pas expirer agressivement)
+    //  - off_platform / whatsapp : 24 h  (validation manuelle vendeur)
     const now = Date.now();
     const cutoffMM = new Date(now - 6 * 60 * 1000).toISOString();
     const cutoffCard = new Date(now - 15 * 60 * 1000).toISOString();
@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       .or(
         `and(payment_method.eq.mobile_money,created_at.lt.${cutoffMM}),` +
         `and(payment_method.in.(card,paypal,stripe),created_at.lt.${cutoffCard}),` +
-        `and(payment_method.eq.off_platform,created_at.lt.${cutoffOffPlatform})`
+        `and(payment_method.in.(off_platform,whatsapp),created_at.lt.${cutoffOffPlatform})`
       );
 
     if (selectError) {

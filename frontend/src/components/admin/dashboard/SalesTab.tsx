@@ -106,7 +106,7 @@ export function SalesTab({ period, geoFilters }: Props) {
       map[method] = (map[method] || 0) + 1;
     });
     return Object.entries(map).map(([name, value]) => ({
-      name: name === "stripe" || name === "card" ? "Carte (Keccel)" : name === "mobile_money" ? "Mobile Money" : name === "cod" ? "Paiement à la livraison" : name === "off_platform" ? "Hors plateforme" : name === "paypal" ? "PayPal" : name,
+      name: name === "stripe" || name === "card" ? "Carte (Keccel)" : name === "mobile_money" ? "Mobile Money" : name === "cod" ? "Paiement à la livraison" : name === "off_platform" ? "Hors plateforme" : name === "whatsapp" ? "WhatsApp" : name === "paypal" ? "PayPal" : name,
       value,
     }));
   }, [orders]);

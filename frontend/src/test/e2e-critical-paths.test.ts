@@ -453,10 +453,15 @@ describe("Product PDP helpers", () => {
 });
 
 describe("Off-platform dual validation", () => {
-  it("vendor filter includes only off_platform awaiting_payment", async () => {
-    const { VENDOR_ORDERS_OR_FILTER } = await import("@/lib/off-platform-payment");
-    expect(VENDOR_ORDERS_OR_FILTER).toContain("payment_method.eq.off_platform");
+  it("vendor filter includes deferred vendor payments awaiting_payment", async () => {
+    const { VENDOR_ORDERS_OR_FILTER, isDeferredVendorPaymentMethod } = await import(
+      "@/lib/off-platform-payment"
+    );
+    expect(VENDOR_ORDERS_OR_FILTER).toContain("payment_method.in.(off_platform,whatsapp)");
     expect(VENDOR_ORDERS_OR_FILTER).toContain("status.not.in.(awaiting_payment,payment_failed)");
+    expect(isDeferredVendorPaymentMethod("whatsapp")).toBe(true);
+    expect(isDeferredVendorPaymentMethod("off_platform")).toBe(true);
+    expect(isDeferredVendorPaymentMethod("mobile_money")).toBe(false);
   });
 
   it("detects admin release queue after vendor verified", async () => {

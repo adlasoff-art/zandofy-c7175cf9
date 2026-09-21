@@ -1,11 +1,25 @@
-/** PostgREST filter: inclure off_platform + awaiting_payment, exclure les autres awaiting_payment. */
+/** Deferred vendor-collected payments: off_platform + whatsapp (same confirmation pipeline). */
+
+export const DEFERRED_VENDOR_PAYMENT_METHODS = ["off_platform", "whatsapp"] as const;
+export type DeferredVendorPaymentMethod = (typeof DEFERRED_VENDOR_PAYMENT_METHODS)[number];
+
+export function isDeferredVendorPaymentMethod(
+  method: string | null | undefined,
+): method is DeferredVendorPaymentMethod {
+  return method === "off_platform" || method === "whatsapp";
+}
+
+/**
+ * PostgREST OR filter: include deferred vendor payments that are awaiting_payment,
+ * exclude other awaiting_payment (MoMo/card in flight).
+ */
 export const VENDOR_ORDERS_OR_FILTER =
-  "and(status.eq.awaiting_payment,payment_method.eq.off_platform),status.not.in.(awaiting_payment,payment_failed)";
+  "and(status.eq.awaiting_payment,payment_method.in.(off_platform,whatsapp)),status.not.in.(awaiting_payment,payment_failed)";
 
 export type OffPlatformOrderFields = {
   payment_method?: string | null;
   status?: string;
-  /** Preuve paiement produit (hors plateforme). */
+  /** Preuve paiement produit (hors plateforme / WhatsApp). */
   product_payment_proof_url?: string | null;
   /** Preuve expédition différée (ne pas confondre avec produit). */
   shipping_payment_proof_url?: string | null;
@@ -29,8 +43,13 @@ export function hasOffPlatformPaymentProof(order: OffPlatformOrderFields): boole
   return !!offPlatformProductProofUrl(order);
 }
 
+/** @deprecated Prefer isDeferredVendorAwaitingPayment — kept for callers. */
 export function isOffPlatformAwaitingPayment(order: OffPlatformOrderFields): boolean {
-  return order.payment_method === "off_platform" && order.status === "awaiting_payment";
+  return isDeferredVendorAwaitingPayment(order);
+}
+
+export function isDeferredVendorAwaitingPayment(order: OffPlatformOrderFields): boolean {
+  return isDeferredVendorPaymentMethod(order.payment_method) && order.status === "awaiting_payment";
 }
 
 /**
@@ -43,7 +62,7 @@ export function isOffPlatformAwaitingAdminRelease(
   isPlatformOwned?: boolean | null,
 ): boolean {
   const base =
-    isOffPlatformAwaitingPayment(order) &&
+    isDeferredVendorAwaitingPayment(order) &&
     !!order.off_platform_vendor_verified_at &&
     !order.off_platform_admin_released_at;
   if (!base) return false;
@@ -51,9 +70,9 @@ export function isOffPlatformAwaitingAdminRelease(
   return isPlatformOwnedStore(isPlatformOwned);
 }
 
-/** Bloque les pastilles STATUS_FLOW tant que le paiement hors plateforme n'est pas tranché. */
+/** Bloque les pastilles STATUS_FLOW tant que le paiement différé n'est pas tranché. */
 export function blocksAdminStatusPillsForOffPlatform(order: OffPlatformOrderFields): boolean {
-  return isOffPlatformAwaitingPayment(order);
+  return isDeferredVendorAwaitingPayment(order);
 }
 
 export function canAdminReleaseOffPlatform(
@@ -63,7 +82,7 @@ export function canAdminReleaseOffPlatform(
 ): boolean {
   // Défense en profondeur : jamais de libération admin sur boutique vendeur autonome.
   if (isPlatformOwned !== undefined && !isPlatformOwnedStore(isPlatformOwned)) return false;
-  if (!isOffPlatformAwaitingPayment(order)) return false;
+  if (!isDeferredVendorAwaitingPayment(order)) return false;
   if (order.off_platform_admin_released_at) return false;
   if (!hasOffPlatformPaymentProof(order)) return false;
   if (order.off_platform_vendor_verified_at) return true;
@@ -72,7 +91,7 @@ export function canAdminReleaseOffPlatform(
 
 /**
  * Ne marquer l'expédition payée que si elle était encore "unpaid".
- * Les commandes hors plateforme partent en "deferred" au checkout — ne pas écraser.
+ * Les commandes hors plateforme / WhatsApp partent en "deferred" au checkout — ne pas écraser.
  * Statuts absents / null / deferred / paid → aucun patch (forward-safe).
  */
 export function shippingStatusPatchForOffPlatformConfirm(
@@ -134,4 +153,10 @@ export function vendorOffPlatformVerifyOnlyUpdates(now: string, userId: string) 
     off_platform_vendor_verified_at: now,
     off_platform_vendor_verified_by: userId,
   };
+}
+
+export function deferredPaymentMethodLabel(method: string | null | undefined): string {
+  if (method === "whatsapp") return "WhatsApp";
+  if (method === "off_platform") return "Hors plateforme";
+  return method || "";
 }

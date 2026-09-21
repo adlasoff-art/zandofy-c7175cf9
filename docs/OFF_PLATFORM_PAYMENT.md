@@ -1,11 +1,30 @@
-# Paiement hors plateforme (`off_platform`)
+# Paiement hors plateforme (`off_platform`) et WhatsApp (`whatsapp`)
 
-## Parcours client
+Les deux modes partagent le **même pipeline de confirmation** (preuve client → validation vendeur → libération admin pour boutiques plateforme).  
+Le helper `isDeferredVendorPaymentMethod` / `isDeferredVendorAwaitingPayment` dans `frontend/src/lib/off-platform-payment.ts` couvre les deux.
+
+## Différence UX
+
+| | `off_platform` | `whatsapp` |
+|--|----------------|------------|
+| Checkout | Affiche numéros vendeur + upload preuve | Enregistre commande + ouvre WhatsApp avec récépissé |
+| Confirmation | Dashboard preuve obligatoire | CTA « Ouvrir WhatsApp » + preuve optionnelle/recommandée |
+| Expiration | 24 h (`expire-pending-orders`) | 24 h (même règle) |
+
+## Parcours client (`off_platform`)
 
 1. Checkout avec mode **Paiement hors plateforme**.
 2. Commande créée en statut `awaiting_payment`.
 3. Client paie le vendeur hors site (Mobile Money, virement, etc.).
 4. Client uploade la preuve depuis **Dashboard** → détail commande.
+
+## Parcours client (`whatsapp`)
+
+1. Checkout avec mode **WhatsApp** (si boutique éligible : flag admin + n° WA + abonnement).
+2. Commande créée en `awaiting_payment`, `payment_method=whatsapp`.
+3. Redirection `wa.me` avec récépissé (réf, articles, total, téléphone client).
+4. Finalisation 1:1 vendeur ; preuve uploadable depuis le dashboard comme hors plateforme.
+5. Dashboard : CTA « Rouvrir WhatsApp » reconstruit le récépissé depuis les lignes commande.
 
 ## Double validation (vendeur puis admin)
 
@@ -16,8 +35,8 @@ sequenceDiagram
   participant Admin
   participant DB as orders
 
-  Client->>DB: checkout off_platform awaiting_payment
-  Client->>DB: shipping_payment_proof_url
+  Client->>DB: checkout off_platform_or_whatsapp awaiting_payment
+  Client->>DB: product_payment_proof_url
   Vendeur->>DB: off_platform_vendor_verified_at
   Note over Vendeur,Admin: statut reste awaiting_payment
   Admin->>DB: status pending + shipping_payment_status paid

@@ -24,8 +24,10 @@ import { withOptionalOrderFields } from "@/lib/order-query";
 import {
   VENDOR_ORDERS_OR_FILTER,
   hasOffPlatformPaymentProof,
+  isDeferredVendorAwaitingPayment,
   isPlatformOwnedStore,
   offPlatformProductProofUrl,
+  deferredPaymentMethodLabel,
   vendorOffPlatformConfirmUpdates,
   vendorOffPlatformVerifyOnlyUpdates,
 } from "@/lib/off-platform-payment";
@@ -635,11 +637,11 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   />
                 )}
 
-                {/* Off-platform: vendeur autonome (non-plateforme) ou verify-only (plateforme → admin) */}
-                {order.payment_method === "off_platform" && order.status === "awaiting_payment" && (
+                {/* Deferred vendor pay (off_platform / whatsapp): vendeur autonome ou verify-only plateforme */}
+                {isDeferredVendorAwaitingPayment(order) && (
                   <div className="space-y-2 border border-amber-200 dark:border-amber-700 rounded-lg p-3 bg-amber-50 dark:bg-amber-900/20">
                     <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                      💳 Paiement hors plateforme — Validation vendeur
+                      💳 {deferredPaymentMethodLabel(order.payment_method)} — Validation vendeur
                     </p>
                     {order.off_platform_vendor_verified_at && isPlatformOwned === true ? (
                       <p className="text-xs text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-900/30 rounded-md p-2">
