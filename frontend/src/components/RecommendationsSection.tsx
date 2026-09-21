@@ -144,11 +144,12 @@ export function RecommendationsSection() {
           .eq("publish_status", "published")
           .order("created_at", { ascending: false })
           .limit(48);
-        if (!hasCompleted && shopTypeFilter) fallbackQ = (fallbackQ as any).eq("shop_type", shopTypeFilter);
-        else {
-          const st = discoveryShopTypeFilter(true, prefs.purchase_scope, shopTypeFilter);
-          if (st) fallbackQ = (fallbackQ as any).eq("shop_type", st);
-        }
+        const fallbackShop = discoveryShopTypeFilter(
+          hasCompleted,
+          prefs.purchase_scope,
+          shopTypeFilter,
+        );
+        if (fallbackShop) fallbackQ = (fallbackQ as any).eq("shop_type", fallbackShop);
         const { data: popular } = await fallbackQ;
         if (!cancelled) setRawProducts((popular || []).map((p: any) => mapProduct(p)));
       }

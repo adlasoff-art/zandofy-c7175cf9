@@ -38,7 +38,7 @@ export function mergeProductPools<T extends { id: string }>(primary: T[], backfi
 type ShopTypeOpt = "local" | "international" | undefined;
 
 /**
- * Fetch preferring local shop_type; if pool &lt; minCount, second open-market request for backfill only.
+ * Fetch preferring local shop_type; if pool < minCount, second open-market request for backfill only.
  */
 export async function fetchWithLocalFirstBackfill<T extends { id: string }>(
   fetchFn: (shopType: ShopTypeOpt) => Promise<T[]>,

@@ -152,6 +152,79 @@ describe("assembleDiscoveryFeed", () => {
     expect(intlCount).toBeLessThanOrEqual(2); // ~10% of 20
   });
 
+  it("does not let neutral unisex intl exceed intl_cap on city scope", () => {
+    const pool = [];
+    for (let i = 1; i <= 30; i++) {
+      pool.push({
+        id: `L${i}`,
+        category_id: "watches",
+        gender_target: "male",
+        shop_type: "local",
+        origin_country: "CD",
+        rating: 5,
+      });
+    }
+    for (let i = 1; i <= 20; i++) {
+      pool.push({
+        id: `IU${i}`,
+        category_id: "other",
+        gender_target: "unisex",
+        shop_type: "international",
+        origin_country: "TR",
+        rating: 5,
+      });
+    }
+    const ranked = assembleDiscoveryFeed(pool, {
+      prefs,
+      take: 20,
+      mix: { ...DISCOVERY_MIX_DEFAULTS, intl_cap_pct: 10 },
+      surface: "test_neutral_intl",
+      seedKey: "u1",
+      nowMs: 1_700_000_000_000,
+    });
+    const intlCount = ranked.filter((p) => p.shop_type === "international").length;
+    expect(intlCount).toBeLessThanOrEqual(2);
+  });
+
+  it("treats missing category as apparel-strict when apparel map is loaded", () => {
+    const housePrefs = normalizeDiscoveryPrefs({
+      ...prefs,
+      interest_category_ids: ["home"],
+    });
+    const pool = [
+      {
+        id: "uncat-u",
+        category_id: null as string | null,
+        gender_target: "unisex",
+        shop_type: "local",
+        origin_country: "CD",
+        rating: 5,
+      },
+      {
+        id: "home-u",
+        category_id: "home",
+        gender_target: "unisex",
+        shop_type: "local",
+        origin_country: "CD",
+        rating: 5,
+      },
+      ...makePool().filter((p) => p.shop_type === "local" && p.gender_target === "male").slice(0, 10),
+    ];
+    const ranked = assembleDiscoveryFeed(pool, {
+      prefs: housePrefs,
+      take: 12,
+      mix: DISCOVERY_MIX_DEFAULTS,
+      apparelCategoryIds: ["fashion", "watches", "shoes"],
+      interestCategoryIds: ["home"],
+      surface: "test_uncat",
+      seedKey: "u1",
+      nowMs: 1_700_000_000_000,
+    });
+    const coreSlice = ranked.slice(0, 8);
+    expect(coreSlice.some((p) => p.id === "home-u")).toBe(true);
+    expect(coreSlice.some((p) => p.id === "uncat-u")).toBe(false);
+  });
+
   it("excludes opposite gender from explore for male audience", () => {
     const ranked = assembleDiscoveryFeed(makePool(), {
       prefs,

@@ -166,6 +166,13 @@ function sameCountry(p: DiscoveryProductLike, country: string | null) {
   return o === country.toUpperCase();
 }
 
+/** International shop OR foreign origin — used for feed-wide intl_cap accounting. */
+function isIntlLike(p: DiscoveryProductLike, country: string | null) {
+  if (isIntlShop(p)) return true;
+  if (country && originOf(p) && originOf(p) !== country.toUpperCase()) return true;
+  return false;
+}
+
 function clampIntlCap(n: unknown): number {
   const v = typeof n === "number" ? n : Number(n);
   if (!Number.isFinite(v)) return DISCOVERY_MIX_FALLBACK.intl_cap_pct;
@@ -268,7 +275,9 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
   const isApparel = (p: T) => {
     if (!apparelKnown) return true;
     const id = catId(p);
-    return !!id && apparelSet.has(id);
+    // Unknown / missing category → apparel-strict (never open unisex core by accident)
+    if (!id) return true;
+    return apparelSet.has(id);
   };
 
   /** Core eligibility: apparel → strict audience; non-apparel interest → OK even unisex. */
@@ -327,9 +336,7 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
   const exploreIntl = seededShuffle(
     shuffled.filter((p) => {
       if (isOppositeAudience(p, audience)) return false;
-      if (isIntlShop(p)) return true;
-      if (country && originOf(p) && originOf(p) !== country.toUpperCase()) return true;
-      return false;
+      return isIntlLike(p, country);
     }),
     seed ^ 0x2345,
   );
@@ -339,8 +346,7 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
     shuffled.filter((p) => {
       if (isNeutral(p)) return false;
       if (isOppositeAudience(p, audience)) return false;
-      if (isIntlShop(p)) return true;
-      if (country && originOf(p) && originOf(p) !== country.toUpperCase()) return true;
+      if (isIntlLike(p, country)) return true;
       if (!inInterest(p) && coreAudience(p)) return true;
       if (apparelKnown && !isApparel(p) && !inInterest(p)) return true;
       return false;
@@ -348,20 +354,27 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
     seed ^ 0x1234,
   );
 
-  const neutralPool = seededShuffle(
+  // Neutral: unisex/empty + soft transverse. Local-scoped: keep intl out of the primary pool
+  // so C cannot silently blow intl_cap (intl unisex only via capped fill below).
+  const neutralLocal = seededShuffle(
     [
-      ...shuffled.filter((p) => isNeutral(p)),
-      // Soft boost: non-apparel outside interests (visibility without forcing gender)
+      ...shuffled.filter((p) => isNeutral(p) && !isIntlLike(p, country)),
       ...transverseLocal.filter((p) => !isNeutral(p)),
     ],
     seed ^ 0x5678,
   );
+  const neutralIntl = seededShuffle(
+    shuffled.filter((p) => isNeutral(p) && isIntlLike(p, country) && !isOppositeAudience(p, audience)),
+    seed ^ 0x5679,
+  );
+  const neutralPool = localScoped ? neutralLocal : seededShuffle([...neutralLocal, ...neutralIntl], seed ^ 0x5678);
 
   const { explore: nExplore, neutral: nNeutral, city: nCity, country: nCountry, restCore, core: nCore } =
     countsForTake(take, mix, scope);
 
-  const intlCapSlots =
-    localScoped ? Math.min(nExplore, Math.round((take * mix.intl_cap_pct) / 100)) : nExplore;
+  const intlCapSlots = localScoped
+    ? Math.min(nExplore + nNeutral, Math.round((take * mix.intl_cap_pct) / 100))
+    : take;
 
   const taken = new Set<string>();
   const result: T[] = [];
@@ -369,6 +382,13 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
   const pushFrom = (pool: T[], n: number) => {
     if (n <= 0) return;
     result.push(...pick(pool, n, taken));
+  };
+
+  const intlUsed = () => result.filter((p) => isIntlLike(p, country)).length;
+  const intlRemaining = () => (localScoped ? Math.max(0, intlCapSlots - intlUsed()) : take);
+  const pushIntlCapped = (pool: T[], n: number) => {
+    if (n <= 0) return;
+    pushFrom(pool, Math.min(n, intlRemaining()));
   };
 
   if (scope === "city") {
@@ -399,8 +419,11 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
       );
     }
     if (result.length < nCore) {
+      // Soft local fill: gendered audience OR known non-apparel (not unknown/uncategorized)
       pushFrom(
-        localSame.filter((p) => !isOppositeAudience(p, audience)),
+        localSame.filter(
+          (p) => coreAudience(p) || (apparelKnown && !isApparel(p)),
+        ),
         nCore - result.length,
       );
     }
@@ -414,7 +437,9 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
     }
     if (result.length < nCore) {
       pushFrom(
-        localSame.filter((p) => !isOppositeAudience(p, audience)),
+        localSame.filter(
+          (p) => coreAudience(p) || (apparelKnown && !isApparel(p)),
+        ),
         nCore - result.length,
       );
     }
@@ -427,37 +452,36 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
     if (result.length < nCore) pushFrom(coreAudienceOnly, nCore - result.length);
   }
 
-  // Explore: local first, then intl up to cap (local scope) / open explore (any_country)
+  // Explore: local first, then intl up to remaining cap (local scope) / open explore (any_country)
   if (localScoped) {
     const beforeExplore = result.length;
     pushFrom(exploreLocal, nExplore);
     pushFrom(transverseLocal, nExplore - (result.length - beforeExplore));
     const localExploreUsed = result.length - beforeExplore;
-    const intlSlots = Math.min(intlCapSlots, Math.max(0, nExplore - localExploreUsed));
-    pushFrom(exploreIntl, intlSlots);
+    pushIntlCapped(exploreIntl, Math.max(0, nExplore - localExploreUsed));
   } else {
     pushFrom(exploreOpen, nExplore);
   }
 
+  // Neutral: local first; intl unisex only within remaining intl_cap
   pushFrom(neutralPool, nNeutral);
+  if (localScoped && result.length < nCore + nExplore + nNeutral) {
+    const needNeutral = nCore + nExplore + nNeutral - result.length;
+    pushIntlCapped(neutralIntl, needNeutral);
+  }
 
-  // Strict backfill: local-first when scoped; never dump opposite-gender
+  // Strict backfill: local-first when scoped; never dump opposite-gender or uncapped intl
   if (result.length < take) {
     if (localScoped) {
       pushFrom(coreLocalInterest, take - result.length);
       if (result.length < take) pushFrom(exploreLocal, take - result.length);
-      if (result.length < take) {
-        const remainingIntl = Math.max(
-          0,
-          intlCapSlots - result.filter((p) => isIntlShop(p)).length,
-        );
-        pushFrom(exploreIntl, Math.min(remainingIntl, take - result.length));
-      }
-      if (result.length < take) pushFrom(neutralPool, take - result.length);
+      if (result.length < take) pushFrom(neutralLocal, take - result.length);
       if (result.length < take) {
         const safeLocal = localSame.filter((p) => !isOppositeAudience(p, audience));
         pushFrom(safeLocal, take - result.length);
       }
+      if (result.length < take) pushIntlCapped(exploreIntl, take - result.length);
+      if (result.length < take) pushIntlCapped(neutralIntl, take - result.length);
     } else {
       if (result.length < take) pushFrom(coreAnyInterest, take - result.length);
       if (result.length < take) pushFrom(coreAudienceOnly, take - result.length);
@@ -467,11 +491,31 @@ export function assembleDiscoveryFeed<T extends DiscoveryProductLike>(
   }
 
   if (result.length < take) {
-    const safe = shuffled.filter((p) => !isOppositeAudience(p, audience));
-    pushFrom(safe, take - result.length);
+    if (localScoped) {
+      // Exhaust local catalogue before any uncapped residual
+      const safeLocal = shuffled.filter(
+        (p) => !isOppositeAudience(p, audience) && !isIntlLike(p, country),
+      );
+      pushFrom(safeLocal, take - result.length);
+      if (result.length < take) {
+        const safeIntl = shuffled.filter(
+          (p) => !isOppositeAudience(p, audience) && isIntlLike(p, country),
+        );
+        pushIntlCapped(safeIntl, take - result.length);
+      }
+    } else {
+      const safe = shuffled.filter((p) => !isOppositeAudience(p, audience));
+      pushFrom(safe, take - result.length);
+    }
   }
   if (result.length < take && (audience === "both" || audience === "any" || !audience)) {
-    pushFrom(shuffled, take - result.length);
+    if (localScoped) {
+      const localRest = shuffled.filter((p) => !isIntlLike(p, country));
+      pushFrom(localRest, take - result.length);
+      if (result.length < take) pushIntlCapped(shuffled, take - result.length);
+    } else {
+      pushFrom(shuffled, take - result.length);
+    }
   }
 
   return result.slice(0, take);

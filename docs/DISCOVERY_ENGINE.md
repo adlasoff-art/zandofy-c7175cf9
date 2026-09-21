@@ -14,8 +14,9 @@ Platform-wide product ranking driven by guest/user onboarding prefs (`profiles.d
 
 - Scope **city** / **country** = **local market** (not an equal local/intl mix).
 - **Core never includes international** when scoped city/country.
-- **`intl_cap_pct`** (default **10**, clamp 0–25): max share of **total take** that may be intl; applied inside explore. Ignored when scope is **any_country**.
+- **`intl_cap_pct`** (default **10**, clamp 0–25): max share of **total take** that may be intl-like (`shop_type=international` **or** foreign `origin_country`); applied across explore **and** neutral, not only explore picks. Ignored when scope is **any_country**.
 - Fetch layer prefers `shop_type=local` for city/country, with open-market backfill only if the local pool is too thin.
+- Missing `category_id` is treated as **apparel-strict** once the apparel tree is loaded (no accidental unisex core).
 
 ### Geo inside core (scope = city)
 
