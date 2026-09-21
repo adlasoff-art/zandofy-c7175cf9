@@ -14,7 +14,10 @@ export function isLovableDomain(): boolean {
   return LOVABLE_DOMAINS.some((d) => host.endsWith(d) || host === "localhost");
 }
 
-export async function signInWithGoogle(): Promise<{ error?: string }> {
+export async function signInWithGoogle(redirectPath = "/"): Promise<{ error?: string }> {
+  const safePath =
+    redirectPath.startsWith("/") && !redirectPath.startsWith("//") ? redirectPath : "/";
+
   if (isLovableDomain()) {
     try {
       const { lovable } = await import("@/integrations/lovable/index");
@@ -30,7 +33,7 @@ export async function signInWithGoogle(): Promise<{ error?: string }> {
 
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: window.location.origin },
+    options: { redirectTo: `${window.location.origin}${safePath}` },
   });
   if (error) return { error: error.message };
   return {};
@@ -222,4 +225,58 @@ export function getPasswordStrength(pw: string): { score: number; label: string;
   if (score <= 2) return { score, label: "Moyen", color: "bg-orange-500" };
   if (score <= 3) return { score, label: "Bon", color: "bg-yellow-500" };
   return { score, label: "Fort", color: "bg-green-500" };
+}
+
+/** Domain for password accounts created with phone-only (no real mailbox). */
+export const SYNTHETIC_EMAIL_DOMAIN = "users.zandofy.internal";
+
+export type ParsedAuthIdentifier =
+  | { kind: "email"; email: string }
+  | { kind: "phone"; e164: string; syntheticEmail: string }
+  | { kind: "invalid"; reason: string };
+
+/** Normalize phone to E.164-ish (+digits). Default country CD (243) when local. */
+export function normalizePhoneE164(raw: string, defaultCountry = "243"): string | null {
+  let digits = String(raw).replace(/\D/g, "");
+  if (!digits) return null;
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("0") && digits.length >= 9) {
+    digits = defaultCountry + digits.slice(1);
+  }
+  if (digits.length < 10 || digits.length > 15) return null;
+  return `+${digits}`;
+}
+
+export function phoneToSyntheticEmail(e164: string): string {
+  const digits = e164.replace(/\D/g, "");
+  return `${digits}@${SYNTHETIC_EMAIL_DOMAIN}`;
+}
+
+export function isSyntheticAuthEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return email.toLowerCase().endsWith(`@${SYNTHETIC_EMAIL_DOMAIN}`);
+}
+
+/**
+ * Parse unified login/signup identifier: email OR phone.
+ * Synthetic domain emails are rejected as user input (reserved).
+ */
+export function parseAuthIdentifier(raw: string): ParsedAuthIdentifier {
+  const s = String(raw || "").trim();
+  if (!s) return { kind: "invalid", reason: "empty" };
+
+  if (s.includes("@")) {
+    const email = s.toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { kind: "invalid", reason: "email" };
+    }
+    if (isSyntheticAuthEmail(email)) {
+      return { kind: "invalid", reason: "reserved" };
+    }
+    return { kind: "email", email };
+  }
+
+  const e164 = normalizePhoneE164(s);
+  if (!e164) return { kind: "invalid", reason: "phone" };
+  return { kind: "phone", e164, syntheticEmail: phoneToSyntheticEmail(e164) };
 }
