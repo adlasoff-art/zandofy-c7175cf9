@@ -60,6 +60,7 @@ const HUB_PAGES: { loc: string; changefreq: string; priority: string }[] = [
   { loc: "/blog", changefreq: "weekly", priority: "0.8" },
   { loc: "/help-center", changefreq: "weekly", priority: "0.8" },
   { loc: "/become-vendor", changefreq: "monthly", priority: "0.8" },
+  { loc: "/discover", changefreq: "monthly", priority: "0.8" },
   { loc: "/affiliate-program", changefreq: "monthly", priority: "0.7" },
   { loc: "/loyalty-program", changefreq: "monthly", priority: "0.6" },
   { loc: "/about", changefreq: "monthly", priority: "0.7" },
