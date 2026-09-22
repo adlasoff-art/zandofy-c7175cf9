@@ -22,6 +22,7 @@ const KNOWN_PATHS: { path: string; label: string }[] = [
   { path: "/trends", label: "Tendances" },
   { path: "/search", label: "Recherche" },
   { path: "/become-vendor", label: "Devenir vendeur" },
+  { path: "/discover", label: "Découvrir Zandofy" },
   { path: "/affiliate-program", label: "Affiliation" },
   { path: "/loyalty-program", label: "Fidélité" },
   { path: "/social-responsibility", label: "Responsabilité sociale" },

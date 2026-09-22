@@ -34,6 +34,7 @@ export const DEFAULT_SITELINKS_NAV = [
   { name: "Blog", url: "/blog" },
   { name: "Centre d'aide", url: "/help-center" },
   { name: "Devenir vendeur", url: "/become-vendor" },
+  { name: "Découvrir Zandofy", url: "/discover" },
   { name: "Programme d'affiliation", url: "/affiliate-program" },
   { name: "À propos", url: "/about" },
 ];

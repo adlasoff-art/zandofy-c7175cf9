@@ -1,5 +1,5 @@
 import { ShoppingBag, Heart, User, Headphones, Globe, ChevronRight, LogOut, MessageCircle, ChevronDown, PackageSearch, Sun, Moon, Monitor, Bell, Sparkles, X } from "lucide-react";
-import { useState, useRef, useEffect, Component, Suspense, type ReactNode, type ErrorInfo } from "react";
+import { useState, useRef, useEffect, useMemo, Component, Suspense, type ReactNode, type ErrorInfo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,7 @@ import {
   CATEGORIES_PANEL_STATE_EVENT,
 } from "@/components/MobileBottomNav";
 import { safeExternalOrAppHref } from "@/lib/safe-href";
+import { buildMarketingNavLinks, injectMarketingNav, cmsUrlToRouterHref } from "@/lib/marketing-nav";
 
 // Lazy-load NotificationCenter to prevent Radix Popover import failures from crashing the entire Header
 const NotificationCenter = lazyRetry(() =>
@@ -46,6 +47,8 @@ const NAV_LINK_KEYS = [
   { label: "Catégories", href: "#", hasMega: true, highlight: false },
   { label: "Nouveautés", href: "/category/nouveautes", hasMega: false, highlight: false },
   { label: "Soldes", href: "/category/soldes", hasMega: false, highlight: true },
+  { label: "Découvrir Zandofy", href: "/discover", hasMega: false, highlight: false },
+  { label: "Devenir vendeur", href: "/become-vendor", hasMega: false, highlight: false },
   { label: "Fournisseurs fiables", href: "/stores", hasMega: false, highlight: false },
   { label: "Électronique", href: "/category/electronics", hasMega: false, highlight: false },
   { label: "Maison & Déco", href: "/category/home", hasMega: false, highlight: false },
@@ -150,15 +153,23 @@ export function Header() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Build nav links: CMS data or fallback
-  const navLinks = (cmsNavItems && cmsNavItems.length > 0)
-    ? cmsNavItems.map((item: any) => ({
-        label: item.label,
-        href: item.url,
-        hasMega: item.has_mega ?? false,
-        highlight: item.highlight ?? false,
-      }))
-    : NAV_LINK_KEYS;
+  // Build nav links: CMS data or fallback, then inject marketing hubs before /stores
+  const navLinks = useMemo(() => {
+    const base =
+      cmsNavItems && cmsNavItems.length > 0
+        ? cmsNavItems.map((item: any) => ({
+            label: item.label as string,
+            href: cmsUrlToRouterHref(String(item.url || "")),
+            hasMega: item.has_mega ?? false,
+            highlight: item.highlight ?? false,
+          }))
+        : NAV_LINK_KEYS;
+    const marketing = buildMarketingNavLinks({
+      discover: t("nav.discoverZandofy") || "Découvrir Zandofy",
+      becomeVendor: t("nav.becomeVendor") || "Devenir vendeur",
+    });
+    return injectMarketingNav(base, marketing);
+  }, [cmsNavItems, t, locale]);
 
   const { data: mobileCategories } = useQuery({
     queryKey: ["mobile-categories"],
@@ -452,7 +463,11 @@ export function Header() {
                     color: link.highlight ? (navHighlight || undefined) : (navText || undefined),
                     fontWeight: link.highlight ? 700 : undefined,
                   }}
-                  onClick={link.hasMega ? (e) => e.preventDefault() : undefined}
+                  onClick={
+                    link.hasMega || link.href === "#"
+                      ? (e) => e.preventDefault()
+                      : undefined
+                  }
                 >
                   {link.label}
                   {link.hasMega && <ChevronRight size={12} className="rotate-90" />}
@@ -531,6 +546,15 @@ export function Header() {
 
             {/* Special links */}
             <div className="border-t border-border mt-2 pt-2">
+              <Link to="/discover" onClick={() => setMobileOpen(false)} className="block py-2.5 px-4 text-sm font-medium text-foreground hover:bg-muted transition-colors">
+                {t("nav.discoverZandofy") || "Découvrir Zandofy"}
+              </Link>
+              <Link to="/become-vendor" onClick={() => setMobileOpen(false)} className="block py-2.5 px-4 text-sm font-medium text-foreground hover:bg-muted transition-colors">
+                {t("nav.becomeVendor") || "Devenir vendeur"}
+              </Link>
+              <Link to="/stores" onClick={() => setMobileOpen(false)} className="block py-2.5 px-4 text-sm font-medium text-foreground hover:bg-muted transition-colors">
+                {t("nav.reliableSuppliers") || "Fournisseurs fiables"}
+              </Link>
               <Link to="/category/nouveautes" onClick={() => setMobileOpen(false)} className="block py-2.5 px-4 text-sm font-medium text-foreground hover:bg-muted transition-colors">
                 {t("nav.newArrivals")}
               </Link>

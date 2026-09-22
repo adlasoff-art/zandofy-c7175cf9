@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/contexts/I18nContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import { sanitizeExtension } from "@/utils/sanitize-filename";
+import { SEOHead } from "@/components/SEOHead";
+import { BecomeVendorLanding } from "@/components/marketing/BecomeVendorLanding";
 import {
   User, Store, FileCheck, Send, CheckCircle2, Upload, Trash2, Loader2, AlertCircle, Clock, ShieldCheck,
 } from "lucide-react";
@@ -83,6 +85,7 @@ const LOCAL_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export default function BecomeVendorPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useI18n();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<ApplicationData>(initialData);
@@ -271,6 +274,18 @@ export default function BecomeVendorPage() {
     return () => window.removeEventListener("beforeunload", beforeUnloadHandler);
   }, [hasUnsavedDraft]);
 
+  // Deep-link from landing CTAs
+  useEffect(() => {
+    if (authLoading || appLoading) return;
+    if (location.hash !== "#candidater") return;
+    const el = document.getElementById("candidater");
+    if (!el) return;
+    const timer = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [authLoading, appLoading, location.hash, user?.id, form.status]);
+
   if (authLoading || appLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -283,14 +298,17 @@ export default function BecomeVendorPage() {
   }
 
   if (!user) {
+    const authRedirect = "/auth?redirect=" + encodeURIComponent("/become-vendor#candidater");
     return (
       <div className="min-h-screen bg-background">
+        <SEOHead title={t("becomeVendor.landing.seo.title")} description={t("becomeVendor.landing.seo.desc")} />
         <Header />
-        <div className="container max-w-lg py-20 text-center space-y-4">
-          <AlertCircle size={48} className="mx-auto text-muted-foreground" />
-          <h1 className="text-2xl font-bold">{t("vendor.loginRequired")}</h1>
-          <p className="text-muted-foreground">{t("vendor.loginRequiredDesc")}</p>
-          <Button onClick={() => navigate("/auth?redirect=" + encodeURIComponent("/become-vendor"))}>{t("general.loginButton")}</Button>
+        <BecomeVendorLanding primaryCtaTo={authRedirect} />
+        <div className="container max-w-lg py-12 text-center space-y-4 border-t border-border">
+          <AlertCircle size={40} className="mx-auto text-muted-foreground" />
+          <h2 className="text-xl font-bold">{t("vendor.loginRequired")}</h2>
+          <p className="text-muted-foreground text-sm">{t("vendor.loginRequiredDesc")}</p>
+          <Button onClick={() => navigate(authRedirect)}>{t("general.loginButton")}</Button>
         </div>
         <Footer />
       </div>
@@ -542,12 +560,14 @@ export default function BecomeVendorPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead title={t("becomeVendor.landing.seo.title")} description={t("becomeVendor.landing.seo.desc")} />
       <Header />
-      <main className="container max-w-2xl py-8 space-y-6">
+      <BecomeVendorLanding primaryCtaTo="#candidater" />
+      <main id="candidater" className="container max-w-2xl py-8 space-y-6 scroll-mt-24">
         <div className="text-center space-y-2">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">{t("vendor.title")}</h1>
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground">{t("vendor.title")}</h2>
           <p className="text-sm text-muted-foreground">
-            Vendez gratuitement — la plateforme prend une commission sur les ventes livrées. Les documents d&apos;entreprise (KYB) seront demandés après un palier de ventes.
+            {t("becomeVendor.landing.formIntro")}
           </p>
         </div>
 
