@@ -1,46 +1,62 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import type { CSSProperties } from "react";
 import { useBranding } from "@/hooks/use-branding";
 
 interface BrandLogoProps {
   variant?: "header" | "footer";
+  /** Visual size — hero is larger for marketing landings; never affects other instances. */
+  size?: "header" | "footer" | "hero";
+  /** Layout only (alignment/margins). Do not pass height/width sizing here. */
   className?: string;
 }
 
-export function BrandLogo({ variant = "header", className = "" }: BrandLogoProps) {
+export function BrandLogo({
+  variant = "header",
+  size,
+  className = "",
+}: BrandLogoProps) {
   const { data: branding } = useBranding();
   const [logoFailed, setLogoFailed] = useState(false);
+  const resolvedSize = size ?? (variant === "footer" ? "footer" : "header");
 
-  const logoUrl =
-    variant === "header"
-      ? branding?.header_logo_url
-      : branding?.footer_logo_url || branding?.header_logo_url;
+  const logoUrlRaw =
+    variant === "footer"
+      ? branding?.footer_logo_url || branding?.header_logo_url
+      : branding?.header_logo_url;
+  const logoUrl = logoUrlRaw?.trim() || null;
+
   // If an image URL is configured but mode stayed at default "text", treat as logo+text
   // so CMS uploads are visible without forcing admins to flip logo_mode manually.
   const rawMode = branding?.logo_mode || "text";
-  const mode =
-    logoUrl && rawMode === "text" ? "logo_and_text" : rawMode;
+  const mode = logoUrl && rawMode === "text" ? "logo_and_text" : rawMode;
 
   useEffect(() => {
     setLogoFailed(false);
   }, [logoUrl]);
 
   const textStyle =
-    variant === "header"
-      ? "text-xl md:text-2xl tracking-[0.08em] text-foreground"
-      : "text-base tracking-[0.08em] text-foreground";
+    resolvedSize === "footer"
+      ? "text-base tracking-[0.08em] text-foreground"
+      : resolvedSize === "hero"
+        ? "text-2xl md:text-3xl tracking-[0.08em] text-foreground"
+        : "text-xl md:text-2xl tracking-[0.08em] text-foreground";
 
-  const imgClass = variant === "header" ? "h-8 md:h-10 w-auto" : "h-7 w-auto";
-  const imgHeight = variant === "header" ? 40 : 28;
-  // For logo_only mode we reserve width via aspect-ratio (no text to hold the row).
-  // For logo_and_text we let the text reserve the row width — réserver une largeur
-  // fantôme sur le wrapper poussait "Zandofy" loin du logo (bug rapporté).
-  const ratio = (branding as any)?.logo_aspect_ratio || 3.5;
+  const imgClass =
+    resolvedSize === "footer"
+      ? "h-7 w-auto max-w-[160px] object-contain"
+      : resolvedSize === "hero"
+        ? "h-10 md:h-12 w-auto max-w-[220px] object-contain"
+        : "h-8 md:h-10 w-auto max-w-[180px] object-contain";
+  const imgHeight = resolvedSize === "footer" ? 28 : resolvedSize === "hero" ? 48 : 40;
+  const ratio =
+    Number((branding as { logo_aspect_ratio?: number } | null)?.logo_aspect_ratio) > 0
+      ? Number((branding as { logo_aspect_ratio?: number }).logo_aspect_ratio)
+      : 3.5;
   const imgWidth = Math.round(imgHeight * ratio);
-  const wrapperStyle = { aspectRatio: String(ratio) } as React.CSSProperties;
-
-  // fetchpriority must be lowercase to be a valid HTML attribute (avoids React warning)
-  const imgExtra = { fetchpriority: "high" } as any;
+  const wrapperStyle: CSSProperties = { aspectRatio: String(ratio) };
+  const linkHeightClass =
+    resolvedSize === "footer" ? "h-7" : resolvedSize === "hero" ? "h-10 md:h-12" : "h-8 md:h-10";
 
   const showLogo = Boolean(logoUrl) && !logoFailed;
 
@@ -64,7 +80,7 @@ export function BrandLogo({ variant = "header", className = "" }: BrandLogoProps
     return (
       <Link
         to="/"
-        className={`shrink-0 inline-block ${variant === "header" ? "h-8 md:h-10" : "h-7"} ${className}`}
+        className={`shrink-0 inline-block ${linkHeightClass} ${className}`}
         style={wrapperStyle}
       >
         <img
@@ -73,8 +89,8 @@ export function BrandLogo({ variant = "header", className = "" }: BrandLogoProps
           width={imgWidth}
           height={imgHeight}
           className={imgClass}
+          fetchPriority="high"
           onError={() => setLogoFailed(true)}
-          {...imgExtra}
         />
       </Link>
     );
@@ -89,14 +105,14 @@ export function BrandLogo({ variant = "header", className = "" }: BrandLogoProps
           width={imgWidth}
           height={imgHeight}
           className={imgClass}
+          fetchPriority="high"
           onError={() => setLogoFailed(true)}
-          {...imgExtra}
         />
         <span
           className={textStyle}
           style={{
             fontFamily: "'Outfit', sans-serif",
-            fontWeight: variant === "header" ? 700 : 400,
+            fontWeight: variant === "footer" ? 400 : 700,
             lineHeight: 1,
           }}
         >
@@ -106,7 +122,6 @@ export function BrandLogo({ variant = "header", className = "" }: BrandLogoProps
     );
   }
 
-  // Default: text only (also used when logo URL fails to load)
   if (variant === "footer") {
     return textOnlyFooter;
   }

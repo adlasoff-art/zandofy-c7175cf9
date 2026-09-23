@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import {
-  Image, Menu, FileText, LayoutDashboard, Palette, MapPin, FootprintsIcon, Languages, Scale, BookOpen, Briefcase, Stamp, TrendingUp, Megaphone, PanelTop, PanelBottom,
+  Image, Menu, FileText, LayoutDashboard, Palette, MapPin, FootprintsIcon, Languages, Scale, BookOpen, Briefcase, Stamp, TrendingUp, Megaphone, PanelTop, PanelBottom, LayoutTemplate,
 } from "lucide-react";
 import { HeroBannerEditor } from "@/components/admin/HeroBannerEditor";
 import { ColorPaletteEditor } from "@/components/admin/ColorPaletteEditor";
@@ -17,6 +17,7 @@ const SectionsTab = lazyRetry(() => import("@/components/admin/cms/SectionsTab")
 const FooterTab = lazyRetry(() => import("@/components/admin/cms/FooterTab"));
 const TextsTab = lazyRetry(() => import("@/components/admin/cms/TextsTab"));
 const LegalPagesTab = lazyRetry(() => import("@/components/admin/cms/LegalPagesTab"));
+const LandingsTab = lazyRetry(() => import("@/components/admin/cms/LandingsTab"));
 const BlogTab = lazyRetry(() => import("@/components/admin/cms/BlogTab"));
 const JobPostingsTab = lazyRetry(() => import("@/components/admin/cms/JobPostingsTab"));
 const BrandingTab = lazyRetry(() => import("@/components/admin/cms/BrandingTab"));
@@ -25,7 +26,7 @@ const TopBarEditor = lazyRetry(() => import("@/components/admin/cms/TopBarEditor
 const HeaderThemeEditor = lazyRetry(() => import("@/components/admin/cms/HeaderThemeEditor"));
 const FooterThemeEditor = lazyRetry(() => import("@/components/admin/cms/FooterThemeEditor"));
 
-type Tab = "hero" | "banners" | "topbar" | "header_theme" | "footer_theme" | "menus" | "pages" | "sections" | "trends" | "colors" | "branding" | "footer" | "texts" | "legal" | "blog" | "jobs";
+type Tab = "hero" | "banners" | "topbar" | "header_theme" | "footer_theme" | "menus" | "pages" | "sections" | "trends" | "colors" | "branding" | "footer" | "texts" | "legal" | "landings" | "blog" | "jobs";
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "hero", label: "Hero Banner", icon: Image },
@@ -41,6 +42,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "colors", label: "Thème & Couleurs", icon: Palette },
   { key: "texts", label: "Textes i18n", icon: Languages },
   { key: "legal", label: "FAQ & Légal", icon: Scale },
+  { key: "landings", label: "Landings", icon: LayoutTemplate },
   { key: "blog", label: "Blog", icon: BookOpen },
   { key: "jobs", label: "Carrières", icon: Briefcase },
   { key: "footer", label: "Footer", icon: FootprintsIcon },
@@ -89,6 +91,7 @@ const AdminCMSPage: React.FC = () => {
         {tab === "footer" && <FooterTab />}
         {tab === "texts" && <TextsTab />}
         {tab === "legal" && <LegalPagesTab />}
+        {tab === "landings" && <LandingsTab />}
         {tab === "blog" && <BlogTab />}
         {tab === "jobs" && <JobPostingsTab />}
       </Suspense>
