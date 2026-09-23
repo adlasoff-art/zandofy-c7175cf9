@@ -12,7 +12,8 @@ import {
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
-import { useI18n } from "@/contexts/I18nContext";
+import { useResolvedMarketingLanding } from "@/hooks/use-cms-marketing-landing";
+import { discoverFallbackFromT } from "@/lib/cms-marketing-landings";
 import {
   MarketingBenefitGrid,
   MarketingCtaBand,
@@ -22,132 +23,108 @@ import {
   MarketingSteps,
 } from "@/components/marketing/MarketingLandingPrimitives";
 
+const BENEFIT_ICONS = [
+  <Package size={20} key="b0" />,
+  <Truck size={20} key="b1" />,
+  <CreditCard size={20} key="b2" />,
+  <ShieldCheck size={20} key="b3" />,
+];
+
+const STEP_ICONS = [
+  <Search size={22} key="s0" />,
+  <ShoppingCart size={22} key="s1" />,
+  <MapPin size={22} key="s2" />,
+];
+
+const TRUST_ICONS = [
+  <ShieldCheck size={20} key="t0" />,
+  <Truck size={20} key="t1" />,
+  <Globe size={20} key="t2" />,
+  <Package size={20} key="t3" />,
+];
+
 export default function DiscoverPage() {
-  const { t } = useI18n();
+  const { content } = useResolvedMarketingLanding("cms_discover", discoverFallbackFromT);
 
-  const benefits = [
-    {
-      icon: <Package size={20} />,
-      title: t("discover.benefit.factory.title"),
-      desc: t("discover.benefit.factory.desc"),
-    },
-    {
-      icon: <Truck size={20} />,
-      title: t("discover.benefit.logistics.title"),
-      desc: t("discover.benefit.logistics.desc"),
-    },
-    {
-      icon: <CreditCard size={20} />,
-      title: t("discover.benefit.pay.title"),
-      desc: t("discover.benefit.pay.desc"),
-    },
-    {
-      icon: <ShieldCheck size={20} />,
-      title: t("discover.benefit.trust.title"),
-      desc: t("discover.benefit.trust.desc"),
-    },
-  ];
+  const benefits = content.benefits.map((item, i) => ({
+    icon: BENEFIT_ICONS[i % BENEFIT_ICONS.length],
+    title: item.title,
+    desc: item.desc,
+  }));
 
-  const steps = [
-    {
-      icon: <Search size={22} />,
-      title: t("discover.step1.title"),
-      desc: t("discover.step1.desc"),
-    },
-    {
-      icon: <ShoppingCart size={22} />,
-      title: t("discover.step2.title"),
-      desc: t("discover.step2.desc"),
-    },
-    {
-      icon: <MapPin size={22} />,
-      title: t("discover.step3.title"),
-      desc: t("discover.step3.desc"),
-    },
-  ];
+  const steps = content.steps.map((item, i) => ({
+    icon: STEP_ICONS[i % STEP_ICONS.length],
+    title: item.title,
+    desc: item.desc,
+  }));
 
-  const trustItems = [
-    {
-      icon: <ShieldCheck size={20} />,
-      title: t("discover.trust.kyc.title"),
-      desc: t("discover.trust.kyc.desc"),
-    },
-    {
-      icon: <Truck size={20} />,
-      title: t("discover.trust.track.title"),
-      desc: t("discover.trust.track.desc"),
-    },
-    {
-      icon: <Globe size={20} />,
-      title: t("discover.trust.hub.title"),
-      desc: t("discover.trust.hub.desc"),
-    },
-    {
-      icon: <Package size={20} />,
-      title: t("discover.trust.vendors.title"),
-      desc: t("discover.trust.vendors.desc"),
-    },
-  ];
-
-  const faq = [
-    { q: t("discover.faq1.q"), a: t("discover.faq1.a") },
-    { q: t("discover.faq2.q"), a: t("discover.faq2.a") },
-    { q: t("discover.faq3.q"), a: t("discover.faq3.a") },
-    { q: t("discover.faq4.q"), a: t("discover.faq4.a") },
-  ];
+  const trustItems = content.trust.items.map((item, i) => ({
+    icon: TRUST_ICONS[i % TRUST_ICONS.length],
+    title: item.title,
+    desc: item.desc,
+  }));
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <SEOHead
-        title={t("discover.seo.title")}
-        description={t("discover.seo.desc")}
-      />
+      <SEOHead title={content.seo.title} description={content.seo.description} />
       <Header />
       <main className="flex-1">
         <MarketingHero
-          eyebrow={t("discover.eyebrow")}
-          title={t("discover.hero.title")}
-          titleHighlight={t("discover.hero.highlight")}
-          subtitle={t("discover.hero.subtitle")}
-          primaryCta={{ label: t("discover.cta.explore"), to: "/search" }}
-          secondaryCta={{ label: t("discover.cta.becomeVendor"), to: "/become-vendor" }}
+          eyebrow={content.hero.eyebrow}
+          title={content.hero.title}
+          titleHighlight={content.hero.highlight}
+          subtitle={content.hero.subtitle}
+          primaryCta={{ label: content.hero.ctaPrimary, to: "/search" }}
+          secondaryCta={{ label: content.hero.ctaSecondary, to: "/become-vendor" }}
         />
 
-        <MarketingSection
-          title={t("discover.why.title")}
-          subtitle={t("discover.why.subtitle")}
-          tone="muted"
-        >
-          <MarketingBenefitGrid items={benefits} />
-        </MarketingSection>
+        {content.sections.why && (
+          <MarketingSection
+            title={content.why.title}
+            subtitle={content.why.subtitle}
+            tone="muted"
+          >
+            <MarketingBenefitGrid items={benefits} />
+          </MarketingSection>
+        )}
 
-        <MarketingSection title={t("discover.how.title")} subtitle={t("discover.how.subtitle")}>
-          <MarketingSteps steps={steps} />
-        </MarketingSection>
+        {content.sections.how && (
+          <MarketingSection title={content.how.title} subtitle={content.how.subtitle}>
+            <MarketingSteps steps={steps} />
+          </MarketingSection>
+        )}
 
-        <MarketingSection
-          title={t("discover.trust.title")}
-          subtitle={t("discover.trust.subtitle")}
-          tone="muted"
-        >
-          <MarketingBenefitGrid items={trustItems} />
-        </MarketingSection>
+        {content.sections.trust && (
+          <MarketingSection
+            title={content.trust.title}
+            subtitle={content.trust.subtitle}
+            tone="muted"
+          >
+            <MarketingBenefitGrid items={trustItems} />
+          </MarketingSection>
+        )}
 
-        <MarketingSection title={t("discover.faq.title")}>
-          <MarketingFaq items={faq} />
-          <p className="text-center text-xs text-muted-foreground mt-8">
-            <Link to="/faq" className="text-primary hover:underline">
-              {t("discover.faq.more")}
-            </Link>
-          </p>
-        </MarketingSection>
+        {content.sections.faq && (
+          <MarketingSection title={content.faq.title}>
+            <MarketingFaq items={content.faq.items} />
+            {content.faq.moreLabel ? (
+              <p className="text-center text-xs text-muted-foreground mt-8">
+                <Link to="/faq" className="text-primary hover:underline">
+                  {content.faq.moreLabel}
+                </Link>
+              </p>
+            ) : null}
+          </MarketingSection>
+        )}
 
-        <MarketingCtaBand
-          title={t("discover.final.title")}
-          subtitle={t("discover.final.subtitle")}
-          primaryCta={{ label: t("discover.cta.explore"), to: "/search" }}
-          secondaryCta={{ label: t("discover.cta.becomeVendor"), to: "/become-vendor" }}
-        />
+        {content.sections.final && (
+          <MarketingCtaBand
+            title={content.final.title}
+            subtitle={content.final.subtitle}
+            primaryCta={{ label: content.final.ctaPrimary, to: "/search" }}
+            secondaryCta={{ label: content.final.ctaSecondary, to: "/become-vendor" }}
+          />
+        )}
       </main>
       <Footer />
     </div>

@@ -17,6 +17,8 @@ import { toast } from "@/hooks/use-toast";
 import { sanitizeExtension } from "@/utils/sanitize-filename";
 import { SEOHead } from "@/components/SEOHead";
 import { BecomeVendorLanding } from "@/components/marketing/BecomeVendorLanding";
+import { useResolvedMarketingLanding } from "@/hooks/use-cms-marketing-landing";
+import { becomeVendorFallbackFromT } from "@/lib/cms-marketing-landings";
 import {
   User, Store, FileCheck, Send, CheckCircle2, Upload, Trash2, Loader2, AlertCircle, Clock, ShieldCheck,
 } from "lucide-react";
@@ -87,6 +89,10 @@ export default function BecomeVendorPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useI18n();
+  const { content: landingSeo } = useResolvedMarketingLanding(
+    "cms_become_vendor_landing",
+    becomeVendorFallbackFromT
+  );
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<ApplicationData>(initialData);
   const [docs, setDocs] = useState<DocFile[]>([]);
@@ -301,7 +307,7 @@ export default function BecomeVendorPage() {
     const authRedirect = "/auth?redirect=" + encodeURIComponent("/become-vendor#candidater");
     return (
       <div className="min-h-screen bg-background">
-        <SEOHead title={t("becomeVendor.landing.seo.title")} description={t("becomeVendor.landing.seo.desc")} />
+        <SEOHead title={landingSeo.seo.title} description={landingSeo.seo.description} />
         <Header />
         <BecomeVendorLanding primaryCtaTo={authRedirect} />
         <div className="container max-w-lg py-12 text-center space-y-4 border-t border-border">
@@ -560,7 +566,7 @@ export default function BecomeVendorPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead title={t("becomeVendor.landing.seo.title")} description={t("becomeVendor.landing.seo.desc")} />
+      <SEOHead title={landingSeo.seo.title} description={landingSeo.seo.description} />
       <Header />
       <BecomeVendorLanding primaryCtaTo="#candidater" />
       <main id="candidater" className="container max-w-2xl py-8 space-y-6 scroll-mt-24">

@@ -66,7 +66,7 @@ export function MarketingHero({
       <div className="container max-w-3xl mx-auto text-center px-4">
         {brandFirst && (
           <div className="flex justify-center mb-6">
-            <BrandLogo className="h-10 md:h-12 w-auto" />
+            <BrandLogo size="hero" />
           </div>
         )}
         {eyebrow && (
