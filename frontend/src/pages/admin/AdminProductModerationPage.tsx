@@ -8,6 +8,7 @@ import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
 import { ProductModerationDetail } from "@/components/admin/ProductModerationDetail";
 import { ModerationActionDialog } from "@/components/admin/ModerationActionDialog";
 import { PublishSocialDialog } from "@/components/admin/PublishSocialDialog";
+import { countProductPhotoUrls } from "@/lib/product-catalogue-validation";
 
 type StatusFilter = "pending_approval" | "published" | "rejected" | "revision_requested" | "draft" | "all";
 
@@ -57,7 +58,7 @@ export default function AdminProductModerationPage() {
 
       let query = supabase
         .from("products")
-        .select("id, name_fr, name, price, currency, publish_status, store_id, created_at, stock_quantity, product_images(id)")
+        .select("id, name_fr, name, price, currency, publish_status, store_id, created_at, stock_quantity, product_images(id, image_url)")
         .order("created_at", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
@@ -83,7 +84,11 @@ export default function AdminProductModerationPage() {
         products: products.map(p => ({
           ...p,
           store_name: p.store_id ? storeMap.get(p.store_id) || "—" : "—",
-          image_count: Array.isArray((p as any).product_images) ? (p as any).product_images.length : 0,
+          image_count: countProductPhotoUrls(
+            Array.isArray((p as any).product_images)
+              ? (p as any).product_images.map((img: { image_url?: string }) => img.image_url)
+              : []
+          ),
         })),
         totalCount: count || 0,
       };
@@ -98,12 +103,13 @@ export default function AdminProductModerationPage() {
   const updateStatus = useMutation({
     mutationFn: async ({ productId, status }: { productId: string; status: string }) => {
       if (status === "published") {
-        const { count, error: countErr } = await supabase
+        const { data: imgRows, error: countErr } = await supabase
           .from("product_images")
-          .select("id", { count: "exact", head: true })
+          .select("image_url")
           .eq("product_id", productId);
         if (countErr) throw new Error("Impossible de vérifier les photos avant publication");
-        if (!count || count < 1) {
+        const photoCount = countProductPhotoUrls((imgRows || []).map((r: { image_url: string }) => r.image_url));
+        if (photoCount < 1) {
           throw new Error("Impossible d'approuver un produit sans photo");
         }
       }

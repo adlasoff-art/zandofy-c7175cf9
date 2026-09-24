@@ -86,25 +86,51 @@ Deno.serve(async (req) => {
     if (rlAllowed === false) return errorResponse("Trop de requêtes. Veuillez patienter.");
 
     const body = await req.json();
-    const { order_id, payment_method, payment_type } = body;
+    const { order_id, payment_method, payment_type, checkout_session_id } = body;
     if (!order_id) return errorResponse("order_id requis");
     const method = payment_method || "card";
 
     // Fetch order
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, order_ref, user_id, total, subtotal, shipping_cost, status, last_mile_fee, wallet_credit_applied")
+      .select("id, order_ref, user_id, total, subtotal, shipping_cost, status, last_mile_fee, wallet_credit_applied, checkout_session_id")
       .eq("id", order_id)
       .maybeSingle();
     if (orderError || !order) return errorResponse("Commande introuvable");
     if (order.user_id !== user.id) return errorResponse("Cette commande ne vous appartient pas");
+
+    const sessionId =
+      checkout_session_id ||
+      (order as { checkout_session_id?: string | null }).checkout_session_id ||
+      null;
 
     // Determine amount
     const pType = payment_type || "order";
     let amount: number;
     if (pType === "shipping") amount = Number(order.shipping_cost) || 0;
     else if (pType === "last_mile") amount = Number(order.last_mile_fee) || 0;
-    else {
+    else if (sessionId) {
+      const { data: sessionOrders } = await supabase
+        .from("orders")
+        .select("id, total, wallet_credit_applied")
+        .eq("checkout_session_id", sessionId);
+      amount = Math.round(
+        (sessionOrders || []).reduce(
+          (s: number, o: any) =>
+            s + Math.max(0, Number(o.total || 0) - Number(o.wallet_credit_applied || 0)),
+          0
+        ) * 100
+      ) / 100;
+      await supabase
+        .from("checkout_sessions")
+        .update({
+          status: "payment_pending",
+          anchor_order_id: order.id,
+          total_amount: amount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sessionId);
+    } else {
       const walletCredit = Number((order as any).wallet_credit_applied) || 0;
       amount = Math.max(0, (Number(order.total) || 0) - walletCredit);
     }
@@ -259,11 +285,15 @@ Deno.serve(async (req) => {
     if (!success) {
       // Marquer la commande payment_failed côté serveur pour cohérence admin.
       if (pType === "order") {
-        await supabase
-          .from("orders")
-          .update({ status: "payment_failed" })
-          .eq("id", order.id)
-          .in("status", ["pending", "awaiting_payment"]);
+        if (sessionId) {
+          await supabase.rpc("fail_checkout_session_payment", { p_session_id: sessionId });
+        } else {
+          await supabase
+            .from("orders")
+            .update({ status: "payment_failed" })
+            .eq("id", order.id)
+            .in("status", ["pending", "awaiting_payment"]);
+        }
       }
       const reason = !keccelOk
         ? `Keccel a refusé le paiement (code ${parsed?.code ?? "?"})`
@@ -287,6 +317,7 @@ Deno.serve(async (req) => {
       .from("payment_transactions")
       .insert({
         order_id: order.id,
+        checkout_session_id: sessionId,
         user_id: user.id,
         method: method === "paypal" ? "paypal" : "card",
         provider: "keccel",
@@ -307,11 +338,19 @@ Deno.serve(async (req) => {
     }
 
     if (pType === "order") {
-      await supabase
-        .from("orders")
-        .update({ status: "awaiting_payment", payment_method: method === "paypal" ? "paypal" : "card" })
-        .eq("id", order.id)
-        .in("status", ["pending", "awaiting_payment"]);
+      if (sessionId) {
+        await supabase
+          .from("orders")
+          .update({ status: "awaiting_payment", payment_method: method === "paypal" ? "paypal" : "card" })
+          .eq("checkout_session_id", sessionId)
+          .in("status", ["pending", "awaiting_payment"]);
+      } else {
+        await supabase
+          .from("orders")
+          .update({ status: "awaiting_payment", payment_method: method === "paypal" ? "paypal" : "card" })
+          .eq("id", order.id)
+          .in("status", ["pending", "awaiting_payment"]);
+      }
     }
 
     return new Response(

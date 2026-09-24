@@ -44,3 +44,44 @@ export function deriveSeoKeywords(
 export function isVideoMediaUrl(url: string): boolean {
   return /\.(mp4|webm|mov)(\?|$)/i.test(url);
 }
+
+/** Count still photos only (exclude video URLs). */
+export function countProductPhotoUrls(
+  urls: Array<string | null | undefined>
+): number {
+  return urls.filter((u) => !!u && !isVideoMediaUrl(u)).length;
+}
+
+/** Default product photo ceiling (cover + gallery). Videos excluded by callers. */
+export const MAX_PRODUCT_PHOTOS = 5;
+/** Minimum photos to submit / keep publish-quality listing. */
+export const MIN_PRODUCT_PHOTOS_FOR_SUBMIT = 1;
+
+export type PhotoQuotaResult =
+  | { ok: true }
+  | { ok: false; reason: "too_few" | "too_many"; count: number; min: number; max: number };
+
+/**
+ * Validate product photo count (images only). Ceiling is a hard max, not a target.
+ */
+export function validatePhotoQuota(
+  count: number,
+  options?: { min?: number; max?: number }
+): PhotoQuotaResult {
+  const min = options?.min ?? MIN_PRODUCT_PHOTOS_FOR_SUBMIT;
+  const max = options?.max ?? MAX_PRODUCT_PHOTOS;
+  if (count < min) {
+    return { ok: false, reason: "too_few", count, min, max };
+  }
+  if (count > max) {
+    return { ok: false, reason: "too_many", count, min, max };
+  }
+  return { ok: true };
+}
+
+export function photoQuotaMessageFr(result: Exclude<PhotoQuotaResult, { ok: true }>): string {
+  if (result.reason === "too_few") {
+    return "Ajoutez au moins une photo pour continuer.";
+  }
+  return `Vous pouvez ajouter jusqu’à ${result.max} photos par article.`;
+}

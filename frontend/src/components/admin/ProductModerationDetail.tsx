@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { PUBLISH_STATUS_CONFIG } from "@/lib/vendor-tiers";
+import { countProductPhotoUrls, isVideoMediaUrl } from "@/lib/product-catalogue-validation";
 import { Loader2, Package, Store, Tag, Ruler, Weight, MapPin, Star, Image as ImageIcon, Palette, LayoutGrid, DollarSign, AlertTriangle, Link as LinkIcon, Layers, Check, Share2 } from "lucide-react";
 
 interface Props {
@@ -95,6 +96,8 @@ export function ProductModerationDetail({ productId, open, onOpenChange, onReque
 
   const statusCfg = product ? (PUBLISH_STATUS_CONFIG[product.publish_status] || PUBLISH_STATUS_CONFIG.draft) : null;
   const images = (product?.product_images || []).sort((a: any, b: any) => (a.position ?? 99) - (b.position ?? 99));
+  const photoCount = countProductPhotoUrls(images.map((img: any) => img.image_url));
+  const hasPhotos = photoCount >= 1;
   const colors = product?.product_colors || [];
   const sizes = product?.product_sizes || [];
   const tiers = product?.product_pricing_tiers || [];
@@ -133,9 +136,9 @@ export function ProductModerationDetail({ productId, open, onOpenChange, onReque
                   <button
                     type="button"
                     onClick={() => onRequestApprove(productId)}
-                    disabled={images.length === 0}
+                    disabled={!hasPhotos}
                     title={
-                      images.length === 0
+                      !hasPhotos
                         ? "Impossible d'approuver sans photo"
                         : "Approuver ce produit"
                     }
@@ -174,7 +177,7 @@ export function ProductModerationDetail({ productId, open, onOpenChange, onReque
 
             {/* Images */}
             <Section title="Photos" icon={<ImageIcon size={14} />}>
-              {images.length === 0 ? (
+              {!hasPhotos ? (
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground italic">Aucune photo</p>
                   <p className="text-xs text-amber-700 dark:text-amber-400">
@@ -183,7 +186,9 @@ export function ProductModerationDetail({ productId, open, onOpenChange, onReque
                 </div>
               ) : (
                 <div className="grid grid-cols-4 gap-2">
-                  {images.map((img: any) => (
+                  {images
+                    .filter((img: any) => !isVideoMediaUrl(img.image_url || ""))
+                    .map((img: any) => (
                     <img key={img.id} src={img.image_url} alt="" className="w-full h-24 object-cover rounded-md border border-border" />
                   ))}
                 </div>

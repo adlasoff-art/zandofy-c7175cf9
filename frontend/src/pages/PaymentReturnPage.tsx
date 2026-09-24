@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle, Clock, ArrowLeft, ShoppingBag } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { useCart } from "@/contexts/CartContext";
 
 type PaymentStatus = "success" | "failed" | "cancelled" | "pending" | "loading";
 
@@ -16,6 +17,8 @@ export default function PaymentReturnPage() {
   const ref = params.get("ref");
   const statusParam = params.get("status");
   const orderId = params.get("order_id");
+  const { removeSelectedItems } = useCart();
+  const cartCleared = useRef(false);
 
   const [status, setStatus] = useState<PaymentStatus>("loading");
   const [orderRef, setOrderRef] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export default function PaymentReturnPage() {
 
       let query = supabase
         .from("payment_transactions")
-        .select("id, status, amount, currency, order_id, reference");
+        .select("id, status, amount, currency, order_id, reference, checkout_session_id");
 
       if (ref) {
         query = query.eq("reference", ref);
@@ -61,7 +64,19 @@ export default function PaymentReturnPage() {
         else if (data.status === "failed") setStatus("failed");
         else setStatus("pending");
 
-        if (data.order_id) {
+        const sessionId = (data as any).checkout_session_id as string | null;
+        if (sessionId) {
+          const { data: sibs } = await (supabase as any)
+            .from("orders")
+            .select("order_ref")
+            .eq("checkout_session_id", sessionId)
+            .order("order_ref");
+          const refs = ((sibs || []) as { order_ref: string }[])
+            .map((o) => o.order_ref)
+            .filter(Boolean);
+          if (refs.length > 1) setOrderRef(refs.join(" · "));
+          else if (refs[0]) setOrderRef(refs[0]);
+        } else if (data.order_id) {
           const { data: order } = await supabase
             .from("orders")
             .select("order_ref")
@@ -164,6 +179,13 @@ export default function PaymentReturnPage() {
     };
   }, [ref, orderId]);
 
+  // Clear cart lines once payment is confirmed (card/PayPal return).
+  useEffect(() => {
+    if (status !== "success" || cartCleared.current) return;
+    cartCleared.current = true;
+    void removeSelectedItems();
+  }, [status, removeSelectedItems]);
+
   const renderContent = () => {
     if (status === "loading") {
       return (
@@ -198,7 +220,9 @@ export default function PaymentReturnPage() {
           )}
           <div className="flex gap-3 mt-4">
             <Button asChild>
-              <Link to="/dashboard"><ShoppingBag size={16} className="mr-2" /> Mes commandes</Link>
+              <Link to={orderRef ? `/dashboard?tab=orders` : "/dashboard"}>
+                <ShoppingBag size={16} className="mr-2" /> Mes commandes
+              </Link>
             </Button>
             <Button variant="outline" asChild>
               <Link to="/"><ArrowLeft size={16} className="mr-2" /> Continuer mes achats</Link>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { Upload, Trash2, Image, Monitor, Smartphone, Info, Mail, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ const DEFAULT: BrandingConfig = {
 
 function BrandingTab() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [config, setConfig] = useState<BrandingConfig>(DEFAULT);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
@@ -70,6 +72,7 @@ function BrandingTab() {
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
+      await queryClient.invalidateQueries({ queryKey: ["platform-bootstrap"] });
       toast({ title: "Branding sauvegardé ✓" });
     }
   };

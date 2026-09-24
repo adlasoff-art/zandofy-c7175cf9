@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
     if (reference) {
       const { data: txData } = await supabaseAdmin
         .from("payment_transactions")
-        .select("id, order_id, status, transaction_id, method")
+        .select("id, order_id, checkout_session_id, status, transaction_id, method")
         .eq("reference", reference)
         .maybeSingle();
 
@@ -162,8 +162,28 @@ Deno.serve(async (req) => {
         })
         .eq("id", localTx.id);
 
-      // Update order status
-      if (localTx.order_id) {
+      // Update order(s) — session fan-out when checkout_session_id set
+      const sessionId = (localTx as { checkout_session_id?: string | null }).checkout_session_id;
+      if (isSuccess && sessionId) {
+        await supabaseAdmin.rpc("confirm_checkout_session_payment", {
+          p_session_id: sessionId,
+          p_tx_id: localTx.id,
+        });
+        const { data: siblingOrders } = await supabaseAdmin
+          .from("orders")
+          .select("id")
+          .eq("checkout_session_id", sessionId);
+        for (const o of siblingOrders || []) {
+          await fetch(`${supabaseUrl}/functions/v1/notify-order-status`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${serviceRoleKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ orderId: o.id, newStatus: "pending" }),
+          }).catch(console.error);
+        }
+      } else if (localTx.order_id) {
         if (isSuccess) {
           const { data: orderData } = await supabaseAdmin
             .from("orders")
@@ -178,7 +198,6 @@ Deno.serve(async (req) => {
               .eq("id", localTx.order_id)
               .in("status", ["awaiting_payment", "pending"]);
 
-            // Logistique payée avec la commande
             await supabaseAdmin.from("orders")
               .update({ shipping_payment_status: "paid" })
               .eq("id", localTx.order_id)
@@ -200,18 +219,22 @@ Deno.serve(async (req) => {
             }
           }
         } else if (isFailed) {
-          const { data: orderData } = await supabaseAdmin
-            .from("orders")
-            .select("status")
-            .eq("id", localTx.order_id)
-            .maybeSingle();
-
-          if (orderData && ["awaiting_payment"].includes(orderData.status)) {
-            await supabaseAdmin
+          if (sessionId) {
+            await supabaseAdmin.rpc("fail_checkout_session_payment", { p_session_id: sessionId });
+          } else {
+            const { data: orderData } = await supabaseAdmin
               .from("orders")
-              .update({ status: "payment_failed" })
+              .select("status")
               .eq("id", localTx.order_id)
-              .eq("status", "awaiting_payment");
+              .maybeSingle();
+
+            if (orderData && ["awaiting_payment"].includes(orderData.status)) {
+              await supabaseAdmin
+                .from("orders")
+                .update({ status: "payment_failed" })
+                .eq("id", localTx.order_id)
+                .eq("status", "awaiting_payment");
+            }
           }
         }
       }

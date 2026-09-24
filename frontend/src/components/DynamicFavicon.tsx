@@ -23,32 +23,8 @@ export function DynamicFavicon() {
       }
     }
 
-    // Update manifest dynamically for PWA icons
-    if (branding.pwa_icon_192_url || branding.pwa_icon_512_url) {
-      const manifestLink = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-      if (manifestLink) {
-        // Create a dynamic manifest blob
-        fetch(manifestLink.href)
-          .then(r => r.json())
-          .then(manifest => {
-            const icons = [...(manifest.icons || [])];
-            if (branding.pwa_icon_192_url) {
-              const idx192 = icons.findIndex((i: any) => i.sizes === "192x192");
-              if (idx192 >= 0) icons[idx192] = { ...icons[idx192], src: branding.pwa_icon_192_url };
-              else icons.push({ src: branding.pwa_icon_192_url, sizes: "192x192", type: "image/png", purpose: "any maskable" });
-            }
-            if (branding.pwa_icon_512_url) {
-              const idx512 = icons.findIndex((i: any) => i.sizes === "512x512");
-              if (idx512 >= 0) icons[idx512] = { ...icons[idx512], src: branding.pwa_icon_512_url };
-              else icons.push({ src: branding.pwa_icon_512_url, sizes: "512x512", type: "image/png", purpose: "any maskable" });
-            }
-            manifest.icons = icons;
-            const blob = new Blob([JSON.stringify(manifest)], { type: "application/json" });
-            manifestLink.href = URL.createObjectURL(blob);
-          })
-          .catch(() => {}); // Silently fail
-      }
-    }
+    // Prefer static /manifest.json for installability (TWA/APK). Never replace with blob URL.
+    // CMS PWA icons are applied as apple-touch / favicon only above.
   }, [branding]);
 
   return null;

@@ -30,11 +30,16 @@ import {
   deriveSeoKeywords,
   imageCount,
   isVideoMediaUrl,
+  MAX_PRODUCT_PHOTOS,
+  MIN_PRODUCT_PHOTOS_FOR_SUBMIT,
+  photoQuotaMessageFr,
+  validatePhotoQuota,
+  countProductPhotoUrls,
 } from "@/lib/product-catalogue-validation";
 
-/** Max product images (cover + gallery). Videos do not count. */
-const MAX_GALLERY_IMAGES = 5;
-const REQUIRED_IMAGES = 5;
+/** Max product images (cover + gallery). Videos do not count. Ceiling only. */
+const MAX_GALLERY_IMAGES = MAX_PRODUCT_PHOTOS;
+const MIN_IMAGES_FOR_SUBMIT = MIN_PRODUCT_PHOTOS_FOR_SUBMIT;
 
 /** Accept product-media Storage URLs, or keep an URL already on this product (legacy). */
 function isAllowedProductMediaUrl(url: string, existingUrls?: Set<string>): boolean {
@@ -245,7 +250,7 @@ export function VendorProductManager({
 
     if (error) {
       console.error("loadProducts error:", error);
-      toast.error("Impossible de charger le catalogue : " + (error.message || "erreur réseau"));
+      toast.error("Impossible de charger le catalogue. Vérifiez votre connexion et réessayez.");
       setLoading(false);
       return;
     }
@@ -398,8 +403,8 @@ export function VendorProductManager({
     if (listingBlocked) {
       toast.error(
         kybGate?.blocked
-          ? "Catalogue bloqué : complétez le KYB entreprise (seuil de ventes atteint)."
-          : "Catalogue bloqué : boutique suspendue, bannie ou archivée"
+          ? "Catalogue indisponible : complétez le KYB entreprise (seuil de ventes atteint)."
+          : "Catalogue indisponible : boutique suspendue ou archivée."
       );
       return;
     }
@@ -428,7 +433,7 @@ export function VendorProductManager({
 
   const startEdit = async (product: Product) => {
     if (listingBlocked) {
-      toast.error("Catalogue bloqué : boutique suspendue, bannie ou archivée");
+      toast.error("Catalogue indisponible : boutique suspendue ou archivée.");
       return;
     }
     setCreating(false);
@@ -490,15 +495,22 @@ export function VendorProductManager({
     setIncludeCare(!!((product as any).care_instructions || "").trim());
     metaDescriptionTouched.current = false;
     seoKeywordsTouched.current = false;
-    // Split images: position 0 = main, rest = variations
+    // Split media: first still photo = cover; remaining photos + videos = gallery
     const sorted = [...product.images].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-    const main = sorted.length > 0 ? [{ id: sorted[0].id, url: sorted[0].image_url, type: "image" as const, position: 0 }] : [];
-    const variations = sorted.slice(1).map((img, i) => ({
+    const typed = sorted.map((img, i) => ({
       id: img.id,
       url: img.image_url,
-      type: (img.image_url.match(/\.(mp4|webm|mov)$/i) ? "video" : "image") as "image" | "video",
-      position: i + 1,
+      type: (isVideoMediaUrl(img.image_url || "") ? "video" : "image") as "image" | "video",
+      position: i,
     }));
+    const coverIdx = typed.findIndex((m) => m.type === "image");
+    const main =
+      coverIdx >= 0
+        ? [{ ...typed[coverIdx], position: 0 }]
+        : [];
+    const variations = typed
+      .filter((_, i) => i !== coverIdx)
+      .map((m, i) => ({ ...m, position: i + 1 }));
     setMainImage(main);
     setVariationMedia(variations);
 
@@ -543,35 +555,46 @@ export function VendorProductManager({
 
   const handleSave = async () => {
     if (listingBlocked) {
-      toast.error("Catalogue bloqué : boutique suspendue, bannie ou archivée");
+      toast.error("Catalogue indisponible : boutique suspendue ou archivée.");
       return;
     }
     if (!form.name_fr.trim() || form.price <= 0) {
-      toast.error("Nom et prix sont obligatoires");
+      toast.error("Indiquez un nom et un prix valides.");
       return;
     }
-    // Produits déjà en catalogue / file / révision : textes + exactement 5 images
+    // Produits déjà en catalogue / file / révision : textes + au moins 1 photo (plafond 5)
     const requiresPublishQuality =
       editing?.publish_status === "published" ||
       editing?.publish_status === "pending_approval" ||
       editing?.publish_status === "revision_requested";
     if (requiresPublishQuality) {
       if (countWords(form.short_description) < 15) {
-        toast.error("La description courte doit contenir au moins 15 mots");
+        toast.error("Description courte : 15 mots minimum.");
         return;
       }
       if ((form.description || "").trim().length < 200) {
-        toast.error("La description longue doit contenir au moins 200 caractères");
+        toast.error("Description détaillée : 200 caractères minimum.");
         return;
       }
     }
     const currentImageCount = imageCount(mainImage, variationMedia);
-    if (requiresPublishQuality && currentImageCount !== REQUIRED_IMAGES) {
-      toast.error(`Ce produit nécessite exactement ${REQUIRED_IMAGES} photos (actuellement ${currentImageCount})`);
-      return;
-    }
-    if (currentImageCount > MAX_GALLERY_IMAGES) {
-      toast.error(`Maximum ${MAX_GALLERY_IMAGES} photos par produit.`);
+    if (requiresPublishQuality) {
+      const quota = validatePhotoQuota(currentImageCount, {
+        min: MIN_IMAGES_FOR_SUBMIT,
+        max: MAX_GALLERY_IMAGES,
+      });
+      if (!quota.ok) {
+        toast.error(photoQuotaMessageFr(quota));
+        return;
+      }
+    } else if (currentImageCount > MAX_GALLERY_IMAGES) {
+      toast.error(photoQuotaMessageFr({
+        ok: false,
+        reason: "too_many",
+        count: currentImageCount,
+        min: MIN_IMAGES_FOR_SUBMIT,
+        max: MAX_GALLERY_IMAGES,
+      }));
       return;
     }
     setSaving(true);
@@ -667,10 +690,10 @@ export function VendorProductManager({
         ? { ...payload, publish_status: "pending_approval" }
         : payload;
       const { error } = await (supabase.from("products").update(updatePayload as any) as any).eq("id", editing.id);
-      if (error) { console.error("Product update error:", error); toast.error("Erreur lors de la mise à jour : " + (error.message || "inconnue")); return; }
+      if (error) { console.error("Product update error:", error); toast.error("La mise à jour a échoué. Réessayez."); return; }
     } else {
       const { data, error } = await (supabase.from("products").insert(payload as any) as any).select("id").single();
-      if (error || !data) { console.error("Product insert error:", error); toast.error("Erreur lors de la création : " + (error?.message || "inconnue")); return; }
+      if (error || !data) { console.error("Product insert error:", error); toast.error("La création a échoué. Réessayez."); return; }
       productId = data.id;
     }
 
@@ -716,7 +739,15 @@ export function VendorProductManager({
         (m) => !isVideoMediaUrl(m.image_url)
       ).length;
       if (syncedImageCount > MAX_GALLERY_IMAGES) {
-        abortSave(`Maximum ${MAX_GALLERY_IMAGES} photos par produit.`);
+        abortSave(
+          photoQuotaMessageFr({
+            ok: false,
+            reason: "too_many",
+            count: syncedImageCount,
+            min: MIN_IMAGES_FOR_SUBMIT,
+            max: MAX_GALLERY_IMAGES,
+          })
+        );
         return;
       }
 
@@ -742,13 +773,8 @@ export function VendorProductManager({
         );
         if (syncErr) {
           console.error("sync_product_gallery error:", syncErr);
-          const msg = String(syncErr.message || syncErr.code || "inconnue");
           abortSave(
-            "Erreur lors de l'enregistrement des photos : " +
-              msg +
-              (msg.includes("Could not find") || msg.includes("PGRST202")
-                ? " Appliquez la migration SQL sync_product_gallery (staging puis prod)."
-                : "")
+            "L’enregistrement des photos a échoué. Réessayez ou contactez le support."
           );
           return;
         }
@@ -988,14 +1014,14 @@ export function VendorProductManager({
     clearDraft();
     toast.success(editing
       ? wasPublished
-        ? "Produit modifié — soumis à nouveau pour approbation"
-        : "Produit mis à jour"
-      : "Produit sauvegardé en brouillon");
+        ? "Modifications enregistrées — article renvoyé pour validation."
+        : "Article mis à jour."
+      : "Article enregistré en brouillon.");
     cancelForm();
     loadProducts();
     } catch (err) {
       console.error("handleSave unexpected error:", err);
-      toast.error("Erreur inattendue lors de la sauvegarde");
+      toast.error("Une erreur est survenue lors de l’enregistrement. Réessayez.");
     } finally {
       setSaving(false);
     }
@@ -1003,35 +1029,37 @@ export function VendorProductManager({
 
   const handlePublish = async (productId: string) => {
     if (listingBlocked) {
-      toast.error("Catalogue bloqué : boutique suspendue, bannie ou archivée");
+      toast.error("Catalogue indisponible : boutique suspendue ou archivée.");
       return;
     }
-    // Toujours vérifier en base (évite un cache liste périmé) — exactement 5 images, hors vidéos
+    // Toujours vérifier en base (évite un cache liste périmé) — min 1 / max 5 photos, hors vidéos
     const { data: imgRows, error: countErr } = await supabase
       .from("product_images")
       .select("image_url")
       .eq("product_id", productId);
     if (countErr) {
-      toast.error("Impossible de vérifier les photos avant soumission");
+      toast.error("Impossible de vérifier les photos avant soumission. Réessayez.");
       return;
     }
-    const photoCount = (imgRows || []).filter(
-      (row: { image_url: string }) => !isVideoMediaUrl(row.image_url || "")
-    ).length;
-    if (photoCount !== REQUIRED_IMAGES) {
-      toast.error(
-        `Ajoutez exactement ${REQUIRED_IMAGES} photos avant de soumettre (actuellement ${photoCount})`
-      );
+    const photoCount = countProductPhotoUrls(
+      (imgRows || []).map((row: { image_url: string }) => row.image_url)
+    );
+    const quota = validatePhotoQuota(photoCount, {
+      min: MIN_IMAGES_FOR_SUBMIT,
+      max: MAX_GALLERY_IMAGES,
+    });
+    if (!quota.ok) {
+      toast.error(photoQuotaMessageFr(quota));
       return;
     }
     const product = products.find((p) => p.id === productId);
     if (product) {
       if (countWords(product.short_description || "") < 15) {
-        toast.error("Description courte : au moins 15 mots avant soumission");
+        toast.error("Description courte : 15 mots minimum.");
         return;
       }
       if ((product.description || "").trim().length < 200) {
-        toast.error("Description longue : au moins 200 caractères avant soumission");
+        toast.error("Description détaillée : 200 caractères minimum.");
         return;
       }
     }
@@ -1041,16 +1069,16 @@ export function VendorProductManager({
       .update({ publish_status: "pending_approval" } as any)
       .eq("id", productId);
     if (error) {
-      toast.error("Erreur lors de la soumission");
+      toast.error("La soumission a échoué. Réessayez dans un instant.");
     } else {
-      toast.success("Produit soumis pour approbation");
+      toast.success("Article envoyé pour validation.");
       loadProducts();
     }
   };
 
   const handleDelete = async (id: string) => {
     if (listingBlocked) {
-      toast.error("Catalogue bloqué : boutique suspendue, bannie ou archivée");
+      toast.error("Catalogue indisponible : boutique suspendue ou archivée.");
       return;
     }
     setDeleting(id);
@@ -1064,7 +1092,7 @@ export function VendorProductManager({
             .update({ publish_status: "draft" } as any)
             .eq("id", id);
           if (!error) {
-            toast.success("Produit dépublié (historique de commandes conservé)");
+            toast.success("Article dépublié (historique de commandes conservé).");
             loadProducts();
           }
         }
@@ -1072,9 +1100,9 @@ export function VendorProductManager({
       }
       await supabase.from("product_images").delete().eq("product_id", id);
       const { error } = await supabase.from("products").delete().eq("id", id);
-      if (error) toast.error("Erreur lors de la suppression : " + (error.message || "inconnue"));
+      if (error) toast.error("La suppression a échoué. Réessayez.");
       else {
-        toast.success("Produit supprimé");
+        toast.success("Article supprimé.");
         loadProducts();
       }
     } finally {
@@ -1084,7 +1112,7 @@ export function VendorProductManager({
 
   const handleUnpublish = async (productId: string) => {
     if (listingBlocked) {
-      toast.error("Catalogue bloqué : boutique suspendue, bannie ou archivée");
+      toast.error("Catalogue indisponible : boutique suspendue ou archivée.");
       return;
     }
     const { error } = await supabase
@@ -1092,9 +1120,9 @@ export function VendorProductManager({
       .update({ publish_status: "draft" } as any)
       .eq("id", productId);
     if (error) {
-      toast.error("Erreur lors de la dépublication");
+      toast.error("La dépublication a échoué. Réessayez.");
     } else {
-      toast.success("Produit dépublié");
+      toast.success("Article dépublié.");
       loadProducts();
     }
   };
@@ -1123,7 +1151,7 @@ export function VendorProductManager({
 
           {/* Gallery media (additional photos / video — not color-variant SKUs) */}
           <MediaUploader
-            label="Galerie — autres photos / vidéo (max 4 photos + vidéos ≤30s)"
+            label="Galerie — photos et vidéo (jusqu’à 4 photos ici ; 5 photos max au total)"
             items={variationMedia}
             onChange={setVariationMedia}
             multiple={true}
@@ -1633,9 +1661,14 @@ export function VendorProductManager({
               key={product.id}
               className="bg-card border border-border rounded-lg p-3 flex items-center gap-3"
             >
-              {product.images[0] ? (
+              {(() => {
+                const coverUrl = product.images.find((img) => !isVideoMediaUrl(img.image_url || ""))?.image_url;
+                const photoCount = countProductPhotoUrls(product.images.map((i) => i.image_url));
+                return (
+                  <>
+              {coverUrl ? (
                 <img
-                  src={product.images[0].image_url}
+                  src={coverUrl}
                   alt={product.name_fr}
                   className="w-12 h-12 rounded-md object-cover shrink-0"
                 />
@@ -1666,10 +1699,10 @@ export function VendorProductManager({
                 {(product.publish_status === "draft" || product.publish_status === "revision_requested") && (
                   <button
                     onClick={() => handlePublish(product.id)}
-                    disabled={!product.images?.length}
+                    disabled={photoCount < MIN_IMAGES_FOR_SUBMIT}
                     className="p-2 text-muted-foreground hover:text-emerald-500 transition-colors disabled:opacity-40 disabled:pointer-events-none"
                     title={
-                      product.images?.length
+                      photoCount >= MIN_IMAGES_FOR_SUBMIT
                         ? "Soumettre pour approbation"
                         : "Ajoutez au moins une photo avant de soumettre"
                     }
@@ -1705,6 +1738,9 @@ export function VendorProductManager({
                   {deleting === product.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                 </button>
               </div>
+                  </>
+                );
+              })()}
             </div>
           ))
           })()}

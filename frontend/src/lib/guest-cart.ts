@@ -15,6 +15,8 @@ export type GuestCartItem = {
   quantity: number;
   moq: number;
   selected: boolean;
+  storeId?: string | null;
+  storeName?: string;
 };
 
 export function readGuestCart(): GuestCartItem[] {
@@ -86,6 +88,8 @@ export function upsertGuestCartItem(
     quantity: addQty,
     moq: item.moq,
     selected: item.selected ?? true,
+    storeId: item.storeId ?? null,
+    storeName: item.storeName ?? "",
   };
   return { items: [...items, row], finalQty: addQty, wasExisting: false };
 }

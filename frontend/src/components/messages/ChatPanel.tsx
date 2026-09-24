@@ -61,12 +61,30 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [keyboardInset, setKeyboardInset] = useState(0);
 
   const autoResize = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = "auto";
     ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+  }, []);
+
+  // Keep composer above mobile virtual keyboard without shifting the layout sideways.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const sync = () => {
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKeyboardInset(inset > 40 ? inset : 0);
+    };
+    vv.addEventListener("resize", sync);
+    vv.addEventListener("scroll", sync);
+    sync();
+    return () => {
+      vv.removeEventListener("resize", sync);
+      vv.removeEventListener("scroll", sync);
+    };
   }, []);
 
   const scrollToBottom = useCallback(() => {
@@ -316,11 +334,8 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
     if (error) toast.error("Erreur lors de la suppression");
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+  const handleKeyDown = (_e: React.KeyboardEvent) => {
+    // Enter = newline only; send exclusively via the Send button.
   };
 
   // Search within conversation
@@ -399,7 +414,10 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div
+      className="flex flex-col h-full"
+      style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
+    >
       {/* Header — sticky on mobile */}
       <div className="px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top,0.75rem))] md:pt-3 border-b border-border flex items-center gap-3 shrink-0 sticky top-0 z-10 bg-background md:static">
         {onBack && (
@@ -561,7 +579,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
                   >
                     <div
                       className={cn(
-                        "max-w-[75%] px-3 py-2 rounded-lg text-sm relative",
+                        "max-w-[min(75%,20rem)] sm:max-w-[75%] px-3 py-2 rounded-lg text-sm relative break-words overflow-wrap-anywhere whitespace-pre-wrap",
                         isOwn
                           ? "bg-primary text-primary-foreground rounded-br-sm"
                           : "bg-[hsl(var(--chat-received))] text-[hsl(var(--chat-received-foreground))] rounded-bl-sm",
@@ -635,7 +653,7 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
       )}
 
       {/* Input area */}
-      <div className="border-t border-border px-3 py-2 flex items-center gap-2 shrink-0">
+      <div className="border-t border-border px-3 py-2 flex items-end gap-2 shrink-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {/* File upload button — always visible */}
         <input
           ref={fileInputRef}
@@ -660,13 +678,15 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
           onPaste={handlePaste}
           placeholder="Écrivez votre message..."
           rows={2}
-          className="flex-1 resize-none bg-muted/50 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground min-h-[44px] max-h-[120px]"
+          enterKeyHint="enter"
+          className="flex-1 min-w-0 resize-none bg-muted/50 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground min-h-[44px] max-h-[120px]"
         />
         <Button
           size="icon"
           onClick={handleSend}
           disabled={!newMessage.trim() || sending}
           className="shrink-0 h-9 w-9"
+          aria-label="Envoyer"
         >
           {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
         </Button>

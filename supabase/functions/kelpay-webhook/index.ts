@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
     // Find the payment transaction by reference
     const { data: tx, error: txErr } = await supabase
       .from("payment_transactions")
-      .select("id, order_id, status, payment_type, amount, user_id, method")
+      .select("id, order_id, checkout_session_id, status, payment_type, amount, user_id, method")
       .eq("reference", reference)
       .maybeSingle();
 
@@ -224,8 +224,31 @@ Deno.serve(async (req) => {
     // Update order status
     if (isSuccess) {
       const paymentType = tx.payment_type || "order";
+      const sessionId = (tx as { checkout_session_id?: string | null }).checkout_session_id;
 
-      if (paymentType === "order") {
+      if (paymentType === "order" && sessionId) {
+        const { error: confErr } = await supabase.rpc("confirm_checkout_session_payment", {
+          p_session_id: sessionId,
+          p_tx_id: tx.id,
+        });
+        if (confErr) console.error("confirm_checkout_session_payment", confErr);
+        else {
+          const { data: siblingOrders } = await supabase
+            .from("orders")
+            .select("id")
+            .eq("checkout_session_id", sessionId);
+          for (const o of siblingOrders || []) {
+            await fetch(`${supabaseUrl}/functions/v1/notify-order-status`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${serviceRoleKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ orderId: o.id, newStatus: "pending" }),
+            }).catch(console.error);
+          }
+        }
+      } else if (paymentType === "order") {
         const { error: orderUpdateError } = await supabase
           .from("orders")
           .update({ status: "pending" })
@@ -265,21 +288,35 @@ Deno.serve(async (req) => {
         });
       }
     } else if (isFailed) {
-      const { data: orderData } = await supabase
-        .from("orders")
-        .select("status")
-        .eq("id", tx.order_id)
-        .maybeSingle();
-
-      if (orderData && ["awaiting_payment"].includes(orderData.status)) {
-        await supabase.rpc("refund_customer_wallet_for_order", {
-          p_order_id: tx.order_id,
-        });
-        await supabase
+      const sessionId = (tx as { checkout_session_id?: string | null }).checkout_session_id;
+      if (sessionId) {
+        const { data: sibs } = await supabase
           .from("orders")
-          .update({ status: "payment_failed" })
+          .select("id, status")
+          .eq("checkout_session_id", sessionId);
+        for (const o of sibs || []) {
+          if (o.status === "awaiting_payment") {
+            await supabase.rpc("refund_customer_wallet_for_order", { p_order_id: o.id });
+          }
+        }
+        await supabase.rpc("fail_checkout_session_payment", { p_session_id: sessionId });
+      } else {
+        const { data: orderData } = await supabase
+          .from("orders")
+          .select("status")
           .eq("id", tx.order_id)
-          .eq("status", "awaiting_payment");
+          .maybeSingle();
+
+        if (orderData && ["awaiting_payment"].includes(orderData.status)) {
+          await supabase.rpc("refund_customer_wallet_for_order", {
+            p_order_id: tx.order_id,
+          });
+          await supabase
+            .from("orders")
+            .update({ status: "payment_failed" })
+            .eq("id", tx.order_id)
+            .eq("status", "awaiting_payment");
+        }
       }
 
       if (tx.user_id) {

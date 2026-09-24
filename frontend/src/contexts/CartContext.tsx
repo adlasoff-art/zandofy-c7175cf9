@@ -26,6 +26,9 @@ export interface CartItem {
   quantity: number;
   moq: number;
   selected: boolean;
+  /** Hydrated from product → store (null until resolved). */
+  storeId: string | null;
+  storeName: string;
 }
 
 interface CartContextType {
@@ -42,6 +45,8 @@ interface CartContextType {
   toggleSelected: (id: string) => Promise<void>;
   selectAll: () => Promise<void>;
   deselectAll: () => Promise<void>;
+  /** Select/deselect all lines for one store (mono-store checkout UX). */
+  selectStore: (storeId: string, selected: boolean) => Promise<void>;
   removeSelectedItems: () => Promise<void>;
   itemCount: number;
   subtotal: number;
@@ -63,6 +68,7 @@ const CartContext = createContext<CartContextType>({
   toggleSelected: async () => {},
   selectAll: async () => {},
   deselectAll: async () => {},
+  selectStore: async () => {},
   removeSelectedItems: async () => {},
   itemCount: 0,
   subtotal: 0,
@@ -73,7 +79,11 @@ const CartContext = createContext<CartContextType>({
 export const useCart = () => useContext(CartContext);
 
 function guestToCart(items: GuestCartItem[]): CartItem[] {
-  return items.map((i) => ({ ...i }));
+  return items.map((i) => ({
+    ...i,
+    storeId: i.storeId ?? null,
+    storeName: i.storeName ?? "",
+  }));
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
@@ -91,8 +101,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       .from("cart_items")
       .select(`
         id, product_id, color, size, quantity, selected,
-        products(name, name_fr, price, original_price, moq,
-          product_images(image_url, position)
+        products(
+          name, name_fr, price, original_price, moq, store_id,
+          product_images(image_url, position),
+          stores(name, slug)
         )
       `)
       .eq("user_id", user.id)
@@ -117,6 +129,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       quantity: row.quantity,
       moq: row.products?.moq || 1,
       selected: row.selected ?? true,
+      storeId: row.products?.store_id || null,
+      storeName: row.products?.stores?.name || "",
     })));
     setLoading(false);
   }, [user]);
@@ -190,6 +204,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [user?.id, fetchDbCart, mergeGuestIntoDb]);
+
+  // Deep-link from checkout bounce: /?openCart=1
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("openCart") === "1") {
+        setDrawerOpen(true);
+        params.delete("openCart");
+        const qs = params.toString();
+        window.history.replaceState(
+          {},
+          "",
+          `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const addItem = async (item: Omit<CartItem, "id" | "selected">) => {
     if (!user) {
@@ -355,6 +389,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prev) => prev.map((i) => ({ ...i, selected: false })));
   };
 
+  const selectStore = async (storeId: string, selected: boolean) => {
+    const match = (i: CartItem) =>
+      (i.storeId || "__unknown__") === storeId ||
+      (!i.storeId && storeId === "__unknown__");
+    if (!user) {
+      const next = readGuestCart().map((i) =>
+        match({ ...i, storeId: i.storeId ?? null, storeName: i.storeName ?? "" } as CartItem)
+          ? { ...i, selected }
+          : i
+      );
+      writeGuestCart(next);
+      setItems(guestToCart(next));
+      return;
+    }
+    const ids = items.filter(match).map((i) => i.id);
+    if (ids.length === 0) return;
+    await supabase.from("cart_items").update({ selected } as any).in("id", ids);
+    setItems((prev) =>
+      prev.map((i) => (ids.includes(i.id) ? { ...i, selected } : i))
+    );
+  };
+
   const removeSelectedItems = async () => {
     if (!user) {
       const next = readGuestCart().filter((i) => !i.selected);
@@ -390,6 +446,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         toggleSelected,
         selectAll,
         deselectAll,
+        selectStore,
         removeSelectedItems,
         itemCount,
         subtotal,
