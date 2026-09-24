@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { compressImage } from "@/utils/image-compress";
 import { useI18n } from "@/contexts/I18nContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -7,6 +7,7 @@ import { Footer } from "@/components/Footer";
 import { SEOHead } from "@/components/SEOHead";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { isSyntheticAuthEmail } from "@/lib/auth-helpers";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -134,6 +135,7 @@ interface OrderRow {
   last_mile_payment_proof_url: string | null;
   hub_pickup_proof_url: string | null;
   store_id: string | null;
+  checkout_session_id?: string | null;
   delivery_date_requested: string | null;
   delivery_time_requested: string | null;
   shop_type?: string | null;
@@ -247,6 +249,7 @@ export default function DashboardPage() {
       "hub_pickup_proof_url",
       "delivery_date_requested",
       "delivery_time_requested",
+      "checkout_session_id",
     ]);
 
     // Enrich with store shop_type for local vs intl tracking steppers
@@ -609,6 +612,16 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
   const totalPages = Math.ceil(filtered.length / ORDERS_PER_PAGE);
   const paginated = filtered.slice(page * ORDERS_PER_PAGE, (page + 1) * ORDERS_PER_PAGE);
 
+  /** Group siblings that share a checkout_session for display (still one row per order). */
+  const sessionSiblingCount = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const o of filtered) {
+      if (!o.checkout_session_id) continue;
+      map.set(o.checkout_session_id, (map.get(o.checkout_session_id) || 0) + 1);
+    }
+    return map;
+  }, [filtered]);
+
   // Reset page on filter change
   useEffect(() => { setPage(0); }, [statusFilter, searchQuery]);
 
@@ -674,6 +687,12 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-foreground text-sm">{order.order_ref}</span>
+                    {order.checkout_session_id &&
+                      (sessionSiblingCount.get(order.checkout_session_id) || 0) > 1 && (
+                      <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-muted text-muted-foreground">
+                        Paiement groupé · {sessionSiblingCount.get(order.checkout_session_id)} commandes
+                      </span>
+                    )}
                     <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${status.badgeClass}`}>{status.label}</span>
                     {(order.shipping_first_name || order.shipping_last_name) && (
                       <span className="text-xs text-foreground font-medium">
@@ -722,6 +741,8 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
           orderId={retryOrder.id}
           orderRef={retryOrder.order_ref}
           amount={Number(retryOrder.total)}
+          currency="USD"
+          checkoutSessionId={retryOrder.checkout_session_id}
           onClose={() => setRetryOrder(null)}
           onSuccess={() => { setRetryOrder(null); onCancelSuccess(); }}
         />
@@ -1339,6 +1360,8 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
           orderId={order.id}
           orderRef={order.order_ref}
           amount={Number(order.total)}
+          currency="USD"
+          checkoutSessionId={order.checkout_session_id}
           onClose={() => setShowRetryPayment(false)}
           onSuccess={() => { setShowRetryPayment(false); onCancelSuccess(); }}
         />
@@ -1764,6 +1787,51 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [savingEmail, setSavingEmail] = useState(false);
+
+  const handleAttachEmail = async () => {
+    const email = newEmail.trim().toLowerCase();
+    if (!email || !email.includes("@") || isSyntheticAuthEmail(email)) {
+      toast({
+        title: t("profile.error"),
+        description: t("profile.invalidEmail") || "Email invalide",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSavingEmail(true);
+    const { error } = await supabase.auth.updateUser({ email });
+    if (!error) {
+      await supabase
+        .from("profiles")
+        .update({ email_is_placeholder: false } as any)
+        .eq("id", user.id);
+    }
+    setSavingEmail(false);
+    if (error) {
+      toast({ title: t("profile.error"), description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({
+      title: t("profile.emailUpdated") || "Email enregistré",
+      description:
+        t("profile.emailConfirmSent") ||
+        "Vérifiez votre boîte mail et cliquez sur le lien de confirmation.",
+    });
+  };
+
+  const handleResendEmail = async () => {
+    if (!user.email || isSyntheticAuthEmail(user.email)) return;
+    setSavingEmail(true);
+    const { error } = await supabase.auth.resend({ type: "signup", email: user.email });
+    setSavingEmail(false);
+    if (error) {
+      toast({ title: t("profile.error"), description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: t("profile.emailConfirmSent") || "Email de confirmation renvoyé" });
+  };
 
   // Check for active orders (locks residence address)
   useEffect(() => {
@@ -1976,7 +2044,41 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
         <div className="space-y-4">
           <div>
             <Label className="text-xs text-muted-foreground">{t("profile.email")}</Label>
-            <Input className="mt-1 bg-muted" value={user.email || ""} disabled />
+            {isSyntheticAuthEmail(user.email) || !(user as any).email_confirmed_at ? (
+              <div className="mt-1 space-y-2">
+                <Input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="vous@email.com"
+                  autoComplete="email"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={savingEmail || !newEmail.trim()}
+                    onClick={handleAttachEmail}
+                  >
+                    {savingEmail ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
+                    {isSyntheticAuthEmail(user.email)
+                      ? t("profile.attachEmail") || "Enregistrer l'email"
+                      : t("profile.changeEmail") || "Mettre à jour l'email"}
+                  </Button>
+                  {!isSyntheticAuthEmail(user.email) && !user.email_confirmed_at && (
+                    <Button type="button" size="sm" variant="outline" onClick={handleResendEmail} disabled={savingEmail}>
+                      {t("profile.resendConfirm") || "Renvoyer la confirmation"}
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {t("profile.attachEmailHint") ||
+                    "Un email de confirmation sera envoyé. Vérifiez votre boîte de réception."}
+                </p>
+              </div>
+            ) : (
+              <Input className="mt-1 bg-muted" value={user.email || ""} disabled />
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

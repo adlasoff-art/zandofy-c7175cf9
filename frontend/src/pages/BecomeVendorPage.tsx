@@ -745,7 +745,7 @@ export default function BecomeVendorPage() {
                         Complétez la vérification d&apos;identité dans votre compte, puis revenez ici pour continuer.
                       </p>
                       <Button asChild size="sm">
-                        <Link to="/dashboard">Compléter mon KYC</Link>
+                        <Link to="/dashboard?tab=kyc">Compléter mon KYC</Link>
                       </Button>
                     </div>
                   )}

@@ -68,7 +68,7 @@ export function MediaUploader({
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     if (!storeId?.trim()) {
-      toast.error("Boutique introuvable — impossible d'uploader les médias.");
+      toast.error("Boutique introuvable. Impossible d’ajouter des médias.");
       return;
     }
 
@@ -77,8 +77,8 @@ export function MediaUploader({
     if (remainingImages <= 0 && remainingVideos <= 0) {
       toast.error(
         acceptVideo
-          ? `Maximum ${limit} image(s) et ${MAX_VIDEOS} vidéo(s) pour cette zone.`
-          : `Maximum ${limit} fichier(s) pour cette zone.`
+          ? `Limite atteinte pour cette zone (jusqu’à ${limit} photos et ${MAX_VIDEOS} vidéos).`
+          : `Limite atteinte pour cette zone (jusqu’à ${limit} photos).`
       );
       return;
     }

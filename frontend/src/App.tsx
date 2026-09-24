@@ -79,6 +79,7 @@ const PrivacyPage = lazyRetry(() => import("./pages/PrivacyPage"));
 const TrackingPage = lazyRetry(() => import("./pages/TrackingPage"));
 const BecomeVendorPage = lazyRetry(() => import("./pages/BecomeVendorPage"));
 const DiscoverPage = lazyRetry(() => import("./pages/DiscoverPage"));
+const GetAppPage = lazyRetry(() => import("./pages/GetAppPage"));
 const BannedPage = lazyRetry(() => import("./pages/BannedPage"));
 const DriverPage = lazyRetry(() => import("./pages/DriverPage"));
 const AffiliateProgramPage = lazyRetry(() => import("./pages/AffiliateProgramPage"));
@@ -322,6 +323,7 @@ const App = () => (
                 <Route path="/t/:token" element={<PublicExternalTrackingPage />} />
                 <Route path="/become-vendor" element={<BecomeVendorPage />} />
                 <Route path="/discover" element={<DiscoverPage />} />
+                <Route path="/get-app" element={<GetAppPage />} />
                 <Route path="/driver" element={<DriverPage />} />
                 <Route path="/affiliate-program" element={<AffiliateProgramPage />} />
                 <Route path="/loyalty-program" element={<LoyaltyProgramPage />} />

@@ -15,6 +15,7 @@ import {
   type GatewayFees,
 } from "@/lib/gateway-fees";
 import { useVendorOffPlatformAccess } from "@/hooks/use-vendor-off-platform-access";
+import { VendorIndividualServices } from "@/components/vendor/VendorIndividualServices";
 
 interface Props {
   storeId: string;
@@ -187,6 +188,23 @@ export function VendorPricingTab({ storeId }: Props) {
         </div>
       </div>
 
+      <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+        <h3 className="text-sm font-bold text-foreground">Fonctionnalités</h3>
+        <div className="grid gap-2 text-xs">
+          <p className="font-semibold text-muted-foreground uppercase tracking-wide">Inclus (socle)</p>
+          <ul className="space-y-1 text-foreground">
+            <li className="flex items-center gap-1.5"><Check size={12} className="text-emerald-600" /> Catalogue &amp; commandes</li>
+            <li className="flex items-center gap-1.5"><Check size={12} className="text-emerald-600" /> Messages clients</li>
+            <li className="flex items-center gap-1.5"><Check size={12} className="text-emerald-600" /> Wallet plateforme</li>
+            <li className="flex items-center gap-1.5"><Check size={12} className="text-emerald-600" /> Stats de base</li>
+          </ul>
+          <p className="font-semibold text-muted-foreground uppercase tracking-wide pt-2">Extras (à activer)</p>
+          <p className="text-muted-foreground">
+            Numéros Mobile Money boutique, services individuels et options payantes : activez-les ci-dessous ou via l’onglet Services.
+          </p>
+        </div>
+      </div>
+
       {offAccess?.reason === "trial" && offAccess.trialEndsAt && (
         <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
           Essai hors plateforme jusqu&apos;au {new Date(offAccess.trialEndsAt).toLocaleDateString("fr-FR")}
@@ -269,6 +287,18 @@ export function VendorPricingTab({ storeId }: Props) {
           onSuccess={handleSubscriptionSuccess}
         />
       )}
+
+      <div className="space-y-2 pt-2">
+        <h3 className="text-sm font-bold text-foreground">Services individuels</h3>
+        <p className="text-xs text-muted-foreground">
+          Activez des extras gratuits ou payants selon les plans plateforme.
+        </p>
+        <VendorIndividualServices
+          storeId={storeId}
+          billingCycle="monthly"
+          kycVerified={!!kycVerified}
+        />
+      </div>
     </div>
   );
 }

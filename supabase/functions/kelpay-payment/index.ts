@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { order_id, phone_number, amount, currency, provider, payment_type } = body;
+    const { order_id, phone_number, amount, currency, provider, payment_type, checkout_session_id } = body;
 
     if (!order_id || !phone_number || !amount || !currency) {
       return new Response(
@@ -107,29 +107,91 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    // Server-authoritative amount: order.total − wallet_credit_applied
-    const { data: orderRow, error: orderErr } = await supabaseAdmin
-      .from("orders")
-      .select("id, total, wallet_credit_applied, user_id, status, payment_method")
-      .eq("id", order_id)
-      .maybeSingle();
-    if (orderErr || !orderRow) {
-      return new Response(
-        JSON.stringify({ error: "Commande introuvable" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    if (orderRow.user_id && userId && orderRow.user_id !== userId) {
-      return new Response(
-        JSON.stringify({ error: "Forbidden" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    let sessionId: string | null = checkout_session_id || null;
+    let expected = 0;
+    let anchorOrderId = order_id;
+
+    if (sessionId) {
+      const { data: sessionOrders, error: sessOrdErr } = await supabaseAdmin
+        .from("orders")
+        .select("id, total, wallet_credit_applied, user_id, status, checkout_session_id")
+        .eq("checkout_session_id", sessionId);
+
+      if (sessOrdErr || !sessionOrders?.length) {
+        return new Response(
+          JSON.stringify({ error: "Session de paiement introuvable" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const ownerOk = sessionOrders.every((o: any) => !o.user_id || o.user_id === userId);
+      if (!ownerOk) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const anchor = sessionOrders.find((o: any) => o.id === order_id) || sessionOrders[0];
+      anchorOrderId = anchor.id;
+      expected =
+        Math.round(
+          sessionOrders.reduce(
+            (s: number, o: any) =>
+              s + Math.max(0, Number(o.total || 0) - Number(o.wallet_credit_applied || 0)),
+            0
+          ) * 100
+        ) / 100;
+
+      await supabaseAdmin
+        .from("checkout_sessions")
+        .update({ status: "payment_pending", anchor_order_id: anchorOrderId, total_amount: expected, updated_at: new Date().toISOString() })
+        .eq("id", sessionId)
+        .in("status", ["open", "payment_pending"]);
+    } else {
+      // Server-authoritative amount: single order.total − wallet_credit_applied
+      const { data: orderRow, error: orderErr } = await supabaseAdmin
+        .from("orders")
+        .select("id, total, wallet_credit_applied, user_id, status, payment_method, checkout_session_id")
+        .eq("id", order_id)
+        .maybeSingle();
+      if (orderErr || !orderRow) {
+        return new Response(
+          JSON.stringify({ error: "Commande introuvable" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (orderRow.user_id && userId && orderRow.user_id !== userId) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      // Auto-detect session if order is linked
+      if ((orderRow as any).checkout_session_id) {
+        sessionId = (orderRow as any).checkout_session_id;
+        const { data: sessionOrders } = await supabaseAdmin
+          .from("orders")
+          .select("id, total, wallet_credit_applied")
+          .eq("checkout_session_id", sessionId);
+        expected =
+          Math.round(
+            (sessionOrders || []).reduce(
+              (s: number, o: any) =>
+                s + Math.max(0, Number(o.total || 0) - Number(o.wallet_credit_applied || 0)),
+              0
+            ) * 100
+          ) / 100;
+        await supabaseAdmin
+          .from("checkout_sessions")
+          .update({ status: "payment_pending", anchor_order_id: order_id, total_amount: expected, updated_at: new Date().toISOString() })
+          .eq("id", sessionId);
+      } else {
+        expected =
+          Math.round(
+            (Number(orderRow.total || 0) - Number(orderRow.wallet_credit_applied || 0)) * 100
+          ) / 100;
+      }
     }
 
-    const expected =
-      Math.round(
-        (Number(orderRow.total || 0) - Number(orderRow.wallet_credit_applied || 0)) * 100
-      ) / 100;
     const clientAmount = Math.round(Number(amount) * 100) / 100;
     if (expected <= 0) {
       return new Response(
@@ -151,6 +213,9 @@ Deno.serve(async (req) => {
     const cleanAmount = expected;
     const reference = `ZPY-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     const callbackUrl = `${supabaseUrl}/functions/v1/kelpay-webhook`;
+    const descSuffix = sessionId
+      ? `session ${String(sessionId).slice(0, 8)}`
+      : String(anchorOrderId);
 
     console.log("KelPay request:", JSON.stringify({
       merchantcode: merchantCode,
@@ -159,6 +224,7 @@ Deno.serve(async (req) => {
       amount: String(cleanAmount),
       currency: currency.toUpperCase(),
       callbackurl: callbackUrl,
+      checkout_session_id: sessionId,
     }));
 
     const kelpayResponse = await fetch(KELPAY_URL, {
@@ -173,7 +239,7 @@ Deno.serve(async (req) => {
         reference,
         amount: String(cleanAmount),
         currency: currency.toUpperCase(),
-        description: `Paiement commande Zandofy - ${order_id}`,
+        description: `Paiement commande Zandofy - ${descSuffix}`,
         callbackurl: callbackUrl,
       }),
     });
@@ -189,7 +255,8 @@ Deno.serve(async (req) => {
 
     if (isAccepted || isSentToMobile) {
       await supabaseAdmin.from("payment_transactions").insert({
-        order_id,
+        order_id: anchorOrderId,
+        checkout_session_id: sessionId,
         user_id: userId,
         method: "mobile_money",
         provider: provider || null,
@@ -203,23 +270,32 @@ Deno.serve(async (req) => {
         callback_payload: kelpayData,
       });
 
-      await supabaseAdmin
-        .from("orders")
-        .update({ payment_method: "mobile_money" })
-        .eq("id", order_id);
+      if (sessionId) {
+        await supabaseAdmin
+          .from("orders")
+          .update({ payment_method: "mobile_money" })
+          .eq("checkout_session_id", sessionId);
+      } else {
+        await supabaseAdmin
+          .from("orders")
+          .update({ payment_method: "mobile_money" })
+          .eq("id", anchorOrderId);
+      }
 
       return new Response(
         JSON.stringify({
           success: true,
           reference,
           transaction_id: kelpayData.transactionid,
+          checkout_session_id: sessionId,
           message: kelpayData.description || "Paiement envoyé, confirmez sur votre téléphone",
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } else {
       await supabaseAdmin.from("payment_transactions").insert({
-        order_id,
+        order_id: anchorOrderId,
+        checkout_session_id: sessionId,
         user_id: userId,
         method: "mobile_money",
         provider: provider || null,

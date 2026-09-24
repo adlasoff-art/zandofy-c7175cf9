@@ -678,6 +678,8 @@ export default function ProductPage() {
                     })(),
                     quantity: currentQty,
                     moq: moq,
+                    storeId: (product as any).store?.id || (product as any).store_id || null,
+                    storeName: (product as any).store?.name || "",
                   });
                 }}><ShoppingCart size={18} />{t("product.addToCart")}</Button>
               </div>

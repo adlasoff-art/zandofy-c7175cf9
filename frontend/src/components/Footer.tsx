@@ -66,6 +66,7 @@ export function Footer() {
         { label: t("footer.giftCard"), to: "/dashboard" },
         { label: t("footer.loyaltyProgram"), to: "/loyalty-program" },
         { label: t("footer.sellOnZandofy"), to: "/become-vendor" },
+        { label: "Télécharger l'app", to: "/get-app" },
         { label: t("header.becomeOperator") || "Devenir opérateur de livraison", to: "/become-operator" },
         { label: t("header.becomeForwarder") || "Devenir transitaire", to: "/become-forwarder" },
         { label: t("footer.topTrends"), to: "/trends" },

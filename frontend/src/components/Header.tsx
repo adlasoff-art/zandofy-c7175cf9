@@ -31,6 +31,7 @@ import { useHeaderTheme } from "@/hooks/use-header-theme";
 import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 import { slugify } from "@/utils/slugify";
 import { isPWAStandalone } from "@/lib/device";
+import { ProfileCompletionBanner } from "@/components/ProfileCompletionBanner";
 
 // Mini error boundary to prevent Radix crashes from taking down the whole page
 class SafeRadix extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
@@ -261,6 +262,7 @@ export function Header() {
   );
 
   return (
+    <>
     <header className="sticky top-0 z-50 bg-card" style={{ paddingTop: "env(safe-area-inset-top)", backgroundColor: headerBg }}>
       {/* Top bar / promo zone — paints under status bar (Alibaba-style) */}
       {topBarMessages.length > 0 && (
@@ -626,5 +628,13 @@ export function Header() {
         </nav>
       )}
     </header>
+    {user && (
+      <div className="sticky top-14 z-40 border-b border-amber-200/50">
+        <div className="container px-0 sm:px-4">
+          <ProfileCompletionBanner />
+        </div>
+      </div>
+    )}
+    </>
   );
 }

@@ -130,6 +130,7 @@ export default function AdminVendorApplicationsPage() {
           shop_type: selected.shop_type || "international",
           fulfillment_type: selected.fulfillment_type || "zandofy_warehouse",
           fleet_management: selected.fleet_management || "platform",
+          group_checkout_policy: "multi_vendor_ok",
         } as any).select("id").maybeSingle();
 
         if (storeErr || !newStore?.id) {
@@ -165,6 +166,7 @@ export default function AdminVendorApplicationsPage() {
           store_id: newStore.id,
           tier: "beginner",
           max_products: 100,
+          // Base free store: WhatsApp stays off until vendor activates + has a number (fail-closed).
           is_whatsapp_enabled: false,
           can_self_deliver: false,
         } as any, { onConflict: "store_id" });

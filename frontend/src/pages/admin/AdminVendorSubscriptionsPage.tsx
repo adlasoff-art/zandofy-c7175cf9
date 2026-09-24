@@ -7,6 +7,7 @@ import { Crown, Store, Search, Loader2, Check, X, MessageCircle, Truck, Eye, Eye
 import { VENDOR_TIERS, PUBLISH_STATUS_CONFIG, type VendorTier } from "@/lib/vendor-tiers";
 import { Switch } from "@/components/ui/switch";
 import { PublishSocialDialog } from "@/components/admin/PublishSocialDialog";
+import { countProductPhotoUrls } from "@/lib/product-catalogue-validation";
 
 interface StoreWithSub {
   id: string;
@@ -106,12 +107,13 @@ export default function AdminVendorSubscriptionsPage() {
   const approveProduct = useMutation({
     mutationFn: async ({ productId, approve }: { productId: string; approve: boolean }) => {
       if (approve) {
-        const { count, error: countErr } = await supabase
+        const { data: imgRows, error: countErr } = await supabase
           .from("product_images")
-          .select("id", { count: "exact", head: true })
+          .select("image_url")
           .eq("product_id", productId);
         if (countErr) throw new Error("Impossible de vérifier les photos avant publication");
-        if (!count || count < 1) throw new Error("Impossible d'approuver un produit sans photo");
+        const photoCount = countProductPhotoUrls((imgRows || []).map((r: { image_url: string }) => r.image_url));
+        if (photoCount < 1) throw new Error("Impossible d'approuver un produit sans photo");
       }
       const { error } = await supabase
         .from("products")

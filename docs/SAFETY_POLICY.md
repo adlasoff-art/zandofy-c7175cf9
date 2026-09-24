@@ -45,6 +45,21 @@ Le Service Worker est enregistré via `/sw.js?v=${APP_VERSION}` dans `main.tsx`.
 | minor | fin d'un lot / nouvelle feature | `true` | oui (`notify-app-update`) |
 | major | refonte UX / breaking | `true` | oui |
 
+### Runbook hard refresh (ops)
+
+1. Bump `APP_VERSION` in `frontend/src/version.ts` (minor/major).
+2. Set `SHOW_UPDATE_PROMPT = true` (patch → leave `false` for silent SW).
+3. Deploy frontend (Vercel).
+4. Admin → Notifications / PWA card → broadcast `notify-app-update`.
+5. Clients: modal « Mettre à jour maintenant » → `CLEAR_CACHES` + reload.
+6. Checkout path: update prompt is **deferred** until the user leaves `/checkout`.
+7. After Branding (logo) save: `platform-bootstrap` cache is invalidated in-app; purge CDN if logo still stale.
+
+### Checkout sessions (1 paiement → N commandes)
+
+Voir [`docs/guides/CHECKOUT_SESSIONS.md`](guides/CHECKOUT_SESSIONS.md).
+Remboursements = **par `order_ref`**, pas par session seule. Défaut vendeur `multi_vendor_ok` (opt-out `solo_only`).
+
 ### Protocole Lovable (obligatoire — Option B)
 
 À la fin de chaque itération significative, Lovable DOIT demander à

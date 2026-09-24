@@ -4,6 +4,9 @@ import {
   deriveSeoKeywords,
   imageCount,
   isVideoMediaUrl,
+  photoQuotaMessageFr,
+  validatePhotoQuota,
+  countProductPhotoUrls,
 } from "@/lib/product-catalogue-validation";
 
 describe("product-catalogue-validation", () => {
@@ -34,5 +37,35 @@ describe("product-catalogue-validation", () => {
   it("detects video urls by extension", () => {
     expect(isVideoMediaUrl("https://x/a.mp4")).toBe(true);
     expect(isVideoMediaUrl("https://x/a.jpg")).toBe(false);
+  });
+
+  it("photo quota: min 1 max 5 (ceiling, not exact)", () => {
+    expect(validatePhotoQuota(0).ok).toBe(false);
+    expect(validatePhotoQuota(0)).toMatchObject({ reason: "too_few" });
+    expect(validatePhotoQuota(1).ok).toBe(true);
+    expect(validatePhotoQuota(3).ok).toBe(true);
+    expect(validatePhotoQuota(5).ok).toBe(true);
+    expect(validatePhotoQuota(6).ok).toBe(false);
+    expect(validatePhotoQuota(6)).toMatchObject({ reason: "too_many" });
+    const few = validatePhotoQuota(0);
+    if (!few.ok) {
+      expect(photoQuotaMessageFr(few)).toContain("au moins une photo");
+    }
+    const many = validatePhotoQuota(6);
+    if (!many.ok) {
+      expect(photoQuotaMessageFr(many)).toContain("jusqu’à 5");
+    }
+  });
+
+  it("counts product photo urls excluding videos", () => {
+    expect(
+      countProductPhotoUrls([
+        "https://x/a.jpg",
+        "https://x/b.mp4",
+        "https://x/c.png?v=1",
+        null,
+        "https://x/d.webm",
+      ])
+    ).toBe(2);
   });
 });

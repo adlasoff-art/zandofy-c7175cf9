@@ -51,6 +51,16 @@ import { trackDiscoveryOnboarding } from "@/hooks/use-analytics";
 import { resolveMomoGateway, discoveryPrefToCheckoutMethod } from "@/lib/payment-gateways";
 import { usePaymentGateways } from "@/hooks/use-payment-gateways";
 import { isDeferredVendorPaymentMethod } from "@/lib/off-platform-payment";
+import { isSyntheticAuthEmail } from "@/lib/auth-helpers";
+import { selectedSpansMultipleStores, normalizeCartStoreId, groupCartByStore } from "@/lib/cart-by-store";
+import {
+  createCheckoutSession,
+  linkOrdersToCheckoutSession,
+  shouldCreateCheckoutSession,
+  abortCreatedOrders,
+} from "@/lib/checkout-session";
+import { compatReasonMessageFr, type CompatReasonCode } from "@/lib/checkout-group-compat";
+import { useCheckoutGroupCompat } from "@/hooks/use-checkout-group-compat";
 import { buildWhatsAppOrderReceiptMessage } from "@/lib/whatsapp-order-receipt";
 import { openStoreWhatsApp } from "@/lib/whatsapp";
 
@@ -134,6 +144,38 @@ export default function CheckoutPage() {
       sessionStorage.setItem("zandofy_geo_needed", "1");
     }
   }, []);
+
+  // Multi-store: allow only when group compat ok (server RPC); else bounce to cart.
+  const selectedStoreIdsForCompat = useMemo(() => {
+    const ids = [
+      ...new Set(
+        items
+          .filter((i) => i.selected)
+          .map((i) => normalizeCartStoreId(i.storeId))
+          .filter((id) => id !== "__unknown__")
+      ),
+    ];
+    return ids;
+  }, [items]);
+
+  const { data: groupCompat, isLoading: groupCompatLoading } = useCheckoutGroupCompat(
+    selectedStoreIdsForCompat
+  );
+
+  useEffect(() => {
+    if (cartLoading || items.length === 0 || groupCompatLoading) return;
+    if (!selectedSpansMultipleStores(items)) return;
+    if (groupCompat?.ok) return;
+    toast({
+      title: t("cart.multiStoreBlocked") || "Achats groupés non disponibles",
+      description:
+        groupCompat?.messageFr ||
+        t("cart.multiStoreBlockedDesc") ||
+        "Décochez les articles des autres magasins dans le panier.",
+      variant: "destructive",
+    });
+    navigate("/?openCart=1");
+  }, [items, cartLoading, groupCompat, groupCompatLoading, navigate, toast, t]);
   
 
   const [step, setStep] = useState<Step>("shipping");
@@ -172,15 +214,36 @@ export default function CheckoutPage() {
   const [paymentTransactionId, setPaymentTransactionId] = useState<string | null>(null);
   const [paymentReference, setPaymentReference] = useState<string | null>(null);
   const [paymentOrderIds, setPaymentOrderIds] = useState<string[]>([]);
-   const [vendorCodAllowed, setVendorCodAllowed] = useState(false);
-   const [vendorOffPlatformAllowed, setVendorOffPlatformAllowed] = useState(false);
-   const [vendorWhatsappAllowed, setVendorWhatsappAllowed] = useState(false);
-   const [vendorMobileMoneyAllowed, setVendorMobileMoneyAllowed] = useState(true);
-   const [vendorCardAllowed, setVendorCardAllowed] = useState(true);
-   const [cartStoreIds, setCartStoreIds] = useState<string[]>([]);
-   const [whatsappFollowUps, setWhatsappFollowUps] = useState<
-     Array<{ storeId: string; orderRef: string; orderId: string; receiptMessage: string }>
-   >([]);
+  const [vendorCodAllowed, setVendorCodAllowed] = useState(false);
+  const [vendorOffPlatformAllowed, setVendorOffPlatformAllowed] = useState(false);
+  const [vendorWhatsappAllowed, setVendorWhatsappAllowed] = useState(false);
+  const [vendorMobileMoneyAllowed, setVendorMobileMoneyAllowed] = useState(true);
+  const [vendorCardAllowed, setVendorCardAllowed] = useState(true);
+  const [cartStoreIds, setCartStoreIds] = useState<string[]>([]);
+  const [whatsappFollowUps, setWhatsappFollowUps] = useState<
+    Array<{ storeId: string; orderRef: string; orderId: string; receiptMessage: string }>
+  >([]);
+
+  const { data: checkoutStoreMeta = [] } = useQuery({
+    queryKey: ["checkout-store-meta", cartStoreIds.slice().sort().join(",")],
+    enabled: cartStoreIds.length > 0,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("stores")
+        .select("id, name, shop_type")
+        .in("id", cartStoreIds);
+      return (data || []) as Array<{ id: string; name: string | null; shop_type: string | null }>;
+    },
+  });
+  const shopTypeByStoreId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of checkoutStoreMeta) {
+      m.set(s.id, s.shop_type || "international");
+    }
+    return m;
+  }, [checkoutStoreMeta]);
+
   const paymentChannelRef = useRef<any>(null);
   const paymentWatchRef = useRef<MoMoPaymentWatchHandle | null>(null);
   const { data: paymentNumbers = [] } = useStorePaymentNumbers(cartStoreIds);
@@ -1070,7 +1133,8 @@ export default function CheckoutPage() {
   if (
     authSettingsFetched &&
     authSettings?.gate_checkout_on_email_confirm &&
-    !user.email_confirmed_at
+    !user.email_confirmed_at &&
+    !isSyntheticAuthEmail(user.email)
   ) {
     const handleResendConfirm = async () => {
       if (!user.email) return;
@@ -1222,6 +1286,18 @@ export default function CheckoutPage() {
 
 
   const createOrderForPayment = async () => {
+    if (selectedSpansMultipleStores(items)) {
+      const { data: compat } = await (supabase as any).rpc("get_checkout_group_compat", {
+        p_store_ids: selectedStoreIdsForCompat,
+      });
+      if (!compat?.ok) {
+        throw new Error(
+          compatReasonMessageFr((compat?.reasonCode as CompatReasonCode) || "SOLO_ONLY") ||
+            "Achats groupés non autorisés. Retournez au panier."
+        );
+      }
+    }
+
     const baseRef = `ZND-${Date.now().toString(36).toUpperCase()}`;
 
     const productIds = [...new Set(items.map((i) => i.productId).filter(Boolean))];
@@ -1552,7 +1628,48 @@ export default function CheckoutPage() {
       }
     }
 
-    return { orderRef: baseRef, orderIds: createdOrderIds, orders: createdOrderMeta };
+    // 1 payment → N orders: session only for online gateways
+    let checkoutSessionId: string | null = null;
+    const expectedGroups = storeEntries.length;
+    if (createdOrderIds.length !== expectedGroups) {
+      await abortCreatedOrders(createdOrderIds);
+      throw new Error(
+        "Création de commande incomplète. Aucun paiement n’a été initié — réessayez."
+      );
+    }
+
+    if (shouldCreateCheckoutSession(createdOrderIds.length, paymentMethod) && user) {
+      try {
+        checkoutSessionId = await createCheckoutSession(user.id);
+        const { data: totals } = await supabase
+          .from("orders")
+          .select("total")
+          .in("id", createdOrderIds);
+        const sessionTotal = (totals || []).reduce(
+          (s: number, o: any) => s + Number(o.total || 0),
+          0
+        );
+        await linkOrdersToCheckoutSession(
+          checkoutSessionId,
+          createdOrderIds,
+          createdOrderIds[0],
+          sessionTotal
+        );
+      } catch (sessErr: any) {
+        await abortCreatedOrders(createdOrderIds);
+        throw new Error(
+          sessErr?.message ||
+            "Session de paiement multi-commandes indisponible. Réessayez."
+        );
+      }
+    }
+
+    return {
+      orderRef: baseRef,
+      orderIds: createdOrderIds,
+      orders: createdOrderMeta,
+      checkoutSessionId,
+    };
   };
 
   const handlePayment = async () => {
@@ -1667,10 +1784,19 @@ export default function CheckoutPage() {
 
       try {
         // Create order first
-        const { orderRef, orderIds } = await createOrderForPayment();
+        const { orderRef, orderIds, checkoutSessionId } = await createOrderForPayment();
         createdOrderIds = orderIds;
         if (orderIds.length === 0) {
           toast({ title: "Erreur", description: "Impossible de créer la commande.", variant: "destructive" });
+          setProcessing(false);
+          return;
+        }
+        if (orderIds.length > 1 && !checkoutSessionId) {
+          toast({
+            title: "Erreur",
+            description: "Session de paiement multi-commandes indisponible. Réessayez.",
+            variant: "destructive",
+          });
           setProcessing(false);
           return;
         }
@@ -1690,8 +1816,8 @@ export default function CheckoutPage() {
           ),
         }));
         const totalRemaining = remainingByOrder.reduce((s, o) => s + o.remaining, 0);
-        const firstRemaining =
-          remainingByOrder.find((o) => o.id === orderIds[0])?.remaining ?? totalRemaining;
+        const payOrderId = orderIds[0];
+        const payRemaining = totalRemaining;
 
         // Fully covered by wallet — mark paid like MoMo success
         if (totalRemaining <= 0) {
@@ -1701,12 +1827,12 @@ export default function CheckoutPage() {
         }
 
         const momoFn = momoGateway === "pawapay" ? "pawapay-payment" : "kelpay-payment";
-        const kelpayAmount = firstRemaining;
         const { data, error } = await supabase.functions.invoke(momoFn, {
           body: {
-            order_id: orderIds[0],
+            order_id: payOrderId,
+            checkout_session_id: checkoutSessionId || undefined,
             phone_number: cleanPhone,
-            amount: kelpayAmount,
+            amount: payRemaining,
             currency: "USD",
             provider: mobileMoneyProvider,
             country_code: shipping.country || discoveryPrefs.country_code || "CD",
@@ -1751,10 +1877,16 @@ export default function CheckoutPage() {
       }
     } else if (paymentMethod === "card" || paymentMethod === "paypal" || paymentMethod === "stripe") {
       // Card/PayPal via Keccel — redirect flow
+      let createdCardOrderIds: string[] = [];
       try {
         setProcessing(true);
-        const { orderRef, orderIds } = await createOrderForPayment();
+        const { orderRef, orderIds, checkoutSessionId } = await createOrderForPayment();
+        createdCardOrderIds = orderIds;
         if (orderIds.length === 0) throw new Error("Impossible de créer la commande");
+        if (orderIds.length > 1 && !checkoutSessionId) {
+          throw new Error("Session de paiement multi-commandes indisponible.");
+        }
+        const payOrderId = orderIds[0];
         const appliedCredit = await debitWalletForOrder(orderIds);
         const { data: cardOrderRows } = await supabase
           .from("orders")
@@ -1772,7 +1904,8 @@ export default function CheckoutPage() {
         }
         const { data, error } = await supabase.functions.invoke("keccel-cardpay", {
           body: {
-            order_id: orderIds[0],
+            order_id: payOrderId,
+            checkout_session_id: checkoutSessionId || undefined,
             payment_method: paymentMethod === "stripe" ? "card" : paymentMethod,
             payment_type: "order",
           },
@@ -1813,22 +1946,14 @@ export default function CheckoutPage() {
           throw new Error("Redirection carte indisponible. Veuillez réessayer ou choisir Mobile Money.");
         }
       } catch (err: any) {
-        // Mark any created orders as payment_failed so they don't appear as active
+        // Mark only orders from this attempt — never blast other awaiting payments
         try {
-          const { data: pendingOrders } = await supabase
-            .from("orders")
-            .select("id")
-            .eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "")
-            .eq("status", "awaiting_payment")
-            .order("created_at", { ascending: false })
-            .limit(5);
-          if (pendingOrders && pendingOrders.length > 0) {
-            const ids = pendingOrders.map((o: any) => o.id);
-            await refundWalletForOrders(ids);
+          if (createdCardOrderIds.length) {
+            await refundWalletForOrders(createdCardOrderIds);
             await supabase
               .from("orders")
-              .update({ status: "payment_failed" })
-              .in("id", ids)
+              .update({ status: "payment_failed" } as any)
+              .in("id", createdCardOrderIds)
               .eq("status", "awaiting_payment");
           }
         } catch (cleanupErr) {
@@ -2022,33 +2147,81 @@ export default function CheckoutPage() {
   // NOTE : `isDesktop` est déclaré tout en haut du composant (avant les early returns)
   // pour respecter les Rules of Hooks. Voir la déclaration près des autres useState.
 
-  const renderSummaryTop = () => (
+  const renderSummaryTop = () => {
+    const summaryGroups = groupCartByStore(
+      items.map((i) => ({
+        id: i.id,
+        productId: i.productId,
+        storeId: i.storeId,
+        storeName: i.storeName,
+        selected: true,
+        price: i.price,
+        quantity: i.quantity,
+      }))
+    );
+    const storeOrderCount = summaryGroups.length;
+
+    return (
     <>
       <h3 className="font-bold text-foreground">{t("checkout.orderSummary")} ({items.length})</h3>
+      {storeOrderCount > 0 && (
+        <p className="text-[11px] text-muted-foreground -mt-1">
+          1 paiement · {storeOrderCount} commande{storeOrderCount > 1 ? "s" : ""} boutique
+        </p>
+      )}
 
-      <div className="space-y-3 max-h-48 overflow-y-auto">
-        {items.map(item => (
-          <div key={item.id} className="flex gap-3">
-            <img src={item.image} alt={item.nameFr} className="w-14 h-16 object-cover rounded-sm shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground line-clamp-1">{item.nameFr}</p>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                {item.color && (() => {
-                  const cd = getColorDisplay(item.color);
-                  return cd ? (
-                    <span className="inline-flex items-center gap-1">
-                      {cd.hex && <span className="w-3 h-3 rounded-full border border-border inline-block" style={{ backgroundColor: cd.hex }} />}
-                      <span>{cd.name}</span>
-                    </span>
-                  ) : null;
-                })()}
-                {item.size && <span>{item.size}</span>}
-                <span>× {item.quantity}</span>
+      <div className="space-y-4 max-h-64 overflow-y-auto">
+        {summaryGroups.map((group) => {
+          const shopType = shopTypeByStoreId.get(group.storeId) || "international";
+          const isLocal = shopType === "local";
+          return (
+            <div key={group.storeId} className="space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold text-foreground truncate">
+                  {group.storeName || "Boutique"}
+                </span>
+                <span
+                  className={`px-1.5 py-0.5 text-[9px] font-medium rounded ${
+                    isLocal
+                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                      : "bg-sky-500/15 text-sky-700 dark:text-sky-300"
+                  }`}
+                >
+                  {isLocal ? "Local" : "International"}
+                </span>
+                <span className="text-[10px] text-muted-foreground ml-auto">
+                  {formatPrice(group.selectedSubtotal)}
+                </span>
               </div>
-              <p className="text-sm font-bold text-foreground">{formatPrice(item.price * item.quantity)}</p>
+              {group.items.map((line) => {
+                const item = items.find((i) => i.id === line.id);
+                if (!item) return null;
+                return (
+                  <div key={item.id} className="flex gap-3 pl-1">
+                    <img src={item.image} alt={item.nameFr} className="w-12 h-14 object-cover rounded-sm shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground line-clamp-1">{item.nameFr}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {item.color && (() => {
+                          const cd = getColorDisplay(item.color);
+                          return cd ? (
+                            <span className="inline-flex items-center gap-1">
+                              {cd.hex && <span className="w-3 h-3 rounded-full border border-border inline-block" style={{ backgroundColor: cd.hex }} />}
+                              <span>{cd.name}</span>
+                            </span>
+                          ) : null;
+                        })()}
+                        {item.size && <span>{item.size}</span>}
+                        <span>× {item.quantity}</span>
+                      </div>
+                      <p className="text-sm font-bold text-foreground">{formatPrice(item.price * item.quantity)}</p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Coupon */}
@@ -2153,7 +2326,8 @@ export default function CheckoutPage() {
         </div>
       )}
     </>
-  );
+    );
+  };
 
   const renderSummaryTotals = () => (
     <>

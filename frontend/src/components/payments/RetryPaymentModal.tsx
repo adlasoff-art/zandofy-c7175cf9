@@ -18,20 +18,31 @@ interface RetryPaymentModalProps {
   orderRef: string;
   amount: number;
   currency?: string;
+  /** When set, charge SUM of session remaining (1 payment → N orders). */
+  checkoutSessionId?: string | null;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF", onClose, onSuccess }: RetryPaymentModalProps) {
+export function RetryPaymentModal({
+  orderId,
+  orderRef,
+  amount,
+  currency = "USD",
+  checkoutSessionId,
+  onClose,
+  onSuccess,
+}: RetryPaymentModalProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [provider, setProvider] = useState("mpesa");
   const [submitting, setSubmitting] = useState(false);
   const [polling, setPolling] = useState(false);
   const [reference, setReference] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "pending" | "success" | "failed">("idle");
+  const [chargeAmount, setChargeAmount] = useState(amount);
+  const [sessionLabel, setSessionLabel] = useState<string | null>(null);
   const pollInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // Load saved payment methods
   useEffect(() => {
     async function loadDefault() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -50,7 +61,53 @@ export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF",
     loadDefault();
   }, []);
 
-  // Cleanup polling on unmount
+  // Resolve session sum when checkout_session_id present (or discover from order)
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      let sessionId = checkoutSessionId || null;
+      if (!sessionId) {
+        const { data: ord } = await (supabase as any)
+          .from("orders")
+          .select("checkout_session_id")
+          .eq("id", orderId)
+          .maybeSingle();
+        sessionId = ord?.checkout_session_id || null;
+      }
+      if (!sessionId) {
+        setChargeAmount(amount);
+        setSessionLabel(null);
+        return;
+      }
+      const { data: rows } = await (supabase as any)
+        .from("orders")
+        .select("id, total, wallet_credit_applied, order_ref, status")
+        .eq("checkout_session_id", sessionId);
+      const awaiting = (rows || []).filter((o: any) =>
+        ["awaiting_payment", "payment_failed", "pending"].includes(o.status)
+      );
+      const sum =
+        Math.round(
+          awaiting.reduce(
+            (s: number, o: any) =>
+              s + Math.max(0, Number(o.total || 0) - Number(o.wallet_credit_applied || 0)),
+            0
+          ) * 100
+        ) / 100;
+      if (!cancelled) {
+        setChargeAmount(sum > 0 ? sum : amount);
+        setSessionLabel(
+          awaiting.length > 1
+            ? `${awaiting.length} commandes (session ${String(sessionId).slice(0, 8)})`
+            : null
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId, amount, checkoutSessionId]);
+
   useEffect(() => {
     return () => {
       if (pollInterval.current) clearInterval(pollInterval.current);
@@ -64,11 +121,22 @@ export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF",
     }
     setSubmitting(true);
     try {
+      let sessionId = checkoutSessionId || null;
+      if (!sessionId) {
+        const { data: ord } = await (supabase as any)
+          .from("orders")
+          .select("checkout_session_id")
+          .eq("id", orderId)
+          .maybeSingle();
+        sessionId = ord?.checkout_session_id || null;
+      }
+
       const res = await supabase.functions.invoke("kelpay-payment", {
         body: {
           order_id: orderId,
+          checkout_session_id: sessionId || undefined,
           phone_number: phoneNumber.trim(),
-          amount,
+          amount: chargeAmount,
           currency,
           provider,
         },
@@ -82,12 +150,10 @@ export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF",
       setPolling(true);
       toast.success(res.data.message || "Confirmez le paiement sur votre téléphone");
 
-      // Start polling
       let attempts = 0;
       pollInterval.current = setInterval(async () => {
         attempts++;
         if (attempts > 60) {
-          // 5 minutes max
           if (pollInterval.current) clearInterval(pollInterval.current);
           setPolling(false);
           setPaymentStatus("failed");
@@ -113,7 +179,7 @@ export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF",
             toast.error("Paiement échoué");
           }
         } catch {
-          // silently retry
+          /* retry */
         }
       }, 5000);
     } catch (e: any) {
@@ -135,7 +201,18 @@ export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF",
         </div>
 
         <div className="text-sm text-muted-foreground">
-          Commande <strong className="text-foreground">{orderRef}</strong> · Montant : <strong className="text-foreground">${amount.toFixed(2)} {currency}</strong>
+          Commande <strong className="text-foreground">{orderRef}</strong>
+          {sessionLabel ? (
+            <>
+              {" "}
+              · <strong className="text-foreground">{sessionLabel}</strong>
+            </>
+          ) : null}
+          {" · "}
+          Montant :{" "}
+          <strong className="text-foreground">
+            ${chargeAmount.toFixed(2)} {currency}
+          </strong>
         </div>
 
         {paymentStatus === "success" ? (
@@ -149,7 +226,7 @@ export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF",
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Opérateur</label>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {PROVIDERS.map(p => (
+                  {PROVIDERS.map((p) => (
                     <button
                       key={p.value}
                       onClick={() => setProvider(p.value)}
@@ -171,7 +248,7 @@ export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF",
                   <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={phoneNumber}
-                    onChange={e => setPhoneNumber(e.target.value)}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
                     placeholder="0XXXXXXXXX"
                     className="pl-9"
                     disabled={polling}
@@ -183,12 +260,14 @@ export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF",
             {polling && (
               <PaymentWaitingPanel
                 durationSeconds={300}
-                providerLabel={PROVIDERS.find(p => p.value === provider)?.label}
+                providerLabel={PROVIDERS.find((p) => p.value === provider)?.label}
                 reference={reference}
                 onCheck={async () => {
                   if (!reference) return;
                   try {
-                    const checkRes = await supabase.functions.invoke("kelpay-check", { body: { reference } });
+                    const checkRes = await supabase.functions.invoke("kelpay-check", {
+                      body: { reference },
+                    });
                     if (checkRes.data?.status === "success") {
                       if (pollInterval.current) clearInterval(pollInterval.current);
                       setPolling(false);
@@ -213,14 +292,12 @@ export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF",
                   setPaymentStatus("idle");
                 }}
                 onAutoAbandon={async () => {
-                  // Délai dépassé sans action : on demande au backend
-                  // de marquer la commande en payment_failed après vérification finale.
                   try {
                     await supabase.functions.invoke("mark-payment-abandoned", {
                       body: { order_ids: [orderId], reference },
                     });
                   } catch {
-                    // best-effort
+                    /* best-effort */
                   }
                   if (pollInterval.current) clearInterval(pollInterval.current);
                   setPolling(false);
@@ -231,7 +308,9 @@ export function RetryPaymentModal({ orderId, orderRef, amount, currency = "CDF",
             )}
 
             {paymentStatus === "failed" && (
-              <p className="text-xs text-destructive text-center">Le paiement a échoué. Vous pouvez réessayer.</p>
+              <p className="text-xs text-destructive text-center">
+                Le paiement a échoué. Vous pouvez réessayer.
+              </p>
             )}
 
             <div className="flex gap-2">

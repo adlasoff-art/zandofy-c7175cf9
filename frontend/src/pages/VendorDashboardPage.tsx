@@ -23,6 +23,7 @@ import { VendorDisputesTab } from "@/components/vendor/VendorDisputesTab";
 import { VendorRiderTracking } from "@/components/vendor/VendorRiderTracking";
 import { VendorTeamTab } from "@/components/vendor/VendorTeamTab";
 import { VendorPaymentNumbers } from "@/components/vendor/VendorPaymentNumbers";
+import { VendorOnboardingChecklist } from "@/components/vendor/VendorOnboardingChecklist";
 import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
 import { VendorPricingTab } from "@/components/vendor/VendorPricingTab";
 import { VendorAutonomousTab } from "@/components/vendor/VendorAutonomousTab";
@@ -95,14 +96,14 @@ export default function VendorDashboardPage() {
   const [noStore, setNoStore] = useState(false);
   const [selectedConv, setSelectedConv] = useState<VendorConversation | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "analytics_pro" | "team" | "suppliers" | "pricing" | "autonomous" | "freight_sim" | "kyb" | "settings">(() => {
+  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "analytics_pro" | "team" | "suppliers" | "pricing" | "autonomous" | "freight_sim" | "kyb" | "settings" | "payments">(() => {
     const tab = new URLSearchParams(window.location.search).get("tab");
     // Deep-link alias: legacy ?tab=stats → analytics_pro
     const normalized = tab === "stats" ? "analytics_pro" : tab;
     const allowed = new Set([
       "messages", "catalogue", "orders", "deliveries", "promos", "coupons", "wallet",
       "returns", "disputes", "featured", "stats", "analytics_pro", "team", "suppliers",
-      "pricing", "autonomous", "freight_sim", "kyb", "settings",
+      "pricing", "autonomous", "freight_sim", "kyb", "settings", "payments",
     ]);
     return (normalized && allowed.has(normalized) ? normalized : "catalogue") as typeof activeTab;
   });
@@ -316,6 +317,14 @@ export default function VendorDashboardPage() {
 
   const renderTabContent = () => (
     <>
+      {store?.id && (
+        <VendorOnboardingChecklist
+          storeId={store.id}
+          productCount={undefined}
+          hasWhatsappNumber={Boolean((store as any)?.whatsapp_number)}
+          whatsappEnabled={(store as any)?.is_whatsapp_enabled === true}
+        />
+      )}
       {activeTab === "catalogue" && (
         <VendorProductManager
           storeId={store!.id}

@@ -36,7 +36,23 @@ export function VendorPaymentModesTab({ storeId }: Props) {
   const [mobileMoney, setMobileMoney] = useState(true);
   const [card, setCard] = useState(true);
   const [offPlatform, setOffPlatform] = useState(false);
+  const [groupPolicy, setGroupPolicy] = useState<"solo_only" | "own_stores_only" | "multi_vendor_ok">(
+    "multi_vendor_ok"
+  );
   const [saving, setSaving] = useState(false);
+  const [savingPolicy, setSavingPolicy] = useState(false);
+
+  const { data: storeRow } = useQuery({
+    queryKey: ["store-group-checkout-policy", storeId],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("stores")
+        .select("group_checkout_policy")
+        .eq("id", storeId)
+        .maybeSingle();
+      return data;
+    },
+  });
 
   useEffect(() => {
     if (!override) return;
@@ -45,6 +61,29 @@ export function VendorPaymentModesTab({ storeId }: Props) {
     setOffPlatform(override.vendor_off_platform_enabled === true);
   }, [override]);
 
+  useEffect(() => {
+    const p = storeRow?.group_checkout_policy;
+    if (p === "solo_only" || p === "own_stores_only" || p === "multi_vendor_ok") {
+      setGroupPolicy(p);
+    }
+  }, [storeRow]);
+
+  const handleSavePolicy = async () => {
+    setSavingPolicy(true);
+    try {
+      const { error } = await (supabase as any).rpc("vendor_update_group_checkout_policy", {
+        p_store_id: storeId,
+        p_policy: groupPolicy,
+      });
+      if (error) throw error;
+      toast.success("Politique d’achats groupés enregistrée");
+      queryClient.invalidateQueries({ queryKey: ["store-group-checkout-policy", storeId] });
+    } catch (e: any) {
+      toast.error(e?.message || "Impossible d'enregistrer la politique");
+    } finally {
+      setSavingPolicy(false);
+    }
+  };
   const handleSave = async () => {
     if (!mobileMoney && !card && !offPlatform) {
       toast.error("Sélectionnez au moins un mode de perception");
@@ -151,6 +190,37 @@ export function VendorPaymentModesTab({ storeId }: Props) {
         {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
         Enregistrer
       </button>
+
+      <div className="border border-border rounded-lg p-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-bold text-foreground">Achats groupés (panier multi-boutiques)</h3>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Ouvert par défaut : un client peut payer une fois pour plusieurs boutiques (1 paiement → N
+            commandes). Remboursements et litiges restent <strong>par commande</strong>. Les vendeurs
+            indépendants peuvent restreindre ci-dessous s’ils le souhaitent.
+          </p>
+        </div>
+        <select
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          value={groupPolicy}
+          onChange={(e) =>
+            setGroupPolicy(e.target.value as "solo_only" | "own_stores_only" | "multi_vendor_ok")
+          }
+        >
+          <option value="multi_vendor_ok">Multi-vendeurs — groupable (recommandé / défaut)</option>
+          <option value="own_stores_only">Mes boutiques — seulement avec mes autres magasins</option>
+          <option value="solo_only">Solo — pas d’achats groupés avec d’autres boutiques</option>
+        </select>
+        <button
+          type="button"
+          onClick={handleSavePolicy}
+          disabled={savingPolicy}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border text-sm font-medium disabled:opacity-50"
+        >
+          {savingPolicy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          Enregistrer la politique
+        </button>
+      </div>
 
       {offPlatform && (
         <div className="border border-border rounded-lg p-4 space-y-3 bg-muted/30">

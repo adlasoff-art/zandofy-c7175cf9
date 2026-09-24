@@ -5,13 +5,19 @@ import { useI18n } from "@/contexts/I18nContext";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Minus, Plus, Trash2, ShoppingBag, CheckSquare, Square, ArrowLeft, X } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, X, Store } from "lucide-react";
 import { imgUrl } from "@/lib/image-url";
 import { CartItemVariantEditor } from "@/components/CartItemVariantEditor";
 import { CartFreightPreview } from "@/components/cart/CartFreightPreview";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import {
+  groupCartByStore,
+  selectedSpansMultipleStores,
+  normalizeCartStoreId,
+} from "@/lib/cart-by-store";
+import { useCheckoutGroupCompat } from "@/hooks/use-checkout-group-compat";
 
 function prefetchCheckoutChunk() {
   void import("@/pages/CheckoutPage");
@@ -21,7 +27,7 @@ export function CartDrawer() {
   const {
     items, drawerOpen, setDrawerOpen, updateQuantity, removeItem,
     itemCount, selectedCount, selectedSubtotal, loading,
-    toggleSelected, selectAll, deselectAll,
+    toggleSelected, selectStore,
   } = useCart();
   const { user } = useAuth();
   const { t, formatPrice } = useI18n();
@@ -35,12 +41,47 @@ export function CartDrawer() {
     };
   }, []);
 
-  const allSelected = items.length > 0 && items.every(i => i.selected);
-  const noneSelected = items.every(i => !i.selected);
+  const groups = useMemo(
+    () =>
+      groupCartByStore(
+        items.map((i) => ({
+          id: i.id,
+          productId: i.productId,
+          storeId: i.storeId,
+          storeName: i.storeName,
+          selected: i.selected,
+          price: i.price,
+          quantity: i.quantity,
+        }))
+      ),
+    [items]
+  );
+
+  const multiStoreSelected = useMemo(
+    () => selectedSpansMultipleStores(items),
+    [items]
+  );
+  const selectedStoreIds = useMemo(
+    () =>
+      [
+        ...new Set(
+          items
+            .filter((i) => i.selected)
+            .map((i) => normalizeCartStoreId(i.storeId))
+            .filter((id) => id !== "__unknown__")
+        ),
+      ],
+    [items]
+  );
+  const { data: groupCompat, isLoading: groupCompatLoading } = useCheckoutGroupCompat(selectedStoreIds);
+  const groupCheckoutBlocked =
+    multiStoreSelected && !groupCompatLoading && groupCompat != null && !groupCompat.ok;
+  const groupCheckoutPending = multiStoreSelected && groupCompatLoading;
+  const noneSelected = selectedCount === 0;
 
   const goCheckout = () => {
+    if (groupCheckoutBlocked || groupCheckoutPending) return;
     setDrawerOpen(false);
-    // Soft nav after Sheet close — keeps cart/React Query cache warm (no full reload).
     if (navTimerRef.current != null) window.clearTimeout(navTimerRef.current);
     navTimerRef.current = window.setTimeout(() => {
       navigate("/checkout");
@@ -48,6 +89,7 @@ export function CartDrawer() {
   };
 
   const goAuthForCheckout = () => {
+    if (groupCheckoutBlocked || groupCheckoutPending) return;
     setDrawerOpen(false);
     if (navTimerRef.current != null) window.clearTimeout(navTimerRef.current);
     navTimerRef.current = window.setTimeout(() => {
@@ -126,87 +168,171 @@ export function CartDrawer() {
           </div>
         ) : (
           <>
-            <div className={`flex items-center justify-between py-2 border-b border-border ${isMobile ? "px-4" : "px-1"}`}>
-              <button
-                type="button"
-                onClick={() => allSelected ? deselectAll() : selectAll()}
-                className="text-xs font-medium text-primary hover:underline flex items-center gap-1.5 min-h-[44px]"
-              >
-                {allSelected ? <Square size={14} /> : <CheckSquare size={14} />}
-                {allSelected ? t("cart.deselectAll") : t("cart.selectAll")}
-              </button>
-              <span className="text-xs text-muted-foreground">
+            <div className={`py-2 border-b border-border ${isMobile ? "px-4" : "px-1"}`}>
+              <p className="text-[11px] text-muted-foreground">
+                {t("cart.oneStorePerOrder") ||
+                  "Chaque boutique crée sa propre commande. Vous pouvez commander plusieurs boutiques en un paiement, sauf si un vendeur a désactivé les achats groupés ou si les modes de paiement sont incompatibles."}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
                 {selectedCount} {t("cart.itemsSelected")}
-              </span>
+              </p>
             </div>
 
-            <div className={`flex-1 overflow-y-auto space-y-3 py-4 ${isMobile ? "px-4" : ""}`}>
-              {items.map(item => (
-                <div key={item.id} className={`flex gap-3 p-3 rounded-sm transition-colors ${item.selected ? "bg-muted/50" : "bg-muted/20 opacity-60"}`}>
-                  <div className="flex items-start pt-1">
+            <div className={`flex-1 overflow-y-auto space-y-4 py-4 ${isMobile ? "px-4" : ""}`}>
+              {groups.map((group) => (
+                <div key={group.storeId} className="border border-border rounded-lg overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-muted/40 border-b border-border">
                     <Checkbox
-                      checked={item.selected}
-                      onCheckedChange={() => toggleSelected(item.id)}
+                      checked={group.allSelected}
+                      onCheckedChange={(v) =>
+                        selectStore(group.storeId, v === true)
+                      }
                     />
+                    <Store size={14} className="text-muted-foreground shrink-0" />
+                    <span className="text-sm font-semibold text-foreground flex-1 truncate">
+                      {group.storeName}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground shrink-0">
+                      {formatPrice(group.selectedSubtotal)}
+                    </span>
                   </div>
-                  <div className="relative w-24 h-24 shrink-0 rounded-sm overflow-hidden bg-muted border border-border">
-                    <img
-                      src={imgUrl(item.image, { width: 192, height: 192, resize: "cover" })}
-                      alt={item.nameFr}
-                      className="absolute inset-0 w-full h-full object-cover object-center"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <p className="text-sm font-medium text-foreground line-clamp-2">{item.nameFr}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {item.color && (() => {
-                        const cd = getColorDisplay(item.color);
-                        return cd ? (
-                          <span className="inline-flex items-center gap-1">
-                            {cd.hex && <span className="w-3 h-3 rounded-full border border-border" style={{ backgroundColor: cd.hex }} />}
-                            <span>{cd.name}</span>
-                          </span>
-                        ) : null;
-                      })()}
-                      {item.size && <span>{t("search.size")}: {item.size}</span>}
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-foreground">{formatPrice(item.price * item.quantity)}</span>
-                      <div className="flex items-center gap-1">
-                        <button type="button" onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-11 h-11 flex items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground">
-                          <Minus size={14} />
-                        </button>
-                        <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                        <button type="button" onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-11 h-11 flex items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground">
-                          <Plus size={14} />
-                        </button>
-                        <button type="button" onClick={() => removeItem(item.id)} className="w-11 h-11 flex items-center justify-center text-destructive hover:bg-destructive/10 rounded ml-1">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    {item.moq > 1 && item.quantity < item.moq && (
-                      <p className="text-xs text-sale">{t("cart.minRequired").replace("{min}", String(item.moq))}</p>
-                    )}
-                    <CartItemVariantEditor
-                      cartItemId={item.id}
-                      productId={item.productId}
-                      currentColor={item.color}
-                      currentSize={item.size}
-                    />
+                  <div className="space-y-2 p-2">
+                    {group.items.map((line) => {
+                      const item = items.find((i) => i.id === line.id)!;
+                      return (
+                        <div
+                          key={item.id}
+                          className={`flex gap-3 p-2 rounded-sm transition-colors ${
+                            item.selected ? "bg-muted/50" : "bg-muted/20 opacity-60"
+                          }`}
+                        >
+                          <div className="flex items-start pt-1">
+                            <Checkbox
+                              checked={item.selected}
+                              onCheckedChange={() => toggleSelected(item.id)}
+                            />
+                          </div>
+                          <div className="relative w-20 h-20 shrink-0 rounded-sm overflow-hidden bg-muted border border-border">
+                            <img
+                              src={imgUrl(item.image, { width: 192, height: 192, resize: "cover" })}
+                              alt={item.nameFr}
+                              className="absolute inset-0 w-full h-full object-cover object-center"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <p className="text-sm font-medium text-foreground line-clamp-2">
+                              {item.nameFr}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              {item.color &&
+                                (() => {
+                                  const cd = getColorDisplay(item.color);
+                                  return cd ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      {cd.hex && (
+                                        <span
+                                          className="w-3 h-3 rounded-full border border-border"
+                                          style={{ backgroundColor: cd.hex }}
+                                        />
+                                      )}
+                                      <span>{cd.name}</span>
+                                    </span>
+                                  ) : null;
+                                })()}
+                              {item.size && (
+                                <span>
+                                  {t("search.size")}: {item.size}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-foreground">
+                                {formatPrice(item.price * item.quantity)}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                  className="w-11 h-11 flex items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground"
+                                >
+                                  <Minus size={14} />
+                                </button>
+                                <span className="w-8 text-center text-sm font-medium">
+                                  {item.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                  className="w-11 h-11 flex items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground"
+                                >
+                                  <Plus size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeItem(item.id)}
+                                  className="w-11 h-11 flex items-center justify-center text-destructive hover:bg-destructive/10 rounded ml-1"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                            {item.moq > 1 && item.quantity < item.moq && (
+                              <p className="text-xs text-sale">
+                                {t("cart.minRequired").replace("{min}", String(item.moq))}
+                              </p>
+                            )}
+                            <CartItemVariantEditor
+                              cartItemId={item.id}
+                              productId={item.productId}
+                              currentColor={item.color}
+                              currentSize={item.size}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className={`border-t border-border pt-4 space-y-3 shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] ${isMobile ? "px-4" : ""}`}>
+            <div
+              className={`border-t border-border pt-4 space-y-3 shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] ${
+                isMobile ? "px-4" : ""
+              }`}
+            >
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t("cart.subtotal")} ({selectedCount} {t("cart.selected")})</span>
-                <span className="font-bold text-foreground">{formatPrice(selectedSubtotal)}</span>
+                <span className="text-muted-foreground">
+                  {t("cart.subtotal")} ({selectedCount} {t("cart.selected")})
+                </span>
+                <span className="font-bold text-foreground">
+                  {formatPrice(selectedSubtotal)}
+                </span>
               </div>
-              {user && selectedCount > 0 && (
+              {groupCheckoutPending && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Vérification des achats groupés…
+                </p>
+              )}
+              {groupCheckoutBlocked && (
+                <p className="text-xs text-destructive text-center font-medium">
+                  {groupCompat?.messageFr ||
+                    t("cart.multiStoreBlocked") ||
+                    "Achats groupés non disponibles pour ces boutiques."}
+                </p>
+              )}
+              {multiStoreSelected &&
+                !groupCheckoutBlocked &&
+                !groupCheckoutPending &&
+                selectedCount > 0 && (
+                <p className="text-[11px] text-muted-foreground text-center">
+                  Achats groupés autorisés : 1 paiement pour plusieurs boutiques, sauf si un vendeur
+                  a choisi le mode solo ou si les moyens de paiement sont incompatibles.
+                </p>
+              )}
+              {user && selectedCount > 0 && !groupCheckoutBlocked && !groupCheckoutPending && (
                 <CartFreightPreview
                   userId={user.id}
                   items={items
@@ -220,9 +346,9 @@ export function CartDrawer() {
                   {t("cart.loginToCheckout") || "Connectez-vous pour finaliser votre commande."}
                 </p>
               )}
-              {noneSelected ? (
+              {noneSelected || groupCheckoutBlocked || groupCheckoutPending ? (
                 <Button type="button" className="w-full h-12 min-h-[44px] font-bold" disabled>
-                  {t("cart.selectItems")}
+                  {noneSelected ? t("cart.selectItems") : t("cart.order")}
                 </Button>
               ) : (
                 <Button
