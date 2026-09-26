@@ -53,7 +53,7 @@ FeaturedSidebar: soft-reorder **product** placements only (ads/stores keep CMS `
 - LS: `zandofy_discovery_prefs`, `zandofy_discovery_onboarding_snoozed`
 - RPC: `set_own_discovery_prefs(jsonb)`
 - Flag: `discovery_onboarding_enabled`
-- Popup delay after onboarding: `discovery_popup_delay_sec` (default 15)
+- Popup delay after onboarding: `discovery_popup_delay_sec` (default **30**)
 - Mix: `intl_cap_pct` soft-merge (absent → 10)
 
 ## Analytics

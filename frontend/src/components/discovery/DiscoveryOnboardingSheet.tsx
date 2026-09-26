@@ -120,7 +120,7 @@ export function DiscoveryOnboardingProvider({ children }: { children: ReactNode 
     };
   }, [enabled, prefs]);
 
-  // Soft trigger: ~4s on Accueil, never if completed / snoozed / already open
+  // Soft trigger: ~8s on Accueil, never if completed / snoozed / already open
   // Wait for auth_settings so kill-switch is respected before first paint timer.
   useEffect(() => {
     if (!authSettingsFetched || !enabled || hideOnAuthRoutes || hasCompleted || isDiscoverySnoozed() || forceEdit || open) {
@@ -133,7 +133,7 @@ export function DiscoveryOnboardingProvider({ children }: { children: ReactNode 
       setStepIndex(0);
       setOpen(true);
       setShownTracked(false);
-    }, 4000);
+    }, 8000);
     return () => window.clearTimeout(t);
   }, [authSettingsFetched, enabled, hideOnAuthRoutes, hasCompleted, location.pathname, forceEdit, open]);
 

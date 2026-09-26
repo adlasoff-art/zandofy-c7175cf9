@@ -207,11 +207,13 @@ export default function AuthPage() {
 
         const finishOk = async (userId?: string) => {
           if (userId) await patchProfile(userId);
+          const fluidDesc = emailIsPlaceholder
+            ? t("auth.signupPhoneFluidDesc") ||
+              "Bienvenue ! Ajoutez un email dans Mon compte pour récupérer votre mot de passe."
+            : t("auth.signupFluidDesc") || "Bienvenue ! Vous pouvez commencer à naviguer.";
           toast({
             title: t("auth.signupSuccess") || "Compte créé",
-            description: isFluid
-              ? t("auth.signupFluidDesc") || "Bienvenue ! Vous pouvez commencer à naviguer."
-              : t("auth.signupSuccessDesc"),
+            description: isFluid ? fluidDesc : t("auth.signupSuccessDesc"),
           });
           navigate(safeRedirect);
         };
@@ -609,6 +611,12 @@ export default function AuthPage() {
                   required
                 />
               </div>
+              {mode !== "forgot" && (
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  {t("auth.identifierHint") ||
+                    "Téléphone ou email + mot de passe. Aucun code SMS n’est envoyé."}
+                </p>
+              )}
             </div>
 
             {mode !== "forgot" && (

@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { imgUrl } from "@/lib/image-url";
 import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
-import { useAuthSettings } from "@/hooks/use-auth-settings";
+import { useAuthSettings, AUTH_SETTINGS_DEFAULTS } from "@/hooks/use-auth-settings";
 import { isDiscoverySnoozed } from "@/lib/discovery-prefs";
 import {
   isDiscoverySheetOpen,
@@ -35,7 +35,7 @@ export function AnnouncementPopup() {
   const pendingRef = useRef<PopupData | null>(null);
   const unsubPromoRef = useRef<(() => void) | null>(null);
 
-  const delaySec = authSettings?.discovery_popup_delay_sec ?? 15;
+  const delaySec = authSettings?.discovery_popup_delay_sec ?? AUTH_SETTINGS_DEFAULTS.discovery_popup_delay_sec;
   const discoveryEnabled = authSettings?.discovery_onboarding_enabled !== false;
 
   const showPopup = (p: PopupData) => {
