@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDiscoveryPrefs } from "@/contexts/DiscoveryPrefsContext";
-import { useAuthSettings } from "@/hooks/use-auth-settings";
+import { useAuthSettings, AUTH_SETTINGS_DEFAULTS } from "@/hooks/use-auth-settings";
 import { isDiscoverySheetOpen, subscribeDiscoverySheetOpen } from "@/lib/discovery-sheet-bus";
 import {
   releasePromoDialog,
@@ -90,7 +90,8 @@ export function WelcomeDiscoveryDialog() {
     if (startedForUser.current === user.id) return;
     startedForUser.current = user.id;
 
-    const delaySec = authSettings?.discovery_popup_delay_sec ?? 15;
+    const delaySec =
+      authSettings?.discovery_popup_delay_sec ?? AUTH_SETTINGS_DEFAULTS.discovery_popup_delay_sec;
     const userId = user.id;
 
     const run = async () => {

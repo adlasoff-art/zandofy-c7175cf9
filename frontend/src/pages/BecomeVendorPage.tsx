@@ -546,7 +546,7 @@ export default function BecomeVendorPage() {
   const STEPS = [
     { id: 1, label: t("vendor.step1"), icon: User, description: t("vendor.step1Desc") },
     { id: 2, label: t("vendor.step2"), icon: Store, description: t("vendor.step2Desc") },
-    { id: 3, label: "Identité (KYC)", icon: ShieldCheck, description: "Vérification d'identité obligatoire — documents entreprise (KYB) plus tard" },
+    { id: 3, label: "Identité (KYC)", icon: ShieldCheck, description: "Obligatoire : KYC approuvé par l’équipe, puis candidature boutique — KYB entreprise plus tard" },
     { id: 4, label: t("vendor.step4"), icon: Send, description: t("vendor.step4Desc") },
   ];
 
@@ -574,6 +574,10 @@ export default function BecomeVendorPage() {
           <h2 className="text-2xl md:text-3xl font-bold text-foreground">{t("vendor.title")}</h2>
           <p className="text-sm text-muted-foreground">
             {t("becomeVendor.landing.formIntro")}
+          </p>
+          <p className="text-xs text-muted-foreground max-w-lg mx-auto leading-relaxed">
+            Compte rapide → KYC identité (validation admin) → candidature boutique → ouverture
+            après approbation. Pas de boutique instantanée.
           </p>
         </div>
 
@@ -742,7 +746,9 @@ export default function BecomeVendorPage() {
                   ) : (
                     <div className="space-y-3">
                       <p className="text-xs text-muted-foreground">
-                        Complétez la vérification d&apos;identité dans votre compte, puis revenez ici pour continuer.
+                        Parcours : compte → KYC identité (validation admin) → soumission boutique →
+                        ouverture après approbation. Complétez le KYC dans votre compte, puis
+                        revenez ici.
                       </p>
                       <Button asChild size="sm">
                         <Link to="/dashboard?tab=kyc">Compléter mon KYC</Link>

@@ -20,7 +20,7 @@ Key: `platform_settings.auth_settings`
     "rotation_hours": 12,
     "intl_cap_pct": 10
   },
-  "discovery_popup_delay_sec": 15
+  "discovery_popup_delay_sec": 30
 }
 ```
 
@@ -35,7 +35,7 @@ Key: `platform_settings.auth_settings`
 |---------|----------|
 | Modes | **Google** + **email OR phone** + password |
 | `magic_link_enabled` | Default **false** — hides “Connexion rapide OTP” |
-| Phone-only | Synthetic email `digits@users.zandofy.internal` + `profiles.phone` + `email_is_placeholder` |
+| Phone-only | Synthetic email `digits@users.zandofy.internal` + `profiles.phone` + `email_is_placeholder` — **no SMS code** |
 | Login phone | Edge Function `resolve-auth-identifier` → then `signInWithPassword` |
 | Forgot password | Real email only |
 
@@ -46,7 +46,7 @@ Key: `platform_settings.auth_settings`
 | `discovery_onboarding_enabled` | Kill-switch soft sheet Accueil |
 | `discovery_onboarding_steps` | Toggle payment / receipt steps |
 | `discovery_mix` | Feed ratios (must sum core+explore+neutral ≈ 100) |
-| `discovery_popup_delay_sec` | Delay CMS announcement after discovery complete/dismiss |
+| `discovery_popup_delay_sec` | Delay CMS announcement after discovery complete/dismiss (default **30**) |
 
 See `docs/DISCOVERY_ENGINE.md`.
 
@@ -60,5 +60,6 @@ Admin UI: Settings → « Authentification clients ».
 2. Deploy Edge Function `resolve-auth-identifier` (`verify_jwt = false`)
 3. Confirm email **OFF** when `mode: fluid`
 4. Smoke: guest cart visible → checkout auth; signup email; signup phone; Google → `/account`
+5. Full launch: [LAUNCH_OPS_CHECKLIST.md](guides/LAUNCH_OPS_CHECKLIST.md) + [LAUNCH_SMOKE.md](guides/LAUNCH_SMOKE.md)
 
 Staging first, then production. Mirror Confirm email between projects when switching mode.

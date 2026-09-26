@@ -55,7 +55,7 @@ export const AUTH_SETTINGS_DEFAULTS: AuthSettings = {
     receipt: true,
   },
   discovery_mix: { ...DISCOVERY_MIX_DEFAULTS },
-  discovery_popup_delay_sec: 15,
+  discovery_popup_delay_sec: 30,
   magic_link_enabled: false,
 };
 
@@ -111,7 +111,7 @@ function normalizeAuthSettings(raw: unknown): AuthSettings {
     discovery_mix: normalizeDiscoveryMix(v.discovery_mix),
     discovery_popup_delay_sec: Math.min(
       120,
-      Math.max(0, typeof v.discovery_popup_delay_sec === "number" ? v.discovery_popup_delay_sec : 15),
+      Math.max(0, typeof v.discovery_popup_delay_sec === "number" ? v.discovery_popup_delay_sec : 30),
     ),
     // Soft default false when absent
     magic_link_enabled: v.magic_link_enabled === true,

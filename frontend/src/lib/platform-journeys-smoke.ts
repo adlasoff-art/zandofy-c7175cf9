@@ -7,6 +7,7 @@
  * - Apply 20260924170000_checkout_sessions_no_client_update.sql (no client UPDATE on sessions)
  * - Apply 20260924180000_group_checkout_default_multi_vendor.sql (default multi_vendor_ok)
  * - Redeploy Edge: kelpay-payment, kelpay-webhook, kelpay-check, keccel-cardpay
+ * Launch ads: see docs/guides/LAUNCH_OPS_CHECKLIST.md + LAUNCH_SMOKE.md
  */
 export const PLATFORM_JOURNEYS_SMOKE = [
   "Auth phone signup (fluid) → session → banner asks for real email",
