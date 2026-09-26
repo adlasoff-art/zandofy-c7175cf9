@@ -16,8 +16,7 @@ import {
   LOCAL_DELIVERY_STATUS_FLOW,
   getNextStatus,
   getStatusFlow,
-  canVendorAdvance,
-  canVendorAdvanceLocal,
+  canVendorAdvanceOrder,
   canAdminAdvance,
 } from "@/lib/order-status";
 import { withOptionalOrderFields } from "@/lib/order-query";
@@ -80,6 +79,7 @@ interface Order {
   delivery_operator_id?: string | null;
   delivery_operator_name?: string | null;
   delivery_choice: string | null;
+  geo_relation?: string | null;
   last_mile_fee: number | null;
   confirmation_code: string | null;
   shipping_payment_status: string | null;
@@ -203,13 +203,24 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("orders")
-      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected, delivery_operator_id")
+      .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, geo_relation, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected, delivery_operator_id")
       .eq("store_id", storeId)
       // Carte/MM : awaiting_payment masqué. Hors plateforme : visible pour validation preuve.
       .or(VENDOR_ORDERS_OR_FILTER)
       .order("created_at", { ascending: false }) as any;
+
+    if (error) {
+      const retry = await supabase
+        .from("orders")
+        .select("id, order_ref, status, payment_method, shipping_first_name, shipping_last_name, shipping_email, shipping_phone, shipping_address, shipping_city, shipping_country, subtotal, shipping_cost, total, created_at, tracking_number, supplier_order_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, rider_cash_collected, delivery_operator_id")
+        .eq("store_id", storeId)
+        .or(VENDOR_ORDERS_OR_FILTER)
+        .order("created_at", { ascending: false }) as any;
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error("[VendorOrderManager] Error loading orders:", error);
@@ -353,27 +364,30 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
     return true;
   };
 
-  const handleAdvance = (orderId: string, currentStatus: string, deliveryChoice?: string | null) => {
-    const next = getNextStatus(currentStatus, shopType, deliveryChoice);
+  const handleAdvance = (orderId: string, currentStatus: string, deliveryChoice?: string | null, geoRelation?: string | null) => {
+    const next = getNextStatus(currentStatus, shopType, deliveryChoice, geoRelation);
     if (!next) return;
 
-    // International flow: require supplier info for confirmed → preparing
-    if (!isLocalShop && currentStatus === "confirmed" && next === "preparing") {
+    const useLocalSteps =
+      geoRelation === "same_city" || (!geoRelation && isLocalShop);
+
+    // International / national flow: require supplier info for confirmed → preparing
+    if (!useLocalSteps && currentStatus === "confirmed" && next === "preparing") {
       setSupplierModal(orderId);
       return;
     }
-    // International flow: require tracking for in_shipping → shipped
-    if (!isLocalShop && currentStatus === "in_shipping" && next === "shipped") {
+    // International / national flow: require tracking for in_shipping → shipped
+    if (!useLocalSteps && currentStatus === "in_shipping" && next === "shipped") {
       setShippedModal(orderId);
       return;
     }
-    // International flow: require rider for shipped → assigning_rider
-    if (!isLocalShop && currentStatus === "shipped" && next === "assigning_rider") {
+    // International / national flow: require rider for shipped → assigning_rider
+    if (!useLocalSteps && currentStatus === "shipped" && next === "assigning_rider") {
       setRiderModal(orderId);
       return;
     }
     // Local home delivery: assign rider at preparing → assigning_rider
-    if (isLocalShop && deliveryChoice === "home_delivery" && currentStatus === "preparing" && next === "assigning_rider") {
+    if (useLocalSteps && deliveryChoice === "home_delivery" && currentStatus === "preparing" && next === "assigning_rider") {
       setRiderModal(orderId);
       return;
     }
@@ -450,10 +464,10 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
         {paginatedOrders.map((order) => {
         const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
         const StatusIcon = config.icon;
-        const next = getNextStatus(order.status, shopType, order.delivery_choice);
+        const next = getNextStatus(order.status, shopType, order.delivery_choice, order.geo_relation);
         const canAdvance = isStaff
-          ? canAdminAdvance(order.status, shopType, order.delivery_choice)
-          : (isLocalShop ? canVendorAdvanceLocal(order.status, order.delivery_choice) : canVendorAdvance(order.status));
+          ? canAdminAdvance(order.status, shopType, order.delivery_choice, order.geo_relation)
+          : canVendorAdvanceOrder(order.status, shopType, order.delivery_choice, order.geo_relation);
         const isExpanded = expandedId === order.id;
 
         return (
@@ -851,7 +865,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                 )}
 
                 {/* Mini stepper with dates */}
-                <OrderMiniStepper status={order.status} history={order.history} trackingNumber={order.tracking_number} shopType={shopType} deliveryChoice={order.delivery_choice} />
+                <OrderMiniStepper status={order.status} history={order.history} trackingNumber={order.tracking_number} shopType={shopType} deliveryChoice={order.delivery_choice} geoRelation={order.geo_relation} />
 
                 {/* Items */}
                 <div className="space-y-1.5">
@@ -897,7 +911,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                 {/* Status actions */}
                 {next && canAdvance && (
                   <button
-                    onClick={() => handleAdvance(order.id, order.status, order.delivery_choice)}
+                    onClick={() => handleAdvance(order.id, order.status, order.delivery_choice, order.geo_relation)}
                     disabled={updatingId === order.id}
                     className="w-full py-2 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
@@ -1094,14 +1108,16 @@ function OrderMiniStepper({
   trackingNumber,
   shopType,
   deliveryChoice,
+  geoRelation,
 }: {
   status: string;
   history: StatusHistoryEntry[];
   trackingNumber?: string | null;
   shopType?: string;
   deliveryChoice?: string | null;
+  geoRelation?: string | null;
 }) {
-  const flow = getStatusFlow(shopType, deliveryChoice);
+  const flow = getStatusFlow(shopType, deliveryChoice, geoRelation);
   const currentIdx = flow.indexOf(status as any);
   const isCancelled = status === "cancelled" || status === "returned";
   const historyMap = new Map(history.map((h) => [h.status, h.created_at]));

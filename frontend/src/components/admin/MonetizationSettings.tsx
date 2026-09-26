@@ -38,6 +38,8 @@ export function MonetizationSettings() {
     default_commission_pct: 10,
     off_platform_trial_days: 30,
   });
+  const [cashPayoutEnabled, setCashPayoutEnabled] = useState(false);
+  const [geoEligibilityEnforced, setGeoEligibilityEnforced] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -49,6 +51,8 @@ export function MonetizationSettings() {
         "geo_coupons_enabled",
         "kyb_settings",
         "vendor_monetization",
+        "vendor_cash_payout_enabled",
+        "geo_eligibility_enforced",
       ])
       .then(({ data }) => {
         data?.forEach(row => {
@@ -71,6 +75,10 @@ export function MonetizationSettings() {
               default_commission_pct: Number(v?.default_commission_pct) || 10,
               off_platform_trial_days: Number(v?.off_platform_trial_days) || 30,
             });
+          } else if (row.key === "vendor_cash_payout_enabled") {
+            setCashPayoutEnabled(v === true || v === "true" || v?.enabled === true);
+          } else if (row.key === "geo_eligibility_enforced") {
+            setGeoEligibilityEnforced(v === true || v === "true" || v?.enabled === true);
           }
         });
       });
@@ -86,6 +94,8 @@ export function MonetizationSettings() {
       { key: "geo_coupons_enabled", value: geoCoupons as any, updated_at: now },
       { key: "kyb_settings", value: kyb as any, updated_at: now },
       { key: "vendor_monetization", value: vendorMonetization as any, updated_at: now },
+      { key: "vendor_cash_payout_enabled", value: cashPayoutEnabled as any, updated_at: now },
+      { key: "geo_eligibility_enforced", value: geoEligibilityEnforced as any, updated_at: now },
     ];
 
     // Keep service_packages price in sync for MM plan
@@ -280,6 +290,38 @@ export function MonetizationSettings() {
             <p className="text-xs text-muted-foreground">Promotions filtrées par ville/pays du client</p>
           </div>
           <Switch checked={geoCoupons.enabled} onCheckedChange={v => setGeoCoupons({ enabled: v })} />
+        </div>
+      </section>
+
+      {/* Vendor cash payout */}
+      <section className="bg-card border border-border rounded-xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <HandCoins size={18} className="text-primary" />
+          <h2 className="text-sm font-semibold text-foreground">Retraits cash vendeur</h2>
+        </div>
+        <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+          <div>
+            <p className="text-sm font-medium text-foreground">Autoriser le cash sur demande</p>
+            <p className="text-xs text-muted-foreground">Défaut off. Open Money et virement restent disponibles.</p>
+          </div>
+          <Switch checked={cashPayoutEnabled} onCheckedChange={setCashPayoutEnabled} />
+        </div>
+      </section>
+
+      {/* Geo eligibility */}
+      <section className="bg-card border border-border rounded-xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <ShieldCheck size={18} className="text-primary" />
+          <h2 className="text-sm font-semibold text-foreground">Éligibilité géographique</h2>
+        </div>
+        <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+          <div>
+            <p className="text-sm font-medium text-foreground">Appliquer le filtre dur (feed + checkout)</p>
+            <p className="text-xs text-muted-foreground">
+              Défaut off. Quand on : produits hors portée commerciale exclus du feed et bloqués au checkout.
+            </p>
+          </div>
+          <Switch checked={geoEligibilityEnforced} onCheckedChange={setGeoEligibilityEnforced} />
         </div>
       </section>
 

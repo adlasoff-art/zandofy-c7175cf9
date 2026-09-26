@@ -6,6 +6,7 @@ import {
   getStepIndex,
   LOCAL_DELIVERY_STATUS_FLOW,
   LOCAL_PICKUP_STATUS_FLOW,
+  NATIONAL_STATUS_FLOW,
   STATUS_FLOW,
 } from "@/lib/order-status";
 
@@ -46,5 +47,15 @@ describe("order-status flows", () => {
   it("getStepIndex best-effort maps legacy statuses outside the active flow", () => {
     expect(getStepIndex("out_for_delivery", "local", "hub_pickup")).toBeGreaterThan(0);
     expect(getStepIndex("delivered", "local", "hub_pickup")).toBe(LOCAL_PICKUP_STATUS_FLOW.length - 1);
+  });
+
+  it("geo_relation same_city overrides shop_type international", () => {
+    expect(getStatusFlow("international", "hub_pickup", "same_city")).toEqual(LOCAL_PICKUP_STATUS_FLOW);
+    expect(getStatusFlow("international", "home_delivery", "same_city")).toEqual(LOCAL_DELIVERY_STATUS_FLOW);
+  });
+
+  it("geo_relation same_country_other_city uses national flow", () => {
+    expect(getStatusFlow("local", "hub_pickup", "same_country_other_city")).toEqual(NATIONAL_STATUS_FLOW);
+    expect(getStatusFlow(undefined, undefined, "cross_border")).toEqual(STATUS_FLOW);
   });
 });

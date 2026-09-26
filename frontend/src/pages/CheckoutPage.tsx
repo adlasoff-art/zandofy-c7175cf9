@@ -63,6 +63,10 @@ import { compatReasonMessageFr, type CompatReasonCode } from "@/lib/checkout-gro
 import { useCheckoutGroupCompat } from "@/hooks/use-checkout-group-compat";
 import { buildWhatsAppOrderReceiptMessage } from "@/lib/whatsapp-order-receipt";
 import { openStoreWhatsApp } from "@/lib/whatsapp";
+import {
+  computeGeoRelation,
+  assertProductsEligibleForCheckout,
+} from "@/lib/geo-eligibility";
 
 type Step = "shipping" | "payment" | "confirmation";
 type PaymentMethod = "stripe" | "card" | "paypal" | "mobile_money" | "cod" | "off_platform" | "whatsapp";
@@ -76,6 +80,7 @@ interface ShippingInfo {
   quartier: string;
   commune: string;
   city: string;
+  city_id: string;
   province: string;
   province_id: string;
   country: string;
@@ -92,8 +97,10 @@ interface SavedAddress {
   quartier: string | null;
   commune: string | null;
   city: string;
+  city_id?: string | null;
   province: string | null;
   country: string;
+  country_code?: string | null;
   postal_code: string;
   is_default: boolean;
 }
@@ -119,7 +126,7 @@ type LastMilePayment = "pay_with_shipping" | "pay_cash_on_delivery";
 
 const emptyShipping: ShippingInfo = {
   firstName: "", lastName: "", email: "", phone: "",
-  address: "", quartier: "", commune: "", city: "", province: "", province_id: "", country: "CD", postalCode: "",
+  address: "", quartier: "", commune: "", city: "", city_id: "", province: "", province_id: "", country: "CD", postalCode: "",
 };
 
 export default function CheckoutPage() {
@@ -756,9 +763,10 @@ export default function CheckoutPage() {
       quartier: addr.quartier || "",
       commune: addr.commune || "",
       city: addr.city || "",
+      city_id: addr.city_id || "",
       province: addr.province || "",
       province_id: "",
-      country: addr.country || "CD",
+      country: addr.country_code || addr.country || "CD",
       postalCode: addr.postal_code || "",
     });
   };
@@ -1255,6 +1263,27 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Geo commercial eligibility vs selected destination (hard only when flag on)
+    if (shipping.country) {
+      const productIdsForElig = [...new Set(items.map((i) => i.productId).filter(Boolean))];
+      if (productIdsForElig.length > 0) {
+        try {
+          await assertProductsEligibleForCheckout(
+            productIdsForElig,
+            shipping.country,
+            shipping.city_id || null,
+          );
+        } catch (e: any) {
+          toast({
+            title: "Adresse hors zone de vente",
+            description: e?.message || "Certains articles ne sont pas livrables à cette adresse.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
+
     // Save address if checked
     if (saveAddress && user) {
       const { error } = await supabase.from("saved_addresses").insert({
@@ -1267,8 +1296,10 @@ export default function CheckoutPage() {
         quartier: shipping.quartier || null,
         commune: shipping.commune || null,
         city: shipping.city,
+        city_id: shipping.city_id || null,
         province: shipping.province || null,
         country: shipping.country,
+        country_code: shipping.country || null,
         postal_code: shipping.postalCode,
         is_default: savedAddresses.length === 0,
       } as any);
@@ -1302,18 +1333,39 @@ export default function CheckoutPage() {
 
     const productIds = [...new Set(items.map((i) => i.productId).filter(Boolean))];
     const { data: prods } = productIds.length > 0
-      ? await supabase.from("products_public").select("id, store_id, origin_country, store:stores(country)").in("id", productIds)
+      ? await supabase
+          .from("products_public")
+          .select("id, store_id, origin_country, store_country_code, store_city_id")
+          .in("id", productIds)
       : { data: [] };
     const storeMap = new Map((prods || []).map((p) => [p.id, p.store_id]));
     // Lot 11C — Map productId → pays d'origine (ISO2). Sert à persister
     // orders.origin_country pour la segmentation multi-origines (Phase 2).
-    // Origine effective = origin_country produit > stores.country (fallback).
+    // Origine effective = origin_country produit > store_country_code (fallback).
     const originMap = new Map(
       (prods || []).map((p: any) => [
         p.id,
-        ((p.origin_country || p.store?.country || "") || "").toUpperCase() || null,
+        ((p.origin_country || p.store_country_code || "") || "").toUpperCase() || null,
       ]),
     );
+    const storeGeoMap = new Map(
+      (prods || []).map((p: any) => [
+        p.id,
+        {
+          country: (p.store_country_code || p.origin_country || "").toString().toUpperCase() || null,
+          cityId: (p.store_city_id || null) as string | null,
+        },
+      ]),
+    );
+
+    // Hard gate again at order create (payment step) — fail-closed
+    if (shipping.country && productIds.length > 0) {
+      await assertProductsEligibleForCheckout(
+        productIds,
+        shipping.country,
+        shipping.city_id || null,
+      );
+    }
 
     // Lot 11C Phase 2 — Segmentation par (store_id, origin_country) si multi-groupes
     // sélectionnés au checkout, sinon par store_id seul (legacy).
@@ -1439,12 +1491,21 @@ export default function CheckoutPage() {
       // Unique order_ref per sub-order (suffix A, B, C...)
       const orderRef = needsSuffix ? `${baseRef}-${String.fromCharCode(65 + idx)}` : baseRef;
 
-      const { data: order, error: orderErr } = await supabase
-        .from("orders")
-        .insert({
+      const firstProductId = storeItems[0]?.productId;
+      const storeGeo = firstProductId ? storeGeoMap.get(firstProductId) : null;
+      const orderGeoRelation = computeGeoRelation({
+        originCountry: storeGeo?.country || orderOriginCountry,
+        originCityId: storeGeo?.cityId,
+        destCountry: shipping.country,
+        destCityId: shipping.city_id || null,
+      });
+
+      const orderPayload: Record<string, unknown> = {
           user_id: user!.id,
           store_id: storeId !== "default" ? storeId : null,
           origin_country: orderOriginCountry,
+          geo_relation: orderGeoRelation,
+          shipping_city_id: shipping.city_id || null,
           // Toute commande dont le paiement est asynchrone (webhook ou validation hors plateforme / WhatsApp)
           // commence en `awaiting_payment` — elle n'est PAS encore une commande à notifier.
           // Seul COD (cash à la livraison) commence en `pending` car il n'y a aucun paiement à attendre.
@@ -1526,9 +1587,22 @@ export default function CheckoutPage() {
           forwarder_unassigned: !selectedForwarder && forwarderUnassigned,
           // Lot 4D — Devis freight verrouillé (nouveau moteur Lot 3A)
           freight_quote_id: orderFreightQuoteId,
-        } as any)
+      };
+
+      let { data: order, error: orderErr } = await supabase
+        .from("orders")
+        .insert(orderPayload as any)
         .select("id")
         .single();
+
+      if (orderErr && /shipping_city_id|geo_relation/i.test(orderErr.message || "")) {
+        const { shipping_city_id: _a, geo_relation: _b, ...legacyPayload } = orderPayload;
+        void _a;
+        void _b;
+        const retry = await supabase.from("orders").insert(legacyPayload as any).select("id").single();
+        order = retry.data;
+        orderErr = retry.error;
+      }
 
       if (!orderErr && order) {
         createdOrderIds.push(order.id);
@@ -2597,6 +2671,7 @@ export default function CheckoutPage() {
                           province: shipping.province,
                           province_id: shipping.province_id,
                           city: shipping.city,
+                          city_id: shipping.city_id,
                           commune: shipping.commune,
                           quartier: shipping.quartier,
                           address: shipping.address,
@@ -2605,6 +2680,8 @@ export default function CheckoutPage() {
                         onChange={(field, value) => {
                           if (field === "postal_code") {
                             updateField("postalCode", value);
+                          } else if (field === "city_id") {
+                            updateField("city_id", value);
                           } else {
                             updateField(field as keyof ShippingInfo, value);
                           }

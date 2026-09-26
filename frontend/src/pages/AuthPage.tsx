@@ -69,7 +69,12 @@ export default function AuthPage() {
   const refCode = searchParams.get("ref") || "";
   const rawRedirect = searchParams.get("redirect");
   const redirectTo = rawRedirect || "/";
-  const initialMode = searchParams.get("mode") === "signup" ? "signup" : "login";
+  const initialMode =
+    searchParams.get("mode") === "signup"
+      ? "signup"
+      : searchParams.get("mode") === "forgot"
+        ? "forgot"
+        : "login";
   const prefillEmail = searchParams.get("email") || "";
 
   useEffect(() => {
@@ -234,12 +239,16 @@ export default function AuthPage() {
             setLoading(false);
             return;
           }
+          console.warn(
+            "[auth] signup session missing after fluid signup; Confirm email may be ON in Supabase Auth",
+            signInErr?.message || "no session",
+          );
           toast({
-            title: "Configuration auth",
+            title: "Compte créé",
             description:
-              "Compte créé mais session absente. Vérifiez que « Confirm email » est désactivé (mode fluide) dans Supabase Auth.",
-            variant: "destructive",
+              "Votre compte a été créé. Connectez-vous avec le même identifiant et mot de passe.",
           });
+          setMode("login");
           setLoading(false);
           return;
         }

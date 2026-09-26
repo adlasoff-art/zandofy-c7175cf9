@@ -23,6 +23,7 @@ import {
   fetchWithLocalFirstBackfill,
   prefersLocalDiscoveryScope,
 } from "@/lib/discovery-fetch";
+import { applyDiscoveryEligibilityFilter } from "@/lib/geo-eligibility";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
@@ -173,11 +174,17 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
       (shopType) => fetchProducts({ limit: popularLimit, orderBy: "popular", shopType }),
       { shopType: effectiveShopType, preferLocalBackfill: localFirst, minCount: 12 },
     )
-      .then((items) => {
+      .then(async (items) => {
+        if (cancelled) return;
+        const eligible = await applyDiscoveryEligibilityFilter(
+          items,
+          prefs.country_code,
+          prefs.city_id,
+        );
         if (cancelled) return;
         const ranked =
           hasCompleted
-            ? assembleDiscoveryFeed(items, {
+            ? assembleDiscoveryFeed(eligible, {
                 prefs,
                 mix: authSettings?.discovery_mix,
                 take: 12,
@@ -186,7 +193,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
                 surface: "home_popular",
                 seedKey: user?.id || "guest",
               })
-            : items.slice(0, 12);
+            : eligible.slice(0, 12);
         setPopularProducts(ranked);
         setPopularLoading(false);
       })
@@ -228,9 +235,15 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
             { shopType: effectiveShopType, preferLocalBackfill: localFirst, minCount: 6 },
           );
           if (cancelled || data.length === 0) continue;
+          const eligible = await applyDiscoveryEligibilityFilter(
+            data,
+            prefs.country_code,
+            prefs.city_id,
+          );
+          if (cancelled || eligible.length === 0) continue;
           const products =
             hasCompleted
-              ? assembleDiscoveryFeed(data, {
+              ? assembleDiscoveryFeed(eligible, {
                   prefs,
                   mix: authSettings?.discovery_mix,
                   take: 6,
@@ -239,7 +252,7 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
                   surface: `home_cat_${cat.id}`,
                   seedKey: user?.id || "guest",
                 })
-              : data;
+              : eligible;
           setCategorySections((prev) => {
             const label = t(target.labelKey) || target.labelFr;
             const href = categoryPath(cat, locale);
@@ -316,8 +329,14 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
           seen.add(p.id);
           mixed.push(p);
         }
+        const eligiblePool = await applyDiscoveryEligibilityFilter(
+          mixed,
+          prefs.country_code,
+          prefs.city_id,
+        );
+        if (cancelled) return;
         const ordered =
-          activeTab === "all" ? shuffleBySessionSeed(mixed, getHomeShuffleSeed()) : mixed;
+          activeTab === "all" ? shuffleBySessionSeed(eligiblePool, getHomeShuffleSeed()) : eligiblePool;
         const ranked =
           hasCompleted && activeTab === "all"
             ? assembleDiscoveryFeed(ordered, {
@@ -378,24 +397,29 @@ export function ProductGrid({ restoreFromCache = false }: { restoreFromCache?: b
         ...moreProducts.map((p) => p.id),
       ]);
       const newProducts = data.filter((p) => !existingIds.has(p.id));
+      const eligibleNew = await applyDiscoveryEligibilityFilter(
+        newProducts,
+        prefs.country_code,
+        prefs.city_id,
+      );
 
-      if (newProducts.length === 0 || data.length < PAGE_SIZE) {
+      if (eligibleNew.length === 0 || data.length < PAGE_SIZE) {
         setHasMore(false);
       }
 
-      if (newProducts.length > 0) {
+      if (eligibleNew.length > 0) {
         const rankedNew =
           hasCompleted && activeTab === "all"
-            ? assembleDiscoveryFeed(newProducts, {
+            ? assembleDiscoveryFeed(eligibleNew, {
                 prefs,
                 mix: authSettings?.discovery_mix,
-                take: Math.min(newProducts.length, PAGE_SIZE),
+                take: Math.min(eligibleNew.length, PAGE_SIZE),
                 interestCategoryIds: interestExpanded,
                 apparelCategoryIds,
                 surface: "home_grid_more",
                 seedKey: user?.id || "guest",
               })
-            : newProducts.slice(0, PAGE_SIZE);
+            : eligibleNew.slice(0, PAGE_SIZE);
         setMoreProducts((prev) => [...prev, ...rankedNew]);
       }
     } catch (err) {

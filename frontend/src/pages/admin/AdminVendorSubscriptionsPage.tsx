@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Crown, Store, Search, Loader2, Check, X, MessageCircle, Truck, Eye, EyeOff, Ticket, Users } from "lucide-react";
-import { VENDOR_TIERS, PUBLISH_STATUS_CONFIG, type VendorTier } from "@/lib/vendor-tiers";
+import { Crown, Store, Search, Loader2, Check, X, MessageCircle, Truck, Ticket, Users } from "lucide-react";
+import { VENDOR_TIERS, type VendorTier } from "@/lib/vendor-tiers";
 import { Switch } from "@/components/ui/switch";
 import { PublishSocialDialog } from "@/components/admin/PublishSocialDialog";
 import { countProductPhotoUrls } from "@/lib/product-catalogue-validation";
+import { DataTablePagination } from "@/components/ui/DataTablePagination";
 
 interface StoreWithSub {
   id: string;
@@ -15,6 +16,8 @@ interface StoreWithSub {
   owner_id: string | null;
   products_count: number | null;
   is_verified: boolean | null;
+  is_suspended?: boolean | null;
+  is_banned?: boolean | null;
   can_create_coupons: boolean;
   collaborators_enabled: boolean;
   max_collaborators_override: number | null;
@@ -29,9 +32,19 @@ interface StoreWithSub {
 }
 
 const TIER_OPTIONS: VendorTier[] = ["beginner", "pro", "grand_supplier"];
+const FEATURE_HINTS: Record<string, string> = {
+  whatsapp: "Contact / checkout WhatsApp boutique (fail-closed si off).",
+  self_deliver: "Autorise la livraison par la flotte vendeur.",
+  coupons: "Création de coupons promo par la boutique.",
+  team: "Collaborateurs multi-comptes sur la boutique.",
+};
 
 export default function AdminVendorSubscriptionsPage() {
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
+  const [planFilter, setPlanFilter] = useState<"all" | VendorTier>("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const queryClient = useQueryClient();
 
   const { data: stores = [], isLoading } = useQuery({
@@ -39,7 +52,7 @@ export default function AdminVendorSubscriptionsPage() {
     queryFn: async () => {
       const { data: storesData } = await supabase
         .from("stores")
-        .select("id, name, owner_id, products_count, is_verified, can_create_coupons, collaborators_enabled, max_collaborators_override")
+        .select("id, name, owner_id, products_count, is_verified, is_suspended, is_banned, can_create_coupons, collaborators_enabled, max_collaborators_override")
         .order("name") as { data: any[] | null };
 
       if (!storesData) return [];
@@ -140,12 +153,26 @@ export default function AdminVendorSubscriptionsPage() {
         .select("id, name_fr, price, currency, store_id")
         .filter("publish_status", "eq", "pending_approval")
         .order("created_at", { ascending: false });
+      return data || [];
     },
   });
 
-  const filtered = stores.filter((s) =>
-    s.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    return stores.filter((s) => {
+      if (search && !s.name.toLowerCase().includes(search.toLowerCase())) return false;
+      const suspended = !!(s.is_suspended || s.is_banned);
+      if (statusFilter === "active" && suspended) return false;
+      if (statusFilter === "suspended" && !suspended) return false;
+      const tier = (s.subscription?.tier || "beginner") as VendorTier;
+      if (planFilter !== "all" && tier !== planFilter) return false;
+      return true;
+    });
+  }, [stores, search, statusFilter, planFilter]);
+
+  const paged = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
 
   return (
     <AdminLayout title="Abonnements vendeurs">
@@ -191,16 +218,48 @@ export default function AdminVendorSubscriptionsPage() {
           </div>
         )}
 
-        {/* Search */}
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Rechercher une boutique..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm bg-card border border-border rounded-md"
-          />
+        {/* Search + filters */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Rechercher une boutique..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="w-full pl-9 pr-4 py-2 text-sm bg-card border border-border rounded-md"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as any);
+              setPage(1);
+            }}
+            className="px-3 py-2 text-sm bg-card border border-border rounded-md"
+          >
+            <option value="all">Tous statuts</option>
+            <option value="active">Actifs</option>
+            <option value="suspended">Suspendus / bannis</option>
+          </select>
+          <select
+            value={planFilter}
+            onChange={(e) => {
+              setPlanFilter(e.target.value as any);
+              setPage(1);
+            }}
+            className="px-3 py-2 text-sm bg-card border border-border rounded-md"
+          >
+            <option value="all">Tous plans</option>
+            {TIER_OPTIONS.map((t) => (
+              <option key={t} value={t}>
+                {VENDOR_TIERS[t].label}
+              </option>
+            ))}
+          </select>
         </div>
 
         {isLoading ? (
@@ -209,7 +268,7 @@ export default function AdminVendorSubscriptionsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map((store) => {
+            {paged.map((store) => {
               const sub = store.subscription;
               const tier = (sub?.tier || "beginner") as VendorTier;
               const tierCfg = VENDOR_TIERS[tier];
@@ -223,6 +282,11 @@ export default function AdminVendorSubscriptionsPage() {
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${tierCfg.badgeClass}`}>
                         {tierCfg.label}
                       </span>
+                      {(store.is_suspended || store.is_banned) && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive">
+                          {store.is_banned ? "Banni" : "Suspendu"}
+                        </span>
+                      )}
                     </div>
                     <span className="text-xs text-muted-foreground">
                       {store.products_count || 0} produits
@@ -230,7 +294,6 @@ export default function AdminVendorSubscriptionsPage() {
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                    {/* Tier selector */}
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block">Plan</label>
                       <select
@@ -252,11 +315,11 @@ export default function AdminVendorSubscriptionsPage() {
                       </select>
                     </div>
 
-                    {/* WhatsApp toggle */}
                     <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1">
-                      <label className="text-xs text-muted-foreground flex items-center gap-1">
-                        <MessageCircle size={12} /> WhatsApp (checkout / contact)
+                      <label className="text-xs text-muted-foreground flex items-center gap-1" title={FEATURE_HINTS.whatsapp}>
+                        <MessageCircle size={12} /> WhatsApp
                       </label>
+                      <p className="text-[10px] text-muted-foreground hidden sm:block">{FEATURE_HINTS.whatsapp}</p>
                       <Switch
                         checked={sub?.is_whatsapp_enabled || false}
                         onCheckedChange={(v) =>
@@ -269,11 +332,11 @@ export default function AdminVendorSubscriptionsPage() {
                       />
                     </div>
 
-                    {/* Self-delivery toggle */}
                     <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1">
-                      <label className="text-xs text-muted-foreground flex items-center gap-1">
+                      <label className="text-xs text-muted-foreground flex items-center gap-1" title={FEATURE_HINTS.self_deliver}>
                         <Truck size={12} /> Self-Delivery
                       </label>
+                      <p className="text-[10px] text-muted-foreground hidden sm:block">{FEATURE_HINTS.self_deliver}</p>
                       <Switch
                         checked={sub?.can_self_deliver || false}
                         onCheckedChange={(v) =>
@@ -286,11 +349,11 @@ export default function AdminVendorSubscriptionsPage() {
                       />
                     </div>
 
-                    {/* Coupons toggle */}
                     <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1">
-                      <label className="text-xs text-muted-foreground flex items-center gap-1">
+                      <label className="text-xs text-muted-foreground flex items-center gap-1" title={FEATURE_HINTS.coupons}>
                         <Ticket size={12} /> Coupons
                       </label>
+                      <p className="text-[10px] text-muted-foreground hidden sm:block">{FEATURE_HINTS.coupons}</p>
                       <Switch
                         checked={store.can_create_coupons || false}
                         onCheckedChange={async (v) => {
@@ -306,11 +369,11 @@ export default function AdminVendorSubscriptionsPage() {
                       />
                     </div>
 
-                    {/* Collaborators toggle */}
                     <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1">
-                      <label className="text-xs text-muted-foreground flex items-center gap-1">
+                      <label className="text-xs text-muted-foreground flex items-center gap-1" title={FEATURE_HINTS.team}>
                         <Users size={12} /> Équipe
                       </label>
+                      <p className="text-[10px] text-muted-foreground hidden sm:block">{FEATURE_HINTS.team}</p>
                       <Switch
                         checked={store.collaborators_enabled || false}
                         onCheckedChange={async (v) => {
@@ -326,7 +389,6 @@ export default function AdminVendorSubscriptionsPage() {
                       />
                     </div>
 
-                    {/* Max collaborators override (only if enabled) */}
                     {store.collaborators_enabled && (
                       <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1">
                         <label className="text-xs text-muted-foreground flex items-center gap-1">
@@ -358,6 +420,17 @@ export default function AdminVendorSubscriptionsPage() {
                 </div>
               );
             })}
+            <DataTablePagination
+              totalItems={filtered.length}
+              currentPage={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(s) => {
+                setPageSize(s);
+                setPage(1);
+              }}
+              pageSizeOptions={[20, 50, 100]}
+            />
           </div>
         )}
       </div>

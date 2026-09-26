@@ -18,6 +18,7 @@ import {
   Loader2, ChevronLeft, FileImage, User, MapPin, Clock, Save,
   AlertTriangle, Link as LinkIcon,
 } from "lucide-react";
+import { AdminIdentityTabs } from "@/components/admin/AdminIdentityTabs";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -534,8 +535,9 @@ export default function AdminKycPage() {
 
   // ── List view ──
   return (
-    <AdminLayout title="Vérification KYC">
+    <AdminLayout title="Identité & conformité">
       <div className="space-y-6">
+        <AdminIdentityTabs />
         <LocationHierarchyFilter value={locationFilters} onChange={setLocationFilters} levels={["country", "city"]} />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">

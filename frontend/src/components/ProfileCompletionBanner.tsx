@@ -53,7 +53,15 @@ export function ProfileCompletionBanner({ className = "" }: { className?: string
           .from("saved_addresses")
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id);
-        if ((count ?? 0) === 0) next.push("need_address");
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("residence_country")
+          .eq("id", user.id)
+          .maybeSingle();
+        const noAddress = (count ?? 0) === 0;
+        const noCountry = !(profile as { residence_country?: string | null } | null)?.residence_country;
+        // Soft pressure: missing address book, or country still empty on profile
+        if (noAddress || noCountry) next.push("need_address");
       } catch {
         /* ignore */
       }

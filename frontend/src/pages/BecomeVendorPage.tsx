@@ -304,17 +304,22 @@ export default function BecomeVendorPage() {
   }
 
   if (!user) {
-    const authRedirect = "/auth?redirect=" + encodeURIComponent("/become-vendor#candidater");
+    const redirectTarget = encodeURIComponent("/become-vendor#candidater");
+    const signupHref = `/auth?mode=signup&redirect=${redirectTarget}`;
+    const loginHref = `/auth?mode=login&redirect=${redirectTarget}`;
     return (
       <div className="min-h-screen bg-background">
         <SEOHead title={landingSeo.seo.title} description={landingSeo.seo.description} />
         <Header />
-        <BecomeVendorLanding primaryCtaTo={authRedirect} />
+        <BecomeVendorLanding primaryCtaTo={signupHref} />
         <div className="container max-w-lg py-12 text-center space-y-4 border-t border-border">
           <AlertCircle size={40} className="mx-auto text-muted-foreground" />
           <h2 className="text-xl font-bold">{t("vendor.loginRequired")}</h2>
           <p className="text-muted-foreground text-sm">{t("vendor.loginRequiredDesc")}</p>
-          <Button onClick={() => navigate(authRedirect)}>{t("general.loginButton")}</Button>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button onClick={() => navigate(signupHref)}>Créer mon compte</Button>
+            <Button variant="outline" onClick={() => navigate(loginHref)}>Se connecter</Button>
+          </div>
         </div>
         <Footer />
       </div>
@@ -418,7 +423,7 @@ export default function BecomeVendorPage() {
       payment_preferences: {
         mobile_money: form.pay_mobile_money,
         card: form.pay_card,
-        off_platform: form.pay_off_platform,
+        off_platform: false,
       },
     };
 
@@ -454,10 +459,10 @@ export default function BecomeVendorPage() {
       });
       return;
     }
-    if (!form.pay_mobile_money && !form.pay_card && !form.pay_off_platform) {
+    if (!form.pay_mobile_money && !form.pay_card) {
       toast({
         title: "Modes de paiement",
-        description: "Sélectionnez au moins un mode de perception (Mobile Money, carte ou hors plateforme).",
+        description: "Sélectionnez au moins un mode (Mobile Money ou carte).",
         variant: "destructive",
       });
       return;
@@ -474,7 +479,7 @@ export default function BecomeVendorPage() {
           payment_preferences: {
             mobile_money: form.pay_mobile_money,
             card: form.pay_card,
-            off_platform: form.pay_off_platform,
+            off_platform: false,
           },
         } as any)
         .eq("id", form.id);
@@ -518,6 +523,25 @@ export default function BecomeVendorPage() {
       .single();
 
     setDocs((prev) => [...prev.filter((d) => d.type !== docType), { type: docType, url: docUrl, file_name: file.name, id: docRow?.id }]);
+
+    // Logo / banner: also publish to product-media and sync application store_*_url for approve → stores
+    if (docType === "logo" || docType === "banner") {
+      const publicPath = `vendor-apps/${user.id}/${docType}-${Date.now()}.${ext}`;
+      const { error: pubErr } = await supabase.storage
+        .from("product-media")
+        .upload(publicPath, file, { upsert: true, cacheControl: "31536000" });
+      if (!pubErr) {
+        const { data: urlData } = supabase.storage.from("product-media").getPublicUrl(publicPath);
+        const publicUrl = urlData.publicUrl;
+        const patch =
+          docType === "logo"
+            ? { store_logo_url: publicUrl }
+            : { store_banner_url: publicUrl };
+        await supabase.from("vendor_applications").update(patch as any).eq("id", appId);
+        setForm((prev) => ({ ...prev, ...patch }));
+      }
+    }
+
     setUploading(null);
     toast({ title: t("vendor.uploaded") });
   };
@@ -536,7 +560,7 @@ export default function BecomeVendorPage() {
       case 2:
         return (
           !!form.store_name &&
-          (form.pay_mobile_money || form.pay_card || form.pay_off_platform)
+          (form.pay_mobile_money || form.pay_card)
         );
       case 3: return kycApproved;
       default: return true;
@@ -580,6 +604,18 @@ export default function BecomeVendorPage() {
             après approbation. Pas de boutique instantanée.
           </p>
         </div>
+
+        {kycApproved && !["submitted", "approved", "rejected"].includes(form.status) && (
+          <div className="rounded-lg border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Reprendre ma candidature boutique</p>
+              <p className="text-xs text-muted-foreground">Votre identité est vérifiée — finalisez et soumettez votre dossier.</p>
+            </div>
+            <Button size="sm" onClick={() => setStep(Math.max(step, 2))}>
+              Continuer
+            </Button>
+          </div>
+        )}
 
         <div className="space-y-3">
           <Progress value={progressPct} className="h-2" />
@@ -657,7 +693,7 @@ export default function BecomeVendorPage() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="international">🌍 International (Import / Sourcing)</SelectItem>
-                      <SelectItem value="local">🏪 Local (Stock physique en RDC)</SelectItem>
+                      <SelectItem value="local">🏪 Stock physique</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -680,7 +716,7 @@ export default function BecomeVendorPage() {
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="platform">Livreurs de la plateforme</SelectItem>
-                          <SelectItem value="own_fleet">Ma propre flotte</SelectItem>
+                          <SelectItem value="own_fleet">Flotte boutique</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -691,7 +727,7 @@ export default function BecomeVendorPage() {
                   <Label className="text-base font-semibold">Perception des paiements *</Label>
                   <p className="text-xs text-muted-foreground">
                     Au moins un mode. Mobile Money et carte = encaissement via Zandofy (KelPay / Keccel).
-                    Hors plateforme = vos numéros / QR + preuve client (essai 30 jours puis abonnement).
+                    Le hors plateforme peut être activé plus tard depuis Pricing / demande boutique.
                   </p>
                   {(
                     [
@@ -704,11 +740,6 @@ export default function BecomeVendorPage() {
                         key: "pay_card" as const,
                         label: "Carte bancaire (Keccel)",
                         checked: form.pay_card,
-                      },
-                      {
-                        key: "pay_off_platform" as const,
-                        label: "Hors plateforme (numéros / QR)",
-                        checked: form.pay_off_platform,
                       },
                     ] as const
                   ).map((opt) => (
@@ -750,7 +781,17 @@ export default function BecomeVendorPage() {
                         ouverture après approbation. Complétez le KYC dans votre compte, puis
                         revenez ici.
                       </p>
-                      <Button asChild size="sm">
+                      <Button
+                        asChild
+                        size="sm"
+                        onClick={() => {
+                          try {
+                            sessionStorage.setItem("zandofy_vendor_return", "/become-vendor#candidater");
+                          } catch {
+                            /* ignore */
+                          }
+                        }}
+                      >
                         <Link to="/dashboard?tab=kyc">Compléter mon KYC</Link>
                       </Button>
                     </div>
@@ -812,7 +853,6 @@ export default function BecomeVendorPage() {
                       {[
                         form.pay_mobile_money ? "Mobile Money (KelPay)" : null,
                         form.pay_card ? "Carte (Keccel)" : null,
-                        form.pay_off_platform ? "Hors plateforme" : null,
                       ]
                         .filter(Boolean)
                         .join(" · ") || "—"}

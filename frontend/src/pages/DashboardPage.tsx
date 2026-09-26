@@ -124,6 +124,7 @@ interface OrderRow {
   supplier_order_number: string | null;
   assigned_rider_name: string | null;
   delivery_choice: string | null;
+  geo_relation?: string | null;
   last_mile_fee: number | null;
   confirmation_code: string | null;
   shipping_payment_status: string | null;
@@ -139,6 +140,7 @@ interface OrderRow {
   delivery_date_requested: string | null;
   delivery_time_requested: string | null;
   shop_type?: string | null;
+  geo_relation?: string | null;
 }
 
 interface OrderItemRow {
@@ -234,13 +236,21 @@ export default function DashboardPage() {
   const loadOrders = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("orders")
-      .select("id, order_ref, created_at, total, status, subtotal, shipping_cost, discount_amount, coupon_code, shipping_first_name, shipping_last_name, shipping_phone, shipping_address, shipping_city, shipping_country, payment_method, tracking_number, assigned_rider_name, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, last_mile_payment_status, rider_cash_collected, store_id")
+      .select("id, order_ref, created_at, total, status, subtotal, shipping_cost, discount_amount, coupon_code, shipping_first_name, shipping_last_name, shipping_phone, shipping_address, shipping_city, shipping_country, payment_method, tracking_number, assigned_rider_name, delivery_choice, geo_relation, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, last_mile_payment_status, rider_cash_collected, store_id")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }) as any;
     if (error) {
-      console.error("[DashboardPage] Error loading orders:", error);
+      // Pre-migration: geo_relation column may be missing
+      const retry = await supabase
+        .from("orders")
+        .select("id, order_ref, created_at, total, status, subtotal, shipping_cost, discount_amount, coupon_code, shipping_first_name, shipping_last_name, shipping_phone, shipping_address, shipping_city, shipping_country, payment_method, tracking_number, assigned_rider_name, delivery_choice, last_mile_fee, confirmation_code, shipping_payment_status, last_mile_payment_method, last_mile_payment_status, rider_cash_collected, store_id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }) as any;
+      data = retry.data;
+      error = retry.error;
+      if (error) console.error("[DashboardPage] Error loading orders:", error);
     }
     const ordersWithOptionalFields = await withOptionalOrderFields<OrderRow>((data || []) as OrderRow[], [
       "shipping_payment_proof_url",
@@ -419,6 +429,21 @@ export default function DashboardPage() {
                   <ShieldCheck size={32} className="mx-auto text-primary" />
                   <h3 className="font-bold text-foreground">{t("kyc.verified.title")}</h3>
                   <p className="text-sm text-muted-foreground">{t("kyc.verified.desc")}</p>
+                  {typeof sessionStorage !== "undefined" &&
+                    sessionStorage.getItem("zandofy_vendor_return") && (
+                      <Button
+                        className="mt-2"
+                        onClick={() => {
+                          const dest =
+                            sessionStorage.getItem("zandofy_vendor_return") ||
+                            "/become-vendor#candidater";
+                          sessionStorage.removeItem("zandofy_vendor_return");
+                          navigate(dest);
+                        }}
+                      >
+                        Reprendre ma candidature boutique
+                      </Button>
+                    )}
                 </div>
                 <ClientCertificationSection />
               </div>
@@ -453,7 +478,9 @@ export default function DashboardPage() {
                   )}
                 </div>
                 <p className="text-sm font-bold text-foreground truncate">{t("dashboard.welcomeDesktop", { name: welcomeName })}</p>
-                <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {isSyntheticAuthEmail(user.email) ? t("profile.phoneAccount") : user.email}
+                </p>
               </div>
 
               {/* Navigation items */}
@@ -1171,6 +1198,7 @@ function OrderDetailView({ order, orderItems, statusHistory, onBack, onCancelSuc
         trackingNumber={order.tracking_number}
         shopType={order.shop_type}
         deliveryChoice={order.delivery_choice}
+        geoRelation={order.geo_relation}
       />
 
       {/* Status History Timeline */}
@@ -1445,6 +1473,7 @@ function TrackingStepper({
   trackingNumber,
   shopType,
   deliveryChoice,
+  geoRelation,
 }: {
   status: string;
   statusHistory?: StatusHistoryRow[];
@@ -1452,12 +1481,13 @@ function TrackingStepper({
   trackingNumber?: string | null;
   shopType?: string | null;
   deliveryChoice?: string | null;
+  geoRelation?: string | null;
 }) {
   const { t, locale } = useI18n();
   const dateLocale = locale === "en" ? enUS : fr;
   const navigate = useNavigate();
-  const steps = getCustomerTrackingSteps(shopType, deliveryChoice);
-  const currentIdx = getStepIndex(status, shopType || undefined, deliveryChoice);
+  const steps = getCustomerTrackingSteps(shopType, deliveryChoice, geoRelation);
+  const currentIdx = getStepIndex(status, shopType || undefined, deliveryChoice, geoRelation);
   const isCancelled = status === "cancelled" || status === "returned";
 
   if (isCancelled) {
@@ -1765,6 +1795,7 @@ function TrackingTab({ orders }: { orders: OrderRow[] }) {
             trackingNumber={order.tracking_number}
             shopType={order.shop_type}
             deliveryChoice={order.delivery_choice}
+            geoRelation={order.geo_relation}
           />
           <CustomerOrderTracker orderId={order.id} />
         </div>
@@ -2037,7 +2068,11 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
           </div>
           <div>
             <p className="text-sm font-medium text-foreground">{profile.first_name || profile.last_name ? `${profile.first_name} ${profile.last_name}`.trim() : t("profile.namePlaceholder")}</p>
-            <p className="text-xs text-muted-foreground">{user.email}</p>
+            <p className="text-xs text-muted-foreground">
+              {isSyntheticAuthEmail(user.email)
+                ? (profile.phone?.trim() || t("profile.phoneAccount"))
+                : user.email}
+            </p>
           </div>
         </div>
 

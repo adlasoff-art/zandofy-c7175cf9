@@ -16,8 +16,10 @@ interface Props {
 }
 
 const METHOD_LABELS: Record<string, string> = {
-  mobile_money: "Mobile Money",
+  open_money: "Open Money",
   bank_transfer: "Virement bancaire",
+  cash: "Cash (sur demande)",
+  mobile_money: "Mobile Money",
   visa: "Carte Visa",
 };
 
@@ -33,9 +35,24 @@ export function VendorWalletTab({ storeId }: Props) {
   const queryClient = useQueryClient();
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [withdrawMethod, setWithdrawMethod] = useState("mobile_money");
+  const [withdrawMethod, setWithdrawMethod] = useState("open_money");
   const { data: kybGate } = useStoreKybGate(storeId);
   const kybBlocked = !!kybGate?.blocked;
+
+  const { data: cashEnabled = false } = useQuery({
+    queryKey: ["vendor-cash-payout-enabled"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("platform_settings")
+        .select("value")
+        .eq("key", "vendor_cash_payout_enabled")
+        .maybeSingle();
+      const v = data?.value as any;
+      if (v === true || v === "true") return true;
+      if (typeof v === "object" && v?.enabled === true) return true;
+      return false;
+    },
+  });
 
   // Release pending funds on load
   const { data: wallet, isLoading: walletLoading } = useQuery({
@@ -208,10 +225,15 @@ export function VendorWalletTab({ storeId }: Props) {
                 onChange={(e) => setWithdrawMethod(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md"
               >
-                <option value="mobile_money">Mobile Money</option>
+                <option value="open_money">Open Money</option>
                 <option value="bank_transfer">Virement bancaire</option>
-                <option value="visa">Carte Visa</option>
+                {cashEnabled && <option value="cash">Cash (sur demande)</option>}
               </select>
+              {!cashEnabled && (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Cash disponible uniquement si activé par l’admin plateforme.
+                </p>
+              )}
             </div>
             <Button
               onClick={() => withdrawMutation.mutate()}

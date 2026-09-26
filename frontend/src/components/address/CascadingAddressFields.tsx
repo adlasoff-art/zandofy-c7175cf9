@@ -16,6 +16,7 @@ interface AddressData {
   province: string;    // province name (stored as text)
   province_id: string; // province UUID for cascading
   city: string;
+  city_id?: string;
   commune: string;
   quartier: string;
   address: string;     // manual: N° parcelle, appartement, Avenue/Rue
@@ -57,6 +58,7 @@ export function CascadingAddressFields({ data, onChange, showPostalCode = true }
     onChange("province", "");
     onChange("province_id", "");
     onChange("city", "");
+    onChange("city_id", "");
     onChange("commune", "");
     onChange("quartier", "");
     setCommuneUuid("");
@@ -67,6 +69,7 @@ export function CascadingAddressFields({ data, onChange, showPostalCode = true }
     const prov = provinces.find(p => p.value === v);
     onChange("province", prov?.label || "");
     onChange("city", "");
+    onChange("city_id", "");
     onChange("commune", "");
     onChange("quartier", "");
     setCommuneUuid("");
@@ -74,6 +77,8 @@ export function CascadingAddressFields({ data, onChange, showPostalCode = true }
 
   const handleCityChange = (v: string) => {
     onChange("city", v);
+    const match = cities.find((c) => c.value === v);
+    onChange("city_id", match?.id || "");
     onChange("commune", "");
     onChange("quartier", "");
     setCommuneUuid("");
