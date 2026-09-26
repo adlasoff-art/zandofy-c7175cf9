@@ -795,6 +795,7 @@ export default function ForwarderShipmentsPage() {
                 <ConsigneeCombobox
                   forwarderId={forwarder.id}
                   valueId={form.consignee_id || null}
+                  destinationCountryCode={destGeo.country || null}
                   onSelect={(c: Consignee | null) => {
                     if (!c) {
                       setForm((f) => ({ ...f, consignee_id: "" }));

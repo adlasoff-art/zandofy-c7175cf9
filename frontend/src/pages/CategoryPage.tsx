@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +23,9 @@ import { useI18n } from "@/contexts/I18nContext";
 import { useSeoConfig } from "@/hooks/use-seo-config";
 import { slugify } from "@/utils/slugify";
 import { useDiscoveryRankedProducts } from "@/hooks/use-discovery-ranked";
+import { CountryCombobox } from "@/components/vendor/CountryCombobox";
+import { applyDiscoveryEligibilityFilter } from "@/lib/geo-eligibility";
+import { useActiveGeo } from "@/hooks/useActiveGeo";
 
 function applySeoTemplate(tpl: string, vars: Record<string, string>): string {
   return (tpl || "").replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? "");
@@ -34,6 +37,7 @@ export default function CategoryPage() {
   const { slug } = useParams<{ slug: string }>();
   const { t, locale, formatPrice } = useI18n();
   const seoConfig = useSeoConfig();
+  const { activeCountryCodes } = useActiveGeo();
   const labelOf = (c: { name?: string | null; name_fr?: string | null }) =>
     locale === "fr" ? (c.name_fr ?? c.name ?? "") : (c.name ?? c.name_fr ?? "");
   const isSpecial = SPECIAL_SLUGS.includes(slug?.toLowerCase() || "");
@@ -44,6 +48,9 @@ export default function CategoryPage() {
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<string>("recent");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [originCountry, setOriginCountry] = useState("");
+  const [deliverableCountry, setDeliverableCountry] = useState("");
+  const [deliverableFilteredIds, setDeliverableFilteredIds] = useState<Set<string> | null>(null);
 
   // Fetch newness duration setting
   const { data: newnessDays } = useQuery({
@@ -155,6 +162,21 @@ export default function CategoryPage() {
       result = result.filter((p) => p.colors?.some((c: string) => selectedColors.includes(c)));
     }
 
+    // Origin (store location)
+    if (originCountry) {
+      const oc = originCountry.toUpperCase();
+      result = result.filter(
+        (p) =>
+          (p.storeCountryCode || "").toUpperCase() === oc ||
+          (p.originCountry || "").toUpperCase() === oc,
+      );
+    }
+
+    // Deliverable-to (when eligibility enforced)
+    if (deliverableCountry && deliverableFilteredIds) {
+      result = result.filter((p) => deliverableFilteredIds.has(p.id));
+    }
+
     // Sort
     switch (sortBy) {
       case "price-asc": result = [...result].sort((a, b) => a.price - b.price); break;
@@ -165,7 +187,22 @@ export default function CategoryPage() {
     }
 
     return result;
-  }, [products, priceRange, selectedSizes, selectedColors, sortBy]);
+  }, [products, priceRange, selectedSizes, selectedColors, sortBy, originCountry, deliverableCountry, deliverableFilteredIds]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!deliverableCountry || !products?.length) {
+      setDeliverableFilteredIds(null);
+      return;
+    }
+    void applyDiscoveryEligibilityFilter(products, deliverableCountry, null).then((eligible) => {
+      if (cancelled) return;
+      setDeliverableFilteredIds(new Set(eligible.map((p) => p.id)));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [deliverableCountry, products]);
 
   const rankedFiltered = useDiscoveryRankedProducts(
     filteredProducts,
@@ -173,7 +210,12 @@ export default function CategoryPage() {
     filteredProducts.length || undefined,
   );
 
-  const activeFiltersCount = (selectedSizes.length > 0 ? 1 : 0) + (selectedColors.length > 0 ? 1 : 0) + (priceRange[0] > 0 || priceRange[1] < 10000 ? 1 : 0);
+  const activeFiltersCount =
+    (selectedSizes.length > 0 ? 1 : 0) +
+    (selectedColors.length > 0 ? 1 : 0) +
+    (priceRange[0] > 0 || priceRange[1] < 10000 ? 1 : 0) +
+    (originCountry ? 1 : 0) +
+    (deliverableCountry ? 1 : 0);
 
   if (catLoading) {
     return (
@@ -358,7 +400,13 @@ export default function CategoryPage() {
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground">{t("filter.filters")}</h3>
               <button
-                onClick={() => { setPriceRange([0, 10000]); setSelectedSizes([]); setSelectedColors([]); }}
+                onClick={() => {
+                  setPriceRange([0, 10000]);
+                  setSelectedSizes([]);
+                  setSelectedColors([]);
+                  setOriginCountry("");
+                  setDeliverableCountry("");
+                }}
                 className="text-xs text-primary hover:underline"
               >
                 {t("filter.reset")}
@@ -424,6 +472,33 @@ export default function CategoryPage() {
                 </div>
               </div>
             )}
+
+            <div className="space-y-2">
+              <Label className="text-xs">Produits de (origine)</Label>
+              <CountryCombobox
+                value={originCountry}
+                onChange={setOriginCountry}
+                label=""
+                showNone
+                noneLabel="Tous les pays"
+                allowedCodes={activeCountryCodes}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Livrables à</Label>
+              <CountryCombobox
+                value={deliverableCountry}
+                onChange={setDeliverableCountry}
+                label=""
+                showNone
+                noneLabel="Tous les pays"
+                allowedCodes={activeCountryCodes}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Différent de l’origine : articles vendus vers cette destination.
+              </p>
+            </div>
           </div>
         )}
 

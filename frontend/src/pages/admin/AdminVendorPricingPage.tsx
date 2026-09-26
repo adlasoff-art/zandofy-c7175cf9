@@ -3,11 +3,13 @@ import { Search, Store, Save, Loader2, ShieldAlert, Settings, Plus, Trash2 } fro
 import { AdminCreateStoreDialog } from "@/components/admin/AdminCreateStoreDialog";
 import { AdminWebhookRequests } from "@/components/admin/AdminWebhookRequests";
 import { FreightSimulatorToggle } from "@/components/admin/vendor-pricing/FreightSimulatorToggle";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { DataTablePagination } from "@/components/ui/DataTablePagination";
 
 function GlobalPricingDefaults({ defaults }: { defaults: any }) {
   const { toast } = useToast();
@@ -172,6 +174,8 @@ interface StoreWithOverride {
 
 export default function AdminVendorPricingPage() {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, {
     margin_pct: string;
@@ -215,7 +219,7 @@ export default function AdminVendorPricingPage() {
     queryFn: async () => {
       let q = (supabase as any).from("stores").select("id, name, owner_id, is_platform_owned, returns_enabled").order("name");
       if (search) q = q.ilike("name", `%${search}%`);
-      const { data: storesData } = await q.limit(50);
+      const { data: storesData } = await q.limit(500);
       if (!storesData?.length) return [];
 
       const storeIds = storesData.map((s: any) => s.id);
@@ -232,6 +236,12 @@ export default function AdminVendorPricingPage() {
       })) as StoreWithOverride[];
     },
   });
+
+  const pagedStores = useMemo(() => {
+    const list = stores || [];
+    const start = (page - 1) * pageSize;
+    return list.slice(start, start + pageSize);
+  }, [stores, page, pageSize]);
 
   // Fetch pending ownership claims for badge display
   const { data: pendingClaims } = useQuery({
@@ -450,7 +460,10 @@ export default function AdminVendorPricingPage() {
             type="text"
             placeholder="Rechercher une boutique..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="w-full pl-9 pr-3 py-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
@@ -466,30 +479,30 @@ export default function AdminVendorPricingPage() {
           <p className="text-sm text-muted-foreground text-center py-8">Aucune boutique trouvée.</p>
         )}
 
-        <div className="space-y-3">
-          {stores?.map((store) => {
+        <Accordion type="multiple" className="space-y-2">
+          {pagedStores.map((store) => {
             const edit = getEdit(store);
             const isDirty = !!edits[store.id];
             const claim = claimsByStore.get(store.id);
 
             return (
-              <div key={store.id} className="bg-card border border-border rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Store size={16} className="text-primary" />
+              <AccordionItem key={store.id} value={store.id} className="bg-card border border-border rounded-xl px-4 border-b-border">
+                <AccordionTrigger className="hover:no-underline py-3">
+                  <div className="flex items-center gap-2 flex-wrap text-left pr-2">
+                    <Store size={16} className="text-primary shrink-0" />
                     <span className="text-sm font-semibold text-foreground">{store.name}</span>
                     {edit.is_platform_owned ? (
                       <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded-full font-medium">Plateforme</span>
                     ) : (
                       <span className="text-[10px] px-1.5 py-0.5 bg-muted text-muted-foreground rounded-full font-medium">Indépendant</span>
                     )}
-                    {claim && (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-destructive/10 text-destructive rounded-full font-medium flex items-center gap-1">
-                        <ShieldAlert size={10} />
-                        {claim.status === "accepted" ? "Contestation reçue" : "Contestation en cours"}
-                      </span>
+                    {isDirty && (
+                      <span className="text-[10px] text-destructive">modifié</span>
                     )}
                   </div>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-3 pb-4">
+                <div className="flex items-center justify-end">
                   <button
                     onClick={() => handleSave(store)}
                     disabled={savingId === store.id}
@@ -796,10 +809,22 @@ export default function AdminVendorPricingPage() {
                 {isDirty && (
                   <p className="text-[10px] text-destructive/70">Modifications non enregistrées</p>
                 )}
-              </div>
+                </AccordionContent>
+              </AccordionItem>
             );
           })}
-        </div>
+        </Accordion>
+        <DataTablePagination
+          totalItems={stores?.length || 0}
+          currentPage={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(s) => {
+            setPageSize(s);
+            setPage(1);
+          }}
+          pageSizeOptions={[20, 50, 100]}
+        />
       </div>
     </AdminLayout>
   );

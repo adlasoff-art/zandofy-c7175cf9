@@ -14,6 +14,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { useToast } from "@/hooks/use-toast";
 import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { ShieldCheck, ExternalLink, Loader2, Building2, FileText, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { AdminIdentityTabs } from "@/components/admin/AdminIdentityTabs";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -31,8 +32,9 @@ export default function AdminKybKycV2Page() {
   const [selected, setSelected] = useState<KybQueueItem | null>(null);
 
   return (
-    <AdminLayout title="KYB / KYC v2">
+    <AdminLayout title="Identité & conformité">
       <div className="space-y-4">
+        <AdminIdentityTabs />
         <div className="flex items-center gap-2">
           <ShieldCheck className="text-primary" size={22} />
           <h1 className="text-2xl font-bold">KYB / KYC v2 — Vérification vendeurs</h1>

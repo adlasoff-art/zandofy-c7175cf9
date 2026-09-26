@@ -70,6 +70,11 @@ export function VendorAutonomousTab({ storeId }: Props) {
   // Submit webhook request
   const submitRequest = useMutation({
     mutationFn: async () => {
+      const autonomous =
+        override?.vendor_mode === "local_only" || override?.vendor_off_platform_enabled === true;
+      if (!autonomous) {
+        throw new Error("Webhook réservé au mode autonome / hors plateforme (extra payant).");
+      }
       if (!webhookUrl.trim()) throw new Error("Veuillez renseigner une URL");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Non authentifié");
@@ -243,8 +248,8 @@ export function VendorAutonomousTab({ storeId }: Props) {
           </div>
         )}
 
-        {/* New request form (only if no pending request) */}
-        {!latestPendingRequest && (
+        {/* New request form — only for approved autonomous / off-platform vendors (paywalled) */}
+        {!latestPendingRequest && isAutonomous && (
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground">URL de votre API</label>
             <div className="flex gap-2">
@@ -265,6 +270,11 @@ export function VendorAutonomousTab({ storeId }: Props) {
               </button>
             </div>
           </div>
+        )}
+        {!latestPendingRequest && !isAutonomous && !webhookApproved && (
+          <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+            Le webhook autonome est un extra payant. Activez le mode autonome / hors plateforme (Pricing ou demande admin) avant de soumettre une URL.
+          </p>
         )}
 
         {/* Request history */}

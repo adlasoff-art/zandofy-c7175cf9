@@ -89,6 +89,19 @@ export const LOCAL_DELIVERY_STATUS_FLOW: OrderStatus[] = [
   "delivered",
 ];
 
+/** National (same country, other city) — prep → national ship → last-mile */
+export const NATIONAL_STATUS_FLOW: OrderStatus[] = [
+  "pending",
+  "confirmed",
+  "preparing",
+  "in_shipping",
+  "shipped",
+  "assigning_rider",
+  "rider_assigned",
+  "out_for_delivery",
+  "delivered",
+];
+
 /**
  * @deprecated Prefer LOCAL_PICKUP_STATUS_FLOW / LOCAL_DELIVERY_STATUS_FLOW via getStatusFlow.
  * Kept as pickup default for callers that omit delivery_choice.
@@ -129,8 +142,25 @@ export const VENDOR_LOCAL_MAX_STATUS_INDEX = VENDOR_LOCAL_DELIVERY_MAX_STATUS_IN
 
 export type DeliveryChoice = "home_delivery" | "hub_pickup" | string | null | undefined;
 
-/** Get the correct status flow based on shop type + delivery choice */
-export function getStatusFlow(shopType?: string, deliveryChoice?: DeliveryChoice): OrderStatus[] {
+export type OrderGeoRelation = "same_city" | "same_country_other_city" | "cross_border" | string | null | undefined;
+
+/** Get the correct status flow based on geo_relation (preferred) or shop_type fallback */
+export function getStatusFlow(
+  shopType?: string,
+  deliveryChoice?: DeliveryChoice,
+  geoRelation?: OrderGeoRelation,
+): OrderStatus[] {
+  if (geoRelation === "same_city") {
+    return deliveryChoice === "home_delivery"
+      ? LOCAL_DELIVERY_STATUS_FLOW
+      : LOCAL_PICKUP_STATUS_FLOW;
+  }
+  if (geoRelation === "same_country_other_city") {
+    return NATIONAL_STATUS_FLOW;
+  }
+  if (geoRelation === "cross_border") {
+    return STATUS_FLOW;
+  }
   if (shopType === "local") {
     return deliveryChoice === "home_delivery"
       ? LOCAL_DELIVERY_STATUS_FLOW
@@ -142,18 +172,20 @@ export function getStatusFlow(shopType?: string, deliveryChoice?: DeliveryChoice
 /** Customer-facing tracking steps */
 export function getCustomerTrackingSteps(
   shopType?: string | null,
-  deliveryChoice?: DeliveryChoice
+  deliveryChoice?: DeliveryChoice,
+  geoRelation?: OrderGeoRelation,
 ): TrackingStep[] {
-  return stepsFromFlow(getStatusFlow(shopType || undefined, deliveryChoice));
+  return stepsFromFlow(getStatusFlow(shopType || undefined, deliveryChoice, geoRelation));
 }
 
 /** Get the next status in the flow */
 export function getNextStatus(
   current: string,
   shopType?: string,
-  deliveryChoice?: DeliveryChoice
+  deliveryChoice?: DeliveryChoice,
+  geoRelation?: OrderGeoRelation,
 ): OrderStatus | null {
-  const flow = getStatusFlow(shopType, deliveryChoice);
+  const flow = getStatusFlow(shopType, deliveryChoice, geoRelation);
   const idx = flow.indexOf(current as OrderStatus);
   return idx >= 0 && idx < flow.length - 1 ? flow[idx + 1] : null;
 }
@@ -162,9 +194,10 @@ export function getNextStatus(
 export function getStepIndex(
   status: string,
   shopType?: string,
-  deliveryChoice?: DeliveryChoice
+  deliveryChoice?: DeliveryChoice,
+  geoRelation?: OrderGeoRelation,
 ): number {
-  const flow = getStatusFlow(shopType, deliveryChoice);
+  const flow = getStatusFlow(shopType, deliveryChoice, geoRelation);
   const idx = flow.indexOf(status as OrderStatus);
   if (idx >= 0) return idx;
 
@@ -183,7 +216,7 @@ export function getStepIndex(
   return best;
 }
 
-/** Can a vendor advance to the next status? (international flow) */
+/** Can a vendor advance to the next status? (international / national flow) */
 export function canVendorAdvance(currentStatus: string): boolean {
   const idx = STATUS_FLOW.indexOf(currentStatus as OrderStatus);
   return idx >= 0 && idx < VENDOR_MAX_STATUS_INDEX;
@@ -194,7 +227,7 @@ export function canVendorAdvanceLocal(
   currentStatus: string,
   deliveryChoice?: DeliveryChoice
 ): boolean {
-  const flow = getStatusFlow("local", deliveryChoice);
+  const flow = getStatusFlow("local", deliveryChoice, "same_city");
   const maxIdx =
     deliveryChoice === "home_delivery"
       ? VENDOR_LOCAL_DELIVERY_MAX_STATUS_INDEX
@@ -203,13 +236,31 @@ export function canVendorAdvanceLocal(
   return idx >= 0 && idx < maxIdx;
 }
 
+/** Vendor advance respecting geo_relation when present (fallback shop_type) */
+export function canVendorAdvanceOrder(
+  currentStatus: string,
+  shopType?: string,
+  deliveryChoice?: DeliveryChoice,
+  geoRelation?: OrderGeoRelation,
+): boolean {
+  if (geoRelation === "same_city" || (!geoRelation && shopType === "local")) {
+    return canVendorAdvanceLocal(currentStatus, deliveryChoice);
+  }
+  const flow = getStatusFlow(shopType, deliveryChoice, geoRelation);
+  const idx = flow.indexOf(currentStatus as OrderStatus);
+  const shippedIdx = flow.indexOf("shipped");
+  const maxIdx = shippedIdx >= 0 ? shippedIdx : VENDOR_MAX_STATUS_INDEX;
+  return idx >= 0 && idx < maxIdx;
+}
+
 /** Can an admin advance to the next status? Always yes if not at end */
 export function canAdminAdvance(
   currentStatus: string,
   shopType?: string,
-  deliveryChoice?: DeliveryChoice
+  deliveryChoice?: DeliveryChoice,
+  geoRelation?: OrderGeoRelation,
 ): boolean {
-  const flow = getStatusFlow(shopType, deliveryChoice);
+  const flow = getStatusFlow(shopType, deliveryChoice, geoRelation);
   const idx = flow.indexOf(currentStatus as OrderStatus);
   return idx >= 0 && idx < flow.length - 1;
 }

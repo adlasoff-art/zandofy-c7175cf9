@@ -24,6 +24,7 @@ import { VendorRiderTracking } from "@/components/vendor/VendorRiderTracking";
 import { VendorTeamTab } from "@/components/vendor/VendorTeamTab";
 import { VendorPaymentNumbers } from "@/components/vendor/VendorPaymentNumbers";
 import { VendorOnboardingChecklist } from "@/components/vendor/VendorOnboardingChecklist";
+import { VendorCommercialScopePanel } from "@/components/vendor/VendorCommercialScopePanel";
 import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
 import { VendorPricingTab } from "@/components/vendor/VendorPricingTab";
 import { VendorAutonomousTab } from "@/components/vendor/VendorAutonomousTab";
@@ -175,7 +176,7 @@ export default function VendorDashboardPage() {
       // Find all stores owned by user
       const { data: storesData } = await (supabase as any)
         .from("stores")
-        .select("id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type")
+        .select("id, name, logo_url, banner_url, country, country_code, city_id, default_commercial_scope, products_count, followers_count, whatsapp_number, is_whatsapp_enabled, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type")
         .eq("owner_id", user!.id)
         .order("created_at", { ascending: true });
 
@@ -321,6 +322,9 @@ export default function VendorDashboardPage() {
         <VendorOnboardingChecklist
           storeId={store.id}
           productCount={undefined}
+          hasLogo={Boolean(store.logo_url)}
+          hasBanner={Boolean((store as any)?.banner_url)}
+          hasCountry={Boolean((store as any)?.country_code || (store as any)?.country)}
           hasWhatsappNumber={Boolean((store as any)?.whatsapp_number)}
           whatsappEnabled={(store as any)?.is_whatsapp_enabled === true}
         />
@@ -1069,6 +1073,14 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
         <div className="p-3 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/10 text-xs text-muted-foreground">
           Paramètres en lecture seule : boutique suspendue, bannie ou archivée.
         </div>
+      )}
+
+      {!settingsBlocked && (
+        <VendorCommercialScopePanel
+          storeId={store.id}
+          initialScope={(store as any).default_commercial_scope}
+          storeCountryCode={(store as any).country_code || store.country}
+        />
       )}
 
       {/* ═══ PRÉSENCE EN LIGNE ═══ */}

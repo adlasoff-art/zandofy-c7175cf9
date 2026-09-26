@@ -32,6 +32,7 @@ import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
 import { slugify } from "@/utils/slugify";
 import { isPWAStandalone } from "@/lib/device";
 import { ProfileCompletionBanner } from "@/components/ProfileCompletionBanner";
+import { isSyntheticAuthEmail } from "@/lib/auth-helpers";
 
 // Mini error boundary to prevent Radix crashes from taking down the whole page
 class SafeRadix extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
@@ -395,7 +396,9 @@ export function Header() {
                 </button>
                 {userMenuOpen && (
                   <div className="absolute right-0 top-full mt-1 w-56 bg-popover border border-border rounded-lg shadow-lg z-50 py-1 animate-fade-in">
-                    <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border">{user.email}</div>
+                    <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border">
+                      {isSyntheticAuthEmail(user.email) ? t("profile.phoneAccount") : user.email}
+                    </div>
                     <Link to="/dashboard" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.mySpace")}</Link>
                     <Link to="/dashboard?tab=messages" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.messages")} {unreadCount > 0 && `(${unreadCount})`}</Link>
                     <Link to="/vendor" onClick={() => setUserMenuOpen(false)} className="block px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">{t("header.vendorSpace")}</Link>

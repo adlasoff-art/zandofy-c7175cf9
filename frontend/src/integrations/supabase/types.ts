@@ -1083,11 +1083,13 @@ export type Database = {
           shipping_city: string | null
           shipping_cost: number
           shipping_country: string | null
+          shipping_city_id: string | null
           shipping_email: string | null
           shipping_first_name: string | null
           shipping_last_name: string | null
           shipping_phone: string | null
           shipping_postal_code: string | null
+          geo_relation: string | null
           status: string
           store_id: string | null
           subtotal: number
@@ -1117,11 +1119,13 @@ export type Database = {
           shipping_city?: string | null
           shipping_cost?: number
           shipping_country?: string | null
+          shipping_city_id?: string | null
           shipping_email?: string | null
           shipping_first_name?: string | null
           shipping_last_name?: string | null
           shipping_phone?: string | null
           shipping_postal_code?: string | null
+          geo_relation?: string | null
           status?: string
           store_id?: string | null
           subtotal?: number
@@ -1151,11 +1155,13 @@ export type Database = {
           shipping_city?: string | null
           shipping_cost?: number
           shipping_country?: string | null
+          shipping_city_id?: string | null
           shipping_email?: string | null
           shipping_first_name?: string | null
           shipping_last_name?: string | null
           shipping_phone?: string | null
           shipping_postal_code?: string | null
+          geo_relation?: string | null
           status?: string
           store_id?: string | null
           subtotal?: number
@@ -2277,6 +2283,12 @@ export type Database = {
           sales_override: number | null
           sales_trend: string | null
           seo_keywords: string[] | null
+          country: string | null
+          country_code: string | null
+          city: string | null
+          city_id: string | null
+          default_commercial_scope: string
+          shop_type: string | null
           verified_years: number | null
           verified_years_override: number | null
           whatsapp_number: string | null

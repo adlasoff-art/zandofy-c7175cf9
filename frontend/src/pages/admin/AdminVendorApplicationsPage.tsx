@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import {
-  Eye, CheckCircle2, XCircle, RotateCcw, Loader2, FileText, User, Store, Clock,
+  Eye, CheckCircle2, XCircle, RotateCcw, Loader2, FileText, User, Store, Clock, Archive, Trash2,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -25,18 +25,69 @@ export default function AdminVendorApplicationsPage() {
   const [selected, setSelected] = useState<any>(null);
   const [adminNotes, setAdminNotes] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [showArchives, setShowArchives] = useState(false);
 
   const { data: applications, isLoading } = useQuery({
-    queryKey: ["admin-vendor-applications"],
+    queryKey: ["admin-vendor-applications", showArchives],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("vendor_applications")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
+      let q = supabase.from("vendor_applications").select("*").order("created_at", { ascending: false });
+      if (showArchives) {
+        q = q.not("deleted_at", "is", null) as any;
+      } else {
+        q = q.is("deleted_at", null) as any;
+      }
+      const { data, error } = await q;
+      if (error) {
+        // Column may not exist yet on staging — fall back without filter
+        const { data: fallback, error: fbErr } = await supabase
+          .from("vendor_applications")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (fbErr) throw fbErr;
+        return fallback || [];
+      }
       return data || [];
     },
   });
+
+  const softDelete = async (appId: string) => {
+    const { error } = await (supabase as any)
+      .from("vendor_applications")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", appId);
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Archivée", description: "Demande archivée (soft-delete)." });
+    if (selected?.id === appId) setSelected(null);
+    queryClient.invalidateQueries({ queryKey: ["admin-vendor-applications"] });
+  };
+
+  const hardDelete = async (appId: string) => {
+    if (!window.confirm("Suppression définitive ? Cette action est irréversible.")) return;
+    const { error } = await supabase.from("vendor_applications").delete().eq("id", appId);
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Supprimée" });
+    if (selected?.id === appId) setSelected(null);
+    queryClient.invalidateQueries({ queryKey: ["admin-vendor-applications"] });
+  };
+
+  const restoreApp = async (appId: string) => {
+    const { error } = await (supabase as any)
+      .from("vendor_applications")
+      .update({ deleted_at: null })
+      .eq("id", appId);
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Restaurée" });
+    queryClient.invalidateQueries({ queryKey: ["admin-vendor-applications"] });
+  };
 
   const { data: selectedDocs } = useQuery({
     queryKey: ["admin-vendor-docs", selected?.id],
@@ -120,11 +171,26 @@ export default function AdminVendorApplicationsPage() {
     try {
       if (action === "approved") {
         // Create store FIRST — never mark application approved without a store
+        let logoUrl = selected.store_logo_url || null;
+        let bannerUrl = selected.store_banner_url || null;
+        if (!logoUrl || !bannerUrl) {
+          const { data: brandDocs } = await supabase
+            .from("vendor_documents")
+            .select("document_type, document_url")
+            .eq("application_id", selected.id)
+            .in("document_type", ["logo", "banner"]);
+          const logoDoc = brandDocs?.find((d: any) => d.document_type === "logo");
+          const bannerDoc = brandDocs?.find((d: any) => d.document_type === "banner");
+          // Prefer already-public URLs; otherwise leave null (private vendor-documents paths are not store-safe)
+          if (!logoUrl && logoDoc?.document_url?.startsWith("http")) logoUrl = logoDoc.document_url;
+          if (!bannerUrl && bannerDoc?.document_url?.startsWith("http")) bannerUrl = bannerDoc.document_url;
+        }
+
         const { data: newStore, error: storeErr } = await supabase.from("stores").insert({
           name: selected.store_name || "Nouvelle boutique",
           description: selected.store_description || null,
-          logo_url: selected.store_logo_url || null,
-          banner_url: selected.store_banner_url || null,
+          logo_url: logoUrl,
+          banner_url: bannerUrl,
           owner_id: selected.user_id,
           is_verified: false,
           shop_type: selected.shop_type || "international",
@@ -298,6 +364,17 @@ export default function AdminVendorApplicationsPage() {
   return (
     <AdminLayout title="Demandes Vendeur">
       <div className="space-y-6">
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant={showArchives ? "default" : "outline"}
+            onClick={() => setShowArchives((v) => !v)}
+            className="gap-1.5"
+          >
+            <Archive size={14} />
+            {showArchives ? "Voir actives" : "Archives"}
+          </Button>
+        </div>
         {/* Pending applications */}
         <Card>
           <CardHeader>
@@ -355,6 +432,20 @@ export default function AdminVendorApplicationsPage() {
                         <Button size="icon" variant="ghost" onClick={() => setSelected(app)} className="h-7 w-7">
                           <Eye size={14} />
                         </Button>
+                        {showArchives ? (
+                          <>
+                            <Button size="icon" variant="ghost" onClick={() => restoreApp(app.id)} className="h-7 w-7" title="Restaurer">
+                              <RotateCcw size={14} />
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={() => hardDelete(app.id)} className="h-7 w-7 text-destructive" title="Supprimer définitivement">
+                              <Trash2 size={14} />
+                            </Button>
+                          </>
+                        ) : (
+                          <Button size="icon" variant="ghost" onClick={() => softDelete(app.id)} className="h-7 w-7" title="Archiver">
+                            <Archive size={14} />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );

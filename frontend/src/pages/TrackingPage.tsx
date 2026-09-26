@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { mapInternalShipment, detectCarrier, fetchExternalTracking, type TrackingResult } from "@/lib/tracking-providers";
-import { STATUS_CONFIG, CUSTOMER_TRACKING_STEPS, LOCAL_CUSTOMER_TRACKING_STEPS, getStepIndex } from "@/lib/order-status";
+import { STATUS_CONFIG, CUSTOMER_TRACKING_STEPS, getCustomerTrackingSteps, getStepIndex } from "@/lib/order-status";
 import { useI18n } from "@/contexts/I18nContext";
 import { DeliveryMap } from "@/components/DeliveryMap";
 import { useRiderLocationSubscription } from "@/hooks/use-rider-location";
@@ -58,6 +58,7 @@ interface OrderTrackingResult {
   created_at: string; updated_at: string;
   store_name: string | null;
   shop_type?: string | null;
+  geo_relation?: string | null;
   history: { status: string; created_at: string; notes: string | null }[];
   delivery_id?: string | null;
 }
@@ -122,19 +123,25 @@ function OrderTimeline({
   currentStatus,
   history,
   shopType,
+  deliveryChoice,
+  geoRelation,
 }: {
   currentStatus: string;
   history: OrderTrackingResult["history"];
   shopType?: string | null;
+  deliveryChoice?: string | null;
+  geoRelation?: string | null;
 }) {
   const { locale } = useI18n();
   const dateLocale = locale === "en" ? "en-US" : "fr-FR";
   const isCancelled = currentStatus === "cancelled";
   const isReturned = currentStatus === "returned";
-  const isLocal = shopType === "local";
-  const steps = isLocal ? LOCAL_CUSTOMER_TRACKING_STEPS : CUSTOMER_TRACKING_STEPS;
-  const activeIdx = getStepIndex(currentStatus, shopType || undefined);
+  const steps = getCustomerTrackingSteps(shopType, deliveryChoice, geoRelation);
+  const activeIdx = getStepIndex(currentStatus, shopType || undefined, deliveryChoice, geoRelation);
   const historyMap = new Map(history.map((h) => [h.status, h.created_at]));
+  const isLocal =
+    geoRelation === "same_city" ||
+    (!geoRelation && shopType === "local");
 
   const renderStep = (step: (typeof CUSTOMER_TRACKING_STEPS)[0], globalIdx: number) => {
     const done = globalIdx <= activeIdx && !isCancelled && !isReturned;
@@ -196,11 +203,11 @@ function OrderTimeline({
     );
   }
 
-  const ROW1 = CUSTOMER_TRACKING_STEPS.slice(0, 3);
-  const ROW2 = CUSTOMER_TRACKING_STEPS.slice(3, 6);
-  const ROW3 = CUSTOMER_TRACKING_STEPS.slice(6, 9);
+  const ROW1 = steps.slice(0, 3);
+  const ROW2 = steps.slice(3, 6);
+  const ROW3 = steps.slice(6, 9);
 
-  const renderRow = (rowSteps: typeof CUSTOMER_TRACKING_STEPS, startIndex: number) => (
+  const renderRow = (rowSteps: typeof steps, startIndex: number) => (
     <div className="flex items-start w-full">
       {rowSteps.map((step, i) => {
         const globalIdx = startIndex + i;
@@ -217,7 +224,7 @@ function OrderTimeline({
     </div>
   );
 
-  const renderRowReversed = (rowSteps: typeof CUSTOMER_TRACKING_STEPS, startIndex: number) => {
+  const renderRowReversed = (rowSteps: typeof steps, startIndex: number) => {
     const reversed = [...rowSteps].reverse();
     return (
       <div className="flex items-start w-full">
@@ -595,7 +602,7 @@ export default function TrackingPage() {
   const fetchOrder = useCallback(async (orderRef: string) => {
     const { data: order } = await (supabase as any)
       .from("orders")
-      .select("id, order_ref, status, total, shipping_address, shipping_city, shipping_country, tracking_number, assigned_rider_name, assigned_rider_id, delivery_choice, last_mile_fee, last_mile_payment_method, confirmation_code, created_at, updated_at, store_id, delivery_operator_id")
+      .select("id, order_ref, status, total, shipping_address, shipping_city, shipping_country, tracking_number, assigned_rider_name, assigned_rider_id, delivery_choice, geo_relation, last_mile_fee, last_mile_payment_method, confirmation_code, created_at, updated_at, store_id, delivery_operator_id")
       .eq("order_ref", orderRef)
       .maybeSingle();
 
@@ -656,6 +663,7 @@ export default function TrackingPage() {
       updated_at: order.updated_at,
       store_name: storeName,
       shop_type: shopType,
+      geo_relation: (order as any).geo_relation || null,
       history: (history || []) as OrderTrackingResult["history"],
       delivery_id: deliveryData?.id || null,
       delivery_operator_id: (order as any).delivery_operator_id || null,
@@ -914,6 +922,8 @@ export default function TrackingPage() {
                 currentStatus={orderResult.status}
                 history={orderResult.history}
                 shopType={orderResult.shop_type}
+                deliveryChoice={orderResult.delivery_choice}
+                geoRelation={orderResult.geo_relation}
               />
 
               {/* Delivery choice panel */}

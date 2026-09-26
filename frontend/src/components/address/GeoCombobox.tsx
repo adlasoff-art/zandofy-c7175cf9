@@ -43,7 +43,13 @@ export function GeoCombobox({ options, value, onChange, label, placeholder = "SÃ
     }
   }, [isMobile, open]);
 
-  const filtered = options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()));
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  const q = normalize(search);
+  const filtered = options.filter((o) => !q || normalize(o.label).includes(q) || normalize(o.value).includes(q));
   const selectedLabel = options.find((o) => o.value === value)?.label;
 
   const handleSelect = (v: string) => {
@@ -97,7 +103,7 @@ export function GeoCombobox({ options, value, onChange, label, placeholder = "SÃ
               <input
                 type="text"
                 placeholder="Rechercher..."
-                className="w-full pl-9 pr-3 py-2 text-base bg-muted border-none rounded-lg outline-none"
+                className="w-full pl-9 pr-3 py-2 text-base bg-muted border-none rounded-lg outline-none text-foreground placeholder:text-muted-foreground"
                 style={{ fontSize: "16px" }}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -119,7 +125,7 @@ export function GeoCombobox({ options, value, onChange, label, placeholder = "SÃ
               <input
                 type="text"
                 placeholder="Rechercher..."
-                className="w-full pl-7 pr-2 py-1.5 text-xs bg-muted border-none rounded outline-none"
+                className="w-full pl-7 pr-2 py-1.5 text-xs bg-muted border-none rounded outline-none text-foreground placeholder:text-muted-foreground"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 autoFocus

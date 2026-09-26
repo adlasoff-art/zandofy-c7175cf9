@@ -8,6 +8,7 @@ import {
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
 import { toast } from "sonner";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
+import { ProductCommercialDestinationsPanel } from "@/components/vendor/ProductCommercialDestinationsPanel";
 import { SearchableCombobox } from "@/components/ui/SearchableCombobox";
 import { MediaUploader } from "@/components/vendor/MediaUploader";
 import { ShippingEstimator } from "@/components/vendor/ShippingEstimator";
@@ -54,6 +55,30 @@ function isAllowedProductMediaUrl(url: string, existingUrls?: Set<string>): bool
   } catch {
     return false;
   }
+}
+
+/** Hard gate before first submit / re-approval: store identity must be complete. */
+async function assertStoreIdentityReady(
+  storeId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { data, error } = await (supabase as any)
+    .from("stores")
+    .select("logo_url, banner_url, country, country_code, whatsapp_number")
+    .eq("id", storeId)
+    .maybeSingle();
+  if (error || !data) {
+    return { ok: false, message: "Impossible de vérifier l’identité boutique. Réessayez." };
+  }
+  const missing: string[] = [];
+  if (!data.logo_url) missing.push("logo");
+  if (!data.banner_url) missing.push("bannière");
+  if (!(data.country_code || data.country)) missing.push("pays");
+  if (!String(data.whatsapp_number || "").trim()) missing.push("WhatsApp business");
+  if (missing.length === 0) return { ok: true };
+  return {
+    ok: false,
+    message: `Complétez l’identité boutique avant de publier (${missing.join(", ")}). Ouvrez Paramètres boutique.`,
+  };
 }
 
 interface Supplier {
@@ -151,6 +176,7 @@ const EMPTY_FORM = {
   can_ship_air: true,
   can_ship_sea: false,
   offers_home_delivery: false,
+  commercial_scope: "inherit",
   meta_title: "",
   meta_description: "",
   seo_keywords: "",
@@ -243,7 +269,7 @@ export function VendorProductManager({
     const { data, error } = await (supabase
       .from("products")
       .select(
-        "id, name, name_fr, slug, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, cost_real, cost_calc, auto_pricing_enabled, vendor_extra_margin, model_size, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea, offers_home_delivery, meta_title, meta_description, seo_keywords, product_images(id, image_url, position)"
+        "id, name, name_fr, slug, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, cost_real, cost_calc, auto_pricing_enabled, vendor_extra_margin, model_size, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea, offers_home_delivery, commercial_scope, meta_title, meta_description, seo_keywords, product_images(id, image_url, position)"
       ) as any)
       .eq("store_id", storeId)
       .order("created_at", { ascending: false });
@@ -462,6 +488,7 @@ export function VendorProductManager({
       season: (product as any).season || "",
       care_instructions: (product as any).care_instructions || "",
       origin_country: product.origin_country || "",
+      commercial_scope: (product as any).commercial_scope || "inherit",
       category_id: product.category_id || "",
       trend_tag_id: (product as any).trend_tag_id || "",
       supplier_id: (product as any).supplier_id || "",
@@ -629,6 +656,7 @@ export function VendorProductManager({
       season: includeSeason ? (form.season || null) : null,
       care_instructions: includeCare ? (form.care_instructions || null) : null,
       origin_country: form.origin_country || null,
+      commercial_scope: form.commercial_scope || "inherit",
       category_id: form.category_id && form.category_id.trim() !== '' ? form.category_id : null,
       trend_tag_id: form.trend_tag_id && form.trend_tag_id.trim() !== '' ? form.trend_tag_id : null,
       supplier_id: form.supplier_id && form.supplier_id.trim() !== '' ? form.supplier_id : null,
@@ -683,6 +711,15 @@ export function VendorProductManager({
 
     let productId = editing?.id;
     const wasPublished = editing?.publish_status === "published";
+
+    if (wasPublished) {
+      const identity = await assertStoreIdentityReady(storeId);
+      if (!identity.ok) {
+        toast.error(identity.message);
+        setSaving(false);
+        return;
+      }
+    }
 
     if (editing) {
       // If the product was published, any edit forces re-approval
@@ -1032,6 +1069,13 @@ export function VendorProductManager({
       toast.error("Catalogue indisponible : boutique suspendue ou archivée.");
       return;
     }
+
+    const identity = await assertStoreIdentityReady(storeId);
+    if (!identity.ok) {
+      toast.error(identity.message);
+      return;
+    }
+
     // Toujours vérifier en base (évite un cache liste périmé) — min 1 / max 5 photos, hors vidéos
     const { data: imgRows, error: countErr } = await supabase
       .from("product_images")
@@ -1297,6 +1341,31 @@ export function VendorProductManager({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <CountryCombobox value={form.origin_country} onChange={(v) => setForm({ ...form, origin_country: v })} />
+          </div>
+          <div className="space-y-2 border border-border rounded-lg p-3">
+            <p className="text-xs font-semibold text-foreground">Disponibilité géographique</p>
+            <p className="text-[11px] text-muted-foreground">
+              Par défaut : paramètres de la boutique. Ne force pas le type ops local/international.
+            </p>
+            <select
+              className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md"
+              value={form.commercial_scope}
+              onChange={(e) => setForm({ ...form, commercial_scope: e.target.value })}
+            >
+              <option value="inherit">Utiliser les paramètres de ma boutique</option>
+              <option value="city">Ma ville uniquement</option>
+              <option value="country">Mon pays</option>
+              <option value="international">International</option>
+              <option value="custom">Zones personnalisées (via destinations produit)</option>
+            </select>
+            {form.commercial_scope === "custom" && editing?.id && (
+              <ProductCommercialDestinationsPanel productId={editing.id} />
+            )}
+            {form.commercial_scope === "custom" && !editing?.id && (
+              <p className="text-[11px] text-muted-foreground">
+                Enregistrez d’abord le produit, puis configurez les zones personnalisées.
+              </p>
+            )}
           </div>
           <div>
             <SearchableCombobox

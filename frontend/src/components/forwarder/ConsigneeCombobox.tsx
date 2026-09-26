@@ -1,5 +1,6 @@
 /**
  * ConsigneeCombobox — searchable carnet + quick-add for forwarder TMS.
+ * New consignee city is geo-filtered by shipment destination country.
  */
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -22,6 +23,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { GeoCombobox } from "@/components/address/GeoCombobox";
+import { useGeoData } from "@/hooks/useGeoData";
 
 export type Consignee = {
   id: string;
@@ -37,9 +40,16 @@ type Props = {
   forwarderId: string;
   valueId: string | null;
   onSelect: (c: Consignee | null) => void;
+  /** ISO country of shipment destination — filters city geo for new consignees. */
+  destinationCountryCode?: string | null;
 };
 
-export function ConsigneeCombobox({ forwarderId, valueId, onSelect }: Props) {
+export function ConsigneeCombobox({
+  forwarderId,
+  valueId,
+  onSelect,
+  destinationCountryCode,
+}: Props) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -51,6 +61,9 @@ export function ConsigneeCombobox({ forwarderId, valueId, onSelect }: Props) {
     address_line: "",
     city: "",
   });
+
+  const destCountry = (destinationCountryCode || "").toUpperCase();
+  const { cities } = useGeoData(destCountry, "", "", "");
 
   const { data: consignees = [], isLoading } = useQuery({
     queryKey: ["forwarder-consignees", forwarderId],
@@ -82,6 +95,7 @@ export function ConsigneeCombobox({ forwarderId, valueId, onSelect }: Props) {
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!draft.name.trim()) throw new Error("Nom obligatoire");
+      if (!draft.city.trim()) throw new Error("Ville obligatoire (liste géo destination)");
       const { data, error } = await (supabase as any)
         .from("forwarder_consignees")
         .insert({
@@ -91,6 +105,7 @@ export function ConsigneeCombobox({ forwarderId, valueId, onSelect }: Props) {
           email: draft.email.trim() || null,
           address_line: draft.address_line.trim() || null,
           city: draft.city.trim() || null,
+          country_code: destCountry || null,
         })
         .select("id, name, phone, email, address_line, country_code, city")
         .single();
@@ -131,7 +146,7 @@ export function ConsigneeCombobox({ forwarderId, valueId, onSelect }: Props) {
             placeholder="Nom ou téléphone…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="h-8 mb-2"
+            className="h-8 mb-2 text-foreground placeholder:text-muted-foreground"
           />
           <div className="max-h-48 overflow-y-auto space-y-0.5">
             {isLoading && (
@@ -166,6 +181,7 @@ export function ConsigneeCombobox({ forwarderId, valueId, onSelect }: Props) {
                 <span className="truncate">
                   {c.name}
                   {c.phone ? ` · ${c.phone}` : ""}
+                  {c.city ? ` · ${c.city}` : ""}
                 </span>
               </button>
             ))}
@@ -176,7 +192,15 @@ export function ConsigneeCombobox({ forwarderId, valueId, onSelect }: Props) {
         </PopoverContent>
       </Popover>
 
-      <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setAddOpen(true)}>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="shrink-0"
+        onClick={() => setAddOpen(true)}
+        disabled={!destCountry}
+        title={!destCountry ? "Sélectionnez d’abord le pays de destination" : "Nouveau destinataire"}
+      >
         <Plus size={16} />
       </Button>
 
@@ -203,15 +227,29 @@ export function ConsigneeCombobox({ forwarderId, valueId, onSelect }: Props) {
               <Input value={draft.address_line} onChange={(e) => setDraft((d) => ({ ...d, address_line: e.target.value }))} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Ville</Label>
-              <Input value={draft.city} onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))} />
+              <Label className="text-xs">Ville * (pays destination : {destCountry || "—"})</Label>
+              {cities.length > 0 ? (
+                <GeoCombobox
+                  options={cities.map((c) => ({ value: c.label || c.value, label: c.label || c.value }))}
+                  value={draft.city}
+                  onChange={(v) => setDraft((d) => ({ ...d, city: v }))}
+                  placeholder="Sélectionner une ville…"
+                />
+              ) : (
+                <Input
+                  value={draft.city}
+                  onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))}
+                  placeholder={destCountry ? "Aucune ville geo — saisie libre" : "Choisissez le pays destination"}
+                  disabled={!destCountry}
+                />
+              )}
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>
               Annuler
             </Button>
-            <Button disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>
+            <Button disabled={createMutation.isPending || !draft.city.trim()} onClick={() => createMutation.mutate()}>
               {createMutation.isPending ? <Loader2 className="animate-spin" size={14} /> : "Ajouter"}
             </Button>
           </DialogFooter>

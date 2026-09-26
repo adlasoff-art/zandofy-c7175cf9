@@ -15,9 +15,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SlidersHorizontal, X, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useDiscoveryRankedProducts } from "@/hooks/use-discovery-ranked";
+import { CountryCombobox } from "@/components/vendor/CountryCombobox";
+import { GeoCombobox } from "@/components/address/GeoCombobox";
+import { supabase } from "@/integrations/supabase/client";
+import { useActiveGeo } from "@/hooks/useActiveGeo";
 
 export default function SearchPage() {
   const { t, locale, formatPrice } = useI18n();
+  const { activeCountryCodes } = useActiveGeo();
   const labelOf = (c: { name?: string | null; nameFr?: string | null }) =>
     locale === "fr" ? (c.nameFr ?? c.name ?? "") : (c.name ?? c.nameFr ?? "");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,6 +40,12 @@ export default function SearchPage() {
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SearchFilters["sortBy"]>("relevance");
+  const [originCountry, setOriginCountry] = useState("");
+  const [originCityId, setOriginCityId] = useState("");
+  const [deliverableCountry, setDeliverableCountry] = useState("");
+  const [deliverableCityId, setDeliverableCityId] = useState("");
+  const [originCities, setOriginCities] = useState<{ value: string; label: string }[]>([]);
+  const [deliverableCities, setDeliverableCities] = useState<{ value: string; label: string }[]>([]);
 
   // Filter options from DB
   const [categories, setCategories] = useState<Category[]>([]);
@@ -42,7 +53,14 @@ export default function SearchPage() {
   const [allSizes, setAllSizes] = useState<string[]>([]);
 
   // Collapsible filter sections
-  const [openSections, setOpenSections] = useState({ category: true, price: true, size: true, color: true });
+  const [openSections, setOpenSections] = useState({
+    category: true,
+    price: true,
+    size: true,
+    color: true,
+    origin: false,
+    deliverable: false,
+  });
   const toggleSection = (key: keyof typeof openSections) =>
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
@@ -65,6 +83,42 @@ export default function SearchPage() {
     );
   }, []);
 
+  useEffect(() => {
+    if (!originCountry) {
+      setOriginCities([]);
+      setOriginCityId("");
+      return;
+    }
+    void (supabase as any)
+      .from("cities")
+      .select("id, name")
+      .eq("country_code", originCountry)
+      .eq("is_active", true)
+      .order("name")
+      .limit(500)
+      .then(({ data }: any) => {
+        setOriginCities((data || []).map((c: any) => ({ value: c.id, label: c.name })));
+      });
+  }, [originCountry]);
+
+  useEffect(() => {
+    if (!deliverableCountry) {
+      setDeliverableCities([]);
+      setDeliverableCityId("");
+      return;
+    }
+    void (supabase as any)
+      .from("cities")
+      .select("id, name")
+      .eq("country_code", deliverableCountry)
+      .eq("is_active", true)
+      .order("name")
+      .limit(500)
+      .then(({ data }: any) => {
+        setDeliverableCities((data || []).map((c: any) => ({ value: c.id, label: c.name })));
+      });
+  }, [deliverableCountry]);
+
   // Run search
   const runSearch = useCallback(async () => {
     setLoading(true);
@@ -76,11 +130,26 @@ export default function SearchPage() {
       sizes: selectedSizes.length > 0 ? selectedSizes : undefined,
       colors: selectedColors.length > 0 ? selectedColors : undefined,
       sortBy,
+      originCountryCode: originCountry || undefined,
+      originCityId: originCityId || undefined,
+      deliverableCountryCode: deliverableCountry || undefined,
+      deliverableCityId: deliverableCityId || undefined,
     };
     const results = await searchProducts(filters);
     setProducts(results);
     setLoading(false);
-  }, [queryParam, selectedCategory, priceRange, selectedSizes, selectedColors, sortBy]);
+  }, [
+    queryParam,
+    selectedCategory,
+    priceRange,
+    selectedSizes,
+    selectedColors,
+    sortBy,
+    originCountry,
+    originCityId,
+    deliverableCountry,
+    deliverableCityId,
+  ]);
 
   // Visual search results (from sessionStorage when ?visual=true)
   useEffect(() => {
@@ -123,13 +192,21 @@ export default function SearchPage() {
     setSelectedSizes([]);
     setSelectedColors([]);
     setSortBy("relevance");
+    setOriginCountry("");
+    setOriginCityId("");
+    setDeliverableCountry("");
+    setDeliverableCityId("");
   };
 
   const activeFilterCount =
     (selectedCategory ? 1 : 0) +
     (priceRange[0] > 0 || priceRange[1] < 500 ? 1 : 0) +
     selectedSizes.length +
-    selectedColors.length;
+    selectedColors.length +
+    (originCountry ? 1 : 0) +
+    (originCityId ? 1 : 0) +
+    (deliverableCountry ? 1 : 0) +
+    (deliverableCityId ? 1 : 0);
 
   const toggleSize = (size: string) =>
     setSelectedSizes((prev) =>
@@ -220,7 +297,7 @@ export default function SearchPage() {
       </div>
 
       {/* Color */}
-      <div className="pb-3">
+      <div className="border-b border-border pb-3">
         <button onClick={() => toggleSection("color")} className="flex items-center justify-between w-full py-2 text-sm font-semibold text-foreground">
           {t("search.color")}
           {openSections.color ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -238,6 +315,73 @@ export default function SearchPage() {
                 style={{ backgroundColor: color.hex }}
               />
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Origin — products from this location */}
+      <div className="border-b border-border pb-3">
+        <button onClick={() => toggleSection("origin")} className="flex items-center justify-between w-full py-2 text-sm font-semibold text-foreground">
+          Produits de (origine)
+          {openSections.origin ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+        {openSections.origin && (
+          <div className="space-y-2 mt-1">
+            <CountryCombobox
+              value={originCountry}
+              onChange={(v) => {
+                setOriginCountry(v);
+                setOriginCityId("");
+              }}
+              label="Pays d'origine"
+              showNone
+              noneLabel="Tous les pays"
+              allowedCodes={activeCountryCodes}
+            />
+            {originCountry && (
+              <GeoCombobox
+                options={originCities}
+                value={originCityId}
+                onChange={setOriginCityId}
+                label="Ville d'origine"
+                placeholder="Toutes les villes"
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Deliverable-to */}
+      <div className="pb-3">
+        <button onClick={() => toggleSection("deliverable")} className="flex items-center justify-between w-full py-2 text-sm font-semibold text-foreground">
+          Livrables à
+          {openSections.deliverable ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+        {openSections.deliverable && (
+          <div className="space-y-2 mt-1">
+            <CountryCombobox
+              value={deliverableCountry}
+              onChange={(v) => {
+                setDeliverableCountry(v);
+                setDeliverableCityId("");
+              }}
+              label="Pays de livraison"
+              showNone
+              noneLabel="Tous les pays"
+              allowedCodes={activeCountryCodes}
+            />
+            {deliverableCountry && (
+              <GeoCombobox
+                options={deliverableCities}
+                value={deliverableCityId}
+                onChange={setDeliverableCityId}
+                label="Ville de livraison"
+                placeholder="Tout le pays"
+              />
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Différent de « Produits de » : filtre les articles vendus vers cette destination.
+            </p>
           </div>
         )}
       </div>

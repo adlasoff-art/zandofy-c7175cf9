@@ -8,6 +8,13 @@ const COUNTRY_MAP: Record<string, string> = {
 
 const COUNTRIES = Object.keys(COUNTRY_MAP);
 
+function normalizeSearch(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 export function getCountryName(code: string): string {
   return COUNTRY_MAP[code] || code;
 }
@@ -56,9 +63,9 @@ export function CountryCombobox({ value, onChange, label = "Pays d'origine", pla
 
   const baseCountries = allowedCodes ? COUNTRIES.filter(c => allowedCodes.includes(c)) : COUNTRIES;
   const filtered = baseCountries.filter((c) => {
-    const name = COUNTRY_MAP[c].toLowerCase();
-    const q = search.toLowerCase();
-    return c.toLowerCase().includes(q) || name.includes(q);
+    const name = normalizeSearch(COUNTRY_MAP[c]);
+    const q = normalizeSearch(search);
+    return !q || normalizeSearch(c).includes(q) || name.includes(q);
   });
 
   const handleSelect = (code: string) => {
@@ -120,7 +127,7 @@ export function CountryCombobox({ value, onChange, label = "Pays d'origine", pla
               <input
                 type="text"
                 placeholder="Rechercher par nom ou code..."
-                className="w-full pl-9 pr-3 py-2 text-base bg-muted border-none rounded-lg outline-none"
+                className="w-full pl-9 pr-3 py-2 text-base bg-muted border-none rounded-lg outline-none text-foreground placeholder:text-muted-foreground"
                 style={{ fontSize: "16px" }}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -137,7 +144,7 @@ export function CountryCombobox({ value, onChange, label = "Pays d'origine", pla
 
       {open && !isMobile && (
         <div
-          className="absolute z-50 mt-1 w-full bg-card border border-border rounded-md shadow-lg max-h-52 overflow-hidden left-0 right-0"
+          className="absolute z-50 mt-1 w-full bg-card text-card-foreground border border-border rounded-md shadow-lg max-h-60 overflow-hidden left-0 right-0"
           style={{
             position: 'fixed',
             width: ref.current?.getBoundingClientRect().width,
@@ -151,7 +158,7 @@ export function CountryCombobox({ value, onChange, label = "Pays d'origine", pla
               <input
                 type="text"
                 placeholder="Rechercher par nom ou code..."
-                className="w-full pl-7 pr-2 py-1.5 text-xs bg-muted border-none rounded outline-none"
+                className="w-full pl-7 pr-2 py-1.5 text-xs bg-muted border-none rounded outline-none text-foreground placeholder:text-muted-foreground"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 autoFocus

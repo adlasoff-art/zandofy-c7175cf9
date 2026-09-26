@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { mapProduct, type Product } from "@/services/api";
+import { applyDiscoveryEligibilityFilter } from "@/lib/geo-eligibility";
 
 /** Lightweight select for search results (kept inline to avoid coupling
  *  with PRODUCT_LIST_SELECT — search needs colors/sizes for filtering). */
@@ -8,7 +9,7 @@ const SEARCH_SELECT = `
   sales_count, store_id, category_id, created_at, short_description, origin_country,
   rating, review_count, moq, publish_status,
   shop_type, store_is_verified, store_is_certified, gender_target,
-  store_city_id, store_city,
+  store_city_id, store_city, store_country_code,
   categories(name, name_fr),
   product_images(image_url, position),
   product_colors(color_hex, color_name),
@@ -28,6 +29,12 @@ export interface SearchFilters {
   sizes?: string[];
   colors?: string[];
   sortBy?: "relevance" | "price_asc" | "price_desc" | "newest" | "rating";
+  /** Product origin (store location) */
+  originCountryCode?: string;
+  originCityId?: string;
+  /** Deliverable-to destination (eligibility batch when enforced) */
+  deliverableCountryCode?: string;
+  deliverableCityId?: string;
 }
 
 export async function searchProducts(filters: SearchFilters): Promise<Product[]> {
@@ -66,6 +73,14 @@ export async function searchProducts(filters: SearchFilters): Promise<Product[]>
       break;
     default:
       query = query.order("created_at", { ascending: false });
+  }
+
+  // Origin filters (store geo on products_public)
+  if (filters.originCountryCode && filters.originCountryCode.length === 2) {
+    query = query.eq("store_country_code", filters.originCountryCode.toUpperCase());
+  }
+  if (filters.originCityId) {
+    query = query.eq("store_city_id", filters.originCityId);
   }
 
   // Hard cap to protect DB I/O — search results are paginated client-side.
@@ -123,6 +138,15 @@ export async function searchProducts(filters: SearchFilters): Promise<Product[]>
   if (filters.colors && filters.colors.length > 0) {
     results = results.filter((p) =>
       p.colors?.some((c) => filters.colors!.includes(c))
+    );
+  }
+
+  // Deliverable-to filter (eligibility batch when flag enforced)
+  if (filters.deliverableCountryCode && filters.deliverableCountryCode.length === 2) {
+    results = await applyDiscoveryEligibilityFilter(
+      results,
+      filters.deliverableCountryCode,
+      filters.deliverableCityId,
     );
   }
 
