@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle, Loader2, Clock, AlertTriangle } from "lucide-react";
+import { getCountryName } from "@/components/vendor/CountryCombobox";
 
 type PendingRate = {
   id: string;
@@ -186,7 +187,7 @@ export default function AdminOperatorRatesPendingPage() {
                             <Badge variant="outline">Plateforme</Badge>
                           )}
                           <Badge variant="secondary">
-                            {r.country_code} · {r.city}
+                            {getCountryName(r.country_code)} · {r.city}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
@@ -252,7 +253,7 @@ export default function AdminOperatorRatesPendingPage() {
                     {noCap && (
                       <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted rounded p-2">
                         <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                        Aucun plafond défini pour {r.city} ({r.country_code}). Pensez à en créer un dans
+                        Aucun plafond défini pour {r.city} ({getCountryName(r.country_code)}). Pensez à en créer un dans
                         « Plafonds tarifaires ».
                       </div>
                     )}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { Fragment, useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from "recharts";
@@ -9,6 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import type { PeriodKey } from "./DashboardPeriodSelector";
 import { getPeriodDate } from "./DashboardPeriodSelector";
 import type { GlobalFilters } from "./DashboardGlobalFilters";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { STATUS_CONFIG } from "@/lib/order-status";
 
 interface Props { period: PeriodKey; geoFilters?: GlobalFilters; }
 
@@ -23,6 +26,12 @@ export function OrdersTab({ period, geoFilters }: Props) {
   const city = geoFilters?.city !== "all" ? geoFilters?.city : undefined;
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [storeFilter, setStoreFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [amountSort, setAmountSort] = useState("desc");
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
 
   const { data: gatewayFees = DEFAULT_GATEWAY_FEES } = useQuery({
     queryKey: ["gateway-fees-orders-tab"],
@@ -106,7 +115,6 @@ export function OrdersTab({ period, geoFilters }: Props) {
     });
 
     return orders
-      .filter((o: any) => !search || o.order_ref?.toLowerCase().includes(search.toLowerCase()))
       .map((o: any) => {
         const items = itemsByOrder.get(o.id) || [];
         const method = o.payment_method || "unknown";
@@ -148,8 +156,25 @@ export function OrdersTab({ period, geoFilters }: Props) {
           netMargin,
           netMarginPct: revenue > 0 ? (netMargin / revenue) * 100 : 0,
         };
-      });
-  }, [orders, allItems, products, stores, referralTxns, search, gatewayFees]);
+      })
+      .filter((o: any) => !search || o.order_ref?.toLowerCase().includes(search.toLowerCase()))
+      .filter((o: any) => storeFilter === "all" || o.store_id === storeFilter)
+      .filter((o: any) => statusFilter === "all" || o.status === statusFilter)
+      .filter((o: any) => paymentFilter === "all" || (o.payment_method || "unknown") === paymentFilter)
+      .sort((a: any, b: any) => amountSort === "asc" ? a.revenue - b.revenue : b.revenue - a.revenue);
+  }, [orders, allItems, products, stores, referralTxns, search, gatewayFees, storeFilter, statusFilter, paymentFilter, amountSort]);
+
+  const pageCount = Math.max(1, Math.ceil(enrichedOrders.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedOrders = enrichedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const paymentMethods = useMemo(
+    () => [...new Set(orders.map((o: any) => String(o.payment_method || "unknown")))].sort() as string[],
+    [orders],
+  );
+  const availableStatuses = useMemo(
+    () => [...new Set(orders.map((o: any) => String(o.status || "")).filter(Boolean))].sort() as string[],
+    [orders],
+  );
 
   // Summary KPIs
   const totals = useMemo(() => {
@@ -179,12 +204,6 @@ export function OrdersTab({ period, geoFilters }: Props) {
     });
     return Object.entries(buckets).map(([name, value]) => ({ name, value })).filter(b => b.value > 0);
   }, [enrichedOrders]);
-
-  const statusLabels: Record<string, string> = {
-    pending: "En attente", confirmed: "Confirmée", preparing: "Préparation",
-    in_shipping: "Expédition", shipped: "Hub", delivered: "Livrée",
-    cancelled: "Annulée", returned: "Retournée",
-  };
 
   const methodLabels: Record<string, string> = {
     stripe: "Carte (Keccel)", mobile_money: "MoMo", cod: "COD", off_platform: "Hors pl.", whatsapp: "WhatsApp", paypal: "PayPal", card: "Carte (Keccel)",
@@ -256,7 +275,7 @@ export function OrdersTab({ period, geoFilters }: Props) {
 
       {/* Search + Order list */}
       <div className="bg-card border border-border rounded-xl p-4">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
           <h2 className="text-sm font-semibold text-foreground flex-1">Détail par commande</h2>
           <div className="relative">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -264,10 +283,40 @@ export function OrdersTab({ period, geoFilters }: Props) {
               type="text"
               placeholder="Réf. commande..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               className="pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 w-40"
             />
           </div>
+          <Select value={storeFilter} onValueChange={(value) => { setStoreFilter(value); setPage(1); }}>
+            <SelectTrigger className="w-[150px] h-8 text-xs"><SelectValue placeholder="Boutique" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toutes les boutiques</SelectItem>
+              {stores.map((store: any) => <SelectItem key={store.id} value={store.id}>{store.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPage(1); }}>
+            <SelectTrigger className="w-[145px] h-8 text-xs"><SelectValue placeholder="Statut" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les statuts</SelectItem>
+              {availableStatuses.map((status) => (
+                <SelectItem key={status} value={status}>{STATUS_CONFIG[status]?.label || status}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={paymentFilter} onValueChange={(value) => { setPaymentFilter(value); setPage(1); }}>
+            <SelectTrigger className="w-[145px] h-8 text-xs"><SelectValue placeholder="Paiement" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les paiements</SelectItem>
+              {paymentMethods.map((method) => <SelectItem key={method} value={method}>{methodLabels[method] || method}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={amountSort} onValueChange={(value) => { setAmountSort(value); setPage(1); }}>
+            <SelectTrigger className="w-[150px] h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="desc">Montant décroissant</SelectItem>
+              <SelectItem value="asc">Montant croissant</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="overflow-x-auto">
@@ -288,10 +337,9 @@ export function OrdersTab({ period, geoFilters }: Props) {
               </tr>
             </thead>
             <tbody>
-              {enrichedOrders.slice(0, 100).map((o: any) => (
-                <>
+              {paginatedOrders.map((o: any) => (
+                <Fragment key={o.id}>
                   <tr
-                    key={o.id}
                     className="border-b border-border/50 hover:bg-muted/30 cursor-pointer"
                     onClick={() => setExpandedId(expandedId === o.id ? null : o.id)}
                   >
@@ -306,7 +354,7 @@ export function OrdersTab({ period, geoFilters }: Props) {
                     <td className="py-1.5 px-2 truncate max-w-[120px]">{o.storeName}</td>
                     <td className="py-1.5 px-2">
                       <Badge variant={o.status === "delivered" ? "default" : o.status === "cancelled" ? "destructive" : "secondary"} className="text-[8px]">
-                        {statusLabels[o.status] || o.status}
+                        {STATUS_CONFIG[o.status]?.label || o.status}
                       </Badge>
                     </td>
                     <td className="py-1.5 px-2">
@@ -376,7 +424,7 @@ export function OrdersTab({ period, geoFilters }: Props) {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -384,6 +432,15 @@ export function OrdersTab({ period, geoFilters }: Props) {
 
         {enrichedOrders.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-8">Aucune commande pour cette période</p>
+        )}
+        {enrichedOrders.length > 0 && (
+          <div className="flex items-center justify-between gap-3 pt-4 text-xs text-muted-foreground">
+            <span>{enrichedOrders.length} commande(s) · page {currentPage}/{pageCount}</span>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Précédent</Button>
+              <Button size="sm" variant="outline" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Suivant</Button>
+            </div>
+          </div>
         )}
       </div>
     </div>

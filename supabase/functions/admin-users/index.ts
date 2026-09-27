@@ -59,11 +59,11 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Forbidden: admin role required" }, 403);
     }
 
-    // Rate limiting: 10 requests/min per admin
+    // Rate limiting: 60 requests/min per admin (batch soft-delete + sync)
     const { data: rlAllowed } = await anonClient.rpc("check_rate_limit", {
       p_identifier: callerId,
       p_endpoint: "admin-users",
-      p_max_requests: 10,
+      p_max_requests: 60,
       p_window_seconds: 60,
     });
     if (rlAllowed === false) {
@@ -240,10 +240,165 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: true });
       }
 
+      case "soft_delete_user": {
+        if (userId === callerId) {
+          return jsonResponse({ error: "Impossible de soft-supprimer votre propre compte" }, 400);
+        }
+        const { data: targetRoles } = await adminClient
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId);
+        const roles = targetRoles?.map((r: { role: string }) => r.role) ?? [];
+        if (roles.includes("admin")) {
+          return jsonResponse({ error: "Impossible de soft-supprimer un administrateur" }, 403);
+        }
+        const reason = (params as { reason?: string }).reason || "Soft-delete admin";
+        const { error: banErr } = await adminClient.auth.admin.updateUserById(userId, {
+          ban_duration: "876600h",
+        });
+        if (banErr) {
+          return jsonResponse({ error: banErr.message }, 500);
+        }
+        const softPayload = {
+          deleted_at: new Date().toISOString(),
+          is_banned: true,
+          ban_reason: reason,
+          banned_at: new Date().toISOString(),
+          banned_by: callerId,
+        };
+        let { error: softErr } = await adminClient.from("profiles").update(softPayload).eq("id", userId);
+        // Column deleted_at may not exist until migration — ban-only fallback
+        if (softErr) {
+          const { error: banOnlyErr } = await adminClient.from("profiles").update({
+            is_banned: true,
+            ban_reason: `[SOFT_DELETE] ${reason}`,
+            banned_at: new Date().toISOString(),
+            banned_by: callerId,
+          }).eq("id", userId);
+          if (banOnlyErr) {
+            return jsonResponse({ error: banOnlyErr.message }, 500);
+          }
+        }
+        await adminClient.from("admin_audit_logs").insert({
+          admin_id: callerId,
+          action: "soft_delete",
+          target_user_id: userId,
+          details: { reason },
+        });
+        return jsonResponse({ success: true });
+      }
+
+      case "restore_user": {
+        const { data: profile } = await adminClient
+          .from("profiles")
+          .select("deleted_at, ban_reason, is_banned")
+          .eq("id", userId)
+          .maybeSingle();
+        const softMarked =
+          Boolean(profile?.deleted_at) ||
+          Boolean(typeof profile?.ban_reason === "string" && profile.ban_reason.startsWith("[SOFT_DELETE]"));
+        if (!softMarked) {
+          return jsonResponse({
+            error: "Ce compte n'est pas en soft-delete ; utilisez Débannir pour un ban classique",
+          }, 400);
+        }
+        const { error: unbanErr } = await adminClient.auth.admin.updateUserById(userId, {
+          ban_duration: "none",
+        });
+        if (unbanErr) {
+          return jsonResponse({ error: unbanErr.message }, 500);
+        }
+        const restorePayload = {
+          deleted_at: null,
+          is_banned: false,
+          ban_reason: null,
+          banned_at: null,
+          banned_by: null,
+        };
+        let { error: restoreErr } = await adminClient.from("profiles").update(restorePayload).eq("id", userId);
+        if (restoreErr) {
+          const { error: banClearErr } = await adminClient.from("profiles").update({
+            is_banned: false,
+            ban_reason: null,
+            banned_at: null,
+            banned_by: null,
+          }).eq("id", userId);
+          if (banClearErr) {
+            return jsonResponse({ error: banClearErr.message }, 500);
+          }
+        }
+        await adminClient.from("admin_audit_logs").insert({
+          admin_id: callerId,
+          action: "restore_user",
+          target_user_id: userId,
+          details: {},
+        });
+        return jsonResponse({ success: true });
+      }
+
+      case "delete_user": {
+        if (userId === callerId) {
+          return jsonResponse({ error: "Impossible de supprimer votre propre compte" }, 400);
+        }
+        const { data: targetRoles } = await adminClient
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId);
+        const roles = targetRoles?.map((r: { role: string }) => r.role) ?? [];
+        if (roles.includes("admin")) {
+          return jsonResponse({ error: "Suppression hard d'un admin interdite via cette action" }, 403);
+        }
+        // Audit before irreversible auth delete (no email PII)
+        await adminClient.from("admin_audit_logs").insert({
+          admin_id: callerId,
+          action: "delete_user",
+          target_user_id: userId,
+          details: { reason: (params as { reason?: string }).reason || null },
+        });
+        const { error: delErr } = await adminClient.auth.admin.deleteUser(userId);
+        if (delErr) {
+          return jsonResponse({ error: delErr.message }, 500);
+        }
+        // Profile usually cascades from auth.users; best-effort cleanup
+        await adminClient.from("profiles").delete().eq("id", userId);
+        return jsonResponse({ success: true });
+      }
+
+      case "sync_auth_sign_ins": {
+        let updated = 0;
+        let page = 1;
+        const perPage = 1000;
+        for (;;) {
+          const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage });
+          if (error) {
+            return jsonResponse({ error: error.message }, 500);
+          }
+          const users = data?.users ?? [];
+          for (const u of users) {
+            const { error: upErr } = await adminClient
+              .from("profiles")
+              .update({ auth_last_sign_in_at: u.last_sign_in_at ?? null })
+              .eq("id", u.id);
+            if (!upErr) updated += 1;
+          }
+          if (users.length < perPage) break;
+          page += 1;
+          if (page > 20) break; // safety cap ~20k
+        }
+        return jsonResponse({ success: true, count: updated });
+      }
+
       case "get_user_details": {
         const { data: authUser, error: authErr } = await adminClient.auth.admin.getUserById(userId);
         if (authErr) {
           return jsonResponse({ error: authErr.message }, 500);
+        }
+        // Keep denormalized column in sync
+        if (authUser.user) {
+          await adminClient
+            .from("profiles")
+            .update({ auth_last_sign_in_at: authUser.user.last_sign_in_at ?? null })
+            .eq("id", userId);
         }
         return jsonResponse({
           last_sign_in_at: authUser.user.last_sign_in_at,

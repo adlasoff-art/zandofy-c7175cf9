@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Loader2, Users, Package, ShoppingBag, DollarSign, Store as StoreIcon, CheckCircle2, Clock, XCircle, Ban, ShieldAlert, RotateCcw, CreditCard, AlertTriangle, TrendingUp, Wallet, Receipt, Truck, Home } from "lucide-react";
-import { KpiCard, KpiCardRow, statusColor, statusLabels } from "./shared";
+import { Loader2, Users, Package, ShoppingBag, DollarSign, Store as StoreIcon, TrendingUp } from "lucide-react";
+import { Area, AreaChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { KpiCard, TOOLTIP_STYLE, statusColor, statusLabels } from "./shared";
 import type { PeriodKey } from "./DashboardPeriodSelector";
 import { getPeriodDate } from "./DashboardPeriodSelector";
 import type { GlobalFilters } from "./DashboardGlobalFilters";
@@ -31,9 +32,6 @@ export function OverviewTab({ period, geoFilters }: Props) {
   });
 
   const orderStats = overview?.orderStats as any;
-  const paymentStats = overview?.paymentStats as any;
-  const disputeStats = overview?.disputeStats as any;
-  const returnStats = overview?.returnStats as any;
   const profileCount = Number(overview?.profileCount ?? 0);
   const productCount = Number(overview?.productCount ?? 0);
   const storeCount = Number(overview?.storeCount ?? 0);
@@ -47,9 +45,41 @@ export function OverviewTab({ period, geoFilters }: Props) {
     },
   });
 
-  const mobileMoneyGross = paymentStats?.mobileMoneyGross ?? 0;
-  const actualGatewayFees = Math.round(mobileMoneyGross * gatewayFeePct) / 100;
-  const actualNetRevenue = mobileMoneyGross - actualGatewayFees;
+  const { data: dailySeries = [], isLoading: loadingSeries } = useQuery({
+    queryKey: ["admin-overview-daily-series", period, country, city, gatewayFeePct],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("admin_dashboard_daily_series", {
+        _since: since,
+        _country: country ?? null,
+        _city: city ?? null,
+      });
+      // RPC not applied yet → empty series (Commerce KPIs still work via overview)
+      if (error) return [];
+      const rows = (data ?? []) as any[];
+      return rows.map((row) => {
+        const gross = Number(row.mobile_money_gross ?? 0);
+        const gatewayFees = gross * (gatewayFeePct / 100);
+        return {
+          date: format(parseISO(row.day), rows.length > 60 ? "d/MM" : "d MMM", { locale: fr }),
+          delivered: Number(row.delivered_count ?? 0),
+          pending: Number(row.pending_count ?? 0),
+          cancelled: Number(row.cancelled_count ?? 0),
+          failedAmount: Number(row.failed_amount ?? 0),
+          orderAmount: Number(row.order_amount ?? 0),
+          shippingAmount: Number(row.shipping_amount ?? 0),
+          lastMileAmount: Number(row.last_mile_amount ?? 0),
+          mobileMoneyGross: gross,
+          gatewayFees,
+          mobileMoneyNet: gross - gatewayFees,
+          disputes: Number(row.disputes_count ?? 0),
+          returns: Number(row.returns_count ?? 0),
+          paymentsSuccessful: Number(row.payments_successful ?? 0),
+          paymentsFailed: Number(row.payments_failed ?? 0),
+          paymentsPending: Number(row.payments_pending ?? 0),
+        };
+      });
+    },
+  });
 
   const roleCounts: { role: string; count: number }[] = overview?.roleCounts ?? [];
   const recentOrders: any[] = overview?.recentOrders ?? [];
@@ -88,34 +118,39 @@ export function OverviewTab({ period, geoFilters }: Props) {
         <KpiCard icon={StoreIcon} label="Boutiques" value={storeCount.toLocaleString()} />
       </div>
 
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Santé des commandes</h2>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCardRow icon={CheckCircle2} label="Livrées" value={(orderStats?.deliveredCount ?? 0).toString()} />
-        <KpiCardRow icon={Clock} label="En attente" value={(orderStats?.pendingCount ?? 0).toString()} color="text-amber-500" />
-        <KpiCardRow icon={XCircle} label="Annulées / retournées" value={(orderStats?.cancelledCount ?? 0).toString()} color="text-destructive" />
-        <KpiCardRow icon={Ban} label="Montant cmd échouées" value={`$${(orderStats?.failedAmount ?? 0).toLocaleString()}`} color="text-destructive" />
-      </div>
+      {loadingSeries ? (
+        <div className="flex justify-center py-16"><Loader2 className="animate-spin text-primary" size={24} /></div>
+      ) : dailySeries.length === 0 ? (
+        <p className="text-xs text-muted-foreground border border-dashed border-border rounded-xl p-4">
+          Séries temporelles indisponibles — appliquez la migration <code className="text-[10px]">admin_dashboard_daily_series</code> sur le projet Supabase, puis rechargez.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <OverviewSeriesChart title="Santé commandes" data={dailySeries} moneyKey="failedAmount">
+            <Area type="monotone" dataKey="delivered" name="Livrées" stroke="hsl(142, 70%, 40%)" fill="hsl(142, 70%, 40%)" fillOpacity={0.18} yAxisId="count" />
+            <Line type="monotone" dataKey="pending" name="En attente" stroke="hsl(40, 80%, 50%)" dot={false} yAxisId="count" />
+            <Line type="monotone" dataKey="cancelled" name="Annulées / retours" stroke="hsl(0, 75%, 55%)" dot={false} yAxisId="count" />
+            <Line type="monotone" dataKey="failedAmount" name="Montant échoué ($)" stroke="hsl(280, 60%, 50%)" dot={false} yAxisId="money" />
+          </OverviewSeriesChart>
 
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Revenus & Passerelle Mobile Money</h2>
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <KpiCard icon={CreditCard} label="Paiements commandes" value={`$${(paymentStats?.orderAmount ?? 0).toFixed(2)}`} sub="Mobile Money réussis" />
-        <KpiCard icon={Truck} label="Paiements expédition" value={`$${(paymentStats?.shippingAmount ?? 0).toFixed(2)}`} sub="Shipping payés via MM" color="text-blue-500" />
-        <KpiCard icon={Home} label="Paiements livraison domicile" value={`$${(paymentStats?.lastMileAmount ?? 0).toFixed(2)}`} sub="Last-mile payés via MM" color="text-purple-500" />
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard icon={Wallet} label="Brut Mobile Money" value={`$${mobileMoneyGross.toFixed(2)}`} sub="Total perçu via MM" />
-        <KpiCard icon={Receipt} label={`Frais passerelle (${gatewayFeePct}%)`} value={`-$${actualGatewayFees.toFixed(2)}`} sub="Estimé KelPay" color="text-destructive" />
-        <KpiCard icon={DollarSign} label="Net plateforme (MM)" value={`$${actualNetRevenue.toFixed(2)}`} sub="Après déduction frais" color="text-green-500" />
-        <KpiCard icon={CheckCircle2} label="Preuves validées" value={`$${((orderStats?.proofShippingPaid ?? 0) + (orderStats?.proofLastMilePaid ?? 0)).toFixed(2)}`} sub={`Expéd: $${(orderStats?.proofShippingPaid ?? 0).toFixed(2)} | Livr: $${(orderStats?.proofLastMilePaid ?? 0).toFixed(2)}`} />
-      </div>
+          <OverviewSeriesChart title="Revenus & passerelle" data={dailySeries} moneyOnly>
+            <Area type="monotone" dataKey="mobileMoneyGross" name="Brut Mobile Money" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.18} yAxisId="money" />
+            <Line type="monotone" dataKey="orderAmount" name="Commandes" stroke="hsl(210, 70%, 50%)" dot={false} yAxisId="money" />
+            <Line type="monotone" dataKey="shippingAmount" name="Expédition" stroke="hsl(160, 60%, 40%)" dot={false} yAxisId="money" />
+            <Line type="monotone" dataKey="lastMileAmount" name="Dernier km" stroke="hsl(280, 60%, 50%)" dot={false} yAxisId="money" />
+            <Line type="monotone" dataKey="gatewayFees" name={`Frais (${gatewayFeePct}%)`} stroke="hsl(0, 75%, 55%)" dot={false} yAxisId="money" />
+            <Line type="monotone" dataKey="mobileMoneyNet" name="Net Mobile Money" stroke="hsl(142, 70%, 40%)" dot={false} yAxisId="money" />
+          </OverviewSeriesChart>
 
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Après-vente & Paiements</h2>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard icon={ShieldAlert} label="Litiges" value={(disputeStats?.total ?? 0).toString()} color="text-destructive" sub={`${disputeStats?.open ?? 0} ouvert(s)`} />
-        <KpiCard icon={RotateCcw} label="Retours" value={(returnStats?.total ?? 0).toString()} color="text-amber-500" sub={`${returnStats?.pending ?? 0} en attente`} />
-        <KpiCard icon={CreditCard} label="Paiements réussis" value={(paymentStats?.successful ?? 0).toString()} sub={`$${(paymentStats?.totalAmount ?? 0).toLocaleString()}`} />
-        <KpiCard icon={AlertTriangle} label="Paiements échoués" value={(paymentStats?.failed ?? 0).toString()} color="text-destructive" sub={`${paymentStats?.pending ?? 0} transaction(s) en attente`} />
-      </div>
+          <OverviewSeriesChart title="Après-vente & paiements" data={dailySeries}>
+            <Area type="monotone" dataKey="paymentsSuccessful" name="Paiements réussis" stroke="hsl(142, 70%, 40%)" fill="hsl(142, 70%, 40%)" fillOpacity={0.18} yAxisId="count" />
+            <Line type="monotone" dataKey="disputes" name="Litiges" stroke="hsl(0, 75%, 55%)" dot={false} yAxisId="count" />
+            <Line type="monotone" dataKey="returns" name="Retours" stroke="hsl(40, 80%, 50%)" dot={false} yAxisId="count" />
+            <Line type="monotone" dataKey="paymentsFailed" name="Paiements échoués" stroke="hsl(330, 60%, 50%)" dot={false} yAxisId="count" />
+            <Line type="monotone" dataKey="paymentsPending" name="Paiements en attente" stroke="hsl(210, 70%, 50%)" dot={false} yAxisId="count" />
+          </OverviewSeriesChart>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2">
         <div className="lg:col-span-2 bg-card border border-border rounded-xl p-4">
@@ -189,6 +224,36 @@ export function OverviewTab({ period, geoFilters }: Props) {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function OverviewSeriesChart({ title, data, children, moneyKey, moneyOnly = false }: {
+  title: string;
+  data: any[];
+  children: React.ReactNode;
+  moneyKey?: string;
+  moneyOnly?: boolean;
+}) {
+  return (
+    <div className="bg-card border border-border rounded-xl p-4">
+      <h2 className="text-sm font-semibold text-foreground mb-4">{title}</h2>
+      <div className="h-[300px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={Math.max(0, Math.floor(data.length / 8))} />
+            {!moneyOnly && <YAxis yAxisId="count" allowDecimals={false} tick={{ fontSize: 10 }} />}
+            {(moneyOnly || moneyKey) && <YAxis yAxisId="money" orientation={moneyOnly ? "left" : "right"} tick={{ fontSize: 10 }} />}
+            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number, name: string, item: any) => [
+              item?.dataKey === moneyKey || moneyOnly ? `$${Number(value).toLocaleString("fr-FR")}` : Number(value).toLocaleString("fr-FR"),
+              name,
+            ]} />
+            <Legend iconType="circle" wrapperStyle={{ fontSize: 10 }} />
+            {children}
+          </AreaChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );

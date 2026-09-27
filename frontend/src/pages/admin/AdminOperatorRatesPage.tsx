@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Loader2, MapPin, Pencil, RefreshCw } from "lucide-react";
 import { GeoFieldsRow, type GeoFieldsValue } from "@/components/address/GeoFieldsRow";
+import { getCountryName } from "@/components/vendor/CountryCombobox";
 
 type Rate = {
   id: string;
@@ -328,7 +329,7 @@ export default function AdminOperatorRatesPage() {
                     <TableRow key={r.id}>
                       <TableCell className="font-medium">{r.zone_name}</TableCell>
                       <TableCell className="text-xs">
-                        {r.city}, {r.country_code}
+                        {r.city}, {getCountryName(r.country_code)}
                         {r.commune && <> · {r.commune}</>}
                         {r.quartier && <> · {r.quartier}</>}
                       </TableCell>

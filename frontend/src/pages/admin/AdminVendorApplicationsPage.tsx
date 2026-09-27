@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminLayout } from "@/components/admin/AdminLayout";
@@ -11,6 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   Eye, CheckCircle2, XCircle, RotateCcw, Loader2, FileText, User, Store, Clock, Archive, Trash2,
 } from "lucide-react";
+import { DataTablePagination } from "@/components/ui/DataTablePagination";
 
 const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   draft: { label: "Brouillon", variant: "secondary" },
@@ -26,6 +27,10 @@ export default function AdminVendorApplicationsPage() {
   const [adminNotes, setAdminNotes] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [showArchives, setShowArchives] = useState(false);
+  const [pendingPage, setPendingPage] = useState(1);
+  const [pendingPageSize, setPendingPageSize] = useState(10);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(25);
 
   const { data: applications, isLoading } = useQuery({
     queryKey: ["admin-vendor-applications", showArchives],
@@ -358,8 +363,28 @@ export default function AdminVendorApplicationsPage() {
     }
   };
 
-  const submitted = applications?.filter((a: any) => a.status === "submitted") || [];
-  const others = applications?.filter((a: any) => a.status !== "submitted") || [];
+  const submitted = useMemo(
+    () => (applications?.filter((a: any) => a.status === "submitted") || []),
+    [applications],
+  );
+  const others = useMemo(
+    () => (applications?.filter((a: any) => a.status !== "submitted") || []),
+    [applications],
+  );
+
+  const pendingTotalPages = Math.max(1, Math.ceil(submitted.length / pendingPageSize));
+  const safePendingPage = Math.min(pendingPage, pendingTotalPages);
+  const pagedSubmitted = submitted.slice(
+    (safePendingPage - 1) * pendingPageSize,
+    safePendingPage * pendingPageSize,
+  );
+
+  const historyTotalPages = Math.max(1, Math.ceil(others.length / historyPageSize));
+  const safeHistoryPage = Math.min(historyPage, historyTotalPages);
+  const pagedOthers = others.slice(
+    (safeHistoryPage - 1) * historyPageSize,
+    safeHistoryPage * historyPageSize,
+  );
 
   return (
     <AdminLayout title="Demandes Vendeur">
@@ -368,7 +393,11 @@ export default function AdminVendorApplicationsPage() {
           <Button
             size="sm"
             variant={showArchives ? "default" : "outline"}
-            onClick={() => setShowArchives((v) => !v)}
+            onClick={() => {
+              setShowArchives((v) => !v);
+              setPendingPage(1);
+              setHistoryPage(1);
+            }}
             className="gap-1.5"
           >
             <Archive size={14} />
@@ -389,20 +418,29 @@ export default function AdminVendorApplicationsPage() {
             ) : submitted.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">Aucune demande en attente</p>
             ) : (
-              <div className="space-y-3">
-                {submitted.map((app: any) => (
-                  <div key={app.id} className="flex items-center justify-between border border-border rounded-md p-3">
-                    <div className="space-y-1">
-                      <p className="font-medium text-sm">{app.full_name || "Sans nom"}</p>
-                      <p className="text-xs text-muted-foreground">{app.store_name} · {app.business_type}</p>
-                      <p className="text-xs text-muted-foreground">Soumis le {new Date(app.submitted_at || app.created_at).toLocaleDateString("fr-FR")}</p>
+              <>
+                <div className="space-y-3">
+                  {pagedSubmitted.map((app: any) => (
+                    <div key={app.id} className="flex items-center justify-between border border-border rounded-md p-3">
+                      <div className="space-y-1">
+                        <p className="font-medium text-sm">{app.full_name || "Sans nom"}</p>
+                        <p className="text-xs text-muted-foreground">{app.store_name} · {app.business_type}</p>
+                        <p className="text-xs text-muted-foreground">Soumis le {new Date(app.submitted_at || app.created_at).toLocaleDateString("fr-FR")}</p>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => setSelected(app)} className="gap-1.5">
+                        <Eye size={14} /> Examiner
+                      </Button>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => setSelected(app)} className="gap-1.5">
-                      <Eye size={14} /> Examiner
-                    </Button>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+                <DataTablePagination
+                  totalItems={submitted.length}
+                  currentPage={safePendingPage}
+                  pageSize={pendingPageSize}
+                  onPageChange={setPendingPage}
+                  onPageSizeChange={(size) => { setPendingPageSize(size); setPendingPage(1); }}
+                />
+              </>
             )}
           </CardContent>
         </Card>
@@ -416,41 +454,50 @@ export default function AdminVendorApplicationsPage() {
             {others.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">Aucune demande</p>
             ) : (
-              <div className="space-y-2">
-                {others.map((app: any) => {
-                  const st = STATUS_LABELS[app.status] || { label: app.status, variant: "secondary" as const };
-                  return (
-                    <div key={app.id} className="flex items-center justify-between border border-border rounded-md p-3">
-                      <div className="flex items-center gap-3">
-                        <div>
-                          <p className="font-medium text-sm">{app.full_name || "Sans nom"}</p>
-                          <p className="text-xs text-muted-foreground">{app.store_name}</p>
+              <>
+                <div className="space-y-2">
+                  {pagedOthers.map((app: any) => {
+                    const st = STATUS_LABELS[app.status] || { label: app.status, variant: "secondary" as const };
+                    return (
+                      <div key={app.id} className="flex items-center justify-between border border-border rounded-md p-3">
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <p className="font-medium text-sm">{app.full_name || "Sans nom"}</p>
+                            <p className="text-xs text-muted-foreground">{app.store_name}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={st.variant}>{st.label}</Badge>
+                          <Button size="icon" variant="ghost" onClick={() => setSelected(app)} className="h-7 w-7">
+                            <Eye size={14} />
+                          </Button>
+                          {showArchives ? (
+                            <>
+                              <Button size="icon" variant="ghost" onClick={() => restoreApp(app.id)} className="h-7 w-7" title="Restaurer">
+                                <RotateCcw size={14} />
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={() => hardDelete(app.id)} className="h-7 w-7 text-destructive" title="Supprimer définitivement">
+                                <Trash2 size={14} />
+                              </Button>
+                            </>
+                          ) : (
+                            <Button size="icon" variant="ghost" onClick={() => softDelete(app.id)} className="h-7 w-7" title="Archiver">
+                              <Archive size={14} />
+                            </Button>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={st.variant}>{st.label}</Badge>
-                        <Button size="icon" variant="ghost" onClick={() => setSelected(app)} className="h-7 w-7">
-                          <Eye size={14} />
-                        </Button>
-                        {showArchives ? (
-                          <>
-                            <Button size="icon" variant="ghost" onClick={() => restoreApp(app.id)} className="h-7 w-7" title="Restaurer">
-                              <RotateCcw size={14} />
-                            </Button>
-                            <Button size="icon" variant="ghost" onClick={() => hardDelete(app.id)} className="h-7 w-7 text-destructive" title="Supprimer définitivement">
-                              <Trash2 size={14} />
-                            </Button>
-                          </>
-                        ) : (
-                          <Button size="icon" variant="ghost" onClick={() => softDelete(app.id)} className="h-7 w-7" title="Archiver">
-                            <Archive size={14} />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+                <DataTablePagination
+                  totalItems={others.length}
+                  currentPage={safeHistoryPage}
+                  pageSize={historyPageSize}
+                  onPageChange={setHistoryPage}
+                  onPageSizeChange={(size) => { setHistoryPageSize(size); setHistoryPage(1); }}
+                />
+              </>
             )}
           </CardContent>
         </Card>

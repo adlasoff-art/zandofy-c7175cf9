@@ -3,7 +3,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Crown, Store, Search, Loader2, Check, X, MessageCircle, Truck, Ticket, Users } from "lucide-react";
+import { Crown, Store, Search, Loader2, Check, X, MessageCircle, Truck, Ticket, Users, ChevronDown, ChevronUp } from "lucide-react";
 import { VENDOR_TIERS, type VendorTier } from "@/lib/vendor-tiers";
 import { Switch } from "@/components/ui/switch";
 import { PublishSocialDialog } from "@/components/admin/PublishSocialDialog";
@@ -45,6 +45,9 @@ export default function AdminVendorSubscriptionsPage() {
   const [planFilter, setPlanFilter] = useState<"all" | VendorTier>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [pendingOpen, setPendingOpen] = useState(false);
+  const [pendingPage, setPendingPage] = useState(1);
+  const [pendingPageSize, setPendingPageSize] = useState(10);
   const queryClient = useQueryClient();
 
   const { data: stores = [], isLoading } = useQuery({
@@ -174,6 +177,13 @@ export default function AdminVendorSubscriptionsPage() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, page, pageSize]);
 
+  const pendingTotalPages = Math.max(1, Math.ceil(pendingProducts.length / pendingPageSize));
+  const safePendingPage = Math.min(pendingPage, pendingTotalPages);
+  const pagedPending = pendingProducts.slice(
+    (safePendingPage - 1) * pendingPageSize,
+    safePendingPage * pendingPageSize,
+  );
+
   return (
     <AdminLayout title="Abonnements vendeurs">
       <div className="space-y-6">
@@ -182,84 +192,108 @@ export default function AdminVendorSubscriptionsPage() {
           Abonnements vendeurs
         </h1>
 
-        {/* Pending product approvals */}
+        {/* Pending product approvals — collapsible so it doesn't drown the store list */}
         {pendingProducts.length > 0 && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 space-y-3">
-            <h2 className="text-sm font-bold text-amber-700 dark:text-amber-400">
-              Produits en attente d'approbation ({pendingProducts.length})
-            </h2>
-            <div className="space-y-2">
-              {pendingProducts.map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between bg-card rounded-md p-2 border border-border">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{p.name_fr}</p>
-                    <p className="text-xs text-muted-foreground">{p.price} {p.currency}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        setSocialProductId(p.id);
-                        setSocialOpen(true);
-                      }}
-                      className="p-1.5 rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
-                    >
-                      <Check size={14} />
-                    </button>
-                    <button
-                      onClick={() => approveProduct.mutate({ productId: p.id, approve: false })}
-                      className="p-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setPendingOpen((v) => !v)}
+              className="w-full flex items-center justify-between gap-2 p-4 text-left hover:bg-amber-100/50 dark:hover:bg-amber-900/30 transition-colors"
+            >
+              <h2 className="text-sm font-bold text-amber-700 dark:text-amber-400">
+                Produits en attente d'approbation ({pendingProducts.length})
+              </h2>
+              {pendingOpen ? <ChevronUp size={16} className="text-amber-700 dark:text-amber-400" /> : <ChevronDown size={16} className="text-amber-700 dark:text-amber-400" />}
+            </button>
+            {pendingOpen && (
+              <div className="px-4 pb-4 space-y-3">
+                <div className="space-y-2">
+                  {pagedPending.map((p: any) => (
+                    <div key={p.id} className="flex items-center justify-between bg-card rounded-md p-2 border border-border">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{p.name_fr}</p>
+                        <p className="text-xs text-muted-foreground">{p.price} {p.currency}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            setSocialProductId(p.id);
+                            setSocialOpen(true);
+                          }}
+                          className="p-1.5 rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+                        >
+                          <Check size={14} />
+                        </button>
+                        <button
+                          onClick={() => approveProduct.mutate({ productId: p.id, approve: false })}
+                          className="p-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+                <DataTablePagination
+                  totalItems={pendingProducts.length}
+                  currentPage={safePendingPage}
+                  pageSize={pendingPageSize}
+                  onPageChange={setPendingPage}
+                  onPageSizeChange={(size) => { setPendingPageSize(size); setPendingPage(1); }}
+                />
+              </div>
+            )}
           </div>
         )}
 
         {/* Search + filters */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Rechercher une boutique..."
-              value={search}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Rechercher une boutique..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full pl-9 pr-4 py-2 text-sm bg-card border border-border rounded-md"
+              />
+            </div>
+            <select
+              value={statusFilter}
               onChange={(e) => {
-                setSearch(e.target.value);
+                setStatusFilter(e.target.value as any);
                 setPage(1);
               }}
-              className="w-full pl-9 pr-4 py-2 text-sm bg-card border border-border rounded-md"
-            />
+              className="px-3 py-2 text-sm bg-card border border-border rounded-md"
+            >
+              <option value="all">Tous statuts</option>
+              <option value="active">Actifs</option>
+              <option value="suspended">Suspendus / bannis</option>
+            </select>
+            <select
+              value={planFilter}
+              onChange={(e) => {
+                setPlanFilter(e.target.value as any);
+                setPage(1);
+              }}
+              className="px-3 py-2 text-sm bg-card border border-border rounded-md"
+            >
+              <option value="all">Tous plans (tiers legacy)</option>
+              {TIER_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {VENDOR_TIERS[t].label}
+                </option>
+              ))}
+            </select>
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as any);
-              setPage(1);
-            }}
-            className="px-3 py-2 text-sm bg-card border border-border rounded-md"
-          >
-            <option value="all">Tous statuts</option>
-            <option value="active">Actifs</option>
-            <option value="suspended">Suspendus / bannis</option>
-          </select>
-          <select
-            value={planFilter}
-            onChange={(e) => {
-              setPlanFilter(e.target.value as any);
-              setPage(1);
-            }}
-            className="px-3 py-2 text-sm bg-card border border-border rounded-md"
-          >
-            <option value="all">Tous plans</option>
-            {TIER_OPTIONS.map((t) => (
-              <option key={t} value={t}>
-                {VENDOR_TIERS[t].label}
-              </option>
-            ))}
-          </select>
+          <p className="text-[11px] text-muted-foreground leading-relaxed max-w-3xl">
+            <span className="font-medium text-foreground">Tiers</span> (<code className="text-[10px]">beginner</code> / <code className="text-[10px]">pro</code> / <code className="text-[10px]">grand_supplier</code>) = capacités legacy (plafond produits, livraisons, collabs).{" "}
+            <span className="font-medium text-foreground">Packages</span> (<code className="text-[10px]">service_packages</code>) = forfaits WhatsApp / mensuels — distincts des tiers ; ne pas confondre lors du filtre.
+          </p>
         </div>
 
         {isLoading ? (

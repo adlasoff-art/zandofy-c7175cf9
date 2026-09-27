@@ -15,8 +15,14 @@ function normalizeSearch(s: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-export function getCountryName(code: string): string {
-  return COUNTRY_MAP[code] || code;
+export function getCountryName(code: string, locale = "fr"): string {
+  const normalized = code.trim().toUpperCase();
+  if (!normalized) return code;
+  try {
+    return new Intl.DisplayNames([locale], { type: "region" }).of(normalized) || COUNTRY_MAP[normalized] || code;
+  } catch {
+    return COUNTRY_MAP[normalized] || code;
+  }
 }
 
 /** Resolve free-text or ISO input to an ISO-3166-1 alpha-2 code when possible. */
