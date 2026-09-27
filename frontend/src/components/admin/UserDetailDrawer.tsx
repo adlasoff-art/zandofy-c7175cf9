@@ -57,6 +57,9 @@ const auditActionLabels: Record<string, string> = {
   warning: "Avertissement",
   reset_password: "Réinit. mot de passe",
   set_operational_credentials: "Identifiants opérationnels modifiés",
+  soft_delete: "Soft-delete",
+  restore_user: "Restauration compte",
+  delete_user: "Hard-delete",
   impersonation_start: "Impersonation démarrée",
   impersonation_end: "Impersonation terminée",
 };
@@ -122,6 +125,8 @@ interface UserProfile {
   last_known_lat?: number | null;
   last_known_lng?: number | null;
   last_login_at?: string | null;
+  auth_last_sign_in_at?: string | null;
+  deleted_at?: string | null;
   login_count?: number | null;
   preferred_language?: string | null;
   preferred_contact_channel?: string | null;
@@ -150,6 +155,10 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
   const [warningSeverity, setWarningSeverity] = useState<"warning" | "final_warning">("warning");
   const [banReason, setBanReason] = useState("");
   const [showBanConfirm, setShowBanConfirm] = useState(false);
+  const [showSoftDeleteConfirm, setShowSoftDeleteConfirm] = useState(false);
+  const [showHardDeleteConfirm, setShowHardDeleteConfirm] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [hardDeleteConfirmText, setHardDeleteConfirmText] = useState("");
   const [showAddRole, setShowAddRole] = useState(false);
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [showActivityLogs, setShowActivityLogs] = useState(false);
@@ -404,6 +413,63 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const softDeleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await supabase.functions.invoke("admin-users", {
+        body: { action: "soft_delete_user", userId: user.id, reason: deleteReason || "Soft-delete admin" },
+      });
+      if (res.error) throw new Error(await getFunctionErrorMessage(res.error));
+      if (res.data?.error) throw new Error(res.data.error);
+      await logAudit("soft_delete", user.id, { reason: deleteReason || undefined });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["user-audit-logs", user.id] });
+      setShowSoftDeleteConfirm(false);
+      setDeleteReason("");
+      toast.success("Compte archivé (soft-delete). L'email reste réservé.");
+      onClose();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: async () => {
+      const res = await supabase.functions.invoke("admin-users", {
+        body: { action: "restore_user", userId: user.id },
+      });
+      if (res.error) throw new Error(await getFunctionErrorMessage(res.error));
+      if (res.data?.error) throw new Error(res.data.error);
+      await logAudit("restore_user", user.id, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["user-audit-logs", user.id] });
+      toast.success("Compte restauré");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const hardDeleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await supabase.functions.invoke("admin-users", {
+        body: { action: "delete_user", userId: user.id, reason: deleteReason || "Hard-delete admin" },
+      });
+      if (res.error) throw new Error(await getFunctionErrorMessage(res.error));
+      if (res.data?.error) throw new Error(res.data.error);
+      await logAudit("delete_user", user.id, { reason: deleteReason || undefined });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      setShowHardDeleteConfirm(false);
+      setDeleteReason("");
+      setHardDeleteConfirmText("");
+      toast.success("Compte définitivement supprimé. L'email peut être réutilisé.");
+      onClose();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   // Add/Remove role
   const addRoleMutation = useMutation({
     mutationFn: async (role: AppRole) => {
@@ -439,6 +505,7 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
   const availableRoles = ALL_ROLES.filter(r => !user.roles.includes(r));
 
   const navigate = useNavigate();
+  const isSoftDeleted = Boolean(user.deleted_at) || Boolean(user.ban_reason?.startsWith("[SOFT_DELETE]"));
 
   // Guard for roles that require an entity to be linked (operator → delivery_operators,
   // forwarder → forwarders). Admin can confirm to assign anyway.
@@ -745,6 +812,99 @@ export function UserDetailDrawer({ user, onClose }: UserDetailDrawerProps) {
               {user.ban_reason && <p className="text-xs text-muted-foreground">{user.ban_reason}</p>}
             </div>
           )}
+
+          {/* Soft / Hard delete */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Suppression</h4>
+            {isSoftDeleted ? (
+              <>
+                <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl space-y-1">
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                    Archivé{user.deleted_at ? ` le ${format(new Date(user.deleted_at), "d MMM yyyy HH:mm", { locale: fr })}` : user.banned_at ? ` le ${format(new Date(user.banned_at), "d MMM yyyy HH:mm", { locale: fr })}` : ""}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">L'email reste réservé jusqu'au hard-delete.</p>
+                </div>
+                <button
+                  onClick={() => restoreMutation.mutate()}
+                  disabled={restoreMutation.isPending}
+                  className="w-full flex items-center gap-3 px-4 py-3 bg-emerald-500/5 rounded-xl hover:bg-emerald-500/10 transition-colors text-sm text-emerald-600"
+                >
+                  <ShieldCheck size={16} />
+                  <span className="flex-1 text-left">Restaurer le compte</span>
+                  {restoreMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <ChevronRight size={14} />}
+                </button>
+                <button
+                  onClick={() => setShowHardDeleteConfirm(true)}
+                  className="w-full flex items-center gap-3 px-4 py-3 bg-destructive/5 rounded-xl hover:bg-destructive/10 transition-colors text-sm text-destructive"
+                >
+                  <AlertTriangle size={16} />
+                  <span className="flex-1 text-left">Hard-delete (libère l'email)</span>
+                  <ChevronRight size={14} />
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setShowSoftDeleteConfirm(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-amber-500/5 rounded-xl hover:bg-amber-500/10 transition-colors text-sm text-amber-700 dark:text-amber-400"
+              >
+                <Ban size={16} />
+                <span className="flex-1 text-left">Soft-delete (archiver)</span>
+                <ChevronRight size={14} />
+              </button>
+            )}
+            {showSoftDeleteConfirm && (
+              <div className="p-4 border border-amber-500/30 rounded-xl bg-amber-500/5 space-y-3">
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Archiver ce compte ?</p>
+                <p className="text-xs text-muted-foreground">Session bloquée ; l'email n'est pas libéré.</p>
+                <textarea
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  placeholder="Motif (optionnel)..."
+                  className="w-full p-2.5 text-sm border border-border rounded-lg bg-background resize-none h-16"
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => setShowSoftDeleteConfirm(false)} className="flex-1 py-2 text-xs rounded-lg border border-border hover:bg-muted">Annuler</button>
+                  <button
+                    onClick={() => softDeleteMutation.mutate()}
+                    disabled={softDeleteMutation.isPending}
+                    className="flex-1 py-2 text-xs rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    {softDeleteMutation.isPending ? "..." : "Archiver"}
+                  </button>
+                </div>
+              </div>
+            )}
+            {showHardDeleteConfirm && (
+              <div className="p-4 border border-destructive/30 rounded-xl bg-destructive/5 space-y-3">
+                <p className="text-sm font-medium text-destructive">Suppression définitive</p>
+                <p className="text-xs text-muted-foreground">
+                  Irréversible. Tapez <span className="font-mono font-bold">SUPPRIMER</span> pour confirmer.
+                </p>
+                <textarea
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  placeholder="Motif..."
+                  className="w-full p-2.5 text-sm border border-border rounded-lg bg-background resize-none h-16"
+                />
+                <Input
+                  value={hardDeleteConfirmText}
+                  onChange={(e) => setHardDeleteConfirmText(e.target.value)}
+                  placeholder="SUPPRIMER"
+                  className="text-sm"
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => { setShowHardDeleteConfirm(false); setHardDeleteConfirmText(""); }} className="flex-1 py-2 text-xs rounded-lg border border-border hover:bg-muted">Annuler</button>
+                  <button
+                    onClick={() => hardDeleteMutation.mutate()}
+                    disabled={hardDeleteMutation.isPending || hardDeleteConfirmText !== "SUPPRIMER" || !deleteReason.trim()}
+                    className="flex-1 py-2 text-xs rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+                  >
+                    {hardDeleteMutation.isPending ? "..." : "Supprimer définitivement"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Warnings section */}
           <div className="space-y-3">

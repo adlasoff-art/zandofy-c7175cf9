@@ -8,6 +8,7 @@ import {
 import { DynamicShippingCalculator } from "@/components/DynamicShippingCalculator";
 import { DeliveryZonesManager } from "@/components/admin/DeliveryZonesManager";
 import { ForwarderProfilesAdminPanel } from "@/components/admin/forwarders/ForwarderProfilesAdminPanel";
+import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -911,7 +912,7 @@ const AdminShippingPage: React.FC = () => {
                       </div>
                       <span className="text-xs text-muted-foreground">
                         {z.zone_type === "country" ? "Pays" : z.zone_type === "city" ? "Ville" : "Région"}
-                        {z.country_code && ` · ${z.country_code}`}
+                        {z.country_code && ` · ${getCountryName(z.country_code)}`}
                         {z.city && ` · ${z.city}`}
                       </span>
                     </div>

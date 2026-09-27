@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapPin, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { getCountryName } from "@/components/vendor/CountryCombobox";
+import { useI18n } from "@/contexts/I18nContext";
 
 export interface GlobalFilters {
   country: string;
@@ -16,6 +18,7 @@ interface Props {
 export function DashboardGlobalFilters({ value, onChange }: Props) {
   const [countries, setCountries] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
+  const { locale } = useI18n();
 
   useEffect(() => {
     supabase.from("cities").select("country_code").then(({ data }) => {
@@ -50,7 +53,7 @@ export function DashboardGlobalFilters({ value, onChange }: Props) {
           <SelectContent>
             <SelectItem value="all">Tous les pays</SelectItem>
             {countries.map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
+              <SelectItem key={c} value={c}>{getCountryName(c, locale)}</SelectItem>
             ))}
           </SelectContent>
         </Select>

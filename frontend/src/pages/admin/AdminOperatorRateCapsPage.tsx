@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { GeoFieldsRow } from "@/components/address/GeoFieldsRow";
+import { getCountryName } from "@/components/vendor/CountryCombobox";
 import {
   Dialog,
   DialogContent,
@@ -230,7 +231,7 @@ export default function AdminOperatorRateCapsPage() {
                       <h3 className="font-semibold text-foreground">
                         {c.city}{" "}
                         <span className="text-xs text-muted-foreground font-normal">
-                          ({c.country_code})
+                          ({getCountryName(c.country_code)})
                         </span>
                       </h3>
                     </div>
@@ -389,7 +390,7 @@ export default function AdminOperatorRateCapsPage() {
             <DialogTitle>Supprimer ce plafond ?</DialogTitle>
             <DialogDescription>
               {confirmDelete &&
-                `Plafond pour ${confirmDelete.city} (${confirmDelete.country_code}). Les opérateurs pourront ensuite fixer librement leurs tarifs sur cette ville.`}
+                `Plafond pour ${confirmDelete.city} (${getCountryName(confirmDelete.country_code)}). Les opérateurs pourront ensuite fixer librement leurs tarifs sur cette ville.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

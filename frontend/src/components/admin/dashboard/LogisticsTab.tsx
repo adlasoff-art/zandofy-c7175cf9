@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, eachDayOfInterval } from "date-fns";
 import { fr } from "date-fns/locale";
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Ship, Truck, TrendingUp, Bike } from "lucide-react";
 import { PIE_COLORS, TOOLTIP_STYLE, KpiCardRow } from "./shared";
 import type { PeriodKey } from "./DashboardPeriodSelector";
@@ -21,7 +21,7 @@ export function LogisticsTab({ period, geoFilters }: Props) {
   const { data: deliveries = [] } = useQuery({
     queryKey: ["admin-log-deliveries", period, country, city],
     queryFn: async () => {
-      let q = (supabase as any).from("deliveries").select("delivery_date, status, address").gte("delivery_date", sinceDay);
+      let q = (supabase as any).from("deliveries").select("delivery_date, status, address, amount").gte("delivery_date", sinceDay);
       // Filter by address text if geo filters set
       if (city) q = q.ilike("address", `%${city}%`);
       else if (country) q = q.ilike("address", `%${country}%`);
@@ -33,8 +33,33 @@ export function LogisticsTab({ period, geoFilters }: Props) {
   const { data: shipments = [] } = useQuery({
     queryKey: ["admin-log-shipments", period],
     queryFn: async () => {
-      const { data } = await supabase.from("shipments").select("mode, status").gte("created_at", since);
-      return data ?? [];
+      // Hub shipper shipments (value column)
+      const { data: hub } = await supabase
+        .from("shipments")
+        .select("mode, status, value, created_at")
+        .gte("created_at", since);
+      const hubRows = (hub || []).map((s: any) => ({
+        mode: s.mode,
+        status: s.status,
+        value: Number(s.value || 0),
+        created_at: s.created_at,
+        source: "shipments" as const,
+      }));
+
+      // Marketplace forwarder assignments (quoted_price)
+      const { data: assignments } = await (supabase as any)
+        .from("shipment_assignments")
+        .select("mode, status, quoted_price, created_at")
+        .gte("created_at", since);
+      const fwdRows = (assignments || []).map((s: any) => ({
+        mode: s.mode || "air",
+        status: s.status || "assigned",
+        value: Number(s.quoted_price || 0),
+        created_at: s.created_at,
+        source: "assignment" as const,
+      }));
+
+      return [...hubRows, ...fwdRows];
     },
   });
 
@@ -62,17 +87,42 @@ export function LogisticsTab({ period, geoFilters }: Props) {
 
   const dailyDeliveries = (() => {
     const days = eachDayOfInterval({ start: sinceDate, end: new Date() });
-    const map: Record<string, { date: string; delivered: number; pending: number; inProgress: number }> = {};
+    const map: Record<string, { date: string; deliveredCount: number; deliveredAmount: number; pendingCount: number; pendingAmount: number; inProgressCount: number; inProgressAmount: number }> = {};
     days.forEach((d) => {
       const key = format(d, "yyyy-MM-dd");
-      map[key] = { date: format(d, days.length > 60 ? "d/MM" : "d MMM", { locale: fr }), delivered: 0, pending: 0, inProgress: 0 };
+      map[key] = { date: format(d, days.length > 60 ? "d/MM" : "d MMM", { locale: fr }), deliveredCount: 0, deliveredAmount: 0, pendingCount: 0, pendingAmount: 0, inProgressCount: 0, inProgressAmount: 0 };
     });
     deliveries.forEach((d: any) => {
       if (map[d.delivery_date]) {
-        if (d.status === "delivered") map[d.delivery_date].delivered++;
-        else if (d.status === "in_progress") map[d.delivery_date].inProgress++;
-        else map[d.delivery_date].pending++;
+        const status = d.status === "delivered" ? "delivered" : d.status === "in_progress" ? "inProgress" : "pending";
+        map[d.delivery_date][`${status}Count`]++;
+        map[d.delivery_date][`${status}Amount`] += Number(d.amount || 0);
       }
+    });
+    return Object.values(map);
+  })();
+
+  const dailyShipments = (() => {
+    const days = eachDayOfInterval({ start: sinceDate, end: new Date() });
+    const map: Record<string, { date: string; deliveredCount: number; deliveredAmount: number; pendingCount: number; pendingAmount: number; inProgressCount: number; inProgressAmount: number }> = {};
+    days.forEach((d) => {
+      const key = format(d, "yyyy-MM-dd");
+      map[key] = { date: format(d, days.length > 60 ? "d/MM" : "d MMM", { locale: fr }), deliveredCount: 0, deliveredAmount: 0, pendingCount: 0, pendingAmount: 0, inProgressCount: 0, inProgressAmount: 0 };
+    });
+    shipments.forEach((shipment: any) => {
+      const raw = shipment.created_at;
+      const key = typeof raw === "string" && raw.length >= 10
+        ? raw.slice(0, 10)
+        : format(new Date(raw), "yyyy-MM-dd");
+      if (!map[key]) return;
+      const st = shipment.status || "";
+      const status = st === "delivered"
+        ? "delivered"
+        : ["in_progress", "loading", "in_transit", "customs", "arrived", "picked_up"].includes(st)
+          ? "inProgress"
+          : "pending"; // assigned, pending, etc.
+      map[key][`${status}Count`]++;
+      map[key][`${status}Amount`] += Number(shipment.value || 0);
     });
     return Object.values(map);
   })();
@@ -118,22 +168,14 @@ export function LogisticsTab({ period, geoFilters }: Props) {
       )}
 
       <div className="bg-card border border-border rounded-xl p-4">
-        <h2 className="text-sm font-semibold text-foreground mb-4">Livraisons par jour</h2>
-        <div className="h-[250px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={dailyDeliveries} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} className="text-muted-foreground" interval={Math.max(0, Math.floor(dailyDeliveries.length / 15))} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} className="text-muted-foreground" />
-              <Tooltip contentStyle={TOOLTIP_STYLE} />
-              <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="delivered" name="Livrées" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} stackId="a" />
-              <Bar dataKey="inProgress" name="En cours" fill="hsl(40, 80%, 50%)" radius={[0, 0, 0, 0]} stackId="a" />
-              <Bar dataKey="pending" name="En attente" fill="hsl(210, 70%, 50%)" radius={[4, 4, 0, 0]} stackId="a" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <StatusAmountChart title="Livraisons par jour — volume et montant" data={dailyDeliveries} />
       </div>
+
+      {shipments.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-4">
+          <StatusAmountChart title="Expéditions par jour — volume et valeur" data={dailyShipments} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-card border border-border rounded-xl p-4">
@@ -171,5 +213,34 @@ export function LogisticsTab({ period, geoFilters }: Props) {
         )}
       </div>
     </div>
+  );
+}
+
+function StatusAmountChart({ title, data }: { title: string; data: any[] }) {
+  return (
+    <>
+      <h2 className="text-sm font-semibold text-foreground mb-4">{title}</h2>
+      <div className="h-[280px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={Math.max(0, Math.floor(data.length / 15))} />
+            <YAxis yAxisId="count" allowDecimals={false} tick={{ fontSize: 10 }} />
+            <YAxis yAxisId="amount" orientation="right" tick={{ fontSize: 10 }} />
+            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number, name: string, item: any) => [
+              String(item?.dataKey).endsWith("Amount") ? `$${Number(value).toLocaleString("fr-FR")}` : value,
+              name,
+            ]} />
+            <Legend iconType="circle" wrapperStyle={{ fontSize: 10 }} />
+            <Line yAxisId="count" dataKey="pendingCount" name="En attente (nb)" stroke="hsl(210, 70%, 50%)" dot={false} />
+            <Line yAxisId="amount" dataKey="pendingAmount" name="En attente ($)" stroke="hsl(210, 70%, 50%)" strokeDasharray="4 3" dot={false} />
+            <Line yAxisId="count" dataKey="inProgressCount" name="En cours (nb)" stroke="hsl(40, 80%, 50%)" dot={false} />
+            <Line yAxisId="amount" dataKey="inProgressAmount" name="En cours ($)" stroke="hsl(40, 80%, 50%)" strokeDasharray="4 3" dot={false} />
+            <Line yAxisId="count" dataKey="deliveredCount" name="Livrées (nb)" stroke="hsl(142, 70%, 40%)" dot={false} />
+            <Line yAxisId="amount" dataKey="deliveredAmount" name="Livrées ($)" stroke="hsl(142, 70%, 40%)" strokeDasharray="4 3" dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </>
   );
 }

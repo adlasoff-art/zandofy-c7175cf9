@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Loader2, MapPin, Check, Truck } from "lucide-react";
+import { getCountryName } from "@/components/vendor/CountryCombobox";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -189,7 +190,7 @@ export default function AdminCoverageRequestsPage() {
                             })}
                           </TableCell>
                           <TableCell className="text-xs">
-                            {r.city}, {r.country_code}
+                            {r.city}, {getCountryName(r.country_code)}
                             {r.commune && <> · {r.commune}</>}
                             {r.quartier && <> · {r.quartier}</>}
                           </TableCell>

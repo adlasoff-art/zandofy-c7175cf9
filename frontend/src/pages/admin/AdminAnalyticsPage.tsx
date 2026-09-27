@@ -15,6 +15,7 @@ import {
   CartesianGrid, Legend,
 } from "recharts";
 import { DiscoveryAnalyticsSection } from "@/components/admin/DiscoveryAnalyticsSection";
+import { getCountryName } from "@/components/vendor/CountryCombobox";
 
 const PERIODS = [
   { key: "1h", label: "1h", hours: 1 },
@@ -343,7 +344,7 @@ function OverviewTab({
           renderItem={(c, i) => (
             <div key={c.country} className="flex items-center gap-1.5">
               <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
-              <span className="text-[11px] text-foreground flex-1 truncate">{c.country}</span>
+              <span className="text-[11px] text-foreground flex-1 truncate">{getCountryName(c.country) || c.country}</span>
               <span className="text-[11px] font-medium text-foreground">{c.session_count} sessions</span>
             </div>
           )}
@@ -356,7 +357,7 @@ function OverviewTab({
           renderItem={(c, i) => (
             <div key={`${c.city}-${c.country}`} className="flex items-center gap-1.5">
               <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
-              <span className="text-[11px] text-foreground flex-1 truncate">{c.city} <span className="text-muted-foreground">({c.country})</span></span>
+              <span className="text-[11px] text-foreground flex-1 truncate">{c.city} <span className="text-muted-foreground">({getCountryName(c.country) || c.country})</span></span>
               <span className="text-[11px] font-medium text-foreground">{c.session_count} sessions</span>
             </div>
           )}
