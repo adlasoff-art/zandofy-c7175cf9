@@ -63,7 +63,7 @@ export function ClientsTab({ period, geoFilters }: Props) {
       (orders || []).forEach((o: any) => {
         if (!o.user_id) return;
         buyerIds.add(o.user_id);
-        spendByUser[o.user_id] = (spendByUser[o.user_id] || 0) + Number(o.total ?? o.subtotal || 0);
+        spendByUser[o.user_id] = (spendByUser[o.user_id] || 0) + Number(o.total ?? o.subtotal ?? 0);
       });
       const nameById: Record<string, string> = {};
       (profiles || []).forEach((p: any) => {
