@@ -150,6 +150,7 @@ export function AdminSidebar() {
   const location = useLocation();
   const { data: branding } = useBranding();
   const logoCandidates = [
+    "/brand/zandofy-logo.webp",
     branding?.header_logo_url,
     branding?.footer_logo_url,
     branding?.pwa_icon_192_url,
