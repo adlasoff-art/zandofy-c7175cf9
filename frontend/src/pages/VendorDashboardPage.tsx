@@ -173,22 +173,79 @@ export default function VendorDashboardPage() {
         setLoading(true);
       }
 
-      // Find all stores owned by user
-      const { data: storesData } = await (supabase as any)
-        .from("stores")
-        .select("id, name, logo_url, banner_url, country, country_code, city_id, default_commercial_scope, products_count, followers_count, whatsapp_number, is_whatsapp_enabled, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type")
-        .eq("owner_id", user!.id)
-        .order("created_at", { ascending: true });
+      const STORE_SELECT_FULL =
+        "id, name, logo_url, banner_url, country, country_code, city_id, default_commercial_scope, products_count, followers_count, whatsapp_number, is_whatsapp_enabled, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type";
+      // Without geo migration columns (default_commercial_scope)
+      const STORE_SELECT_SAFE =
+        "id, name, logo_url, banner_url, country, country_code, city_id, products_count, followers_count, whatsapp_number, is_whatsapp_enabled, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type";
+      // Absolute minimum — never treat schema drift as "no store"
+      const STORE_SELECT_MINIMAL =
+        "id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_platform_owned, shop_type";
 
-      if (!storesData || storesData.length === 0) {
+      const fetchOwned = async (cols: string) =>
+        (supabase as any)
+          .from("stores")
+          .select(cols)
+          .eq("owner_id", user!.id)
+          .order("created_at", { ascending: true });
+
+      let { data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_FULL);
+      if (storesErr) {
+        console.warn("[VendorDashboard] full select failed:", storesErr.message);
+        ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_SAFE));
+      }
+      if (storesErr) {
+        console.warn("[VendorDashboard] safe select failed:", storesErr.message);
+        ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_MINIMAL));
+      }
+
+      // Active collaborator stores (owners already included above)
+      let collabStores: any[] = [];
+      try {
+        const { data: collabRows } = await (supabase as any)
+          .from("store_collaborators")
+          .select("store_id")
+          .eq("user_id", user!.id)
+          .eq("status", "active");
+        const collabIds = (collabRows || [])
+          .map((r: any) => r.store_id)
+          .filter((id: string) => !(storesData || []).some((s: any) => s.id === id));
+        if (collabIds.length > 0) {
+          const tryCols = [STORE_SELECT_FULL, STORE_SELECT_SAFE, STORE_SELECT_MINIMAL];
+          for (const cols of tryCols) {
+            const collabRes = await (supabase as any)
+              .from("stores")
+              .select(cols)
+              .in("id", collabIds);
+            if (!collabRes.error) {
+              collabStores = collabRes.data || [];
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[VendorDashboard] collaborator stores", e);
+      }
+
+      const merged = [...(storesData || []), ...collabStores];
+
+      if (storesErr && merged.length === 0) {
+        console.error("[VendorDashboard] cannot load stores:", storesErr.message);
         setNoStore(true);
         setLoading(false);
         return;
       }
 
-      setAllStores(storesData);
+      if (merged.length === 0) {
+        setNoStore(true);
+        setLoading(false);
+        return;
+      }
+
+      setNoStore(false);
+      setAllStores(merged);
       // Use first store as default active store
-      const activeStore = storesData[0];
+      const activeStore = merged[0];
       setStore(activeStore);
       storeIdForRealtime = activeStore.id;
 
@@ -1078,7 +1135,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
       {!settingsBlocked && (
         <VendorCommercialScopePanel
           storeId={store.id}
-          initialScope={(store as any).default_commercial_scope}
+          initialScope={(store as any).default_commercial_scope || "country"}
           storeCountryCode={(store as any).country_code || store.country}
         />
       )}

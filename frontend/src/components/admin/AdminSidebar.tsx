@@ -149,14 +149,20 @@ export function AdminSidebar() {
   const { user } = useAuth();
   const location = useLocation();
   const { data: branding } = useBranding();
-  const logoUrl = branding?.header_logo_url || branding?.footer_logo_url || null;
-  const [logoFailed, setLogoFailed] = useState(false);
+  const logoCandidates = [
+    branding?.header_logo_url,
+    branding?.footer_logo_url,
+    branding?.pwa_icon_192_url,
+    "/icons/icon-192.png",
+  ].filter((u): u is string => Boolean(u?.trim()));
+  const [logoIndex, setLogoIndex] = useState(0);
+  const logoUrl = logoCandidates[logoIndex] ?? null;
 
   useEffect(() => {
-    setLogoFailed(false);
-  }, [logoUrl]);
+    setLogoIndex(0);
+  }, [branding?.header_logo_url, branding?.footer_logo_url, branding?.pwa_icon_192_url]);
 
-  const showLogo = Boolean(logoUrl) && !logoFailed;
+  const showLogo = Boolean(logoUrl) && logoIndex < logoCandidates.length;
 
   const { data: profile } = useQuery({
     queryKey: ["admin-sidebar-profile", user?.id],
@@ -230,7 +236,7 @@ export function AdminSidebar() {
                 src={logoUrl!}
                 alt="Zandofy"
                 className="w-full h-full object-contain p-0.5"
-                onError={() => setLogoFailed(true)}
+                onError={() => setLogoIndex((i) => i + 1)}
               />
             ) : (
               <span className="text-primary-foreground font-bold text-sm">Z</span>
