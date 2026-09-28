@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { CSSProperties } from "react";
 import { useBranding } from "@/hooks/use-branding";
@@ -11,29 +11,44 @@ interface BrandLogoProps {
   className?: string;
 }
 
+/** Static fallbacks when CMS image URL is missing or broken (order matters). */
+const STATIC_LOGO_FALLBACKS = ["/icons/icon-192.png", "/favicon.ico"] as const;
+
 export function BrandLogo({
   variant = "header",
   size,
   className = "",
 }: BrandLogoProps) {
   const { data: branding } = useBranding();
-  const [logoFailed, setLogoFailed] = useState(false);
+  const [fallbackIndex, setFallbackIndex] = useState(0);
+
   const resolvedSize = size ?? (variant === "footer" ? "footer" : "header");
 
-  const logoUrlRaw =
+  const cmsUrlRaw =
     variant === "footer"
       ? branding?.footer_logo_url || branding?.header_logo_url
-      : branding?.header_logo_url;
-  const logoUrl = logoUrlRaw?.trim() || null;
+      : branding?.header_logo_url || branding?.footer_logo_url;
+  const cmsUrl = cmsUrlRaw?.trim() || null;
+  const pwaUrl = branding?.pwa_icon_192_url?.trim() || null;
 
-  // If an image URL is configured but mode stayed at default "text", treat as logo+text
-  // so CMS uploads are visible without forcing admins to flip logo_mode manually.
   const rawMode = branding?.logo_mode || "text";
-  const mode = logoUrl && rawMode === "text" ? "logo_and_text" : rawMode;
+  // CMS URL present but mode still "text" → show image (common CMS pitfall)
+  const mode = cmsUrl && rawMode === "text" ? "logo_and_text" : rawMode;
+  const wantsImage = mode === "logo_only" || mode === "logo_and_text";
+
+  const candidates = useMemo(() => {
+    if (!wantsImage && !cmsUrl) return [] as string[];
+    return [cmsUrl, pwaUrl, ...STATIC_LOGO_FALLBACKS].filter(
+      (u): u is string => Boolean(u),
+    );
+  }, [wantsImage, cmsUrl, pwaUrl]);
+
+  const logoUrl = candidates[Math.min(fallbackIndex, Math.max(candidates.length - 1, 0))] ?? null;
+  const showLogo = Boolean(logoUrl) && fallbackIndex < candidates.length;
 
   useEffect(() => {
-    setLogoFailed(false);
-  }, [logoUrl]);
+    setFallbackIndex(0);
+  }, [cmsUrl, pwaUrl, mode]);
 
   const textStyle =
     resolvedSize === "footer"
@@ -52,13 +67,16 @@ export function BrandLogo({
   const ratio =
     Number((branding as { logo_aspect_ratio?: number } | null)?.logo_aspect_ratio) > 0
       ? Number((branding as { logo_aspect_ratio?: number }).logo_aspect_ratio)
-      : 3.5;
-  const imgWidth = Math.round(imgHeight * ratio);
-  const wrapperStyle: CSSProperties = { aspectRatio: String(ratio) };
+      : 1;
+  const imgWidth = Math.round(imgHeight * Math.max(ratio, 1));
+  const wrapperStyle: CSSProperties =
+    ratio > 1.2 ? { aspectRatio: String(ratio) } : undefined;
   const linkHeightClass =
     resolvedSize === "footer" ? "h-7" : resolvedSize === "hero" ? "h-10 md:h-12" : "h-8 md:h-10";
 
-  const showLogo = Boolean(logoUrl) && !logoFailed;
+  const onImgError = () => {
+    setFallbackIndex((i) => i + 1);
+  };
 
   const textOnlyFooter = (
     <span className={`${textStyle} ${className}`} style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 400 }}>
@@ -90,7 +108,7 @@ export function BrandLogo({
           height={imgHeight}
           className={imgClass}
           fetchPriority="high"
-          onError={() => setLogoFailed(true)}
+          onError={onImgError}
         />
       </Link>
     );
@@ -106,7 +124,7 @@ export function BrandLogo({
           height={imgHeight}
           className={imgClass}
           fetchPriority="high"
-          onError={() => setLogoFailed(true)}
+          onError={onImgError}
         />
         <span
           className={textStyle}
