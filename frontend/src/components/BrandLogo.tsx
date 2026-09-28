@@ -37,18 +37,31 @@ export function BrandLogo({
   const wantsImage = mode === "logo_only" || mode === "logo_and_text";
 
   const candidates = useMemo(() => {
+    // Prefer CMS / PWA / static icons whenever an image mode is requested OR a CMS URL exists.
+    // If mode is intentional "text" with no CMS URL, stay text-only (no forced PWA badge).
     if (!wantsImage && !cmsUrl) return [] as string[];
-    return [cmsUrl, pwaUrl, ...STATIC_LOGO_FALLBACKS].filter(
+    const list = [cmsUrl, pwaUrl, ...STATIC_LOGO_FALLBACKS].filter(
       (u): u is string => Boolean(u),
     );
+    return [...new Set(list)];
   }, [wantsImage, cmsUrl, pwaUrl]);
 
-  const logoUrl = candidates[Math.min(fallbackIndex, Math.max(candidates.length - 1, 0))] ?? null;
+  const logoUrl =
+    candidates.length === 0
+      ? null
+      : candidates[Math.min(fallbackIndex, candidates.length - 1)] ?? null;
   const showLogo = Boolean(logoUrl) && fallbackIndex < candidates.length;
 
   useEffect(() => {
     setFallbackIndex(0);
   }, [cmsUrl, pwaUrl, mode]);
+
+  const onImgError = () => {
+    setFallbackIndex((i) => {
+      if (i + 1 >= candidates.length) return candidates.length;
+      return i + 1;
+    });
+  };
 
   const textStyle =
     resolvedSize === "footer"
@@ -73,10 +86,6 @@ export function BrandLogo({
     ratio > 1.2 ? { aspectRatio: String(ratio) } : undefined;
   const linkHeightClass =
     resolvedSize === "footer" ? "h-7" : resolvedSize === "hero" ? "h-10 md:h-12" : "h-8 md:h-10";
-
-  const onImgError = () => {
-    setFallbackIndex((i) => i + 1);
-  };
 
   const textOnlyFooter = (
     <span className={`${textStyle} ${className}`} style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 400 }}>

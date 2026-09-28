@@ -175,9 +175,12 @@ export default function VendorDashboardPage() {
 
       const STORE_SELECT_FULL =
         "id, name, logo_url, banner_url, country, country_code, city_id, default_commercial_scope, products_count, followers_count, whatsapp_number, is_whatsapp_enabled, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type";
-      // Without geo migration columns (default_commercial_scope) — never treat as "no store"
+      // Without geo migration columns (default_commercial_scope)
       const STORE_SELECT_SAFE =
         "id, name, logo_url, banner_url, country, country_code, city_id, products_count, followers_count, whatsapp_number, is_whatsapp_enabled, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type";
+      // Absolute minimum — never treat schema drift as "no store"
+      const STORE_SELECT_MINIMAL =
+        "id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_platform_owned, shop_type";
 
       const fetchOwned = async (cols: string) =>
         (supabase as any)
@@ -188,8 +191,12 @@ export default function VendorDashboardPage() {
 
       let { data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_FULL);
       if (storesErr) {
-        console.warn("[VendorDashboard] store select failed, retrying safe columns:", storesErr.message);
+        console.warn("[VendorDashboard] full select failed:", storesErr.message);
         ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_SAFE));
+      }
+      if (storesErr) {
+        console.warn("[VendorDashboard] safe select failed:", storesErr.message);
+        ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_MINIMAL));
       }
 
       // Active collaborator stores (owners already included above)
@@ -204,17 +211,17 @@ export default function VendorDashboardPage() {
           .map((r: any) => r.store_id)
           .filter((id: string) => !(storesData || []).some((s: any) => s.id === id));
         if (collabIds.length > 0) {
-          let collabRes = await (supabase as any)
-            .from("stores")
-            .select(STORE_SELECT_FULL)
-            .in("id", collabIds);
-          if (collabRes.error) {
-            collabRes = await (supabase as any)
+          const tryCols = [STORE_SELECT_FULL, STORE_SELECT_SAFE, STORE_SELECT_MINIMAL];
+          for (const cols of tryCols) {
+            const collabRes = await (supabase as any)
               .from("stores")
-              .select(STORE_SELECT_SAFE)
+              .select(cols)
               .in("id", collabIds);
+            if (!collabRes.error) {
+              collabStores = collabRes.data || [];
+              break;
+            }
           }
-          collabStores = collabRes.data || [];
         }
       } catch (e) {
         console.warn("[VendorDashboard] collaborator stores", e);
@@ -1128,7 +1135,7 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
       {!settingsBlocked && (
         <VendorCommercialScopePanel
           storeId={store.id}
-          initialScope={(store as any).default_commercial_scope}
+          initialScope={(store as any).default_commercial_scope || "country"}
           storeCountryCode={(store as any).country_code || store.country}
         />
       )}
