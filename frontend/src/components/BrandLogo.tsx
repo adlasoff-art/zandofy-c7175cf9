@@ -11,9 +11,12 @@ interface BrandLogoProps {
   className?: string;
 }
 
-/** Static fallbacks when CMS image URL is missing or broken (order matters). */
-const STATIC_LOGO_FALLBACKS = ["/icons/icon-192.png", "/favicon.ico"] as const;
+/** Shipped brand mark (green Z / bag on black). */
+export const DEFAULT_BRAND_LOGO = "/brand/zandofy-logo.webp";
 
+/**
+ * Site brand mark: shipped Zandofy Z logo (priority), then CMS URL if static fails.
+ */
 export function BrandLogo({
   variant = "header",
   size,
@@ -21,30 +24,21 @@ export function BrandLogo({
 }: BrandLogoProps) {
   const { data: branding } = useBranding();
   const [fallbackIndex, setFallbackIndex] = useState(0);
-
   const resolvedSize = size ?? (variant === "footer" ? "footer" : "header");
 
   const cmsUrlRaw =
     variant === "footer"
       ? branding?.footer_logo_url || branding?.header_logo_url
-      : branding?.header_logo_url || branding?.footer_logo_url;
+      : branding?.header_logo_url;
   const cmsUrl = cmsUrlRaw?.trim() || null;
-  const pwaUrl = branding?.pwa_icon_192_url?.trim() || null;
-
-  const rawMode = branding?.logo_mode || "text";
-  // CMS URL present but mode still "text" → show image (common CMS pitfall)
-  const mode = cmsUrl && rawMode === "text" ? "logo_and_text" : rawMode;
-  const wantsImage = mode === "logo_only" || mode === "logo_and_text";
 
   const candidates = useMemo(() => {
-    // Prefer CMS / PWA / static icons whenever an image mode is requested OR a CMS URL exists.
-    // If mode is intentional "text" with no CMS URL, stay text-only (no forced PWA badge).
-    if (!wantsImage && !cmsUrl) return [] as string[];
-    const list = [cmsUrl, pwaUrl, ...STATIC_LOGO_FALLBACKS].filter(
+    // Shipped Z mark first so a stale CMS/PWA URL cannot replace the brand.
+    const list = [DEFAULT_BRAND_LOGO, cmsUrl].filter(
       (u): u is string => Boolean(u),
     );
     return [...new Set(list)];
-  }, [wantsImage, cmsUrl, pwaUrl]);
+  }, [cmsUrl]);
 
   const logoUrl =
     candidates.length === 0
@@ -52,9 +46,18 @@ export function BrandLogo({
       : candidates[Math.min(fallbackIndex, candidates.length - 1)] ?? null;
   const showLogo = Boolean(logoUrl) && fallbackIndex < candidates.length;
 
+  const rawMode = branding?.logo_mode || "logo_and_text";
+  // Ensure the mark is visible even if CMS still says "text"
+  const mode =
+    showLogo && (rawMode === "text" || !rawMode)
+      ? "logo_and_text"
+      : rawMode === "logo_only"
+        ? "logo_only"
+        : "logo_and_text";
+
   useEffect(() => {
     setFallbackIndex(0);
-  }, [cmsUrl, pwaUrl, mode]);
+  }, [cmsUrl]);
 
   const onImgError = () => {
     setFallbackIndex((i) => {
@@ -72,20 +75,15 @@ export function BrandLogo({
 
   const imgClass =
     resolvedSize === "footer"
-      ? "h-7 w-auto max-w-[160px] object-contain"
+      ? "h-7 w-7 object-contain rounded-sm"
       : resolvedSize === "hero"
-        ? "h-10 md:h-12 w-auto max-w-[220px] object-contain"
-        : "h-8 md:h-10 w-auto max-w-[180px] object-contain";
+        ? "h-10 md:h-12 w-10 md:w-12 object-contain rounded-sm"
+        : "h-8 md:h-10 w-8 md:w-10 object-contain rounded-sm";
   const imgHeight = resolvedSize === "footer" ? 28 : resolvedSize === "hero" ? 48 : 40;
-  const ratio =
-    Number((branding as { logo_aspect_ratio?: number } | null)?.logo_aspect_ratio) > 0
-      ? Number((branding as { logo_aspect_ratio?: number }).logo_aspect_ratio)
-      : 1;
-  const imgWidth = Math.round(imgHeight * Math.max(ratio, 1));
-  const wrapperStyle: CSSProperties =
-    ratio > 1.2 ? { aspectRatio: String(ratio) } : undefined;
+  const imgWidth = imgHeight;
   const linkHeightClass =
     resolvedSize === "footer" ? "h-7" : resolvedSize === "hero" ? "h-10 md:h-12" : "h-8 md:h-10";
+  const wrapperStyle: CSSProperties | undefined = undefined;
 
   const textOnlyFooter = (
     <span className={`${textStyle} ${className}`} style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 400 }}>
