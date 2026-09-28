@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { CSSProperties } from "react";
 import { useBranding } from "@/hooks/use-branding";
@@ -11,57 +11,33 @@ interface BrandLogoProps {
   className?: string;
 }
 
-/** Static fallbacks when CMS image URL is missing or broken (order matters). */
-const STATIC_LOGO_FALLBACKS = ["/icons/icon-192.png", "/favicon.ico"] as const;
-
+/**
+ * Site brand mark from CMS (`header_logo_url` / `footer_logo_url`).
+ * On broken CMS image → text "Zandofy" (never substitute PWA/app icon — different asset).
+ */
 export function BrandLogo({
   variant = "header",
   size,
   className = "",
 }: BrandLogoProps) {
   const { data: branding } = useBranding();
-  const [fallbackIndex, setFallbackIndex] = useState(0);
-
+  const [logoFailed, setLogoFailed] = useState(false);
   const resolvedSize = size ?? (variant === "footer" ? "footer" : "header");
 
-  const cmsUrlRaw =
+  // Header uses header URL only; footer may fall back to header (same mark).
+  const logoUrlRaw =
     variant === "footer"
       ? branding?.footer_logo_url || branding?.header_logo_url
-      : branding?.header_logo_url || branding?.footer_logo_url;
-  const cmsUrl = cmsUrlRaw?.trim() || null;
-  const pwaUrl = branding?.pwa_icon_192_url?.trim() || null;
+      : branding?.header_logo_url;
+  const logoUrl = logoUrlRaw?.trim() || null;
 
-  const rawMode = branding?.logo_mode || "text";
   // CMS URL present but mode still "text" → show image (common CMS pitfall)
-  const mode = cmsUrl && rawMode === "text" ? "logo_and_text" : rawMode;
-  const wantsImage = mode === "logo_only" || mode === "logo_and_text";
-
-  const candidates = useMemo(() => {
-    // Prefer CMS / PWA / static icons whenever an image mode is requested OR a CMS URL exists.
-    // If mode is intentional "text" with no CMS URL, stay text-only (no forced PWA badge).
-    if (!wantsImage && !cmsUrl) return [] as string[];
-    const list = [cmsUrl, pwaUrl, ...STATIC_LOGO_FALLBACKS].filter(
-      (u): u is string => Boolean(u),
-    );
-    return [...new Set(list)];
-  }, [wantsImage, cmsUrl, pwaUrl]);
-
-  const logoUrl =
-    candidates.length === 0
-      ? null
-      : candidates[Math.min(fallbackIndex, candidates.length - 1)] ?? null;
-  const showLogo = Boolean(logoUrl) && fallbackIndex < candidates.length;
+  const rawMode = branding?.logo_mode || "text";
+  const mode = logoUrl && rawMode === "text" ? "logo_and_text" : rawMode;
 
   useEffect(() => {
-    setFallbackIndex(0);
-  }, [cmsUrl, pwaUrl, mode]);
-
-  const onImgError = () => {
-    setFallbackIndex((i) => {
-      if (i + 1 >= candidates.length) return candidates.length;
-      return i + 1;
-    });
-  };
+    setLogoFailed(false);
+  }, [logoUrl]);
 
   const textStyle =
     resolvedSize === "footer"
@@ -80,12 +56,13 @@ export function BrandLogo({
   const ratio =
     Number((branding as { logo_aspect_ratio?: number } | null)?.logo_aspect_ratio) > 0
       ? Number((branding as { logo_aspect_ratio?: number }).logo_aspect_ratio)
-      : 1;
-  const imgWidth = Math.round(imgHeight * Math.max(ratio, 1));
-  const wrapperStyle: CSSProperties =
-    ratio > 1.2 ? { aspectRatio: String(ratio) } : undefined;
+      : 3.5;
+  const imgWidth = Math.round(imgHeight * ratio);
+  const wrapperStyle: CSSProperties = { aspectRatio: String(ratio) };
   const linkHeightClass =
     resolvedSize === "footer" ? "h-7" : resolvedSize === "hero" ? "h-10 md:h-12" : "h-8 md:h-10";
+
+  const showLogo = Boolean(logoUrl) && !logoFailed;
 
   const textOnlyFooter = (
     <span className={`${textStyle} ${className}`} style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 400 }}>
@@ -117,7 +94,7 @@ export function BrandLogo({
           height={imgHeight}
           className={imgClass}
           fetchPriority="high"
-          onError={onImgError}
+          onError={() => setLogoFailed(true)}
         />
       </Link>
     );
@@ -133,7 +110,7 @@ export function BrandLogo({
           height={imgHeight}
           className={imgClass}
           fetchPriority="high"
-          onError={onImgError}
+          onError={() => setLogoFailed(true)}
         />
         <span
           className={textStyle}
