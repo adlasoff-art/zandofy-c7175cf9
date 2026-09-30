@@ -57,17 +57,24 @@ function isAllowedProductMediaUrl(url: string, existingUrls?: Set<string>): bool
   }
 }
 
-/** Hard gate before first submit / re-approval: store identity must be complete. */
+/**
+ * Hard gate before first submit / re-approval: store identity must be complete.
+ * Platform-owned / claimed stores (`is_platform_owned`) are exempt — identity is managed by ops.
+ */
 async function assertStoreIdentityReady(
   storeId: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { data, error } = await (supabase as any)
     .from("stores")
-    .select("logo_url, banner_url, country, country_code, whatsapp_number")
+    .select("logo_url, banner_url, country, country_code, whatsapp_number, is_platform_owned")
     .eq("id", storeId)
     .maybeSingle();
   if (error || !data) {
     return { ok: false, message: "Impossible de vérifier l’identité boutique. Réessayez." };
+  }
+  // Boutiques plateforme (réclamées / opérées) : pas de contrainte identité vendeur.
+  if (data.is_platform_owned === true) {
+    return { ok: true };
   }
   const missing: string[] = [];
   if (!data.logo_url) missing.push("logo");
