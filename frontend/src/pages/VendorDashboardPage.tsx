@@ -375,7 +375,7 @@ export default function VendorDashboardPage() {
 
   const renderTabContent = () => (
     <>
-      {store?.id && (
+      {store?.id && !store.is_platform_owned && (
         <VendorOnboardingChecklist
           storeId={store.id}
           productCount={undefined}
