@@ -59,28 +59,53 @@ function isAllowedProductMediaUrl(url: string, existingUrls?: Set<string>): bool
 
 /**
  * Hard gate before first submit / re-approval: store identity must be complete.
- * Platform-owned / claimed stores (`is_platform_owned`) are exempt — identity is managed by ops.
+ * Platform-owned / claimed stores are exempt (ops-managed identity).
+ *
+ * Resilience: trust `knownPlatformOwned` from dashboard, then `stores`, then
+ * `stores_public` (collaborators may lack SELECT on base `stores`).
  */
 async function assertStoreIdentityReady(
   storeId: string,
+  opts?: { knownPlatformOwned?: boolean },
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (opts?.knownPlatformOwned === true) {
+    return { ok: true };
+  }
+
   const { data, error } = await (supabase as any)
     .from("stores")
     .select("logo_url, banner_url, country, country_code, whatsapp_number, is_platform_owned")
     .eq("id", storeId)
     .maybeSingle();
-  if (error || !data) {
+
+  let row = !error && data ? data : null;
+
+  if (!row) {
+    // Public catalog view is readable by team/anon and includes is_platform_owned.
+    const { data: pub } = await (supabase as any)
+      .from("stores_public")
+      .select("logo_url, banner_url, country, is_platform_owned")
+      .eq("id", storeId)
+      .maybeSingle();
+    if (pub) row = pub;
+  }
+
+  if (!row) {
     return { ok: false, message: "Impossible de vérifier l’identité boutique. Réessayez." };
   }
-  // Boutiques plateforme (réclamées / opérées) : pas de contrainte identité vendeur.
-  if (data.is_platform_owned === true) {
+
+  if (row.is_platform_owned === true) {
     return { ok: true };
   }
+
   const missing: string[] = [];
-  if (!data.logo_url) missing.push("logo");
-  if (!data.banner_url) missing.push("bannière");
-  if (!(data.country_code || data.country)) missing.push("pays");
-  if (!String(data.whatsapp_number || "").trim()) missing.push("WhatsApp business");
+  if (!row.logo_url) missing.push("logo");
+  if (!row.banner_url) missing.push("bannière");
+  if (!(row.country_code || row.country)) missing.push("pays");
+  // whatsapp_number is not on stores_public — only enforce when present on the row
+  if ("whatsapp_number" in row && !String(row.whatsapp_number || "").trim()) {
+    missing.push("WhatsApp business");
+  }
   if (missing.length === 0) return { ok: true };
   return {
     ok: false,
@@ -720,7 +745,9 @@ export function VendorProductManager({
     const wasPublished = editing?.publish_status === "published";
 
     if (wasPublished) {
-      const identity = await assertStoreIdentityReady(storeId);
+      const identity = await assertStoreIdentityReady(storeId, {
+        knownPlatformOwned: isPlatformOwned,
+      });
       if (!identity.ok) {
         toast.error(identity.message);
         setSaving(false);
@@ -1077,7 +1104,9 @@ export function VendorProductManager({
       return;
     }
 
-    const identity = await assertStoreIdentityReady(storeId);
+    const identity = await assertStoreIdentityReady(storeId, {
+      knownPlatformOwned: isPlatformOwned,
+    });
     if (!identity.ok) {
       toast.error(identity.message);
       return;
