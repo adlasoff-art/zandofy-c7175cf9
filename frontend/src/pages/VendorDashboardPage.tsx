@@ -217,9 +217,21 @@ export default function VendorDashboardPage() {
               .from("stores")
               .select(cols)
               .in("id", collabIds);
-            if (!collabRes.error) {
+            if (!collabRes.error && (collabRes.data || []).length > 0) {
               collabStores = collabRes.data || [];
               break;
+            }
+          }
+          // RLS may deny base `stores` to collaborators — public view still has is_platform_owned
+          if (collabStores.length === 0) {
+            const pubRes = await (supabase as any)
+              .from("stores_public")
+              .select(
+                "id, name, logo_url, banner_url, country, is_platform_owned, products_count, followers_count, shop_type",
+              )
+              .in("id", collabIds);
+            if (!pubRes.error) {
+              collabStores = pubRes.data || [];
             }
           }
         }
