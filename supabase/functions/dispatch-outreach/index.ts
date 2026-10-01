@@ -1,6 +1,6 @@
 /**
  * dispatch-outreach — send a utility template via email / push / in_app / whatsapp_cloud.
- * Auth: admin|manager JWT, or service_role (Authorization Bearer service key).
+ * Auth: admin|manager JWT, or exact service_role Bearer.
  * wa.me is NEVER sent here (manual admin UI only).
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -13,18 +13,40 @@ import {
   type UtilityTemplateRow,
 } from "../_shared/outreach.ts";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_HEADERS =
+  "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowed = [
+    "https://studio.zandofy.com",
+    "https://zandofy.com",
+    "https://www.zandofy.com",
+  ];
+  const isAllowed =
+    allowed.includes(origin) ||
+    origin.endsWith(".lovable.app") ||
+    origin.endsWith(".lovableproject.com") ||
+    origin.startsWith("http://localhost");
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowed[0],
+    "Access-Control-Allow-Headers": ALLOWED_HEADERS,
+  };
+}
 
 const DEFAULT_CTA = "https://www.zandofy.com";
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: CORS_HEADERS });
+    return new Response(null, { headers: corsHeaders });
   }
+
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -35,9 +57,7 @@ Deno.serve(async (req) => {
     const svc = createClient(supabaseUrl, serviceKey);
 
     let actorAdminId: string | null = null;
-    const isService =
-      authHeader === `Bearer ${serviceKey}` ||
-      authHeader.includes(serviceKey.slice(0, 20));
+    const isService = authHeader === `Bearer ${serviceKey}`;
 
     if (!isService) {
       if (!authHeader.startsWith("Bearer ")) {
@@ -77,7 +97,10 @@ Deno.serve(async (req) => {
       }, 400);
     }
 
-    let templateQuery = svc.from("utility_message_templates").select("*").eq("is_active", true);
+    let templateQuery = svc
+      .from("utility_message_templates")
+      .select("*")
+      .eq("is_active", true);
     if (templateId) templateQuery = templateQuery.eq("id", templateId);
     else if (templateSlug) templateQuery = templateQuery.eq("slug", templateSlug);
     else return json({ error: "template_id or template_slug required" }, 400);
@@ -111,7 +134,6 @@ Deno.serve(async (req) => {
       ...varsIn,
     };
 
-    // Fallback: no email → push/in_app only
     let effectiveChannel = channel;
     if (channel === "email" && !profile.email) {
       effectiveChannel = "push";
@@ -145,7 +167,9 @@ Deno.serve(async (req) => {
 
     if (effectiveChannel === "push" || effectiveChannel === "in_app") {
       const title = interpolateOutreach(
-        effectiveChannel === "in_app" ? t.in_app_title || t.push_title : t.push_title || t.in_app_title,
+        effectiveChannel === "in_app"
+          ? t.in_app_title || t.push_title
+          : t.push_title || t.in_app_title,
         vars,
       );
       const message = interpolateOutreach(
@@ -166,31 +190,44 @@ Deno.serve(async (req) => {
         return json({ ok: false, reason: "missing_content" });
       }
 
-      await svc.from("notifications").insert({
-        user_id: userId,
-        title,
-        message,
-        type: "promo",
-      });
-
-      // Best-effort web push
+      // Single path: push-notifications?action=send-push does in-app + web push
       try {
-        await fetch(`${supabaseUrl}/functions/v1/push-notifications`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${serviceKey}`,
-            apikey: serviceKey,
-            "Content-Type": "application/json",
+        const pushRes = await fetch(
+          `${supabaseUrl}/functions/v1/push-notifications?action=send-push`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${serviceKey}`,
+              apikey: serviceKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              userIds: [userId],
+              title,
+              body: message,
+              url: vars.cta_url || "/",
+            }),
           },
-          body: JSON.stringify({
-            user_ids: [userId],
+        );
+        if (!pushRes.ok) {
+          // Fallback: in-app only if push function rejects
+          await svc.from("notifications").insert({
+            user_id: userId,
             title,
-            body: message,
-            url: vars.cta_url || "/",
-          }),
-        });
+            message,
+            type: "promo",
+            link: vars.cta_url || null,
+          });
+        }
       } catch (e) {
         console.warn("[dispatch-outreach] push invoke", e);
+        await svc.from("notifications").insert({
+          user_id: userId,
+          title,
+          message,
+          type: "promo",
+          link: vars.cta_url || null,
+        });
       }
 
       await logOutreach(svc, {
@@ -219,16 +256,25 @@ Deno.serve(async (req) => {
 
       const cfg = await loadOutreachConfig(svc);
       const enabledEnv = Deno.env.get("WHATSAPP_CLOUD_ENABLED") === "true";
-      if (!cfg.whatsapp_cloud_enabled && !enabledEnv) {
+      // Both flags must allow send (defense in depth)
+      if (!cfg.whatsapp_cloud_enabled || !enabledEnv) {
         await logOutreach(svc, {
           user_id: userId,
           template_id: t.id,
           channel: "whatsapp_cloud",
           status: "disabled",
           actor_admin_id: actorAdminId,
-          meta: { reason: "cloud_disabled" },
+          meta: {
+            reason: "cloud_disabled",
+            settings_flag: cfg.whatsapp_cloud_enabled,
+            env_flag: enabledEnv,
+          },
         });
         return json({ ok: false, reason: "cloud_disabled" });
+      }
+
+      if (!t.whatsapp_cloud_template_name) {
+        return json({ ok: false, reason: "missing_cloud_template_name" }, 400);
       }
 
       const res = await fetch(`${supabaseUrl}/functions/v1/whatsapp-cloud-send`, {
@@ -258,10 +304,3 @@ Deno.serve(async (req) => {
     return json({ error: (err as Error).message }, 500);
   }
 });
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-  });
-}

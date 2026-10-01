@@ -82,7 +82,8 @@ export function isWithinSendWindow(
       hour: "numeric",
       hour12: false,
     }).format(now);
-    const hour = Number(hourStr);
+    // Some ICU builds return "24" for midnight — normalize to 0–23
+    const hour = Number(hourStr) % 24;
     if (!Number.isFinite(hour)) return true;
     const start = cfg.start_hour;
     const end = cfg.end_hour;

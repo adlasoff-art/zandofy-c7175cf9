@@ -43,6 +43,20 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Optional hardening: if AUTOMATION_CRON_SECRET is set, require matching Bearer/x-cron-secret.
+    // Cron today uses anon JWT — leave secret unset until cron headers are updated.
+    const cronSecret = Deno.env.get("AUTOMATION_CRON_SECRET");
+    if (cronSecret) {
+      const auth = req.headers.get("Authorization") || "";
+      const headerSecret = req.headers.get("x-cron-secret") || "";
+      const ok =
+        auth === `Bearer ${cronSecret}` ||
+        headerSecret === cronSecret;
+      if (!ok) {
+        return jsonResponse({ error: "Unauthorized" }, 401);
+      }
+    }
+
     const { createClient } = await import("npm:@supabase/supabase-js@2");
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -103,32 +117,28 @@ Deno.serve(async (req) => {
 
         for (const userId of eligibleUserIds) {
           let sentSomething = false;
+          let emailOk = false;
 
+          // Email channel (independent of push for push_email / all)
           if (wantsEmail && emailSubject && emailHtml) {
-            const ok = await sendEmailResolved(supabase, userId, {
+            emailOk = await sendEmailResolved(supabase, userId, {
               subject: emailSubject,
               html: emailHtml,
               templateId: template?.id ?? null,
             });
-            if (ok) {
+            if (emailOk) {
               summary.emails_sent++;
               sentSomething = true;
-            } else if (wantsPush && pushTitle && pushBody) {
-              // Fallback no-email → push (plan)
-              const okPush = await sendPushResolved(supabase, userId, {
-                title: pushTitle,
-                body: pushBody,
-                url: wf.popup_cta_link || "/",
-                templateId: template?.id ?? null,
-              });
-              if (okPush) {
-                summary.pushes_sent++;
-                sentSomething = true;
-              }
             }
           }
 
-          if (!sentSomething && wantsPush && pushTitle && pushBody) {
+          // Push: always for push / popup_push / push_email / all (restore dual-channel)
+          // Also fallback when email-only failed (no address / Resend error)
+          const shouldPush =
+            (wantsPush && !!pushTitle && !!pushBody) ||
+            (wantsEmail && !wantsPush && !emailOk && !!pushTitle && !!pushBody);
+
+          if (shouldPush && pushTitle && pushBody) {
             const ok = await sendPushResolved(supabase, userId, {
               title: pushTitle,
               body: pushBody,
@@ -326,34 +336,47 @@ async function sendPushResolved(
     const title = interpolateOutreach(opts.title, vars);
     const body = interpolateOutreach(opts.body, vars);
 
-    await supabase.from("notifications").insert({
-      user_id: userId,
-      title,
-      message: body,
-      type: "promo",
-    });
-
-    const { count } = await supabase
-      .from("push_subscriptions")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId);
-
-    if (count && count > 0) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      await fetch(`${supabaseUrl}/functions/v1/push-notifications`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${serviceKey}`,
-          apikey: serviceKey,
-          "Content-Type": "application/json",
+    // push-notifications?action=send-push inserts in-app + delivers Web Push
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    let pushHttpOk = false;
+    try {
+      const pushRes = await fetch(
+        `${supabaseUrl}/functions/v1/push-notifications?action=send-push`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serviceKey}`,
+            apikey: serviceKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userIds: [userId],
+            title,
+            body,
+            url: opts.url || "/",
+          }),
         },
-        body: JSON.stringify({
-          user_ids: [userId],
+      );
+      pushHttpOk = pushRes.ok;
+      if (!pushRes.ok) {
+        // Fallback: in-app only
+        await supabase.from("notifications").insert({
+          user_id: userId,
           title,
-          body,
-          url: opts.url || "/",
-        }),
+          message: body,
+          type: "promo",
+          link: opts.url || null,
+        });
+      }
+    } catch (e) {
+      console.warn("push-notifications invoke failed, in-app fallback", e);
+      await supabase.from("notifications").insert({
+        user_id: userId,
+        title,
+        message: body,
+        type: "promo",
+        link: opts.url || null,
       });
     }
 
@@ -362,7 +385,10 @@ async function sendPushResolved(
       template_id: opts.templateId,
       channel: "push",
       status: "sent",
-      meta: { source: "process-automation-workflows", had_push_sub: !!count },
+      meta: {
+        source: "process-automation-workflows",
+        push_http_ok: pushHttpOk,
+      },
     });
     return true;
   } catch (err) {

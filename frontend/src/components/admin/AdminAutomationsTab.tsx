@@ -28,7 +28,11 @@ interface WorkflowRow {
   email_html_content: string | null;
   display_frequency: string;
   max_displays: number | null;
+  template_id: string | null;
+  ignore_send_window: boolean | null;
 }
+
+type TemplateOption = { id: string; label: string; slug: string };
 
 const TRIGGER_LABELS: Record<string, string> = {
   visit_no_account: "Visite sans compte",
@@ -76,6 +80,8 @@ type FormShape = {
   email_html_content: string;
   display_frequency: string;
   max_displays: number | null;
+  template_id: string;
+  ignore_send_window: boolean;
 };
 
 const DEFAULT_WORKFLOW: FormShape = {
@@ -98,6 +104,8 @@ const DEFAULT_WORKFLOW: FormShape = {
   email_html_content: "",
   display_frequency: "once",
   max_displays: null,
+  template_id: "",
+  ignore_send_window: false,
 };
 
 const showsPopup = (ch: string) => ["popup", "popup_push", "all"].includes(ch);
@@ -127,6 +135,8 @@ function workflowToForm(wf: WorkflowRow): FormShape {
     email_html_content: wf.email_html_content || "",
     display_frequency: wf.display_frequency,
     max_displays: wf.max_displays,
+    template_id: wf.template_id || "",
+    ignore_send_window: wf.ignore_send_window === true,
   };
 }
 
@@ -142,6 +152,8 @@ function formToPayload(form: FormShape) {
     condition_max_days_since_signup: form.condition_max_days_since_signup,
     display_frequency: form.display_frequency,
     max_displays: form.max_displays,
+    template_id: form.template_id || null,
+    ignore_send_window: form.ignore_send_window === true,
     popup_title: showsPopup(form.channel) ? form.popup_title || null : null,
     popup_content: showsPopup(form.channel) ? form.popup_content || null : null,
     popup_image_url: showsPopup(form.channel) ? form.popup_image_url || null : null,
@@ -155,7 +167,15 @@ function formToPayload(form: FormShape) {
   return payload;
 }
 
-function FormFields({ values, onChange }: { values: FormShape; onChange: (v: FormShape) => void }) {
+function FormFields({
+  values,
+  onChange,
+  templates,
+}: {
+  values: FormShape;
+  onChange: (v: FormShape) => void;
+  templates: TemplateOption[];
+}) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
@@ -192,6 +212,32 @@ function FormFields({ values, onChange }: { values: FormShape; onChange: (v: For
         <div>
           <label className="text-xs text-muted-foreground block mb-1">Max affichages (vide = illimité)</label>
           <input type="number" min={1} value={values.max_displays ?? ""} onChange={(e) => onChange({ ...values, max_displays: e.target.value ? parseInt(e.target.value) : null })} className={inputClass} />
+        </div>
+        <div className="col-span-2">
+          <label className="text-xs text-muted-foreground block mb-1">
+            Template utilitaire (optionnel — remplace email/push inline)
+          </label>
+          <select
+            value={values.template_id}
+            onChange={(e) => onChange({ ...values, template_id: e.target.value })}
+            className={inputClass}
+          >
+            <option value="">Aucun — contenu inline ci-dessous</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label} ({t.slug})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="col-span-2 flex items-center gap-2">
+          <Switch
+            checked={values.ignore_send_window}
+            onCheckedChange={(v) => onChange({ ...values, ignore_send_window: v })}
+          />
+          <span className="text-xs text-muted-foreground">
+            Ignorer la fenêtre d&apos;envoi (18–19 Africa/Kinshasa)
+          </span>
         </div>
       </div>
 
@@ -336,6 +382,7 @@ function EmailPreview({ form }: { form: FormShape }) {
 export function AdminAutomationsTab() {
   const { toast } = useToast();
   const [workflows, setWorkflows] = useState<WorkflowRow[]>([]);
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormShape>(DEFAULT_WORKFLOW);
@@ -345,6 +392,7 @@ export function AdminAutomationsTab() {
 
   useEffect(() => {
     loadWorkflows();
+    loadTemplates();
   }, []);
 
   const loadWorkflows = async () => {
@@ -353,6 +401,15 @@ export function AdminAutomationsTab() {
       .select("*")
       .order("sort_order", { ascending: true });
     setWorkflows(data || []);
+  };
+
+  const loadTemplates = async () => {
+    const { data } = await (supabase as any)
+      .from("utility_message_templates")
+      .select("id, label, slug")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
+    setTemplates((data || []) as TemplateOption[]);
   };
 
   const handleCreate = async () => {
@@ -424,7 +481,7 @@ export function AdminAutomationsTab() {
         </div>
         {showCreateForm && (
           <>
-            <FormFields values={createForm} onChange={setCreateForm} />
+            <FormFields values={createForm} onChange={setCreateForm} templates={templates} />
             <Button onClick={handleCreate} disabled={saving || !createForm.name} size="sm" className="gap-1.5">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Créer
             </Button>
@@ -491,7 +548,7 @@ export function AdminAutomationsTab() {
 
                 {isEditing && (
                   <div className="px-4 pb-4 border-t border-border pt-4 space-y-3">
-                    <FormFields values={editForm} onChange={setEditForm} />
+                    <FormFields values={editForm} onChange={setEditForm} templates={templates} />
                     <div className="flex gap-2">
                       <Button onClick={handleSaveEdit} disabled={saving} size="sm" className="gap-1.5">
                         {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Enregistrer
@@ -518,7 +575,8 @@ export function AdminAutomationsTab() {
       </section>
 
       <p className="text-[10px] text-muted-foreground">
-        💡 Tous les workflows sont inactifs par défaut. Activez-les un par un quand vous êtes prêt. Les emails sont envoyés avec un décalage de 2-3 minutes entre chaque pour protéger la réputation du domaine.
+        Workflows inactifs par défaut. Fenêtre d&apos;envoi email/push : 18–19 Africa/Kinshasa
+        (sauf ignore_send_window). Lien template utilitaire optionnel dans Notifications → Messages utilitaires.
       </p>
     </div>
   );

@@ -163,7 +163,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.whatsapp-cloud-send]
-verify_jwt = false
+verify_jwt = true
 
 [functions.whatsapp-cloud-webhook]
 verify_jwt = false

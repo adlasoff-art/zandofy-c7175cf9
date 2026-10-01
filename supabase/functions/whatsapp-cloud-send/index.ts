@@ -1,5 +1,6 @@
 /**
  * WhatsApp Cloud API send — feature-flagged OFF by default.
+ * Auth: service_role Bearer only (never public).
  * Secrets: WHATSAPP_CLOUD_ENABLED, WHATSAPP_CLOUD_TOKEN, WHATSAPP_CLOUD_PHONE_NUMBER_ID
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -11,6 +12,11 @@ const CORS = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+function isServiceRole(req: Request, serviceKey: string): boolean {
+  const auth = req.headers.get("Authorization") || "";
+  return auth === `Bearer ${serviceKey}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: CORS });
@@ -19,6 +25,10 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const svc = createClient(supabaseUrl, serviceKey);
+
+  if (!isServiceRole(req, serviceKey)) {
+    return json({ ok: false, error: "Unauthorized" }, 401);
+  }
 
   try {
     const enabled = Deno.env.get("WHATSAPP_CLOUD_ENABLED") === "true";
@@ -53,12 +63,11 @@ Deno.serve(async (req) => {
       return json({ ok: false, reason: "invalid_phone_or_template" }, 400);
     }
 
-    // Build simple body params from name / cta if template expects them
     const components: unknown[] = [];
     if (vars.name || vars.cta_url) {
       const parameters: { type: string; text: string }[] = [];
-      if (vars.name) parameters.push({ type: "text", text: vars.name });
-      if (vars.cta_url) parameters.push({ type: "text", text: vars.cta_url });
+      if (vars.name) parameters.push({ type: "text", text: String(vars.name).slice(0, 1024) });
+      if (vars.cta_url) parameters.push({ type: "text", text: String(vars.cta_url).slice(0, 1024) });
       if (parameters.length) {
         components.push({ type: "body", parameters });
       }

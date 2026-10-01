@@ -101,6 +101,22 @@ export function UtilityTemplatesPanel() {
     },
   });
 
+  // Cloud stays OFF until platform_settings.outreach_config.whatsapp_cloud_enabled = true
+  // (and WHATSAPP_CLOUD_ENABLED=true on Edge). Surface that clearly in admin UI.
+  const { data: cloudEnabled = false } = useQuery({
+    queryKey: ["outreach-config-cloud-flag"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("platform_settings")
+        .select("value")
+        .eq("key", "outreach_config")
+        .maybeSingle();
+      if (error) return false;
+      return data?.value?.whatsapp_cloud_enabled === true;
+    },
+    staleTime: 60_000,
+  });
+
   const saveMutation = useMutation({
     mutationFn: async (payload: FormState) => {
       if (!payload.slug.trim() || !payload.label.trim()) {
@@ -179,15 +195,31 @@ export function UtilityTemplatesPanel() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
       <div className="lg:col-span-2 bg-card border border-border rounded-xl p-4 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-foreground">Messages utilitaires</h2>
-          <button
-            type="button"
-            onClick={() => setForm(EMPTY)}
-            className="text-xs flex items-center gap-1 text-primary hover:underline"
-          >
-            <Plus size={12} /> Nouveau
-          </button>
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                cloudEnabled
+                  ? "border-emerald-500/40 text-emerald-700 bg-emerald-500/10"
+                  : "border-border text-muted-foreground bg-muted/40"
+              }`}
+              title={
+                cloudEnabled
+                  ? "Flag platform ON — nécessite aussi WHATSAPP_CLOUD_ENABLED sur Edge"
+                  : "WhatsApp Cloud désactivé (outreach_config.whatsapp_cloud_enabled=false)"
+              }
+            >
+              Cloud {cloudEnabled ? "ON" : "OFF"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setForm(EMPTY)}
+              className="text-xs flex items-center gap-1 text-primary hover:underline"
+            >
+              <Plus size={12} /> Nouveau
+            </button>
+          </div>
         </div>
         {isLoading ? (
           <div className="flex justify-center py-8">
@@ -409,8 +441,8 @@ export function UtilityTemplatesPanel() {
           )}
         </div>
         <p className="text-[10px] text-muted-foreground">
-          Variables : {"{{name}}"}, {"{{cta_url}}"}. WhatsApp Cloud reste désactivé tant que les
-          secrets Meta ne sont pas configurés.
+          Variables : {"{{name}}"}, {"{{cta_url}}"}. Canal wa.me = ouverture manuelle admin.
+          Cloud API = flag OFF par défaut (+ secrets Meta + opt-in marketing).
         </p>
       </div>
     </div>

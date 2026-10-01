@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -39,6 +39,11 @@ export function AdminUserWhatsAppDialog({ open, onOpenChange, user }: Props) {
   const { user: admin } = useAuth();
   const [templateId, setTemplateId] = useState<string>("");
   const [sending, setSending] = useState(false);
+
+  // Reset selection when dialog opens for a different user
+  useEffect(() => {
+    if (open) setTemplateId("");
+  }, [open, user?.id]);
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["utility-message-templates-wame"],

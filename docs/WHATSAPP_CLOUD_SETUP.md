@@ -47,7 +47,8 @@ Related:
    - Callback URL: `https://<PROJECT_REF>.supabase.co/functions/v1/whatsapp-cloud-webhook`
    - Verify token: choose a long random string → `WHATSAPP_CLOUD_VERIFY_TOKEN`
 3. Subscribe to `messages` (statuses).
-4. Optional: set `WHATSAPP_CLOUD_APP_SECRET` for signature verification (enhance later).
+4. Set `WHATSAPP_CLOUD_APP_SECRET` — when set, the webhook **requires** a valid
+   `X-Hub-Signature-256` (HMAC-SHA256). Leave empty only for local stub testing.
 
 ---
 
