@@ -159,6 +159,15 @@ verify_jwt = false
 [functions.process-automation-workflows]
 verify_jwt = false
 
+[functions.dispatch-outreach]
+verify_jwt = true
+
+[functions.whatsapp-cloud-send]
+verify_jwt = true
+
+[functions.whatsapp-cloud-webhook]
+verify_jwt = false
+
 [functions.process-dispute-sla]
 verify_jwt = false
 

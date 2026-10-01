@@ -25,8 +25,17 @@ Appliquer dans le SQL Editor **staging**, smoke, puis **production** :
 14. `20261001164000_list_my_vendor_stores_rpc.sql` (**hotfix** RPC `list_my_vendor_stores` — chemin vendor dashboard)
 15. `20261001165000_platform_stores_product_quota_exempt.sql` (**hotfix** platform shops unlimited products + team product SELECT)
 16. `20261001166000_fix_stores_products_rls_recursion.sql` (**CRITICAL**) break stores↔collaborators RLS recursion — restore admin/vendor visibility
+17. `20261001170000_outreach_utility_messages_foundation.sql` — utility templates + outreach_send_log + WA opt-in + outreach_config
 
-### Incident note — empty admin/vendor stores (2026-10-01)
+### Outreach multi-canal (2026-10-01)
+
+- Admin templates: `/admin/notifications` → **Messages utilitaires**
+- Manual wa.me: `/admin/users` → column **WA**
+- Edge: `dispatch-outreach`, `whatsapp-cloud-send` (flag OFF), `whatsapp-cloud-webhook`
+- Meta guide: [`docs/WHATSAPP_CLOUD_SETUP.md`](./WHATSAPP_CLOUD_SETUP.md)
+- Deploy new Edge Functions to staging then production after SQL
+
+**Smoke after apply:** Messages utilitaires lists seeds ; WA dialog with phone ; Cloud remains disabled.
 
 **Cause:** `stores` SELECT used inline `EXISTS(store_collaborators)` while `store_collaborators` RLS reads `stores` → infinite recursion. Amplified by `165000` products policy.
 
