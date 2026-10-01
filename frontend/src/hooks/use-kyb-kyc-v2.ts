@@ -113,7 +113,12 @@ export function useKybSubmission(storeId: string | null) {
     if (!id) return;
     const { error } = await (supabase as any).from("kyb_submissions").update(patch).eq("id", id);
     if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    else await load();
+    else {
+      // Ensure score uses latest fields + docs (BEFORE UPDATE trigger covers fields;
+      // RPC forces consistency after race with concurrent uploads)
+      await (supabase as any).rpc("refresh_kyb_completeness_score", { p_submission_id: id });
+      await load();
+    }
   }, [ensureDraft, load, toast]);
 
   const uploadDocument = useCallback(async (docType: KybDocType, file: File) => {
@@ -128,23 +133,39 @@ export function useKybSubmission(storeId: string | null) {
       file_name: file.name, file_size: file.size, mime_type: file.type,
     });
     if (insErr) { toast({ title: "Erreur", description: insErr.message, variant: "destructive" }); return; }
+    await (supabase as any).rpc("refresh_kyb_completeness_score", { p_submission_id: id });
     toast({ title: "Document ajouté" });
     await load();
   }, [user, ensureDraft, load, toast]);
 
   const deleteDocument = useCallback(async (docId: string, path: string) => {
+    const subId = submission?.id;
     await supabase.storage.from("kyb-documents").remove([path]);
     await (supabase as any).from("kyb_documents").delete().eq("id", docId);
+    if (subId) {
+      await (supabase as any).rpc("refresh_kyb_completeness_score", { p_submission_id: subId });
+    }
     await load();
-  }, [load]);
+  }, [load, submission?.id]);
 
   const submit = useCallback(async () => {
     if (!submission) return;
     const { error } = await (supabase as any).from("kyb_submissions")
       .update({ status: "submitted", submitted_at: new Date().toISOString() })
       .eq("id", submission.id);
-    if (error) toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    else { toast({ title: "Dossier soumis", description: "Votre dossier KYB est en attente de revue." }); await load(); }
+    if (error) {
+      const msg = String(error.message || "");
+      const hint =
+        /kyb_incomplete_score/i.test(msg)
+          ? "Score de complétude insuffisant (minimum 80). Complétez les champs et documents."
+          : /kyb_incomplete_docs/i.test(msg)
+            ? "Documents incomplets : les 5 pièces obligatoires sont requises."
+            : error.message;
+      toast({ title: "Soumission refusée", description: hint, variant: "destructive" });
+    } else {
+      toast({ title: "Dossier soumis", description: "Votre dossier KYB est en attente de revue." });
+      await load();
+    }
   }, [submission, load, toast]);
 
   return { submission, documents, loading, updateFields, uploadDocument, deleteDocument, submit, refresh: load };

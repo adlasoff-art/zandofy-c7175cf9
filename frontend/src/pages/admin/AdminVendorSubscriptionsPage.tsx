@@ -21,6 +21,8 @@ interface StoreWithSub {
   can_create_coupons: boolean;
   collaborators_enabled: boolean;
   max_collaborators_override: number | null;
+  vendor_cod_enabled?: boolean;
+  vendor_off_platform_enabled?: boolean;
   subscription: {
     id: string;
     tier: VendorTier;
@@ -31,12 +33,15 @@ interface StoreWithSub {
   } | null;
 }
 
-const TIER_OPTIONS: VendorTier[] = ["beginner", "pro", "grand_supplier"];
+const TIER_OPTIONS: VendorTier[] = ["beginner", "intermediate", "pro", "enterprise", "grand_supplier"];
 const FEATURE_HINTS: Record<string, string> = {
-  whatsapp: "Contact / checkout WhatsApp boutique (fail-closed si off).",
-  self_deliver: "Autorise la livraison par la flotte vendeur.",
-  coupons: "Création de coupons promo par la boutique.",
-  team: "Collaborateurs multi-comptes sur la boutique.",
+  whatsapp:
+    "Contact / checkout WhatsApp boutique (entitlement whatsapp_store).",
+  self_deliver: "Autorise la livraison par la flotte vendeur (entitlement self_delivery).",
+  coupons: "Création de coupons promo (entitlement coupons).",
+  team: "Collaborateurs multi-comptes. Limite: collaborator_limit overrides.",
+  cod: "Paiement à la livraison produit (entitlement cod_payment).",
+  off_platform: "Paiement hors plateforme + preuve (entitlement off_platform_payment).",
 };
 
 export default function AdminVendorSubscriptionsPage() {
@@ -61,16 +66,22 @@ export default function AdminVendorSubscriptionsPage() {
       if (!storesData) return [];
 
       const storeIds = storesData.map((s) => s.id);
-      const { data: subs } = await supabase
-        .from("vendor_subscriptions")
-        .select("*")
-        .in("store_id", storeIds);
+      const [{ data: subs }, { data: overrides }] = await Promise.all([
+        supabase.from("vendor_subscriptions").select("*").in("store_id", storeIds),
+        (supabase as any)
+          .from("vendor_pricing_overrides")
+          .select("store_id, vendor_cod_enabled, vendor_off_platform_enabled")
+          .in("store_id", storeIds),
+      ]);
 
       const subMap = new Map((subs || []).map((s: any) => [s.store_id, s]));
+      const ovMap = new Map((overrides || []).map((o: any) => [o.store_id, o]));
 
       return storesData.map((s) => ({
         ...s,
         subscription: subMap.get(s.id) || null,
+        vendor_cod_enabled: ovMap.get(s.id)?.vendor_cod_enabled === true,
+        vendor_off_platform_enabled: ovMap.get(s.id)?.vendor_off_platform_enabled === true,
       })) as StoreWithSub[];
     },
   });
@@ -111,6 +122,14 @@ export default function AdminVendorSubscriptionsPage() {
           .update(updateData)
           .eq("store_id", storeId);
         if (error) throw error;
+      }
+      // Mirror entitlements for dual-read
+      const { mirrorFeatureEntitlement } = await import("@/lib/mirror-feature-entitlement");
+      if (field === "is_whatsapp_enabled") {
+        await mirrorFeatureEntitlement(storeId, "whatsapp_store", !!value);
+      }
+      if (field === "can_self_deliver") {
+        await mirrorFeatureEntitlement(storeId, "self_delivery", !!value);
       }
     },
     onSuccess: () => {
@@ -367,6 +386,70 @@ export default function AdminVendorSubscriptionsPage() {
                     </div>
 
                     <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1">
+                      <label className="text-xs text-muted-foreground" title={FEATURE_HINTS.cod}>
+                        COD produit
+                      </label>
+                      <p className="text-[10px] text-muted-foreground hidden sm:block">{FEATURE_HINTS.cod}</p>
+                      <Switch
+                        checked={store.vendor_cod_enabled === true}
+                        onCheckedChange={async (v) => {
+                          const { data: ov } = await (supabase as any)
+                            .from("vendor_pricing_overrides")
+                            .select("id")
+                            .eq("store_id", store.id)
+                            .maybeSingle();
+                          if (ov?.id) {
+                            await (supabase as any)
+                              .from("vendor_pricing_overrides")
+                              .update({ vendor_cod_enabled: v })
+                              .eq("id", ov.id);
+                          } else {
+                            await (supabase as any).from("vendor_pricing_overrides").insert({
+                              store_id: store.id,
+                              vendor_cod_enabled: v,
+                            });
+                          }
+                          const { mirrorFeatureEntitlement } = await import("@/lib/mirror-feature-entitlement");
+                          await mirrorFeatureEntitlement(store.id, "cod_payment", v);
+                          queryClient.invalidateQueries({ queryKey: ["admin-vendor-subs"] });
+                          toast.success(v ? "COD activé" : "COD désactivé");
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1">
+                      <label className="text-xs text-muted-foreground" title={FEATURE_HINTS.off_platform}>
+                        Hors plateforme
+                      </label>
+                      <p className="text-[10px] text-muted-foreground hidden sm:block">{FEATURE_HINTS.off_platform}</p>
+                      <Switch
+                        checked={store.vendor_off_platform_enabled === true}
+                        onCheckedChange={async (v) => {
+                          const { data: ov } = await (supabase as any)
+                            .from("vendor_pricing_overrides")
+                            .select("id")
+                            .eq("store_id", store.id)
+                            .maybeSingle();
+                          if (ov?.id) {
+                            await (supabase as any)
+                              .from("vendor_pricing_overrides")
+                              .update({ vendor_off_platform_enabled: v })
+                              .eq("id", ov.id);
+                          } else {
+                            await (supabase as any).from("vendor_pricing_overrides").insert({
+                              store_id: store.id,
+                              vendor_off_platform_enabled: v,
+                            });
+                          }
+                          const { mirrorFeatureEntitlement } = await import("@/lib/mirror-feature-entitlement");
+                          await mirrorFeatureEntitlement(store.id, "off_platform_payment", v);
+                          queryClient.invalidateQueries({ queryKey: ["admin-vendor-subs"] });
+                          toast.success(v ? "Hors plateforme activé" : "Hors plateforme désactivé");
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1">
                       <label className="text-xs text-muted-foreground flex items-center gap-1" title={FEATURE_HINTS.self_deliver}>
                         <Truck size={12} /> Self-Delivery
                       </label>
@@ -396,6 +479,8 @@ export default function AdminVendorSubscriptionsPage() {
                             .update({ can_create_coupons: v } as any)
                             .eq("id", store.id);
                           if (!error) {
+                            const { mirrorFeatureEntitlement } = await import("@/lib/mirror-feature-entitlement");
+                            await mirrorFeatureEntitlement(store.id, "coupons", v);
                             queryClient.invalidateQueries({ queryKey: ["admin-vendor-subs"] });
                             toast.success(v ? "Coupons activés" : "Coupons désactivés");
                           } else toast.error("Erreur");
@@ -416,6 +501,8 @@ export default function AdminVendorSubscriptionsPage() {
                             .update({ collaborators_enabled: v } as any)
                             .eq("id", store.id);
                           if (!error) {
+                            const { mirrorFeatureEntitlement } = await import("@/lib/mirror-feature-entitlement");
+                            await mirrorFeatureEntitlement(store.id, "collaborators", v);
                             queryClient.invalidateQueries({ queryKey: ["admin-vendor-subs"] });
                             toast.success(v ? "Collaborateurs activés" : "Collaborateurs désactivés");
                           } else toast.error("Erreur");
@@ -442,6 +529,23 @@ export default function AdminVendorSubscriptionsPage() {
                               .update({ max_collaborators_override: override } as any)
                               .eq("id", store.id);
                             if (!error) {
+                              // Mirror onto pricing overrides so TeamTab / Pricing stay aligned
+                              const { data: ov } = await (supabase as any)
+                                .from("vendor_pricing_overrides")
+                                .select("id")
+                                .eq("store_id", store.id)
+                                .maybeSingle();
+                              if (ov?.id) {
+                                await (supabase as any)
+                                  .from("vendor_pricing_overrides")
+                                  .update({ collaborator_limit_override: override })
+                                  .eq("id", ov.id);
+                              } else if (override != null) {
+                                await (supabase as any).from("vendor_pricing_overrides").insert({
+                                  store_id: store.id,
+                                  collaborator_limit_override: override,
+                                });
+                              }
                               queryClient.invalidateQueries({ queryKey: ["admin-vendor-subs"] });
                               toast.success("Limite collaborateurs mise à jour");
                             } else toast.error("Erreur");

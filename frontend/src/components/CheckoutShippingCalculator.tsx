@@ -44,6 +44,7 @@ interface CartProductInfo {
   heightCm: number;
   originCountry: string;
   categoryId: string | null;
+  storeId?: string | null;
 }
 
 interface CategorySurchargeInfo {
@@ -156,6 +157,7 @@ export function CheckoutShippingCalculator({
             heightCm: p?.height_cm ? Number(p.height_cm) : 10,
             originCountry: p?.origin_country || "CN",
             categoryId: p?.category_id || null,
+            storeId: p?.store_id || null,
           };
         });
         setProducts(mapped);
@@ -869,6 +871,8 @@ export function CheckoutShippingCalculator({
               const origins = [...new Set(products.map((p) => (p.originCountry || "").toUpperCase()).filter(Boolean))];
               return origins.length === 1 ? origins[0] : null;
             })()}
+            storeId={products[0]?.storeId || null}
+            productIds={products.map((p) => p.productId).filter(Boolean)}
             items={cartItems.map((ci) => {
               const p = products.find((pp) => pp.productId === ci.productId);
               return {

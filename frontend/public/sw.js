@@ -1,5 +1,5 @@
-const CACHE_NAME = "zandofy-v12";
-const STATIC_CACHE = "zandofy-static-v12";
+const CACHE_NAME = "zandofy-v13";
+const STATIC_CACHE = "zandofy-static-v13";
 const API_CACHE = "zandofy-api-v5";
 const IMG_CACHE = "zandofy-images-v5";
 const CATALOG_CACHE = "zandofy-catalog-v3";
@@ -87,23 +87,17 @@ self.addEventListener("fetch", (event) => {
   // Skip product API calls — always fetch fresh from network
   if (url.hostname.includes("supabase") && url.pathname.includes("/rest/v1/products")) return;
 
-  // Navigation: NETWORK-FIRST with cache fallback
-  // This prevents stale HTML from being served after deployments
+  // Navigation: NETWORK-FIRST — do NOT persist HTML into long-lived STATIC_CACHE
+  // (stale shell + new hashed chunks = white screen after deploy / PWA update).
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(STATIC_CACHE).then((cache) => cache.put("/index.html", clone));
-          }
-          return response;
-        })
+        .then((response) => response)
         .catch(() =>
           caches.open(STATIC_CACHE).then((cache) =>
-            cache.match("/index.html")
+            cache.match("/offline.html")
           ).then((cached) =>
-            cached || caches.match("/offline.html") || new Response("Offline", { status: 503 })
+            cached || new Response("Offline", { status: 503 })
           )
         )
     );

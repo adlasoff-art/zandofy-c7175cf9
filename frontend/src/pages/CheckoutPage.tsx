@@ -67,9 +67,75 @@ import {
   computeGeoRelation,
   assertProductsEligibleForCheckout,
 } from "@/lib/geo-eligibility";
+import {
+  deriveLane,
+  buildLaneGroupKey,
+  parseLaneGroupKey,
+  LANE_LABELS_FR,
+  type FulfillmentLane,
+} from "@/lib/fulfillment-lane";
 
 type Step = "shipping" | "payment" | "confirmation";
 type PaymentMethod = "stripe" | "card" | "paypal" | "mobile_money" | "cod" | "off_platform" | "whatsapp";
+
+/** Phase C3 — preview how many shipments the cart will create */
+function LaneSplitRecap({
+  items,
+  destCountry,
+  destCityId,
+}: {
+  items: Array<{ productId: string; quantity: number; nameFr?: string; name?: string }>;
+  destCountry: string;
+  destCityId: string | null;
+}) {
+  const productIds = [...new Set(items.map((i) => i.productId).filter(Boolean))];
+  const { data: lanes } = useQuery({
+    queryKey: ["checkout-lane-preview", productIds.join(","), destCountry, destCityId],
+    enabled: productIds.length > 0 && !!destCountry,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data: prods } = await supabase
+        .from("products_public")
+        .select("id, store_id, origin_country, store_country_code, store_city_id")
+        .in("id", productIds);
+      const groups = new Map<string, number>();
+      for (const item of items) {
+        const p = (prods || []).find((x: any) => x.id === item.productId) as any;
+        if (!p) continue;
+        const { lane } = deriveLane({
+          originCountry: p.store_country_code || p.origin_country,
+          originCityId: p.store_city_id,
+          destCountry,
+          destCityId,
+        });
+        const origin = ((p.origin_country || p.store_country_code || "UNKNOWN") as string).toUpperCase();
+        const key = buildLaneGroupKey(p.store_id, lane, origin, lane === "freight");
+        groups.set(key, (groups.get(key) || 0) + item.quantity);
+      }
+      return [...groups.entries()].map(([key, qty]) => {
+        const parsed = parseLaneGroupKey(key);
+        return { lane: parsed.lane, qty };
+      });
+    },
+  });
+
+  if (!lanes || lanes.length <= 1) return null;
+
+  return (
+    <div className="bg-secondary/60 border border-border rounded-lg p-4 space-y-2">
+      <p className="text-sm font-semibold text-foreground">
+        {lanes.length} envois pour cette commande
+      </p>
+      <ul className="text-xs text-muted-foreground space-y-1">
+        {lanes.map((l, i) => (
+          <li key={`${l.lane}-${i}`}>
+            Envoi {String.fromCharCode(65 + i)} — {LANE_LABELS_FR[l.lane]} ({l.qty} art.)
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 interface ShippingInfo {
   firstName: string;
@@ -284,8 +350,43 @@ export default function CheckoutPage() {
     commune: shipping.commune,
     quartier: shipping.quartier,
     enabled: homeDeliveryEnabled && !!shipping.city && !!shipping.country,
+    storeId: cartStoreIds[0] || null,
+    productIds: items.map((i) => i.productId).filter(Boolean),
+    lane: "last_mile",
   });
   const hasOperatorCoverage = homeDeliveryEnabled && (operatorQuotesForCoverage?.length ?? 0) > 0;
+
+  // Phase C3 — only require last-mile delivery choice when cart has a last_mile lane
+  const productIdsForLane = useMemo(
+    () => [...new Set(items.map((i) => i.productId).filter(Boolean))],
+    [items],
+  );
+  const { data: cartHasLastMileLane = true } = useQuery({
+    queryKey: [
+      "cart-has-last-mile",
+      productIdsForLane.join(","),
+      shipping.country,
+      shipping.city_id,
+    ],
+    enabled: productIdsForLane.length > 0 && !!shipping.country,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data: prods } = await supabase
+        .from("products_public")
+        .select("id, origin_country, store_country_code, store_city_id")
+        .in("id", productIdsForLane);
+      for (const p of prods || []) {
+        const { lane } = deriveLane({
+          originCountry: (p as any).store_country_code || (p as any).origin_country,
+          originCityId: (p as any).store_city_id,
+          destCountry: shipping.country,
+          destCityId: shipping.city_id || null,
+        });
+        if (lane === "last_mile") return true;
+      }
+      return false;
+    },
+  });
 
   // Kill-switch off : forcer retrait hub (plus de choix domicile)
   useEffect(() => {
@@ -680,7 +781,49 @@ export default function CheckoutPage() {
   const fallbackLastMileFee =
     deliveryOption === "home_delivery" && lastMileResult ? lastMileResult.fee : 0;
   const rawLastMileFee = selectedOperator ? operatorFee : fallbackLastMileFee;
-  const lastMileFee = hasActiveDeliverySub ? 0 : rawLastMileFee;
+  // Preview Enterprise included credit (buyer-safe RPC) — waive UI fee when eligible.
+  // Weight must match consume path: products.weight_grams (fallback 500g), not a flat 0.5kg guess.
+  const { data: includedDeliveryPreview } = useQuery({
+    queryKey: [
+      "preview-included-delivery",
+      cartStoreIds[0],
+      items.map((i) => `${i.productId}:${i.quantity}`).join("|"),
+      rawLastMileFee,
+      deliveryOption,
+      cartHasLastMileLane,
+    ],
+    enabled:
+      !!cartStoreIds[0] &&
+      cartHasLastMileLane &&
+      deliveryOption === "home_delivery" &&
+      !hasActiveDeliverySub &&
+      rawLastMileFee > 0,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const productIds = [...new Set(items.map((i) => i.productId).filter(Boolean))];
+      const { data: prods } = await supabase
+        .from("products_public")
+        .select("id, weight_grams")
+        .in("id", productIds);
+      const gramsById = new Map(
+        (prods || []).map((p: any) => [
+          p.id,
+          Number(p.weight_grams) > 0 ? Number(p.weight_grams) : 500,
+        ]),
+      );
+      const weightKg = items.reduce((s, i) => {
+        const grams = gramsById.get(i.productId) ?? 500;
+        return s + (grams * i.quantity) / 1000;
+      }, 0);
+      const { data } = await (supabase as any).rpc("preview_included_delivery_credit", {
+        p_store_id: cartStoreIds[0],
+        p_weight_kg: weightKg,
+      });
+      return (data || null) as { eligible?: boolean; remaining?: number; reason?: string } | null;
+    },
+  });
+  const lastMileFee =
+    hasActiveDeliverySub || includedDeliveryPreview?.eligible === true ? 0 : rawLastMileFee;
   const effectiveLastMile = deliveryOption === "home_delivery" && lastMilePayment === "pay_with_shipping" ? lastMileFee : 0;
   
   const total = Math.max(0, subtotal - discountAmount - pointsDiscount + effectiveShipping + effectiveLastMile);
@@ -1238,8 +1381,8 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Lot 11B Phase B8 — Le client doit choisir un mode de livraison (sauf si domicile désactivé → hub forcé)
-    if (homeDeliveryEnabled && deliveryOption === "none") {
+    // Lot 11B Phase B8 — Mode livraison last-mile uniquement si le panier a une lane last_mile
+    if (cartHasLastMileLane && homeDeliveryEnabled && deliveryOption === "none") {
       toast({
         title: "Mode de livraison requis",
         description: "Choisissez « Livraison à domicile » ou « Retrait au Hub » pour finaliser votre commande.",
@@ -1250,6 +1393,7 @@ export default function CheckoutPage() {
 
     // Si livraison à domicile : un livreur doit être sélectionné (sauf abonnement actif)
     if (
+      cartHasLastMileLane &&
       deliveryOption === "home_delivery" &&
       !hasActiveDeliverySub &&
       hasOperatorCoverage &&
@@ -1335,10 +1479,13 @@ export default function CheckoutPage() {
     const { data: prods } = productIds.length > 0
       ? await supabase
           .from("products_public")
-          .select("id, store_id, origin_country, store_country_code, store_city_id")
+          .select("id, store_id, origin_country, store_country_code, store_city_id, weight_grams")
           .in("id", productIds)
       : { data: [] };
     const storeMap = new Map((prods || []).map((p) => [p.id, p.store_id]));
+    const weightMap = new Map(
+      (prods || []).map((p: any) => [p.id, Number(p.weight_grams) > 0 ? Number(p.weight_grams) : 500]),
+    );
     // Lot 11C — Map productId → pays d'origine (ISO2). Sert à persister
     // orders.origin_country pour la segmentation multi-origines (Phase 2).
     // Origine effective = origin_country produit > store_country_code (fallback).
@@ -1367,14 +1514,25 @@ export default function CheckoutPage() {
       );
     }
 
-    // Lot 11C Phase 2 — Segmentation par (store_id, origin_country) si multi-groupes
-    // sélectionnés au checkout, sinon par store_id seul (legacy).
+    // Phase C3 — Segment by store × fulfillment lane (+ origin for freight multi-group)
     const useMultiGroup = isMultiGroupCheckout;
     const storeGroups = new Map<string, typeof items>();
     items.forEach((item) => {
       const sid = storeMap.get(item.productId) || "default";
       const origin = (originMap.get(item.productId) || "UNKNOWN") as string;
-      const groupKey = useMultiGroup ? `${sid}|${origin}` : sid;
+      const geo = storeGeoMap.get(item.productId);
+      const { lane } = deriveLane({
+        originCountry: geo?.country || origin,
+        originCityId: geo?.cityId,
+        destCountry: shipping.country,
+        destCityId: shipping.city_id || null,
+      });
+      const groupKey = buildLaneGroupKey(
+        sid,
+        lane,
+        origin,
+        useMultiGroup || lane === "freight",
+      );
       const arr = storeGroups.get(groupKey) || [];
       arr.push(item);
       storeGroups.set(groupKey, arr);
@@ -1455,8 +1613,12 @@ export default function CheckoutPage() {
 
     for (let idx = 0; idx < storeEntries.length; idx++) {
       const [groupKey, storeItems] = storeEntries[idx];
-      // En multi-groupes : groupKey = `${storeId}|${origin}`. Sinon : storeId seul.
-      const [storeId, groupOriginRaw] = useMultiGroup ? groupKey.split("|") : [groupKey, undefined];
+      const parsed = parseLaneGroupKey(groupKey);
+      const storeId = parsed.storeId;
+      const orderLane: FulfillmentLane = parsed.lane;
+      const groupOriginRaw = parsed.origin;
+      const isLastMileLane = orderLane === "last_mile";
+      const isFreightLane = orderLane === "freight";
       const orderSubtotal = storeItems.reduce((s, i) => s + i.price * i.quantity, 0);
       // Lot 11C — Origine effective de la sous-commande : si tous les produits
       // partagent la même origine, on la persiste ; sinon NULL (multi-origines).
@@ -1467,29 +1629,43 @@ export default function CheckoutPage() {
             .filter((c: any): c is string => !!c),
         ),
       ];
-      const orderOriginCountry = useMultiGroup
+      const orderOriginCountry = isFreightLane
         ? (groupOriginRaw && groupOriginRaw !== "UNKNOWN" ? groupOriginRaw : null)
         : (orderOrigins.length === 1 ? orderOrigins[0] : null);
       
       // Proportional shipping & discount distribution
       const ratio = subtotal > 0 ? orderSubtotal / subtotal : 0;
-      // Lot 11C Phase 2 — En multi-groupes, le shipping = devis du groupe (pas de ratio).
-      // Sinon : ratio sur le total verrouillé (mono-devis).
-      const groupQuote = useMultiGroup ? lockedQuotesByGroup.get(groupKey) : null;
-      const orderShippingCost = useMultiGroup
-        ? preciseRound(groupQuote?.total ?? 0, 2)
-        : preciseRound((lockedFreightTotal ?? shippingCost) * ratio, 2);
-      const orderFreightQuoteId = useMultiGroup ? (groupQuote?.quoteId ?? null) : lockedFreightQuoteId;
+      // Freight lock lookup: multi-origin keys are store|origin; lane keys are store|freight|origin
+      const freightLookupKey =
+        isFreightLane && groupOriginRaw
+          ? `${storeId}|${groupOriginRaw}`
+          : groupKey;
+      const groupQuote = useMultiGroup
+        ? (lockedQuotesByGroup.get(freightLookupKey) || lockedQuotesByGroup.get(groupKey))
+        : null;
+      const orderShippingCost = isLastMileLane
+        ? 0
+        : isFreightLane
+          ? preciseRound(
+              useMultiGroup
+                ? (groupQuote?.total ?? 0)
+                : (lockedFreightTotal ?? shippingCost ?? 0),
+              2,
+            )
+          : // domestic: use proportional non-freight shipping only (never full freight quote)
+            preciseRound(
+              useMultiGroup ? 0 : ((lockedFreightTotal != null ? 0 : shippingCost) * ratio),
+              2,
+            );
+      const orderFreightQuoteId = isFreightLane
+        ? (useMultiGroup ? (groupQuote?.quoteId ?? null) : lockedFreightQuoteId)
+        : null;
       const orderDiscount = preciseRound(discountAmount * ratio, 2);
       const orderPointsDiscount = preciseRound(pointsDiscount * ratio, 2);
       
       // Deferred vendor payment (off_platform / whatsapp): product only; shipping deferred.
       const isDeferredVendorPay = isDeferredVendorPaymentMethod(paymentMethod);
       const effectiveShip = (shippingPaymentChoice === "pay_on_arrival" || isDeferredVendorPay) ? 0 : orderShippingCost;
-      const orderTotal = Math.max(0, preciseRound(orderSubtotal - orderDiscount - orderPointsDiscount + effectiveShip, 2));
-      
-      // Unique order_ref per sub-order (suffix A, B, C...)
-      const orderRef = needsSuffix ? `${baseRef}-${String.fromCharCode(65 + idx)}` : baseRef;
 
       const firstProductId = storeItems[0]?.productId;
       const storeGeo = firstProductId ? storeGeoMap.get(firstProductId) : null;
@@ -1500,11 +1676,36 @@ export default function CheckoutPage() {
         destCityId: shipping.city_id || null,
       });
 
+      const applyLastMile =
+        isLastMileLane &&
+        homeDeliveryEnabled &&
+        deliveryOption === "home_delivery";
+      const applyForwarder = isFreightLane;
+
+      const lastMileInTotal =
+        applyLastMile &&
+        lastMileFee > 0 &&
+        lastMilePayment === "pay_with_shipping" &&
+        !isDeferredVendorPay
+          ? lastMileFee
+          : 0;
+      const orderTotal = Math.max(
+        0,
+        preciseRound(
+          orderSubtotal - orderDiscount - orderPointsDiscount + effectiveShip + lastMileInTotal,
+          2,
+        ),
+      );
+      
+      // Unique order_ref per sub-order (suffix A, B, C...)
+      const orderRef = needsSuffix ? `${baseRef}-${String.fromCharCode(65 + idx)}` : baseRef;
+
       const orderPayload: Record<string, unknown> = {
           user_id: user!.id,
           store_id: storeId !== "default" ? storeId : null,
           origin_country: orderOriginCountry,
           geo_relation: orderGeoRelation,
+          fulfillment_lane: orderLane,
           shipping_city_id: shipping.city_id || null,
           // Toute commande dont le paiement est asynchrone (webhook ou validation hors plateforme / WhatsApp)
           // commence en `awaiting_payment` — elle n'est PAS encore une commande à notifier.
@@ -1545,33 +1746,31 @@ export default function CheckoutPage() {
               : (paymentMethod === "mobile_money" || paymentMethod === "card" || paymentMethod === "paypal" || paymentMethod === "stripe")
                 ? "unpaid"
                 : "paid",
-          delivery_choice: !homeDeliveryEnabled
-            ? "hub_pickup"
-            : deliveryOption !== "none"
-              ? deliveryOption
-              : null,
-          last_mile_fee: deliveryOption === "home_delivery" ? lastMileFee : 0,
+          delivery_choice: applyLastMile
+            ? deliveryOption
+            : (!homeDeliveryEnabled && isLastMileLane ? "hub_pickup" : (isLastMileLane ? deliveryOption : null)),
+          last_mile_fee: applyLastMile ? lastMileFee : 0,
           // Lot 11B Phase B4 — opérateur de livraison sélectionné (NULL = flotte plateforme par défaut)
           delivery_operator_id:
-            deliveryOption === "home_delivery" && selectedOperator
+            applyLastMile && selectedOperator
               ? selectedOperator.operator_id
               : null,
           // Lot 11B Phase B7 — workflow d'acceptation opérateur (30 min pour répondre)
           operator_acceptance_status:
-            deliveryOption === "home_delivery" && selectedOperator
+            applyLastMile && selectedOperator
               ? "pending"
               : "not_applicable",
           operator_assigned_at:
-            deliveryOption === "home_delivery" && selectedOperator
+            applyLastMile && selectedOperator
               ? new Date().toISOString()
               : null,
           operator_response_deadline:
-            deliveryOption === "home_delivery" && selectedOperator
+            applyLastMile && selectedOperator
               ? new Date(Date.now() + 30 * 60 * 1000).toISOString()
               : null,
-          last_mile_payment_method: deliveryOption === "home_delivery" && lastMileFee > 0 ? (isDeferredVendorPay ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
+          last_mile_payment_method: applyLastMile && lastMileFee > 0 ? (isDeferredVendorPay ? null : (lastMilePayment === "pay_with_shipping" ? paymentMethod : "cod")) : null,
           last_mile_payment_status:
-            deliveryOption === "home_delivery" && lastMileFee > 0
+            applyLastMile && lastMileFee > 0
               ? (isDeferredVendorPay
                   ? "deferred"
                   : (lastMilePayment === "pay_with_shipping"
@@ -1580,11 +1779,11 @@ export default function CheckoutPage() {
                           : "paid")
                       : "deferred"))
               : null,
-          // Lot 3 — Forwarder assignment (silent fallback when no eligible forwarder)
-          forwarder_id: selectedForwarder?.forwarder_id ?? null,
-          forwarder_tier: selectedForwarder?.tier ?? null,
-          forwarder_quoted_price: selectedForwarder ? preciseRound(selectedForwarder.quoted_price * ratio, 2) : null,
-          forwarder_unassigned: !selectedForwarder && forwarderUnassigned,
+          // Lot 3 — Forwarder assignment (freight lane only)
+          forwarder_id: applyForwarder ? (selectedForwarder?.forwarder_id ?? null) : null,
+          forwarder_tier: applyForwarder ? (selectedForwarder?.tier ?? null) : null,
+          forwarder_quoted_price: applyForwarder && selectedForwarder ? preciseRound(selectedForwarder.quoted_price * ratio, 2) : null,
+          forwarder_unassigned: applyForwarder ? (!selectedForwarder && forwarderUnassigned) : false,
           // Lot 4D — Devis freight verrouillé (nouveau moteur Lot 3A)
           freight_quote_id: orderFreightQuoteId,
       };
@@ -1595,10 +1794,16 @@ export default function CheckoutPage() {
         .select("id")
         .single();
 
-      if (orderErr && /shipping_city_id|geo_relation/i.test(orderErr.message || "")) {
-        const { shipping_city_id: _a, geo_relation: _b, ...legacyPayload } = orderPayload;
+      if (orderErr && /shipping_city_id|geo_relation|fulfillment_lane/i.test(orderErr.message || "")) {
+        const {
+          shipping_city_id: _a,
+          geo_relation: _b,
+          fulfillment_lane: _c,
+          ...legacyPayload
+        } = orderPayload;
         void _a;
         void _b;
+        void _c;
         const retry = await supabase.from("orders").insert(legacyPayload as any).select("id").single();
         order = retry.data;
         orderErr = retry.error;
@@ -1620,6 +1825,7 @@ export default function CheckoutPage() {
             total: orderSubtotal,
           });
         }
+        // Insert line items BEFORE try_consume so server can sum weight_grams (not client guess).
         await supabase.from("order_items").insert(
           storeItems.map((item) => ({
             order_id: order.id,
@@ -1633,8 +1839,65 @@ export default function CheckoutPage() {
           }))
         );
 
-        // Lot 11B Phase B4 — Notification opérateur (non-bloquant)
-        if (selectedOperator?.operator_id) {
+        // Phase C2 — consume included last-mile credit (Enterprise ≤10kg / month)
+        if (applyLastMile && storeId !== "default") {
+          const weightKg = storeItems.reduce((sum, i) => {
+            const grams = weightMap.get(i.productId) ?? 500;
+            return sum + (grams * i.quantity) / 1000;
+          }, 0);
+          try {
+            const { data: consumeRes } = await (supabase as any).rpc(
+              "try_consume_included_delivery",
+              {
+                p_store_id: storeId,
+                p_order_id: order.id,
+                p_weight_kg: weightKg,
+              },
+            );
+            // Preview waived fee (lastMileFee=0) but consume failed → restore fee before payment
+            // (checkout session totals are read from DB after this loop).
+            if (
+              consumeRes?.consumed !== true &&
+              lastMileFee === 0 &&
+              rawLastMileFee > 0 &&
+              !hasActiveDeliverySub
+            ) {
+              const feeInTotal =
+                lastMilePayment === "pay_with_shipping" && !isDeferredVendorPay
+                  ? rawLastMileFee
+                  : 0;
+              await supabase
+                .from("orders")
+                .update({
+                  last_mile_fee: rawLastMileFee,
+                  total: preciseRound(orderTotal + feeInTotal, 2),
+                  last_mile_payment_method: isDeferredVendorPay
+                    ? null
+                    : lastMilePayment === "pay_with_shipping"
+                      ? paymentMethod
+                      : "cod",
+                  last_mile_payment_status:
+                    feeInTotal > 0
+                      ? paymentMethod === "mobile_money" ||
+                        paymentMethod === "card" ||
+                        paymentMethod === "paypal" ||
+                        paymentMethod === "stripe"
+                        ? "unpaid"
+                        : isDeferredVendorPay
+                          ? "deferred"
+                          : "paid"
+                      : "deferred",
+                } as any)
+                .eq("id", order.id);
+              console.warn("[checkout] included delivery consume failed; fee restored", consumeRes);
+            }
+          } catch (e) {
+            console.warn("[checkout] included delivery consume:", e);
+          }
+        }
+
+        // Lot 11B Phase B4 — Notification opérateur (last-mile only)
+        if (applyLastMile && selectedOperator?.operator_id) {
           try {
             await supabase.functions.invoke("notify-operator-new-order", {
               body: { order_id: order.id },
@@ -1644,8 +1907,8 @@ export default function CheckoutPage() {
           }
         }
 
-        // Lot 3 — Create shipment_assignments row when a forwarder was selected
-        if (selectedForwarder?.forwarder_id) {
+        // Lot 3 — Create shipment_assignments row when a forwarder was selected (freight only)
+        if (applyForwarder && selectedForwarder?.forwarder_id) {
           // shipment_assignments: mode NOT NULL, status IN ('assigned', ...).
           // Forwarders only handle air/sea; coerce other modes to 'air' as a safe default.
           const assignmentMode =
@@ -2581,6 +2844,14 @@ export default function CheckoutPage() {
           <div className="lg:col-span-3 space-y-6">
             {step === "shipping" && (
               <>
+                {/* Phase C3 — Récap N envois when destination known */}
+                {shipping.country && items.length > 0 && (
+                  <LaneSplitRecap
+                    items={items}
+                    destCountry={shipping.country}
+                    destCityId={shipping.city_id || null}
+                  />
+                )}
                 {/* Saved addresses */}
                 {savedAddresses.length > 0 && (
                   <div className="bg-card rounded-lg p-5 shadow-card space-y-3">
@@ -2776,8 +3047,8 @@ export default function CheckoutPage() {
                     );
                   })()}
 
-                  {/* Delivery option: home vs hub — masqué si kill-switch off */}
-                  {homeDeliveryEnabled && (
+                  {/* Delivery option: home vs hub — last-mile lane only */}
+                  {homeDeliveryEnabled && cartHasLastMileLane && (
                    <div className="pt-3 border-t border-border space-y-2">
                     <p className="text-sm font-medium text-foreground flex items-center gap-2">
                       <Home size={14} className="text-primary" /> Option de livraison
@@ -2878,6 +3149,9 @@ export default function CheckoutPage() {
                         quartier={shipping.quartier}
                         selectedOperatorId={selectedOperator?.operator_id ?? null}
                         onSelect={setSelectedOperator}
+                        storeId={cartStoreIds[0] || null}
+                        productIds={items.map((i) => i.productId).filter(Boolean)}
+                        lane="last_mile"
                       />
                     )}
 

@@ -374,6 +374,8 @@ export default function AdminVendorPricingPage() {
       }
     }
 
+    // R5: COD / WhatsApp / hors plateforme / numéros custom → Abonnements vendeurs only.
+    // Pricing save must not overwrite those entitlement mirrors.
     const payload = {
       store_id: store.id,
       margin_pct: edit.margin_pct ? Number(edit.margin_pct) : null,
@@ -381,11 +383,6 @@ export default function AdminVendorPricingPage() {
       max_extra_margin: edit.max_extra_margin ? Number(edit.max_extra_margin) : null,
       vendor_extra_margin_enabled: edit.vendor_extra_margin_enabled,
       commission_rate: edit.commission_rate ? Number(edit.commission_rate) : null,
-      vendor_cod_enabled: edit.vendor_cod_enabled,
-      vendor_off_platform_enabled: edit.vendor_off_platform_enabled,
-      vendor_whatsapp_enabled: edit.vendor_whatsapp_enabled,
-      vendor_custom_payment_numbers_enabled: edit.vendor_custom_payment_numbers_enabled,
-      mm_granted_by_admin: !!edit.vendor_custom_payment_numbers_enabled,
       vendor_mobile_money_enabled: edit.vendor_mobile_money_enabled,
       vendor_card_enabled: edit.vendor_card_enabled,
       vendor_mode: edit.vendor_mode,
@@ -418,6 +415,15 @@ export default function AdminVendorPricingPage() {
     if (error) {
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     } else {
+      // Sync collab limit + WhatsApp kill-switch onto stores / vendor_subscriptions
+      const collabLimit = edit.collaborator_limit_override
+        ? Number(edit.collaborator_limit_override)
+        : null;
+      await (supabase as any)
+        .from("stores")
+        .update({ max_collaborators_override: collabLimit })
+        .eq("id", store.id);
+
       toast({ title: "Enregistré", description: `Tarification de "${store.name}" mise à jour.` });
       setEdits((prev) => {
         const next = { ...prev };
@@ -426,6 +432,7 @@ export default function AdminVendorPricingPage() {
       });
       queryClient.invalidateQueries({ queryKey: ["admin-stores-pricing"] });
       queryClient.invalidateQueries({ queryKey: ["admin-pending-claims"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-vendor-subs"] });
     }
     setSavingId(null);
   };
@@ -435,6 +442,14 @@ export default function AdminVendorPricingPage() {
   return (
     <AdminLayout title="Tarification par boutique">
       <div className="space-y-4 max-w-4xl">
+        <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          <strong className="text-foreground">Droits boutique (COD, WhatsApp, hors plateforme, coupons, équipe)</strong>{" "}
+          : uniquement dans{" "}
+          <a href="/admin/vendor-subscriptions" className="text-primary underline">
+            Abonnements vendeurs
+          </a>
+          . Cette page = marges, commission, MoMo/carte kill-switches et overrides numériques.
+        </div>
         {/* Global defaults section */}
         <GlobalPricingDefaults defaults={globalDefaults} />
 
@@ -589,50 +604,6 @@ export default function AdminVendorPricingPage() {
                   <Switch
                     checked={edit.vendor_card_enabled}
                     onCheckedChange={(v) => updateEdit(store.id, "vendor_card_enabled", v)}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
-                  <div>
-                    <p className="text-xs font-medium text-foreground">Paiement à la livraison vendeur</p>
-                    <p className="text-[10px] text-muted-foreground">Autorise cette boutique à accepter le paiement du produit à la livraison.</p>
-                  </div>
-                  <Switch
-                    checked={edit.vendor_cod_enabled}
-                    onCheckedChange={(v) => updateEdit(store.id, "vendor_cod_enabled", v)}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
-                  <div>
-                    <p className="text-xs font-medium text-foreground">Paiement hors plateforme</p>
-                    <p className="text-[10px] text-muted-foreground">Autorise cette boutique à accepter les paiements hors plateforme (preuve + validation).</p>
-                  </div>
-                  <Switch
-                    checked={edit.vendor_off_platform_enabled}
-                    onCheckedChange={(v) => updateEdit(store.id, "vendor_off_platform_enabled", v)}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
-                  <div>
-                    <p className="text-xs font-medium text-foreground">Paiement WhatsApp</p>
-                    <p className="text-[10px] text-muted-foreground">Autorise le checkout WhatsApp (commande enregistrée + récépissé au vendeur). Nécessite un numéro WhatsApp + abonnement WhatsApp.</p>
-                  </div>
-                  <Switch
-                    checked={edit.vendor_whatsapp_enabled}
-                    onCheckedChange={(v) => updateEdit(store.id, "vendor_whatsapp_enabled", v)}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
-                  <div>
-                    <p className="text-xs font-medium text-foreground">Numéros de paiement personnalisés</p>
-                    <p className="text-[10px] text-muted-foreground">Autorise le vendeur à renseigner ses propres numéros Mobile Money.</p>
-                  </div>
-                  <Switch
-                    checked={edit.vendor_custom_payment_numbers_enabled}
-                    onCheckedChange={(v) => updateEdit(store.id, "vendor_custom_payment_numbers_enabled", v)}
                   />
                 </div>
 

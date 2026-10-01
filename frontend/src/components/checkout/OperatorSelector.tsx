@@ -16,6 +16,10 @@ interface Props {
   quartier?: string | null;
   selectedOperatorId: string | null;
   onSelect: (quote: OperatorQuote | null) => void;
+  /** Phase C4 — store allowlist filter */
+  storeId?: string | null;
+  productIds?: string[];
+  lane?: "last_mile" | "domestic" | "freight" | null;
 }
 
 export function OperatorSelector({
@@ -25,6 +29,9 @@ export function OperatorSelector({
   quartier,
   selectedOperatorId,
   onSelect,
+  storeId = null,
+  productIds = [],
+  lane = "last_mile",
 }: Props) {
   const { data: quotes, isLoading } = useOperatorQuotes({
     city,
@@ -32,6 +39,9 @@ export function OperatorSelector({
     commune,
     quartier,
     enabled: !!city && !!countryCode,
+    storeId,
+    productIds,
+    lane,
   });
 
   if (!city || !countryCode) return null;

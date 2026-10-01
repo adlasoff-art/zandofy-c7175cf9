@@ -31,6 +31,10 @@ interface Args {
   commune?: string | null;
   quartier?: string | null;
   enabled?: boolean;
+  /** Phase C4 — filter by store allowlist when set */
+  storeId?: string | null;
+  productIds?: string[];
+  lane?: "last_mile" | "domestic" | "freight" | null;
 }
 
 /**
@@ -70,6 +74,9 @@ export function useOperatorQuotes({
   commune,
   quartier,
   enabled = true,
+  storeId = null,
+  productIds = [],
+  lane = "last_mile",
 }: Args) {
   return useQuery({
     queryKey: [
@@ -78,6 +85,9 @@ export function useOperatorQuotes({
       countryCode,
       commune ?? null,
       quartier ?? null,
+      storeId ?? null,
+      (productIds || []).join(","),
+      lane ?? null,
     ],
     enabled: enabled && !!city && !!countryCode,
     staleTime: 60_000,
@@ -93,7 +103,29 @@ export function useOperatorQuotes({
         .ilike("city", c);
       if (opsErr || !ops || ops.length === 0) return [];
 
-      const operatorIds = ops.map((o: any) => o.operator_id);
+      let operatorIds = ops.map((o: any) => o.operator_id) as string[];
+
+      // Phase C4 — allowlist filter (null = no filter)
+      if (storeId) {
+        const { getCarrierAllowlistIds, filterByAllowlist } = await import(
+          "@/lib/carrier-allowlist"
+        );
+        const allow = await getCarrierAllowlistIds({
+          storeId,
+          productIds,
+          carrierType: "operator",
+          lane: lane || "last_mile",
+        });
+        if (allow) {
+          const filteredOps = filterByAllowlist(
+            ops.map((o: any) => ({ ...o, id: o.operator_id })),
+            allow,
+            "operator_id",
+          );
+          if (filteredOps.length === 0) return [];
+          operatorIds = filteredOps.map((o: any) => o.operator_id);
+        }
+      }
 
       // 2. Tarifs détaillés pour ces opérateurs sur cette ville.
       const { data: rates } = await (supabase as any)
@@ -113,10 +145,10 @@ export function useOperatorQuotes({
         ratesByOp[r.operator_id].push(r);
       });
 
-      const quotes: OperatorQuote[] = ops.flatMap((op: any) => {
+      const opsForQuotes = ops.filter((o: any) => operatorIds.includes(o.operator_id));
+
+      const quotes: OperatorQuote[] = opsForQuotes.flatMap((op: any) => {
         const best = pickBestRate(ratesByOp[op.operator_id] || [], commune, quartier);
-        // Phase B8 : on n'affiche un opérateur que s'il a un tarif approuvé
-        // (statut + is_active déjà filtrés dans la requête `rates`).
         if (!best) return [];
         const fee =
           (Number(best.base_price) || 0) + (Number(best.surcharge) || 0);
@@ -135,7 +167,6 @@ export function useOperatorQuotes({
         }];
       });
 
-      // Tri : plateforme d'abord, puis par prix croissant.
       return quotes.sort((a, b) => {
         if (a.is_platform_owned !== b.is_platform_owned) {
           return a.is_platform_owned ? -1 : 1;

@@ -23,6 +23,8 @@ import { VendorDisputesTab } from "@/components/vendor/VendorDisputesTab";
 import { VendorRiderTracking } from "@/components/vendor/VendorRiderTracking";
 import { VendorTeamTab } from "@/components/vendor/VendorTeamTab";
 import { VendorPaymentNumbers } from "@/components/vendor/VendorPaymentNumbers";
+import { VendorCarrierAllowlistsPanel } from "@/components/vendor/VendorCarrierAllowlistsPanel";
+import { VendorIncludedDeliveryQuota } from "@/components/vendor/VendorIncludedDeliveryQuota";
 import { VendorOnboardingChecklist } from "@/components/vendor/VendorOnboardingChecklist";
 import { VendorCommercialScopePanel } from "@/components/vendor/VendorCommercialScopePanel";
 import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
@@ -41,6 +43,7 @@ import {
   Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign, Calculator, ShieldCheck, LineChart, Archive, CreditCard,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
+import { useStoreEntitlements, hasFeature } from "@/hooks/use-store-entitlements";
 import { ACTIVE_ORDER_STATUSES, NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
 import { VENDOR_TIERS } from "@/lib/vendor-tiers";
 import { useStorePresence } from "@/hooks/useStorePresence";
@@ -79,6 +82,8 @@ interface VendorStore {
   delete_reason?: string | null;
   suspended_activities?: string[];
   is_platform_owned?: boolean;
+  /** From vendor_subscriptions — not a stores column */
+  is_whatsapp_enabled?: boolean;
 }
 
 interface OrderCounters {
@@ -136,6 +141,7 @@ export default function VendorDashboardPage() {
 
   // Presence heartbeat — marks store as online while vendor is on dashboard
   useStorePresence(store?.id);
+  const { data: storeEntitlements } = useStoreEntitlements(store?.id);
 
   const hasLoadedRef = useRef(false);
 
@@ -173,11 +179,12 @@ export default function VendorDashboardPage() {
         setLoading(true);
       }
 
+      // NOTE: is_whatsapp_enabled lives on vendor_subscriptions, not stores
       const STORE_SELECT_FULL =
-        "id, name, logo_url, banner_url, country, country_code, city_id, default_commercial_scope, products_count, followers_count, whatsapp_number, is_whatsapp_enabled, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type";
+        "id, name, logo_url, banner_url, country, country_code, city_id, default_commercial_scope, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type, max_collaborators_override";
       // Without geo migration columns (default_commercial_scope)
       const STORE_SELECT_SAFE =
-        "id, name, logo_url, banner_url, country, country_code, city_id, products_count, followers_count, whatsapp_number, is_whatsapp_enabled, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type";
+        "id, name, logo_url, banner_url, country, country_code, city_id, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type, max_collaborators_override";
       // Absolute minimum — never treat schema drift as "no store"
       const STORE_SELECT_MINIMAL =
         "id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_platform_owned, shop_type";
@@ -222,7 +229,7 @@ export default function VendorDashboardPage() {
               break;
             }
           }
-          // RLS may deny base `stores` to collaborators — public view still has is_platform_owned
+          // Last resort: public catalog view (thin row — prefer collaborator RLS on stores)
           if (collabStores.length === 0) {
             const pubRes = await (supabase as any)
               .from("stores_public")
@@ -239,7 +246,7 @@ export default function VendorDashboardPage() {
         console.warn("[VendorDashboard] collaborator stores", e);
       }
 
-      const merged = [...(storesData || []), ...collabStores];
+      let merged = [...(storesData || []), ...collabStores];
 
       if (storesErr && merged.length === 0) {
         console.error("[VendorDashboard] cannot load stores:", storesErr.message);
@@ -252,6 +259,27 @@ export default function VendorDashboardPage() {
         setNoStore(true);
         setLoading(false);
         return;
+      }
+
+      // Attach WhatsApp flag from vendor_subscriptions (not a stores column)
+      try {
+        const ids = merged.map((s) => s.id);
+        const { data: subs } = await supabase
+          .from("vendor_subscriptions")
+          .select("store_id, is_whatsapp_enabled")
+          .in("store_id", ids);
+        const waMap = new Map(
+          (subs || []).map((r: { store_id: string; is_whatsapp_enabled: boolean }) => [
+            r.store_id,
+            r.is_whatsapp_enabled === true,
+          ]),
+        );
+        merged = merged.map((s) => ({
+          ...s,
+          is_whatsapp_enabled: waMap.get(s.id) === true,
+        }));
+      } catch (e) {
+        console.warn("[VendorDashboard] vendor_subscriptions WA flags", e);
       }
 
       setNoStore(false);
@@ -381,9 +409,18 @@ export default function VendorDashboardPage() {
     ...(freightSimEnabled && shopType !== "local" ? [{ key: "freight_sim" as const, label: "Simulateur fret", icon: Calculator }] : []),
     { key: "kyb" as const, label: "Vérification KYB", icon: ShieldCheck },
     { key: "analytics_pro" as const, label: "Analytics", icon: LineChart },
-    ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
+    ...(hasFeature(storeEntitlements, "collaborators", store?.collaborators_enabled)
+      ? [{ key: "team" as const, label: "Équipe", icon: Users }]
+      : []),
     { key: "settings" as const, label: "Paramètres", icon: Settings },
   ];
+
+  const couponsEnabled = hasFeature(storeEntitlements, "coupons", store?.can_create_coupons);
+  const whatsappEntitled = hasFeature(
+    storeEntitlements,
+    "whatsapp_store",
+    store?.is_whatsapp_enabled === true,
+  );
 
   const renderTabContent = () => (
     <>
@@ -395,7 +432,7 @@ export default function VendorDashboardPage() {
           hasBanner={Boolean((store as any)?.banner_url)}
           hasCountry={Boolean((store as any)?.country_code || (store as any)?.country)}
           hasWhatsappNumber={Boolean((store as any)?.whatsapp_number)}
-          whatsappEnabled={(store as any)?.is_whatsapp_enabled === true}
+          whatsappEnabled={whatsappEntitled}
         />
       )}
       {activeTab === "catalogue" && (
@@ -411,7 +448,7 @@ export default function VendorDashboardPage() {
       {activeTab === "promos" && <VendorPromotionsTab storeId={store!.id} />}
       {activeTab === "coupons" && (
         <div className="space-y-6">
-          {store?.can_create_coupons ? (
+          {couponsEnabled ? (
             <>
               <VendorCouponsTab storeId={store!.id} />
               <div className="border-t border-border pt-4">
@@ -1347,6 +1384,9 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
 
       {/* Mobile Money Payment Numbers */}
       <VendorPaymentNumbers storeId={store.id} />
+
+      <VendorIncludedDeliveryQuota storeId={store.id} />
+      <VendorCarrierAllowlistsPanel storeId={store.id} />
 
       {/* Store Certification Badge */}
       <StoreCertificationSection storeId={store.id} />

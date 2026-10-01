@@ -21,7 +21,8 @@ export function StoreKybGateBanner({ storeId, kybHref = "/vendor?tab=kyb" }: Pro
         <p className="text-muted-foreground">
           Vos ventes livrées (${Number(gate.gmv ?? 0).toFixed(0)}) ont atteint le seuil
           (${Number(gate.threshold ?? 0).toFixed(0)}). Catalogue, promos et retraits sont
-          temporairement bloqués jusqu&apos;à approbation KYB. Commandes et litiges restent actifs.
+          temporairement bloqués jusqu&apos;à approbation KYB. Ouvrez l&apos;onglet KYB : score ≥ 80
+          + 5 documents requis pour soumettre. Commandes et litiges restent actifs.
         </p>
         <Link to={kybHref} className="inline-flex items-center gap-1 text-primary font-medium underline-offset-2 hover:underline">
           <ShieldCheck size={12} /> Compléter le dossier KYB

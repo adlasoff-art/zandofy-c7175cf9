@@ -15,7 +15,7 @@ interface BrandLogoProps {
 export const DEFAULT_BRAND_LOGO = "/brand/zandofy-logo.webp";
 
 /**
- * Site brand mark: shipped Zandofy Z logo (priority), then CMS URL if static fails.
+ * Site brand mark: CMS URL when set, else shipped Zandofy Z logo.
  */
 export function BrandLogo({
   variant = "header",
@@ -33,8 +33,8 @@ export function BrandLogo({
   const cmsUrl = cmsUrlRaw?.trim() || null;
 
   const candidates = useMemo(() => {
-    // Shipped Z mark first so a stale CMS/PWA URL cannot replace the brand.
-    const list = [DEFAULT_BRAND_LOGO, cmsUrl].filter(
+    // CMS first when configured; shipped mark as resilient fallback (never PWA badge).
+    const list = [cmsUrl, DEFAULT_BRAND_LOGO].filter(
       (u): u is string => Boolean(u),
     );
     return [...new Set(list)];

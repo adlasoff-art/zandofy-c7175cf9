@@ -56,6 +56,9 @@ interface Props {
   totalWeightKgForMarketing?: number;
   /** Lot 11C — ISO2 du pays d'origine effectif des produits (origine produit > origine boutique). */
   originCountry?: string | null;
+  /** Phase C4 / R2 — store allowlist filter (null = no filter). */
+  storeId?: string | null;
+  productIds?: string[];
 }
 
 export function FreightSelector({
@@ -71,6 +74,8 @@ export function FreightSelector({
   realPriceIndicative,
   totalWeightKgForMarketing,
   originCountry,
+  storeId = null,
+  productIds = [],
 }: Props) {
   const { t } = useI18n();
   const [offers, setOffers] = useState<EligibleFreightOffer[]>([]);
@@ -127,7 +132,23 @@ export function FreightSelector({
       totalWeightKg,
       originCountry,
     })
-      .then((res) => {
+      .then(async (res) => {
+        if (cancelled) return;
+        let filtered = res;
+        if (storeId) {
+          const { getCarrierAllowlistIds, filterByAllowlist } = await import(
+            "@/lib/carrier-allowlist"
+          );
+          const allow = await getCarrierAllowlistIds({
+            storeId,
+            productIds,
+            carrierType: "forwarder",
+            lane: "freight",
+          });
+          if (allow) {
+            filtered = filterByAllowlist(res, allow, "forwarder_id");
+          }
+        }
         if (cancelled) return;
         // Lot 4G — Diagnostic : pourquoi pas/peu d'offres ?
         // eslint-disable-next-line no-console
@@ -137,8 +158,8 @@ export function FreightSelector({
           mode,
           totalCbm,
           totalWeightKg,
-          count: res.length,
-          offers: res.map((o) => ({
+          count: filtered.length,
+          offers: filtered.map((o) => ({
             profile_id: o.profile_id,
             mode: o.mode,
             service_class: o.service_class,
@@ -146,16 +167,16 @@ export function FreightSelector({
             currency: o.quote.currency,
           })),
         });
-        setOffers(res);
+        setOffers(filtered);
         // Lot Very Speed — On exclut les offres "plateforme grisées" (non sélectionnables)
         // du compteur de disponibilité utilisé pour le gating obligatoire.
-        const selectableCount = res.filter(
+        const selectableCount = filtered.filter(
           (o) => o.has_profile_for_zone !== false,
         ).length;
         onAvailabilityChange?.(selectableCount);
         // UX Polissage — Pré-sélection automatique de l'offre la moins chère
         // sélectionnable (tri déjà fait dans `sortedOffers`).
-        const cheapest = res
+        const cheapest = filtered
           .filter((o) => o.has_profile_for_zone !== false)
           .sort((a, b) => a.quote.total - b.quote.total)[0] ?? null;
         setConsolidationChoice("split");
@@ -174,7 +195,17 @@ export function FreightSelector({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [destinationCountry, destinationCityId, mode, totalCbm, totalWeightKg, items.length, originCountry]);
+  }, [
+    destinationCountry,
+    destinationCityId,
+    mode,
+    totalCbm,
+    totalWeightKg,
+    items.length,
+    originCountry,
+    storeId,
+    (productIds || []).join(","),
+  ]);
 
   // Lot Very Speed — Tri d'affichage :
   //  1) Les offres réellement sélectionnables (has_profile_for_zone !== false)

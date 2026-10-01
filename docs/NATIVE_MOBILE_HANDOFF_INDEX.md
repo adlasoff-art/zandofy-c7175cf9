@@ -22,7 +22,26 @@ Document principal à lire en premier :
 | `docs/guides/GEO_COMMERCIAL_SCOPE.md` | Scope commercial, destinations, `except_cities`, RPC |
 | `docs/guides/CHECKOUT_SESSIONS.md` | Sessions multi-boutiques, confirm Edge |
 | `docs/OFF_PLATFORM_PAYMENT.md` | Paiement différé + release admin plateforme |
-| `docs/DISCOVERY_MOBILE_HANDOFF.md` | Discovery prefs, feed, tokens |
+| `docs/VENDOR_PLANS_AND_FULFILLMENT_CONTRACT.md` | Plans, lanes, hub, **Contract RPC §8** |
+| `docs/OPS_RUNBOOK_RELIABILITY.md` | Migrations + crons staging→prod |
+| `docs/CHECKOUT_SMOKE_CHECKLIST.md` | 5 scénarios checkout |
+| `docs/NATIVE_SYNC_FROM_WEB.md` | **Réponse web → mobile** (chrome, geo cascade, poids, freight) |
+
+### Contract RPC obligatoire (natif)
+
+Consommer ces RPC plutôt que les colonnes legacy en lecture seule :
+
+| RPC | Usage |
+|-----|--------|
+| `get_store_entitlements` | Features + quotas boutique |
+| `get_checkout_vendor_payment_flags` | Modes paiement checkout |
+| `preview_included_delivery_credit` | Aperçu crédit livraison Enterprise |
+| `get_carrier_allowlist_ids` | Filtre forwarders / operators |
+| `refresh_kyb_completeness_score` | Rescore KYB après upload |
+| `assert_store_identity_ready` | Gate publish / identité |
+| `try_consume_included_delivery` | Consommation crédit (post-order) |
+
+Détail auth + signatures : `docs/VENDOR_PLANS_AND_FULFILLMENT_CONTRACT.md` §8.
 
 ### P1 — Fortement recommandé
 

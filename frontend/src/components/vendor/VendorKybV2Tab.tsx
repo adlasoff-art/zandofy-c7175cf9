@@ -217,9 +217,18 @@ export function VendorKybV2Tab({ storeId }: Props) {
       </Card>
 
       {!isLocked && (
-        <div className="flex items-center justify-end gap-3">
-          <span className="text-sm text-muted-foreground">{allDocsUploaded ? "Tous les documents sont fournis" : "Certains documents manquent"}</span>
-          <Button disabled={!allDocsUploaded || score < 80} onClick={submit}>
+        <div className="sticky bottom-0 z-10 -mx-1 px-1 py-3 bg-background/95 backdrop-blur border-t border-border flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
+          <span className="text-sm text-muted-foreground order-2 sm:order-1">
+            Score {score}/100 (seuil 80) — docs{" "}
+            {KYB_REQUIRED_DOCS.filter((d) => documents.some((doc) => doc.doc_type === d.type)).length}/
+            {KYB_REQUIRED_DOCS.length}
+            {allDocsUploaded ? " — documents OK" : " — documents incomplets"}
+          </span>
+          <Button
+            className="order-1 sm:order-2 w-full sm:w-auto"
+            disabled={!allDocsUploaded || score < 80}
+            onClick={submit}
+          >
             <ShieldCheck size={16} className="mr-2" /> Soumettre pour revue
           </Button>
         </div>
