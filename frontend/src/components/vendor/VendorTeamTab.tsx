@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
+import { useStoreEntitlements } from "@/hooks/use-store-entitlements";
 import { VENDOR_TIERS } from "@/lib/vendor-tiers";
 import { toast } from "sonner";
 import { Users, UserPlus, Trash2, Loader2, Mail, Shield, ShieldCheck, AlertTriangle } from "lucide-react";
@@ -37,24 +38,42 @@ export function VendorTeamTab({ storeId }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { subscription } = useVendorSubscription(storeId);
+  const { data: entitlements } = useStoreEntitlements(storeId);
   const [email, setEmail] = useState("");
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>(["orders"]);
 
   const { data: storeData } = useQuery({
     queryKey: ["store-collab-limit", storeId],
     queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from("stores")
-        .select("max_collaborators_override")
-        .eq("id", storeId)
-        .single();
-      return data as { max_collaborators_override: number | null } | null;
+      const [{ data: storeRow }, { data: overrideRow }] = await Promise.all([
+        (supabase as any)
+          .from("stores")
+          .select("max_collaborators_override")
+          .eq("id", storeId)
+          .maybeSingle(),
+        (supabase as any)
+          .from("vendor_pricing_overrides")
+          .select("collaborator_limit_override")
+          .eq("store_id", storeId)
+          .maybeSingle(),
+      ]);
+      return {
+        max_collaborators_override: (storeRow as { max_collaborators_override?: number | null } | null)
+          ?.max_collaborators_override ?? null,
+        collaborator_limit_override: (overrideRow as { collaborator_limit_override?: number | null } | null)
+          ?.collaborator_limit_override ?? null,
+      };
     },
   });
 
   const tier = subscription?.tier || "beginner";
-  const tierLimit = VENDOR_TIERS[tier]?.maxCollaborators || 2;
-  const maxCollaborators = storeData?.max_collaborators_override ?? tierLimit;
+  const tierLimit = VENDOR_TIERS[tier as keyof typeof VENDOR_TIERS]?.maxCollaborators || 2;
+  // RPC collaborator_limit → pricing override → stores override → tier
+  const maxCollaborators =
+    entitlements?.collaborator_limit ??
+    storeData?.collaborator_limit_override ??
+    storeData?.max_collaborators_override ??
+    tierLimit;
 
   const { data: collaborators = [], isLoading } = useQuery({
     queryKey: ["store-collaborators", storeId],

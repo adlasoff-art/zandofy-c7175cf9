@@ -59,10 +59,8 @@ function isAllowedProductMediaUrl(url: string, existingUrls?: Set<string>): bool
 
 /**
  * Hard gate before first submit / re-approval: store identity must be complete.
- * Platform-owned / claimed stores are exempt (ops-managed identity).
- *
- * Resilience: trust `knownPlatformOwned` from dashboard, then `stores`, then
- * `stores_public` (collaborators may lack SELECT on base `stores`).
+ * Prefers SECURITY DEFINER RPC (owner/collab); falls back to client select.
+ * Platform-owned stores are exempt.
  */
 async function assertStoreIdentityReady(
   storeId: string,
@@ -72,40 +70,41 @@ async function assertStoreIdentityReady(
     return { ok: true };
   }
 
+  const { data: rpcData, error: rpcErr } = await (supabase as any).rpc(
+    "assert_store_identity_ready",
+    { p_store_id: storeId },
+  );
+
+  if (!rpcErr && rpcData && typeof rpcData === "object") {
+    const res = rpcData as { ok?: boolean; message?: string };
+    if (res.ok === true) return { ok: true };
+    if (res.ok === false) {
+      return {
+        ok: false,
+        message:
+          res.message ||
+          "Complétez l’identité boutique avant de publier. Ouvrez Paramètres boutique.",
+      };
+    }
+  }
+
+  // Fallback if RPC not deployed yet
   const { data, error } = await (supabase as any)
     .from("stores")
     .select("logo_url, banner_url, country, country_code, whatsapp_number, is_platform_owned")
     .eq("id", storeId)
     .maybeSingle();
 
-  let row = !error && data ? data : null;
-
-  if (!row) {
-    // Public catalog view is readable by team/anon and includes is_platform_owned.
-    const { data: pub } = await (supabase as any)
-      .from("stores_public")
-      .select("logo_url, banner_url, country, is_platform_owned")
-      .eq("id", storeId)
-      .maybeSingle();
-    if (pub) row = pub;
-  }
-
-  if (!row) {
+  if (error || !data) {
     return { ok: false, message: "Impossible de vérifier l’identité boutique. Réessayez." };
   }
-
-  if (row.is_platform_owned === true) {
-    return { ok: true };
-  }
+  if (data.is_platform_owned === true) return { ok: true };
 
   const missing: string[] = [];
-  if (!row.logo_url) missing.push("logo");
-  if (!row.banner_url) missing.push("bannière");
-  if (!(row.country_code || row.country)) missing.push("pays");
-  // whatsapp_number is not on stores_public — only enforce when present on the row
-  if ("whatsapp_number" in row && !String(row.whatsapp_number || "").trim()) {
-    missing.push("WhatsApp business");
-  }
+  if (!data.logo_url) missing.push("logo");
+  if (!data.banner_url) missing.push("bannière");
+  if (!(data.country_code || data.country)) missing.push("pays");
+  if (!String(data.whatsapp_number || "").trim()) missing.push("WhatsApp business");
   if (missing.length === 0) return { ok: true };
   return {
     ok: false,
@@ -242,7 +241,7 @@ export function VendorProductManager({
   isPlatformOwned?: boolean;
 }) {
   const { user } = useAuth();
-  const { subscription, tierConfig, canAddProduct } = useVendorSubscription(storeId);
+  const { subscription, tierConfig, canAddProduct, effectiveMaxProducts } = useVendorSubscription(storeId);
   const { data: suspensionStatus } = useStoreSuspension(storeId);
   const { data: kybGate } = useStoreKybGate(storeId);
   const listingBlocked = isActivityBlocked(suspensionStatus, "product_listing") || !!kybGate?.blocked;
@@ -467,7 +466,7 @@ export function VendorProductManager({
       return;
     }
     if (!canAddProduct(products.length)) {
-      toast.error(`Limite atteinte (${tierConfig.maxProducts} produits max pour le plan ${tierConfig.label})`);
+      toast.error(`Limite atteinte (${effectiveMaxProducts} produits max pour le plan ${tierConfig.label})`);
       return;
     }
     setEditing(null);
@@ -619,6 +618,10 @@ export function VendorProductManager({
     }
     if (!form.name_fr.trim() || form.price <= 0) {
       toast.error("Indiquez un nom et un prix valides.");
+      return;
+    }
+    if (isLocalShop && (form.commercial_scope === "international" || form.commercial_scope === "custom")) {
+      toast.error("Boutique locale : scope international / zones custom interdit");
       return;
     }
     // Produits déjà en catalogue / file / révision : textes + au moins 1 photo (plafond 5)
@@ -1385,14 +1388,23 @@ export function VendorProductManager({
             </p>
             <select
               className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md"
-              value={form.commercial_scope}
-              onChange={(e) => setForm({ ...form, commercial_scope: e.target.value })}
+              value={isLocalShop && form.commercial_scope === "international" ? "inherit" : form.commercial_scope}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (isLocalShop && (v === "international" || v === "custom")) {
+                  toast.error("Boutique locale : scope international / zones custom interdit");
+                  return;
+                }
+                setForm({ ...form, commercial_scope: v });
+              }}
             >
               <option value="inherit">Utiliser les paramètres de ma boutique</option>
               <option value="city">Ma ville uniquement</option>
               <option value="country">Mon pays</option>
-              <option value="international">International</option>
-              <option value="custom">Zones personnalisées (via destinations produit)</option>
+              {!isLocalShop && <option value="international">International</option>}
+              {!isLocalShop && (
+                <option value="custom">Zones personnalisées (via destinations produit)</option>
+              )}
             </select>
             {form.commercial_scope === "custom" && editing?.id && (
               <ProductCommercialDestinationsPanel productId={editing.id} />
@@ -1706,7 +1718,7 @@ export function VendorProductManager({
       <div className="flex items-center justify-between">
         <h3 className="text-base font-bold text-foreground flex items-center gap-2">
           <Package size={16} /> Catalogue ({filteredProducts.length}
-          {subscription && subscription.max_products < Infinity && `/${subscription.max_products}`})
+          {subscription && effectiveMaxProducts < Infinity && `/${effectiveMaxProducts}`})
         </h3>
         <button
           onClick={startCreate}

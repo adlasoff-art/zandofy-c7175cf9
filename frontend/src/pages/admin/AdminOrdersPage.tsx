@@ -13,7 +13,6 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 import { triggerOrderStatusNotification } from "@/services/order-notifications";
-import { resolveDeliveryPath, checkRiderAvailability, type DeliveryZoneMatch } from "@/services/logistics-path";
 import {
   STATUS_CONFIG,
   STATUS_FLOW,
@@ -158,8 +157,6 @@ export default function AdminOrdersPage() {
   const [locationFilters, setLocationFilters] = useState<LocationFilters>({});
   const [adminOrderPageSize, setAdminOrderPageSize] = useState(25);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [logisticsInfo, setLogisticsInfo] = useState<Record<string, { zones: DeliveryZoneMatch[]; usePlatform: boolean; riderAvailable: boolean; riderCount: number } | null>>({});
-  const [loadingLogistics, setLoadingLogistics] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<DateFilterKey>("all");
   const [customStart, setCustomStart] = useState<string>("");
   const [customEnd, setCustomEnd] = useState<string>("");

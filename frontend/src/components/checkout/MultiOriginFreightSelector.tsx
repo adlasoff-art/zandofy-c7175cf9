@@ -194,6 +194,8 @@ export function MultiOriginFreightSelector({
                   items={group.items}
                   totalCbm={group.total_cbm}
                   totalWeightKg={group.total_weight_kg}
+                  storeId={group.store_id !== "default" ? group.store_id : null}
+                  productIds={group.items.map((i) => i.productId).filter(Boolean)}
                   onChange={handleGroupChange(group.key, group)}
                   onAvailabilityChange={handleGroupAvailability(group.key)}
                 />

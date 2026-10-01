@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { VENDOR_TIERS, type VendorTier } from "@/lib/vendor-tiers";
+import { useStoreEntitlements } from "@/hooks/use-store-entitlements";
 
 export interface VendorSubscription {
   id: string;
@@ -16,7 +17,7 @@ export interface VendorSubscription {
 
 const DEFAULT_SUB: Omit<VendorSubscription, "id" | "store_id"> = {
   tier: "beginner",
-  max_products: 100,
+  max_products: 20,
   is_whatsapp_enabled: false,
   can_self_deliver: false,
   payment_method: null,
@@ -28,12 +29,15 @@ export function useVendorSubscription(storeId: string | null) {
   const [subscription, setSubscription] = useState<VendorSubscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [maxProductsOverride, setMaxProductsOverride] = useState<number | null>(null);
+  const { data: entitlements } = useStoreEntitlements(storeId);
 
   useEffect(() => {
-    if (!storeId) { setLoading(false); return; }
+    if (!storeId) {
+      setLoading(false);
+      return;
+    }
 
     async function load() {
-      // Fetch subscription + admin override in parallel
       const [subRes, overrideRes] = await Promise.all([
         supabase
           .from("vendor_subscriptions")
@@ -52,7 +56,6 @@ export function useVendorSubscription(storeId: string | null) {
 
       if (subRes.data) {
         const sub = subRes.data as unknown as VendorSubscription;
-        // Admin override takes priority over tier max_products
         if (adminOverride != null) {
           sub.max_products = adminOverride;
         }
@@ -70,12 +73,26 @@ export function useVendorSubscription(storeId: string | null) {
     load();
   }, [storeId]);
 
-  const tierConfig = subscription
-    ? VENDOR_TIERS[subscription.tier] || VENDOR_TIERS.beginner
-    : VENDOR_TIERS.beginner;
+  const planSlug = (entitlements?.plan_slug || subscription?.tier || "beginner") as VendorTier;
+  const tierConfig =
+    VENDOR_TIERS[planSlug] ||
+    VENDOR_TIERS[(subscription?.tier as VendorTier) || "beginner"] ||
+    VENDOR_TIERS.beginner;
 
-  const effectiveMaxProducts = maxProductsOverride ?? subscription?.max_products ?? 100;
+  // Prefer RPC max_products when available; else override / subscription
+  const effectiveMaxProducts =
+    entitlements?.max_products ??
+    maxProductsOverride ??
+    subscription?.max_products ??
+    20;
   const canAddProduct = (currentCount: number) => currentCount < effectiveMaxProducts;
 
-  return { subscription, loading, tierConfig, canAddProduct, effectiveMaxProducts };
+  return {
+    subscription,
+    loading,
+    tierConfig,
+    canAddProduct,
+    effectiveMaxProducts,
+    entitlements: entitlements ?? null,
+  };
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useStoreEntitlements, hasFeature } from "@/hooks/use-store-entitlements";
 import { Webhook, Loader2, Package, ShieldCheck, Send, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
 export function VendorAutonomousTab({ storeId }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: entitlements } = useStoreEntitlements(storeId);
 
   // Fetch store info (is_platform_owned)
   const { data: storeInfo } = useQuery({
@@ -25,7 +27,7 @@ export function VendorAutonomousTab({ storeId }: Props) {
     },
   });
 
-  // Fetch vendor overrides
+  // Fetch vendor overrides (mode / webhook / MM-card kill switches — features via entitlements)
   const { data: override, isLoading } = useQuery({
     queryKey: ["vendor-autonomous", storeId],
     queryFn: async () => {
@@ -67,11 +69,27 @@ export function VendorAutonomousTab({ storeId }: Props) {
 
   const [webhookUrl, setWebhookUrl] = useState("");
 
+  const offPlatformEntitled = hasFeature(
+    entitlements,
+    "off_platform_payment",
+    override?.vendor_off_platform_enabled === true,
+  );
+  const codEntitled = hasFeature(
+    entitlements,
+    "cod_payment",
+    override?.vendor_cod_enabled === true,
+  );
+  const customNumbersEntitled = hasFeature(
+    entitlements,
+    "custom_payment_numbers",
+    override?.vendor_custom_payment_numbers_enabled === true,
+  );
+
   // Submit webhook request
   const submitRequest = useMutation({
     mutationFn: async () => {
       const autonomous =
-        override?.vendor_mode === "local_only" || override?.vendor_off_platform_enabled === true;
+        override?.vendor_mode === "local_only" || offPlatformEntitled;
       if (!autonomous) {
         throw new Error("Webhook réservé au mode autonome / hors plateforme (extra payant).");
       }
@@ -123,15 +141,15 @@ export function VendorAutonomousTab({ storeId }: Props) {
     );
   }
 
-  const isAutonomous = override?.vendor_mode === "local_only" || override?.vendor_off_platform_enabled;
+  const isAutonomous = override?.vendor_mode === "local_only" || offPlatformEntitled;
   const webhookApproved = override?.webhook_approved === true;
   const activeWebhook = webhookApproved ? override?.vendor_webhook_url : null;
   const paymentConfig = {
     mobile_money: override?.vendor_mobile_money_enabled !== false,
     card: override?.vendor_card_enabled !== false,
-    cod: override?.vendor_cod_enabled === true,
-    off_platform: override?.vendor_off_platform_enabled === true,
-    custom_numbers: override?.vendor_custom_payment_numbers_enabled === true,
+    cod: codEntitled,
+    off_platform: offPlatformEntitled,
+    custom_numbers: customNumbersEntitled,
   };
 
   const latestPendingRequest = webhookRequests?.find((r: any) => r.status === "pending");

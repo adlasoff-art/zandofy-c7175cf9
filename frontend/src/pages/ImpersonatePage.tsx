@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { throwIfEdgeFunctionError } from "@/services/admin-email";
 import { defaultImpersonationLanding, sanitizeImpersonationRedirect } from "@/lib/admin-impersonate";
@@ -8,7 +8,6 @@ import { SEOHead } from "@/components/SEOHead";
 
 export default function ImpersonatePage() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState("Échange du token d'impersonation...");
   const exchangeStarted = useRef(false);
@@ -63,13 +62,14 @@ export default function ImpersonatePage() {
         const forced = sanitizeImpersonationRedirect(searchParams.get("redirect"));
         const roles: string[] = target.roles || [];
         const landing = forced || defaultImpersonationLanding(roles);
-        navigate(landing, { replace: true });
+        // Hard navigation: remount app with target JWT (avoids stale VendorDashboard cache)
+        window.location.replace(landing);
       } catch (e: any) {
         console.error("Impersonation exchange failed:", e);
         setError(e.message || "Échec de l'impersonation");
       }
     })();
-  }, [searchParams, navigate]);
+  }, [searchParams]);
 
   if (error) {
     return (

@@ -23,6 +23,9 @@ interface Props {
   mode: string;
   baseShippingCost: number;
   onChange: (choice: ForwarderChoice | null, unassigned: boolean) => void;
+  /** Phase C4 — filter by store allowlist when set */
+  storeId?: string | null;
+  productIds?: string[];
 }
 
 const TIER_LABELS: Record<string, string> = {
@@ -31,7 +34,15 @@ const TIER_LABELS: Record<string, string> = {
   vip: "VIP",
 };
 
-export function ForwarderSelector({ country, cityId, mode, baseShippingCost, onChange }: Props) {
+export function ForwarderSelector({
+  country,
+  cityId,
+  mode,
+  baseShippingCost,
+  onChange,
+  storeId = null,
+  productIds = [],
+}: Props) {
   const [config, setConfig] = useState<ForwardersConfig | null>(null);
   const [list, setList] = useState<EligibleForwarder[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,9 +61,27 @@ export function ForwarderSelector({ country, cityId, mode, baseShippingCost, onC
     }
     setLoading(true);
     fetchEligibleForwarders({ country, cityId, mode })
+      .then(async (rows) => {
+        if (!storeId) return rows;
+        const { getCarrierAllowlistIds, filterByAllowlist } = await import(
+          "@/lib/carrier-allowlist"
+        );
+        const allow = await getCarrierAllowlistIds({
+          storeId,
+          productIds,
+          carrierType: "forwarder",
+          lane: "freight",
+        });
+        if (!allow) return rows;
+        return filterByAllowlist(
+          rows.map((r) => ({ ...r, id: r.forwarder_id })),
+          allow,
+          "forwarder_id",
+        ) as EligibleForwarder[];
+      })
       .then(setList)
       .finally(() => setLoading(false));
-  }, [config?.enabled, country, cityId, mode]);
+  }, [config?.enabled, country, cityId, mode, storeId, (productIds || []).join(",")]);
 
   // Build options with computed final price
   const options = useMemo(() => {

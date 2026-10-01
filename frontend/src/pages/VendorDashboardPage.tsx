@@ -23,6 +23,8 @@ import { VendorDisputesTab } from "@/components/vendor/VendorDisputesTab";
 import { VendorRiderTracking } from "@/components/vendor/VendorRiderTracking";
 import { VendorTeamTab } from "@/components/vendor/VendorTeamTab";
 import { VendorPaymentNumbers } from "@/components/vendor/VendorPaymentNumbers";
+import { VendorCarrierAllowlistsPanel } from "@/components/vendor/VendorCarrierAllowlistsPanel";
+import { VendorIncludedDeliveryQuota } from "@/components/vendor/VendorIncludedDeliveryQuota";
 import { VendorOnboardingChecklist } from "@/components/vendor/VendorOnboardingChecklist";
 import { VendorCommercialScopePanel } from "@/components/vendor/VendorCommercialScopePanel";
 import { VendorSuppliersTab } from "@/components/vendor/VendorSuppliersTab";
@@ -41,6 +43,7 @@ import {
   Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign, Calculator, ShieldCheck, LineChart, Archive, CreditCard,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
+import { useStoreEntitlements, hasFeature } from "@/hooks/use-store-entitlements";
 import { ACTIVE_ORDER_STATUSES, NON_REVENUE_ORDER_STATUSES } from "@/lib/order-status";
 import { VENDOR_TIERS } from "@/lib/vendor-tiers";
 import { useStorePresence } from "@/hooks/useStorePresence";
@@ -79,6 +82,8 @@ interface VendorStore {
   delete_reason?: string | null;
   suspended_activities?: string[];
   is_platform_owned?: boolean;
+  /** From vendor_subscriptions — not a stores column */
+  is_whatsapp_enabled?: boolean;
 }
 
 interface OrderCounters {
@@ -136,8 +141,10 @@ export default function VendorDashboardPage() {
 
   // Presence heartbeat — marks store as online while vendor is on dashboard
   useStorePresence(store?.id);
+  const { data: storeEntitlements } = useStoreEntitlements(store?.id);
 
   const hasLoadedRef = useRef(false);
+  const loadedForUserRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (authLoading) {
@@ -149,11 +156,21 @@ export default function VendorDashboardPage() {
       return;
     }
 
+    // Impersonation / account switch: always reload stores for the new JWT user
+    if (loadedForUserRef.current !== user.id) {
+      hasLoadedRef.current = false;
+      loadedForUserRef.current = user.id;
+      setStore(null);
+      setAllStores([]);
+      setNoStore(false);
+    }
+
     if (hasLoadedRef.current && store) {
       return;
     }
 
     let storeIdForRealtime: string | null = null;
+    let cancelled = false;
 
     async function fetchOrderCounters(storeId: string) {
       const [totalRes, activeRes, deliveredRes] = await Promise.all([
@@ -173,86 +190,154 @@ export default function VendorDashboardPage() {
         setLoading(true);
       }
 
+      // NOTE: is_whatsapp_enabled lives on vendor_subscriptions, not stores
       const STORE_SELECT_FULL =
-        "id, name, logo_url, banner_url, country, country_code, city_id, default_commercial_scope, products_count, followers_count, whatsapp_number, is_whatsapp_enabled, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type";
+        "id, name, logo_url, banner_url, country, country_code, city_id, default_commercial_scope, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type, max_collaborators_override";
       // Without geo migration columns (default_commercial_scope)
       const STORE_SELECT_SAFE =
-        "id, name, logo_url, banner_url, country, country_code, city_id, products_count, followers_count, whatsapp_number, is_whatsapp_enabled, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type";
+        "id, name, logo_url, banner_url, country, country_code, city_id, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_suspended, is_banned, deleted_at, suspension_reason, ban_reason, delete_reason, suspended_activities, is_platform_owned, shop_type, max_collaborators_override";
       // Absolute minimum — never treat schema drift as "no store"
       const STORE_SELECT_MINIMAL =
         "id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_platform_owned, shop_type";
 
-      const fetchOwned = async (cols: string) =>
-        (supabase as any)
-          .from("stores")
-          .select(cols)
-          .eq("owner_id", user!.id)
-          .order("created_at", { ascending: true });
-
-      let { data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_FULL);
-      if (storesErr) {
-        console.warn("[VendorDashboard] full select failed:", storesErr.message);
-        ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_SAFE));
-      }
-      if (storesErr) {
-        console.warn("[VendorDashboard] safe select failed:", storesErr.message);
-        ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_MINIMAL));
-      }
-
-      // Active collaborator stores (owners already included above)
-      let collabStores: any[] = [];
+      // Preferred path: SECURITY DEFINER RPC (survives stores RLS drift)
+      let merged: any[] = [];
+      let storesErr: { message: string } | null = null;
       try {
-        const { data: collabRows } = await (supabase as any)
-          .from("store_collaborators")
-          .select("store_id")
-          .eq("user_id", user!.id)
-          .eq("status", "active");
-        const collabIds = (collabRows || [])
-          .map((r: any) => r.store_id)
-          .filter((id: string) => !(storesData || []).some((s: any) => s.id === id));
-        if (collabIds.length > 0) {
-          const tryCols = [STORE_SELECT_FULL, STORE_SELECT_SAFE, STORE_SELECT_MINIMAL];
-          for (const cols of tryCols) {
-            const collabRes = await (supabase as any)
-              .from("stores")
-              .select(cols)
-              .in("id", collabIds);
-            if (!collabRes.error && (collabRes.data || []).length > 0) {
-              collabStores = collabRes.data || [];
-              break;
-            }
-          }
-          // RLS may deny base `stores` to collaborators — public view still has is_platform_owned
-          if (collabStores.length === 0) {
-            const pubRes = await (supabase as any)
-              .from("stores_public")
-              .select(
-                "id, name, logo_url, banner_url, country, is_platform_owned, products_count, followers_count, shop_type",
-              )
-              .in("id", collabIds);
-            if (!pubRes.error) {
-              collabStores = pubRes.data || [];
-            }
-          }
+        const { data: rpcPayload, error: rpcErr } = await (supabase as any).rpc(
+          "list_my_vendor_stores",
+        );
+        if (rpcErr) {
+          console.warn("[VendorDashboard] list_my_vendor_stores:", rpcErr.message);
+        } else if (rpcPayload?.ok === true && Array.isArray(rpcPayload.stores)) {
+          merged = rpcPayload.stores;
+          console.info(
+            "[VendorDashboard] list_my_vendor_stores ok count=",
+            rpcPayload.count,
+            "uid=",
+            rpcPayload.auth_uid,
+          );
+        } else if (rpcPayload?.error) {
+          console.warn("[VendorDashboard] list_my_vendor_stores payload:", rpcPayload);
         }
       } catch (e) {
-        console.warn("[VendorDashboard] collaborator stores", e);
+        console.warn("[VendorDashboard] list_my_vendor_stores unavailable", e);
       }
+      if (cancelled) return;
 
-      const merged = [...(storesData || []), ...collabStores];
+      // Fallback: direct SELECT + collaborators (legacy path)
+      if (merged.length === 0) {
+        const fetchOwned = async (cols: string) =>
+          (supabase as any)
+            .from("stores")
+            .select(cols)
+            .eq("owner_id", user!.id)
+            .order("created_at", { ascending: true });
+
+        let storesData: any[] | null = null;
+        ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_FULL));
+        if (cancelled) return;
+        if (storesErr) {
+          console.warn("[VendorDashboard] full select failed:", storesErr.message);
+          ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_SAFE));
+        }
+        if (cancelled) return;
+        if (storesErr) {
+          console.warn("[VendorDashboard] safe select failed:", storesErr.message);
+          ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_MINIMAL));
+        }
+        if (cancelled) return;
+
+        let collabStores: any[] = [];
+        try {
+          const { data: collabRows } = await (supabase as any)
+            .from("store_collaborators")
+            .select("store_id")
+            .eq("user_id", user!.id)
+            .eq("status", "active");
+          const collabIds = (collabRows || [])
+            .map((r: any) => r.store_id)
+            .filter((id: string) => !(storesData || []).some((s: any) => s.id === id));
+          if (collabIds.length > 0) {
+            const tryCols = [STORE_SELECT_FULL, STORE_SELECT_SAFE, STORE_SELECT_MINIMAL];
+            for (const cols of tryCols) {
+              const collabRes = await (supabase as any)
+                .from("stores")
+                .select(cols)
+                .in("id", collabIds);
+              if (!collabRes.error && (collabRes.data || []).length > 0) {
+                collabStores = collabRes.data || [];
+                break;
+              }
+            }
+            if (collabStores.length === 0) {
+              const pubRes = await (supabase as any)
+                .from("stores_public")
+                .select(
+                  "id, name, logo_url, banner_url, country, is_platform_owned, products_count, followers_count, shop_type",
+                )
+                .in("id", collabIds);
+              if (!pubRes.error) {
+                collabStores = pubRes.data || [];
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[VendorDashboard] collaborator stores", e);
+        }
+
+        merged = [...(storesData || []), ...collabStores];
+      }
 
       if (storesErr && merged.length === 0) {
         console.error("[VendorDashboard] cannot load stores:", storesErr.message);
-        setNoStore(true);
-        setLoading(false);
+        if (!cancelled) {
+          setNoStore(true);
+          setLoading(false);
+          hasLoadedRef.current = true;
+        }
         return;
       }
 
       if (merged.length === 0) {
-        setNoStore(true);
-        setLoading(false);
+        try {
+          const { data: dbg } = await (supabase as any).rpc("debug_store_select_access", {
+            p_store_id: null,
+          });
+          console.warn("[VendorDashboard] empty stores; debug_store_select_access:", dbg);
+        } catch (e) {
+          console.warn("[VendorDashboard] debug_store_select_access unavailable", e);
+        }
+        if (!cancelled) {
+          setNoStore(true);
+          setLoading(false);
+          hasLoadedRef.current = true;
+        }
         return;
       }
+
+      // Attach WhatsApp flag from vendor_subscriptions (not a stores column)
+      try {
+        const ids = merged.map((s) => s.id);
+        const { data: subs } = await supabase
+          .from("vendor_subscriptions")
+          .select("store_id, is_whatsapp_enabled")
+          .in("store_id", ids);
+        const waMap = new Map(
+          (subs || []).map((r: { store_id: string; is_whatsapp_enabled: boolean }) => [
+            r.store_id,
+            r.is_whatsapp_enabled === true,
+          ]),
+        );
+        merged = merged.map((s) => ({
+          ...s,
+          is_whatsapp_enabled: waMap.get(s.id) === true,
+        }));
+      } catch (e) {
+        console.warn("[VendorDashboard] vendor_subscriptions WA flags", e);
+      }
+
+      if (cancelled) return;
 
       setNoStore(false);
       setAllStores(merged);
@@ -326,6 +411,7 @@ export default function VendorDashboardPage() {
     }, 20000);
 
     return () => {
+      cancelled = true;
       clearInterval(pollInterval);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -381,9 +467,18 @@ export default function VendorDashboardPage() {
     ...(freightSimEnabled && shopType !== "local" ? [{ key: "freight_sim" as const, label: "Simulateur fret", icon: Calculator }] : []),
     { key: "kyb" as const, label: "Vérification KYB", icon: ShieldCheck },
     { key: "analytics_pro" as const, label: "Analytics", icon: LineChart },
-    ...(store?.collaborators_enabled ? [{ key: "team" as const, label: "Équipe", icon: Users }] : []),
+    ...(hasFeature(storeEntitlements, "collaborators", store?.collaborators_enabled)
+      ? [{ key: "team" as const, label: "Équipe", icon: Users }]
+      : []),
     { key: "settings" as const, label: "Paramètres", icon: Settings },
   ];
+
+  const couponsEnabled = hasFeature(storeEntitlements, "coupons", store?.can_create_coupons);
+  const whatsappEntitled = hasFeature(
+    storeEntitlements,
+    "whatsapp_store",
+    store?.is_whatsapp_enabled === true,
+  );
 
   const renderTabContent = () => (
     <>
@@ -395,7 +490,7 @@ export default function VendorDashboardPage() {
           hasBanner={Boolean((store as any)?.banner_url)}
           hasCountry={Boolean((store as any)?.country_code || (store as any)?.country)}
           hasWhatsappNumber={Boolean((store as any)?.whatsapp_number)}
-          whatsappEnabled={(store as any)?.is_whatsapp_enabled === true}
+          whatsappEnabled={whatsappEntitled}
         />
       )}
       {activeTab === "catalogue" && (
@@ -411,7 +506,7 @@ export default function VendorDashboardPage() {
       {activeTab === "promos" && <VendorPromotionsTab storeId={store!.id} />}
       {activeTab === "coupons" && (
         <div className="space-y-6">
-          {store?.can_create_coupons ? (
+          {couponsEnabled ? (
             <>
               <VendorCouponsTab storeId={store!.id} />
               <div className="border-t border-border pt-4">
@@ -514,15 +609,32 @@ export default function VendorDashboardPage() {
           <div className="text-center py-16 space-y-3">
             <Store size={48} className="mx-auto text-muted-foreground/20" />
             <p className="text-sm text-muted-foreground">Vous n'avez pas encore de boutique.</p>
-            <p className="text-xs text-muted-foreground">
-              Contactez l'administration pour créer votre espace vendeur.
+            <p className="text-xs text-muted-foreground max-w-md mx-auto">
+              Si une boutique existait déjà, reconnectez-vous ou contactez le support — un problème
+              d&apos;accès (session / droits) peut masquer temporairement l&apos;espace vendeur.
             </p>
-            <button
-              onClick={() => navigate("/become-vendor")}
-              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90"
-            >
-              Demander une boutique
-            </button>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  hasLoadedRef.current = false;
+                  loadedForUserRef.current = null;
+                  setLoading(true);
+                  setNoStore(false);
+                  // Force effect re-run
+                  window.location.reload();
+                }}
+                className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted"
+              >
+                Réessayer
+              </button>
+              <button
+                onClick={() => navigate("/become-vendor")}
+                className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90"
+              >
+                Demander une boutique
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -1347,6 +1459,9 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
 
       {/* Mobile Money Payment Numbers */}
       <VendorPaymentNumbers storeId={store.id} />
+
+      <VendorIncludedDeliveryQuota storeId={store.id} />
+      <VendorCarrierAllowlistsPanel storeId={store.id} />
 
       {/* Store Certification Badge */}
       <StoreCertificationSection storeId={store.id} />

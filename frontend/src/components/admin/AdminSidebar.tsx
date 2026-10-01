@@ -150,18 +150,16 @@ export function AdminSidebar() {
   const location = useLocation();
   const { data: branding } = useBranding();
   const logoCandidates = [
-    "/brand/zandofy-logo.webp",
     branding?.header_logo_url,
     branding?.footer_logo_url,
-    branding?.pwa_icon_192_url,
-    "/icons/icon-192.png",
+    "/brand/zandofy-logo.webp",
   ].filter((u): u is string => Boolean(u?.trim()));
   const [logoIndex, setLogoIndex] = useState(0);
   const logoUrl = logoCandidates[logoIndex] ?? null;
 
   useEffect(() => {
     setLogoIndex(0);
-  }, [branding?.header_logo_url, branding?.footer_logo_url, branding?.pwa_icon_192_url]);
+  }, [branding?.header_logo_url, branding?.footer_logo_url]);
 
   const showLogo = Boolean(logoUrl) && logoIndex < logoCandidates.length;
 

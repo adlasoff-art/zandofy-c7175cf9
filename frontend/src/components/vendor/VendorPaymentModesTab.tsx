@@ -1,6 +1,7 @@
 /**
  * Vendor payment modes: MoMo / Carte (Keccel) / Hors plateforme.
  * Persists via SECURITY DEFINER RPC vendor_update_payment_modes.
+ * Off-platform toggle gated by get_store_entitlements (R1) with legacy override fallback.
  */
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +11,7 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { useVendorOffPlatformAccess } from "@/hooks/use-vendor-off-platform-access";
 import { VendorPaymentNumbers } from "@/components/vendor/VendorPaymentNumbers";
+import { useStoreEntitlements, hasFeature } from "@/hooks/use-store-entitlements";
 
 interface Props {
   storeId: string;
@@ -18,6 +20,7 @@ interface Props {
 export function VendorPaymentModesTab({ storeId }: Props) {
   const queryClient = useQueryClient();
   const { data: access } = useVendorOffPlatformAccess(storeId);
+  const { data: entitlements } = useStoreEntitlements(storeId);
 
   const { data: override, isLoading } = useQuery({
     queryKey: ["vendor-payment-modes", storeId],
@@ -33,6 +36,11 @@ export function VendorPaymentModesTab({ storeId }: Props) {
     },
   });
 
+  const offPlatformEntitled = hasFeature(
+    entitlements,
+    "off_platform_payment",
+    override?.vendor_off_platform_enabled === true,
+  );
   const [mobileMoney, setMobileMoney] = useState(true);
   const [card, setCard] = useState(true);
   const [offPlatform, setOffPlatform] = useState(false);
@@ -58,8 +66,11 @@ export function VendorPaymentModesTab({ storeId }: Props) {
     if (!override) return;
     setMobileMoney(override.vendor_mobile_money_enabled !== false);
     setCard(override.vendor_card_enabled !== false);
-    setOffPlatform(override.vendor_off_platform_enabled === true);
-  }, [override]);
+    // Entitlement is the read source; do not enable off-platform if not entitled
+    setOffPlatform(
+      offPlatformEntitled && override.vendor_off_platform_enabled === true,
+    );
+  }, [override, offPlatformEntitled]);
 
   useEffect(() => {
     const p = storeRow?.group_checkout_policy;
@@ -85,8 +96,13 @@ export function VendorPaymentModesTab({ storeId }: Props) {
     }
   };
   const handleSave = async () => {
-    if (!mobileMoney && !card && !offPlatform) {
+    const effectiveOff = offPlatformEntitled && offPlatform;
+    if (!mobileMoney && !card && !effectiveOff) {
       toast.error("Sélectionnez au moins un mode de perception");
+      return;
+    }
+    if (offPlatform && !offPlatformEntitled) {
+      toast.error("Le paiement hors plateforme n’est pas activé pour cette boutique (contactez le support).");
       return;
     }
     setSaving(true);
@@ -95,7 +111,7 @@ export function VendorPaymentModesTab({ storeId }: Props) {
         p_store_id: storeId,
         p_mobile_money: mobileMoney,
         p_card: card,
-        p_off_platform: offPlatform,
+        p_off_platform: effectiveOff,
       });
       if (error) throw error;
       toast.success("Modes de paiement enregistrés");
@@ -125,6 +141,7 @@ export function VendorPaymentModesTab({ storeId }: Props) {
       icon: Smartphone,
       checked: mobileMoney,
       onChange: setMobileMoney,
+      disabled: false,
     },
     {
       key: "card" as const,
@@ -133,14 +150,18 @@ export function VendorPaymentModesTab({ storeId }: Props) {
       icon: CreditCard,
       checked: card,
       onChange: setCard,
+      disabled: false,
     },
     {
       key: "off" as const,
       label: "Hors plateforme",
-      desc: "Le client paie vos numéros / QR directement, puis envoie une preuve. Essai 30 jours puis abonnement.",
+      desc: offPlatformEntitled
+        ? "Le client paie vos numéros / QR directement, puis envoie une preuve. Essai 30 jours puis abonnement."
+        : "Non inclus dans votre plan — activez ce droit via Abonnements (admin) ou contactez le support.",
       icon: Banknote,
       checked: offPlatform,
       onChange: setOffPlatform,
+      disabled: !offPlatformEntitled,
     },
   ];
 
@@ -159,14 +180,19 @@ export function VendorPaymentModesTab({ storeId }: Props) {
           return (
             <label
               key={m.key}
-              className={`flex gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
-                m.checked ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+              className={`flex gap-3 p-4 rounded-lg border-2 transition-colors ${
+                m.disabled
+                  ? "border-border opacity-60 cursor-not-allowed"
+                  : m.checked
+                    ? "border-primary bg-primary/5 cursor-pointer"
+                    : "border-border hover:border-primary/40 cursor-pointer"
               }`}
             >
               <input
                 type="checkbox"
                 className="mt-1"
                 checked={m.checked}
+                disabled={m.disabled}
                 onChange={(e) => m.onChange(e.target.checked)}
               />
               <div className="flex-1 min-w-0">
