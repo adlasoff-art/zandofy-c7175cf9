@@ -901,7 +901,8 @@ function VendorSummaryWidgets({
   totalUnread: number;
   storeId: string;
 }) {
-  const { subscription, tierConfig } = useVendorSubscription(storeId);
+  const { subscription, tierConfig, effectiveMaxProducts, productQuotaExempt } =
+    useVendorSubscription(storeId, { isPlatformOwned: store.is_platform_owned });
 
   // Today's sales and pending orders
   const { data: todayStats } = useQuery({
@@ -973,8 +974,13 @@ function VendorSummaryWidgets({
           </div>
           <p className="text-[11px] text-muted-foreground mt-1">
             Produits
-            {subscription && subscription.max_products < Infinity && (
-              <span className="text-muted-foreground/60"> / {subscription.max_products}</span>
+            {!productQuotaExempt &&
+              Number.isFinite(effectiveMaxProducts) &&
+              effectiveMaxProducts < Infinity && (
+                <span className="text-muted-foreground/60"> / {effectiveMaxProducts}</span>
+              )}
+            {productQuotaExempt && (
+              <span className="text-muted-foreground/60"> · plateforme (illimité)</span>
             )}
           </p>
         </div>
