@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Bell, Mail, Smartphone, Send, Users, Store, Truck, Bike, Loader2, CheckCircle, XCircle, TestTube, Settings, Calendar } from "lucide-react";
+import { Bell, Mail, Smartphone, Send, Users, Store, Truck, Bike, Loader2, CheckCircle, XCircle, TestTube, Settings, Calendar, MessageSquareText } from "lucide-react";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,7 @@ import { SmsConfigPanel } from "@/components/admin/notifications/SmsConfigPanel"
 import { CampaignsPanel } from "@/components/admin/notifications/CampaignsPanel";
 import { ensureFreshSession, parseEdgeFunctionError } from "@/services/admin-email";
 import { PwaUpdateBroadcastCard } from "@/components/admin/PwaUpdateBroadcastCard";
+import { UtilityTemplatesPanel } from "@/components/admin/notifications/UtilityTemplatesPanel";
 
 type Channel = "push" | "email" | "sms";
 type Audience = "all" | "vendors" | "forwarders" | "shippers" | "operators" | "riders" | "customers";
@@ -243,11 +244,16 @@ export default function AdminNotificationsPage() {
       <Tabs defaultValue="compose" className="space-y-4">
         <TabsList className="bg-muted/50">
           <TabsTrigger value="compose" className="text-xs gap-1"><Send size={12} /> Envoyer</TabsTrigger>
+          <TabsTrigger value="utility" className="text-xs gap-1"><MessageSquareText size={12} /> Messages utilitaires</TabsTrigger>
           <TabsTrigger value="campaigns" className="text-xs gap-1"><Calendar size={12} /> Campagnes auto</TabsTrigger>
           <TabsTrigger value="sms-config" className="text-xs gap-1"><Settings size={12} /> Config SMS</TabsTrigger>
           <TabsTrigger value="deliverability" className="text-xs gap-1"><TestTube size={12} /> Test email</TabsTrigger>
           <TabsTrigger value="pwa-update" className="text-xs gap-1"><Bell size={12} /> Mise à jour PWA</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="utility">
+          <UtilityTemplatesPanel />
+        </TabsContent>
 
         {/* ── Tab: Compose & Send ── */}
         <TabsContent value="compose">

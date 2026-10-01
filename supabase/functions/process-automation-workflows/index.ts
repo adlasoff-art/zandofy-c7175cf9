@@ -1,6 +1,15 @@
 // Automation workflows processor — runs hourly via pg_cron
 // Processes email + push channels for active workflows.
 // Popup channel is handled client-side via useAutomation hook.
+// Additive: send window (outreach_config) + optional template_id from utility_message_templates.
+
+import {
+  interpolateOutreach,
+  isWithinSendWindow,
+  loadOutreachConfig,
+  type UtilityTemplateRow,
+} from "../_shared/outreach.ts";
+import { sendEmail as sendResendEmail } from "../_shared/email.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -24,6 +33,8 @@ interface Workflow {
   push_title: string | null;
   push_body: string | null;
   popup_cta_link: string | null;
+  template_id: string | null;
+  ignore_send_window: boolean | null;
 }
 
 Deno.serve(async (req) => {
@@ -35,10 +46,11 @@ Deno.serve(async (req) => {
     const { createClient } = await import("npm:@supabase/supabase-js@2");
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Fetch active workflows that have at least one non-popup channel
+    const outreachCfg = await loadOutreachConfig(supabase);
+
     const { data: workflows, error: wfErr } = await supabase
       .from("automation_workflows")
       .select("*")
@@ -55,14 +67,36 @@ Deno.serve(async (req) => {
       workflows_evaluated: workflows.length,
       emails_sent: 0,
       pushes_sent: 0,
+      skipped_outside_window: 0,
       users_skipped_already_processed: 0,
       errors: [] as string[],
     };
 
     for (const wf of workflows as Workflow[]) {
       try {
+        if (!wf.ignore_send_window && !isWithinSendWindow(outreachCfg.default_send_window)) {
+          summary.skipped_outside_window++;
+          continue;
+        }
+
         const eligibleUserIds = await getEligibleUsers(supabase, wf);
         if (eligibleUserIds.length === 0) continue;
+
+        let template: UtilityTemplateRow | null = null;
+        if (wf.template_id) {
+          const { data: t } = await supabase
+            .from("utility_message_templates")
+            .select("*")
+            .eq("id", wf.template_id)
+            .eq("is_active", true)
+            .maybeSingle();
+          template = (t as UtilityTemplateRow) || null;
+        }
+
+        const emailSubject = template?.email_subject ?? wf.email_subject;
+        const emailHtml = template?.email_html ?? wf.email_html_content;
+        const pushTitle = template?.push_title ?? wf.push_title;
+        const pushBody = template?.push_body ?? wf.push_body;
 
         const wantsEmail = ["email", "push_email", "all"].includes(wf.channel);
         const wantsPush = ["push", "popup_push", "push_email", "all"].includes(wf.channel);
@@ -70,25 +104,43 @@ Deno.serve(async (req) => {
         for (const userId of eligibleUserIds) {
           let sentSomething = false;
 
-          // EMAIL
-          if (wantsEmail && wf.email_subject && wf.email_html_content) {
-            const ok = await sendEmail(supabase, userId, wf);
+          if (wantsEmail && emailSubject && emailHtml) {
+            const ok = await sendEmailResolved(supabase, userId, {
+              subject: emailSubject,
+              html: emailHtml,
+              templateId: template?.id ?? null,
+            });
             if (ok) {
               summary.emails_sent++;
               sentSomething = true;
+            } else if (wantsPush && pushTitle && pushBody) {
+              // Fallback no-email → push (plan)
+              const okPush = await sendPushResolved(supabase, userId, {
+                title: pushTitle,
+                body: pushBody,
+                url: wf.popup_cta_link || "/",
+                templateId: template?.id ?? null,
+              });
+              if (okPush) {
+                summary.pushes_sent++;
+                sentSomething = true;
+              }
             }
           }
 
-          // PUSH
-          if (wantsPush && wf.push_title && wf.push_body) {
-            const ok = await sendPush(supabase, userId, wf);
+          if (!sentSomething && wantsPush && pushTitle && pushBody) {
+            const ok = await sendPushResolved(supabase, userId, {
+              title: pushTitle,
+              body: pushBody,
+              url: wf.popup_cta_link || "/",
+              templateId: template?.id ?? null,
+            });
             if (ok) {
               summary.pushes_sent++;
               sentSomething = true;
             }
           }
 
-          // Record progress only if at least one send succeeded
           if (sentSomething) {
             await supabase.from("automation_user_progress").insert({
               user_id: userId,
@@ -122,11 +174,9 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 async function getEligibleUsers(supabase: any, wf: Workflow): Promise<string[]> {
-  // 1. Build profile candidates based on signup window
   let query = supabase.from("profiles").select("id, created_at, email");
 
   if (wf.delay_days > 0) {
-    // Users who signed up exactly delay_days ago (24h window)
     const target = new Date();
     target.setUTCDate(target.getUTCDate() - wf.delay_days);
     const start = new Date(target);
@@ -146,7 +196,6 @@ async function getEligibleUsers(supabase: any, wf: Workflow): Promise<string[]> 
 
   let userIds: string[] = profiles.map((p: any) => p.id);
 
-  // 2. Filter out users already processed for this workflow (idempotence)
   const { data: existingProgress } = await supabase
     .from("automation_user_progress")
     .select("user_id, display_count")
@@ -163,12 +212,11 @@ async function getEligibleUsers(supabase: any, wf: Workflow): Promise<string[]> 
     if (count === undefined) return true;
     if (wf.display_frequency === "once") return false;
     if (wf.max_displays !== null && count >= wf.max_displays) return false;
-    return false; // For email/push, default to once-per-workflow
+    return false;
   });
 
   if (userIds.length === 0) return [];
 
-  // 3. condition_has_order filter
   if (wf.condition_has_order !== null) {
     const { data: orderers } = await supabase
       .from("orders")
@@ -184,9 +232,7 @@ async function getEligibleUsers(supabase: any, wf: Workflow): Promise<string[]> 
     }
   }
 
-  // Trigger-based shortcuts
   if (wf.trigger_type === "visit_no_order" || wf.trigger_type === "no_order_delay") {
-    // Already covered by condition_has_order=false above if set; otherwise re-apply
     if (wf.condition_has_order === null) {
       const { data: orderers } = await supabase
         .from("orders")
@@ -201,32 +247,53 @@ async function getEligibleUsers(supabase: any, wf: Workflow): Promise<string[]> 
   return userIds;
 }
 
-async function sendEmail(supabase: any, userId: string, wf: Workflow): Promise<boolean> {
+async function sendEmailResolved(
+  supabase: any,
+  userId: string,
+  opts: { subject: string; html: string; templateId: string | null },
+): Promise<boolean> {
   try {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("email, first_name")
+      .select("email, first_name, last_name")
       .eq("id", userId)
       .maybeSingle();
 
     if (!profile?.email) return false;
 
-    const html = (wf.email_html_content || "")
+    const name =
+      [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim() ||
+      profile.first_name ||
+      "";
+    const vars = {
+      name,
+      first_name: profile.first_name || "",
+      email: profile.email,
+      cta_url: "https://www.zandofy.com",
+    };
+    const subject = interpolateOutreach(opts.subject, vars);
+    const html = interpolateOutreach(opts.html, vars)
       .replace(/\{\{first_name\}\}/g, profile.first_name || "")
       .replace(/\{\{email\}\}/g, profile.email);
 
-    const { error } = await supabase.functions.invoke("send-email", {
-      body: {
-        to: profile.email,
-        subject: wf.email_subject,
-        html,
-      },
+    const result = await sendResendEmail({
+      to: profile.email,
+      subject,
+      html,
     });
 
-    if (error) {
-      console.error(`Email send failed for ${profile.email}:`, error);
+    if (!result.ok) {
+      console.error(`Email send failed for ${profile.email}:`, result.error);
       return false;
     }
+
+    await supabase.from("outreach_send_log").insert({
+      user_id: userId,
+      template_id: opts.templateId,
+      channel: "email",
+      status: "sent",
+      meta: { source: "process-automation-workflows" },
+    });
     return true;
   } catch (err) {
     console.error(`sendEmail error for user ${userId}:`, err);
@@ -234,29 +301,69 @@ async function sendEmail(supabase: any, userId: string, wf: Workflow): Promise<b
   }
 }
 
-async function sendPush(supabase: any, userId: string, wf: Workflow): Promise<boolean> {
+async function sendPushResolved(
+  supabase: any,
+  userId: string,
+  opts: { title: string; body: string; url: string; templateId: string | null },
+): Promise<boolean> {
   try {
-    // Verify the user has at least one subscription
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("first_name, last_name, email")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const name =
+      [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() ||
+      profile?.first_name ||
+      "";
+    const vars = {
+      name,
+      first_name: profile?.first_name || "",
+      email: profile?.email || "",
+      cta_url: opts.url || "https://www.zandofy.com",
+    };
+    const title = interpolateOutreach(opts.title, vars);
+    const body = interpolateOutreach(opts.body, vars);
+
+    await supabase.from("notifications").insert({
+      user_id: userId,
+      title,
+      message: body,
+      type: "promo",
+    });
+
     const { count } = await supabase
       .from("push_subscriptions")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId);
 
-    if (!count || count === 0) return false;
-
-    const { error } = await supabase.functions.invoke("push-notifications", {
-      body: {
-        user_ids: [userId],
-        title: wf.push_title,
-        body: wf.push_body,
-        url: wf.popup_cta_link || "/",
-      },
-    });
-
-    if (error) {
-      console.error(`Push send failed for user ${userId}:`, error);
-      return false;
+    if (count && count > 0) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      await fetch(`${supabaseUrl}/functions/v1/push-notifications`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_ids: [userId],
+          title,
+          body,
+          url: opts.url || "/",
+        }),
+      });
     }
+
+    await supabase.from("outreach_send_log").insert({
+      user_id: userId,
+      template_id: opts.templateId,
+      channel: "push",
+      status: "sent",
+      meta: { source: "process-automation-workflows", had_push_sub: !!count },
+    });
     return true;
   } catch (err) {
     console.error(`sendPush error for user ${userId}:`, err);
