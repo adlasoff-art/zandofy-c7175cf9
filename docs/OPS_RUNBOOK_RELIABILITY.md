@@ -21,6 +21,7 @@ Appliquer dans le SQL Editor **staging**, smoke, puis **production** :
 10. `20261001160000_kyb_completeness_rescore.sql`
 11. `20261001161000_preview_included_delivery_credit.sql`
 12. `20261001162000_reliability_audit_hotfixes.sql` (KYB submit gate + consume authz/total)
+13. `20261001163000_restore_stores_select_for_vendors.sql` (**hotfix** vendor/admin store SELECT)
 
 Skip already-applied files (idempotent where possible).
 

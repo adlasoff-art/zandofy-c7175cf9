@@ -2,13 +2,11 @@ import { useState } from "react";
 import { X, Loader2, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { throwIfEdgeFunctionError } from "@/services/admin-email";
-import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 export function ImpersonationBanner() {
   const isActive = sessionStorage.getItem("impersonation_active") === "true";
   const [restoring, setRestoring] = useState(false);
-  const navigate = useNavigate();
 
   if (!isActive) return null;
 
@@ -51,7 +49,8 @@ export function ImpersonationBanner() {
       sessionStorage.removeItem("impersonation_admin_refresh_token");
 
       toast.success("Session admin restaurée");
-      navigate("/admin/users", { replace: true });
+      // Hard reload so VendorDashboard / Auth caches reset for the admin JWT
+      window.location.assign("/admin/users");
     } catch (e: any) {
       console.error("Restore failed:", e);
       toast.error(e.message || "Échec de la restauration");
