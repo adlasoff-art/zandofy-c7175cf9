@@ -25,7 +25,7 @@ Document principal à lire en premier :
 | `docs/VENDOR_PLANS_AND_FULFILLMENT_CONTRACT.md` | Plans, lanes, hub, **Contract RPC §8** |
 | `docs/OPS_RUNBOOK_RELIABILITY.md` | Migrations + crons staging→prod |
 | `docs/CHECKOUT_SMOKE_CHECKLIST.md` | 5 scénarios checkout |
-| `docs/NATIVE_SYNC_FROM_WEB.md` | **Réponse web → mobile** (chrome, geo cascade, poids, freight) |
+| `docs/NATIVE_SYNC_FROM_WEB.md` | **Réponse web → mobile** (chrome, geo, poids, freight, **RLS stores vendeur**, KYB) |
 
 ### Contract RPC obligatoire (natif)
 
@@ -39,7 +39,9 @@ Consommer ces RPC plutôt que les colonnes legacy en lecture seule :
 | `get_carrier_allowlist_ids` | Filtre forwarders / operators |
 | `refresh_kyb_completeness_score` | Rescore KYB après upload |
 | `assert_store_identity_ready` | Gate publish / identité |
-| `try_consume_included_delivery` | Consommation crédit (post-order) |
+| `try_consume_included_delivery` | Consommation crédit (post-order items) |
+
+**Table `stores` (dashboard vendeur) :** SELECT via JWT owner/collab/admin/manager — policy `Store team and staff read full store` (`163000`). Catalog public = `stores_public` seulement.
 
 Détail auth + signatures : `docs/VENDOR_PLANS_AND_FULFILLMENT_CONTRACT.md` §8.
 

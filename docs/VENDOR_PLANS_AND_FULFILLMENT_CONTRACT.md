@@ -159,6 +159,10 @@ Apply **after** `150000–154000` on staging then production.
 | `register_hub_storage_arrival(...)` | store team | Hub tracking |
 | `accrue_hub_storage_charges(date)` | service_role | Cron only |
 
+**KYB submit (serveur `162000`) :** transition vers `submitted` refusée si score &lt; 80 ou &lt; 5 docs requis.
+
+**Dashboard vendeur :** lire table `stores` (RLS `163000` — owner/collab/admin/manager). Ne pas s’appuyer seul sur `stores_public` (filtre catalog).
+
 Legacy columns (`vendor_*_enabled`, `can_create_coupons`) remain **write mirrors**; reads prefer entitlements / checkout flags RPC.
 
 ---
