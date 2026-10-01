@@ -219,7 +219,11 @@ export default function AdminVendorPricingPage() {
     queryFn: async () => {
       let q = (supabase as any).from("stores").select("id, name, owner_id, is_platform_owned, returns_enabled").order("name");
       if (search) q = q.ilike("name", `%${search}%`);
-      const { data: storesData } = await q.limit(500);
+      const { data: storesData, error } = await q.limit(500);
+      if (error) {
+        console.error("[AdminVendorPricing] stores select:", error);
+        throw error;
+      }
       if (!storesData?.length) return [];
 
       const storeIds = storesData.map((s: any) => s.id);

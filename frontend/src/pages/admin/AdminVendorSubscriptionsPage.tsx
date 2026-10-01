@@ -58,12 +58,16 @@ export default function AdminVendorSubscriptionsPage() {
   const { data: stores = [], isLoading } = useQuery({
     queryKey: ["admin-vendor-subs"],
     queryFn: async () => {
-      const { data: storesData } = await supabase
+      const { data: storesData, error } = await supabase
         .from("stores")
         .select("id, name, owner_id, products_count, is_verified, is_suspended, is_banned, can_create_coupons, collaborators_enabled, max_collaborators_override")
-        .order("name") as { data: any[] | null };
+        .order("name") as { data: any[] | null; error: any };
 
-      if (!storesData) return [];
+      if (error) {
+        console.error("[AdminVendorSubscriptions] stores select:", error);
+        throw error;
+      }
+      if (!storesData?.length) return [];
 
       const storeIds = storesData.map((s) => s.id);
       const [{ data: subs }, { data: overrides }] = await Promise.all([
