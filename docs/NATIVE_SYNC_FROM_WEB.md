@@ -2,7 +2,7 @@
 
 **Public :** agent Cursor / équipe **Flutter `zandofy-mobile`**  
 **Auteur :** web PWA (`frontend/` + `supabase/` monorepo)  
-**Contexte :** migrations `20261001140000` → **`20261001163000`** (staging) ; fiabilisation R0–R5 + audit + hotfix stores SELECT.  
+**Contexte :** migrations `20261001140000` → **`20261001164000`** (staging) ; fiabilisation R0–R5 + audit + hotfix stores SELECT + RPC `list_my_vendor_stores`.  
 **Backend unique :** `supabase/` à la racine du monorepo web — **jamais** `frontend/supabase/` (supprimé).
 
 > Règles mobiles à respecter : JWT/anon only ; catalogue `*_public` ; pas d’UPDATE client sur `checkout_sessions` ; hide-if-fail via `BackendCapabilityProbe`.
@@ -18,7 +18,7 @@
 - KYB : rescore docs + **gate submit serveur** score≥80 + 5 docs (`162000`)
 - PWA SW v13 : navigate **network-first** (plus de cache HTML long)
 - Dead trees : `frontend/supabase/`, `src/integrations/`, `logistics-path.ts` retirés
-- **Hotfix `163000` :** RLS `stores` SELECT restaurée (owner / collab / admin / manager) — boutiques « invisibles » après dérive policies
+- **Hotfix `163000` / `164000` :** RLS `stores` SELECT + RPC **`list_my_vendor_stores()`** (SECURITY DEFINER) — chemin recommandé pour l’espace vendeur
 - Docs : `VENDOR_PLANS_AND_FULFILLMENT_CONTRACT.md` §8, `OPS_RUNBOOK_RELIABILITY.md`, `CHECKOUT_SMOKE_CHECKLIST.md`
 
 ### Contrats SQL / RPC / Edge (noms + migrations)
@@ -34,7 +34,8 @@
 | `assert_store_identity_ready` | `140000` | owner/collab | Gate publish |
 | `store_kyb_gate` | existant | store team | soft_warn / blocked |
 | Edge `accrue-hub-storage` | `supabase/functions/accrue-hub-storage/` | cron secret / service_role | Ops only |
-| Policy `Store team and staff read full store` | **`163000`** | RLS on `stores` | Voir § Addendum vendeur ci-dessous |
+| Policy `Store team and staff read full store` | **`163000`/`164000`** | RLS on `stores` | Voir § Addendum vendeur ci-dessous |
+| `list_my_vendor_stores()` | **`164000`** | authenticated | **Primary** vendor store list (owner + active collab) |
 
 Détail signatures : [`docs/VENDOR_PLANS_AND_FULFILLMENT_CONTRACT.md`](./VENDOR_PLANS_AND_FULFILLMENT_CONTRACT.md) §8.
 
@@ -72,17 +73,18 @@ Liste vendeur uniquement via `stores_public` → **boutiques suspendues / archiv
 | Contexte | Source de vérité | Notes |
 |----------|------------------|--------|
 | Catalogue / discovery / storefront public | `stores_public` / `products_public` | Exclut ban / suspend / `deleted_at` |
-| **Dashboard vendeur** (owner, collab, impersonation JWT) | Table **`stores`** filtrée `owner_id = auth.uid()` **ou** collab active | RLS policy `Store team and staff read full store` |
-| Admin listing ops | `stores` + rôle admin/manager | Même policy |
+| **Dashboard vendeur** (owner, collab, impersonation JWT) | RPC **`list_my_vendor_stores()`** (`164000`) ; fallback table `stores` | SECURITY DEFINER — survit dérive RLS |
+| Admin listing ops | `stores` + rôle admin/manager | Policy `Store team and staff read full store` |
 
-**Ne pas** charger l’espace vendeur uniquement depuis `stores_public` : une boutique suspendue/archivée doit encore être visible pour le owner (bannières web) via `stores`.
+**Ne pas** charger l’espace vendeur uniquement depuis `stores_public` : une boutique suspendue/archivée doit encore être visible pour le owner (bannières web) via `stores` / RPC.
 
 ### Ordre migrations à exiger côté ops mobile
 
-`140000` → … → `162000` → **`163000`** (voir [`OPS_RUNBOOK_RELIABILITY.md`](./OPS_RUNBOOK_RELIABILITY.md)).
+`140000` → … → `163000` → **`164000`** (voir [`OPS_RUNBOOK_RELIABILITY.md`](./OPS_RUNBOOK_RELIABILITY.md)).
 
 ### Diagnostic (JWT utilisateur — pas SQL Editor)
 
+- RPC : `list_my_vendor_stores()` → `{ ok, count, stores[] }`
 - RPC optionnelle : `debug_store_select_access(null)` → `owned_store_count` / `accessible_store_count`
 - SQL Editor sans session → toujours `not_authenticated` (normal)
 

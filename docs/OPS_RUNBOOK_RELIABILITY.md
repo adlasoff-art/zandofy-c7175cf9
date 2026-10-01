@@ -22,6 +22,7 @@ Appliquer dans le SQL Editor **staging**, smoke, puis **production** :
 11. `20261001161000_preview_included_delivery_credit.sql`
 12. `20261001162000_reliability_audit_hotfixes.sql` (KYB submit gate + consume authz/total)
 13. `20261001163000_restore_stores_select_for_vendors.sql` (**hotfix** vendor/admin store SELECT)
+14. `20261001164000_list_my_vendor_stores_rpc.sql` (**hotfix** RPC `list_my_vendor_stores` — chemin vendor dashboard)
 
 Skip already-applied files (idempotent where possible).
 

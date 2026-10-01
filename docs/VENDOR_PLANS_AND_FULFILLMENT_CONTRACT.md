@@ -161,7 +161,7 @@ Apply **after** `150000–154000` on staging then production.
 
 **KYB submit (serveur `162000`) :** transition vers `submitted` refusée si score &lt; 80 ou &lt; 5 docs requis.
 
-**Dashboard vendeur :** lire table `stores` (RLS `163000` — owner/collab/admin/manager). Ne pas s’appuyer seul sur `stores_public` (filtre catalog).
+**Dashboard vendeur :** RPC `list_my_vendor_stores()` (`164000`) en chemin principal ; sinon table `stores` (RLS `163000`). Ne pas s’appuyer seul sur `stores_public` (filtre catalog).
 
 Legacy columns (`vendor_*_enabled`, `can_create_coupons`) remain **write mirrors**; reads prefer entitlements / checkout flags RPC.
 

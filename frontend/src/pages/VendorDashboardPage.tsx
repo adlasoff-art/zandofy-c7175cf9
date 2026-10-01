@@ -200,67 +200,94 @@ export default function VendorDashboardPage() {
       const STORE_SELECT_MINIMAL =
         "id, name, logo_url, products_count, followers_count, whatsapp_number, pending_name, name_change_status, can_create_coupons, collaborators_enabled, is_platform_owned, shop_type";
 
-      const fetchOwned = async (cols: string) =>
-        (supabase as any)
-          .from("stores")
-          .select(cols)
-          .eq("owner_id", user!.id)
-          .order("created_at", { ascending: true });
-
-      let { data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_FULL);
-      if (cancelled) return;
-      if (storesErr) {
-        console.warn("[VendorDashboard] full select failed:", storesErr.message);
-        ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_SAFE));
-      }
-      if (cancelled) return;
-      if (storesErr) {
-        console.warn("[VendorDashboard] safe select failed:", storesErr.message);
-        ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_MINIMAL));
-      }
-      if (cancelled) return;
-
-      // Active collaborator stores (owners already included above)
-      let collabStores: any[] = [];
+      // Preferred path: SECURITY DEFINER RPC (survives stores RLS drift)
+      let merged: any[] = [];
+      let storesErr: { message: string } | null = null;
       try {
-        const { data: collabRows } = await (supabase as any)
-          .from("store_collaborators")
-          .select("store_id")
-          .eq("user_id", user!.id)
-          .eq("status", "active");
-        const collabIds = (collabRows || [])
-          .map((r: any) => r.store_id)
-          .filter((id: string) => !(storesData || []).some((s: any) => s.id === id));
-        if (collabIds.length > 0) {
-          const tryCols = [STORE_SELECT_FULL, STORE_SELECT_SAFE, STORE_SELECT_MINIMAL];
-          for (const cols of tryCols) {
-            const collabRes = await (supabase as any)
-              .from("stores")
-              .select(cols)
-              .in("id", collabIds);
-            if (!collabRes.error && (collabRes.data || []).length > 0) {
-              collabStores = collabRes.data || [];
-              break;
-            }
-          }
-          // Last resort: public catalog view (thin row — prefer collaborator RLS on stores)
-          if (collabStores.length === 0) {
-            const pubRes = await (supabase as any)
-              .from("stores_public")
-              .select(
-                "id, name, logo_url, banner_url, country, is_platform_owned, products_count, followers_count, shop_type",
-              )
-              .in("id", collabIds);
-            if (!pubRes.error) {
-              collabStores = pubRes.data || [];
-            }
-          }
+        const { data: rpcPayload, error: rpcErr } = await (supabase as any).rpc(
+          "list_my_vendor_stores",
+        );
+        if (rpcErr) {
+          console.warn("[VendorDashboard] list_my_vendor_stores:", rpcErr.message);
+        } else if (rpcPayload?.ok === true && Array.isArray(rpcPayload.stores)) {
+          merged = rpcPayload.stores;
+          console.info(
+            "[VendorDashboard] list_my_vendor_stores ok count=",
+            rpcPayload.count,
+            "uid=",
+            rpcPayload.auth_uid,
+          );
+        } else if (rpcPayload?.error) {
+          console.warn("[VendorDashboard] list_my_vendor_stores payload:", rpcPayload);
         }
       } catch (e) {
-        console.warn("[VendorDashboard] collaborator stores", e);
+        console.warn("[VendorDashboard] list_my_vendor_stores unavailable", e);
       }
+      if (cancelled) return;
 
-      let merged = [...(storesData || []), ...collabStores];
+      // Fallback: direct SELECT + collaborators (legacy path)
+      if (merged.length === 0) {
+        const fetchOwned = async (cols: string) =>
+          (supabase as any)
+            .from("stores")
+            .select(cols)
+            .eq("owner_id", user!.id)
+            .order("created_at", { ascending: true });
+
+        let storesData: any[] | null = null;
+        ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_FULL));
+        if (cancelled) return;
+        if (storesErr) {
+          console.warn("[VendorDashboard] full select failed:", storesErr.message);
+          ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_SAFE));
+        }
+        if (cancelled) return;
+        if (storesErr) {
+          console.warn("[VendorDashboard] safe select failed:", storesErr.message);
+          ({ data: storesData, error: storesErr } = await fetchOwned(STORE_SELECT_MINIMAL));
+        }
+        if (cancelled) return;
+
+        let collabStores: any[] = [];
+        try {
+          const { data: collabRows } = await (supabase as any)
+            .from("store_collaborators")
+            .select("store_id")
+            .eq("user_id", user!.id)
+            .eq("status", "active");
+          const collabIds = (collabRows || [])
+            .map((r: any) => r.store_id)
+            .filter((id: string) => !(storesData || []).some((s: any) => s.id === id));
+          if (collabIds.length > 0) {
+            const tryCols = [STORE_SELECT_FULL, STORE_SELECT_SAFE, STORE_SELECT_MINIMAL];
+            for (const cols of tryCols) {
+              const collabRes = await (supabase as any)
+                .from("stores")
+                .select(cols)
+                .in("id", collabIds);
+              if (!collabRes.error && (collabRes.data || []).length > 0) {
+                collabStores = collabRes.data || [];
+                break;
+              }
+            }
+            if (collabStores.length === 0) {
+              const pubRes = await (supabase as any)
+                .from("stores_public")
+                .select(
+                  "id, name, logo_url, banner_url, country, is_platform_owned, products_count, followers_count, shop_type",
+                )
+                .in("id", collabIds);
+              if (!pubRes.error) {
+                collabStores = pubRes.data || [];
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[VendorDashboard] collaborator stores", e);
+        }
+
+        merged = [...(storesData || []), ...collabStores];
+      }
 
       if (storesErr && merged.length === 0) {
         console.error("[VendorDashboard] cannot load stores:", storesErr.message);
@@ -273,7 +300,6 @@ export default function VendorDashboardPage() {
       }
 
       if (merged.length === 0) {
-        // Extra diagnostic when RLS returns empty without error (common after policy drift)
         try {
           const { data: dbg } = await (supabase as any).rpc("debug_store_select_access", {
             p_store_id: null,

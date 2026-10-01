@@ -41,7 +41,7 @@ Consommer ces RPC plutôt que les colonnes legacy en lecture seule :
 | `assert_store_identity_ready` | Gate publish / identité |
 | `try_consume_included_delivery` | Consommation crédit (post-order items) |
 
-**Table `stores` (dashboard vendeur) :** SELECT via JWT owner/collab/admin/manager — policy `Store team and staff read full store` (`163000`). Catalog public = `stores_public` seulement.
+**Table `stores` (dashboard vendeur) :** préférer RPC `list_my_vendor_stores()` (`164000`) ; sinon SELECT + policy `Store team and staff read full store`. Catalog public = `stores_public` seulement.
 
 Détail auth + signatures : `docs/VENDOR_PLANS_AND_FULFILLMENT_CONTRACT.md` §8.
 
