@@ -35,6 +35,7 @@
 ```
 admin_revoke > admin_grant > addon (paid_until) > plan.included_feature_keys
 max_products / max_stores: vendor_pricing_overrides.*_override ?? plan.*
+**Exception:** `stores.is_platform_owned = true` → `product_quota_exempt: true`, `max_products: null` (unlimited catalogue)
 ```
 
 Admin may enable/disable **any** feature on **any** store regardless of plan.  

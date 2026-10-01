@@ -23,6 +23,16 @@ Appliquer dans le SQL Editor **staging**, smoke, puis **production** :
 12. `20261001162000_reliability_audit_hotfixes.sql` (KYB submit gate + consume authz/total)
 13. `20261001163000_restore_stores_select_for_vendors.sql` (**hotfix** vendor/admin store SELECT)
 14. `20261001164000_list_my_vendor_stores_rpc.sql` (**hotfix** RPC `list_my_vendor_stores` — chemin vendor dashboard)
+15. `20261001165000_platform_stores_product_quota_exempt.sql` (**hotfix** platform shops unlimited products + team product SELECT)
+16. `20261001166000_fix_stores_products_rls_recursion.sql` (**CRITICAL**) break stores↔collaborators RLS recursion — restore admin/vendor visibility
+
+### Incident note — empty admin/vendor stores (2026-10-01)
+
+**Cause:** `stores` SELECT used inline `EXISTS(store_collaborators)` while `store_collaborators` RLS reads `stores` → infinite recursion. Amplified by `165000` products policy.
+
+**Fix:** `166000` — use `can_access_store_orders` (SECURITY DEFINER) in policies.
+
+**Smoke after apply:** Admin → Tarification boutiques (liste non vide) ; `/vendor` catalogue ; `select debug_rls_visibility();` en session JWT.
 
 Skip already-applied files (idempotent where possible).
 

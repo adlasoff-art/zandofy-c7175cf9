@@ -125,7 +125,11 @@ export default function AdminVendorAccountingPage() {
   const { data: stores } = useQuery({
     queryKey: ["accounting-stores"],
     queryFn: async () => {
-      const { data } = await (supabase as any).from("stores").select("id, name, owner_id, is_platform_owned").order("name");
+      const { data, error } = await (supabase as any).from("stores").select("id, name, owner_id, is_platform_owned").order("name");
+      if (error) {
+        console.error("[AdminVendorAccounting] stores select:", error);
+        throw error;
+      }
       return (data || []) as { id: string; name: string; owner_id: string; is_platform_owned: boolean }[];
     },
   });

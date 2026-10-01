@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { VENDOR_TIERS, type VendorTier } from "@/lib/vendor-tiers";
 import { useStoreEntitlements } from "@/hooks/use-store-entitlements";
+import { isPlatformOwnedStore } from "@/lib/off-platform-payment";
 
 export interface VendorSubscription {
   id: string;
@@ -25,7 +26,15 @@ const DEFAULT_SUB: Omit<VendorSubscription, "id" | "store_id"> = {
   active_services: null,
 };
 
-export function useVendorSubscription(storeId: string | null) {
+export type UseVendorSubscriptionOptions = {
+  /** When true (or entitlements.product_quota_exempt), catalogue cap is unlimited */
+  isPlatformOwned?: boolean | null;
+};
+
+export function useVendorSubscription(
+  storeId: string | null,
+  opts?: UseVendorSubscriptionOptions,
+) {
   const [subscription, setSubscription] = useState<VendorSubscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [maxProductsOverride, setMaxProductsOverride] = useState<number | null>(null);
@@ -79,13 +88,21 @@ export function useVendorSubscription(storeId: string | null) {
     VENDOR_TIERS[(subscription?.tier as VendorTier) || "beginner"] ||
     VENDOR_TIERS.beginner;
 
+  const productQuotaExempt =
+    isPlatformOwnedStore(opts?.isPlatformOwned) ||
+    entitlements?.product_quota_exempt === true ||
+    entitlements?.is_platform_owned === true;
+
   // Prefer RPC max_products when available; else override / subscription
-  const effectiveMaxProducts =
-    entitlements?.max_products ??
-    maxProductsOverride ??
-    subscription?.max_products ??
-    20;
-  const canAddProduct = (currentCount: number) => currentCount < effectiveMaxProducts;
+  // Platform-owned: unlimited (Infinity) — null max_products from RPC means unlimited
+  const effectiveMaxProducts = productQuotaExempt
+    ? Infinity
+    : entitlements?.max_products != null
+      ? Number(entitlements.max_products)
+      : maxProductsOverride ?? subscription?.max_products ?? 20;
+
+  const canAddProduct = (currentCount: number) =>
+    productQuotaExempt || currentCount < effectiveMaxProducts;
 
   return {
     subscription,
@@ -93,6 +110,7 @@ export function useVendorSubscription(storeId: string | null) {
     tierConfig,
     canAddProduct,
     effectiveMaxProducts,
+    productQuotaExempt,
     entitlements: entitlements ?? null,
   };
 }

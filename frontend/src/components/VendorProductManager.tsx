@@ -241,7 +241,8 @@ export function VendorProductManager({
   isPlatformOwned?: boolean;
 }) {
   const { user } = useAuth();
-  const { subscription, tierConfig, canAddProduct, effectiveMaxProducts } = useVendorSubscription(storeId);
+  const { subscription, tierConfig, canAddProduct, effectiveMaxProducts, productQuotaExempt } =
+    useVendorSubscription(storeId, { isPlatformOwned });
   const { data: suspensionStatus } = useStoreSuspension(storeId);
   const { data: kybGate } = useStoreKybGate(storeId);
   const listingBlocked = isActivityBlocked(suspensionStatus, "product_listing") || !!kybGate?.blocked;
@@ -297,38 +298,53 @@ export function VendorProductManager({
   const loadProducts = useCallback(async () => {
     // Only show loading spinner on first load to avoid flash on tab refocus
     setLoading((prev) => (products.length === 0 ? true : prev));
-    const { data, error } = await (supabase
-      .from("products")
-      .select(
-        "id, name, name_fr, slug, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, cost_real, cost_calc, auto_pricing_enabled, vendor_extra_margin, model_size, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea, offers_home_delivery, commercial_scope, meta_title, meta_description, seo_keywords, product_images(id, image_url, position)"
-      ) as any)
-      .eq("store_id", storeId)
-      .order("created_at", { ascending: false });
 
-    if (error) {
+    const SELECT_FULL =
+      "id, name, name_fr, slug, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, material, style, season, care_instructions, origin_country, category_id, trend_tag_id, supplier_id, supplier_product_id, store_id, promo_start_date, promo_end_date, flash_timer_enabled, weight_grams, length_cm, width_cm, height_cm, cost_real, cost_calc, auto_pricing_enabled, vendor_extra_margin, model_size, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea, offers_home_delivery, commercial_scope, meta_title, meta_description, seo_keywords, product_images(id, image_url, position)";
+    // Lighter select — avoids nested image payload / optional column drift killing the whole list
+    const SELECT_SAFE =
+      "id, name, name_fr, slug, price, original_price, currency, description, short_description, moq, sku, is_new, is_sale, discount, category_id, trend_tag_id, store_id, weight_grams, cost_real, cost_calc, auto_pricing_enabled, vendor_extra_margin, publish_status, prep_days_min, prep_days_max, can_ship_air, can_ship_sea, commercial_scope, product_images(id, image_url, position)";
+    const SELECT_MINIMAL =
+      "id, name, name_fr, slug, price, original_price, currency, description, category_id, store_id, publish_status";
+
+    const mapRows = (rows: any[]) =>
+      rows.map((p: any) => {
+        const { product_images, ...rest } = p;
+        return {
+          ...rest,
+          publish_status: p.publish_status || "draft",
+          images: Array.isArray(product_images)
+            ? [...product_images].sort(
+                (a: { position?: number | null }, b: { position?: number | null }) =>
+                  (a.position ?? 0) - (b.position ?? 0),
+              )
+            : [],
+        };
+      });
+
+    let data: any[] | null = null;
+    let error: { message?: string } | null = null;
+    for (const cols of [SELECT_FULL, SELECT_SAFE, SELECT_MINIMAL]) {
+      const res = await (supabase.from("products").select(cols) as any)
+        .eq("store_id", storeId)
+        .order("created_at", { ascending: false });
+      if (!res.error) {
+        data = res.data || [];
+        error = null;
+        break;
+      }
+      error = res.error;
+      console.warn("[VendorProductManager] loadProducts select failed:", cols.slice(0, 40), res.error.message);
+    }
+
+    if (error || data == null) {
       console.error("loadProducts error:", error);
       toast.error("Impossible de charger le catalogue. Vérifiez votre connexion et réessayez.");
       setLoading(false);
       return;
     }
 
-    if (data) {
-      setProducts(
-        data.map((p: any) => {
-          const { product_images, ...rest } = p;
-          return {
-            ...rest,
-            publish_status: p.publish_status || "draft",
-            images: Array.isArray(product_images)
-              ? [...product_images].sort(
-                  (a: { position?: number | null }, b: { position?: number | null }) =>
-                    (a.position ?? 0) - (b.position ?? 0)
-                )
-              : [],
-          };
-        })
-      );
-    }
+    setProducts(mapRows(data));
     setLoading(false);
   }, [storeId]);
 
@@ -1718,7 +1734,9 @@ export function VendorProductManager({
       <div className="flex items-center justify-between">
         <h3 className="text-base font-bold text-foreground flex items-center gap-2">
           <Package size={16} /> Catalogue ({filteredProducts.length}
-          {subscription && effectiveMaxProducts < Infinity && `/${effectiveMaxProducts}`})
+          {!productQuotaExempt && subscription && effectiveMaxProducts < Infinity
+            ? `/${effectiveMaxProducts}`
+            : ""})
         </h3>
         <button
           onClick={startCreate}

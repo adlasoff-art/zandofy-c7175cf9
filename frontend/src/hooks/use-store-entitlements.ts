@@ -5,8 +5,12 @@ export type StoreEntitlements = {
   ok: boolean;
   plan_slug?: string;
   plan_label?: string;
-  max_products?: number;
+  /** null = unlimited (platform-owned stores) */
+  max_products?: number | null;
   max_stores?: number;
+  /** True when stores.is_platform_owned — ignore plan product caps */
+  product_quota_exempt?: boolean;
+  is_platform_owned?: boolean;
   collaborator_limit?: number | null;
   included_deliveries_per_month?: number;
   max_kg_per_included_delivery?: number;
