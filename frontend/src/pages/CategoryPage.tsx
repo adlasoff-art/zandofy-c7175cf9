@@ -26,6 +26,7 @@ import { useDiscoveryRankedProducts } from "@/hooks/use-discovery-ranked";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
 import { applyDiscoveryEligibilityFilter } from "@/lib/geo-eligibility";
 import { useActiveGeo } from "@/hooks/useActiveGeo";
+import { expandCategoryIds } from "@/lib/category-tree";
 
 function applySeoTemplate(tpl: string, vars: Record<string, string>): string {
   return (tpl || "").replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? "");
@@ -67,16 +68,44 @@ export default function CategoryPage() {
   const { data: category, isLoading: catLoading } = useQuery({
     queryKey: ["category", slug],
     queryFn: async () => {
-      if (isSpecial) return { id: slug!, name: slug!, name_fr: slug === "nouveautes" ? "Nouveautés" : "Soldes", icon: slug === "nouveautes" ? "🆕" : "🔥", subcategories: [], parent: null };
+      if (isSpecial) {
+        return {
+          id: slug!,
+          name: slug!,
+          name_fr: slug === "nouveautes" ? "Nouveautés" : "Soldes",
+          icon: slug === "nouveautes" ? "🆕" : "🔥",
+          image_url: null as string | null,
+          parent_id: null as string | null,
+          subcategories: [] as Array<{ id: string; name: string; name_fr: string; children: unknown[] }>,
+          parent: null as { id: string; name: string; name_fr: string } | null,
+          _allCategories: [] as Array<{ id: string; parent_id: string | null }>,
+        };
+      }
       
       const decodedSlug = decodeURIComponent(slug || "").toLowerCase().trim();
       const normalizedSlug = slugify(decodedSlug);
-      const { data, error } = await supabase
+      // Generated types omit seo_body / seo_faq (present in DB migrations)
+      const { data, error } = await (supabase as any)
         .from("categories")
-        .select("id, name, name_fr, icon, parent_id, image_url, meta_title, meta_description, seo_keywords, og_image_url, seo_body, seo_faq")
+        .select("id, name, name_fr, icon, parent_id, image_url, meta_title, meta_description, seo_keywords, og_image_url, seo_body, seo_faq, sort_order")
+        .order("sort_order")
         .order("name");
       if (error) throw error;
-      const all = data || [];
+      const all = (data || []) as Array<{
+        id: string;
+        name: string;
+        name_fr: string;
+        icon: string | null;
+        parent_id: string | null;
+        image_url: string | null;
+        meta_title: string | null;
+        meta_description: string | null;
+        seo_keywords: string[] | null;
+        og_image_url: string | null;
+        seo_body: string | null;
+        seo_faq: unknown;
+        sort_order: number | null;
+      }>;
       // Match by slugified name, slugified name_fr, raw name, name_fr, or ID
       const match = all.find(
         (c) =>
@@ -87,9 +116,14 @@ export default function CategoryPage() {
           c.id === slug
       );
       if (!match) return null;
-      const subs = all.filter((c) => c.parent_id === match.id);
+      const subs = all
+        .filter((c) => c.parent_id === match.id)
+        .map((sub) => ({
+          ...sub,
+          children: all.filter((c) => c.parent_id === sub.id),
+        }));
       const parent = match.parent_id ? all.find((c) => c.id === match.parent_id) : null;
-      return { ...match, subcategories: subs, parent };
+      return { ...match, subcategories: subs, parent, _allCategories: all };
     },
     enabled: !!slug,
     retry: 2,
@@ -101,7 +135,8 @@ export default function CategoryPage() {
     queryFn: async () => {
       if (!category) return [];
 
-      let query = supabase
+      // products_public select string is wider than generated types
+      let query = (supabase as any)
         .from("products_public")
         .select(PRODUCT_LIST_SELECT)
         .eq("publish_status", "published");
@@ -115,8 +150,13 @@ export default function CategoryPage() {
         // Products on sale
         query = query.eq("is_sale", true);
       } else {
-        // Regular category
-        const catIds = [category.id, ...(category.subcategories || []).map((s: any) => s.id)];
+        // Include N-level descendants so leaf products appear on parent pages.
+        // Fail-closed if the tree payload is missing (avoids silent under-fetch).
+        const allCats =
+          (category as { _allCategories?: { id: string; parent_id: string | null }[] })._allCategories;
+        if (!allCats?.length) return [];
+        const catIds = expandCategoryIds([category.id], allCats);
+        if (!catIds.length) return [];
         query = query.in("category_id", catIds);
       }
 
@@ -286,7 +326,7 @@ export default function CategoryPage() {
         title={seoTitle}
         description={seoDesc}
         canonical={`/category/${slug}`}
-        ogImage={(category as any).og_image_url || category.image_url || undefined}
+        ogImage={(category as any).og_image_url || (category as any).image_url || undefined}
         jsonLd={buildJsonLdGraph(
           buildBreadcrumbJsonLd([
             { name: "Accueil", url: "/" },
@@ -350,22 +390,46 @@ export default function CategoryPage() {
           </div>
         )}
 
-        {/* Subcategories */}
+        {/* Subcategories (L2) + nested L3 chips */}
         {!isSpecial && category.subcategories && category.subcategories.length > 0 && (
-          <div className="mb-6">
-            <h2 className="text-sm font-semibold text-foreground mb-3">{t("filter.subcategories")}</h2>
-            <div className="flex gap-2 flex-wrap">
-              {category.subcategories.map((sub: any) => (
-                <Link
-                  key={sub.id}
-                  to={`/category/${slugify(sub.name)}`}
-                  className="px-4 py-2 text-sm rounded-full border border-border bg-card text-foreground hover:border-primary hover:text-primary transition-colors"
-                >
-                  {sub.icon && <span className="mr-1">{sub.icon}</span>}
-                  {labelOf(sub)}
-                </Link>
-              ))}
+          <div className="mb-6 space-y-4">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground mb-3">{t("filter.subcategories")}</h2>
+              <div className="flex gap-2 flex-wrap">
+                {category.subcategories.map((sub: any) => (
+                  <Link
+                    key={sub.id}
+                    to={`/category/${slugify(sub.name)}`}
+                    className="px-4 py-2 text-sm rounded-full border border-border bg-card text-foreground hover:border-primary hover:text-primary transition-colors"
+                  >
+                    {sub.icon && <span className="mr-1">{sub.icon}</span>}
+                    {labelOf(sub)}
+                  </Link>
+                ))}
+              </div>
             </div>
+            {category.subcategories.some((s: any) => (s.children || []).length > 0) && (
+              <div className="space-y-3">
+                {category.subcategories
+                  .filter((s: any) => (s.children || []).length > 0)
+                  .map((sub: any) => (
+                    <div key={`l3-${sub.id}`}>
+                      <p className="text-xs font-medium text-muted-foreground mb-1.5">{labelOf(sub)}</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {(sub.children || []).map((child: any) => (
+                          <Link
+                            key={child.id}
+                            to={`/category/${slugify(child.name)}`}
+                            className="px-3 py-1.5 text-xs rounded-full border border-border/80 bg-muted/40 text-foreground hover:border-primary hover:text-primary transition-colors"
+                          >
+                            {labelOf(child)}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
         )}
 

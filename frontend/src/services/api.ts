@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { fromTable } from "@/lib/supabase-helpers";
 import { computeStoreYears } from "@/lib/store-years";
+import { expandCategoryIds } from "@/lib/category-tree";
 
 export interface Product {
   id: string;
@@ -215,6 +216,23 @@ export async function fetchProducts(params?: {
   /** Filter by products_public.shop_type (local | international). */
   shopType?: "local" | "international";
 }): Promise<Product[]> {
+  // Resolve categoryId → self + all descendants (N-level). Fail-closed if tree unavailable.
+  let expandedCategoryIds: string[] | null = null;
+  if (params?.categoryId) {
+    const { data: cats, error: catErr } = await (supabase as any)
+      .from("categories")
+      .select("id, parent_id");
+    if (catErr || !Array.isArray(cats)) {
+      console.error("[fetchProducts] Category expand failed — returning empty:", catErr?.message);
+      return [];
+    }
+    expandedCategoryIds = expandCategoryIds(
+      [params.categoryId],
+      cats as { id: string; parent_id: string | null }[],
+    );
+    if (!expandedCategoryIds.length) return [];
+  }
+
   const tryFetch = async (selectQuery: string): Promise<{ data: any[] | null; error: any }> => {
     let query = supabase
       .from(PRODUCTS_PUBLIC)
@@ -229,8 +247,8 @@ export async function fetchProducts(params?: {
     if (params?.category) {
       query = query.eq("categories.name", params.category);
     }
-    if (params?.categoryId) {
-      query = query.eq("category_id", params.categoryId);
+    if (expandedCategoryIds) {
+      query = query.in("category_id", expandedCategoryIds);
     }
     if (params?.storeId) {
       query = query.eq("store_id", params.storeId);

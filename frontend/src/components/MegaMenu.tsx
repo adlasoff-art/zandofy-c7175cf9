@@ -91,28 +91,45 @@ export function MegaMenu() {
                   {t("megaMenu.viewAll") || "Tout voir"} {getLabel(active)} →
                 </Link>
                 <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
-                  {subcategories.map((sub) => (
-                    <Link
-                      key={sub.id}
-                      to={`/category/${slugify(sub.name)}`}
-                      className="flex flex-col items-center gap-2 group py-2"
-                    >
-                      <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-border group-hover:border-primary transition-colors bg-muted flex items-center justify-center">
-                        {sub.image_url ? (
-                          <img src={imgUrl(sub.image_url, { width: 200 })} srcSet={imgSrcSet(sub.image_url, [120, 240])} sizes="120px" alt={getLabel(sub)} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                        ) : sub.icon ? (
-                          <span className="text-xl">{sub.icon}</span>
-                        ) : (
-                          <span className="text-xs font-bold text-primary">
-                            {getLabel(sub).slice(0, 2).toUpperCase()}
+                  {subcategories.map((sub) => {
+                    const l3 = getChildren(sub.id);
+                    return (
+                      <div key={sub.id} className="flex flex-col items-center gap-1.5 group py-2">
+                        <Link
+                          to={`/category/${slugify(sub.name)}`}
+                          className="flex flex-col items-center gap-2 w-full"
+                        >
+                          <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-border group-hover:border-primary transition-colors bg-muted flex items-center justify-center">
+                            {sub.image_url ? (
+                              <img src={imgUrl(sub.image_url, { width: 200 })} srcSet={imgSrcSet(sub.image_url, [120, 240])} sizes="120px" alt={getLabel(sub)} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                            ) : sub.icon ? (
+                              <span className="text-xl">{sub.icon}</span>
+                            ) : (
+                              <span className="text-xs font-bold text-primary">
+                                {getLabel(sub).slice(0, 2).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-foreground text-center font-medium group-hover:text-primary transition-colors">
+                            {getLabel(sub)}
                           </span>
+                        </Link>
+                        {l3.length > 0 && (
+                          <div className="flex flex-col items-center gap-0.5 w-full px-0.5">
+                            {l3.map((child) => (
+                              <Link
+                                key={child.id}
+                                to={`/category/${slugify(child.name)}`}
+                                className="text-[10px] leading-tight text-muted-foreground hover:text-primary text-center transition-colors"
+                              >
+                                {getLabel(child)}
+                              </Link>
+                            ))}
+                          </div>
                         )}
                       </div>
-                      <span className="text-[11px] text-foreground text-center font-medium group-hover:text-primary transition-colors">
-                        {getLabel(sub)}
-                      </span>
-                    </Link>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}

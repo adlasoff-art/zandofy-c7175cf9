@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { CountryCombobox } from "@/components/vendor/CountryCombobox";
 import { ProductCommercialDestinationsPanel } from "@/components/vendor/ProductCommercialDestinationsPanel";
 import { SearchableCombobox } from "@/components/ui/SearchableCombobox";
+import { flattenCategoryOptions } from "@/lib/category-tree";
 import { MediaUploader } from "@/components/vendor/MediaUploader";
 import { ShippingEstimator } from "@/components/vendor/ShippingEstimator";
 import { PromotionTimer } from "@/components/vendor/PromotionTimer";
@@ -159,6 +160,9 @@ interface Product {
 interface Category {
   id: string;
   name_fr: string;
+  name?: string | null;
+  parent_id?: string | null;
+  sort_order?: number | null;
   apparel_fields_enabled?: boolean;
 }
 
@@ -250,6 +254,14 @@ export function VendorProductManager({
   const isLocalShop = shopType === "local";
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const categoryOptions = useMemo(
+    () =>
+      flattenCategoryOptions(categories).map((o) => ({
+        value: o.id,
+        label: o.pathLabel,
+      })),
+    [categories],
+  );
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierProductOptions, setSupplierProductOptions] = useState<SupplierProductOption[]>([]);
   const [loadingSupplierProducts, setLoadingSupplierProducts] = useState(false);
@@ -351,9 +363,14 @@ export function VendorProductManager({
 
   useEffect(() => {
     loadProducts();
-    supabase.from("categories").select("id, name_fr, apparel_fields_enabled").then(({ data }) => {
-      if (data) setCategories(data as Category[]);
-    });
+    (supabase as any)
+      .from("categories")
+      .select("id, name, name_fr, parent_id, sort_order, apparel_fields_enabled")
+      .order("sort_order")
+      .order("name_fr")
+      .then(({ data }: { data: Category[] | null }) => {
+        if (data) setCategories(data);
+      });
     (supabase as any).from("trend_tags").select("id, name_fr").eq("is_active", true).order("sort_order").then(({ data }: any) => {
       if (data) setTrendTags(data);
     });
@@ -1461,7 +1478,7 @@ export function VendorProductManager({
               searchPlaceholder="Rechercher une catégorie..."
               value={form.category_id}
               onChange={(v) => setForm({ ...form, category_id: v })}
-              options={categories.map((c) => ({ value: c.id, label: c.name_fr }))}
+              options={categoryOptions}
             />
           </div>
           {categories.find((c) => c.id === form.category_id)?.apparel_fields_enabled && (
