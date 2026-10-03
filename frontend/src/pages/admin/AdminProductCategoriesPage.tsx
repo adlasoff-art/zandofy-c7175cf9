@@ -6,15 +6,28 @@ import { toast } from "sonner";
 import { FolderTree, Search, Loader2, Save, CheckSquare, Square } from "lucide-react";
 import { imgUrl } from "@/lib/image-url";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
+import {
+  categoriesWithChildren,
+  expandCategoryIds,
+  flattenCategoryOptions,
+  formatCategoryPath,
+  type CategoryTreeNode,
+} from "@/lib/category-tree";
 
-interface CategoryRow {
+interface CategoryRow extends CategoryTreeNode {
   id: string;
   name: string;
   name_fr: string;
   parent_id: string | null;
+  sort_order: number | null;
 }
 
 const PAGE_SIZE = 25;
+
+/** Escape PostgREST filter metacharacters in ilike patterns. */
+function sanitizeIlike(raw: string): string {
+  return raw.replace(/[%_,.()\\]/g, "").slice(0, 80);
+}
 
 async function logCategoryAudit(productIds: string[], fromCategoryId: string | null, toCategoryId: string) {
   const {
@@ -33,6 +46,22 @@ async function logCategoryAudit(productIds: string[], fromCategoryId: string | n
   });
 }
 
+function CategorySelectOptions({
+  options,
+}: {
+  options: ReturnType<typeof flattenCategoryOptions>;
+}) {
+  return (
+    <>
+      {options.map((o) => (
+        <option key={o.id} value={o.id} title={o.pathLabel}>
+          {o.label}
+        </option>
+      ))}
+    </>
+  );
+}
+
 export default function AdminProductCategoriesPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -47,19 +76,24 @@ export default function AdminProductCategoriesPage() {
   const { data: categories = [], isLoading: catsLoading } = useQuery({
     queryKey: ["admin-all-categories"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Generated types omit sort_order (present in DB / used by MegaMenu)
+      const { data, error } = await (supabase as any)
         .from("categories")
-        .select("id, name, name_fr, parent_id")
+        .select("id, name, name_fr, parent_id, sort_order")
+        .order("sort_order")
         .order("name_fr");
       if (error) throw error;
       return (data || []) as CategoryRow[];
     },
   });
 
-  const parentCategories = useMemo(
-    () => categories.filter((c) => !c.parent_id),
-    [categories],
-  );
+  const flatOptions = useMemo(() => flattenCategoryOptions(categories), [categories]);
+
+  // Filter by branch: roots + any node that has children (N-level)
+  const filterNodes = useMemo(() => {
+    const withKids = new Set(categoriesWithChildren(categories).map((c) => c.id));
+    return flatOptions.filter((o) => withKids.has(o.id) || o.parent_id === null);
+  }, [categories, flatOptions]);
 
   const parentIdsWithChildren = useMemo(() => {
     const set = new Set<string>();
@@ -70,7 +104,15 @@ export default function AdminProductCategoriesPage() {
   }, [categories]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-product-categories", search, parentFilter, onParentOnly, page, pageSize],
+    queryKey: [
+      "admin-product-categories",
+      search,
+      parentFilter,
+      onParentOnly,
+      page,
+      pageSize,
+      categories.map((c) => c.id).join(","),
+    ],
     queryFn: async () => {
       let query = supabase
         .from("products")
@@ -82,23 +124,47 @@ export default function AdminProductCategoriesPage() {
         .order("name_fr")
         .range((page - 1) * pageSize, page * pageSize - 1);
 
-      if (search.trim()) {
-        query = query.or(`name_fr.ilike.%${search.trim()}%,name.ilike.%${search.trim()}%`);
+      const q = sanitizeIlike(search.trim());
+      if (q) {
+        query = query.or(`name_fr.ilike.%${q}%,name.ilike.%${q}%`);
       }
 
+      // Resolve category_id filter server-side (keeps pagination / count accurate)
+      let categoryIds: string[] | null = null;
       if (parentFilter) {
-        const childIds = categories.filter((c) => c.parent_id === parentFilter).map((c) => c.id);
-        query = query.in("category_id", [parentFilter, ...childIds]);
+        categoryIds = expandCategoryIds([parentFilter], categories);
+      }
+      if (onParentOnly) {
+        const parentOnly = [...parentIdsWithChildren];
+        if (categoryIds) {
+          const branch = new Set(categoryIds);
+          categoryIds = parentOnly.filter((id) => branch.has(id));
+        } else {
+          categoryIds = parentOnly;
+        }
+      }
+      if (categoryIds) {
+        if (categoryIds.length === 0) {
+          return { totalCount: 0, products: [] as Array<{
+            id: string;
+            name_fr: string;
+            category_id: string | null;
+            category_path: string;
+            store_name: string;
+            image: string | null;
+          }> };
+        }
+        if (categoryIds.length === 1) {
+          query = query.eq("category_id", categoryIds[0]);
+        } else {
+          query = query.in("category_id", categoryIds);
+        }
       }
 
       const { data: products, error, count } = await query;
       if (error) throw error;
 
-      let rows = products || [];
-      if (onParentOnly) {
-        rows = rows.filter((p) => p.category_id && parentIdsWithChildren.has(p.category_id));
-      }
-
+      const rows = products || [];
       const storeIds = [...new Set(rows.map((p) => p.store_id).filter(Boolean))] as string[];
       let storeMap = new Map<string, string>();
       if (storeIds.length) {
@@ -106,31 +172,27 @@ export default function AdminProductCategoriesPage() {
         storeMap = new Map((stores || []).map((s) => [s.id, s.name]));
       }
 
-      const catMap = new Map(categories.map((c) => [c.id, c]));
-
       return {
-        totalCount: onParentOnly ? rows.length : count || 0,
+        totalCount: count || 0,
         products: rows.map((p) => {
-          const cat = p.category_id ? catMap.get(p.category_id) : null;
-          const parent = cat?.parent_id ? catMap.get(cat.parent_id) : null;
           const images = (p as { product_images?: { image_url: string; position: number | null }[] })
             .product_images;
           const sorted = [...(images || [])].sort(
             (a, b) => (a.position ?? 0) - (b.position ?? 0),
           );
+          const path = p.category_id ? formatCategoryPath(p.category_id, categories) : "—";
           return {
             id: p.id,
             name_fr: p.name_fr,
             category_id: p.category_id,
-            category_name: cat?.name_fr || "—",
-            parent_name: parent?.name_fr || (cat && !cat.parent_id ? cat.name_fr : "—"),
+            category_path: path,
             store_name: p.store_id ? storeMap.get(p.store_id) || "—" : "—",
             image: sorted[0]?.image_url || null,
           };
         }),
       };
     },
-    enabled: categories.length > 0 || !catsLoading,
+    enabled: !catsLoading,
   });
 
   const products = data?.products || [];
@@ -209,7 +271,7 @@ export default function AdminProductCategoriesPage() {
       <div className="p-4 md:p-6 space-y-4 max-w-7xl">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <FolderTree size={16} className="text-primary" />
-          Réassigner catégorie et sous-catégorie (admin uniquement).
+          Réassigner catégorie à N niveaux (ex. Prêt-à-porter › Vêtements Femme › Jupes).
         </div>
 
         <div className="flex flex-wrap gap-3 items-end bg-card border border-border rounded-xl p-4">
@@ -228,8 +290,10 @@ export default function AdminProductCategoriesPage() {
               />
             </div>
           </div>
-          <div className="min-w-[180px]">
-            <label className="text-xs font-medium text-foreground block mb-1">Catégorie parente</label>
+          <div className="min-w-[220px]">
+            <label className="text-xs font-medium text-foreground block mb-1">
+              Filtrer par branche
+            </label>
             <select
               value={parentFilter}
               onChange={(e) => {
@@ -239,9 +303,9 @@ export default function AdminProductCategoriesPage() {
               className="w-full px-3 py-2 text-sm bg-muted border border-border rounded-lg"
             >
               <option value="">Toutes</option>
-              {parentCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name_fr}
+              {filterNodes.map((o) => (
+                <option key={o.id} value={o.id} title={o.pathLabel}>
+                  {o.label}
                 </option>
               ))}
             </select>
@@ -255,7 +319,7 @@ export default function AdminProductCategoriesPage() {
                 setPage(1);
               }}
             />
-            Sur catégorie parente uniquement
+            Sur nœud avec enfants uniquement
           </label>
         </div>
 
@@ -265,15 +329,10 @@ export default function AdminProductCategoriesPage() {
             <select
               value={bulkCategoryId}
               onChange={(e) => setBulkCategoryId(e.target.value)}
-              className="px-3 py-2 text-sm bg-background border border-border rounded-lg min-w-[200px]"
+              className="px-3 py-2 text-sm bg-background border border-border rounded-lg min-w-[260px]"
             >
               <option value="">Catégorie cible…</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.parent_id ? "↳ " : ""}
-                  {c.name_fr}
-                </option>
-              ))}
+              <CategorySelectOptions options={flatOptions} />
             </select>
             <button
               type="button"
@@ -308,7 +367,7 @@ export default function AdminProductCategoriesPage() {
                     <th className="p-3 text-left font-medium">Produit</th>
                     <th className="p-3 text-left font-medium">Boutique</th>
                     <th className="p-3 text-left font-medium">Catégorie actuelle</th>
-                    <th className="p-3 text-left font-medium min-w-[220px]">Nouvelle catégorie</th>
+                    <th className="p-3 text-left font-medium min-w-[260px]">Nouvelle catégorie</th>
                     <th className="p-3 w-16" />
                   </tr>
                 </thead>
@@ -326,7 +385,7 @@ export default function AdminProductCategoriesPage() {
                           <div className="flex items-center gap-2">
                             {p.image ? (
                               <img
-                                src={imgUrl(p.image, 80)}
+                                src={imgUrl(p.image, { width: 80 })}
                                 alt=""
                                 className="w-10 h-10 rounded object-cover border border-border"
                               />
@@ -338,10 +397,7 @@ export default function AdminProductCategoriesPage() {
                         </td>
                         <td className="p-3 text-muted-foreground">{p.store_name}</td>
                         <td className="p-3">
-                          <span className="text-foreground">{p.category_name}</span>
-                          {p.parent_name !== p.category_name && (
-                            <span className="block text-[10px] text-muted-foreground">{p.parent_name}</span>
-                          )}
+                          <span className="text-foreground text-xs leading-snug">{p.category_path}</span>
                         </td>
                         <td className="p-3">
                           <select
@@ -352,18 +408,7 @@ export default function AdminProductCategoriesPage() {
                             className="w-full px-2 py-1.5 text-xs bg-muted border border-border rounded-lg"
                           >
                             <option value="">—</option>
-                            {parentCategories.map((parent) => (
-                              <optgroup key={parent.id} label={parent.name_fr}>
-                                <option value={parent.id}>{parent.name_fr} (parent)</option>
-                                {categories
-                                  .filter((c) => c.parent_id === parent.id)
-                                  .map((sub) => (
-                                    <option key={sub.id} value={sub.id}>
-                                      {sub.name_fr}
-                                    </option>
-                                  ))}
-                              </optgroup>
-                            ))}
+                            <CategorySelectOptions options={flatOptions} />
                           </select>
                         </td>
                         <td className="p-3">

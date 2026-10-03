@@ -532,16 +532,30 @@ export function Header() {
                         >
                           {t("nav.viewAll")}
                         </Link>
-                        {subs.map((sub) => (
-                          <Link
-                            key={sub.id}
-                            to={`/category/${slugify(sub.name)}`}
-                            onClick={() => setMobileOpen(false)}
-                            className="block py-2 px-8 text-sm text-foreground hover:bg-muted hover:text-primary transition-colors"
-                          >
-                            {getCatLabel(sub)}
-                          </Link>
-                        ))}
+                        {subs.map((sub) => {
+                          const l3 = getChildren(sub.id);
+                          return (
+                            <div key={sub.id}>
+                              <Link
+                                to={`/category/${slugify(sub.name)}`}
+                                onClick={() => setMobileOpen(false)}
+                                className="block py-2 px-8 text-sm text-foreground hover:bg-muted hover:text-primary transition-colors"
+                              >
+                                {getCatLabel(sub)}
+                              </Link>
+                              {l3.map((child) => (
+                                <Link
+                                  key={child.id}
+                                  to={`/category/${slugify(child.name)}`}
+                                  onClick={() => setMobileOpen(false)}
+                                  className="block py-1.5 px-12 text-xs text-muted-foreground hover:bg-muted hover:text-primary transition-colors"
+                                >
+                                  {getCatLabel(child)}
+                                </Link>
+                              ))}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
