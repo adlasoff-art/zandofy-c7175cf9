@@ -82,12 +82,18 @@ const STATIC_CHILD_SITEMAPS = [
 async function countPublishedProducts(supabase: ReturnType<typeof createClient>): Promise<number> {
   // Align with public catalog only — never fall back to unfiltered `products`
   // (would re-index banned/suspended/archived store SKUs).
+  // Match product sitemap body filter: require a non-empty display name.
   const { count, error } = await supabase
     .from("products_public")
-    .select("id", { count: "exact", head: true });
+    .select("id", { count: "exact", head: true })
+    .or('name_fr.neq."",name.neq.""');
   if (error) {
     console.error("[generate-sitemap] count products_public", error.message);
-    return 0;
+    // Fallback: unfiltered public count (body still skips thin rows)
+    const { count: fallback } = await supabase
+      .from("products_public")
+      .select("id", { count: "exact", head: true });
+    return fallback ?? 0;
   }
   return count ?? 0;
 }
@@ -148,9 +154,12 @@ Deno.serve(async (req) => {
       const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
       const from = (page - 1) * PRODUCT_PAGE_SIZE;
       const to = from + PRODUCT_PAGE_SIZE - 1;
+      // products_public already fail-closed (published + publicly visible store).
+      // Extra thin-content filter: require a non-empty display name (name_fr or name).
       const { data: products, error } = await supabase
         .from("products_public")
-        .select("id, slug, updated_at")
+        .select("id, slug, updated_at, name, name_fr")
+        .or('name_fr.neq."",name.neq.""')
         .order("updated_at", { ascending: false })
         .range(from, to);
       if (error) {
@@ -159,7 +168,13 @@ Deno.serve(async (req) => {
         return xmlResponse(wrapUrlset(""));
       }
       let body = "";
+      let skippedThin = 0;
       for (const p of products || []) {
+        const label = String(p.name_fr || p.name || "").trim();
+        if (!label) {
+          skippedThin++;
+          continue;
+        }
         const lastmod = p.updated_at ? String(p.updated_at).split("T")[0] : "";
         const productPath = p.slug || p.id;
         body += urlEntry(`${SITE_URL}/product/${productPath}`, {
@@ -167,6 +182,11 @@ Deno.serve(async (req) => {
           changefreq: "weekly",
           priority: "0.8",
         });
+      }
+      if (skippedThin > 0) {
+        console.warn(
+          `[generate-sitemap] skipped ${skippedThin} thin products (empty name) on page ${page}`,
+        );
       }
       return xmlResponse(wrapUrlset(body));
     }

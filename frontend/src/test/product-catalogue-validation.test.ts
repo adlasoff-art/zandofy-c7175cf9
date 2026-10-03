@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assessProductSeoCoverage,
   countWords,
   deriveSeoKeywords,
   imageCount,
@@ -67,5 +68,27 @@ describe("product-catalogue-validation", () => {
         "https://x/d.webm",
       ])
     ).toBe(2);
+  });
+
+  it("assesses soft SEO coverage without blocking publish", () => {
+    const weak = assessProductSeoCoverage({
+      metaTitle: "",
+      metaDescription: "court",
+      seoKeywords: "",
+      shortDescription: "trop court",
+    });
+    expect(weak.score).toBeLessThan(weak.maxScore);
+    expect(weak.warningsFr.length).toBeGreaterThan(0);
+
+    const strong = assessProductSeoCoverage({
+      metaTitle: "Robe prix usine Kinshasa",
+      metaDescription:
+        "Robe élégante import Chine livrée en RDC — description SEO d’au moins cinquante caractères.",
+      seoKeywords: "robe, kinshasa, import chine",
+      shortDescription:
+        "Robe fluide pour femme disponible en plusieurs tailles avec envoi vers Kinshasa et suivi commande",
+    });
+    expect(strong.score).toBe(strong.maxScore);
+    expect(strong.warningsFr).toHaveLength(0);
   });
 });

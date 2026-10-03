@@ -3,6 +3,10 @@ import {
   isDynamicSeoPath,
   resolveRequestPathname,
 } from "../../api/meta-injector-path";
+import {
+  BOT_UA_VERCEL_VALUE,
+  isSeoBot,
+} from "../../api/_shared/bot-ua";
 
 describe("resolveRequestPathname", () => {
   it("prefers __pathname query from Vercel rewrite", () => {
@@ -47,6 +51,35 @@ describe("isDynamicSeoPath", () => {
     expect(isDynamicSeoPath("/blog/x")).toBe(true);
     expect(isDynamicSeoPath("/faq")).toBe(false);
     expect(isDynamicSeoPath("/")).toBe(false);
+  });
+});
+
+describe("isSeoBot / AI crawlers", () => {
+  it("matches Googlebot and classic social crawlers", () => {
+    expect(isSeoBot("Mozilla/5.0 (compatible; Googlebot/2.1)")).toBe(true);
+    expect(isSeoBot("facebookexternalhit/1.1")).toBe(true);
+  });
+
+  it("matches AI answer crawlers for prerender", () => {
+    expect(isSeoBot("Mozilla/5.0 AppleWebKit/537.36 (compatible; GPTBot/1.0)")).toBe(true);
+    expect(isSeoBot("ClaudeBot/1.0")).toBe(true);
+    expect(isSeoBot("PerplexityBot/1.0")).toBe(true);
+    expect(isSeoBot("OAI-SearchBot/1.0")).toBe(true);
+    expect(isSeoBot("ChatGPT-User/1.0")).toBe(true);
+    expect(isSeoBot("Google-Extended")).toBe(true);
+  });
+
+  it("does not treat humans or blocked scrapers as SEO bots", () => {
+    expect(isSeoBot("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120")).toBe(false);
+    expect(isSeoBot(null)).toBe(false);
+    // CCBot / Bytespider remain Disallow in robots.txt — not in prerender allowlist
+    expect(isSeoBot("CCBot/2.0")).toBe(false);
+    expect(isSeoBot("Bytespider")).toBe(false);
+  });
+
+  it("exports a Vercel has-value string that includes gptbot", () => {
+    expect(BOT_UA_VERCEL_VALUE).toContain("gptbot");
+    expect(BOT_UA_VERCEL_VALUE.startsWith("(?i).")).toBe(true);
   });
 });
 

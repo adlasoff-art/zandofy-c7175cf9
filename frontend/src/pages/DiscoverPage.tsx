@@ -22,6 +22,7 @@ import {
   MarketingSection,
   MarketingSteps,
 } from "@/components/marketing/MarketingLandingPrimitives";
+import { SEO_IMPORT_GUIDES } from "@/lib/seo-import-guides";
 
 const BENEFIT_ICONS = [
   <Package size={20} key="b0" />,
@@ -74,7 +75,7 @@ export default function DiscoverPage() {
           title={content.hero.title}
           titleHighlight={content.hero.highlight}
           subtitle={content.hero.subtitle}
-          primaryCta={{ label: content.hero.ctaPrimary, to: "/search" }}
+          primaryCta={{ label: content.hero.ctaPrimary, to: "/stores" }}
           secondaryCta={{ label: content.hero.ctaSecondary, to: "/become-vendor" }}
         />
 
@@ -117,11 +118,35 @@ export default function DiscoverPage() {
           </MarketingSection>
         )}
 
+        <MarketingSection
+          title="Guides import & marketplace"
+          subtitle="Comprendre l’achat en Chine / Turquie et la livraison vers la RDC et l’Afrique."
+          tone="muted"
+        >
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl mx-auto">
+            {SEO_IMPORT_GUIDES.map((g) => (
+              <li key={g.slug}>
+                <Link
+                  to={g.path}
+                  className="block rounded-lg border border-border bg-card px-4 py-3 text-sm font-medium text-foreground hover:border-primary/40 transition-colors"
+                >
+                  {g.labelFr}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className="text-center text-xs text-muted-foreground mt-6">
+            <Link to="/blog" className="text-primary hover:underline">
+              Voir tous les articles
+            </Link>
+          </p>
+        </MarketingSection>
+
         {content.sections.final && (
           <MarketingCtaBand
             title={content.final.title}
             subtitle={content.final.subtitle}
-            primaryCta={{ label: content.final.ctaPrimary, to: "/search" }}
+            primaryCta={{ label: content.final.ctaPrimary, to: "/stores" }}
             secondaryCta={{ label: content.final.ctaSecondary, to: "/become-vendor" }}
           />
         )}
