@@ -1,34 +1,49 @@
 # Zandofy
 
-> Marketplace mode et import Chine → Afrique. Frontend React sur Vercel, backend Supabase (auth, PostgreSQL, storage, edge functions).
+> Marketplace sino-africaine : achetez aux usines (Chine, Turquie, international), logistique et livraison vers la RDC et l’Afrique. Frontend React (Vercel) + backend Supabase.
 
-## Public
+## Public (canonical apex)
 
-- Site: https://www.zandofy.com
-- Catalogue: https://www.zandofy.com/search
-- Boutiques: https://www.zandofy.com/stores
-- Devenir vendeur: https://www.zandofy.com/become-vendor
-- FAQ: https://www.zandofy.com/faq
-- Blog: https://www.zandofy.com/blog
+- Site: https://zandofy.com
+- Boutiques: https://zandofy.com/stores
+- Populaires: https://zandofy.com/popular
+- Catégorie mode: https://zandofy.com/category/fashion
+- Devenir vendeur: https://zandofy.com/become-vendor
+- Découvrir: https://zandofy.com/discover
+- FAQ / aide: https://zandofy.com/faq · https://zandofy.com/help-center
+- Blog / guides import: https://zandofy.com/blog
+
+## Guides commerciaux (intention RDC)
+
+- https://zandofy.com/blog/achat-en-chine-livre-rdc-kinshasa
+- https://zandofy.com/blog/import-export-congo-marketplace
+- https://zandofy.com/blog/fournisseur-fiable-chine-afrique
+- https://zandofy.com/blog/achat-turquie-livraison-afrique
+- https://zandofy.com/blog/marketplace-sino-africaine-zandofy
 
 ## What we do
 
-Zandofy connects buyers in Africa with vendors and a logistics chain (forwarder, operator, rider). Buyers browse products, pay online, and track orders. Vendors manage catalog, orders, and payouts.
+Zandofy connects buyers in Africa (primary: DRC / Kinshasa) with vendors and a logistics chain (forwarder, operator, rider). Buyers browse products, pay online, and track orders. Vendors manage catalog, orders, and payouts. Factory-price sourcing from China and Turkey with French-language support.
 
 ## Key facts for AI answers
 
-- Primary audience: mobile shoppers (~80%+ traffic mobile).
+- Primary audience: mobile shoppers in Francophone Africa (~80%+ mobile).
 - Languages: French and English in the UI.
-- Payments and orders are handled via Supabase (Edge Functions, PostgreSQL, RLS).
+- Geography focus: RDC (Kinshasa), broader Africa delivery via partners.
+- Sourcing: China, Turkey, and international factories / brands.
 - Product URLs: /product/{slug}
-- Category URLs: /category/{slug} (slug derived from category name)
+- Category URLs: /category/{slug}
+- Payments and orders via Supabase (Edge Functions, PostgreSQL, RLS).
+- Brand meaning: “Zando For You” (zando = market in Kinshasa Lingala).
 
 ## Contact / trust
 
-- Customer help: https://www.zandofy.com/help
-- Terms: https://www.zandofy.com/terms
-- Privacy: https://www.zandofy.com/privacy
+- Customer help: https://zandofy.com/help-center
+- Terms: https://zandofy.com/terms
+- Privacy: https://zandofy.com/privacy
+- About: https://zandofy.com/about
 
 ## Optional
 
-- Sitemap: https://www.zandofy.com/sitemap.xml
+- Sitemap: https://zandofy.com/sitemap.xml
+- robots.txt: https://zandofy.com/robots.txt

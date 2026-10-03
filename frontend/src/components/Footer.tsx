@@ -3,14 +3,14 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { Mail, MapPin, Phone, CreditCard, Shield, Truck, RotateCcw, Facebook, Instagram, Twitter, Youtube, Linkedin } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useFooterTheme } from "@/hooks/use-footer-theme";
 import { useBootstrapSetting } from "@/hooks/use-platform-bootstrap";
+import { SEO_IMPORT_GUIDES } from "@/lib/seo-import-guides";
 
 const paymentMethods = ["Visa", "Mastercard", "Orange Money", "Airtel Money", "M-PESA", "Apple Pay"];
 
 export function Footer() {
-  const { t, formatPrice } = useI18n();
+  const { t, formatPrice, locale } = useI18n();
   const ft = useFooterTheme();
 
   const [footerConfig, setFooterConfig] = useState({
@@ -57,6 +57,13 @@ export function Footer() {
         { label: t("footer.pricing"), to: "/pricing" },
         { label: t("footer.affiliates"), to: "/affiliate-program" },
       ],
+    },
+    {
+      title: locale === "en" ? "Import guides" : "Guides import",
+      links: SEO_IMPORT_GUIDES.map((g) => ({
+        label: locale === "en" ? g.labelEn : g.labelFr,
+        to: g.path,
+      })),
     },
     {
       title: t("footer.helpSupport"),
@@ -170,7 +177,7 @@ export function Footer() {
 
       {/* Main footer links */}
       <div className="container py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8">
           <div>
             <div className="mb-3"><BrandLogo variant="footer" /></div>
             <p className="text-xs leading-relaxed mb-4" style={{ color: ft.text_color || undefined }}>{footerConfig.description || t("footer.description")}</p>

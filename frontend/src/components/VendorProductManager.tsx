@@ -28,6 +28,7 @@ import {
 } from "@/lib/product-order-guards";
 import {
   countWords,
+  assessProductSeoCoverage,
   deriveSeoKeywords,
   imageCount,
   isVideoMediaUrl,
@@ -1312,6 +1313,27 @@ export function VendorProductManager({
           />
           <div className="rounded-lg border border-border p-3 space-y-3 bg-muted/20">
             <p className="text-xs font-semibold text-foreground">Référencement (SEO)</p>
+            {(() => {
+              const seoCov = assessProductSeoCoverage({
+                metaTitle: form.meta_title,
+                metaDescription: form.meta_description,
+                seoKeywords: form.seo_keywords,
+                shortDescription: form.short_description,
+              });
+              if (seoCov.warningsFr.length === 0) return null;
+              return (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 space-y-1">
+                  <p className="text-[11px] font-medium text-amber-800 dark:text-amber-200">
+                    Couverture SEO {seoCov.score}/{seoCov.maxScore} (conseil — n&apos;bloque pas la publication)
+                  </p>
+                  <ul className="text-[10px] text-muted-foreground list-disc pl-4 space-y-0.5">
+                    {seoCov.warningsFr.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
             <Field
               label={`Titre SEO (${form.meta_title.length}/60)`}
               value={form.meta_title}

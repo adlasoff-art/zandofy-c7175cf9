@@ -200,7 +200,7 @@ function GeoBlockGuard({ children }: { children: React.ReactNode }) {
   // Align with meta-injector UA allowlist; humans in blocked countries still see the gate.
   const isBot =
     typeof navigator !== "undefined" &&
-    /(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|quora link preview|outbrain|vkshare|w3c_validator|redditbot|tumblr|bitlybot|nuzzel|qwantify|pinterestbot|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot|gptbot|bytespider|claudebot|anthropic|perplexity|lighthouse|chrome-lighthouse|headlesschrome)/i.test(
+    /(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|quora link preview|outbrain|vkshare|w3c_validator|redditbot|tumblr|bitlybot|nuzzel|qwantify|pinterestbot|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot|gptbot|chatgpt-user|oai-searchbot|claudebot|anthropic|perplexity|google-extended|bytespider|lighthouse|chrome-lighthouse|headlesschrome)/i.test(
       navigator.userAgent || ""
     );
   if (blocked && !isBot) return <GeoBlockScreen />;

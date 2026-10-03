@@ -8,6 +8,7 @@
  */
 
 import { isDynamicSeoPath, resolveRequestPathname } from "./meta-injector-path";
+import { isSeoBot } from "./_shared/bot-ua";
 
 export const config = { runtime: "edge" };
 
@@ -47,12 +48,8 @@ function toAbsoluteOgImage(url: string | null | undefined): string {
   return `${site}${path}`;
 }
 
-const BOT_REGEX =
-  /(googlebot|bingbot|yandex|duckduckbot|baiduspider|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|applebot|pinterest|skypeuripreview|embedly|quora link preview|outbrain|vkshare|w3c_validator|redditbot|tumblr|bitlybot|nuzzel|qwantify|pinterestbot|petalbot|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot)/i;
-
 function isBot(ua: string | null): boolean {
-  if (!ua) return false;
-  return BOT_REGEX.test(ua);
+  return isSeoBot(ua);
 }
 
 function escapeHtml(s: string): string {

@@ -85,3 +85,52 @@ export function photoQuotaMessageFr(result: Exclude<PhotoQuotaResult, { ok: true
   }
   return `Vous pouvez ajouter jusqu’à ${result.max} photos par article.`;
 }
+
+/** Soft SEO coverage hints for vendor publish UI (non-blocking). */
+export type ProductSeoCoverage = {
+  hasMetaTitle: boolean;
+  hasMetaDescription: boolean;
+  hasSeoKeywords: boolean;
+  shortDescriptionOk: boolean;
+  score: number;
+  maxScore: number;
+  warningsFr: string[];
+};
+
+export function assessProductSeoCoverage(input: {
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  seoKeywords?: string | null;
+  shortDescription?: string | null;
+  minShortWords?: number;
+}): ProductSeoCoverage {
+  const minShortWords = input.minShortWords ?? 15;
+  const hasMetaTitle = !!String(input.metaTitle || "").trim();
+  const hasMetaDescription = String(input.metaDescription || "").trim().length >= 50;
+  const hasSeoKeywords = !!String(input.seoKeywords || "").trim();
+  const shortDescriptionOk = countWords(String(input.shortDescription || "")) >= minShortWords;
+  const flags = [hasMetaTitle, hasMetaDescription, hasSeoKeywords, shortDescriptionOk];
+  const score = flags.filter(Boolean).length;
+  const warningsFr: string[] = [];
+  if (!hasMetaTitle) {
+    warningsFr.push("Titre SEO vide — Google utilisera le nom du produit.");
+  }
+  if (!hasMetaDescription) {
+    warningsFr.push("Meta description courte ou vide (visez ~120–160 caractères).");
+  }
+  if (!hasSeoKeywords) {
+    warningsFr.push("Ajoutez quelques mots-clés (ex. import Chine, Kinshasa).");
+  }
+  if (!shortDescriptionOk) {
+    warningsFr.push(`Description courte trop courte (min. ${minShortWords} mots).`);
+  }
+  return {
+    hasMetaTitle,
+    hasMetaDescription,
+    hasSeoKeywords,
+    shortDescriptionOk,
+    score,
+    maxScore: flags.length,
+    warningsFr,
+  };
+}

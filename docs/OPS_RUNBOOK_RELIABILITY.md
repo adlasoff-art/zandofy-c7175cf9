@@ -26,6 +26,14 @@ Appliquer dans le SQL Editor **staging**, smoke, puis **production** :
 15. `20261001165000_platform_stores_product_quota_exempt.sql` (**hotfix** platform shops unlimited products + team product SELECT)
 16. `20261001166000_fix_stores_products_rls_recursion.sql` (**CRITICAL**) break stores↔collaborators RLS recursion — restore admin/vendor visibility
 17. `20261001170000_outreach_utility_messages_foundation.sql` — utility templates + outreach_send_log + WA opt-in + outreach_config
+18. `20261003120000_seo_recovery_pillars_and_overrides.sql` — home/discover SEO overrides + 5 blog pillars (RDC/import)
+
+### SEO recovery (2026-10-03)
+
+- AI crawler prerender: root + `frontend` `vercel.json` + `api/_shared/bot-ua.ts`
+- Redeploy Edge `generate-sitemap` (skip empty-name products) then Vercel rebuild
+- Ops: [`docs/SEO_MARKETPLACE_PLAYBOOK.md`](./SEO_MARKETPLACE_PLAYBOOK.md) §3 GSC 404 recovery
+- Pillars: [`docs/SEO_CONTENT_PILLARS_RDC.md`](./SEO_CONTENT_PILLARS_RDC.md)
 
 ### Outreach multi-canal (2026-10-01)
 

@@ -38,11 +38,35 @@ Pour `/product/:slug` sans produit `publish_status=published` : réponse **HTTP 
 
 Le HTML bot = champs catalogue (nom, prix, devise réelle, description) — **pas de cloaking**.
 
+## User-Agent allowlist (prerender)
+
+Source of truth: [`frontend/api/_shared/bot-ua.ts`](../frontend/api/_shared/bot-ua.ts) (+ mirror `api/_shared/bot-ua.ts`).
+
+Must stay in sync with **every** `user-agent` rewrite in root [`vercel.json`](../vercel.json) and [`frontend/vercel.json`](../frontend/vercel.json).
+
+After editing tokens, run from repo root:
+
+```bash
+node scripts/sync-bot-ua-vercel.mjs
+cp frontend/api/_shared/bot-ua.ts api/_shared/bot-ua.ts
+```
+
+Vitest `src/test/bot-ua-vercel-sync.test.ts` fails if the two diverge.
+
+**Included for AI answers:** GPTBot, ChatGPT-User, OAI-SearchBot, ClaudeBot, anthropic, PerplexityBot, Google-Extended.
+
+**Still Disallow in robots.txt (not prerendered):** CCBot, Bytespider.
+
 ## Vérification
 
 ```bash
 # Body crawlers : H1 + prix
 curl -sA "Googlebot" "https://zandofy.com/product/<slug>" | grep -E "<h1|class=\"price\"|offers"
+
+# AI crawler must hit meta-injector (not bare SPA)
+curl -sA "GPTBot" "https://zandofy.com/" | grep -E "BEGIN injected SEO|<h1"
+
+curl -sA "ClaudeBot" "https://zandofy.com/blog/achat-en-chine-livre-rdc-kinshasa" | grep -E "<title>|BEGIN injected"
 
 # Produit retiré → 410
 curl -sI -A "Googlebot" "https://zandofy.com/product/this-slug-does-not-exist-xyz" | head -5

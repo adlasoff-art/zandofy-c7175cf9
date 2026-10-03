@@ -107,6 +107,23 @@ export function SeoCategoriesSection() {
         <FolderTree size={18} className="text-primary" />
         <h2 className="text-sm font-semibold text-foreground">SEO par catégorie</h2>
       </div>
+      <p className="text-[11px] text-muted-foreground leading-relaxed">
+        Priorité top 10 racines : renseigner <strong>meta title</strong>,{" "}
+        <strong>meta description</strong>, <strong>seo_body</strong> (≥150 mots utiles) et{" "}
+        <strong>FAQ</strong> (3–5 Q/R). Objectif indexation : Mode/Fashion, Électronique, Beauté,
+        Maison, Accessoires, puis le reste. Voir{" "}
+        <code className="text-[10px]">docs/SEO_CONTENT_PILLARS_RDC.md</code>.
+      </p>
+      {(() => {
+        const withBody = rows.filter((r) => (r.seo_body || "").trim().length >= 80).length;
+        const withMeta = rows.filter((r) => (r.meta_title || "").trim()).length;
+        return (
+          <p className="text-[10px] text-muted-foreground">
+            Couverture racines : {withMeta}/{rows.length} titre SEO · {withBody}/{rows.length}{" "}
+            corps seo_body
+          </p>
+        );
+      })()}
       <select
         value={activeId}
         onChange={(e) => setActiveId(e.target.value)}

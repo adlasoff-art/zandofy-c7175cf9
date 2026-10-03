@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { SEOHead } from "@/components/SEOHead";
 import { Clock, Eye, Calendar, ArrowLeft, Tag, Share2, MessageCircle, Heart, ChevronRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BlogComments } from "@/components/blog/BlogComments";
@@ -90,6 +91,12 @@ const BlogPostPage: React.FC = () => {
   if (!post) {
     return (
       <div className="min-h-screen bg-background">
+        <SEOHead
+          title="Article introuvable | Zandofy"
+          description="Cet article n'existe pas ou n'est plus publié sur Zandofy."
+          canonical={slug ? `/blog/${slug}` : "/blog"}
+          noindex
+        />
         <Header />
         <div className="container py-20 text-center">
           <h1 className="text-2xl font-bold text-foreground mb-4">Article introuvable</h1>
@@ -101,25 +108,43 @@ const BlogPostPage: React.FC = () => {
   }
 
   const videoEmbeds = (post.video_embeds as any[]) || [];
+  const seoTitle = post.meta_title || post.title;
+  const seoDescription =
+    post.meta_description ||
+    post.excerpt ||
+    String(post.content || "").replace(/<[^>]+>/g, " ").slice(0, 155);
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": post.schema_type || "BlogPosting",
-    headline: post.meta_title || post.title,
-    description: post.meta_description || post.excerpt,
+    headline: seoTitle,
+    description: seoDescription,
     image: post.og_image_url || post.cover_image_url,
     datePublished: post.published_at,
     dateModified: post.updated_at,
     author: { "@type": "Organization", name: "Zandofy" },
-    publisher: { "@type": "Organization", name: "Zandofy", logo: { "@type": "ImageObject", url: "/logo.png" } },
-    mainEntityOfPage: { "@type": "WebPage", "@id": window.location.href },
+    publisher: {
+      "@type": "Organization",
+      name: "Zandofy",
+      logo: { "@type": "ImageObject", url: "https://zandofy.com/og-default.jpg" },
+    },
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": `https://zandofy.com/blog/${post.slug}`,
+    },
     wordCount: post.content?.split(/\s+/).length || 0,
     timeRequired: `PT${post.reading_time_min}M`,
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* SEO JSON-LD injected via script */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <SEOHead
+        title={seoTitle}
+        description={seoDescription}
+        canonical={`/blog/${post.slug}`}
+        ogImage={post.og_image_url || post.cover_image_url || undefined}
+        ogType="article"
+        jsonLd={jsonLd}
+      />
       <Header />
 
       <article className="flex-1">
