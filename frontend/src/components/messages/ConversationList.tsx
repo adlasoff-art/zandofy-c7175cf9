@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { resolvePartyLabel } from "@/lib/party-label";
 
 export interface ConversationItem {
   id: string;
@@ -146,9 +147,7 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
 
       if (conv.is_store_owner) {
         const profile = profileMap.get(conv.user_id);
-        otherPartyName = profile
-          ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Client"
-          : "Client";
+        otherPartyName = resolvePartyLabel(profile, "Client");
         otherPartyAvatar = profile?.avatar_url || null;
       }
 
@@ -325,9 +324,9 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
                       </p>
                     </div>
                   )}
-                  <div className="flex items-center justify-between gap-1 mt-0.5">
+                  <div className="flex items-center justify-between gap-1 mt-0.5 min-w-0">
                     <p className={cn(
-                      "text-xs truncate",
+                      "text-xs min-w-0 flex-1 line-clamp-1 break-all",
                       conv.unread_count > 0 ? "font-semibold text-foreground" : "text-muted-foreground"
                     )}>
                       {conv.last_message

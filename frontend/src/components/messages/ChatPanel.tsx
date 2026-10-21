@@ -652,9 +652,8 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
         </div>
       )}
 
-      {/* Input area */}
-      <div className="border-t border-border px-3 py-2 flex items-end gap-2 shrink-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        {/* File upload button — always visible */}
+      {/* Input area — full-width composer with integrated send */}
+      <div className="border-t border-border px-2 sm:px-3 py-2 flex items-end gap-1.5 shrink-0 w-full max-w-full pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <input
           ref={fileInputRef}
           type="file"
@@ -663,33 +662,37 @@ export function ChatPanel({ conversation, onBack }: ChatPanelProps) {
           onChange={handleFileUpload}
         />
         <button
+          type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="shrink-0 w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          className="shrink-0 h-11 w-11 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
           title="Joindre une image ou un PDF (max 3 Mo)"
         >
           {uploading ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
         </button>
-        <textarea
-          ref={textareaRef}
-          value={newMessage}
-          onChange={e => { setNewMessage(e.target.value); broadcastTyping(); autoResize(); }}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          placeholder="Écrivez votre message..."
-          rows={2}
-          enterKeyHint="enter"
-          className="flex-1 min-w-0 resize-none bg-muted/50 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground min-h-[44px] max-h-[120px]"
-        />
-        <Button
-          size="icon"
-          onClick={handleSend}
-          disabled={!newMessage.trim() || sending}
-          className="shrink-0 h-9 w-9"
-          aria-label="Envoyer"
-        >
-          {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-        </Button>
+        <div className="relative flex-1 min-w-0">
+          <textarea
+            ref={textareaRef}
+            value={newMessage}
+            onChange={e => { setNewMessage(e.target.value); broadcastTyping(); autoResize(); }}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder="Écrivez votre message..."
+            rows={2}
+            enterKeyHint="enter"
+            className="w-full min-w-0 resize-none bg-muted/50 border border-border rounded-md pl-3 pr-12 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground min-h-[44px] max-h-[120px]"
+          />
+          <Button
+            type="button"
+            size="icon"
+            onClick={handleSend}
+            disabled={!newMessage.trim() || sending}
+            className="absolute right-1.5 bottom-1.5 h-9 w-9 shrink-0"
+            aria-label="Envoyer"
+          >
+            {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+          </Button>
+        </div>
       </div>
     </div>
   );

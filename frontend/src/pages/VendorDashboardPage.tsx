@@ -40,7 +40,7 @@ import { GeoFieldsRow, type GeoFieldsValue } from "@/components/address/GeoField
 import { toast } from "sonner";
 import {
   Store, MessageCircle, Loader2, ChevronLeft, Package, Users, Inbox, ShoppingBag,
-  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign, Calculator, ShieldCheck, LineChart, Archive, CreditCard,
+  Settings, Phone, Save, Clock, XCircle, Send, Crown, Flame, Ticket, Wallet, RotateCcw, AlertTriangle, Globe, Bike, Sparkles, Truck, Ban, DollarSign, Calculator, ShieldCheck, LayoutDashboard, Archive, CreditCard,
 } from "lucide-react";
 import { useVendorSubscription } from "@/hooks/use-vendor-subscription";
 import { useStoreEntitlements, hasFeature } from "@/hooks/use-store-entitlements";
@@ -51,6 +51,7 @@ import { useStoreCertification } from "@/hooks/use-certification";
 import { useStoreSuspension, isActivityBlocked } from "@/hooks/use-store-suspension";
 import { CertificationBadge } from "@/components/CertificationBadge";
 import { Switch } from "@/components/ui/switch";
+import { resolvePartyLabel } from "@/lib/party-label";
 
 interface VendorConversation {
   id: string;
@@ -58,6 +59,8 @@ interface VendorConversation {
   product_id: string | null;
   updated_at: string;
   customer_email: string | null;
+  /** Display name preferred for UI — never show email as title when this is set */
+  customer_label: string;
   product_name: string | null;
   last_message: string | null;
   unread_count: number;
@@ -102,22 +105,63 @@ export default function VendorDashboardPage() {
   const [noStore, setNoStore] = useState(false);
   const [selectedConv, setSelectedConv] = useState<VendorConversation | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"messages" | "catalogue" | "orders" | "deliveries" | "promos" | "coupons" | "wallet" | "returns" | "disputes" | "featured" | "stats" | "analytics_pro" | "team" | "suppliers" | "pricing" | "autonomous" | "freight_sim" | "kyb" | "settings" | "payments">(() => {
+  type VendorTabKey =
+    | "dashboard"
+    | "messages"
+    | "catalogue"
+    | "orders"
+    | "deliveries"
+    | "promos"
+    | "coupons"
+    | "wallet"
+    | "returns"
+    | "disputes"
+    | "featured"
+    | "stats"
+    | "analytics_pro"
+    | "team"
+    | "suppliers"
+    | "pricing"
+    | "autonomous"
+    | "freight_sim"
+    | "kyb"
+    | "settings"
+    | "payments";
+
+  const [activeTab, setActiveTab] = useState<VendorTabKey>(() => {
     const tab = new URLSearchParams(window.location.search).get("tab");
-    // Deep-link alias: legacy ?tab=stats → analytics_pro
-    const normalized = tab === "stats" ? "analytics_pro" : tab;
-    const allowed = new Set([
-      "messages", "catalogue", "orders", "deliveries", "promos", "coupons", "wallet",
-      "returns", "disputes", "featured", "stats", "analytics_pro", "team", "suppliers",
-      "pricing", "autonomous", "freight_sim", "kyb", "settings", "payments",
+    // Deep-link aliases: legacy stats / analytics_pro → dashboard
+    const normalized =
+      tab === "stats" || tab === "analytics_pro" ? "dashboard" : tab;
+    const allowed = new Set<string>([
+      "dashboard",
+      "messages",
+      "catalogue",
+      "orders",
+      "deliveries",
+      "promos",
+      "coupons",
+      "wallet",
+      "returns",
+      "disputes",
+      "featured",
+      "team",
+      "suppliers",
+      "pricing",
+      "autonomous",
+      "freight_sim",
+      "kyb",
+      "settings",
+      "payments",
     ]);
-    return (normalized && allowed.has(normalized) ? normalized : "catalogue") as typeof activeTab;
+    return (normalized && allowed.has(normalized) ? normalized : "dashboard") as VendorTabKey;
   });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    // Keep URL clean: never leave ?tab=stats after merge
-    const urlTab = activeTab === "stats" ? "analytics_pro" : activeTab;
+    // Keep URL clean: never leave ?tab=stats / analytics_pro after merge
+    const urlTab =
+      activeTab === "stats" || activeTab === "analytics_pro" ? "dashboard" : activeTab;
     if (params.get("tab") !== urlTab) {
       params.set("tab", urlTab);
       const qs = params.toString();
@@ -364,16 +408,34 @@ export default function VendorDashboardPage() {
       if (convErr || !convRows) {
         setConversations([]);
       } else {
-        const items: VendorConversation[] = (convRows as any[]).map((c) => ({
-          id: c.id,
-          user_id: c.user_id,
-          product_id: c.product_id,
-          updated_at: c.updated_at,
-          customer_email: c.customer_email || "Client",
-          product_name: c.product_name || null,
-          last_message: c.last_message || null,
-          unread_count: Number(c.unread_count || 0),
-        }));
+        const rows = convRows as any[];
+        const userIds = [...new Set(rows.map((c) => c.user_id).filter(Boolean))] as string[];
+        let profileMap = new Map<string, { first_name: string | null; last_name: string | null }>();
+        if (userIds.length) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, first_name, last_name")
+            .in("id", userIds);
+          profileMap = new Map(
+            (profiles || []).map((p) => [p.id, { first_name: p.first_name, last_name: p.last_name }]),
+          );
+        }
+        const items: VendorConversation[] = rows.map((c) => {
+          const profile = c.user_id ? profileMap.get(c.user_id) : null;
+          const email = typeof c.customer_email === "string" ? c.customer_email.trim() : "";
+          return {
+            id: c.id,
+            user_id: c.user_id,
+            product_id: c.product_id,
+            updated_at: c.updated_at,
+            customer_email: email || null,
+            // Name first; email only when profile has no display name (keeps vendors able to identify threads)
+            customer_label: resolvePartyLabel(profile, email || "Client"),
+            product_name: c.product_name || null,
+            last_message: c.last_message || null,
+            unread_count: Number(c.unread_count || 0),
+          };
+        });
         setConversations(items);
       }
       setLoading(false);
@@ -450,6 +512,7 @@ export default function VendorDashboardPage() {
   const shopType = (store as any)?.shop_type === "local" ? "local" : "international";
 
   const VENDOR_TABS = [
+    { key: "dashboard" as const, label: "Tableau de bord", icon: LayoutDashboard },
     { key: "catalogue" as const, label: "Catalogue", icon: Package },
     { key: "orders" as const, label: "Commandes", icon: ShoppingBag },
     { key: "messages" as const, label: "Messages", icon: MessageCircle },
@@ -466,7 +529,6 @@ export default function VendorDashboardPage() {
     ...(shopType === "local" ? [{ key: "autonomous" as const, label: "Autonome", icon: Globe }] : []),
     ...(freightSimEnabled && shopType !== "local" ? [{ key: "freight_sim" as const, label: "Simulateur fret", icon: Calculator }] : []),
     { key: "kyb" as const, label: "Vérification KYB", icon: ShieldCheck },
-    { key: "analytics_pro" as const, label: "Analytics", icon: LineChart },
     ...(hasFeature(storeEntitlements, "collaborators", store?.collaborators_enabled)
       ? [{ key: "team" as const, label: "Équipe", icon: Users }]
       : []),
@@ -482,16 +544,32 @@ export default function VendorDashboardPage() {
 
   const renderTabContent = () => (
     <>
-      {store?.id && !store.is_platform_owned && (
-        <VendorOnboardingChecklist
-          storeId={store.id}
-          productCount={undefined}
-          hasLogo={Boolean(store.logo_url)}
-          hasBanner={Boolean((store as any)?.banner_url)}
-          hasCountry={Boolean((store as any)?.country_code || (store as any)?.country)}
-          hasWhatsappNumber={Boolean((store as any)?.whatsapp_number)}
-          whatsappEnabled={whatsappEntitled}
-        />
+      {(activeTab === "dashboard" || activeTab === "analytics_pro" || activeTab === "stats") && (
+        <div className="space-y-8">
+          {store?.id && !store.is_platform_owned && (
+            <VendorOnboardingChecklist
+              storeId={store.id}
+              productCount={undefined}
+              hasLogo={Boolean(store.logo_url)}
+              hasBanner={Boolean((store as any)?.banner_url)}
+              hasCountry={Boolean((store as any)?.country_code || (store as any)?.country)}
+              hasWhatsappNumber={Boolean((store as any)?.whatsapp_number)}
+              whatsappEnabled={whatsappEntitled}
+            />
+          )}
+          <VendorSummaryWidgets
+            store={store!}
+            orderCounters={orderCounters}
+            totalUnread={totalUnread}
+            storeId={store!.id}
+            onMessagesClick={() => setActiveTab("messages")}
+          />
+          <VendorAnalyticsProTab storeId={store!.id} />
+          <div className="border-t border-border pt-6">
+            <h3 className="text-sm font-semibold text-muted-foreground mb-4">Vue détaillée boutique</h3>
+            <VendorStatsTab storeId={store!.id} />
+          </div>
+        </div>
       )}
       {activeTab === "catalogue" && (
         <VendorProductManager
@@ -533,15 +611,6 @@ export default function VendorDashboardPage() {
       {activeTab === "autonomous" && <VendorAutonomousTab storeId={store!.id} />}
       {activeTab === "freight_sim" && freightSimEnabled && <VendorFreightSimulator />}
       {activeTab === "kyb" && <VendorKybV2Tab storeId={store!.id} />}
-      {(activeTab === "analytics_pro" || activeTab === "stats") && (
-        <div className="space-y-8">
-          <VendorAnalyticsProTab storeId={store!.id} />
-          <div className="border-t border-border pt-6">
-            <h3 className="text-sm font-semibold text-muted-foreground mb-4">Vue détaillée boutique</h3>
-            <VendorStatsTab storeId={store!.id} />
-          </div>
-        </div>
-      )}
       {activeTab === "team" && <VendorTeamTab storeId={store!.id} />}
       {activeTab === "messages" && (
         <>
@@ -564,7 +633,7 @@ export default function VendorDashboardPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-foreground truncate">
-                        {conv.customer_email}
+                        {conv.customer_label}
                       </span>
                       {conv.unread_count > 0 && (
                         <span className="w-5 h-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center shrink-0">
@@ -747,10 +816,7 @@ export default function VendorDashboardPage() {
                   </div>
                 )}
 
-                {/* KPI Widgets — always visible */}
-                <VendorSummaryWidgets store={store!} orderCounters={orderCounters} totalUnread={totalUnread} storeId={store!.id} />
-
-                {/* Tab content */}
+                {/* Tab content (KPI live only inside dashboard tab) */}
                 {renderTabContent()}
               </div>
             </div>
@@ -776,9 +842,6 @@ export default function VendorDashboardPage() {
                   }
                 }}
               />
-
-              {/* Summary widgets */}
-              <VendorSummaryWidgets store={store!} orderCounters={orderCounters} totalUnread={totalUnread} storeId={store!.id} />
 
               {/* Platform claim banner */}
               <VendorPlatformClaimBanner storeId={store!.id} userId={user!.id} storeName={store!.name} />
@@ -853,7 +916,7 @@ export default function VendorDashboardPage() {
                 <MessageCircle size={18} className="text-primary" />
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">
-                    {selectedConv.customer_email}
+                    {selectedConv.customer_label}
                   </p>
                   {selectedConv.product_name && (
                     <p className="text-[11px] text-muted-foreground truncate">{selectedConv.product_name}</p>
@@ -895,11 +958,13 @@ function VendorSummaryWidgets({
   orderCounters,
   totalUnread,
   storeId,
+  onMessagesClick,
 }: {
   store: VendorStore;
   orderCounters: OrderCounters;
   totalUnread: number;
   storeId: string;
+  onMessagesClick?: () => void;
 }) {
   const { subscription, tierConfig, effectiveMaxProducts, productQuotaExempt } =
     useVendorSubscription(storeId, { isPlatformOwned: store.is_platform_owned });
@@ -999,18 +1064,20 @@ function VendorSummaryWidgets({
           </p>
         </div>
 
-        {/* Messages */}
-        <div className="bg-card border border-border rounded-lg p-3">
+        {/* Messages — always labeled clearly; click opens Messages tab */}
+        <button
+          type="button"
+          onClick={onMessagesClick}
+          className="bg-card border border-border rounded-lg p-3 text-left w-full hover:border-primary/40 transition-colors"
+        >
           <div className="flex items-center gap-2">
             <Inbox size={16} className="text-primary shrink-0" />
             <p className={`text-xl font-bold leading-none ${totalUnread > 0 ? "text-primary" : "text-foreground"}`}>
-              {totalUnread > 0 ? totalUnread : 0}
+              {totalUnread}
             </p>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-1">
-            {totalUnread > 0 ? "Non lu(s)" : "Messages"}
-          </p>
-        </div>
+          <p className="text-[11px] text-muted-foreground mt-1">Messages non lus</p>
+        </button>
       </div>
     </div>
   );
@@ -1485,37 +1552,41 @@ function VendorSettings({ store, onUpdate }: { store: VendorStore; onUpdate: (s:
         {seoLoading ? (
           <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-primary" /></div>
         ) : (
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Titre SEO</label>
+          <div className="space-y-4 min-w-0">
+            <div className="min-w-0">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="text-xs text-muted-foreground">Titre SEO</label>
+                <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{seoTitle.length}/60</span>
+              </div>
               <input
                 value={seoTitle}
                 onChange={(e) => setSeoTitle(e.target.value)}
                 maxLength={60}
                 placeholder={store.name}
-                className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">{seoTitle.length}/60</p>
             </div>
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Meta description</label>
+            <div className="min-w-0">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="text-xs text-muted-foreground">Meta description</label>
+                <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{seoDesc.length}/160</span>
+              </div>
               <textarea
                 value={seoDesc}
                 onChange={(e) => setSeoDesc(e.target.value)}
                 maxLength={160}
                 rows={2}
                 placeholder="Décrivez votre boutique en une ou deux phrases..."
-                className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">{seoDesc.length}/160</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="text-xs text-muted-foreground block mb-1">Mots-clés (séparés par des virgules)</label>
               <input
                 value={seoKeywords}
                 onChange={(e) => setSeoKeywords(e.target.value)}
                 placeholder="mode, robes, accessoires, femme"
-                className="w-full px-3 py-2 text-sm bg-card border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <div className="flex flex-wrap gap-1 mt-2">
                 {seoKeywords.split(",").map((k) => k.trim()).filter(Boolean).map((k, i) => (
