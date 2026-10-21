@@ -127,12 +127,12 @@ export function VendorAnalyticsProTab({ storeId }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Filtres */}
-      <Card>
-        <CardContent className="pt-6 flex flex-wrap gap-3 items-end">
-          <div className="flex gap-1">
+      {/* Filtres — sticky on mobile for quick period access */}
+      <Card className="sticky top-16 z-10 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/90 border-border shadow-sm">
+        <CardContent className="pt-4 pb-4 flex flex-wrap gap-3 items-end">
+          <div className="flex gap-1 overflow-x-auto max-w-full pb-0.5 scrollbar-hide">
             {PRESETS.map(pr => (
-              <Button key={pr.key} size="sm" variant={preset === pr.key ? "default" : "outline"} onClick={() => setPreset(pr.key)}>{pr.label}</Button>
+              <Button key={pr.key} size="sm" variant={preset === pr.key ? "default" : "outline"} onClick={() => setPreset(pr.key)} className="shrink-0">{pr.label}</Button>
             ))}
           </div>
           <div className="flex-1 min-w-[180px]">
@@ -230,21 +230,35 @@ export function VendorAnalyticsProTab({ storeId }: Props) {
 
       {/* Top produits */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Top produits</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Top produits</CardTitle>
+          <p className="text-[10px] text-muted-foreground font-normal md:hidden">Glisser horizontalement pour voir CA / marge / stock →</p>
+        </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-1 px-1">
+            <table className="w-full text-sm min-w-[640px]">
               <thead className="text-xs text-muted-foreground border-b">
-                <tr><th className="text-left py-2">Produit</th><th className="text-right">Unités</th><th className="text-right">CA</th><th className="text-right">Marge</th><th className="text-right">Stock</th></tr>
+                <tr>
+                  <th className="text-left py-2">Produit</th>
+                  <th className="text-right tabular-nums">Unités</th>
+                  <th className="text-right tabular-nums">CA</th>
+                  <th className="text-right tabular-nums">Marge</th>
+                  <th className="text-right tabular-nums">Stock</th>
+                </tr>
               </thead>
               <tbody>
                 {(top.data || []).map(t => (
                   <tr key={t.product_id} className="border-b">
-                    <td className="py-2 flex items-center gap-2">{t.product_name}{t.is_low_stock && <Badge variant="destructive" className="text-[10px] gap-1"><AlertTriangle className="w-3 h-3" />stock bas</Badge>}</td>
-                    <td className="text-right">{t.units_sold}</td>
-                    <td className="text-right">{fmtMoney(t.revenue)}</td>
-                    <td className="text-right">{fmtMoney(t.margin)}</td>
-                    <td className="text-right">{t.current_stock}</td>
+                    <td className="py-2">
+                      <span className="inline-flex items-center gap-2 max-w-[220px]">
+                        <span className="truncate">{t.product_name}</span>
+                        {t.is_low_stock && <Badge variant="destructive" className="text-[10px] gap-1 shrink-0"><AlertTriangle className="w-3 h-3" />stock bas</Badge>}
+                      </span>
+                    </td>
+                    <td className="text-right tabular-nums">{t.units_sold}</td>
+                    <td className="text-right tabular-nums">{fmtMoney(t.revenue)}</td>
+                    <td className="text-right tabular-nums">{fmtMoney(t.margin)}</td>
+                    <td className="text-right tabular-nums">{t.current_stock}</td>
                   </tr>
                 ))}
               </tbody>
@@ -255,22 +269,32 @@ export function VendorAnalyticsProTab({ storeId }: Props) {
 
       {/* Cohortes */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Cohortes clients (6 derniers mois)</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Cohortes clients (6 derniers mois)</CardTitle>
+          <p className="text-[10px] text-muted-foreground font-normal md:hidden">Glisser horizontalement →</p>
+        </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-1 px-1">
+            <table className="w-full text-sm min-w-[560px]">
               <thead className="text-xs text-muted-foreground border-b">
-                <tr><th className="text-left py-2">Mois cohorte</th><th className="text-right">Nouveaux clients</th><th className="text-right">LTV</th><th className="text-right">Rétention J30</th><th className="text-right">J60</th><th className="text-right">J90</th></tr>
+                <tr>
+                  <th className="text-left py-2">Mois cohorte</th>
+                  <th className="text-right tabular-nums">Nouveaux</th>
+                  <th className="text-right tabular-nums">LTV</th>
+                  <th className="text-right tabular-nums">J30</th>
+                  <th className="text-right tabular-nums">J60</th>
+                  <th className="text-right tabular-nums">J90</th>
+                </tr>
               </thead>
               <tbody>
                 {(cohorts.data || []).map(c => (
                   <tr key={c.cohort_month} className="border-b">
-                    <td className="py-2">{new Date(c.cohort_month).toLocaleDateString("fr-FR", { year: "numeric", month: "short" })}</td>
-                    <td className="text-right">{c.customers}</td>
-                    <td className="text-right">{fmtMoney(c.ltv)}</td>
-                    <td className="text-right">{c.retention_d30_pct}%</td>
-                    <td className="text-right">{c.retention_d60_pct}%</td>
-                    <td className="text-right">{c.retention_d90_pct}%</td>
+                    <td className="py-2 whitespace-nowrap">{new Date(c.cohort_month).toLocaleDateString("fr-FR", { year: "numeric", month: "short" })}</td>
+                    <td className="text-right tabular-nums">{c.customers}</td>
+                    <td className="text-right tabular-nums">{fmtMoney(c.ltv)}</td>
+                    <td className="text-right tabular-nums">{c.retention_d30_pct}%</td>
+                    <td className="text-right tabular-nums">{c.retention_d60_pct}%</td>
+                    <td className="text-right tabular-nums">{c.retention_d90_pct}%</td>
                   </tr>
                 ))}
               </tbody>

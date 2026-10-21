@@ -90,8 +90,13 @@ export function useNotifications() {
   }, [fetchNotifications]);
 
   const markAsRead = async (id: string) => {
+    if (!user) return;
     setUnreadCount((c) => Math.max(0, c - 1));
-    await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+    await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("id", id)
+      .eq("user_id", user.id);
     fetchNotifications();
   };
 
@@ -103,11 +108,30 @@ export function useNotifications() {
   };
 
   const deleteNotification = async (id: string) => {
+    if (!user) return;
     const wasUnread = notifications.find((n) => n.id === id && !n.is_read);
     if (wasUnread) setUnreadCount((c) => Math.max(0, c - 1));
-    await supabase.from("notifications").delete().eq("id", id);
+    // Scope by user_id — defense in depth with RLS
+    await supabase.from("notifications").delete().eq("id", id).eq("user_id", user.id);
     fetchNotifications();
   };
 
-  return { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification };
+  const deleteNotifications = async (ids: string[]) => {
+    if (!user || ids.length === 0) return;
+    const unique = [...new Set(ids)];
+    const unreadRemoved = notifications.filter((n) => unique.includes(n.id) && !n.is_read).length;
+    if (unreadRemoved) setUnreadCount((c) => Math.max(0, c - unreadRemoved));
+    await supabase.from("notifications").delete().in("id", unique).eq("user_id", user.id);
+    fetchNotifications();
+  };
+
+  return {
+    notifications,
+    unreadCount,
+    loading,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    deleteNotifications,
+  };
 }

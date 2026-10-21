@@ -509,55 +509,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
 
             {isExpanded && (
               <div className="px-3 pb-3 border-t border-border space-y-3 pt-3">
-                {/* Customer info + full address */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">Client</span>
-                    <p className="font-medium text-foreground">
-                      {shouldMaskPII
-                        ? `${order.shipping_first_name || ""} ***`
-                        : `${order.shipping_first_name} ${order.shipping_last_name}`}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Téléphone</span>
-                    <p className="font-medium text-foreground">
-                      {shouldMaskPII ? "***" : (order.shipping_phone || "—")}
-                    </p>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-muted-foreground flex items-center gap-1"><MapPin size={10} /> Adresse complète</span>
-                    <p className="font-medium text-foreground">
-                      {shouldMaskPII
-                        ? [order.shipping_city, order.shipping_country].filter(Boolean).join(", ") || "—"
-                        : [order.shipping_address, order.shipping_city, order.shipping_country].filter(Boolean).join(", ") || "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Paiement</span>
-                    <p className="font-medium text-foreground">{order.payment_method === "mobile_money" ? "Mobile Money" : order.payment_method === "cod" ? "Cash à la livraison" : order.payment_method || "—"}</p>
-                  </div>
-                  {order.shipping_payment_status && (
-                    <div>
-                      <span className="text-muted-foreground">Expédition</span>
-                      <p className="font-medium text-foreground">{order.shipping_payment_status === "paid" ? "Payée" : order.shipping_payment_status === "deferred" ? "Paiement différé" : order.shipping_payment_status}</p>
-                    </div>
-                  )}
-                  {order.delivery_choice && (
-                    <div>
-                      <span className="text-muted-foreground">Mode de livraison</span>
-                      <p className="font-medium text-foreground">{order.delivery_choice === "home_delivery" ? "Livraison domicile" : "Retrait Hub"}</p>
-                    </div>
-                  )}
-                  {order.last_mile_payment_method && (
-                    <div>
-                      <span className="text-muted-foreground">Paiement dernier km</span>
-                      <p className="font-medium text-foreground">{order.last_mile_payment_method === "cash" ? "Cash au livreur" : "Mobile Money"}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Supplier order number */}
+                {/* Ops first: tracking, rider, fees, confirmation */}
                 {order.supplier_order_number && (
                   <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
                     <Hash size={12} className="text-primary shrink-0" />
@@ -566,7 +518,6 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   </div>
                 )}
 
-                {/* Tracking number */}
                 {order.tracking_number && (
                   <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
                     <Hash size={12} className="text-primary shrink-0" />
@@ -575,10 +526,8 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   </div>
                 )}
 
-                {/* Lot 4H — Détail freight (transitaire, sous-colis, mode split/groupé) */}
                 <FreightDetailsPanel orderId={order.id} actor="vendor" />
 
-                {/* Edit tracking button — available when in_shipping or later, before delivered */}
                 {["in_shipping", "shipped", "assigning_rider", "rider_assigned", "out_for_delivery"].includes(order.status) && (
                   <button
                     onClick={() => setEditTrackingModal(order.id)}
@@ -589,7 +538,6 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   </button>
                 )}
 
-                {/* Assigned rider */}
                 {order.assigned_rider_name && (
                   <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
                     <Bike size={12} className="text-primary shrink-0" />
@@ -598,7 +546,6 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   </div>
                 )}
 
-                {/* Lot 11B Phase B4 — Opérateur de livraison */}
                 {order.delivery_operator_name && (
                   <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
                     <Truck size={12} className="text-primary shrink-0" />
@@ -607,7 +554,6 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   </div>
                 )}
 
-                {/* Delivery choice & fee */}
                 {order.last_mile_fee != null && Number(order.last_mile_fee) > 0 && (
                   <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-md p-2">
                     <span className="text-muted-foreground">Frais livraison domicile :</span>
@@ -622,14 +568,78 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   </div>
                 )}
 
-                {/* Deferred shipping payment badge */}
+                {order.confirmation_code && (
+                  <div className="flex items-center gap-2 text-xs bg-primary/10 rounded-md p-2">
+                    <span className="text-muted-foreground">Code confirmation :</span>
+                    <span className="font-mono font-bold text-primary text-sm">{order.confirmation_code}</span>
+                  </div>
+                )}
+
+                <OrderMiniStepper status={order.status} history={order.history} trackingNumber={order.tracking_number} shopType={shopType} deliveryChoice={order.delivery_choice} geoRelation={order.geo_relation} />
+
+                {/* Client PII — collapsed by default to keep ops above the fold */}
+                <details className="rounded-lg border border-border bg-muted/20 group">
+                  <summary className="cursor-pointer list-none flex items-center justify-between px-3 py-2.5 text-xs font-medium text-foreground select-none [&::-webkit-details-marker]:hidden">
+                    <span className="flex items-center gap-1.5">
+                      <MapPin size={12} className="text-muted-foreground" />
+                      Infos client
+                    </span>
+                    <ChevronDown size={14} className="text-muted-foreground transition-transform group-open:rotate-180 shrink-0" />
+                  </summary>
+                  <div className="grid grid-cols-2 gap-2 text-xs px-3 pb-3 pt-1 border-t border-border">
+                    <div>
+                      <span className="text-muted-foreground">Client</span>
+                      <p className="font-medium text-foreground">
+                        {shouldMaskPII
+                          ? `${order.shipping_first_name || ""} ***`
+                          : `${order.shipping_first_name} ${order.shipping_last_name}`}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Téléphone</span>
+                      <p className="font-medium text-foreground">
+                        {shouldMaskPII ? "***" : (order.shipping_phone || "—")}
+                      </p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground flex items-center gap-1"><MapPin size={10} /> Adresse complète</span>
+                      <p className="font-medium text-foreground">
+                        {shouldMaskPII
+                          ? [order.shipping_city, order.shipping_country].filter(Boolean).join(", ") || "—"
+                          : [order.shipping_address, order.shipping_city, order.shipping_country].filter(Boolean).join(", ") || "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Paiement</span>
+                      <p className="font-medium text-foreground">{order.payment_method === "mobile_money" ? "Mobile Money" : order.payment_method === "cod" ? "Cash à la livraison" : order.payment_method || "—"}</p>
+                    </div>
+                    {order.shipping_payment_status && (
+                      <div>
+                        <span className="text-muted-foreground">Expédition</span>
+                        <p className="font-medium text-foreground">{order.shipping_payment_status === "paid" ? "Payée" : order.shipping_payment_status === "deferred" ? "Paiement différé" : order.shipping_payment_status}</p>
+                      </div>
+                    )}
+                    {order.delivery_choice && (
+                      <div>
+                        <span className="text-muted-foreground">Mode de livraison</span>
+                        <p className="font-medium text-foreground">{order.delivery_choice === "home_delivery" ? "Livraison domicile" : "Retrait Hub"}</p>
+                      </div>
+                    )}
+                    {order.last_mile_payment_method && (
+                      <div>
+                        <span className="text-muted-foreground">Paiement dernier km</span>
+                        <p className="font-medium text-foreground">{order.last_mile_payment_method === "cash" ? "Cash au livreur" : "Mobile Money"}</p>
+                      </div>
+                    )}
+                  </div>
+                </details>
+
                 {order.shipping_payment_status === "deferred" && (
                   <div className="flex items-center gap-2 text-xs bg-amber-50 border border-amber-200 rounded-md p-2">
                     <span className="text-amber-700 font-medium">⏳ Expédition à payer à l'arrivée : ${Number(order.shipping_cost || 0).toFixed(2)}</span>
                   </div>
                 )}
 
-                {/* Rider cash collection status */}
                 {order.last_mile_payment_method === "cash" && order.delivery_choice === "home_delivery" && (
                   <div className={`flex items-center gap-2 text-xs rounded-md p-2 ${
                     order.rider_cash_collected ? "bg-primary/10 text-primary" : "bg-amber-50 border border-amber-200 text-amber-700"
@@ -641,7 +651,6 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   </div>
                 )}
 
-                {/* Preuve expédition différée (champ dédié — distinct de la preuve produit hors plateforme) */}
                 {order.shipping_payment_status === "deferred" && (
                   <PaymentProofUpload
                     orderId={order.id}
@@ -856,16 +865,6 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                     existingUrl={order.last_mile_payment_proof_url}
                   />
                 )}
-
-                {order.confirmation_code && (
-                  <div className="flex items-center gap-2 text-xs bg-primary/10 rounded-md p-2">
-                    <span className="text-muted-foreground">Code confirmation :</span>
-                    <span className="font-mono font-bold text-primary text-sm">{order.confirmation_code}</span>
-                  </div>
-                )}
-
-                {/* Mini stepper with dates */}
-                <OrderMiniStepper status={order.status} history={order.history} trackingNumber={order.tracking_number} shopType={shopType} deliveryChoice={order.delivery_choice} geoRelation={order.geo_relation} />
 
                 {/* Items */}
                 <div className="space-y-1.5">

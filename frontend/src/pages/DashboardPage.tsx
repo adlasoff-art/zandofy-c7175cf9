@@ -710,7 +710,19 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
               ["awaiting_payment", "payment_failed"].includes(order.status) &&
               !isDeferredVendorPaymentMethod(order.payment_method);
             return (
-              <div key={order.id} className="bg-card border border-border rounded-lg p-4 flex items-center gap-4">
+              <div
+                key={order.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedOrder(order.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelectedOrder(order.id);
+                  }
+                }}
+                className="bg-card border border-border rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 cursor-pointer hover:border-primary/40 transition-colors"
+              >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-foreground text-sm">{order.order_ref}</span>
@@ -732,14 +744,25 @@ function OrdersTab({ orders, selectedOrder, setSelectedOrder, orderItems, status
                     {order.coupon_code && ` · 🏷️ ${order.coupon_code}`}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div
+                  className="flex flex-col xs:flex-row sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full sm:w-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {canRetryPayment && (
-                    <button onClick={() => setRetryOrder(order)} className="text-xs text-primary font-medium flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setRetryOrder(order)}
+                      className="min-h-11 px-3 py-2 text-xs text-primary font-medium flex items-center justify-center gap-1 rounded-md border border-primary/30 hover:bg-primary/5"
+                    >
                       <CreditCard size={12} /> {t("dashboard.orders.pay")}
                     </button>
                   )}
                   {canCancel && <CancelOrderButton orderId={order.id} orderRef={order.order_ref} onSuccess={onCancelSuccess} small />}
-                  <button onClick={() => setSelectedOrder(order.id)} className="text-xs text-primary font-medium flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrder(order.id)}
+                    className="min-h-11 px-3 py-2 text-xs text-primary font-medium flex items-center justify-center gap-1 rounded-md border border-border hover:border-primary/40"
+                  >
                     {t("dashboard.orders.details")} <ChevronRight size={12} />
                   </button>
                 </div>
@@ -2286,10 +2309,34 @@ function ProfileTab({ user, onProfileUpdated }: { user: any; onProfileUpdated?: 
 }
 
 function NotificationsTab() {
-  const { notifications, loading, markAsRead, markAllAsRead, deleteNotification, unreadCount } = useNotifications();
+  const {
+    notifications,
+    loading,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    deleteNotifications,
+    unreadCount,
+  } = useNotifications();
   const navigate = useNavigate();
   const { t, locale } = useI18n();
   const dateLocale = locale === "en" ? enUS : fr;
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // Drop stale selections after list refresh / single deletes elsewhere
+  useEffect(() => {
+    const live = new Set(notifications.map((n) => n.id));
+    setSelectedIds((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (live.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [notifications]);
 
   const typeIcons: Record<string, React.ReactNode> = {
     order: <Package size={16} className="text-blue-500" />,
@@ -2298,18 +2345,66 @@ function NotificationsTab() {
     info: <Bell size={16} className="text-muted-foreground" />,
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === notifications.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(notifications.map((n) => n.id)));
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    try {
+      await deleteNotifications([...selectedIds]);
+      setSelectedIds(new Set());
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   if (loading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary" size={20} /></div>;
 
   return (
     <div className="max-w-xl space-y-3">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <p className="text-sm text-muted-foreground">{t("notif.unread", { count: unreadCount })}</p>
-        {unreadCount > 0 && (
-          <Button variant="ghost" size="sm" className="text-xs h-7" onClick={markAllAsRead}>
-            <CheckCircle2 size={12} className="mr-1" /> {t("notif.markAllReadFull")}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {notifications.length > 0 && (
+            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={toggleSelectAll}>
+              {selectedIds.size === notifications.length ? "Tout désélectionner" : "Tout sélectionner"}
+            </Button>
+          )}
+          {unreadCount > 0 && (
+            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={markAllAsRead}>
+              <CheckCircle2 size={12} className="mr-1" /> {t("notif.markAllReadFull")}
+            </Button>
+          )}
+        </div>
       </div>
+
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between gap-2 bg-destructive/5 border border-destructive/20 rounded-lg px-3 py-2">
+          <span className="text-xs font-medium text-foreground">{selectedIds.size} sélectionnée(s)</span>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-8 text-xs gap-1"
+            disabled={bulkDeleting}
+            onClick={handleBulkDelete}
+          >
+            {bulkDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+            Supprimer
+          </Button>
+        </div>
+      )}
 
       {notifications.length === 0 ? (
         <div className="text-center py-12">
@@ -2320,25 +2415,47 @@ function NotificationsTab() {
         notifications.map((n) => (
           <div
             key={n.id}
-            className={`bg-card border rounded-lg p-4 flex items-start gap-3 cursor-pointer hover:border-primary/50 transition-colors ${
+            className={`bg-card border rounded-lg p-4 flex items-start gap-3 hover:border-primary/50 transition-colors ${
               !n.is_read ? "border-primary bg-primary/5" : "border-border"
             }`}
-            onClick={() => {
-              if (!n.is_read) markAsRead(n.id);
-              if (n.link) navigate(n.link);
-            }}
           >
-            <div className="mt-0.5 shrink-0">{typeIcons[n.type] || typeIcons.info}</div>
-            <div className="flex-1 min-w-0">
-              <p className={`text-sm ${!n.is_read ? "font-semibold" : ""} text-foreground`}>{n.title}</p>
-              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
-              <p className="text-[10px] text-muted-foreground mt-1">
-                {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: dateLocale })}
-              </p>
-            </div>
+            <input
+              type="checkbox"
+              checked={selectedIds.has(n.id)}
+              onChange={() => toggleSelect(n.id)}
+              className="mt-1 shrink-0 rounded border-border"
+              aria-label="Sélectionner la notification"
+            />
             <button
-              onClick={(e) => { e.stopPropagation(); deleteNotification(n.id); }}
-              className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
+              type="button"
+              className="flex-1 min-w-0 flex items-start gap-3 text-left cursor-pointer"
+              onClick={() => {
+                if (!n.is_read) markAsRead(n.id);
+                if (n.link) navigate(n.link);
+              }}
+            >
+              <div className="mt-0.5 shrink-0">{typeIcons[n.type] || typeIcons.info}</div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm ${!n.is_read ? "font-semibold" : ""} text-foreground`}>{n.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 break-words">{n.message}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: dateLocale })}
+                </p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await deleteNotification(n.id);
+                setSelectedIds((prev) => {
+                  if (!prev.has(n.id)) return prev;
+                  const next = new Set(prev);
+                  next.delete(n.id);
+                  return next;
+                });
+              }}
+              className="shrink-0 p-2 min-h-11 min-w-11 flex items-center justify-center text-muted-foreground hover:text-destructive"
+              aria-label="Supprimer"
             >
               <Trash2 size={14} />
             </button>

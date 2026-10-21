@@ -109,7 +109,13 @@ export function VendorKybV2Tab({ storeId }: Props) {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <CardTitle className="flex items-center gap-2"><ShieldCheck className="text-primary" size={20} /> Vérification KYB (entreprise)</CardTitle>
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold whitespace-nowrap">
+                <ShieldCheck className="text-primary shrink-0" size={18} />
+                Vérification KYB
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5 pl-7">Entreprise</p>
+            </div>
             {submission && <Badge variant={STATUS_BADGE[submission.status].variant}>{STATUS_BADGE[submission.status].label}</Badge>}
           </div>
         </CardHeader>

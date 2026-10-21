@@ -157,29 +157,39 @@ export function VendorWalletTab({ storeId }: Props) {
   return (
     <div className="space-y-6">
       <StoreKybGateBanner storeId={storeId} />
-      {/* Balance cards */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Wallet size={16} className="text-emerald-500" />
-            <span className="text-xs text-muted-foreground">Disponible</span>
+      {/* Balance cards — fixed label row + amount baseline; retention below amounts */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="bg-card border border-border rounded-lg p-3 sm:p-4 flex flex-col min-w-0">
+          <div className="flex items-center gap-1.5 h-5 mb-2 min-w-0">
+            <Wallet size={14} className="text-emerald-500 shrink-0" />
+            <span className="text-[10px] sm:text-xs text-muted-foreground truncate">Disponible</span>
           </div>
-          <p className="text-xl font-bold text-foreground">${availableBalance.toFixed(2)}</p>
+          <p className="text-lg sm:text-xl font-bold text-foreground tabular-nums leading-none">
+            ${availableBalance.toFixed(2)}
+          </p>
+          <div className="h-4 mt-0.5" aria-hidden />
         </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Clock size={16} className="text-amber-500" />
-            <span className="text-xs text-muted-foreground">En attente</span>
+        <div className="bg-card border border-border rounded-lg p-3 sm:p-4 flex flex-col min-w-0">
+          <div className="flex items-center gap-1.5 h-5 mb-2 min-w-0">
+            <Clock size={14} className="text-amber-500 shrink-0" />
+            <span className="text-[10px] sm:text-xs text-muted-foreground truncate">En attente</span>
           </div>
-          <p className="text-xl font-bold text-foreground">${pendingBalance.toFixed(2)}</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Rétention : {wallet.retention_days}j</p>
+          <p className="text-lg sm:text-xl font-bold text-foreground tabular-nums leading-none">
+            ${pendingBalance.toFixed(2)}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+            Rétention : {wallet.retention_days}j
+          </p>
         </div>
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <ArrowDownCircle size={16} className="text-primary" />
-            <span className="text-xs text-muted-foreground">Total gagné</span>
+        <div className="bg-card border border-border rounded-lg p-3 sm:p-4 flex flex-col min-w-0">
+          <div className="flex items-center gap-1.5 h-5 mb-2 min-w-0">
+            <ArrowDownCircle size={14} className="text-primary shrink-0" />
+            <span className="text-[10px] sm:text-xs text-muted-foreground truncate">Total gagné</span>
           </div>
-          <p className="text-xl font-bold text-foreground">${totalEarned.toFixed(2)}</p>
+          <p className="text-lg sm:text-xl font-bold text-foreground tabular-nums leading-none">
+            ${totalEarned.toFixed(2)}
+          </p>
+          <div className="h-4 mt-0.5" aria-hidden />
         </div>
       </div>
 

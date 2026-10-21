@@ -1624,14 +1624,15 @@ export function VendorProductManager({
           <div className="border-t border-border pt-3 mt-1">
             <label className="text-xs font-semibold text-foreground">📦 Poids & Dimensions (pour estimation fret)</label>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 items-start">
             <div>
               <Field
-                label="Poids unitaire en grammes (ex : 100 g = 0,1 kg)"
+                label="Poids (g)"
                 type="number"
                 value={String(form.weight_grams)}
                 onChange={(v) => setForm({ ...form, weight_grams: Number(v) })}
               />
+              <p className="text-[10px] text-muted-foreground mt-1">ex. 100 g = 0,1 kg</p>
               {form.weight_grams >= 1000 && (
                 <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 flex items-start gap-1">
                   <span>⚠️</span>
@@ -1644,7 +1645,7 @@ export function VendorProductManager({
             </div>
             <Field label="Longueur (cm)" type="number" value={String(form.length_cm)} onChange={(v) => setForm({ ...form, length_cm: Number(v) })} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 items-start">
             <Field label="Largeur (cm)" type="number" value={String(form.width_cm)} onChange={(v) => setForm({ ...form, width_cm: Number(v) })} />
             <Field label="Hauteur (cm)" type="number" value={String(form.height_cm)} onChange={(v) => setForm({ ...form, height_cm: Number(v) })} />
           </div>

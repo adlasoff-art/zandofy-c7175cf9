@@ -217,18 +217,19 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
 
       {/* Request Dialog */}
       <Dialog open={showForm} onOpenChange={(v) => { if (!v) resetForm(); }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>Demande de mise en avant</DialogTitle>
+            <DialogTitle className="pr-10 text-base leading-snug">Demande de mise en avant</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 min-w-0">
             {/* Request type selector */}
-            <div>
+            <div className="min-w-0">
               <label className="text-xs font-medium text-muted-foreground">Type de demande</label>
-              <div className="flex gap-2 mt-1.5">
+              <div className="flex flex-wrap gap-2 mt-1.5">
                 <button
+                  type="button"
                   onClick={() => setRequestType("product")}
-                  className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-colors ${
+                  className={`flex-1 min-w-[8rem] px-3 py-2 text-xs font-medium rounded-lg border transition-colors ${
                     requestType === "product"
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-border text-muted-foreground hover:border-primary/40"
@@ -237,8 +238,9 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
                   Produits approuvés
                 </button>
                 <button
+                  type="button"
                   onClick={() => setRequestType("custom")}
-                  className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-colors ${
+                  className={`flex-1 min-w-[8rem] px-3 py-2 text-xs font-medium rounded-lg border transition-colors ${
                     requestType === "custom"
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-border text-muted-foreground hover:border-primary/40"
@@ -256,17 +258,17 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
                 {products.length === 0 ? (
                   <p className="text-xs text-muted-foreground mt-1">Aucun produit publié disponible.</p>
                 ) : (
-                  <div className="mt-1.5 max-h-40 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
+                  <div className="mt-1.5 max-h-40 overflow-y-auto space-y-1 border border-border rounded-lg p-2 min-w-0">
                     {products.map((p) => (
-                      <label key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer">
+                      <label key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer min-w-0">
                         <input
                           type="checkbox"
                           checked={selectedProductIds.includes(p.id)}
                           onChange={() => toggleProduct(p.id)}
-                          className="rounded border-border text-primary focus:ring-primary"
+                          className="rounded border-border text-primary focus:ring-primary shrink-0"
                         />
-                        <span className="text-sm text-foreground truncate flex-1">{p.name_fr}</span>
-                        <span className="text-xs text-muted-foreground">${p.price}</span>
+                        <span className="text-sm text-foreground truncate flex-1 min-w-0">{p.name_fr}</span>
+                        <span className="text-xs text-muted-foreground shrink-0 tabular-nums">${p.price}</span>
                       </label>
                     ))}
                   </div>
@@ -323,7 +325,9 @@ export function VendorFeaturedRequestTab({ storeId }: Props) {
                   className="mt-1.5 w-full border-2 border-dashed border-border rounded-lg py-8 flex flex-col items-center gap-2 hover:border-primary/40 transition-colors"
                 >
                   <ImagePlus size={24} className="text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Cliquez pour importer une image</span>
+                  <span className="text-xs text-muted-foreground text-center px-2 break-words">
+                    Cliquez pour importer une image
+                  </span>
                 </button>
               )}
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageSelect} />
