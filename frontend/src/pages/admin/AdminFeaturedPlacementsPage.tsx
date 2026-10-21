@@ -314,36 +314,75 @@ function PlacementsTab() {
 // ─── Requests Tab ────────────────────────────────────────────
 function RequestsTab() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState("");
   const [priceQuoted, setPriceQuoted] = useState("");
+  const [createPlacementOnApprove, setCreatePlacementOnApprove] = useState(true);
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["admin-featured-requests"],
     queryFn: async () => {
-      const { data } = await (supabase.from("featured_placement_requests" as any) as any).select("*").order("created_at", { ascending: false });
+      const { data, error } = await (supabase.from("featured_placement_requests" as any) as any)
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
       return (data || []) as any[];
     },
   });
 
-  const reviewMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await (supabase.from("featured_placement_requests" as any) as any).update({
-        status,
-        admin_notes: adminNotes || null,
-        price_quoted: priceQuoted ? parseFloat(priceQuoted) : null,
-        reviewed_by: user?.id,
-        reviewed_at: new Date().toISOString(),
-      }).eq("id", id);
+  const { data: placementsById = {} } = useQuery({
+    queryKey: ["admin-featured-placements-lookup"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("featured_placements" as any) as any)
+        .select("id, title, end_date, store_id, image_url, is_active")
+        .order("end_date", { ascending: false });
+      if (error) throw error;
+      const map: Record<string, any> = {};
+      for (const p of data || []) map[p.id] = p;
+      return map;
     },
-    onSuccess: (_, { status }) => {
-      toast.success(status === "approved" ? "Demande approuvée" : "Demande rejetée");
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
+      const item = requests.find((r: any) => r.id === id);
+      if (!item) throw new Error("Demande introuvable");
+
+      const shouldCreate =
+        status === "approved" &&
+        item.action_type !== "extend" &&
+        createPlacementOnApprove;
+
+      const { data, error } = await (supabase as any).rpc("admin_review_featured_placement_request", {
+        p_request_id: id,
+        p_status: status,
+        p_admin_notes: adminNotes || null,
+        p_price_quoted: priceQuoted ? parseFloat(priceQuoted) : null,
+        p_create_placement: shouldCreate,
+      });
+      if (error) throw error;
+      if (data && data.ok === false && data.reason === "already_reviewed") {
+        throw new Error("Cette demande a déjà été traitée");
+      }
+      return data;
+    },
+    onSuccess: (data, { status }) => {
+      if (status === "approved" && data?.extended_end) {
+        toast.success(`Prolongée jusqu'au ${format(new Date(data.extended_end), "dd/MM/yyyy HH:mm")}`);
+      } else if (status === "approved" && data?.placement_id) {
+        toast.success("Demande approuvée — emplacement créé");
+      } else {
+        toast.success(status === "approved" ? "Demande approuvée" : "Demande rejetée");
+      }
       queryClient.invalidateQueries({ queryKey: ["admin-featured-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-featured-placements"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-featured-placements-lookup"] });
       setReviewId(null);
       setAdminNotes("");
       setPriceQuoted("");
+      setCreatePlacementOnApprove(true);
     },
+    onError: (err: any) => toast.error(err.message || "Erreur lors de l'examen"),
   });
 
   const statusColors: Record<string, string> = {
@@ -360,11 +399,18 @@ function RequestsTab() {
     expired: "Expirée",
   };
 
+  const actionLabels: Record<string, string> = {
+    new: "Nouvelle",
+    relaunch: "Relance",
+    extend: "Prolongation",
+  };
+
   const reviewItem = requests.find((r: any) => r.id === reviewId);
+  const isExtend = reviewItem?.action_type === "extend";
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">Demandes des vendeurs pour la mise en avant de produits.</p>
+      <p className="text-sm text-muted-foreground">Demandes des vendeurs (nouvelles, relances, prolongations).</p>
 
       {isLoading ? (
         <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary" size={20} /></div>
@@ -377,20 +423,42 @@ function RequestsTab() {
               {r.image_url && <img src={r.image_url} alt="" className="w-12 h-16 object-cover rounded-md shrink-0" />}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">
-                  {r.product_ids?.length || 0} produit(s) • Boutique: <span className="text-primary">{r.store_id?.slice(0, 8)}…</span>
+                  {r.action_type === "extend"
+                    ? "Prolongation"
+                    : r.request_type === "custom"
+                      ? "Annonce libre"
+                      : `${r.product_ids?.length || 0} produit(s)`}
+                  {" · "}
+                  Boutique: <span className="text-primary">{r.store_id?.slice(0, 8)}…</span>
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{r.message || "Pas de message"}</p>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  {r.action_type && r.action_type !== "new" && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                      {actionLabels[r.action_type] || r.action_type}
+                    </span>
+                  )}
                   <Clock size={10} className="text-muted-foreground" />
                   <span className="text-[10px] text-muted-foreground">{format(new Date(r.created_at), "dd/MM/yyyy HH:mm")}</span>
-                  {r.desired_duration_days && <span className="text-[10px] text-muted-foreground">• {r.desired_duration_days}j souhaités</span>}
+                  {r.desired_duration_days && (
+                    <span className="text-[10px] text-muted-foreground">
+                      · {r.desired_duration_days}j {r.action_type === "extend" ? "à ajouter" : "souhaités"}
+                    </span>
+                  )}
                 </div>
               </div>
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColors[r.status] || ""}`}>
                 {statusLabels[r.status] || r.status}
               </span>
               {r.status === "pending" && (
-                <button onClick={() => setReviewId(r.id)} className="p-1.5 text-primary hover:bg-primary/10 rounded-md">
+                <button
+                  onClick={() => {
+                    setReviewId(r.id);
+                    // Relance: ne pas créer un 2e emplacement par défaut (éviter doublons)
+                    setCreatePlacementOnApprove(r.action_type === "new" || !r.action_type);
+                  }}
+                  className="p-1.5 text-primary hover:bg-primary/10 rounded-md"
+                >
                   <Eye size={14} />
                 </button>
               )}
@@ -399,15 +467,57 @@ function RequestsTab() {
         </div>
       )}
 
-      {/* Review Dialog */}
       <Dialog open={!!reviewId} onOpenChange={() => setReviewId(null)}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Examiner la demande</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{isExtend ? "Examiner la prolongation" : "Examiner la demande"}</DialogTitle>
+          </DialogHeader>
           {reviewItem && (
             <div className="space-y-3">
-              <div className="text-sm">
-                <p><strong>Produits :</strong> {reviewItem.product_ids?.length || 0}</p>
-                <p><strong>Durée souhaitée :</strong> {reviewItem.desired_duration_days || "—"} jours</p>
+              <div className="text-sm space-y-1">
+                <p>
+                  <strong>Type :</strong>{" "}
+                  {actionLabels[reviewItem.action_type] || reviewItem.action_type || "Nouvelle"}
+                  {reviewItem.request_type === "custom" ? " · Annonce libre" : ""}
+                </p>
+                {isExtend ? (
+                  <>
+                    {(() => {
+                      const pl = reviewItem.target_placement_id
+                        ? placementsById[reviewItem.target_placement_id]
+                        : null;
+                      return (
+                        <>
+                          <p>
+                            <strong>Emplacement :</strong>{" "}
+                            {pl?.title || (
+                              <span className="font-mono text-xs">{reviewItem.target_placement_id?.slice(0, 8)}…</span>
+                            )}
+                          </p>
+                          {pl?.end_date && (
+                            <p className="text-xs text-muted-foreground">
+                              Fin actuelle : {format(new Date(pl.end_date), "dd/MM/yyyy HH:mm")}
+                              {pl.is_active === false ? " · inactif" : ""}
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
+                    <p><strong>Jours à ajouter :</strong> {reviewItem.desired_duration_days || "—"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      L&apos;approbation prolonge automatiquement la date de fin (à partir de la fin actuelle, ou d&apos;aujourd&apos;hui si déjà dépassée), dans une transaction atomique.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p><strong>Produits :</strong> {reviewItem.product_ids?.length || 0}</p>
+                    <p><strong>Durée souhaitée :</strong> {reviewItem.desired_duration_days || "—"} jours</p>
+                    {reviewItem.internal_link && <p><strong>Lien :</strong> {reviewItem.internal_link}</p>}
+                    {reviewItem.parent_request_id && (
+                      <p className="text-xs text-muted-foreground">Relance de {reviewItem.parent_request_id.slice(0, 8)}…</p>
+                    )}
+                  </>
+                )}
                 <p><strong>Message :</strong> {reviewItem.message || "—"}</p>
               </div>
               {reviewItem.image_url && (
@@ -420,6 +530,24 @@ function RequestsTab() {
                 <label className="text-xs font-medium text-muted-foreground">Prix à facturer ($)</label>
                 <Input type="number" value={priceQuoted} onChange={(e) => setPriceQuoted(e.target.value)} placeholder="0" />
               </div>
+              {!isExtend && (
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={createPlacementOnApprove}
+                    onChange={(e) => setCreatePlacementOnApprove(e.target.checked)}
+                    className="rounded border-border mt-0.5"
+                  />
+                  <span>
+                    Créer l&apos;emplacement actif à l&apos;approbation (lié à la boutique)
+                    {reviewItem.action_type === "relaunch" && (
+                      <span className="block text-xs text-muted-foreground mt-0.5">
+                        Décoché par défaut pour une relance — évite un doublon si l&apos;emplacement précédent existe encore.
+                      </span>
+                    )}
+                  </span>
+                </label>
+              )}
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Notes admin</label>
                 <Textarea value={adminNotes} onChange={(e) => setAdminNotes(e.target.value)} placeholder="Raison du refus ou conditions..." rows={3} />
@@ -427,11 +555,19 @@ function RequestsTab() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            <button onClick={() => reviewMutation.mutate({ id: reviewId!, status: "rejected" })} className="flex items-center gap-1 px-4 py-2 text-sm border border-destructive text-destructive rounded-lg hover:bg-destructive/10">
+            <button
+              onClick={() => reviewMutation.mutate({ id: reviewId!, status: "rejected" })}
+              disabled={reviewMutation.isPending}
+              className="flex items-center gap-1 px-4 py-2 text-sm border border-destructive text-destructive rounded-lg hover:bg-destructive/10 disabled:opacity-50"
+            >
               <X size={14} /> Refuser
             </button>
-            <button onClick={() => reviewMutation.mutate({ id: reviewId!, status: "approved" })} className="flex items-center gap-1 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90">
-              <Check size={14} /> Approuver
+            <button
+              onClick={() => reviewMutation.mutate({ id: reviewId!, status: "approved" })}
+              disabled={reviewMutation.isPending}
+              className="flex items-center gap-1 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50"
+            >
+              <Check size={14} /> {isExtend ? "Approuver & prolonger" : "Approuver"}
             </button>
           </DialogFooter>
         </DialogContent>
