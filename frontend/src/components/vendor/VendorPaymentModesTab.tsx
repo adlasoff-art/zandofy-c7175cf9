@@ -15,9 +15,11 @@ import { useStoreEntitlements, hasFeature } from "@/hooks/use-store-entitlements
 
 interface Props {
   storeId: string;
+  /** Platform-owned stores: no trial/subscription constraints on off-platform. */
+  isPlatformOwned?: boolean;
 }
 
-export function VendorPaymentModesTab({ storeId }: Props) {
+export function VendorPaymentModesTab({ storeId, isPlatformOwned = false }: Props) {
   const queryClient = useQueryClient();
   const { data: access } = useVendorOffPlatformAccess(storeId);
   const { data: entitlements } = useStoreEntitlements(storeId);
@@ -36,11 +38,13 @@ export function VendorPaymentModesTab({ storeId }: Props) {
     },
   });
 
-  const offPlatformEntitled = hasFeature(
-    entitlements,
-    "off_platform_payment",
-    override?.vendor_off_platform_enabled === true,
-  );
+  const offPlatformEntitled =
+    isPlatformOwned ||
+    hasFeature(
+      entitlements,
+      "off_platform_payment",
+      override?.vendor_off_platform_enabled === true,
+    );
   const [mobileMoney, setMobileMoney] = useState(true);
   const [card, setCard] = useState(true);
   const [offPlatform, setOffPlatform] = useState(false);
@@ -155,9 +159,11 @@ export function VendorPaymentModesTab({ storeId }: Props) {
     {
       key: "off" as const,
       label: "Hors plateforme",
-      desc: offPlatformEntitled
-        ? "Le client paie vos numéros / QR directement, puis envoie une preuve. Essai 30 jours puis abonnement."
-        : "Non inclus dans votre plan — activez ce droit via Abonnements (admin) ou contactez le support.",
+      desc: isPlatformOwned
+        ? "Boutique plateforme : le client paie les numéros / QR (boutique ou numéros plateforme), puis envoie une preuve. Aucune contrainte d’essai ou d’abonnement."
+        : offPlatformEntitled
+          ? "Le client paie vos numéros / QR directement, puis envoie une preuve. Essai 30 jours puis abonnement."
+          : "Non inclus dans votre plan — activez ce droit via Abonnements (admin) ou contactez le support.",
       icon: Banknote,
       checked: offPlatform,
       onChange: setOffPlatform,
@@ -253,6 +259,13 @@ export function VendorPaymentModesTab({ storeId }: Props) {
           <div className="flex items-start gap-2 text-xs text-muted-foreground">
             <Info size={14} className="shrink-0 mt-0.5 text-primary" />
             <div>
+              {access?.reason === "platform" && (
+                <p>
+                  Boutique plateforme : hors plateforme disponible sans essai ni abonnement. Les
+                  numéros boutique sont utilisés s’ils existent ; sinon les numéros plateforme
+                  par défaut.
+                </p>
+              )}
               {access?.reason === "trial" && access.trialEndsAt && (
                 <p>
                   Essai hors plateforme actif jusqu’au{" "}
@@ -268,7 +281,7 @@ export function VendorPaymentModesTab({ storeId }: Props) {
               {access?.reason === "grant" && (
                 <p>Accès hors plateforme accordé par l’administration.</p>
               )}
-              {access && !access.allowed && (
+              {access && !access.allowed && !isPlatformOwned && (
                 <p>
                   Essai terminé. Souscrivez le forfait numéros pour continuer à afficher vos
                   numéros / QR.{" "}

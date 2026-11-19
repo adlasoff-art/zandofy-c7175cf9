@@ -1,7 +1,8 @@
 /**
  * Hook to fetch vendor off-platform payment numbers at checkout.
- * Uses SECURITY DEFINER RPC (bypasses owner-only RLS) and never mixes in
- * platform default numbers — those are for platform MoMo, not off-platform.
+ * Uses SECURITY DEFINER RPC (bypasses owner-only RLS).
+ * Independent stores: store numbers only.
+ * Platform-owned: store numbers, else default_payment_numbers (RPC).
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
