@@ -1,6 +1,7 @@
 /**
  * Shared gate for vendor off-platform payment numbers / QR access.
- * Prefer SQL store_off_platform_numbers_allowed; fall back to client if RPC absent.
+ * Source of truth: SECURITY DEFINER RPC store_off_platform_numbers_allowed.
+ * Platform-owned: SQL returns true (no trial/sub/grant). Client fallback mirrors that.
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,7 +10,7 @@ export const DEFAULT_OFF_PLATFORM_TRIAL_DAYS = 30;
 
 export type OffPlatformAccess = {
   allowed: boolean;
-  reason: "grant" | "subscription" | "trial" | "denied";
+  reason: "platform" | "grant" | "subscription" | "trial" | "denied";
   trialEndsAt: string | null;
   trialDays: number;
   daysLeft: number | null;
@@ -51,8 +52,10 @@ function classifyReason(
   override: any,
   inTrial: boolean,
   allowed: boolean,
+  isPlatformOwned: boolean,
 ): OffPlatformAccess["reason"] {
   if (!allowed) return "denied";
+  if (isPlatformOwned) return "platform";
   if (
     override?.mm_granted_by_admin === true &&
     override?.vendor_custom_payment_numbers_enabled === true
@@ -74,8 +77,20 @@ async function resolveClientFallback(
   trialDays: number,
   storeCreatedAt: string | null | undefined,
   override: any,
+  isPlatformOwned: boolean,
 ): Promise<OffPlatformAccess> {
   const meta = buildTrialMeta(storeCreatedAt, trialDays);
+
+  if (isPlatformOwned) {
+    return {
+      allowed: true,
+      reason: "platform",
+      trialEndsAt: meta.trialEndsAt,
+      trialDays,
+      daysLeft: meta.daysLeft,
+    };
+  }
+
   const now = Date.now();
 
   if (
@@ -146,7 +161,11 @@ export async function resolveOffPlatformAccess(storeId: string): Promise<OffPlat
   const trialDays = await fetchTrialDays();
 
   const [{ data: store }, { data: override }] = await Promise.all([
-    supabase.from("stores").select("created_at").eq("id", storeId).maybeSingle(),
+    supabase
+      .from("stores")
+      .select("created_at, is_platform_owned")
+      .eq("id", storeId)
+      .maybeSingle(),
     (supabase as any)
       .from("vendor_pricing_overrides")
       .select(
@@ -156,6 +175,8 @@ export async function resolveOffPlatformAccess(storeId: string): Promise<OffPlat
       .maybeSingle(),
   ]);
 
+  // Buyers often cannot SELECT stores (RLS) — is_platform_owned may be null; RPC is authoritative.
+  const isPlatformOwned = (store as any)?.is_platform_owned === true;
   const meta = buildTrialMeta(store?.created_at, trialDays);
 
   const { data: allowedRpc, error: rpcErr } = await (supabase as any).rpc(
@@ -164,13 +185,19 @@ export async function resolveOffPlatformAccess(storeId: string): Promise<OffPlat
   );
 
   if (rpcErr) {
-    return resolveClientFallback(storeId, trialDays, store?.created_at, override);
+    return resolveClientFallback(
+      storeId,
+      trialDays,
+      store?.created_at,
+      override,
+      isPlatformOwned,
+    );
   }
 
   const allowed = allowedRpc === true;
   return {
     allowed,
-    reason: classifyReason(override, meta.inTrial, allowed),
+    reason: classifyReason(override, meta.inTrial, allowed, isPlatformOwned),
     trialEndsAt: meta.trialEndsAt,
     trialDays,
     daysLeft: meta.daysLeft,

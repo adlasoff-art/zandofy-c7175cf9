@@ -11,6 +11,7 @@ type: feature
 - Config : `frontend/playwright.config.ts`
 - Specs : `frontend/e2e/*.spec.ts` (séparé de Vitest qui cible `src/**`)
 - CI : `.github/workflows/e2e-playwright.yml` — **build + vite preview local** (ne plus cibler l’URL preview Lovable protégée par login)
+- Runner CI : **`ubuntu-24.04`** (pas `ubuntu-latest` tant que Playwright &lt; 1.61 — pas de chromium sur ubuntu26.04)
 - Build CI : secrets GitHub `VITE_*` **ou** fallback `frontend/.env.e2e` (clé anon publique prod, déjà dans `api/meta-injector.ts`)
 
 ## Commandes
