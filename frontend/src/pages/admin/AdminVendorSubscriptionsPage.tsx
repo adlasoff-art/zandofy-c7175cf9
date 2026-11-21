@@ -9,6 +9,11 @@ import { Switch } from "@/components/ui/switch";
 import { PublishSocialDialog } from "@/components/admin/PublishSocialDialog";
 import { countProductPhotoUrls } from "@/lib/product-catalogue-validation";
 import { DataTablePagination } from "@/components/ui/DataTablePagination";
+import {
+  resolveVendorMayUploadPaymentProof,
+  vendorMayUploadPaymentProofUiLabel,
+  vendorMayUploadPaymentProofUiState,
+} from "@/lib/off-platform-payment";
 
 interface StoreWithSub {
   id: string;
@@ -18,11 +23,14 @@ interface StoreWithSub {
   is_verified: boolean | null;
   is_suspended?: boolean | null;
   is_banned?: boolean | null;
+  is_platform_owned?: boolean | null;
   can_create_coupons: boolean;
   collaborators_enabled: boolean;
   max_collaborators_override: number | null;
   vendor_cod_enabled?: boolean;
   vendor_off_platform_enabled?: boolean;
+  /** Raw override: null/undefined = default from is_platform_owned */
+  vendor_may_upload_payment_proof?: boolean | null;
   subscription: {
     id: string;
     tier: VendorTier;
@@ -42,6 +50,8 @@ const FEATURE_HINTS: Record<string, string> = {
   team: "Collaborateurs multi-comptes. Limite: collaborator_limit overrides.",
   cod: "Paiement à la livraison produit (entitlement cod_payment).",
   off_platform: "Paiement hors plateforme + preuve (entitlement off_platform_payment).",
+  may_upload_proof:
+    "Équipe boutique peut joindre la preuve si le client ne l'a pas fait. Défaut: ON plateforme, OFF indépendant.",
 };
 
 export default function AdminVendorSubscriptionsPage() {
@@ -60,7 +70,7 @@ export default function AdminVendorSubscriptionsPage() {
     queryFn: async () => {
       const { data: storesData, error } = await supabase
         .from("stores")
-        .select("id, name, owner_id, products_count, is_verified, is_suspended, is_banned, can_create_coupons, collaborators_enabled, max_collaborators_override")
+        .select("id, name, owner_id, products_count, is_verified, is_suspended, is_banned, is_platform_owned, can_create_coupons, collaborators_enabled, max_collaborators_override")
         .order("name") as { data: any[] | null; error: any };
 
       if (error) {
@@ -74,19 +84,28 @@ export default function AdminVendorSubscriptionsPage() {
         supabase.from("vendor_subscriptions").select("*").in("store_id", storeIds),
         (supabase as any)
           .from("vendor_pricing_overrides")
-          .select("store_id, vendor_cod_enabled, vendor_off_platform_enabled")
+          .select("store_id, vendor_cod_enabled, vendor_off_platform_enabled, vendor_may_upload_payment_proof")
           .in("store_id", storeIds),
       ]);
 
       const subMap = new Map((subs || []).map((s: any) => [s.store_id, s]));
       const ovMap = new Map((overrides || []).map((o: any) => [o.store_id, o]));
 
-      return storesData.map((s) => ({
-        ...s,
-        subscription: subMap.get(s.id) || null,
-        vendor_cod_enabled: ovMap.get(s.id)?.vendor_cod_enabled === true,
-        vendor_off_platform_enabled: ovMap.get(s.id)?.vendor_off_platform_enabled === true,
-      })) as StoreWithSub[];
+      return storesData.map((s) => {
+        const ov = ovMap.get(s.id);
+        return {
+          ...s,
+          subscription: subMap.get(s.id) || null,
+          vendor_cod_enabled: ov?.vendor_cod_enabled === true,
+          vendor_off_platform_enabled: ov?.vendor_off_platform_enabled === true,
+          vendor_may_upload_payment_proof:
+            ov?.vendor_may_upload_payment_proof === true
+              ? true
+              : ov?.vendor_may_upload_payment_proof === false
+                ? false
+                : null,
+        };
+      }) as StoreWithSub[];
     },
   });
 
@@ -350,7 +369,7 @@ export default function AdminVendorSubscriptionsPage() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block">Plan</label>
                       <select
@@ -449,6 +468,72 @@ export default function AdminVendorSubscriptionsPage() {
                           await mirrorFeatureEntitlement(store.id, "off_platform_payment", v);
                           queryClient.invalidateQueries({ queryKey: ["admin-vendor-subs"] });
                           toast.success(v ? "Hors plateforme activé" : "Hors plateforme désactivé");
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1">
+                      <label className="text-xs text-muted-foreground" title={FEATURE_HINTS.may_upload_proof}>
+                        Preuve vendeur
+                      </label>
+                      <p className="text-[10px] text-muted-foreground hidden sm:block">
+                        {FEATURE_HINTS.may_upload_proof}
+                      </p>
+                      <p
+                        className={`text-[10px] font-medium ${
+                          resolveVendorMayUploadPaymentProof(
+                            store.is_platform_owned,
+                            store.vendor_may_upload_payment_proof,
+                          )
+                            ? "text-emerald-700 dark:text-emerald-400"
+                            : "text-amber-700 dark:text-amber-400"
+                        }`}
+                      >
+                        {vendorMayUploadPaymentProofUiLabel(
+                          vendorMayUploadPaymentProofUiState(
+                            store.is_platform_owned,
+                            store.vendor_may_upload_payment_proof,
+                          ),
+                        )}
+                      </p>
+                      <Switch
+                        checked={resolveVendorMayUploadPaymentProof(
+                          store.is_platform_owned,
+                          store.vendor_may_upload_payment_proof,
+                        )}
+                        onCheckedChange={async (v) => {
+                          const { data: ov } = await (supabase as any)
+                            .from("vendor_pricing_overrides")
+                            .select("id")
+                            .eq("store_id", store.id)
+                            .maybeSingle();
+                          if (ov?.id) {
+                            const { error } = await (supabase as any)
+                              .from("vendor_pricing_overrides")
+                              .update({ vendor_may_upload_payment_proof: v })
+                              .eq("id", ov.id);
+                            if (error) {
+                              toast.error(`Enregistrement échoué : ${error.message}`);
+                              return;
+                            }
+                          } else {
+                            const { error } = await (supabase as any)
+                              .from("vendor_pricing_overrides")
+                              .insert({
+                                store_id: store.id,
+                                vendor_may_upload_payment_proof: v,
+                              });
+                            if (error) {
+                              toast.error(`Création override échouée : ${error.message}`);
+                              return;
+                            }
+                          }
+                          queryClient.invalidateQueries({ queryKey: ["admin-vendor-subs"] });
+                          toast.success(
+                            v
+                              ? "Permission upload preuve : Activé manuellement"
+                              : "Permission upload preuve : Désactivé manuellement",
+                          );
                         }}
                       />
                     </div>

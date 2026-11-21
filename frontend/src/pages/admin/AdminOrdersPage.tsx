@@ -28,7 +28,23 @@ import { OffPlatformReleasePanel } from "@/components/admin/OffPlatformReleasePa
 import {
   blocksAdminStatusPillsForOffPlatform,
   isOffPlatformAwaitingAdminRelease,
+  isOffPlatformIndependentRescueCandidate,
 } from "@/lib/off-platform-payment";
+
+/** File admin hors plateforme : libération plateforme + secours indépendants bloqués. */
+function needsOffPlatformAdminAttention(order: {
+  _isPlatformOwned?: boolean;
+  payment_method?: string | null;
+  status?: string;
+  off_platform_vendor_verified_at?: string | null;
+  off_platform_admin_released_at?: string | null;
+}): boolean {
+  const platform = order._isPlatformOwned === true;
+  return (
+    isOffPlatformAwaitingAdminRelease(order, platform) ||
+    isOffPlatformIndependentRescueCandidate(order, platform)
+  );
+}
 
 function OrderItemsPanel({ orderId, order }: { orderId: string; order: any }) {
   const { data: items = [], isLoading, error } = useQuery({
@@ -284,17 +300,13 @@ export default function AdminOrdersPage() {
   }, [dateFilter, customStart, customEnd]);
 
   const offPlatformReleaseCount = useMemo(
-    () =>
-      orders.filter(
-        (o: any) => isOffPlatformAwaitingAdminRelease(o, o._isPlatformOwned === true),
-      ).length,
-
+    () => orders.filter((o: any) => needsOffPlatformAdminAttention(o)).length,
     [orders],
   );
 
   const filtered = orders.filter((o: any) => {
     if (statusFilter === "off_platform_release") {
-      if (!isOffPlatformAwaitingAdminRelease(o, o._isPlatformOwned === true)) return false;
+      if (!needsOffPlatformAdminAttention(o)) return false;
     } else {
       const matchStatus = statusFilter === "all" || o.status === statusFilter;
       if (!matchStatus) return false;
@@ -658,7 +670,7 @@ export default function AdminOrdersPage() {
             {s === "all"
               ? "Toutes"
               : s === "off_platform_release"
-                ? `Hors plateforme (${offPlatformReleaseCount})`
+                ? `Hors plateforme / secours (${offPlatformReleaseCount})`
                 : STATUS_CONFIG[s]?.label || s}
           </button>
         ))}

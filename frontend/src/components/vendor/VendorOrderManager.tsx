@@ -153,6 +153,8 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
   const [hasSelfDelivery, setHasSelfDelivery] = useState(false);
   const [labelsEnabled, setLabelsEnabled] = useState(false);
   const [isPlatformOwned, setIsPlatformOwned] = useState<boolean | null>(null);
+  /** Effective store_may_upload_payment_proof (RPC). null = loading / unknown. */
+  const [mayUploadPaymentProof, setMayUploadPaymentProof] = useState<boolean | null>(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [showLabelPreview, setShowLabelPreview] = useState(false);
 
@@ -179,7 +181,7 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
     checkLabels();
   }, [storeId]);
 
-  // Boutique plateforme vs vendeur autonome (hors-plateforme)
+  // Boutique plateforme vs vendeur autonome + droit upload preuve
   useEffect(() => {
     async function loadStoreFlags() {
       const { data, error } = await supabase
@@ -191,12 +193,24 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
       if (error || !data) {
         console.error("[VendorOrderManager] is_platform_owned unavailable:", error);
         setIsPlatformOwned(null);
-        return;
+      } else {
+        setIsPlatformOwned(isPlatformOwnedStore((data as any).is_platform_owned));
       }
-      setIsPlatformOwned(isPlatformOwnedStore((data as any).is_platform_owned));
+
+      const { data: mayUpload, error: mayErr } = await supabase.rpc(
+        "store_may_upload_payment_proof",
+        { p_store_id: storeId },
+      );
+      if (mayErr) {
+        console.error("[VendorOrderManager] store_may_upload_payment_proof:", mayErr);
+        setMayUploadPaymentProof(null);
+      } else {
+        setMayUploadPaymentProof(mayUpload === true);
+      }
     }
     if (storeId) {
       setIsPlatformOwned(null);
+      setMayUploadPaymentProof(null);
       loadStoreFlags();
     }
   }, [storeId]);
@@ -651,12 +665,19 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                   </div>
                 )}
 
-                {order.shipping_payment_status === "deferred" && (
+                {order.shipping_payment_status === "deferred" && mayUploadPaymentProof === true && (
                   <PaymentProofUpload
                     orderId={order.id}
                     field="shipping_payment_proof_url"
-                    label="Preuve paiement expédition (client)"
+                    label="Preuve paiement expédition (si client absent)"
                     existingUrl={order.shipping_payment_proof_url}
+                    onUploaded={(path) => {
+                      setOrders((prev) =>
+                        prev.map((o) =>
+                          o.id === order.id ? { ...o, shipping_payment_proof_url: path } : o,
+                        ),
+                      );
+                    }}
                   />
                 )}
 
@@ -828,9 +849,35 @@ export function VendorOrderManager({ storeId, shopType, suppliersEnabled = false
                         </div>
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground">
-                        ⏳ En attente de la preuve de paiement du client...
-                      </p>
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground">
+                          ⏳ En attente de la preuve de paiement du client...
+                        </p>
+                        {mayUploadPaymentProof === true && (
+                          <PaymentProofUpload
+                            orderId={order.id}
+                            field="product_payment_proof_url"
+                            label="Joindre la preuve (à la place du client)"
+                            existingUrl={offPlatformProductProofUrl(order)}
+                            onUploaded={(path) => {
+                              setOrders((prev) =>
+                                prev.map((o) =>
+                                  o.id === order.id
+                                    ? { ...o, product_payment_proof_url: path }
+                                    : o,
+                                ),
+                              );
+                            }}
+                          />
+                        )}
+                        {mayUploadPaymentProof === false && (
+                          <p className="text-[11px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-2">
+                            {isPlatformOwned
+                              ? "L'upload de preuve par la boutique est désactivé. Contactez l'administration pour le réactiver."
+                              : "Seul le client peut joindre la preuve pour l'instant. Pour pouvoir la déposer à sa place, demandez l'activation de cette permission à l'administration."}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}

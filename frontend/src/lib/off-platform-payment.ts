@@ -32,6 +32,59 @@ export function isPlatformOwnedStore(flag: boolean | null | undefined): boolean 
   return flag === true;
 }
 
+/**
+ * Effective store-team permission to upload payment proofs.
+ * Mirrors SQL store_may_upload_payment_proof exactly:
+ *   COALESCE(overrideFlag, COALESCE(is_platform_owned, false), false)
+ * where "missing override row" is passed as null/undefined overrideFlag.
+ * - NULL/undefined override → platform ON, independent/null OFF (fail closed)
+ * - Explicit true/false always wins
+ * Admins are out of scope (has_role separately). Prefer RPC at enforcement time.
+ */
+export function resolveVendorMayUploadPaymentProof(
+  isPlatformOwned: boolean | null | undefined,
+  overrideFlag: boolean | null | undefined,
+): boolean {
+  // Match SQL: only boolean true/false short-circuit; null/undefined → default.
+  if (overrideFlag === true) return true;
+  if (overrideFlag === false) return false;
+  // Match SQL COALESCE(is_platform_owned, false): only true enables.
+  return isPlatformOwnedStore(isPlatformOwned);
+}
+
+/** UI state for admin toggle label (default vs explicit override). */
+export type VendorMayUploadProofUiState =
+  | "default_platform_on"
+  | "default_independent_off"
+  | "manual_on"
+  | "manual_off";
+
+export function vendorMayUploadPaymentProofUiState(
+  isPlatformOwned: boolean | null | undefined,
+  overrideFlag: boolean | null | undefined,
+): VendorMayUploadProofUiState {
+  if (overrideFlag === true) return "manual_on";
+  if (overrideFlag === false) return "manual_off";
+  return isPlatformOwnedStore(isPlatformOwned)
+    ? "default_platform_on"
+    : "default_independent_off";
+}
+
+export function vendorMayUploadPaymentProofUiLabel(
+  state: VendorMayUploadProofUiState,
+): string {
+  switch (state) {
+    case "default_platform_on":
+      return "Actif par défaut — Boutique plateforme";
+    case "default_independent_off":
+      return "Inactif par défaut — Boutique indépendante";
+    case "manual_on":
+      return "Activé manuellement";
+    case "manual_off":
+      return "Désactivé manuellement";
+  }
+}
+
 /** URL preuve produit hors plateforme (fallback legacy sur shipping_* avant backfill). */
 export function offPlatformProductProofUrl(order: OffPlatformOrderFields): string | null {
   const product = order.product_payment_proof_url?.trim();
@@ -53,9 +106,10 @@ export function isDeferredVendorAwaitingPayment(order: OffPlatformOrderFields): 
 }
 
 /**
- * File admin « à libérer » : preuve validée vendeur, pas encore libérée.
+ * File admin « à libérer » (double validation plateforme) :
+ * preuve validée vendeur, pas encore libérée.
  * Si `isPlatformOwned` est fourni, uniquement les boutiques plateforme
- * (les vendeurs autonomes confirment eux-mêmes → pending).
+ * (les indépendants avancent via le vendeur — pas dans cette file obligatoire).
  */
 export function isOffPlatformAwaitingAdminRelease(
   order: OffPlatformOrderFields,
@@ -70,18 +124,35 @@ export function isOffPlatformAwaitingAdminRelease(
   return isPlatformOwnedStore(isPlatformOwned);
 }
 
+/**
+ * Commande indépendante encore en awaiting_payment : visible pour secours admin
+ * (pas dans la file obligatoire plateforme).
+ */
+export function isOffPlatformIndependentRescueCandidate(
+  order: OffPlatformOrderFields,
+  isPlatformOwned?: boolean | null,
+): boolean {
+  if (isPlatformOwned !== undefined && isPlatformOwnedStore(isPlatformOwned)) return false;
+  return isDeferredVendorAwaitingPayment(order) && !order.off_platform_admin_released_at;
+}
+
 /** Bloque les pastilles STATUS_FLOW tant que le paiement différé n'est pas tranché. */
 export function blocksAdminStatusPillsForOffPlatform(order: OffPlatformOrderFields): boolean {
   return isDeferredVendorAwaitingPayment(order);
 }
 
+/**
+ * Admin peut libérer / débloquer → pending.
+ * - Plateforme : double validation (vendeur vérifié) OU override litige.
+ * - Indépendant : secours (même règles preuve + vérif/override) — pas un frein
+ *   obligatoire du flux vendeur normal.
+ * `isPlatformOwned` n'interdit plus le secours sur indépendant.
+ */
 export function canAdminReleaseOffPlatform(
   order: OffPlatformOrderFields,
   allowOverrideWithoutVendor: boolean,
-  isPlatformOwned?: boolean | null,
+  _isPlatformOwned?: boolean | null,
 ): boolean {
-  // Défense en profondeur : jamais de libération admin sur boutique vendeur autonome.
-  if (isPlatformOwned !== undefined && !isPlatformOwnedStore(isPlatformOwned)) return false;
   if (!isDeferredVendorAwaitingPayment(order)) return false;
   if (order.off_platform_admin_released_at) return false;
   if (!hasOffPlatformPaymentProof(order)) return false;
@@ -133,7 +204,7 @@ export function offPlatformProductConfirmFields(
   });
 }
 
-/** Libération admin (boutique plateforme) → pending + timestamps admin. */
+/** Libération / secours admin → pending + timestamps admin (plateforme ou indépendant). */
 export function adminOffPlatformReleaseFields(
   now: string,
   userId: string,

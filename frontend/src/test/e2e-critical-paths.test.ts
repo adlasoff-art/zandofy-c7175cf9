@@ -464,6 +464,48 @@ describe("Off-platform dual validation", () => {
     expect(isDeferredVendorPaymentMethod("mobile_money")).toBe(false);
   });
 
+  it("resolves vendor_may_upload_payment_proof defaults (platform ON, independent OFF)", async () => {
+    const {
+      resolveVendorMayUploadPaymentProof,
+      vendorMayUploadPaymentProofUiState,
+      vendorMayUploadPaymentProofUiLabel,
+    } = await import("@/lib/off-platform-payment");
+
+    // Missing override row (null/undefined) → store default
+    expect(resolveVendorMayUploadPaymentProof(true, null)).toBe(true);
+    expect(resolveVendorMayUploadPaymentProof(true, undefined)).toBe(true);
+    expect(resolveVendorMayUploadPaymentProof(false, null)).toBe(false);
+    expect(resolveVendorMayUploadPaymentProof(false, undefined)).toBe(false);
+
+    // is_platform_owned NULL/undefined → fail closed (false), with or without override row
+    expect(resolveVendorMayUploadPaymentProof(null, null)).toBe(false);
+    expect(resolveVendorMayUploadPaymentProof(null, undefined)).toBe(false);
+    expect(resolveVendorMayUploadPaymentProof(undefined, null)).toBe(false);
+    expect(resolveVendorMayUploadPaymentProof(undefined, undefined)).toBe(false);
+
+    // Explicit override wins (incl. disable platform / enable independent)
+    expect(resolveVendorMayUploadPaymentProof(true, false)).toBe(false);
+    expect(resolveVendorMayUploadPaymentProof(false, true)).toBe(true);
+    expect(resolveVendorMayUploadPaymentProof(true, true)).toBe(true);
+    expect(resolveVendorMayUploadPaymentProof(false, false)).toBe(false);
+    expect(resolveVendorMayUploadPaymentProof(null, true)).toBe(true);
+    expect(resolveVendorMayUploadPaymentProof(undefined, false)).toBe(false);
+
+    // Admin UI labels (état effectif)
+    expect(vendorMayUploadPaymentProofUiLabel(vendorMayUploadPaymentProofUiState(true, null))).toBe(
+      "Actif par défaut — Boutique plateforme",
+    );
+    expect(vendorMayUploadPaymentProofUiLabel(vendorMayUploadPaymentProofUiState(false, null))).toBe(
+      "Inactif par défaut — Boutique indépendante",
+    );
+    expect(vendorMayUploadPaymentProofUiLabel(vendorMayUploadPaymentProofUiState(false, true))).toBe(
+      "Activé manuellement",
+    );
+    expect(vendorMayUploadPaymentProofUiLabel(vendorMayUploadPaymentProofUiState(true, false))).toBe(
+      "Désactivé manuellement",
+    );
+  });
+
   it("detects admin release queue after vendor verified", async () => {
     const {
       isOffPlatformAwaitingAdminRelease,
@@ -489,8 +531,29 @@ describe("Off-platform dual validation", () => {
     expect(blocksAdminStatusPillsForOffPlatform(waiting)).toBe(true);
     expect(canAdminReleaseOffPlatform(waiting, false)).toBe(true);
     expect(canAdminReleaseOffPlatform(waiting, false, true)).toBe(true);
-    expect(canAdminReleaseOffPlatform(waiting, false, false)).toBe(false);
+    // Indépendant : secours admin autorisé si preuve + vérif vendeur (pas un frein obligatoire)
+    expect(canAdminReleaseOffPlatform(waiting, false, false)).toBe(true);
     expect(hasOffPlatformPaymentProof(waiting)).toBe(true);
+
+    const { isOffPlatformIndependentRescueCandidate } = await import("@/lib/off-platform-payment");
+    expect(isOffPlatformIndependentRescueCandidate(waiting, false)).toBe(true);
+    expect(isOffPlatformIndependentRescueCandidate(waiting, true)).toBe(false);
+    // File admin : plateforme (libération) OU indépendant (secours) — les deux comptent
+    expect(
+      isOffPlatformAwaitingAdminRelease(waiting, true) ||
+        isOffPlatformIndependentRescueCandidate(waiting, true),
+    ).toBe(true);
+    expect(
+      isOffPlatformAwaitingAdminRelease(waiting, false) ||
+        isOffPlatformIndependentRescueCandidate(waiting, false),
+    ).toBe(true);
+
+    // Sans vérif vendeur : override requis (plateforme et indépendant)
+    const waitingNoVendor = { ...waiting, off_platform_vendor_verified_at: null };
+    expect(canAdminReleaseOffPlatform(waitingNoVendor, false, true)).toBe(false);
+    expect(canAdminReleaseOffPlatform(waitingNoVendor, true, true)).toBe(true);
+    expect(canAdminReleaseOffPlatform(waitingNoVendor, false, false)).toBe(false);
+    expect(canAdminReleaseOffPlatform(waitingNoVendor, true, false)).toBe(true);
 
     // Fallback legacy: preuve encore dans shipping_*
     expect(
@@ -515,7 +578,7 @@ describe("Off-platform dual validation", () => {
     const confirmUnpaid = vendorOffPlatformConfirmUpdates("2026-05-24T13:00:00Z", "user-1", {
       currentShippingPaymentStatus: "unpaid",
     });
-    expect(confirmUnpaid.shipping_payment_status).toBe("paid");
+    expect(confirmUnpaid).toMatchObject({ status: "pending", shipping_payment_status: "paid" });
 
     const adminRelease = adminOffPlatformReleaseFields("2026-05-24T14:00:00Z", "admin-1", "deferred");
     expect(adminRelease.status).toBe("pending");

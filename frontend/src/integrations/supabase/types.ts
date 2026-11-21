@@ -2869,6 +2869,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      store_may_upload_payment_proof: {
+        Args: { p_store_id: string }
+        Returns: boolean
+      }
       set_own_discovery_prefs: {
         Args: { p_prefs: Json }
         Returns: Json
